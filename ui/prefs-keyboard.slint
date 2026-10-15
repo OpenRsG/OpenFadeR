@@ -1,0 +1,135 @@
+import { Theme } from "theme.slint";
+import { Chip } from "widgets.slint";
+import { FormRow } from "dialog.slint";
+import { HelpLine, KeysState } from "help.slint";
+
+/// Keymap editor state (src/app/prefs/keyboard.rs). Rust builds `rows` (keys + action name of every shortcut, the table of
+/// src/app/keys) and owns the assignment: `select` picks the row to edit, then the next key press (Rust reads it through the
+/// key hook of KeysState, whichever item has focus) assigns it; Backspace / Delete clears, Escape cancels.
+export global KeymapState {
+    in property <[HelpLine]> rows;
+    /// Per row: the binding differs from the preset's.
+    in property <[bool]> custom;
+    /// Row waiting for a key, -1 = none.
+    in property <int> selected: -1;
+    in property <string> status;
+    /// A key that another action uses was pressed: REPLACE / CANCEL are offered.
+    in property <bool> conflict;
+    in property <[string]> presets;
+    in property <int> preset;
+    callback select(int);
+    /// text, shift, ctrl as `KeysState.key`: the CLEAR / REPLACE / CANCEL buttons send Backspace / Enter / Escape.
+    callback key-captured(string, bool, bool);
+    callback preset-chosen(int);
+    callback reset();
+}
+
+/// KEYBOARD category: preset chooser, RESET TO DEFAULTS, the list of every action with its key(s).
+export component KeyboardPage inherits Rectangle {
+    preferred-height: col.preferred-height;
+
+    col := VerticalLayout {
+        width: parent.width;
+        spacing: Theme.space-lg;
+        FormRow {
+            label: "Preset";
+            for name[i] in KeymapState.presets: Chip {
+                text: name;
+                width: 110px;
+                horizontal-stretch: 0;
+                active: KeymapState.preset == i;
+                clicked => { KeymapState.preset-chosen(i); }
+            }
+            Chip {
+                text: "RESET TO DEFAULTS";
+                width: 150px;
+                horizontal-stretch: 0;
+                clicked => { KeymapState.reset(); }
+            }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-sm;
+            Text {
+                text: KeymapState.status;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+                wrap: word-wrap;
+                color: KeymapState.conflict ? Theme.danger : KeymapState.selected >= 0 ? Theme.text-bright : Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+            }
+            if KeymapState.selected >= 0 && !KeymapState.conflict: Chip {
+                text: "CLEAR";
+                width: 70px;
+                horizontal-stretch: 0;
+                clicked => { KeymapState.key-captured("\u{8}", false, false); }
+            }
+            if KeymapState.conflict: Chip {
+                text: "REPLACE";
+                width: 80px;
+                horizontal-stretch: 0;
+                clicked => { KeymapState.key-captured("\n", false, false); }
+            }
+            if KeymapState.selected >= 0: Chip {
+                text: "CANCEL";
+                width: 70px;
+                horizontal-stretch: 0;
+                clicked => { KeymapState.key-captured("\u{1b}", false, false); }
+            }
+        }
+        Flickable {
+            height: 420px;
+            content-height: KeymapState.rows.length * Theme.h-row;
+            for r[i] in KeymapState.rows: Rectangle {
+                y: i * Theme.h-row;
+                width: parent.width;
+                height: Theme.h-row;
+                background: KeymapState.selected == i ? Theme.select : ta.has-hover ? Theme.hover-row : transparent;
+                HorizontalLayout {
+                    padding-left: Theme.space-lg;
+                    padding-right: Theme.space-lg;
+                    spacing: Theme.space-lg;
+                    Text {
+                        text: r.what;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        color: Theme.text;
+                        font-family: Theme.font;
+                        font-size: Theme.font-size;
+                    }
+                    Text {
+                        text: r.keys == "" ? "—" : r.keys;
+                        width: 150px;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        color: KeymapState.custom[i] ? Theme.accent-hi : r.keys == "" ? Theme.text-faint : Theme.text-bright;
+                        font-family: Theme.font;
+                        font-size: Theme.font-size;
+                        font-weight: Theme.weight-bold;
+                    }
+                }
+                ta := TouchArea {
+                    clicked => {
+                        KeymapState.select(i);
+                        fs.focus();
+                    }
+                }
+            }
+        }
+    }
+
+    // Takes the keyboard focus when a row is clicked (it leaves the search box or the track table) and passes every key on
+    // to the shortcut table, like the root scope does, so shortcuts keep working while it is focused.
+    fs := FocusScope {
+        width: 1px;
+        height: 1px;
+        key-pressed(e) => {
+            if (!e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+        }
+        key-released(e) => {
+            if (KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+        }
+    }
+}

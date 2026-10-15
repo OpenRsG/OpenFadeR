@@ -1,0 +1,487 @@
+import { AutomixState, Browser, BrowserState } from "browser.slint";
+import { DeckCompact, DeckDetail, DeckDetailV, DeckPanel, DeckState, DeckView } from "deck.slint";
+import { FxPanel, FxSlot, FxState, FxUnit } from "fx.slint";
+import { FxRackState, RackView } from "fxrack.slint";
+import { Mixer, MixerBar, MixerState, ChannelView, BusView } from "mixer.slint";
+import { TrackInfoState } from "trackinfo.slint";
+import { CueRowView, PadOpt, PadView, PadsState } from "pads.slint";
+import { HelpOverlay, HelpLine, KeysState } from "help.slint";
+import { MidiChip, MidiOverlay, MidiState } from "midi.slint";
+import { ActionItem, BackupItem, DeviceChip, DeviceItem, DeviceOverlay, DeviceProgress, DeviceState, PickRow } from "device.slint";
+import { DupeRow, LibraryOverlays, LibraryState, MissingRow } from "library.slint";
+import { PrefsOverlay, PrefsState, PrefRowData } from "prefs.slint";
+import { KeymapState } from "prefs-keyboard.slint";
+import { DjEditor, DjItem, DjSystemState } from "prefs-djsystem.slint";
+import { Chip, Dropdown, Glyph, Icon, IconButton, Meter, Splitter, TipOverlay } from "widgets.slint";
+import { PaneState } from "panes.slint";
+import { Theme } from "theme.slint";
+import { LightingView, LightingState, FixtureView } from "lighting.slint";
+import { EditView, EditState } from "edit.slint";
+import { VideoDeckView, VideoItem, VideoView, VideoState, VideoWindow } from "video.slint";
+import { SamplerPanel, SamplerState, SlotView } from "sampler.slint";
+import { DrumSlotView, GrooveDeckView, GroovePanel, GrooveState } from "groove.slint";
+import { ToastState, ToastView } from "toast.slint";
+import { MixPointPanel } from "mixpoint.slint";
+import { MixDeckView, MixPointState } from "mixpoint-state.slint";
+import { DragGhost, DragState, DragTracker, FileDropOverlay, FileDropState } from "dnd.slint";
+import { LayoutState, SplitWindow } from "split.slint";
+import { PluginOverlays, PluginState } from "plugins.slint";
+import { ExportDeck, ExportDock, ExportModeState, ExportPlayers, ExportRecPanel, HotCue, PhraseSeg } from "exportmode.slint";
+import { Palette } from "std-widgets.slint";
+import { ThemeCard, ThemeState, TokenRow } from "themes.slint";
+// Re-exported so Rust can reach them via `app.global::<…>()` and by name.
+export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowView, DeckState, DeckView, DeviceItem, DeviceState, DjEditor, DjItem, DjSystemState, DragState, DupeRow, EditState, ExportDeck, ExportModeState, FixtureView, FxState, FxUnit, HelpLine, KeymapState, KeysState, LayoutState, LibraryState, LightingState, MidiState, MissingRow, MixDeckView, MixPointState, MixerState, PadOpt, PadView, PadsState, PaneState, PluginState, PrefRowData, PrefsState, SamplerState, SlotView, SplitWindow, Theme, ToastState, TrackInfoState, VideoDeckView, VideoItem, VideoState, VideoWindow }
+export { DrumSlotView, GrooveDeckView, GrooveState, HotCue, PhraseSeg }
+export { FxRackState, RackView, FxSlot }
+export { ActionItem }
+export { Palette } // the std widgets' colour scheme follows the skin's base (src/app/skin)
+export { FileDropState } // files dragged in from the desktop (src/app/drop)
+export { ThemeCard, ThemeState, TokenRow } // PREFS > THEMES (ui/themes.slint, src/app/skin/page.rs)
+
+/// PERFORMANCE layouts: global bar, [FX], then either the enlarged waveforms stacked full width
+/// above the deck row (2Deck / 4Deck Horizontal) or standing side by side between the decks (2Deck / 4Deck Vertical), the deck row (decks
+/// either side of the mixer channels), the headphone / crossfader / REC strip, [sampler], the browser, the status bar. EXPORT mode
+/// swaps the stage for the player panels of exportmode.slint. Everything is positioned by hand: the browser takes whatever height is left,
+/// and a layout would feed that back into the window's.
+export component App inherits Window {
+    /// Set by Rust once the library is open ("OpenFadeR — USB (device library) — <root>").
+    in property <string> window-title: "OpenFadeR";
+    title: root.window-title;
+    preferred-width: 1100px;
+    preferred-height: 960px;
+    min-width: root.vert ? 1100px : 1000px;
+    min-height: root.y-browser + root.browser-min + Theme.h-status;
+    background: Theme.bg;
+    default-font-family: Theme.font;
+    default-font-size: Theme.font-size;
+
+    property <length> browser-min: Theme.h-tab + Theme.h-toolbar + Theme.h-header + 6 * Theme.h-row;
+    property <bool> four: DeckState.count == 4;
+    property <bool> browse-on: BrowserState.browse-max;
+    /// 0 EXPORT, 1 PERFORMANCE, 2 EDIT, 3 LIGHTING, 4 VIDEO.
+    property <int> mode: ExportModeState.visible ? 0 : EditState.visible ? 2 : LightingState.visible ? 3 : VideoState.visible ? 4 : 1;
+    /// The deck stage (waveforms, decks, mixer, FX, sampler) exists in every mode but EXPORT: its players show decks A and B, and one
+    /// deck's waveform image has one size.
+    property <bool> stage: !ExportModeState.visible;
+    /// Panel toggles of the global bar (the sampler's is `SamplerState.open`, shared with the keyboard and MIDI).
+    property <bool> show-fx: FxState.open && root.stage;
+    /// The mixer column and strip (VIEW > Mixer, the View menu and the global bar's MIXER button flip `PrefsState.show-mixer`; a theme's layout may hide it).
+    property <bool> show-mixer: PrefsState.show-mixer;
+    /// 2Deck / 4Deck Vertical (`PrefsState.vertical`, the VIEW setting); the Browse layout and EXPORT mode use the horizontal stack.
+    property <bool> vert: PrefsState.vertical && !root.browse-on && root.stage;
+    /// Layout selector value: 0 2Deck Horizontal, 1 2Deck Vertical, 2 4Deck Horizontal, 3 4Deck Vertical, 4 Browse.
+    property <int> layout: root.browse-on ? 4 : (root.four ? 2 : 0) + (PrefsState.vertical ? 1 : 0);
+
+    property <length> wave-h: root.four ? Theme.h-wave-4 : Theme.h-wave-2;
+    property <int> decks-n: root.four ? 4 : 2;
+    property <length> waves-h: root.decks-n * root.wave-h + (root.decks-n - 1) * Theme.gap;
+    /// Horizontal waveform strips on screen.
+    property <int> waves-n: root.vert || !root.stage ? 0 : root.decks-n;
+    property <length> deck-h: root.four ? 2 * Theme.h-deck-4 + Theme.gap : Theme.h-deck-2;
+    property <length> mixer-w: !root.show-mixer ? 0px : root.four ? 4 * 44px : root.width >= 1400px ? 120px : 2 * Theme.w-channel;
+    property <length> mid-w: root.show-mixer ? root.mixer-w + 2 * Theme.gap : Theme.gap;
+    property <length> panel-w: (root.width - root.mid-w) / 2;
+    property <length> col-r: root.panel-w + root.mid-w;
+    // Vertical: [deck column][waves | mixer | waves][deck column]. The waves take what the window has over 2 × 440 px of decks (2 decks)
+    // or 2 × 340 px (4 decks), between 64 / 56 px and 150 / 120 px each.
+    property <length> vw: root.four ? Math.clamp((root.width - 680px - root.mixer-w) / 4, 56px, root.show-mixer ? 120px : 170px) : Math.clamp((root.width - 880px - root.mixer-w) / 2, 64px, root.show-mixer ? 150px : 240px);
+    property <length> v-dw: (root.width - 2 * Theme.gap - root.decks-n * root.vw - root.mixer-w) / 2;
+    /// Deck column width and the x of the right-hand one, whichever the orientation.
+    property <length> dw: root.vert ? root.v-dw : root.panel-w;
+    property <length> col-r-x: root.vert ? root.width - root.v-dw : root.col-r;
+    property <length> mixer-x: root.vert ? root.v-dw + Theme.gap + root.decks-n / 2 * root.vw : root.panel-w + Theme.gap;
+    /// The x of vertical wave slot `s` (left to right); the mixer sits after the first half.
+    pure function wave-x(s: int) -> length { return root.v-dw + Theme.gap + s * root.vw + (s >= root.decks-n / 2 ? root.mixer-w : 0px); }
+    // The vertical stack, top to bottom.
+    property <length> y-fx: Theme.h-bar + Theme.gap;
+    /// The MIX POINT LINK panel (global-bar button, PREFS > Controller > MIX POINT LINK > Enable); it needs a deck layout, not Browse.
+    property <bool> show-mix: MixPointState.enabled && MixPointState.open && !root.browse-on && root.stage;
+    changed show-mix => { MixPointState.active = root.show-mix; }
+    /// EXPORT layout (1 PLAYER … FULL BROWSER, `PrefsState.export-layout`): exportmode.slint draws the players for it.
+    property <int> export-layout: PrefsState.export-layout;
+    changed export-layout => { ExportModeState.layout = root.export-layout; }
+    init => {
+        MixPointState.active = root.show-mix;
+        ExportModeState.layout = root.export-layout;
+    }
+    property <length> y-mix: root.y-fx + (root.show-fx ? Theme.h-fx + Theme.gap : 0px);
+    property <length> y-wave: root.y-mix + (root.show-mix ? Theme.h-mixpoint + Theme.gap : 0px);
+    property <length> y-deck: root.y-wave + (root.vert ? 0px : root.waves-h + Theme.gap);
+    property <length> y-strip: root.y-deck + (root.browse-on ? 0px : root.deck-h + Theme.gap);
+    property <length> y-sampler: root.y-strip + (root.browse-on || !root.show-mixer ? 0px : Theme.h-toolbar + Theme.gap);
+    /// The BEAT LAB panel (global-bar button, PREFS > Extensions > BEAT LAB): under the sampler, over the browser.
+    property <bool> show-groove: GrooveState.enabled && GrooveState.open && !root.browse-on && root.stage;
+    property <length> y-groove: root.y-sampler + (root.browse-on || !SamplerState.open ? 0px : Theme.h-sampler + Theme.gap);
+    property <length> y-browser: root.stage ? root.y-groove + (root.show-groove ? GrooveState.panel-h + Theme.gap : 0px) : Theme.h-bar + ExportModeState.panel-h + Theme.gap;
+    /// What the user dragged on the border above the browser (`PaneState`, clamped to the window): the growth of the enlarged-waveform
+    /// area in the deck layouts (the horizontal strips share it; the vertical columns take it under the decks), of the player panel in
+    /// EXPORT mode. `y-browser` and the chain above it are the default stack; everything under the waveforms moves by this.
+    property <length> bx: root.stage ? PaneState.stage(root.height, root.y-browser, root.decks-n, root.vert) : PaneState.player(root.height, ExportModeState.panel-h);
+    property <length> wave-hx: root.wave-h + root.bx / root.decks-n;
+    /// Items at the decks' row stay put in the vertical layouts (their waveform columns grow instead).
+    property <length> dy-deck: root.vert ? 0px : root.bx;
+    /// The border is draggable in PERFORMANCE and EXPORT (the other modes cover the window with their own view) when something can move.
+    property <bool> split-on: (root.mode == 1 || root.mode == 0) && (root.stage || ExportModeState.panel-h > 100px);
+    /// Track rows the browser has room for (0.5 px of slack for the rounding): at least `PaneState.min-rows`, however far the border is dragged.
+    out property <int> browser-rows: Math.floor((root.height - root.y-browser - root.bx - Theme.h-status - PaneState.browser-h(0) + 0.5px) / Theme.h-row);
+
+    /// Ctrl+F (src/app/keys.rs).
+    public function focus-search() { browser.focus-search(); }
+    /// MIDI browse encoder (src/app/midi): move the track selection by `d` rows.
+    public function browse(d: int) { browser.select-delta(d); }
+    /// MIDI BACK / browse push / sort buttons (see Browser).
+    public function browse-back() { browser.browse-back(); }
+    public function browse-push() -> bool { return browser.browse-push(); }
+    public function sort-by(col: int) { browser.sort-by(col); }
+    /// MIDI VIEW (SwitchActiveWindow) / W: browse view on / off.
+    public function browse-view() { BrowserState.browse-max = !BrowserState.browse-max; }
+    /// MIDI Area (Back+Shift) / Shift+W: the browser focus moves on, tree → Tag List → track list → related → tree.
+    public function browse-area() { browser.cycle-area(); }
+    /// Mode selector: 0 EXPORT, 1 PERFORMANCE, 2 EDIT, 3 LIGHTING, 4 VIDEO. Each mode shows while its state is `visible` (PERFORMANCE
+    /// while none is); one at a time.
+    function set-mode(n: int) {
+        ExportModeState.visible = n == 0;
+        EditState.visible = n == 2;
+        LightingState.visible = n == 3;
+        VideoState.visible = n == 4;
+    }
+    /// PERFORMANCE layout selector (see `layout`): the deck count, the orientation (both stored in the settings) or Browse.
+    function set-layout(n: int) {
+        BrowserState.browse-max = n == 4;
+        if n != 4 {
+            PrefsState.chose("decks", n >= 2 ? 1 : 0);
+            PrefsState.chose("deck_layout", Math.mod(n, 2));
+        }
+    }
+    /// EXPORT layout selector: 0 1 PLAYER, 1 2 PLAYER, 2 DUAL PLAYER, 3 SIMPLE PLAYER, 4 FULL BROWSER (stored in the settings).
+    function set-export-layout(n: int) { PrefsState.chose("export_layout", n); }
+
+    MenuBar {
+        Menu {
+            title: "File";
+            Menu {
+                title: "Import";
+                MenuItem { title: "Import Track…"; activated => { LibraryState.action("import-track"); } }
+                MenuItem { title: "Import Folder…"; activated => { LibraryState.action("import-folder"); } }
+                MenuItem { title: "Import Playlist…"; activated => { LibraryState.action("import-playlist"); } }
+                for label[i] in LibraryState.import-readers: MenuItem { title: label; activated => { LibraryState.action("import-collection:" + i); } }
+            }
+            MenuSeparator {}
+            MenuItem { title: "Display All Missing Files"; activated => { LibraryState.action("missing"); } }
+            MenuItem { title: "Display All Duplicated Files"; activated => { LibraryState.action("dupes"); } }
+            Menu {
+                title: "Library";
+                MenuItem { title: "Backup Library…"; activated => { LibraryState.action("backup"); } }
+                MenuItem { title: "Restore Library…"; activated => { LibraryState.action("restore"); } }
+                MenuItem { title: "Backed up device library management…"; activated => { DeviceState.manage-backups(); } }
+            }
+            for label[i] in LibraryState.export-writers: MenuItem { title: label; activated => { LibraryState.action("export-collection:" + i); } }
+            MenuSeparator {}
+            MenuItem { title: "Preferences…"; activated => { PrefsState.visible = true; } }
+            MenuItem { title: "Exit"; activated => { LibraryState.action("exit"); } }
+        }
+        Menu {
+            title: "Track";
+            MenuItem { title: "Import To Collection"; activated => { LibraryState.action("track-import"); } }
+            MenuItem { title: "Analyze Track"; activated => { LibraryState.action("track-analyze"); } }
+            MenuItem { title: "Analysis Lock"; activated => { LibraryState.action("track-lock"); } }
+            MenuItem { title: "Reload Tag"; activated => { LibraryState.action("track-reload-tag"); } }
+            MenuItem { title: "Show in File Manager"; activated => { LibraryState.action("track-show"); } }
+            MenuSeparator {}
+            MenuItem { title: "Relocate…"; activated => { LibraryState.action("track-relocate"); } }
+            MenuItem { title: "Auto Relocate"; activated => { LibraryState.action("track-auto-relocate"); } }
+            MenuItem { title: "Remove from Collection"; activated => { LibraryState.action("track-remove"); } }
+            MenuSeparator {}
+            MenuItem { title: "Add to Tag List"; activated => { BrowserState.tag-add(); } }
+            MenuItem { title: "Add to Playlist…"; activated => { BrowserState.panel-request(0); } }
+            MenuItem { title: "Tags…"; activated => { BrowserState.panel-request(1); } }
+        }
+        Menu {
+            title: "Playlist";
+            MenuItem { title: "Create New Playlist"; activated => { LibraryState.action("playlist-new"); } }
+            MenuItem { title: "Create New Intelligent Playlist"; activated => { LibraryState.action("playlist-new-smart"); } }
+            MenuItem { title: "Create New Folder"; activated => { LibraryState.action("playlist-new-folder"); } }
+            MenuItem { title: "Delete Playlist"; activated => { LibraryState.action("playlist-delete"); } }
+            MenuSeparator {}
+            Menu {
+                title: "Sort Items";
+                MenuItem { title: "Track Title"; activated => { LibraryState.action("playlist-sort-title"); } }
+                MenuItem { title: "Artist"; activated => { LibraryState.action("playlist-sort-artist"); } }
+                MenuItem { title: "Genre"; activated => { LibraryState.action("playlist-sort-genre"); } }
+                MenuItem { title: "BPM"; activated => { LibraryState.action("playlist-sort-bpm"); } }
+                MenuItem { title: "Key"; activated => { LibraryState.action("playlist-sort-key"); } }
+                MenuItem { title: "Time"; activated => { LibraryState.action("playlist-sort-time"); } }
+                MenuItem { title: "Rating"; activated => { LibraryState.action("playlist-sort-rating"); } }
+                MenuItem { title: "Comments"; activated => { LibraryState.action("playlist-sort-comment"); } }
+            }
+            MenuItem { title: "Renumber Track Order"; activated => { LibraryState.action("playlist-renumber"); } }
+            MenuSeparator {}
+            Menu {
+                title: "Export a playlist to a file";
+                MenuItem { title: "M3U8"; activated => { LibraryState.action("playlist-export-m3u8"); } }
+                MenuItem { title: "PLS"; activated => { LibraryState.action("playlist-export-pls"); } }
+                MenuItem { title: "Text"; activated => { LibraryState.action("playlist-export-text"); } }
+            }
+            MenuItem { title: "Export Playlist (to a device)…"; activated => { LibraryState.action("playlist-export-device"); } }
+            MenuItem { title: "Import Playlist…"; activated => { LibraryState.action("playlist-import"); } }
+        }
+        Menu {
+            title: "View";
+            MenuItem { title: "Full Screen"; activated => { root.full-screen = !root.full-screen; } }
+            MenuSeparator {}
+            if root.stage: MenuItem { title: "2Deck Horizontal"; activated => { root.set-layout(0); } }
+            if root.stage: MenuItem { title: "2Deck Vertical"; activated => { root.set-layout(1); } }
+            if root.stage: MenuItem { title: "4Deck Horizontal"; activated => { root.set-layout(2); } }
+            if root.stage: MenuItem { title: "4Deck Vertical"; activated => { root.set-layout(3); } }
+            if root.stage: MenuItem { title: "Browse"; activated => { root.set-layout(4); } }
+            if !root.stage: MenuItem { title: "1 PLAYER"; activated => { root.set-export-layout(0); } }
+            if !root.stage: MenuItem { title: "2 PLAYER"; activated => { root.set-export-layout(1); } }
+            if !root.stage: MenuItem { title: "DUAL PLAYER"; activated => { root.set-export-layout(2); } }
+            if !root.stage: MenuItem { title: "SIMPLE PLAYER"; activated => { root.set-export-layout(3); } }
+            if !root.stage: MenuItem { title: "FULL BROWSER"; activated => { root.set-export-layout(4); } }
+            MenuItem { title: LayoutState.split-open ? "Close Split Screen" : "Split Screen"; activated => { LayoutState.split-toggle(); } }
+            MenuSeparator {}
+            MenuItem { title: "Mixer"; activated => { PrefsState.chose("show_mixer", root.show-mixer ? 0 : 1); } }
+            MenuItem { title: "Effect Panel"; activated => { FxState.open = !FxState.open; } }
+            MenuItem { title: "Sampler"; activated => { SamplerState.open = !SamplerState.open; } }
+            MenuItem { title: "BEAT LAB"; enabled: GrooveState.enabled; activated => { GrooveState.open = !GrooveState.open; } }
+            MenuSeparator {}
+            MenuItem { title: "Related Tracks"; activated => { BrowserState.related-toggled(!BrowserState.related); } }
+            MenuItem { title: "Tags"; activated => { BrowserState.panel-request(1); } }
+            MenuItem { title: "Automix"; activated => { AutomixState.toggled(); } }
+        }
+        if PluginState.actions.length > 0: Menu {
+            title: "Plugins";
+            for action[i] in PluginState.actions: MenuItem { title: action; activated => { PluginState.run(i); } }
+        }
+        Menu {
+            title: "Help";
+            MenuItem { title: "Keyboard Shortcuts"; activated => { KeysState.help-visible = !KeysState.help-visible; } }
+        }
+    }
+
+    /// What the stage draws: the deck panels and the mixer (not in Browse or EXPORT), the vertical waveform columns.
+    property <bool> decks-on: root.stage && !root.browse-on;
+    property <int> vwaves-n: root.vert ? root.decks-n : 0;
+    // Reports the cursor of a drag where no drop target takes it (dnd.slint); under everything.
+    DragTracker { x: 0; y: 0; width: root.width; height: root.height; }
+    FocusScope {
+        init => { self.focus(); }
+        key-pressed(e) => {
+            // Arrows reach here only when neither the search box nor the table has focus.
+            if (e.text == Key.UpArrow || e.text == Key.DownArrow) {
+                browser.select-delta(e.text == Key.DownArrow ? 1 : -1);
+                return accept;
+            }
+            // Held keys repeat; a shortcut fires once per press.
+            if (!e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+        }
+        key-released(e) => {
+            if (KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+        }
+
+        if root.show-fx: FxPanel { x: 0; y: root.y-fx; width: root.width; height: Theme.h-fx; }
+        if root.show-mix: MixPointPanel { x: 0; y: root.y-mix; width: root.width; height: Theme.h-mixpoint; }
+        for i in root.waves-n: DeckDetail {
+            index: PrefsState.wave-order[i];
+            x: 0;
+            y: root.y-wave + i * (root.wave-hx + Theme.gap);
+            width: root.width;
+            height: root.wave-hx;
+        }
+        // Vertical layouts: one column per deck, left to right (4 decks: the left-hand decks 1, 3 first, as the deck columns stand).
+        for s in root.vwaves-n: DeckDetailV {
+            index: PrefsState.wave-order[root.four ? [0, 2, 1, 3][s] : s];
+            x: root.wave-x(s);
+            y: root.y-wave;
+            width: root.vw;
+            height: root.deck-h + root.bx;
+        }
+        if root.decks-on && !root.four: DeckPanel { index: 0; x: 0; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-2; }
+        if root.decks-on && !root.four: DeckPanel { index: 1; x: root.col-r-x; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-2; }
+        if root.decks-on && root.four: DeckCompact { index: 0; x: 0; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-4; }
+        if root.decks-on && root.four: DeckCompact { index: 2; x: 0; y: root.y-deck + root.dy-deck + Theme.h-deck-4 + Theme.gap; width: root.dw; height: Theme.h-deck-4; }
+        if root.decks-on && root.four: DeckCompact { index: 1; x: root.col-r-x; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-4; }
+        if root.decks-on && root.four: DeckCompact { index: 3; x: root.col-r-x; y: root.y-deck + root.dy-deck + Theme.h-deck-4 + Theme.gap; width: root.dw; height: Theme.h-deck-4; }
+        if root.decks-on && root.show-mixer: Mixer { x: root.mixer-x; y: root.y-deck + root.dy-deck; width: root.mixer-w; height: root.deck-h; }
+        if root.decks-on && root.show-mixer: MixerBar { x: 0; y: root.y-strip + root.bx; width: root.width; height: Theme.h-toolbar; }
+        if root.decks-on && SamplerState.open: SamplerPanel { x: 0; y: root.y-sampler + root.bx; width: root.width; height: Theme.h-sampler; }
+        if root.show-groove: GroovePanel { x: 0; y: root.y-groove + root.bx; width: root.width; height: GrooveState.panel-h; }
+        // EXPORT mode: the player panels over the browser, whose tree column carries the device dock.
+        if ExportModeState.visible && ExportModeState.panel-h > 0px: ExportPlayers { x: 0; y: Theme.h-bar; width: root.width; height: ExportModeState.panel-h + root.bx; }
+        browser := Browser {
+            x: 0;
+            y: root.y-browser + root.bx;
+            width: root.width;
+            height: root.height - root.y-browser - root.bx - Theme.h-status;
+            dock: ExportModeState.visible;
+            if ExportModeState.visible: ExportDock { vertical-stretch: 0; min-height: ExportModeState.dock-h; max-height: ExportModeState.dock-h; }
+        }
+        // The border between the deck area and the browser (drag; double-click = the default).
+        if root.split-on && root.stage: Splitter {
+            horizontal: true;
+            x: 0;
+            y: root.y-browser + root.bx - Theme.gap / 2 - 3px;
+            width: root.width;
+            height: 6px;
+            value <=> PaneState.stage-d;
+            lo: PaneState.stage-lo(root.decks-n, root.vert);
+            hi: PaneState.stage-hi(root.height, root.y-browser, root.decks-n);
+        }
+        if root.split-on && !root.stage: Splitter {
+            horizontal: true;
+            x: 0;
+            y: root.y-browser + root.bx - Theme.gap / 2 - 3px;
+            width: root.width;
+            height: 6px;
+            value <=> PaneState.player-d;
+            lo: PaneState.player-lo(ExportModeState.panel-h);
+            hi: PaneState.player-hi(root.height, ExportModeState.panel-h);
+        }
+        if ExportModeState.visible && ExportModeState.rec-open: ExportRecPanel { x: root.width - self.width; y: Theme.h-bar; }
+    }
+
+    // Status bar.
+    Rectangle {
+        x: 0;
+        y: root.height - Theme.h-status;
+        width: root.width;
+        height: Theme.h-status;
+        background: Theme.bg-deep;
+        Text { x: Theme.space-lg; width: 70px; height: parent.height; text: "OpenFadeR"; vertical-alignment: center; color: Theme.text-dim; font-size: Theme.font-size; font-weight: Theme.weight-bold; }
+        if BrowserState.load-progress >= 0: Rectangle {
+            x: 90px;
+            y: (parent.height - self.height) / 2;
+            width: 160px;
+            height: 12px;
+            background: Theme.panel-raised;
+            border-radius: Theme.radius;
+            Rectangle { x: 0; width: parent.width * BrowserState.load-progress; background: Theme.accent; border-radius: Theme.radius; }
+        }
+        Text {
+            x: BrowserState.load-progress >= 0 ? 260px : 90px;
+            width: parent.width - self.x - prog.width - 92px;
+            height: parent.height;
+            text: BrowserState.load-progress >= 0 ? BrowserState.load-text : AutomixState.running ? AutomixState.status : BrowserState.status;
+            horizontal-alignment: left;
+            vertical-alignment: center;
+            overflow: elide;
+            color: BrowserState.load-progress >= 0 ? Theme.text-bright : Theme.text-dim;
+            font-size: Theme.font-size;
+        }
+        if TrackInfoState.progress != "": Glyph { x: parent.width - prog.width - 80px; y: (parent.height - self.height) / 2; width: 14px; height: 14px; icon: Icon.info; tint: Theme.accent; }
+        prog := Text { x: parent.width - self.width - 52px - Theme.space-lg; height: parent.height; text: TrackInfoState.progress; vertical-alignment: center; color: Theme.accent; font-size: Theme.font-size; }
+        DeviceProgress { x: parent.width - self.width - prog.width - 100px; y: (parent.height - self.height) / 2; }
+        // Split screen (bottom right): the browser in a second window, and the switch to the other window.
+        IconButton { x: parent.width - 50px; y: 2px; width: 22px; height: 18px; icon: Icon.layout-dual; active: LayoutState.split-open; tooltip: "Split screen: the browser in a window of its own"; clicked => { LayoutState.split-toggle(); } }
+        IconButton { x: parent.width - 26px; y: 2px; width: 22px; height: 18px; icon: Icon.browse; enabled: LayoutState.split-open; tooltip: "Switch the active window"; clicked => { LayoutState.split-switch(); } }
+    }
+
+    // The full-window views start under the global bar.
+    EditView { x: 0; y: Theme.h-bar; width: root.width; height: root.height - Theme.h-bar; }
+    LightingView { x: 0; y: Theme.h-bar; width: root.width; height: root.height - Theme.h-bar; }
+    VideoView { x: 0; y: Theme.h-bar; width: root.width; height: root.height - Theme.h-bar; }
+
+    // Global bar. Drawn after the views so it stays on top in every mode.
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: Theme.h-bar;
+        background: Theme.bg;
+        Rectangle { y: parent.height - 1px; height: 1px; background: Theme.line; }
+        TouchArea {}
+        HorizontalLayout {
+            padding: 3px;
+            padding-left: Theme.space-md;
+            padding-right: Theme.space-md;
+            spacing: Theme.space-sm;
+            Dropdown {
+                width: 120px;
+                horizontal-stretch: 0;
+                options: ["EXPORT", "PERFORMANCE", "EDIT", "LIGHTING", "VIDEO"];
+                current: root.mode;
+                chose(n) => { root.set-mode(n); }
+            }
+            if root.mode == 1: Dropdown {
+                width: 52px;
+                horizontal-stretch: 0;
+                compact: true;
+                list-width: 170px;
+                options: ["2Deck Horizontal", "2Deck Vertical", "4Deck Horizontal", "4Deck Vertical", "Browse"];
+                icons: [Icon.layout-2h, Icon.layout-2v, Icon.layout-4h, Icon.layout-4v, Icon.browse];
+                current: root.layout;
+                chose(n) => { root.set-layout(n); }
+            }
+            if root.mode == 0: Dropdown {
+                width: 52px;
+                horizontal-stretch: 0;
+                compact: true;
+                list-width: 170px;
+                options: ExportModeState.layout-names;
+                icons: [Icon.layout-1p, Icon.layout-2p, Icon.layout-dual, Icon.layout-simple, Icon.layout-full];
+                current: ExportModeState.layout;
+                chose(n) => { root.set-export-layout(n); }
+            }
+            HorizontalLayout {
+                spacing: Theme.gap;
+                horizontal-stretch: 0;
+                if root.mode == 1: IconButton { icon: Icon.fx; active: root.show-fx; tooltip: "FX"; clicked => { FxState.open = !FxState.open; } }
+                if root.mode == 1 && GrooveState.enabled && !root.browse-on: IconButton { icon: Icon.shuffle; active: GrooveState.open; tooltip: "BEAT LAB"; clicked => { GrooveState.open = !GrooveState.open; } }
+                if root.mode == 1 && MixPointState.enabled && !root.browse-on: IconButton { icon: Icon.mix-point; active: MixPointState.open; tooltip: "MIX POINT LINK"; clicked => { MixPointState.open = !MixPointState.open; } }
+                if root.mode == 1: IconButton { icon: Icon.grid; active: SamplerState.open; tooltip: "SAMPLER"; clicked => { SamplerState.open = !SamplerState.open; } }
+                if root.mode == 1: IconButton { icon: Icon.mixer; active: root.show-mixer; tooltip: "MIXER"; clicked => { PrefsState.chose("show_mixer", root.show-mixer ? 0 : 1); } }
+                IconButton {
+                    icon: Icon.rec;
+                    active: root.mode == 0 ? ExportModeState.rec-open : MixerState.bus.rec;
+                    active-color: Theme.rec;
+                    tooltip: root.mode == 0 ? "REC panel" : "REC (master out)";
+                    clicked => { if (root.mode == 0) { ExportModeState.rec-open = !ExportModeState.rec-open; } else { MixerState.rec-toggled(); } }
+                }
+                if VideoState.enabled: IconButton { icon: Icon.video; active: root.mode == 4; tooltip: "VIDEO"; clicked => { root.set-mode(root.mode == 4 ? 1 : 4); } }
+                if LightingState.enabled: IconButton { icon: Icon.light; active: root.mode == 3; tooltip: "LIGHTING"; clicked => { root.set-mode(root.mode == 3 ? 1 : 3); } }
+            }
+            if MixerState.bus.rec: Text { text: MixerState.bus.rec-text; vertical-alignment: center; horizontal-stretch: 0; color: Theme.rec.brighter(0.4); font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+            Rectangle { horizontal-stretch: 1; }
+            MidiChip { width: 44px; height: Theme.h-ctl; horizontal-stretch: 0; }
+            DeviceChip { width: 70px; horizontal-stretch: 0; }
+            IconButton { icon: Icon.info; active: KeysState.help-visible; tooltip: "SHORTCUTS (?)"; clicked => { KeysState.help-visible = !KeysState.help-visible; } }
+            Chip { text: "PREFS"; width: 54px; horizontal-stretch: 0; clicked => { PrefsState.visible = true; } }
+            Rectangle {
+                width: 70px;
+                horizontal-stretch: 0;
+                Meter { y: (parent.height - self.height) / 2; width: 70px; height: 6px; level: MixerState.bus.level; peak: MixerState.bus.peak; }
+            }
+        }
+        // Waveform zoom for every deck at once (enlarged waveforms, horizontal or vertical): in, out, default.
+        if root.mode == 1 && !root.browse-on: HorizontalLayout {
+            x: (parent.width - self.width) / 2;
+            width: self.preferred-width;
+            padding: 3px;
+            spacing: Theme.gap;
+            IconButton { icon: Icon.zoom-out; tooltip: "Zoom out the waveforms"; clicked => { root.zoom-all(-1); } }
+            IconButton { icon: Icon.zoom-reset; tooltip: "Default waveform zoom"; clicked => { root.zoom-all(0); } }
+            IconButton { icon: Icon.zoom-in; tooltip: "Zoom in the waveforms"; clicked => { root.zoom-all(1); } }
+        }
+    }
+    /// One zoom step on all four decks' waveforms (`dir` 0 = default).
+    function zoom-all(dir: int) {
+        DeckState.zoom(0, dir);
+        DeckState.zoom(1, dir);
+        DeckState.zoom(2, dir);
+        DeckState.zoom(3, dir);
+    }
+
+    HelpOverlay {}
+    MidiOverlay {}
+    PrefsOverlay {}
+    LibraryOverlays { x: 0; y: 0; width: root.width; height: root.height; }
+    PluginOverlays { x: 0; y: 0; width: root.width; height: root.height; }
+    DeviceOverlay {}
+    // Top centre, under the global bar.
+    ToastView { x: floor((root.width - self.width) / 2px) * 1px; y: Theme.h-bar + Theme.space-lg; }
+    TipOverlay { window-w: root.width; window-h: root.height; }
+    // The label that follows the cursor while a track row is dragged (dnd.slint); above everything.
+    DragGhost { x: 0; y: 0; width: root.width; height: root.height; }
+    FileDropOverlay { x: 0; y: 0; width: root.width; height: root.height; }
+}

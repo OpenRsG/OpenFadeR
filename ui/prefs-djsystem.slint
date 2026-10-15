@@ -1,0 +1,178 @@
+import { Chip, Icon, IconButton } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { PrefRows } from "prefs-state.slint";
+
+/// One entry of a list field (`id` is its index among the field's items, `text` its label).
+export struct DjItem {
+    id: int,
+    text: string,
+}
+
+/// The two lists of one List field.
+export struct DjEditor {
+    key: string,
+    inactive-title: string,
+    active-title: string,
+    inactive: [DjItem],
+    active: [DjItem],
+}
+
+/// DJ SYSTEM page state (src/app/prefs/dj_system). The rows of the open tab are the generic `PrefsState.rows`; the tab strip
+/// and the two-list editor of a tab with a list field are drawn here.
+export global DjSystemState {
+    /// "DEFAULTS FOR EVERY DEVICE" or "DEVICE <label> (<id>)".
+    in property <string> title;
+    /// The page edits one device (not the defaults): the title row gets a button back to the defaults.
+    in property <bool> device;
+    in property <[string]> tabs;
+    /// Index in `tabs` of the open tab.
+    in property <int> tab;
+    /// One two-list editor per List field of the open tab.
+    in property <[DjEditor]> editors;
+    callback tab-chosen(int);
+    /// The List field's key, then "activate" / "deactivate" / "up" / "down" with the item id, or "reset" (id ignored).
+    callback list-action(string, string, int);
+    callback defaults();
+}
+
+component DjList inherits Rectangle {
+    in property <string> title;
+    in property <[DjItem]> items;
+    in property <int> selected;
+    callback picked(int);
+    background: Theme.bg-deep;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    border-radius: Theme.radius;
+    VerticalLayout {
+        Rectangle {
+            height: Theme.h-ctl;
+            background: Theme.panel-raised;
+            Text {
+                x: Theme.space-md;
+                text: root.title;
+                vertical-alignment: center;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+                font-weight: Theme.weight-bold;
+            }
+        }
+        Flickable {
+            VerticalLayout {
+                alignment: start;
+                for it in root.items: Rectangle {
+                    height: Theme.h-row;
+                    background: it.id == root.selected ? Theme.select : ta.has-hover ? Theme.hover-row : transparent;
+                    Text {
+                        x: Theme.space-md;
+                        text: it.text;
+                        vertical-alignment: center;
+                        color: it.id == root.selected ? Theme.text-bright : Theme.text;
+                        font-family: Theme.font;
+                        font-size: Theme.font-size;
+                    }
+                    ta := TouchArea { clicked => { root.picked(it.id); } }
+                }
+            }
+        }
+    }
+}
+
+/// Two lists with arrow buttons between them (inactive left, active right).
+component ListEditor inherits HorizontalLayout {
+    in property <DjEditor> data;
+    property <int> sel: -1;
+    property <bool> sel-active;
+    spacing: Theme.space-md;
+    height: 300px;
+    DjList {
+        title: root.data.inactive-title;
+        items: root.data.inactive;
+        selected: root.sel-active ? -1 : root.sel;
+        picked(id) => { root.sel = id; root.sel-active = false; }
+    }
+    VerticalLayout {
+        width: Theme.h-ctl;
+        spacing: Theme.space-sm;
+        alignment: center;
+        IconButton {
+            solid: true;
+            icon: Icon.chevron-right;
+            tooltip: "Add to Active";
+            enabled: root.sel >= 0 && !root.sel-active;
+            clicked => { DjSystemState.list-action(root.data.key, "activate", root.sel); root.sel-active = true; }
+        }
+        IconButton {
+            solid: true;
+            icon: Icon.chevron-left;
+            tooltip: "Remove from Active";
+            enabled: root.sel >= 0 && root.sel-active;
+            clicked => { DjSystemState.list-action(root.data.key, "deactivate", root.sel); root.sel-active = false; }
+        }
+        IconButton {
+            solid: true;
+            icon: Icon.chevron-up;
+            tooltip: "Shift selected item upward";
+            enabled: root.sel >= 0 && root.sel-active;
+            clicked => { DjSystemState.list-action(root.data.key, "up", root.sel); }
+        }
+        IconButton {
+            solid: true;
+            icon: Icon.chevron-down;
+            tooltip: "Shift selected item downward";
+            enabled: root.sel >= 0 && root.sel-active;
+            clicked => { DjSystemState.list-action(root.data.key, "down", root.sel); }
+        }
+        IconButton {
+            solid: true;
+            icon: Icon.trash;
+            tooltip: "Reset to defaults";
+            clicked => { DjSystemState.list-action(root.data.key, "reset", 0); root.sel = -1; }
+        }
+    }
+    DjList {
+        title: root.data.active-title;
+        items: root.data.active;
+        selected: root.sel-active ? root.sel : -1;
+        picked(id) => { root.sel = id; root.sel-active = true; }
+    }
+}
+
+/// DJ SYSTEM category: scope title, tab strip, then the list editor and the rows of the tab.
+export component PrefsDjSystem inherits VerticalLayout {
+    spacing: Theme.space-md;
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        height: Theme.h-ctl;
+        Text {
+            text: DjSystemState.title;
+            vertical-alignment: center;
+            color: Theme.accent-hi;
+            font-family: Theme.font;
+            font-size: Theme.font-md;
+            font-weight: Theme.weight-bold;
+            overflow: elide;
+        }
+        if DjSystemState.device: Chip {
+            text: "DEFAULTS";
+            width: 80px;
+            horizontal-stretch: 0;
+            tooltip: "Edit the defaults of every device";
+            clicked => { DjSystemState.defaults(); }
+        }
+    }
+    HorizontalLayout {
+        spacing: Theme.gap;
+        alignment: start;
+        for name[i] in DjSystemState.tabs: Chip {
+            text: name;
+            width: max(64px, name.character-count * 7px + 16px);
+            horizontal-stretch: 0;
+            active: i == DjSystemState.tab;
+            clicked => { DjSystemState.tab-chosen(i); }
+        }
+    }
+    for ed in DjSystemState.editors: ListEditor { data: ed; }
+    PrefRows {}
+}

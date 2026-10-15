@@ -1,0 +1,461 @@
+import { Theme } from "theme.slint";
+import { Chip, Dropdown, Glyph, Icon, TextField } from "widgets.slint";
+import { Note } from "dialog.slint";
+
+/// A TextField that shows `value` (and follows it when it changes, which a plain `text: …` binding stops doing after the first
+/// key typed into it); the editor's fields are rebuilt from Rust values.
+component ValueField inherits TextField {
+    in property <string> value;
+    init => { self.text = self.value; }
+    changed value => { self.text = self.value; }
+}
+
+/// One theme of the gallery (src/app/skin/page.rs). `name` is what `ThemeState.apply` takes, `title` what the card shows. `colors` are
+/// the theme's own values for the mini preview, in this order: bg, bg-deep, panel, panel-raised, text, text-dim, accent, play, cue,
+/// danger, wave-bg, wave-low, wave-mid, wave-high, select, deck1, deck2.
+export struct ThemeCard {
+    name: string,
+    title: string,
+    author: string,
+    description: string,
+    user: bool,
+    active: bool,
+    colors: [color],
+}
+
+/// One token of the open editor group (src/app/skin/draft.rs `Row`). kind: 0 colour, 1 number, 2 text, 3 font family.
+export struct TokenRow {
+    index: int,
+    name: string,
+    hint: string,
+    kind: int,
+    text: string,
+    color: color,
+    changed: bool,
+}
+
+/// PREFS > THEMES state: the gallery, the theme actions and the editor. Rust owns it (src/app/skin/page.rs).
+export global ThemeState {
+    in property <[ThemeCard]> cards;
+    /// Name of the applied theme and whether it is one of the user's (the DELETE button).
+    in property <string> current;
+    in property <bool> current-user;
+    /// The answer of the last action ("Saved to …", "Imported Nord"), or what went wrong.
+    in property <string> message;
+    in property <bool> failed;
+    /// The editor is open (CUSTOMIZE): every window shows the draft.
+    in property <bool> editing;
+    in property <bool> draft-light;
+    in-out property <string> draft-name;
+    in property <[string]> groups;
+    in property <int> group;
+    in property <[TokenRow]> rows;
+    /// The colour token open in the picker (-1 none), its colour and hue (degrees), saturation, value and alpha (0..1).
+    in property <int> picked: -1;
+    in property <color> picked-color;
+    in property <string> picked-hex;
+    in property <float> hue;
+    in property <float> sat;
+    in property <float> val;
+    in property <float> alpha;
+    /// The distinct colours of the draft, to pick from.
+    in property <[color]> palette;
+    /// The page was opened: re-read the theme folders.
+    callback opened();
+    callback apply(string);
+    callback customize();
+    callback duplicate();
+    callback remove();
+    callback import-file();
+    callback open-folder();
+    callback rescan();
+    callback save(string);
+    callback discard();
+    callback set-base(bool);
+    callback reset-all();
+    callback group-chosen(int);
+    callback pick(int);
+    callback edit(int, string);
+    callback step(int, int);
+    callback reset(int);
+    callback set-hsva(float, float, float, float);
+    callback set-color(color);
+}
+
+/// A theme's card: a miniature of the window painted in the theme's own colours, its name and author. A click applies it.
+component ThemeCardView inherits Rectangle {
+    in property <ThemeCard> card;
+    callback clicked;
+    property <[color]> c: root.card.colors;
+    background: ta.has-hover ? Theme.panel-high : Theme.panel-raised;
+    border-width: root.card.active ? 2px : 1px;
+    border-color: root.card.active ? Theme.accent-hi : Theme.line;
+    border-radius: Theme.radius-lg;
+    // The miniature: a deck with a waveform and buttons on the left, a track list on the right.
+    Rectangle {
+        x: 6px;
+        y: 6px;
+        width: parent.width - 12px;
+        height: 70px;
+        background: root.c[0];
+        clip: true;
+        Rectangle {
+            x: 5px;
+            y: 5px;
+            width: 112px;
+            height: 60px;
+            background: root.c[2];
+            border-radius: 2px;
+            Text { x: 5px; y: 2px; text: "Aa"; color: root.c[4]; font-size: 11px; font-weight: 700; }
+            Rectangle { x: 28px; y: 7px; width: 40px; height: 3px; background: root.c[5]; }
+            Rectangle {
+                x: 5px;
+                y: 20px;
+                width: 102px;
+                height: 18px;
+                background: root.c[10];
+                for k in 17: Rectangle {
+                    x: 1px + k * 6px;
+                    width: 4px;
+                    height: 4px + Math.mod(k * 7 + 3, 6) * 2px;
+                    y: (parent.height - self.height) / 2;
+                    background: Math.mod(k, 3) == 0 ? root.c[11] : Math.mod(k, 3) == 1 ? root.c[12] : root.c[13];
+                }
+            }
+            Rectangle { x: 5px; y: 44px; width: 26px; height: 10px; background: root.c[6]; border-radius: 2px; }
+            Rectangle { x: 37px; y: 43px; width: 12px; height: 12px; border-radius: 6px; border-width: 1.5px; border-color: root.c[7]; }
+            Rectangle { x: 53px; y: 43px; width: 12px; height: 12px; border-radius: 6px; border-width: 1.5px; border-color: root.c[8]; }
+            Rectangle { x: 69px; y: 45px; width: 8px; height: 8px; border-radius: 4px; background: root.c[9]; }
+            Rectangle { x: 81px; y: 45px; width: 8px; height: 8px; border-radius: 4px; background: root.c[15]; }
+            Rectangle { x: 93px; y: 45px; width: 8px; height: 8px; border-radius: 4px; background: root.c[16]; }
+        }
+        Rectangle {
+            x: 122px;
+            y: 5px;
+            width: parent.width - 127px;
+            height: 60px;
+            background: root.c[1];
+            for r in 5: Rectangle {
+                y: r * 12px;
+                height: 12px;
+                background: r == 1 ? root.c[14] : Math.mod(r, 2) == 0 ? root.c[1] : root.c[3];
+                Rectangle { x: 4px; y: 5px; width: 18px + Math.mod(r * 5, 4) * 6px; height: 2px; background: r == 1 ? root.c[4] : root.c[5]; }
+            }
+        }
+    }
+    Text {
+        x: 8px;
+        y: 80px;
+        width: parent.width - 34px;
+        text: root.card.title;
+        overflow: elide;
+        color: Theme.text-bright;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+        font-weight: Theme.weight-bold;
+    }
+    Text {
+        x: 8px;
+        y: 96px;
+        width: parent.width - 16px;
+        text: root.card.author != "" ? "by " + root.card.author : root.card.user ? "yours" : "built in";
+        overflow: elide;
+        color: Theme.text-faint;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+    }
+    if root.card.active: Glyph { x: parent.width - 22px; y: 80px; width: 14px; height: 14px; icon: Icon.check; tint: Theme.accent-hi; stroke-width: 2px; }
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+/// The cards in rows as wide as the page allows (a layout would not wrap).
+component Gallery inherits Rectangle {
+    property <length> cw: 204px;
+    property <length> ch: 118px;
+    property <length> gap: Theme.space-lg;
+    property <int> cols: Math.max(1, Math.floor((root.width + root.gap) / (root.cw + root.gap)));
+    height: Math.ceil(ThemeState.cards.length / root.cols) * (root.ch + root.gap);
+    for card[i] in ThemeState.cards: ThemeCardView {
+        x: Math.mod(i, root.cols) * (root.cw + root.gap);
+        y: Math.floor(i / root.cols) * (root.ch + root.gap);
+        width: root.cw;
+        height: root.ch;
+        card: card;
+        clicked => { ThemeState.apply(card.name); }
+    }
+}
+
+/// A 0..1 slider whose track is a gradient (`track`): press or drag anywhere on it.
+component GradSlider inherits Rectangle {
+    in property <brush> track;
+    in property <float> value;
+    callback moved(float);
+    height: 16px;
+    Rectangle {
+        y: 3px;
+        height: 10px;
+        background: root.track;
+        border-radius: 5px;
+        border-width: 1px;
+        border-color: Theme.line-strong;
+    }
+    Rectangle {
+        x: root.value * (root.width - self.width);
+        width: 8px;
+        height: root.height;
+        border-radius: 3px;
+        background: Theme.text-bright;
+        border-width: 2px;
+        border-color: Theme.bg-deep;
+    }
+    ta := TouchArea {
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                root.moved(Math.clamp(self.mouse-x / self.width, 0, 1));
+            }
+        }
+        moved => {
+            if self.pressed { root.moved(Math.clamp(self.mouse-x / self.width, 0, 1)); }
+        }
+    }
+}
+
+/// The colour picker under a colour token: hue, saturation, value and alpha sliders, the hex code and the theme's own colours.
+component Picker inherits Rectangle {
+    property <length> sw: 18px;
+    property <int> cols: Math.max(1, Math.floor(palette-box.width / (root.sw + 2px)));
+    height: 92px + Math.ceil(ThemeState.palette.length / root.cols) * (root.sw + 2px) + Theme.space-md;
+    background: Theme.bg;
+    border-radius: Theme.radius;
+    Rectangle {
+        x: Theme.space-lg;
+        y: Theme.space-md;
+        width: 44px;
+        height: 44px;
+        background: ThemeState.picked-color;
+        border-width: 1px;
+        border-color: Theme.line-strong;
+        border-radius: Theme.radius;
+    }
+    ValueField {
+        x: Theme.space-lg;
+        y: 54px;
+        width: 80px;
+        value: ThemeState.picked-hex;
+        accepted(t) => { ThemeState.edit(ThemeState.picked, t); }
+    }
+    VerticalLayout {
+        x: 100px;
+        y: Theme.space-md;
+        width: min(parent.width - 100px - Theme.space-lg, 420px);
+        spacing: 4px;
+        for s[n] in ["Hue", "Saturation", "Value", "Alpha"]: HorizontalLayout {
+            spacing: Theme.space-md;
+            Text { width: 70px; text: s; vertical-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; }
+            GradSlider {
+                value: n == 0 ? ThemeState.hue / 360 : n == 1 ? ThemeState.sat : n == 2 ? ThemeState.val : ThemeState.alpha;
+                track: n == 0 ? @linear-gradient(90deg, Colors.hsv(0, 1, 1) 0%, Colors.hsv(60, 1, 1) 16.6%, Colors.hsv(120, 1, 1) 33.3%, Colors.hsv(180, 1, 1) 50%, Colors.hsv(240, 1, 1) 66.6%, Colors.hsv(300, 1, 1) 83.3%, Colors.hsv(360, 1, 1) 100%)
+                    : n == 1 ? @linear-gradient(90deg, Colors.hsv(ThemeState.hue, 0, ThemeState.val) 0%, Colors.hsv(ThemeState.hue, 1, ThemeState.val) 100%)
+                    : n == 2 ? @linear-gradient(90deg, Colors.hsv(ThemeState.hue, ThemeState.sat, 0) 0%, Colors.hsv(ThemeState.hue, ThemeState.sat, 1) 100%)
+                    : @linear-gradient(90deg, ThemeState.picked-color.with-alpha(0) 0%, ThemeState.picked-color.with-alpha(1) 100%);
+                moved(v) => {
+                    ThemeState.set-hsva(n == 0 ? v * 360 : ThemeState.hue, n == 1 ? v : ThemeState.sat, n == 2 ? v : ThemeState.val, n == 3 ? v : ThemeState.alpha);
+                }
+            }
+        }
+    }
+    palette-box := Rectangle {
+        x: 100px;
+        y: 90px;
+        width: parent.width - 100px - Theme.space-lg;
+        height: parent.height - 90px;
+        for c[i] in ThemeState.palette: Rectangle {
+            x: Math.mod(i, root.cols) * (root.sw + 2px);
+            y: Math.floor(i / root.cols) * (root.sw + 2px);
+            width: root.sw;
+            height: root.sw;
+            background: c;
+            border-width: pa.has-hover ? 2px : 1px;
+            border-color: pa.has-hover ? Theme.text-bright : Theme.line-strong;
+            border-radius: 2px;
+            pa := TouchArea { clicked => { ThemeState.set-color(c); } }
+        }
+    }
+}
+
+/// One token: its name, an editor for its kind (a swatch that opens the picker and the hex code, − / + steppers, a text or font
+/// field), its hint and RESET once it differs from the base. The picker opens under it.
+component TokenRowView inherits VerticalLayout {
+    in property <TokenRow> r;
+    property <[string]> fonts: ["Liberation Sans", "DejaVu Sans", "Noto Sans", "Inter", "Roboto", "Ubuntu", "Cantarell", "Open Sans", "Lato", "Fira Sans", "Source Sans 3", "IBM Plex Sans"];
+    spacing: 0px;
+    HorizontalLayout {
+        height: Theme.h-ctl + Theme.space-xs;
+        spacing: Theme.space-md;
+        padding-left: Theme.space-lg;
+        Text {
+            width: 150px;
+            text: root.r.name;
+            vertical-alignment: center;
+            color: root.r.changed ? Theme.accent-hi : Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.font-size;
+            font-weight: root.r.changed ? Theme.weight-bold : Theme.weight;
+        }
+        Rectangle {
+            width: 230px;
+            if root.r.kind == 0: HorizontalLayout {
+                spacing: Theme.space-md;
+                Rectangle {
+                    width: 34px;
+                    height: Theme.h-ctl - 4px;
+                    y: 2px;
+                    background: root.r.color;
+                    border-width: ThemeState.picked == root.r.index ? 2px : 1px;
+                    border-color: ThemeState.picked == root.r.index ? Theme.accent-hi : Theme.line-strong;
+                    border-radius: Theme.radius;
+                    TouchArea { clicked => { ThemeState.pick(root.r.index); } }
+                }
+                ValueField {
+                    width: 100px;
+                    horizontal-stretch: 0;
+                    value: root.r.text;
+                    accepted(t) => { ThemeState.edit(root.r.index, t); }
+                }
+            }
+            if root.r.kind == 1: HorizontalLayout {
+                spacing: 2px;
+                Chip { text: "−"; width: 22px; horizontal-stretch: 0; clicked => { ThemeState.step(root.r.index, -1); } }
+                ValueField {
+                    width: 84px;
+                    horizontal-stretch: 0;
+                    value: root.r.text;
+                    accepted(t) => { ThemeState.edit(root.r.index, t); }
+                }
+                Chip { text: "+"; width: 22px; horizontal-stretch: 0; clicked => { ThemeState.step(root.r.index, 1); } }
+            }
+            if root.r.kind >= 2: HorizontalLayout {
+                spacing: 2px;
+                ValueField {
+                    width: root.r.kind == 3 ? 110px : 226px;
+                    horizontal-stretch: 0;
+                    value: root.r.text;
+                    accepted(t) => { ThemeState.edit(root.r.index, t); }
+                }
+                if root.r.kind == 3: Dropdown {
+                    width: 116px;
+                    horizontal-stretch: 0;
+                    label: "FONTS";
+                    options: root.fonts;
+                    current: -1;
+                    chose(n) => { ThemeState.edit(root.r.index, root.fonts[n]); }
+                }
+            }
+        }
+        Text {
+            text: root.r.hint;
+            vertical-alignment: center;
+            overflow: elide;
+            color: Theme.text-faint;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+        }
+        Chip {
+            width: 46px;
+            horizontal-stretch: 0;
+            text: "RESET";
+            font-size: Theme.font-xs;
+            visible: root.r.changed;
+            clicked => { ThemeState.reset(root.r.index); }
+        }
+    }
+    if root.r.kind == 0 && ThemeState.picked == root.r.index: Picker { }
+}
+
+/// The editor: name, SAVE AS / DISCARD, the groups of tokens and their rows.
+component Editor inherits Rectangle {
+    background: Theme.panel;
+    border-width: 1px;
+    border-color: Theme.line;
+    border-radius: Theme.radius-lg;
+    VerticalLayout {
+        padding: Theme.space-lg;
+        spacing: Theme.space-md;
+        Text { text: "CUSTOMIZE"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+        Note { text: "Every change shows in the whole app at once. Give the theme a name and SAVE AS to keep it (a file in your themes folder); DISCARD goes back to the applied theme."; }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            height: Theme.h-ctl;
+            TextField {
+                width: 220px;
+                horizontal-stretch: 0;
+                placeholder-text: "Theme name";
+                text <=> ThemeState.draft-name;
+                accepted(t) => { ThemeState.save(t); }
+            }
+            Chip { text: "SAVE AS"; width: 84px; horizontal-stretch: 0; active: true; clicked => { ThemeState.save(ThemeState.draft-name); } }
+            Chip { text: "DISCARD"; width: 84px; horizontal-stretch: 0; clicked => { ThemeState.discard(); } }
+            Chip { text: "RESET ALL"; width: 84px; horizontal-stretch: 0; tooltip: "Every token back to how it was when the editor opened"; clicked => { ThemeState.reset-all(); } }
+            Rectangle { width: Theme.space-lg; }
+            Text { text: "BASE"; vertical-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+            Chip { text: "DARK"; width: 60px; horizontal-stretch: 0; active: !ThemeState.draft-light; tooltip: "The values the tokens you do not change keep (and the menu bar's colours)"; clicked => { ThemeState.set-base(false); } }
+            Chip { text: "LIGHT"; width: 60px; horizontal-stretch: 0; active: ThemeState.draft-light; clicked => { ThemeState.set-base(true); } }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        HorizontalLayout {
+            spacing: Theme.gap;
+            height: Theme.h-ctl;
+            for g[i] in ThemeState.groups: Chip {
+                text: g;
+                width: max(70px, g.character-count * 7px + 18px);
+                horizontal-stretch: 0;
+                active: ThemeState.group == i;
+                clicked => { ThemeState.group-chosen(i); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        VerticalLayout {
+            spacing: 0px;
+            for r in ThemeState.rows: TokenRowView { r: r; }
+        }
+    }
+}
+
+/// PREFS > THEMES: the gallery (click a theme to apply it), the theme actions and, under CUSTOMIZE, the editor. Opening the page
+/// re-reads the theme folders.
+export component ThemesPage inherits VerticalLayout {
+    spacing: Theme.space-md;
+    alignment: start;
+    init => { ThemeState.opened(); }
+    Text {
+        text: "THEMES";
+        color: Theme.accent-hi;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+        font-weight: Theme.weight-bold;
+    }
+    Note { text: "Click a theme to apply it: colours, fonts, sizes and the layout it asks for change at once. Drop a theme file on the window, or IMPORT one; folders are re-read while the app runs."; }
+    Gallery { }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        height: Theme.h-ctl;
+        Chip { text: "CUSTOMIZE"; width: 100px; horizontal-stretch: 0; active: ThemeState.editing; tooltip: "Edit every colour, font and size of the applied theme, live"; clicked => { ThemeState.customize(); } }
+        Chip { text: "DUPLICATE"; width: 100px; horizontal-stretch: 0; tooltip: "A copy of the applied theme in your themes folder"; clicked => { ThemeState.duplicate(); } }
+        Chip { text: "DELETE"; width: 80px; horizontal-stretch: 0; enabled: ThemeState.current-user; active-color: Theme.danger; tooltip: "Delete the applied theme (only your own can be)"; clicked => { ThemeState.remove(); } }
+        Chip { text: "IMPORT…"; width: 90px; horizontal-stretch: 0; tooltip: "Choose a theme file to add"; clicked => { ThemeState.import-file(); } }
+        Chip { text: "OPEN FOLDER"; width: 110px; horizontal-stretch: 0; tooltip: "Your themes folder"; clicked => { ThemeState.open-folder(); } }
+        Chip { text: "RESCAN"; width: 80px; horizontal-stretch: 0; tooltip: "Read the theme folders again"; clicked => { ThemeState.rescan(); } }
+        Rectangle { horizontal-stretch: 1; }
+    }
+    Text {
+        text: ThemeState.message;
+        visible: ThemeState.message != "";
+        wrap: word-wrap;
+        color: ThemeState.failed ? Theme.danger : Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+    }
+    if ThemeState.editing: Editor { }
+}

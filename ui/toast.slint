@@ -1,0 +1,32 @@
+import { Theme } from "theme.slint";
+
+/// Short notification near the top centre (src/app/toast.rs): "Controller connected", "Audio output: Speakers".
+/// Rust sets `text` (up to three lines) and `shown`, and clears `shown` again about 3 s later.
+export global ToastState {
+    in-out property <string> text;
+    in-out property <bool> shown;
+}
+
+/// Placed by the instantiation (x / y): it has no parent to centre itself in. No TouchArea, so clicks fall through.
+export component ToastView inherits Rectangle {
+    visible: self.opacity > 0.01;
+    opacity: ToastState.shown ? 1 : 0;
+    animate opacity { duration: Theme.t-fade; easing: ease-out; }
+    width: max(label.preferred-width + 32px, 180px);
+    height: label.preferred-height + 18px;
+    background: Theme.toast-bg;
+    border-color: Theme.overlay-border;
+    border-width: 1px;
+    border-radius: Theme.radius-xl;
+    drop-shadow-blur: 12px;
+    drop-shadow-color: Theme.toast-shadow;
+    drop-shadow-offset-y: 3px;
+    label := Text {
+        text: ToastState.text;
+        color: Theme.toast-text;
+        font-size: Theme.font-toast;
+        font-weight: Theme.weight-semi;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}

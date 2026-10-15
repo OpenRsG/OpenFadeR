@@ -1,0 +1,69 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { FormRow, Note } from "dialog.slint";
+import { BackupItem, Caption, DeviceState } from "device-state.slint";
+
+/// One column of a backup row.
+component Cell inherits Text {
+    color: Theme.text;
+    font-family: Theme.font;
+    font-size: Theme.font-size;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+/// BACKUPS tab (File > Library > Backed up device library management): the device library backups taken on this computer, backup
+/// now, restore to the chosen device, delete. The music itself is not in a backup: a restore copies back the tracks the device lacks
+/// from the collection.
+export component BackupPage inherits VerticalLayout {
+    spacing: Theme.space-lg;
+    Note { text: "A backup keeps the library of a device (databases, analysis files, artwork, settings), not its music. Restoring puts the library back and copies the missing tracks from your collection."; vertical-stretch: 0; }
+    FormRow {
+        label: "BACKUP FOLDER";
+        vertical-stretch: 0;
+        TextField { text <=> DeviceState.backup-dir; placeholder-text: "folder on this computer"; horizontal-stretch: 1; }
+    }
+    Caption { text: "BACKED UP DEVICE LIBRARIES"; }
+    Rectangle {
+        background: Theme.bg-deep;
+        border-color: Theme.line-strong;
+        border-width: 1px;
+        VerticalLayout {
+            Rectangle {
+                height: Theme.h-header;
+                background: Theme.panel;
+                HorizontalLayout {
+                    padding-left: Theme.space-md;
+                    spacing: Theme.space-md;
+                    Text { text: "DATE AND TIME"; width: 150px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                    Text { text: "COMPUTER"; width: 140px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                    Text { text: "DEVICE"; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                    Text { text: "FILE SYSTEM"; width: 90px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                }
+            }
+            ListView {
+                for b[i] in DeviceState.backups: Rectangle {
+                    height: Theme.h-row;
+                    background: b.selected ? Theme.select : area.has-hover ? Theme.hover-row : transparent;
+                    HorizontalLayout {
+                        padding-left: Theme.space-md;
+                        spacing: Theme.space-md;
+                        Cell { text: b.when; width: 150px; }
+                        Cell { text: b.computer; width: 140px; }
+                        Cell { text: b.device; }
+                        Cell { text: b.fs; width: 90px; }
+                    }
+                    area := TouchArea { clicked => { DeviceState.backup-toggle(i); } }
+                }
+            }
+        }
+    }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        vertical-stretch: 0;
+        Chip { text: "BACKUP NOW"; enabled: !DeviceState.busy && DeviceState.current >= 0; tooltip: "Back up the library of the chosen device"; clicked => { DeviceState.backup-now(); } }
+        Chip { text: "RESTORE TO DEVICE"; enabled: !DeviceState.busy && DeviceState.current >= 0; clicked => { DeviceState.restore(); } }
+        Chip { text: "DELETE"; enabled: !DeviceState.busy; clicked => { DeviceState.backup-delete(); } }
+    }
+}

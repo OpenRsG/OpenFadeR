@@ -1,0 +1,199 @@
+import { ListView } from "std-widgets.slint";
+import { Icon, IconButton, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { BrowserState } from "browser-state.slint";
+import { DragState } from "dnd.slint";
+
+/// One row of a palette's menus.
+component Item inherits Rectangle {
+    in property <string> text;
+    callback activated;
+    height: Theme.h-row;
+    background: ta.has-hover ? Theme.select : transparent;
+    Text {
+        x: Theme.space-lg;
+        width: parent.width - 2 * Theme.space-lg;
+        height: parent.height;
+        text: root.text;
+        vertical-alignment: center;
+        overflow: elide;
+        color: Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+    }
+    ta := TouchArea { clicked => { root.activated(); } }
+}
+
+/// The name box over a palette's header (double click): Enter renames, losing the focus cancels.
+component NameEdit inherits Rectangle {
+    in property <string> text;
+    callback done(string);
+    callback cancel;
+    property <bool> focused: field.has-focus;
+    changed focused => { if (!root.focused) { root.cancel(); } }
+    field := TextField {
+        width: parent.width;
+        text: root.text;
+        accepted(t) => { root.done(t); }
+        init => { self.focus-field(); }
+    }
+}
+
+/// One palette: its name bar (click: the playlist is chosen in the tree; double click: rename; ▾: pick the playlist from a
+/// list), and its tracks. A DropArea takes tracks dragged from the track list / another palette and playlists dragged from the
+/// tree. `slot` 0 is the TAG LIST.
+component PaletteColumn inherits Rectangle {
+    in property <int> slot;
+    in property <string> name;
+    in property <[string]> rows;
+    property <int> sel: -1;
+    property <bool> editing;
+    property <int> menu-row: -1;
+    property <length> menu-x;
+    property <length> menu-y;
+    property <int> edit-request: BrowserState.palette-edit;
+    changed edit-request => { if (root.edit-request == root.slot && root.slot > 0) { root.editing = true; } }
+    background: drop.has-drag ? Theme.hover-row : Theme.bg-deep;
+    border-width: 1px;
+    border-color: drop.has-drag ? Theme.accent : Theme.line;
+    clip: true;
+
+    drop := DropArea {
+        can-drop(e) => {
+            DragState.moved(root.absolute-position.x + e.position.x, root.absolute-position.y + e.position.y);
+            DragAction.copy
+        }
+        dropped(e) => { BrowserState.palette-drop(root.slot, e.data); DragAction.copy }
+        VerticalLayout {
+            spacing: 0;
+            Rectangle {
+                height: Theme.h-header;
+                background: Theme.panel-raised;
+                if !root.editing: Text {
+                    x: Theme.space-md;
+                    width: parent.width - 2 * Theme.space-md - (root.slot > 0 ? Theme.h-ctl : 0px);
+                    height: parent.height;
+                    text: root.name;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    color: root.name == "[blank list]" ? Theme.text-faint : Theme.text-bright;
+                    font-family: Theme.font;
+                    font-size: Theme.font-sm;
+                    font-weight: Theme.weight-bold;
+                }
+                if !root.editing: TouchArea {
+                    width: parent.width - (root.slot > 0 ? Theme.h-ctl : 0px);
+                    clicked => { BrowserState.palette-header(root.slot); }
+                    double-clicked => { if (root.slot > 0 && root.name != "[blank list]") { root.editing = true; } }
+                }
+                if root.editing: NameEdit {
+                    text: root.name;
+                    done(t) => { root.editing = false; BrowserState.palette-edit = -1; BrowserState.palette-rename(root.slot, t); }
+                    cancel => { root.editing = false; BrowserState.palette-edit = -1; }
+                }
+                if root.slot > 0 && !root.editing: IconButton {
+                    x: parent.width - self.width;
+                    height: parent.height;
+                    width: Theme.h-ctl;
+                    icon: Icon.chevron-down;
+                    icon-size: 10px;
+                    tooltip: "Playlist for this palette";
+                    clicked => { BrowserState.palette-menu(root.slot); choose.show(); }
+                }
+                choose := PopupWindow {
+                    x: 0px;
+                    y: -self.height;
+                    width: max(150px, parent.width);
+                    height: min(200px, (BrowserState.palette-choices.length + 0) * Theme.h-row + 4px);
+                    Rectangle {
+                        background: Theme.panel-raised;
+                        border-width: 1px;
+                        border-color: Theme.line-strong;
+                        ListView {
+                            for c[i] in BrowserState.palette-choices: Item {
+                                text: c.text;
+                                activated => { BrowserState.palette-choose(root.slot, i); choose.close(); }
+                            }
+                        }
+                    }
+                }
+            }
+            ListView {
+                for line[j] in root.rows: Rectangle {
+                    height: Theme.h-row;
+                    background: j == root.sel ? Theme.select : (ta.has-hover ? Theme.hover-row : (Math.mod(j, 2) == 0 ? Theme.bg-deep : Theme.row-alt));
+                    Text {
+                        x: Theme.space-md;
+                        width: parent.width - 2 * Theme.space-md;
+                        height: parent.height;
+                        text: line;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        color: Theme.text;
+                        font-family: Theme.font;
+                        font-size: Theme.list-font;
+                        font-weight: Theme.list-weight;
+                    }
+                    DragArea {
+                        data: BrowserState.drag-palette(root.slot, j);
+                        allow-copy: true;
+                        changed dragging => { DragState.drag-changed(self.dragging, BrowserState.drag-palette(root.slot, j)); }
+                        ta := TouchArea {
+                            pointer-event(e) => {
+                                if (e.kind != PointerEventKind.down) { return; }
+                                root.sel = j;
+                                BrowserState.palette-track-selected(root.slot, j);
+                                if (e.button == PointerEventButton.right) {
+                                    root.menu-row = j;
+                                    root.menu-x = min(self.absolute-position.x - root.absolute-position.x + self.mouse-x, root.width - 150px);
+                                    root.menu-y = min(self.absolute-position.y - root.absolute-position.y + self.mouse-y, max(0px, root.height - 2 * Theme.h-row - 4px));
+                                    menu.show();
+                                }
+                            }
+                            double-clicked => { BrowserState.palette-track-load(root.slot, j); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if root.rows.length == 0: Text {
+        y: Theme.h-header;
+        height: parent.height - Theme.h-header;
+        text: root.slot == 0 ? "Drop tracks here (Tag List)" : "Drop a playlist or tracks here";
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: Theme.text-faint;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+    }
+    menu := PopupWindow {
+        x: root.menu-x;
+        y: root.menu-y;
+        width: 150px;
+        height: 2 * Theme.h-row + 4px;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            VerticalLayout {
+                padding: 1px;
+                Item { text: "Load to deck"; activated => { BrowserState.palette-track-load(root.slot, root.menu-row); menu.close(); } }
+                Item { text: "Remove from list"; activated => { BrowserState.palette-track-remove(root.slot, root.menu-row); menu.close(); } }
+            }
+        }
+    }
+}
+
+/// The Playlist Palette: the TAG LIST and three playlist palettes side by side, under the track list.
+export component Palette inherits Rectangle {
+    background: Theme.bg;
+    HorizontalLayout {
+        spacing: Theme.gap;
+        for p in 4: PaletteColumn {
+            slot: p;
+            name: BrowserState.palette-names[p];
+            rows: BrowserState.palette-tracks[p];
+        }
+    }
+}

@@ -1,0 +1,68 @@
+import { Theme } from "theme.slint";
+
+/// The sizes the user drags (`Splitter`, ui/widgets.slint). Each in-out property is the drag as a delta in px from the region's
+/// default size, so 0 is the default everywhere and a double-click on a handle resets it. Rust (src/app/prefs/view.rs) keeps them in
+/// the settings file; the split-screen window mirrors them. The pure functions turn a delta into the size a region really gets: they
+/// keep the decks usable and the browser readable whatever the window size or an old settings file says, and the handles take their
+/// bounds from the same functions. Which borders are draggable is our choice [the the
+/// deck area / browser border, the tree / track list border and the track list's column borders are the ones its window offers].
+export global PaneState {
+    /// The enlarged-waveform area (the strips, or the vertical columns), which pushes the browser down or up.
+    in-out property <length> stage-d;
+    /// The EXPORT mode player panel.
+    in-out property <length> player-d;
+    /// Browser: the tree column's width, the track info under it, the Playlist Palette under the list.
+    in-out property <length> tree-d;
+    in-out property <length> info-d;
+    in-out property <length> palette-d;
+    /// Browser track table: the width of every column but the title, which takes what is left.
+    in-out property <length> col-artist-d;
+    in-out property <length> col-genre-d;
+    in-out property <length> col-comment-d;
+    in-out property <length> col-bpm-d;
+    in-out property <length> col-rating-d;
+    in-out property <length> col-time-d;
+    in-out property <length> col-key-d;
+
+    /// Default sizes.
+    out property <length> tree-w0: 172px;
+    out property <length> info-h0: 196px;
+    out property <length> palette-h0: 150px;
+    /// The smallest an enlarged waveform strip gets.
+    out property <length> min-wave: 28px;
+    /// The smallest column of the track table; the title column keeps `min-title`.
+    out property <length> min-col: 48px;
+    out property <length> min-title: 120px;
+
+    /// Track rows the browser keeps when the stage grows: 8 with two decks, 6 with four.
+    pure public function min-rows(decks: int) -> int { return decks >= 4 ? 6 : 8; }
+    /// Height of a browser showing `rows` track rows: tabs, toolbar, table header and the rows.
+    pure public function browser-h(rows: int) -> length { return Theme.h-tab + Theme.h-toolbar + Theme.h-header + rows * Theme.h-row; }
+
+    /// The stage growth range: the strips shrink to `min-wave` (the vertical columns do not shrink: the decks beside them stay as tall),
+    /// and grow until the browser is down to `min-rows`. `y0` is the browser's top with every strip at its default height.
+    pure public function stage-lo(decks: int, vertical: bool) -> length { return vertical ? 0px : decks * (root.min-wave - (decks >= 4 ? Theme.h-wave-4 : Theme.h-wave-2)); }
+    pure public function stage-hi(window-h: length, y0: length, decks: int) -> length { return Math.max(0px, window-h - y0 - Theme.h-status - root.browser-h(root.min-rows(decks))); }
+    pure public function stage(window-h: length, y0: length, decks: int, vertical: bool) -> length {
+        return Math.clamp(root.stage-d, root.stage-lo(decks, vertical), root.stage-hi(window-h, y0, decks));
+    }
+
+    /// The EXPORT player panel (`panel-h` high by default; the one-strip SIMPLE PLAYER and FULL BROWSER have nothing to drag).
+    pure public function player-lo(panel-h: length) -> length { return panel-h > 100px ? -0.2 * panel-h : 0px; }
+    pure public function player-hi(window-h: length, panel-h: length) -> length {
+        return panel-h > 100px ? Math.max(0px, window-h - Theme.h-bar - panel-h - Theme.gap - Theme.h-status - root.browser-h(8)) : 0px;
+    }
+    pure public function player(window-h: length, panel-h: length) -> length { return Math.clamp(root.player-d, root.player-lo(panel-h), root.player-hi(window-h, panel-h)); }
+
+    /// Browser inside `avail` px: the tree column (the icon strips, the gaps and a 360 px list stay), the track info under the tree
+    /// (the tree keeps 70 px with its buttons) and the Playlist Palette under the list (the list keeps 4 rows).
+    pure public function tree-lo() -> length { return 120px - root.tree-w0; }
+    pure public function tree-hi(avail: length) -> length { return Math.max(0px, Math.min(420px, avail - 422px) - root.tree-w0); }
+    pure public function tree-w(avail: length) -> length { return root.tree-w0 + Math.clamp(root.tree-d, root.tree-lo(), root.tree-hi(avail)); }
+    pure public function info-lo() -> length { return 80px - root.info-h0; }
+    pure public function info-hi(avail: length) -> length { return Math.max(0px, avail - 70px - root.info-h0); }
+    pure public function info-h(avail: length) -> length { return Math.max(80px, Math.min(root.info-h0 + Math.clamp(root.info-d, root.info-lo(), root.info-hi(avail)), avail - 70px)); }
+    pure public function palette-lo() -> length { return 60px - root.palette-h0; }
+    pure public function palette-hi(avail: length) -> length { return Math.max(0px, avail - root.browser-h(4) - root.palette-h0); }
+    pure public function palette-h(avail: length) -> length { return Math.max(60px, Math.min(root.palette-h0 + Math.clamp(root.palette-d, root.palette-lo(), root.palette-hi(avail)), avail - root.browser-h(4))); }
+}

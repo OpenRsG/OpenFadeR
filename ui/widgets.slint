@@ -1,0 +1,491 @@
+import { Theme } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+export { Glyph, Icon }
+import { Fader, Knob, Meter } from "gauges.slint";
+export { Fader, Knob, Meter }
+
+/// The one tooltip on screen: [`Tooltip`] fills it, [`TipOverlay`] (last child of the window) draws it. A `PopupWindow`
+/// would swallow the click that follows the hover, so the tip is a plain, input-transparent rectangle.
+export global TipState {
+    in-out property <string> text;
+    in-out property <length> x;
+    in-out property <length> y;
+}
+
+/// Hover tooltip. Put it inside the element it describes, sized like it (`width: root.width; height: root.height`), and
+/// bind `hovered` to that element's pointer state; the text shows below the element after `Theme.tooltip-delay` and hides
+/// again on leave or press. Nothing shows while `text` is empty.
+export component Tooltip inherits Rectangle {
+    in property <string> text;
+    in property <bool> hovered;
+    property <bool> armed;
+    changed hovered => {
+        root.armed = root.hovered && root.text != "" && Theme.tooltips;
+        if !root.hovered { TipState.text = ""; }
+    }
+    Timer {
+        interval: Theme.tooltip-delay;
+        running: root.armed;
+        triggered => {
+            root.armed = false;
+            TipState.x = root.absolute-position.x;
+            TipState.y = root.absolute-position.y + root.height + 4px;
+            TipState.text = root.text;
+        }
+    }
+}
+
+/// Draws [`TipState`] above everything; keeps inside the window.
+export component TipOverlay inherits Rectangle {
+    in property <length> window-w;
+    in property <length> window-h;
+    visible: TipState.text != "";
+    x: max(0px, min(TipState.x, root.window-w - self.width));
+    y: min(TipState.y, root.window-h - self.height);
+    width: label.preferred-width + 2 * Theme.space-lg;
+    height: label.preferred-height + 2 * Theme.space-sm;
+    background: Theme.panel-raised;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    border-radius: Theme.radius;
+    label := Text {
+        text: TipState.text;
+        color: Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+    }
+}
+
+/// Flat button. `active` lights it in `active-color` (blue); `enabled: false` greys it.
+/// Hover and press are drawn here. Give it a `tooltip` to explain an abbreviation.
+export component Chip inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <bool> enabled: true;
+    in property <length> font-size: Theme.font-sm;
+    in property <color> active-color: Theme.accent;
+    in property <string> tooltip;
+    /// Shown instead of `text` when the chip is too narrow for the whole label (give a `tooltip` then).
+    in property <Icon> icon;
+    /// Width the whole label needs (SegmentedChips sizes its chips to it).
+    out property <length> fit-width: label.preferred-width + 12px;
+    callback clicked;
+    /// Pointer down / up on the chip, for momentary buttons.
+    callback pressed;
+    callback released;
+    height: Theme.h-ctl;
+    min-width: 28px;
+    horizontal-stretch: 1;
+    // The face is a child, not the root's own background: Slint inlines every use of a component whose root property is
+    // animated, which made each Chip (and IconButton, RingButton, Dropdown) a full copy in the generated code.
+    face := Rectangle {
+        border-radius: Theme.radius;
+        background: !root.enabled ? Theme.panel
+            : root.active ? (ta.pressed ? root.active-color.darker(0.25) : ta.has-hover ? root.active-color.brighter(0.2) : root.active-color)
+            : ta.pressed ? Theme.bg-deep : ta.has-hover ? Theme.panel-high : Theme.panel-raised;
+        animate background { duration: Theme.t-fast; }
+    }
+    property <bool> iconic: root.icon != Icon.none && label.preferred-width > root.width - 4px;
+    label := Text {
+        visible: !root.iconic;
+        width: parent.width - 4px;
+        text: root.text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+        color: !root.enabled ? Theme.text-disabled : root.active ? Theme.text-bright : Theme.text;
+        font-family: Theme.font;
+        font-size: root.font-size;
+        font-weight: Theme.weight-bold;
+    }
+    if root.iconic: Glyph {
+        width: min(14px, root.height - 4px);
+        height: self.width;
+        icon: root.icon;
+        tint: !root.enabled ? Theme.text-disabled : root.active ? Theme.text-bright : Theme.text;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left {
+                if e.kind == PointerEventKind.down { root.pressed(); }
+                if e.kind == PointerEventKind.up { root.released(); }
+            }
+        }
+    }
+    if root.tooltip != "": Tooltip { width: root.width; height: root.height; text: root.tooltip; hovered: ta.has-hover && !ta.pressed; }
+}
+
+/// Square icon button (global-bar panel toggles, zoom, close, transport arrows). Flat until hovered; `solid` gives it the
+/// idle fill of a Chip. `active` lights it in `active-color`.
+export component IconButton inherits Rectangle {
+    in property <Icon> icon;
+    in property <bool> active;
+    in property <bool> enabled: true;
+    in property <bool> solid;
+    in property <color> active-color: Theme.accent;
+    in property <length> icon-size: 14px;
+    in property <string> tooltip;
+    callback clicked;
+    callback pressed;
+    callback released;
+    width: Theme.h-ctl;
+    height: Theme.h-ctl;
+    face := Rectangle {
+        border-radius: Theme.radius;
+        background: !root.enabled ? (root.solid ? Theme.panel : transparent)
+            : root.active ? (ta.pressed ? root.active-color.darker(0.25) : ta.has-hover ? root.active-color.brighter(0.2) : root.active-color)
+            : ta.pressed ? Theme.bg-deep : ta.has-hover ? Theme.panel-high : (root.solid ? Theme.panel-raised : transparent);
+        animate background { duration: Theme.t-fast; }
+    }
+    Glyph {
+        width: root.icon-size;
+        height: root.icon-size;
+        icon: root.icon;
+        tint: !root.enabled ? Theme.text-disabled : root.active ? Theme.text-bright : Theme.text;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left {
+                if e.kind == PointerEventKind.down { root.pressed(); }
+                if e.kind == PointerEventKind.up { root.released(); }
+            }
+        }
+    }
+    if root.tooltip != "": Tooltip { width: root.width; height: root.height; text: root.tooltip; hovered: ta.has-hover && !ta.pressed; }
+}
+
+/// Round CUE / PLAY button: a 1.5 px `tone` ring around a disc (ring #FFB937 or
+/// #2DD728, disc #282828, label and glyph white; disabled = 40% ring, darker disc, grey glyph). `lit` tints the disc
+/// with `tone` (CUE lit on the cue point, PLAY lit while playing). Give `icon` or `text`.
+export component RingButton inherits Rectangle {
+    in property <color> tone: Theme.cue;
+    in property <string> text;
+    in property <Icon> icon;
+    in property <bool> lit;
+    in property <bool> enabled: true;
+    callback clicked;
+    callback pressed;
+    callback released;
+    width: Theme.ring;
+    height: Theme.ring;
+    face := Rectangle {
+        border-radius: root.width / 2;
+        border-width: 1.5px;
+        border-color: root.enabled ? (ta.pressed ? root.tone.brighter(0.3) : root.tone) : root.tone.with-alpha(0.4);
+        background: !root.enabled ? Theme.panel : ta.has-hover ? Theme.panel-high : Theme.panel-raised;
+        animate background { duration: Theme.t-fast; }
+        Rectangle {
+            background: root.lit && root.enabled ? root.tone.with-alpha(0.3) : transparent;
+            border-radius: parent.border-radius;
+        }
+    }
+    Text {
+        text: root.text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: !root.enabled ? Theme.text-faint : Theme.text-bright;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+        font-weight: Theme.weight-bold;
+    }
+    Glyph {
+        width: 14px;
+        height: 14px;
+        icon: root.icon;
+        tint: !root.enabled ? Theme.text-faint : Theme.text-bright;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left {
+                if e.kind == PointerEventKind.down { root.pressed(); }
+                if e.kind == PointerEventKind.up { root.released(); }
+            }
+        }
+    }
+}
+
+/// Checkbox with a label (#282828 box, blue tick). A pure function of `checked`: the parent
+/// flips its own value in `toggled`.
+export component Toggle inherits Rectangle {
+    in property <bool> checked;
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    height: Theme.h-ctl;
+    min-width: self.preferred-width;
+    opacity: root.enabled ? 1 : 0.4;
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        alignment: start;
+        Rectangle {
+            width: 14px;
+            height: 14px;
+            y: (parent.height - self.height) / 2;
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: ta.has-hover ? Theme.text-dim : Theme.line-strong;
+            border-radius: Theme.radius;
+            if root.checked: Glyph { width: 12px; height: 12px; icon: Icon.check; tint: Theme.accent-hi; stroke-width: 2px; }
+        }
+        Text {
+            text: root.text;
+            vertical-alignment: center;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.font-size;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.toggled(!root.checked); }
+    }
+}
+
+/// A row of mutually exclusive choices (AU / MA, SINGLE / MULTI, DEFAULT / USER, 2 DECKS / 4 DECKS): the chosen one
+/// is lit. Pure function of `current`; `chose` carries the clicked index.
+export component SegmentedChips inherits HorizontalLayout {
+    in property <[string]> options;
+    in property <int> current;
+    in property <color> active-color: Theme.accent;
+    in property <length> font-size: Theme.font-sm;
+    callback chose(int);
+    spacing: Theme.gap;
+    for o[i] in root.options: Chip {
+        text: o;
+        font-size: root.font-size;
+        active: i == root.current;
+        active-color: root.active-color;
+        min-width: self.fit-width;
+        clicked => { root.chose(i); }
+    }
+}
+
+/// Header strip of a panel (FX1, CFX, MIX IN, SAMPLER): dim bold caps `title` on the left, `@children` (chips, knobs,
+/// a close button) laid out after it, a hairline under it.
+export component PanelHeader inherits Rectangle {
+    in property <string> title;
+    height: Theme.h-header;
+    background: Theme.panel;
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-sm;
+        spacing: Theme.space-sm;
+        Text {
+            text: root.title;
+            vertical-alignment: center;
+            horizontal-stretch: 0;
+            color: Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+            font-weight: Theme.weight-bold;
+        }
+        Rectangle { horizontal-stretch: 1; }
+        @children
+    }
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.line;
+    }
+}
+
+
+/// Button that opens a list of `options` (mode selector, layout selector, pad mode, effect, tempo range, output). The
+/// button shows `label` if given, else the current option. `icons` (optional, same order as `options`) puts a glyph
+/// before each row and before the label. Pure function of `current`; `chose` carries the picked index. Clicking outside
+/// closes the list.
+export component Dropdown inherits Rectangle {
+    in property <[string]> options;
+    in property <[Icon]> icons;
+    in property <int> current;
+    in property <string> label;
+    in property <bool> enabled: true;
+    in property <length> font-size: Theme.font-sm;
+    /// Width of the open list; 0 = as wide as the button, at least 100 px.
+    in property <length> list-width: 0px;
+    /// Closed button shows only the current option's glyph and the arrow (the layout selector).
+    in property <bool> compact;
+    callback chose(int);
+    height: Theme.h-ctl;
+    min-width: 60px;
+    horizontal-stretch: 1;
+    face := Rectangle {
+        border-radius: Theme.radius;
+        background: !root.enabled ? Theme.panel : ta.pressed ? Theme.bg-deep : ta.has-hover ? Theme.panel-high : Theme.panel-raised;
+        animate background { duration: Theme.t-fast; }
+    }
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-sm;
+        spacing: Theme.space-sm;
+        if root.icons.length > root.current && (root.label == "" || root.compact): Glyph { width: 14px; height: 14px; y: (parent.height - self.height) / 2; icon: root.icons[root.current]; tint: Theme.text; }
+        if !root.compact: Text {
+            text: root.label != "" ? root.label : root.options[root.current];
+            vertical-alignment: center;
+            overflow: elide;
+            color: root.enabled ? Theme.text : Theme.text-disabled;
+            font-family: Theme.font;
+            font-size: root.font-size;
+            font-weight: Theme.weight-bold;
+        }
+        Glyph { width: 12px; height: 12px; y: (parent.height - self.height) / 2; icon: Icon.tri-down; tint: Theme.text-dim; }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { pop.show(); }
+    }
+    pop := PopupWindow {
+        x: 0;
+        y: root.height + 1px;
+        width: max(root.list-width > 0px ? root.list-width : root.width, 100px);
+        height: root.options.length * Theme.h-row + 2px;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.radius;
+            VerticalLayout {
+                padding: 1px;
+                for o[i] in root.options: Rectangle {
+                    height: Theme.h-row;
+                    background: row.has-hover ? Theme.select : (i == root.current ? Theme.panel-high : transparent);
+                    HorizontalLayout {
+                        padding-left: Theme.space-md;
+                        spacing: Theme.space-md;
+                        if root.icons.length > i: Glyph { width: 14px; height: 14px; y: (parent.height - self.height) / 2; icon: root.icons[i]; tint: Theme.text; }
+                        Text {
+                            text: o;
+                            vertical-alignment: center;
+                            color: Theme.text;
+                            font-family: Theme.font;
+                            font-size: Theme.font-size;
+                        }
+                    }
+                    row := TouchArea {
+                        clicked => {
+                            root.chose(i);
+                            pop.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Single-line text input in the app's look (search box, BPM range, comment): black field, 1 px border that turns
+/// blue with focus, optional leading `icon`, clear button while there is text. Same names as std-widgets' LineEdit
+/// (`text`, `placeholder-text`, `input-type`, `edited`, `accepted`, `has-focus`); `focus-field()` focuses it.
+export component TextField inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder-text;
+    in property <Icon> icon;
+    in property <InputType> input-type: InputType.text;
+    out property <bool> has-focus: input.has-focus;
+    callback edited(string);
+    callback accepted(string);
+    public function focus-field() { input.focus(); }
+    height: Theme.h-ctl;
+    min-width: 60px;
+    background: Theme.bg-deep;
+    border-width: 1px;
+    border-color: input.has-focus ? Theme.accent : Theme.line-strong;
+    border-radius: Theme.radius;
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-xs;
+        spacing: Theme.space-sm;
+        if root.icon != Icon.none: Glyph { width: 12px; height: 12px; y: (parent.height - self.height) / 2; icon: root.icon; tint: Theme.text-dim; }
+        Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+            input := TextInput {
+                width: parent.width;
+                height: parent.height;
+                vertical-alignment: center;
+                single-line: true;
+                input-type: root.input-type;
+                color: Theme.text;
+                selection-background-color: Theme.select;
+                selection-foreground-color: Theme.text-bright;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+                edited => { root.edited(self.text); }
+                accepted => { root.accepted(self.text); }
+            }
+            if input.text == "": Text {
+                x: 0px;
+                height: parent.height;
+                text: root.placeholder-text;
+                vertical-alignment: center;
+                color: Theme.text-faint;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+            }
+        }
+        if input.text != "": IconButton {
+            icon: Icon.close;
+            icon-size: 10px;
+            width: root.height - 2px;
+            height: root.height - 2px;
+            clicked => {
+                input.text = "";
+                root.edited("");
+            }
+        }
+    }
+}
+
+/// A drag handle on the border between two panes . `value` is the size being dragged, as a delta
+/// from the default (see `PaneState`, ui/panes.slint); the owner binds it two-way and gives the range `lo`..`hi` (0 is the default
+/// and always inside). Give it a few px of thickness over the border: it draws only a 2 px `accent` line while hovered or dragged.
+/// `horizontal`: a bar dragged up and down (ns-resize); else a column dragged left and right (ew-resize). `invert`: the value grows
+/// as the pointer goes up / left (a pane on the far side of the border). Double-click sets the default.
+export component Splitter inherits Rectangle {
+    in property <bool> horizontal;
+    in property <bool> invert;
+    in property <length> lo;
+    in property <length> hi;
+    in-out property <length> value;
+    property <length> start-value;
+    property <length> start-pointer;
+    // The pointer in window coordinates, so that it does not move with the handle the drag moves.
+    function pointer() -> length { return root.horizontal ? ta.absolute-position.y + ta.mouse-y : ta.absolute-position.x + ta.mouse-x; }
+    function clamped(v: length) -> length { return Math.max(root.lo, Math.min(root.hi, v)); }
+    Rectangle {
+        x: root.horizontal ? 0px : (parent.width - 2px) / 2;
+        y: root.horizontal ? (parent.height - 2px) / 2 : 0px;
+        width: root.horizontal ? parent.width : 2px;
+        height: root.horizontal ? 2px : parent.height;
+        background: ta.pressed ? Theme.accent-hi : ta.has-hover ? Theme.accent : transparent;
+    }
+    ta := TouchArea {
+        mouse-cursor: root.horizontal ? MouseCursor.ns-resize : MouseCursor.ew-resize;
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left) {
+                root.start-value = root.clamped(root.value);
+                root.start-pointer = root.pointer();
+            }
+        }
+        moved => {
+            if (self.pressed) { root.value = root.clamped(root.start-value + (root.invert ? -1 : 1) * (root.pointer() - root.start-pointer)); }
+        }
+        double-clicked => { root.value = 0px; }
+    }
+}
+
+/// The label flag of a MIX POINT LINK marker: `tone` tab with a dark bold label, 11 px high.
+export component MixFlag inherits Rectangle {
+    in property <string> label;
+    in property <color> tone;
+    width: tag.preferred-width + 6px;
+    height: 11px;
+    background: root.tone;
+    tag := Text { text: root.label; x: 3px; vertical-alignment: center; color: Theme.bg-deep; font-size: Theme.font-xs; font-weight: Theme.weight-bold; }
+}

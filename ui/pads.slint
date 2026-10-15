@@ -1,0 +1,238 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+
+/// One performance pad (hot cues A-H, or the pad of another mode). `time` is the hot cue's position ("1:02.4"), empty
+/// for the other modes. Pure view: Rust supplies the data; cue and loop edits are saved to the store (src/app/deck/cuelist.rs).
+export struct PadView { label: string, color: color, set: bool, time: string }
+
+/// One option chip of the current pad mode (SLICER LENGTH, ROLL, shift; SAMPLER bank, sequencer REC / PLAY; SEQ. CALL stop): `on` = lit.
+export struct PadOpt { text: string, on: bool, tip: string }
+
+/// The option chips per deck (4 rows), filled by src/app/deck/padopts.rs for the deck's pad mode; a click carries (deck, index).
+export global PadsState {
+    in-out property <[[PadOpt]]> options;
+    callback option(int, int);
+}
+
+/// The chip row of deck `index` under its pads while the mode has options (see `PadsState`).
+export component PadOptions inherits HorizontalLayout {
+    in property <int> index;
+    spacing: 2px;
+    for o[i] in PadsState.options[root.index]: Chip {
+        text: o.text;
+        tooltip: o.tip;
+        active: o.on;
+        clicked => { PadsState.option(root.index, i); }
+    }
+}
+
+/// One row of a deck's cue / loop list: tag is "M" (memory) or the pad letter, kind "cue" / "loop",
+/// len the loop length ("" for a plain cue).
+export struct CueRowView { time: string, tag: string, kind: string, len: string, color: color, comment: string }
+
+/// The 8 pads as 2 columns of 4 rows: A-D left, E-H right, 22 px each. Hot cue mode: letter badge in the cue's
+/// colour and its time; empty = dim letter. Other modes: a lit pad is filled with its colour, an idle one carries it as a
+/// 3 px bar. Height needed: 4 × 24 − 2 = 94 px.
+export component PadGrid inherits Rectangle {
+    in property <[PadView]> pads;
+    /// Pad mode: 0 HOT CUE, 1 BEAT JUMP, 2 KEYBOARD, 3 BEAT LOOP, 4 PAD FX (held pad = effect on), 5 KEY SHIFT, 6 S.SCRATCH (pads load sampler slots onto the deck), 7 SLICER, 8 SLICE LOOP (a held pad rolls its slice), 9 SAMPLER (pads = the slots of the sampler's bank), 10 SEQ. CALL (pads = saved sequences), 11 STEMS (pads 1-4 = the parts), 12 and up plugin modes (the pads show the hot cues like HOT CUE); Rust fills `pads`.
+    in property <int> mode;
+    /// Track loaded and decoded.
+    in property <bool> enabled;
+    /// × mode: a pad press deletes the cue.
+    in property <bool> delete-mode;
+    /// VIEW > PAD FX colour (0 blue, 1 green, 2 orange, 3 red, 4 purple) of the PAD FX pads (mode 4).
+    in property <int> fx-color;
+    callback pad(int);
+    /// A pad's mouse button was released (a held pad in slip mode hands back to the shadow playhead).
+    callback pad-released();
+    /// Theme.pad-style 1: 4 columns of 2 rows, each pad filled in its cue's colour ; 0: 2 columns of 4 rows.
+    property <bool> grid: Theme.pad-style == 1;
+    property <int> cols: root.grid ? 4 : 2;
+    property <length> cw: (root.width - (root.cols - 1) * Theme.gap) / root.cols;
+    property <length> ch: root.grid ? (root.height - Theme.gap) / 2 : Theme.h-row;
+    /// S.SCRATCH, SAMPLER and SEQ. CALL pads work on an empty deck.
+    property <bool> live: root.enabled || root.mode == 6 || root.mode == 9 || root.mode == 10;
+    /// HOT CUE and the plugin modes draw the hot cue pads (letter badge, time).
+    property <bool> cues: root.mode == 0 || root.mode >= 12;
+    min-height: 4 * 24px - 2px;
+    for p[i] in root.pads: Rectangle {
+        /// The pad's colour: its own, but the PAD FX pads wear the VIEW > PAD FX COLOR.
+        property <color> tone: root.mode == 4 ? [Theme.accent, Theme.play, Theme.deck2, Theme.danger, Theme.sampler][root.fx-color] : p.color;
+        x: root.grid ? Math.mod(i, 4) * (root.cw + Theme.gap) : Math.floor(i / 4) * (root.cw + Theme.gap);
+        y: root.grid ? Math.floor(i / 4) * (root.ch + Theme.gap) : Math.mod(i, 4) * 24px;
+        width: root.cw;
+        height: root.ch;
+        opacity: root.live ? 1 : 0.4;
+        border-radius: Theme.radius;
+        border-width: root.delete-mode && p.set && root.mode == 0 ? 1px : 0px;
+        border-color: Theme.danger;
+        background: root.cues && root.grid && p.set ? p.color : !root.cues && p.set ? tone : (ta.pressed ? Theme.bg-deep : ta.has-hover ? Theme.panel-high : Theme.panel-raised);
+        animate background { duration: Theme.t-fast; }
+        if root.cues && root.grid: Text {
+            x: 4px;
+            y: 2px;
+            text: root.delete-mode && p.set ? "×" : p.label;
+            color: p.set ? Theme.bg-deep : Theme.text-faint;
+            font-size: Theme.font-md;
+            font-weight: Theme.weight-bold;
+        }
+        if root.cues && root.grid: Text {
+            x: 4px;
+            y: parent.height - self.height - 2px;
+            width: parent.width - 8px;
+            text: p.time;
+            color: Theme.bg-deep;
+            font-size: Theme.font-sm;
+            overflow: elide;
+        }
+        if root.cues && !root.grid: Rectangle {
+            x: 3px;
+            y: 3px;
+            width: 16px;
+            height: 16px;
+            background: p.set ? p.color : Theme.panel-high;
+            Text {
+                text: root.delete-mode && p.set ? "×" : p.label;
+                color: p.set ? Theme.bg-deep : Theme.text-faint;
+                font-size: Theme.font-sm;
+                font-weight: Theme.weight-bold;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+        if root.cues && !root.grid: Text {
+            x: 24px;
+            width: parent.width - 28px;
+            text: p.time;
+            color: Theme.text;
+            font-size: Theme.font-size;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+        if !root.cues: Rectangle { x: 0; width: 3px; background: tone; }
+        if !root.cues: Text {
+            x: 4px;
+            width: parent.width - 6px;
+            text: p.label;
+            color: p.set ? Theme.bg-deep : Theme.text;
+            font-size: root.mode == 4 || root.mode == 11 ? Theme.font-xs : Theme.font-size;
+            font-weight: Theme.weight-bold;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        ta := TouchArea {
+            enabled: root.live;
+            pointer-event(e) => {
+                if (e.button == PointerEventButton.left) {
+                    if (e.kind == PointerEventKind.down) { root.pad(i); }
+                    if (e.kind == PointerEventKind.up) { root.pad-released(); }
+                }
+            }
+        }
+    }
+}
+
+/// Cue / loop list of one deck (memory cues, hot cues and loops in track order, plus this session's).
+/// A click on a row jumps to it (a loop row also activates the loop); SAVE LOOP stores the active loop.
+export component CueList inherits Rectangle {
+    in property <[CueRowView]> cues;
+    in property <bool> enabled;
+    in property <bool> loop-active;
+    callback jump(int);
+    callback save-loop();
+    /// Right-click popup: palette index (-1 = default colour) / comment text for row `i`.
+    callback cue-color(int, int);
+    callback cue-comment(int, string);
+    /// Colours the popup offers (Rust fills it from `analysis::picker()`, 63 entries; the 64th grid cell is "default").
+    in property <[color]> palette;
+    background: Theme.bg-deep;
+    border-radius: Theme.radius;
+    opacity: root.enabled ? 1 : 0.5;
+    VerticalLayout {
+        padding: 3px;
+        spacing: 3px;
+        HorizontalLayout {
+            spacing: 4px;
+            Text { text: "CUES / LOOPS"; color: Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+            Chip {
+                text: "SAVE LOOP";
+                height: Theme.h-ctl-sm;
+                min-width: 62px;
+                horizontal-stretch: 0;
+                enabled: root.enabled && root.loop-active;
+                clicked => { root.save-loop(); }
+            }
+        }
+        ListView {
+            for c[i] in root.cues: Rectangle {
+                height: 18px;
+                background: touch.has-hover && root.enabled ? Theme.hover-row : transparent;
+                HorizontalLayout {
+                    spacing: 5px;
+                    padding-left: 2px;
+                    padding-right: 4px;
+                    Rectangle { width: 5px; height: 12px; y: 3px; background: c.color; }
+                    Text { text: c.tag; color: Theme.text; font-size: Theme.font-size; font-weight: Theme.weight-bold; width: 14px; vertical-alignment: center; }
+                    Text { text: c.time; color: Theme.text; font-size: Theme.font-size; width: 44px; vertical-alignment: center; }
+                    Text { text: c.kind; color: c.kind == "loop" ? Theme.cue : Theme.text-dim; font-size: Theme.font-size; width: 28px; vertical-alignment: center; }
+                    Text { text: c.comment != "" ? c.comment : c.len; color: c.comment != "" ? Theme.cue : Theme.text-dim; font-size: Theme.font-size; horizontal-alignment: right; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
+                }
+                touch := TouchArea {
+                    enabled: root.enabled;
+                    clicked => { root.jump(i); }
+                    pointer-event(e) => {
+                        if (e.button == PointerEventButton.right && e.kind == PointerEventKind.up) { pop.show(); }
+                    }
+                }
+                // Right-click: the full colour grid (the last cell = default colour) and the cue's comment.
+                pop := PopupWindow {
+                    x: 0px;
+                    y: parent.height;
+                    width: 184px;
+                    close-policy: close-on-click-outside; // the comment field must be clickable
+                    height: 182px;
+                    Rectangle {
+                        background: Theme.panel-raised;
+                        border-color: Theme.line-strong;
+                        border-width: 1px;
+                        border-radius: Theme.radius-lg;
+                        VerticalLayout {
+                            padding: 4px;
+                            spacing: 4px;
+                            Rectangle {
+                                height: 142px;
+                                for p[k] in root.palette: Rectangle {
+                                    x: Math.mod(k, 8) * 22px;
+                                    y: Math.floor(k / 8) * 18px;
+                                    width: 20px;
+                                    height: 16px;
+                                    background: p;
+                                    border-radius: Theme.radius;
+                                    TouchArea { clicked => { root.cue-color(i, k); pop.close(); } }
+                                }
+                                Rectangle {
+                                    x: 7 * 22px;
+                                    y: 7 * 18px;
+                                    width: 20px;
+                                    height: 16px;
+                                    background: Theme.panel-high;
+                                    border-radius: Theme.radius;
+                                    Text { text: "×"; color: Theme.text; font-size: Theme.font-size; }
+                                    TouchArea { clicked => { root.cue-color(i, -1); pop.close(); } }
+                                }
+                            }
+                            TextField {
+                                text: c.comment;
+                                placeholder-text: "comment";
+                                accepted(t) => { root.cue-comment(i, t); pop.close(); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

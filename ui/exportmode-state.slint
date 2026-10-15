@@ -1,0 +1,110 @@
+/// One phrase of the loaded track on the overview: start and end as fractions of the track, and whether it is the selected one.
+export struct PhraseSeg { x0: float, x1: float, selected: bool }
+
+/// One of the 8 hot cue buttons / rows: `row` is its row in `DeckView.cues` (-1 = empty).
+export struct HotCue { label: string, color: color, set: bool, time: string, row: int, comment: string, len: string }
+
+/// What EXPORT mode shows of one player beyond `DeckView` (Rust: src/app/exportmode/): the GRID panel's state, the 8 hot cues
+/// whatever the pad mode is, and the loaded track's artwork and INFO panel lines.
+export struct ExportDeck {
+    /// Analysis Lock on (the padlock in the GRID panel); the grid edits are refused.
+    grid-locked: bool,
+    /// Range button: grid edits apply from the playhead on (else the whole track).
+    from-here: bool,
+    can-undo: bool,
+    can-redo: bool,
+    /// Tempo of the grid at the playhead ("114.50"; "" without a grid).
+    grid-bpm: string,
+    /// Hot cues A-H.
+    hot: [HotCue],
+    /// The track's cover, when the library has one.
+    has-art: bool,
+    artwork: image,
+    /// [INFO] panel: stars 0-5, colour name and its RGB (`has-color`), comment, file type, size, sample rate, bit rate.
+    rating: int,
+    has-color: bool,
+    color: color,
+    color-name: string,
+    comment: string,
+    file-type: string,
+    file-size: string,
+    sample-rate: string,
+    bit-rate: string,
+    /// The two loaded tracks are registered as related ([Matching]); only meaningful on deck 0.
+    matched: bool,
+    /// PHRASE EDIT: the row is shown (`phrase-panel`), CUT is lit, the edit is allowed (a track with phrases or a grid, no Analysis Lock),
+    /// the selected phrase (index + 1, 0 = none) with its name and colour, and every phrase's span as fractions of the track.
+    phrase-panel: bool,
+    phrase-cut: bool,
+    phrase-enabled: bool,
+    phrase-sel: int,
+    phrase-label: string,
+    phrase-color: color,
+    phrase-segs: [PhraseSeg],
+}
+
+/// EXPORT mode (src/app/exportmode/): the mode flag, the player layout and what the panels ask of Rust.
+/// ui/app.slint flips `visible` with the mode selector and `layout` with the layout selector.
+export global ExportModeState {
+    in-out property <bool> visible;
+    /// 0 1 PLAYER, 1 2 PLAYER, 2 DUAL PLAYER, 3 SIMPLE PLAYER, 4 FULL BROWSER.
+    in-out property <int> layout;
+    in property <[string]> layout-names: ["1 PLAYER", "2 PLAYER", "DUAL PLAYER", "SIMPLE PLAYER", "FULL BROWSER"];
+    /// Height of the player area under the global bar (the browser fills the rest); 0 for FULL BROWSER.
+    out property <length> panel-h: [261px, 400px, 400px, 69px, 0px][root.layout];
+    /// The tree column's bottom slot (the device dock).
+    out property <length> dock-h: 196px;
+    /// The recording panel (global-bar REC button in EXPORT mode).
+    in-out property <bool> rec-open;
+    /// Decks A and B.
+    in property <[ExportDeck]> decks;
+    /// DUAL CONTROL: PLAY on either player starts / pauses both.
+    in-out property <bool> dual-control;
+    /// Metronome volume level 0..2 (the Preferences' metronome volume, bucketed) and the REC source (0 MASTER, 1 INPUT).
+    in property <int> metro-level;
+    in property <int> rec-source;
+    /// Hot cue button: set when empty, play when set (deck, pad 0..7).
+    callback hot-cue(int, int);
+    /// × of a MEMORY / HOT CUE row (deck, row of `DeckView.cues`).
+    callback cue-remove(int, int);
+    /// MEMORY CUE CALL: previous / next memory cue or loop (deck, -1 / +1).
+    callback cue-step(int, int);
+    /// × of the function panel: the memory cue or loop under the playhead.
+    callback memory-delete(int);
+    /// PLAY (deck): both decks when DUAL CONTROL is on.
+    callback play(int);
+    /// Pitch bend while held (deck, offset; 0 releases).
+    callback bend(int, float);
+    callback grid-undo(int);
+    callback grid-redo(int);
+    /// Widen / narrow the beat distance by n ms (deck, ±1).
+    callback grid-stretch(int, int);
+    /// Range: true = from the playhead on, false = the whole track (deck, flag).
+    callback grid-range(int, bool);
+    /// The BPM field was accepted (deck, text).
+    callback grid-bpm(int, string);
+    /// The padlock (Analysis Lock).
+    callback grid-lock(int);
+    /// ≡ menu of the function panel: re-analyse the deck's track.
+    callback analyze(int);
+    /// [Matching]: registers the two loaded tracks as related, or removes the pair when already registered.
+    callback matching();
+    /// PHRASE EDIT row of the GRID panel ( src/app/exportmode/phrase.rs). Deck, then:
+    /// the panel is shown instead of the GRID row (and the overview's clicks go to the phrase callbacks).
+    callback phrase-panel(int, bool);
+    /// CUT toggle.
+    callback phrase-cut-toggle(int);
+    /// CLEAR: delete every phrase.
+    callback phrase-clear(int);
+    /// RESET: drop the edit, the track's analysed phrases again.
+    callback phrase-reset(int);
+    /// The type chip: the selected phrase takes the next name of its mood.
+    callback phrase-kind(int);
+    /// A press on the overview's phrase strip (deck, x as a fraction of the track, divider grab range as a fraction): with CUT
+    /// lit it cuts there, else it grabs a divider or selects the phrase.
+    callback phrase-press(int, float, float);
+    /// The pointer moves with a divider grabbed (deck, x fraction).
+    callback phrase-drag(int, float);
+    /// The button is released (deck, x fraction): a grabbed divider is saved.
+    callback phrase-release(int, float);
+}

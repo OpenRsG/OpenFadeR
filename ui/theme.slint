@@ -1,0 +1,283 @@
+/// Design tokens. The defaults are Catppuccin Mocha (dark base) and Catppuccin Latte (light base). Sections use these names and
+/// never a literal colour, size or font.
+/// Every `in-out` property is a skin token: src/app/skin/ sets each one from the chosen skin file (docs/skins.md), so the values
+/// below are the built-in defaults and a new token needs no Rust edit (ui/build.rs lists them). `in` properties are pref-driven.
+/// A `// @group <name>` comment starts a group of the theme editor (PREFS > THEMES): every token after it, up to the next marker,
+/// is listed there under that name, with its `///` doc comment as the hint. Keep the groups contiguous.
+export global Theme {
+    // Skin (VIEW > Color > Skin, set from Rust): false = Catppuccin Mocha, true = Catppuccin Latte.
+    in property <bool> light: false;
+    /// Hover tooltips on / off (VIEW > Tooltips).
+    in property <bool> tooltips: true;
+
+    // @group Surfaces
+    // Surfaces
+    /// Window and the 1-2 px gaps between panels.
+    in-out property <color> bg: root.light ? #dce0e8 : #11111b;
+    /// Waveform, track list and status bar background.
+    in-out property <color> bg-deep: root.light ? #eff1f5 : #181825;
+    /// Panel body (deck panel, mixer, browser toolbar, tree).
+    in-out property <color> panel: root.light ? #e6e9ef : #1e1e2e;
+    /// Idle button / pad / input fill.
+    in-out property <color> panel-raised: root.light ? #ccd0da : #313244;
+    /// Hovered button, fader groove, thumb-less borders.
+    in-out property <color> panel-high: root.light ? #bcc0cc : #45475a;
+    /// The deck panels' body (the header, overview, pads and jog sit on it).
+    in-out property <color> deck-bg: root.light ? #e6e9ef : #1e1e2e;
+    /// Odd track-list row (even rows are `bg-deep`).
+    in-out property <color> row-alt: root.light ? #eaecf1 : #1b1b2a;
+    /// Column header strip of the track list.
+    in-out property <color> list-head: root.light ? #ccd0da : #313244;
+    /// Hairline between panels / table cells.
+    in-out property <color> line: root.light ? #ccd0da : #313244;
+    /// Checkbox / radio / input border.
+    in-out property <color> line-strong: root.light ? #9ca0b0 : #585b70;
+    /// Selected track-list row and tree entry.
+    in-out property <color> select: root.light ? #b0c7f5 : #425173;
+    /// Row under the pointer.
+    in-out property <color> hover-row: root.light ? #d6e0f5 : #282e43;
+    /// Dim overlay behind dialogs.
+    in-out property <color> scrim: root.light ? #dce0e8b0 : #11111bb0;
+    /// Fader cap face.
+    in-out property <color> fader-cap: root.light ? #8c8fa1 : #a6adc8;
+    /// Outline of a deck panel (see `deck-frame-w`; transparent = none). A themed accent colour draws one around each deck.
+    in-out property <color> deck-frame: #00000000;
+    // Learn overlay and toast: fixed dark in both skins, so they use their own text colours.
+    /// Dim overlay behind the MIDI learn screen.
+    in-out property <color> overlay-scrim: root.light ? #dce0e8cc : #11111bcc;
+    /// Card of the MIDI learn overlay.
+    in-out property <color> overlay-bg: root.light ? #1c1c1c : #181825;
+    /// Border of the learn overlay's card.
+    in-out property <color> overlay-border: root.light ? #fe640b : #fab387;
+    /// Title of the learn overlay.
+    in-out property <color> overlay-title: root.light ? #fe640b : #fab387;
+    /// Main text of the learn overlay.
+    in-out property <color> overlay-text: root.light ? #ffffff : #cdd6f4;
+    /// Secondary text of the learn overlay.
+    in-out property <color> overlay-soft: root.light ? #cccccc : #bac2de;
+    /// Dim text of the learn overlay.
+    in-out property <color> overlay-dim: root.light ? #888888 : #7f849c;
+    /// Faintest text of the learn overlay.
+    in-out property <color> overlay-faint: root.light ? #666666 : #6c7086;
+    /// A mapped control in the learn overlay.
+    in-out property <color> overlay-ok: root.light ? #79bc6b : #a6e3a1;
+    /// A control that is bound in the learn overlay.
+    in-out property <color> overlay-bound: root.light ? #40a02b : #94e2d5;
+    /// A warning in the learn overlay.
+    in-out property <color> overlay-warn: root.light ? #fe640b : #f9e2af;
+    /// Background of the toast (the notice that fades in over the window).
+    in-out property <color> toast-bg: root.light ? #2a2a2af2 : #313244f2;
+    /// Text of the toast.
+    in-out property <color> toast-text: root.light ? #eeeeee : #cdd6f4;
+    /// Shadow of the toast.
+    in-out property <color> toast-shadow: root.light ? #000000aa : #11111baa;
+
+    // @group Text
+    // Text
+    /// The strongest text: titles, the label of a lit button, the track title. Must read on `accent` and `select`.
+    in-out property <color> text-bright: root.light ? #11111b : #cdd6f4;
+    /// Default text of lists, inputs and values.
+    in-out property <color> text: root.light ? #4c4f69 : #bac2de;
+    /// Labels (TRIM, HIGH, MID, LOW), artist, secondary values.
+    in-out property <color> text-dim: root.light ? #6c6f85 : #9399b2;
+    /// Disabled-looking glyphs, unit text.
+    in-out property <color> text-faint: root.light ? #8c8fa1 : #7f849c;
+    /// Text of a disabled control.
+    in-out property <color> text-disabled: root.light ? #acb0be : #585b70;
+    /// Secondary cells of the track list (artist, genre, comment, time).
+    in-out property <color> row-dim: root.light ? #6c6f85 : #9399b2;
+    /// The cells of a track list row whose track a deck has loaded.
+    in-out property <color> row-loaded: root.light ? #11111b : #cdd6f4;
+
+    // @group Accents
+    // Functional accents
+    /// ON state of nearly every toggle: SYNC, MASTER, Q, MT, AU, bank, panel toggles.
+    in-out property <color> accent: root.light ? #1e66f5 : #59719e;
+    /// A lighter accent: headings of the preferences, a synced BPM, glyphs on dark.
+    in-out property <color> accent-hi: root.light ? #209fb5 : #89b4fa;
+    /// PLAY / PAUSE ring and glyph. The loaded track's title is also this green.
+    in-out property <color> play: root.light ? #40a02b : #a6e3a1;
+    /// CUE ring and cue point marker.
+    in-out property <color> cue: root.light ? #fe640b : #fab387;
+    /// The SYNC button when it is on.
+    in-out property <color> sync: root.light ? #1e66f5 : #59719e;
+    /// The MASTER button when it is on.
+    in-out property <color> master: root.light ? #1e66f5 : #59719e;
+    /// BPM SYNC icon when on.
+    in-out property <color> bpm-sync: root.light ? #df8e1d : #f9e2af;
+    /// Alerts, SLIP lit, memory cue passed.
+    in-out property <color> danger: root.light ? #d20f39 : #f38ba8;
+    /// REC button and recording indicator.
+    in-out property <color> rec: root.light ? #e64553 : #c6738c;
+    /// Memory cue not yet reached.
+    in-out property <color> memory-cue: root.light ? #ea76cb : #f5c2e7;
+    /// Sampler slot play arrow.
+    in-out property <color> sampler: root.light ? #8839ef : #cba6f7;
+
+    // @group Waveform
+    // Waveforms
+    /// Background of the waveforms and overviews (drawn by Rust).
+    in-out property <color> wave-bg: root.light ? #eff1f5 : #11111b;
+    /// Low (bass) band of the waveforms.
+    in-out property <color> wave-low: root.light ? #1e66f5 : #89b4fa;
+    /// Mid band of the waveforms.
+    in-out property <color> wave-mid: root.light ? #fe640b : #fab387;
+    /// High band of the waveforms.
+    in-out property <color> wave-high: root.light ? #5c5f77 : #cdd6f4;
+    /// Playhead of the enlarged waveform and the slip ghost (the shadow playhead while SLIP diverges).
+    in-out property <color> wave-playhead: root.light ? #4c4f69 : #f5e0dc;
+    /// The shadow playhead drawn while SLIP diverges.
+    in-out property <color> slip-ghost: root.light ? #04a5e5 : #89dceb;
+
+    // @group Decks and meters
+    /// Stem accents: VOCAL green, INST red, DRUMS blue.
+    in-out property <color> stem-vocal: root.light ? #40a02b : #a6e3a1;
+    /// INST stem.
+    in-out property <color> stem-inst: root.light ? #d20f39 : #f38ba8;
+    /// DRUMS stem.
+    in-out property <color> stem-drums: root.light ? #1e66f5 : #89b4fa;
+    /// BASS stem (4 stems).
+    in-out property <color> stem-bass: root.light ? #fe640b : #fab387;
+    /// Deck number badges and "loaded on deck n" markers only.
+    in-out property <color> deck1: root.light ? #1e66f5 : #89b4fa;
+    /// Deck 2.
+    in-out property <color> deck2: root.light ? #fe640b : #fab387;
+    /// Deck 3.
+    in-out property <color> deck3: root.light ? #8839ef : #cba6f7;
+    /// Deck 4.
+    in-out property <color> deck4: root.light ? #179299 : #94e2d5;
+    /// The jog's outer ring and the disc inside it.
+    in-out property <color> jog-ring: root.light ? #bcc0cc : #45475a;
+    /// The disc inside the jog's ring.
+    in-out property <color> jog-face: root.light ? #eff1f5 : #11111b;
+    /// The playhead arc on the jog's ring.
+    in-out property <color> jog-arc: root.light ? #d20f39 : #f38ba8;
+    /// The big BPM figure in the jog.
+    in-out property <color> jog-bpm: root.light ? #4c4f69 : #cdd6f4;
+    /// The tempo offset text in the jog.
+    in-out property <color> jog-text: root.light ? #6c6f85 : #a6adc8;
+    /// The tempo range text (±6 %) in the jog.
+    in-out property <color> jog-range: root.light ? #40a02b : #a6e3a1;
+    /// Hot cue pads: 0 = a list (2 columns of 4 rows, a letter badge and the cue time), 1 = a grid (4 columns of
+    /// 2 rows, every pad filled in its cue's colour).
+    in-out property <int> pad-style: 0;
+    /// Saturation and brightness (0..1) of the key column's Camelot colours (the hue is the key's).
+    in-out property <float> key-sat: root.light ? 0.75 : 0.45;
+    /// Brightness (0..1) of the key column's colours.
+    in-out property <float> key-val: root.light ? 0.75 : 1.0;
+    /// Size of the deck header's title, of the artist under it, and of the BPM next to the artist.
+    in-out property <length> deck-title: 14px;
+    in-out property <length> deck-sub: 12px;
+    in-out property <length> deck-bpm: 12px;
+    // Level meters
+    /// Level meters: the quiet part.
+    in-out property <color> meter-lo: root.light ? #40a02b : #a6e3a1;
+    /// Level meters: the middle part.
+    in-out property <color> meter-mid: root.light ? #df8e1d : #f9e2af;
+    /// Level meters: the loud part.
+    in-out property <color> meter-hi: root.light ? #d20f39 : #f38ba8;
+
+    // @group Typography
+    // Typography
+    /// Family of every text. A name that is not installed falls back to the system's default sans-serif.
+    in-out property <string> font: "Liberation Sans";
+    /// Smallest text: badges and tiny labels.
+    in-out property <length> font-xs: 9px;
+    /// Small text: labels, buttons, hints.
+    in-out property <length> font-sm: 10px;
+    /// Default text (track list, tree, inputs).
+    in-out property <length> font-size: 11px;
+    /// Medium text: headings of the preferences, dialog titles.
+    in-out property <length> font-md: 12px;
+    /// Deck title, elapsed / remaining time.
+    in-out property <length> font-lg: 14px;
+    /// Large text.
+    in-out property <length> font-xl: 18px;
+    /// Jog-centre BPM integer part.
+    in-out property <length> font-xxl: 22px;
+    /// Normal font weight.
+    in-out property <int> weight: 400;
+    /// Bold font weight (buttons, labels).
+    in-out property <int> weight-bold: 700;
+    /// Text size of the toast.
+    in-out property <length> font-toast: 13px;
+    /// Semi-bold font weight.
+    in-out property <int> weight-semi: 600;
+
+    // @group Sizes
+    // Spacing and radii
+    /// Gap between panels.
+    in-out property <length> gap: 2px;
+    /// Spacing, smallest step.
+    in-out property <length> space-xs: 2px;
+    /// Spacing, small step.
+    in-out property <length> space-sm: 4px;
+    /// Spacing, medium step.
+    in-out property <length> space-md: 6px;
+    /// Spacing, large step.
+    in-out property <length> space-lg: 8px;
+    /// Spacing, largest step.
+    in-out property <length> space-xl: 12px;
+    /// Corner radius of buttons and inputs.
+    in-out property <length> radius: 2px;
+    /// Corner radius of cards and dialogs.
+    in-out property <length> radius-lg: 4px;
+    /// Corner radius, largest.
+    in-out property <length> radius-xl: 6px;
+    /// Thickness of the `deck-frame` outline around each deck panel.
+    in-out property <length> deck-frame-w: 0px;
+
+    // Heights and widths of the shared regions
+    /// Height of the global bar (and dialog title bars).
+    in-out property <length> h-bar: 28px;
+    /// Height of the status bar.
+    in-out property <length> h-status: 22px;
+    /// Height of buttons and inputs.
+    in-out property <length> h-ctl: 22px;
+    /// Height of small buttons.
+    in-out property <length> h-ctl-sm: 18px;
+    /// Height of panel and column headers.
+    in-out property <length> h-header: 20px;
+    /// Row height of the browse lists (VIEW > Browse > Line Space); set from Rust.
+    in property <length> h-row: 22px;
+    /// Character size / weight of the browse lists (VIEW > Browse > FontSize, bold); set from Rust.
+    in property <length> list-font: 11px;
+    in property <int> list-weight: 400;
+    /// Height of the browser tabs.
+    in-out property <length> h-tab: 22px;
+    /// Height of the browser toolbar and the mixer strip.
+    in-out property <length> h-toolbar: 28px;
+    /// Height of each enlarged waveform with 2 decks (horizontal layout).
+    in-out property <length> h-wave-2: 56px;
+    /// Height of each enlarged waveform with 4 decks (horizontal layout).
+    in-out property <length> h-wave-4: 44px;
+    /// Height of the deck's full-track waveform.
+    in-out property <length> h-overview: 36px;
+    /// Height of the phrase strip under it.
+    in-out property <length> h-phrase: 14px;
+    /// Height of a deck panel with 2 decks.
+    in-out property <length> h-deck-2: 240px;
+    /// Height of a deck panel with 4 decks.
+    in-out property <length> h-deck-4: 132px;
+    /// Optional panels (toggled from the global bar).
+    in-out property <length> h-fx: 62px;
+    /// Height of the MIX POINT LINK panel.
+    in-out property <length> h-mixpoint: 96px;
+    /// Height of the sampler panel.
+    in-out property <length> h-sampler: 96px;
+    /// Width of one mixer channel.
+    in-out property <length> w-channel: 52px;
+    /// Diameter of the jog.
+    in-out property <length> jog: 112px;
+    /// Diameter of the CUE and PLAY buttons.
+    in-out property <length> ring: 36px;
+
+    // @group Motion
+    // Motion
+    /// Hover and press fades of buttons.
+    in-out property <duration> t-fast: 80ms;
+    /// Toast fade.
+    in-out property <duration> t-fade: 180ms;
+    /// Hover time before a tooltip shows.
+    in-out property <duration> tooltip-delay: 600ms;
+}

@@ -1,0 +1,38 @@
+import { Theme } from "theme.slint";
+import { DialogFrame, Note } from "dialog.slint";
+
+/// One shortcut row, generated from the table in src/app/keys.rs.
+export struct HelpLine { keys: string, what: string }
+
+/// Keyboard shortcuts: the root FocusScope sends key events to Rust (src/app/keys.rs).
+export global KeysState {
+    /// Left and right column of the overlay.
+    in property <[HelpLine]> help;
+    in property <[HelpLine]> help-right;
+    in-out property <bool> help-visible;
+    /// text, shift, ctrl → true if a shortcut handled it.
+    callback key(string, bool, bool) -> bool;
+    /// Same arguments on key release (a held hot-cue / jump pad hands back to the slip playhead).
+    callback key-released(string, bool, bool) -> bool;
+}
+
+/// Dialog listing every shortcut; the scrim or the close button closes it.
+export component HelpOverlay inherits DialogFrame {
+    visible: KeysState.help-visible;
+    title: "KEYBOARD SHORTCUTS";
+    card-width: 940px;
+    closed => { KeysState.help-visible = false; }
+    HorizontalLayout {
+        spacing: Theme.space-xl * 2;
+        for rows in [KeysState.help, KeysState.help-right]: VerticalLayout {
+            spacing: 3px;
+            alignment: start;
+            for l in rows: HorizontalLayout {
+                spacing: Theme.space-lg;
+                Text { text: l.keys; color: Theme.text-bright; font-family: Theme.font; font-weight: Theme.weight-bold; font-size: Theme.font-md; width: 110px; overflow: elide; }
+                Text { text: l.what; color: Theme.text; font-family: Theme.font; font-size: Theme.font-md; overflow: elide; }
+            }
+        }
+    }
+    Note { text: "Up / Down move the track selection (when the search box is not focused).  Beat jump with a loop active moves the loop.  Hold CUE to preview, release returns; PLAY while held keeps playing.  SYNC latches: the deck follows the master's tempo and beats.  Drag a waveform to scratch.  The keys are the current KEYBOARD preset plus your changes (PREFERENCES > KEYBOARD).  ? or click to close."; }
+}

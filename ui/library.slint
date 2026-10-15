@@ -1,0 +1,250 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DialogFrame, FormRow, Note } from "dialog.slint";
+
+/// One track of the Missing File Manager.
+export struct MissingRow {
+    title: string,
+    path: string,
+    selected: bool,
+}
+
+/// One track of the Duplicated File Manager; `group` numbers the duplicate set, `keep` marks the representative file.
+export struct DupeRow {
+    group: int,
+    title: string,
+    info: string,
+    keep: bool,
+    selected: bool,
+}
+
+/// Library management (Rust: src/app/library/): the File / Track / Playlist menu actions, the path entry and confirmation
+/// dialogs they use, the Missing File Manager and the Duplicated File Manager. Rust owns every value.
+export global LibraryState {
+    /// A menu or context-menu entry was chosen; the id names the action (src/app/library/mod.rs `act`).
+    callback action(string);
+    /// Menu labels of the library plugins that read / write a collection file (File > Import / Export); choosing the
+    /// `i`th runs the action `import-collection:<i>` / `export-collection:<i>`.
+    in property <[string]> import-readers;
+    in property <[string]> export-writers;
+    /// Path / name entry: `path-done(true)` = OK. `path-browse` says a file chooser program (kdialog / zenity) exists.
+    in-out property <bool> path-open;
+    in property <string> path-title;
+    in property <string> path-note;
+    in-out property <string> path-text;
+    in property <bool> path-browse;
+    callback path-done(bool);
+    callback path-browse-clicked();
+    /// Question with up to two answers: 1 = yes, 2 = no (hidden when `confirm-no` is empty), 0 = cancel.
+    in-out property <bool> confirm-open;
+    in property <string> confirm-title;
+    in property <string> confirm-text;
+    in property <string> confirm-yes: "YES";
+    in property <string> confirm-no;
+    callback confirm-done(int);
+    /// Missing File Manager.
+    in-out property <bool> missing-open;
+    in property <[MissingRow]> missing-rows;
+    in property <string> missing-status;
+    in property <bool> busy;
+    callback missing-toggle(int);
+    callback missing-all();
+    callback missing-relocate();
+    callback missing-auto();
+    callback missing-delete();
+    callback missing-rescan();
+    /// Duplicated File Manager.
+    in-out property <bool> dupes-open;
+    in property <[DupeRow]> dupes-rows;
+    in property <string> dupes-status;
+    callback dupes-toggle(int);
+    callback dupes-keep(int);
+    callback dupes-merge();
+    callback dupes-delete();
+    callback dupes-rescan();
+}
+
+component Check inherits Rectangle {
+    in property <bool> on;
+    width: 14px;
+    height: 14px;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    border-radius: Theme.radius;
+    background: root.on ? Theme.accent : Theme.panel-raised;
+}
+
+component Radio inherits Rectangle {
+    in property <bool> on;
+    width: 14px;
+    height: 14px;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    border-radius: 7px;
+    background: root.on ? Theme.accent : Theme.panel-raised;
+}
+
+component Line inherits Text {
+    vertical-alignment: center;
+    overflow: elide;
+    font-family: Theme.font;
+    font-size: Theme.font-size;
+}
+
+/// A missing track: tick, title, and the path it used to have.
+component MissingLine inherits Rectangle {
+    in property <MissingRow> item;
+    callback toggled();
+    height: Theme.h-row;
+    background: area.has-hover ? Theme.hover-row : transparent;
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-md;
+        spacing: Theme.space-md;
+        Check { y: 4px; on: root.item.selected; horizontal-stretch: 0; }
+        Line { text: root.item.title; color: Theme.text-bright; horizontal-stretch: 2; }
+        Line { text: root.item.path; color: Theme.text-dim; horizontal-stretch: 3; }
+    }
+    area := TouchArea { clicked => { root.toggled(); } }
+}
+
+/// A duplicate: tick (to delete), radio (the file to keep), title and file facts.
+component DupeLine inherits Rectangle {
+    in property <DupeRow> item;
+    callback toggled();
+    callback kept();
+    height: Theme.h-row;
+    background: area.has-hover ? Theme.hover-row : (Math.mod(root.item.group, 2) == 0 ? transparent : Theme.row-alt);
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-md;
+        spacing: Theme.space-md;
+        Line { text: "#" + (root.item.group + 1); color: Theme.text-faint; width: 28px; horizontal-stretch: 0; }
+        Radio { y: 4px; on: root.item.keep; horizontal-stretch: 0; TouchArea { clicked => { root.kept(); } } }
+        Check { y: 4px; on: root.item.selected; horizontal-stretch: 0; }
+        Line { text: root.item.title; color: root.item.keep ? Theme.play : Theme.text-bright; horizontal-stretch: 2; }
+        Line { text: root.item.info; color: Theme.text-dim; horizontal-stretch: 3; }
+    }
+    area := TouchArea { clicked => { root.toggled(); } }
+}
+
+/// Every dialog of LibraryState; instantiate once in the window.
+export component LibraryOverlays inherits Rectangle {
+    // Path / name entry.
+    DialogFrame {
+        visible: LibraryState.path-open;
+        title: LibraryState.path-title;
+        card-width: 560px;
+        closed => { LibraryState.path-done(false); }
+        if LibraryState.path-note != "": Note { text: LibraryState.path-note; vertical-stretch: 0; }
+        HorizontalLayout {
+            spacing: Theme.space-sm;
+            vertical-stretch: 0;
+            path := TextField {
+                text <=> LibraryState.path-text;
+                accepted => { LibraryState.path-done(true); }
+                init => { self.focus-field(); }
+            }
+            if LibraryState.path-browse: Chip { text: "BROWSE…"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.path-browse-clicked(); } }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            vertical-stretch: 0;
+            alignment: end;
+            Chip { text: "OK"; width: 80px; horizontal-stretch: 0; active: true; clicked => { LibraryState.path-done(true); } }
+            Chip { text: "CANCEL"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.path-done(false); } }
+        }
+    }
+
+    // Confirmation.
+    DialogFrame {
+        visible: LibraryState.confirm-open;
+        title: LibraryState.confirm-title;
+        card-width: 480px;
+        closed => { LibraryState.confirm-done(0); }
+        Note { text: LibraryState.confirm-text; vertical-stretch: 0; }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            vertical-stretch: 0;
+            alignment: end;
+            Chip { text: LibraryState.confirm-yes; width: 100px; horizontal-stretch: 0; active: true; clicked => { LibraryState.confirm-done(1); } }
+            if LibraryState.confirm-no != "": Chip { text: LibraryState.confirm-no; width: 100px; horizontal-stretch: 0; clicked => { LibraryState.confirm-done(2); } }
+            Chip { text: "CANCEL"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.confirm-done(0); } }
+        }
+    }
+
+    // Missing File Manager.
+    DialogFrame {
+        visible: LibraryState.missing-open;
+        title: "MISSING FILE MANAGER";
+        card-width: 820px;
+        card-height: 520px;
+        closed => { LibraryState.missing-open = false; }
+        Note { text: "Tracks whose audio file cannot be found. Tick tracks, then RELOCATE (choose the new file of the first one; the others are looked for in its folder), AUTO RELOCATE (search the Auto Relocate Search Folders from Preferences > Advanced > Database) or DELETE (remove from the Collection; files are never deleted). None ticked = all."; vertical-stretch: 0; }
+        Rectangle {
+            background: Theme.bg-deep;
+            border-color: Theme.line-strong;
+            border-width: 1px;
+            ListView {
+                for row[i] in LibraryState.missing-rows: MissingLine { item: row; toggled => { LibraryState.missing-toggle(i); } }
+            }
+            if LibraryState.missing-rows.length == 0: Text {
+                text: LibraryState.busy ? "Searching…" : "No missing files";
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                color: Theme.text-faint;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+            }
+        }
+        Text { text: LibraryState.missing-status; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; vertical-stretch: 0; }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            vertical-stretch: 0;
+            Chip { text: "SELECT ALL"; width: 100px; horizontal-stretch: 0; clicked => { LibraryState.missing-all(); } }
+            Chip { text: "RESCAN"; width: 80px; horizontal-stretch: 0; enabled: !LibraryState.busy; clicked => { LibraryState.missing-rescan(); } }
+            Rectangle { horizontal-stretch: 1; }
+            Chip { text: "RELOCATE"; width: 100px; horizontal-stretch: 0; enabled: !LibraryState.busy && LibraryState.missing-rows.length > 0; clicked => { LibraryState.missing-relocate(); } }
+            Chip { text: "AUTO RELOCATE"; width: 120px; horizontal-stretch: 0; enabled: !LibraryState.busy && LibraryState.missing-rows.length > 0; clicked => { LibraryState.missing-auto(); } }
+            Chip { text: "DELETE"; width: 80px; horizontal-stretch: 0; enabled: !LibraryState.busy && LibraryState.missing-rows.length > 0; clicked => { LibraryState.missing-delete(); } }
+            Chip { text: "CLOSE"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.missing-open = false; } }
+        }
+    }
+
+    // Duplicated File Manager.
+    DialogFrame {
+        visible: LibraryState.dupes-open;
+        title: "DUPLICATED FILE MANAGER";
+        card-width: 820px;
+        card-height: 520px;
+        closed => { LibraryState.dupes-open = false; }
+        Note { text: "Tracks with the same title and artist (length within 1 s). The filled circle is the representative file. MERGE keeps it, adds the cues, playlist places, tags and plays of the others to it and removes the others from the Collection; DELETE removes the ticked tracks from the Collection. Files are never deleted."; vertical-stretch: 0; }
+        Rectangle {
+            background: Theme.bg-deep;
+            border-color: Theme.line-strong;
+            border-width: 1px;
+            ListView {
+                for row[i] in LibraryState.dupes-rows: DupeLine { item: row; toggled => { LibraryState.dupes-toggle(i); } kept => { LibraryState.dupes-keep(i); } }
+            }
+            if LibraryState.dupes-rows.length == 0: Text {
+                text: "No duplicate track found";
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                color: Theme.text-faint;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+            }
+        }
+        Text { text: LibraryState.dupes-status; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; vertical-stretch: 0; }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            vertical-stretch: 0;
+            alignment: end;
+            Chip { text: "MERGE"; width: 90px; horizontal-stretch: 0; enabled: LibraryState.dupes-rows.length > 0; active: true; clicked => { LibraryState.dupes-merge(); } }
+            Chip { text: "DELETE"; width: 90px; horizontal-stretch: 0; enabled: LibraryState.dupes-rows.length > 0; clicked => { LibraryState.dupes-delete(); } }
+            Chip { text: "RESCAN"; width: 90px; horizontal-stretch: 0; clicked => { LibraryState.dupes-rescan(); } }
+            Chip { text: "CLOSE"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.dupes-open = false; } }
+        }
+    }
+}

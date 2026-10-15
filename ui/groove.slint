@@ -1,0 +1,207 @@
+import { Chip, Dropdown, Knob, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState } from "deck.slint";
+
+/// One DRUM SWAP SLOT as its tile shows it. `state`: 0 idle, 1 waiting for the beat, 2 playing. `wave` is the loop's waveform, `beats` its
+/// length (the dots under the waveform mark the beats), `pos` the playhead 0..1, `target` a DRUM CAPTURE can land here (white frame).
+export struct DrumSlotView { loaded: bool, state: int, title: string, info: string, wave: image, beats: int, pos: float, target: bool }
+
+/// One deck's BEAT LAB row: the DRUM LOOP BANK in view (0 = A, 1 = B), MULTI mode, DRUM SWAP GAIN (0..1, 0.5 = unity), its 8 slots,
+/// DRUM RELEASE FX (the effect and beat names, held), and DRUM CAPTURE (armed, its range in beats).
+export struct GrooveDeckView {
+    bank: int,
+    multi: bool,
+    master: float,
+    slots: [DrumSlotView],
+    release-on: bool,
+    release-fx: string,
+    release-beat: string,
+    swapped: bool,
+    capture-on: bool,
+    capture-beats: string,
+}
+
+/// BEAT LAB (src/app/groove/, audio in src/audio/groove/): DRUM SWAP with 8 slots per deck.
+/// Rust owns every value; the callbacks (first argument = deck) carry the user's request.
+export global GrooveState {
+    /// PREFS > Extensions > BEAT LAB is on (and STEMS): the global bar shows the toggle.
+    in-out property <bool> enabled;
+    in-out property <bool> open;
+    in-out property <[GrooveDeckView]> decks;
+    /// The Drum Presets the PRESET list offers: the factory ones, the user's, then "Save as New Preset…" last.
+    in-out property <[string]> presets;
+    /// Deck whose "Save as New Preset" name box is open, -1 = none.
+    in-out property <int> saving: -1;
+    in-out property <string> status;
+    out property <length> panel-h: 18px + DeckState.count * 32px;
+    callback slot-pressed(int, int);
+    callback slot-load(int, int);
+    callback slot-clear(int, int);
+    /// (deck, slot, steps) the mouse wheel over a tile: SLOT GAIN.
+    callback slot-gain(int, int, float);
+    callback bank-selected(int, int);
+    callback multi-selected(int, bool);
+    callback master-edited(int, float);
+    callback preset-chosen(int, int);
+    callback preset-saved(int, string);
+    callback fx-step(int, int);
+    callback beat-step(int, int);
+    /// (deck, kind, beat index, held) kind 0 = DRUM RELEASE FX, 1 = DRUM ROLL, 2 = DRUM TRANS.
+    callback fx-held(int, int, int, bool);
+    callback capture-clicked(int);
+    callback range-clicked(int);
+}
+
+component Label inherits Text {
+    color: Theme.text-dim;
+    font-family: Theme.font;
+    font-size: Theme.font-xs;
+    font-weight: Theme.weight-bold;
+    vertical-alignment: center;
+    horizontal-stretch: 0;
+}
+
+/// One slot tile: bank letter and number, title / tempo, the loop's waveform with its beat dots and playhead. Click = PLAY / stop (or the DRUM
+/// CAPTURE target), the wheel = SLOT GAIN, ⤓ loads the browser's selected track, × unloads.
+component DrumSlot inherits Rectangle {
+    in property <int> deck;
+    in property <int> slot;
+    property <GrooveDeckView> d: GrooveState.decks[root.deck];
+    property <int> idx: root.d.bank * 4 + root.slot;
+    property <DrumSlotView> v: root.d.slots[root.idx];
+    min-width: 70px;
+    horizontal-stretch: 1;
+    background: root.v.state == 2 ? Theme.stem-drums.with-alpha(0.35) : root.v.state == 1 ? Theme.cue.with-alpha(0.3) : Theme.bg-deep;
+    border-width: 1px;
+    border-color: root.v.target ? Theme.text-bright : root.v.state == 2 ? Theme.stem-drums : Theme.line;
+    border-radius: Theme.radius;
+    clip: true;
+    if root.v.loaded: Image { width: parent.width; height: parent.height - 4px; source: root.v.wave; image-fit: fill; opacity: 0.55; }
+    for b in root.v.beats: Rectangle { x: b * parent.width / root.v.beats; y: parent.height - 4px; width: 2px; height: 2px; background: Theme.text-dim; }
+    if root.v.state == 2: Rectangle { x: root.v.pos * parent.width; width: 1px; background: Theme.play; }
+    Text {
+        x: 4px;
+        y: 1px;
+        width: parent.width - 22px;
+        text: (root.d.bank == 0 ? "A" : "B") + (root.slot + 1) + (root.v.title != "" ? "  " + root.v.title : "");
+        color: root.v.loaded ? Theme.text-bright : Theme.text-faint;
+        font-family: Theme.font;
+        font-size: Theme.font-xs;
+        font-weight: Theme.weight-bold;
+        overflow: elide;
+    }
+    Text {
+        x: 4px;
+        y: parent.height - 15px;
+        width: parent.width - 22px;
+        text: root.v.info;
+        color: Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-xs;
+        overflow: elide;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { GrooveState.slot-pressed(root.deck, root.idx); }
+        scroll-event(e) => {
+            GrooveState.slot-gain(root.deck, root.idx, e.delta-y > 0 ? 1.0 : -1.0);
+            accept
+        }
+    }
+    Rectangle {
+        x: parent.width - 16px;
+        y: 1px;
+        width: 14px;
+        height: 14px;
+        border-radius: Theme.radius;
+        background: load.has-hover ? Theme.accent : Theme.panel-raised.with-alpha(0.8);
+        Text { text: "⤓"; color: Theme.text; font-size: Theme.font-sm; horizontal-alignment: center; vertical-alignment: center; }
+        load := TouchArea { mouse-cursor: pointer; clicked => { GrooveState.slot-load(root.deck, root.idx); } }
+    }
+    if root.v.loaded: Rectangle {
+        x: parent.width - 16px;
+        y: 16px;
+        width: 14px;
+        height: 12px;
+        border-radius: Theme.radius;
+        background: clear.has-hover ? Theme.danger : Theme.panel-raised.with-alpha(0.8);
+        Text { text: "×"; color: Theme.text; font-size: Theme.font-sm; horizontal-alignment: center; vertical-alignment: center; }
+        clear := TouchArea { mouse-cursor: pointer; clicked => { GrooveState.slot-clear(root.deck, root.idx); } }
+    }
+}
+
+/// One deck's row: BANK A / B, the four slots in view, SINGLE / MULTI, DRUM SWAP GAIN, PRESET, DRUM CAPTURE (+ its range), DRUM RELEASE FX
+/// (its effect, its beats, hold to apply).
+component DeckRow inherits HorizontalLayout {
+    in property <int> deck;
+    property <GrooveDeckView> d: GrooveState.decks[root.deck];
+    spacing: 3px;
+    padding-left: Theme.space-md;
+    padding-right: Theme.space-md;
+    Text {
+        width: 16px;
+        horizontal-stretch: 0;
+        text: "" + (root.deck + 1);
+        color: [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][root.deck];
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+        font-weight: Theme.weight-bold;
+        vertical-alignment: center;
+    }
+    for b in 2: Chip { text: b == 0 ? "A" : "B"; min-width: 22px; max-width: 22px; horizontal-stretch: 0; height: 26px; active: root.d.bank == b; tooltip: "DRUM LOOP BANK"; clicked => { GrooveState.bank-selected(root.deck, b); } }
+    for n in 4: DrumSlot { deck: root.deck; slot: n; }
+    Chip { text: "SINGLE"; font-size: Theme.font-xs; min-width: 42px; horizontal-stretch: 0; height: 26px; active: !root.d.multi; tooltip: "DRUM SWAP SINGLE MODE: replaces the drums"; clicked => { GrooveState.multi-selected(root.deck, false); } }
+    Chip { text: "MULTI"; font-size: Theme.font-xs; min-width: 38px; horizontal-stretch: 0; height: 26px; active: root.d.multi; tooltip: "DRUM SWAP MULTI MODE: adds to the drums"; clicked => { GrooveState.multi-selected(root.deck, true); } }
+    Knob { width: 26px; height: 26px; horizontal-stretch: 0; detent: true; value: root.d.master; edited(v) => { GrooveState.master-edited(root.deck, v); } }
+    Dropdown { label: "PRESET"; width: 60px; horizontal-stretch: 0; height: 26px; font-size: Theme.font-xs; list-width: 190px; options: GrooveState.presets; current: -1; chose(i) => { GrooveState.preset-chosen(root.deck, i); } }
+    Chip { text: "CAPTURE"; font-size: Theme.font-xs; min-width: 52px; horizontal-stretch: 0; height: 26px; active: root.d.capture-on; active-color: Theme.text-bright.with-alpha(0.35); tooltip: "DRUM CAPTURE: pick a slot to put the drums of the range in"; clicked => { GrooveState.capture-clicked(root.deck); } }
+    if root.d.capture-on: Chip { text: root.d.capture-beats; font-size: Theme.font-xs; min-width: 24px; max-width: 24px; horizontal-stretch: 0; height: 26px; tooltip: "Range in beats: 4, 8, 16, 32"; clicked => { GrooveState.range-clicked(root.deck); } }
+    Chip { text: "◀"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; tooltip: "DRUM RELEASE FX"; clicked => { GrooveState.fx-step(root.deck, -1); } }
+    Chip {
+        text: root.d.release-fx;
+        font-size: Theme.font-xs;
+        min-width: 50px;
+        horizontal-stretch: 0;
+        height: 26px;
+        active: root.d.release-on;
+        active-color: Theme.stem-drums;
+        tooltip: "DRUM RELEASE FX: hold to apply to the drums";
+        pressed => { GrooveState.fx-held(root.deck, 0, 0, true); }
+        released => { GrooveState.fx-held(root.deck, 0, 0, false); }
+    }
+    Chip { text: "▶"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; clicked => { GrooveState.fx-step(root.deck, 1); } }
+    Chip { text: "−"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; clicked => { GrooveState.beat-step(root.deck, -1); } }
+    Text { text: root.d.release-beat; width: 24px; horizontal-stretch: 0; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+    Chip { text: "+"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; tooltip: "Beats of the DRUM RELEASE FX"; clicked => { GrooveState.beat-step(root.deck, 1); } }
+}
+
+/// BEAT LAB panel: a header (title, the last action's result, the name box of "Save as New Preset") and one row per deck in use.
+export component GroovePanel inherits Rectangle {
+    background: Theme.panel;
+    VerticalLayout {
+        spacing: 2px;
+        HorizontalLayout {
+            height: 16px;
+            padding-left: Theme.space-md;
+            padding-right: Theme.space-md;
+            spacing: Theme.space-md;
+            Label { text: "BEAT LAB"; color: Theme.stem-drums.brighter(0.4); }
+            if GrooveState.saving < 0: Text { text: GrooveState.status; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+            if GrooveState.saving >= 0: HorizontalLayout {
+                spacing: Theme.space-md;
+                horizontal-stretch: 1;
+                Label { text: "PRESET NAME"; }
+                name := TextField {
+                    height: 16px;
+                    horizontal-stretch: 1;
+                    placeholder-text: "Drum Preset name";
+                    accepted(t) => { GrooveState.preset-saved(GrooveState.saving, t); }
+                    init => { self.focus-field(); }
+                }
+                Chip { text: "OK"; height: 16px; min-width: 30px; horizontal-stretch: 0; clicked => { GrooveState.preset-saved(GrooveState.saving, name.text); } }
+                Chip { text: "CANCEL"; height: 16px; min-width: 50px; horizontal-stretch: 0; clicked => { GrooveState.saving = -1; } }
+            }
+        }
+        for i in DeckState.count: DeckRow { height: 30px; deck: i; }
+    }
+}

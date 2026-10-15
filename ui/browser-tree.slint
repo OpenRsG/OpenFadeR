@@ -1,0 +1,129 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, IconButton, Icon, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { BrowserState } from "browser-state.slint";
+import { DragState, TreeDropTarget } from "dnd.slint";
+
+/// The playlist tree: 22 px rows, the selected one on `select`. Labels carry their depth as leading spaces (sidebar.rs).
+export component TreeView inherits Rectangle {
+    in-out property <int> current-item: -1;
+    /// The chosen row changed by click, key or `set-current-item`.
+    callback item-changed(int);
+    callback focused;
+    out property <bool> has-focus: fs.has-focus;
+    background: Theme.panel;
+    clip: true;
+
+    forward-focus: fs;
+    /// Chooses row `i` (clamped), scrolls it into view and reports it, as the std list view did.
+    public function set-current-item(i: int) {
+        if (BrowserState.playlists.length == 0) { return; }
+        root.current-item = max(0, min(BrowserState.playlists.length - 1, i));
+        if (root.current-item * Theme.h-row + list.content-y < 0) { list.content-y = -root.current-item * Theme.h-row; }
+        else if ((root.current-item + 1) * Theme.h-row + list.content-y > list.height) { list.content-y = list.height - (root.current-item + 1) * Theme.h-row; }
+        root.item-changed(root.current-item);
+    }
+
+    fs := FocusScope {
+        key-pressed(e) => {
+            if (e.text == Key.UpArrow) { root.set-current-item(root.current-item - 1); return accept; }
+            if (e.text == Key.DownArrow) { root.set-current-item(root.current-item + 1); return accept; }
+            reject
+        }
+        list := ListView {
+            for item[i] in BrowserState.playlists: Rectangle {
+                height: Theme.h-row;
+                background: i == root.current-item ? Theme.select : (ta.has-hover ? Theme.hover-row : transparent);
+                Text {
+                    x: Theme.space-md;
+                    width: parent.width - 2 * Theme.space-md;
+                    height: parent.height;
+                    text: item.text;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    color: i == root.current-item ? Theme.text-bright : Theme.text-dim;
+                    font-family: Theme.font;
+                    font-size: Theme.list-font;
+                    font-weight: Theme.list-weight;
+                }
+                // Dragging a playlist onto a palette (Playlist Palette) shows it there.
+                DragArea {
+                    data: BrowserState.drag-tree(i);
+                    allow-copy: true;
+                    changed dragging => { DragState.drag-changed(self.dragging, BrowserState.drag-tree(i)); }
+                    ta := TouchArea {
+                        pointer-event(e) => {
+                            if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left) {
+                                root.focused();
+                                fs.focus();
+                                root.set-current-item(i);
+                            }
+                        }
+                        // Preferences > Advanced > Browse > Edit Library: rename by double click.
+                        double-clicked => { if (BrowserState.edit-library) { BrowserState.side-rename(); } }
+                    }
+                }
+                TreeDropTarget { tree-row: i; }
+            }
+        }
+    }
+    Rectangle { border-width: 1px; border-color: fs.has-focus ? Theme.accent : transparent; }
+}
+
+/// The picker on the table's right edge (ADD TO playlist, tags of the track, tag filter, NEW, MORE).
+export component PickerPanel inherits Rectangle {
+    background: Theme.panel-raised;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    VerticalLayout {
+        padding: Theme.space-sm;
+        spacing: Theme.space-sm;
+        HorizontalLayout {
+            spacing: Theme.space-sm;
+            Text { text: BrowserState.panel-title; color: Theme.text; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; overflow: elide; }
+            IconButton { icon: Icon.close; tooltip: "Close"; clicked => { BrowserState.panel-close(); } }
+        }
+        ListView {
+            for item[i] in BrowserState.panel-rows: Rectangle {
+                height: Theme.h-row;
+                background: ta.has-hover ? Theme.select : transparent;
+                Text { x: Theme.space-md; width: parent.width - 2 * Theme.space-md; height: parent.height; text: item.text; vertical-alignment: center; overflow: elide; color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
+                ta := TouchArea { clicked => { BrowserState.panel-row(i); } }
+            }
+        }
+    }
+}
+
+/// Smart playlist editor: match all / any, one row per condition (kind, first and second box).
+export component SmartEditor inherits Rectangle {
+    background: Theme.panel;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    property <[string]> kinds: ["BPM", "Key", "Rating ≥", "Genre contains", "Tags", "Date added"];
+    property <[string]> hints-a: ["BPM min", "8A / Am / …", "1-5 stars", "text", "tag name", "from YYYY-MM-DD"];
+    property <[string]> hints-b: ["BPM max", "", "", "", "", "to YYYY-MM-DD"];
+    VerticalLayout {
+        padding: Theme.space-md;
+        spacing: Theme.space-sm;
+        HorizontalLayout {
+            spacing: Theme.space-sm;
+            Text { text: "SMART PLAYLIST: " + BrowserState.editor-title; color: Theme.text; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; overflow: elide; }
+            Chip { text: BrowserState.editor-any ? "MATCH ANY" : "MATCH ALL"; width: 84px; horizontal-stretch: 0; clicked => { BrowserState.editor-any = !BrowserState.editor-any; } }
+            Chip { text: "+ CONDITION"; width: 88px; horizontal-stretch: 0; clicked => { BrowserState.cond-add(); } }
+            Chip { text: "SAVE"; width: 54px; horizontal-stretch: 0; active: true; clicked => { BrowserState.editor-save(); } }
+            Chip { text: "CANCEL"; width: 64px; horizontal-stretch: 0; clicked => { BrowserState.editor-cancel(); } }
+        }
+        if BrowserState.editor-error != "": Text { text: BrowserState.editor-error; color: Theme.danger; font-family: Theme.font; font-size: Theme.font-size; overflow: elide; vertical-stretch: 0; }
+        ListView {
+            for kind[i] in BrowserState.cond-kinds: HorizontalLayout {
+                spacing: Theme.space-sm;
+                height: Theme.h-ctl + Theme.space-sm;
+                padding-bottom: Theme.space-sm;
+                Chip { text: kinds[kind]; width: 110px; horizontal-stretch: 0; clicked => { BrowserState.cond-kind(i); } }
+                TextField { placeholder-text: hints-a[kind]; text: BrowserState.cond-a[i]; edited(t) => { BrowserState.cond-edit(i, 0, t); } }
+                if kind == 0 || kind == 5: TextField { placeholder-text: hints-b[kind]; text: BrowserState.cond-b[i]; edited(t) => { BrowserState.cond-edit(i, 1, t); } }
+                IconButton { icon: Icon.close; tooltip: "Remove condition"; clicked => { BrowserState.cond-remove(i); } }
+            }
+        }
+    }
+}

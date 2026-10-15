@@ -1,0 +1,16 @@
+[package]
+name = "openfader-ui"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# The Slint UI compiled on its own: its generated Rust (tens of MB) is rebuilt only when a .slint file changes, not on
+# every edit of the app's Rust code (src/app/), which depends on it.
+[lib]
+path = "lib.rs"
+
+[dependencies]
+slint = "1.17"
+
+[build-dependencies]
+slint-build = "1.17"

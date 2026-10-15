@@ -1,0 +1,75 @@
+import { Chip, Dropdown, TextField, Toggle } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DialogFrame, FormRow, Note } from "dialog.slint";
+import { Caption, DeviceState, PickList } from "device-state.slint";
+
+/// EXPORT tab: the library, or the ticked playlists, onto a device (new library) or into the one it holds (new tracks are
+/// copied and analysed, tracks it has are refreshed, same-named playlists replaced, everything else stays).
+export component ExportPage inherits VerticalLayout {
+    spacing: Theme.space-lg;
+    Note { text: "Writes the library, its analysis files and the audio in the format of the device's plugin. A library already on the device is extended, never wiped."; vertical-stretch: 0; }
+    FormRow {
+        label: "DEVICE";
+        vertical-stretch: 0;
+        Dropdown {
+            options: DeviceState.device-names;
+            current: max(0, DeviceState.current);
+            enabled: DeviceState.device-names.length > 0 && !DeviceState.busy;
+            label: DeviceState.current < 0 ? "no device" : "";
+            list-width: 320px;
+            chose(i) => { DeviceState.select(i); }
+        }
+    }
+    FormRow {
+        label: "OR A FOLDER";
+        vertical-stretch: 0;
+        TextField { text <=> DeviceState.folder; placeholder-text: "any folder, e.g. a mounted share"; horizontal-stretch: 1; }
+    }
+    HorizontalLayout {
+        spacing: Theme.space-sm;
+        vertical-stretch: 0;
+        Caption { text: "PLAYLISTS (none ticked = everything)"; }
+        Chip { text: "CLEAR"; width: 60px; horizontal-stretch: 0; clicked => { DeviceState.export-clear(); } }
+    }
+    PickList { rows: DeviceState.export-rows; toggled(i) => { DeviceState.export-toggle(i); } }
+    HorizontalLayout {
+        alignment: end;
+        vertical-stretch: 0;
+        Chip {
+            text: "EXPORT";
+            width: 100px;
+            horizontal-stretch: 0;
+            enabled: !DeviceState.busy && (DeviceState.folder != "" || DeviceState.current >= 0);
+            active: !DeviceState.busy;
+            clicked => { DeviceState.export-start(); }
+        }
+    }
+}
+
+/// SYNC MANAGER tab ("Synchronize playlists with a device"): the ticked playlists are exported to the chosen device
+/// in their latest state when SYNC is pressed, and when the app starts and the device is mounted.
+export component SyncPage inherits VerticalLayout {
+    spacing: Theme.space-lg;
+    Toggle {
+        text: "Synchronize playlists with " + (DeviceState.current < 0 ? "a device" : DeviceState.device-names[DeviceState.current]);
+        checked: DeviceState.sync-on;
+        enabled: DeviceState.current >= 0;
+        vertical-stretch: 0;
+        toggled(on) => { DeviceState.sync-set-on(on); }
+    }
+    Note { text: "The ticked playlists are exported always in the latest state: new tracks are copied, tracks the device has are updated, the playlists get the current content."; vertical-stretch: 0; }
+    Caption { text: "PLAYLISTS TO KEEP IN SYNC"; }
+    PickList { rows: DeviceState.sync-rows; toggled(i) => { DeviceState.sync-toggle(i); } }
+    HorizontalLayout {
+        alignment: end;
+        vertical-stretch: 0;
+        Chip {
+            text: "SYNC NOW";
+            width: 100px;
+            horizontal-stretch: 0;
+            enabled: !DeviceState.busy && DeviceState.current >= 0;
+            active: !DeviceState.busy && DeviceState.current >= 0;
+            clicked => { DeviceState.sync-start(); }
+        }
+    }
+}

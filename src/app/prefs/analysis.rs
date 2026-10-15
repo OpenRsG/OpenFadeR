@@ -1,0 +1,321 @@
+//! ANALYSIS category (Preferences > Analysis: Track Analysis, CUE Analysis; values and defaults are
+//! our choice). Typed section [`Analysis`] plus the page rows; [`crate::app::analyze`] hands it to the analysis code
+//! ([`openfader::analysis::options`], workers, tags, stored cues) whenever it changes.
+//!
+//! | item | setting | wired to |
+//! | --- | --- | --- |
+//! | high precision | `high_precision` | [`openfader::analysis::detect::GridOptions::precision`] (1 ms flux frames, sub-frame onsets) |
+//! | mode, BPM range | `track_mode`, `bpm_range` | [`openfader::analysis::detect::Mode`], `bpm_range` (octave fold + search band); Auto only with high precision |
+//! | parts | `part_*` | [`openfader::analysis::options::Parts`]: a part off is not computed and left empty |
+//! | Auto Analysis | `auto_analysis` | the background run at start ([`crate::app::analyze::wire`]); off = only ANALYZE NOW / the track menu |
+//! | write key | `key_write_tag` | [`openfader::analysis::tag::write_key`] after each analysis, never otherwise |
+//! | process | `process` | worker threads and their priority ([`crate::app::analyze`]) |
+//! | CUE | `cue_*` | [`openfader::analysis::auto::CueOptions`] (pure cue generation), stored through the store overlay |
+//! | playlist | `view.panel_cue_analysis` | shared with VIEW; the tracks are [`crate::app::analyze::cue_analysed`] |
+
+use super::{Prefs, Row, choice, section};
+use openfader::analysis::auto::{MAX_HOT, MAX_MEMORY, MIN_TRACKS};
+
+choice!(
+    /// Track Analysis Mode: Normal = one steady tempo, Dynamic = a tempo-varying grid, Auto = Dynamic when the
+    /// tempo drifts (needs high precision).
+    TrackMode { #[default] Normal = "normal", Dynamic = "dynamic", Auto = "auto" }
+);
+choice!(
+    /// BPM Range for Normal analysis: the tempo is doubled or halved
+    /// into it. Every range spans an octave, so exactly one reading fits.
+    BpmRange { R70 = "70-140", R80 = "80-160", #[default] R85 = "85-175", R90 = "90-180", R100 = "100-200", R110 = "110-220" }
+);
+choice!(
+    /// Analysis Process: Performance (as fast as possible) or Power saving (lowest CPU load).
+    Process { #[default] Performance = "performance", PowerSaving = "power-saving" }
+);
+choice!(
+    /// Set CUE during analysis.
+    CueSetting { Auto = "auto", #[default] Manual = "manual" }
+);
+
+impl BpmRange {
+    /// Lowest and highest BPM of the range.
+    pub fn bounds(self) -> (u16, u16) {
+        match self {
+            BpmRange::R70 => (70, 140),
+            BpmRange::R80 => (80, 160),
+            BpmRange::R85 => (85, 175),
+            BpmRange::R90 => (90, 180),
+            BpmRange::R100 => (100, 200),
+            BpmRange::R110 => (110, 220),
+        }
+    }
+}
+
+/// The N values of "Repeat CUE settings per N bars from 1.1 Bars".
+pub const REPEAT_BARS: [u8; 7] = [1, 2, 4, 8, 16, 32, 64];
+
+section!(
+    Analysis {
+        /// Auto Analysis of imported / newly seen tracks.
+        auto_analysis: bool = true;
+        /// Use high precision BeatGrid analysis, Track Analysis Mode, BPM range of the grid.
+        high_precision: bool = false;
+        track_mode: TrackMode = TrackMode::Normal;
+        bpm_range: BpmRange = BpmRange::R85;
+        /// Track Analysis Setting: BPM / Grid, KEY, Phrase, Vocal.
+        part_grid: bool = true;
+        part_key: bool = true;
+        part_phrase: bool = true;
+        part_vocal: bool = true;
+        /// Key Analysis > Write the value to the ID3 tag.
+        key_write_tag: bool = false;
+        /// Analysis Process.
+        process: Process = Process::Performance;
+        /// CUE Analysis: Set CUE during analysis, CUE Type counts, CUE Setting.
+        cue_mode: CueSetting = CueSetting::Manual;
+        cue_hot: u8 = 8;
+        cue_memory: u8 = 1;
+        cue_first_bar: bool = false;
+        cue_repeat: bool = false;
+        cue_repeat_bars: u8 = 16;
+        cue_keep: bool = false;
+        cue_comment: bool = false;
+    }
+);
+
+impl Analysis {
+    /// Auto only exists with high precision; without it a stored Auto reads as Normal.
+    pub fn mode(&self) -> TrackMode {
+        if self.track_mode == TrackMode::Auto && !self.high_precision {
+            TrackMode::Normal
+        } else {
+            self.track_mode
+        }
+    }
+}
+
+fn numbers(n: usize) -> Vec<String> {
+    (0..=n).map(|i| i.to_string()).collect()
+}
+
+pub fn rows(p: &Prefs) -> Vec<Row> {
+    let a = &p.analysis;
+    let mode_names: &[&str] = if a.high_precision {
+        &["NORMAL", "DYNAMIC", "AUTO"]
+    } else {
+        &["NORMAL", "DYNAMIC"]
+    };
+    let learnt = crate::app::analyze::tendency_status();
+    let auto_cue = a.cue_mode == CueSetting::Auto;
+    let followed = auto_cue && learnt.tendency.is_some(); // Auto with a tendency overrides the counts and bar options
+    let manual_only = |r: Row| r.enabled(!followed);
+    let repeat_at = REPEAT_BARS
+        .iter()
+        .position(|&n| n == a.cue_repeat_bars)
+        .unwrap_or(4);
+    let mut rows = vec![
+        Row::header("TRACK ANALYSIS"),
+        Row::check(
+            "high_precision",
+            "Use high precision BeatGrid analysis",
+            a.high_precision,
+        )
+        .hint("1 ms frames"),
+        Row::chips(
+            "track_mode",
+            "TRACK ANALYSIS MODE",
+            mode_names,
+            a.mode() as usize,
+        )
+        .hint(if a.high_precision {
+            "AUTO: Dynamic when the tempo drifts"
+        } else {
+            "AUTO needs high precision"
+        }),
+        Row::of("bpm_range", "BPM RANGE", a.bpm_range).hint("BPM"),
+        Row::header("TRACK ANALYSIS SETTING"),
+        Row::check("part_grid", "BPM / Grid", a.part_grid),
+        Row::check("part_key", "KEY", a.part_key),
+        Row::check("part_phrase", "Phrase", a.part_phrase).hint("needs the grid"),
+        Row::check("part_vocal", "Vocal", a.part_vocal).hint("heuristic"),
+        Row::header("AUTO ANALYSIS"),
+        Row::check("auto_analysis", "Auto Analysis", a.auto_analysis)
+            .hint("tracks without a BPM or key"),
+        Row::chips(
+            "analyze_now",
+            "ANALYZE LIBRARY",
+            &["ANALYZE NOW"],
+            usize::MAX,
+        ),
+        Row::header("KEY ANALYSIS"),
+        Row::check(
+            "key_write_tag",
+            "Write the value to the ID3 tag",
+            a.key_write_tag,
+        )
+        .hint("MP3, WAV, AIFF, FLAC")
+        .enabled(a.part_key),
+        Row::header("ANALYSIS PROCESS"),
+        Row::of("process", "ANALYSIS PROCESS", a.process).hint(&format!(
+            "{} worker thread(s)",
+            crate::app::analyze::workers(a.process)
+        )),
+        Row::header("CUE ANALYSIS"),
+        Row::chips(
+            "cue_mode",
+            "SET CUE DURING ANALYSIS",
+            &["AUTO", "MANUAL"],
+            a.cue_mode as usize,
+        ),
+    ];
+    if auto_cue {
+        rows.push(match &learnt.tendency {
+            Some(t) => Row::info(
+                "PERSONAL CUE TENDENCY",
+                &format!(
+                    "{} tracks: first cue at bar {}, {}, {} hot / {} memory",
+                    t.tracks,
+                    t.offset_bars + 1,
+                    t.spacing_bars
+                        .map_or("on phrases".to_owned(), |n| format!("every {n} bars")),
+                    t.hot,
+                    t.memory
+                ),
+            ),
+            None => Row::info(
+                "PERSONAL CUE TENDENCY",
+                &format!(
+                    "needs {} tracks with cues ({} found): MANUAL settings apply",
+                    MIN_TRACKS, learnt.found
+                ),
+            ),
+        });
+    }
+    rows.extend([
+        manual_only(Row::dropdown_of(
+            "cue_hot",
+            "HOT CUES",
+            numbers(MAX_HOT as usize),
+            a.cue_hot.min(MAX_HOT) as usize,
+        )),
+        manual_only(Row::dropdown_of(
+            "cue_memory",
+            "MEMORY CUES",
+            numbers(MAX_MEMORY as usize),
+            a.cue_memory.min(MAX_MEMORY) as usize,
+        )),
+        manual_only(Row::check(
+            "cue_first_bar",
+            "Set to 1.1 Bars",
+            a.cue_first_bar,
+        )),
+        Row::check(
+            "cue_repeat",
+            "Repeat CUE settings per N bars from 1.1 Bars",
+            a.cue_repeat && !auto_cue,
+        )
+        .enabled(!auto_cue),
+        Row::dropdown_of(
+            "cue_repeat_bars",
+            "N BARS",
+            REPEAT_BARS.iter().map(|n| n.to_string()).collect(),
+            repeat_at,
+        )
+        .enabled(!auto_cue && a.cue_repeat),
+        Row::check("cue_keep", "Prohibit overwriting CUEs", a.cue_keep),
+        Row::check("cue_comment", "Add a comment to CUE", a.cue_comment).hint("phrase or bar"),
+        Row::check(
+            "panel_cue_analysis",
+            "Display the CUE Analysis playlist",
+            p.view.panel_cue_analysis,
+        ),
+    ]);
+    rows
+}
+
+pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
+    let a = &mut p.analysis;
+    match key {
+        "cue_hot" => a.cue_hot = i.min(MAX_HOT as usize) as u8,
+        "cue_memory" => a.cue_memory = i.min(MAX_MEMORY as usize) as u8,
+        "cue_repeat_bars" => {
+            a.cue_repeat_bars = REPEAT_BARS.get(i).copied().unwrap_or(a.cue_repeat_bars)
+        }
+        "high_precision" => {
+            a.high_precision = i == 1;
+            if !a.high_precision && a.track_mode == TrackMode::Auto {
+                a.track_mode = TrackMode::Normal;
+            }
+        }
+        "analyze_now" => super::run_action(key),
+        // the same setting as VIEW > Layout > Browser panel > CUE Analysis Playlist
+        "panel_cue_analysis" => p.view.panel_cue_analysis = i == 1,
+        _ => return a.pick(key, i),
+    }
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(p: &Prefs, key: &str) -> Row {
+        rows(p).into_iter().find(|r| r.key == key).unwrap()
+    }
+
+    #[test]
+    fn auto_mode_exists_only_with_high_precision() {
+        let mut p = Prefs::default();
+        assert!(choose(&mut p, "high_precision", 1));
+        assert!(choose(&mut p, "track_mode", 2));
+        assert_eq!(p.analysis.mode(), TrackMode::Auto);
+        assert_eq!(row(&p, "track_mode").options.len(), 3);
+        choose(&mut p, "high_precision", 0);
+        assert_eq!(
+            p.analysis.track_mode,
+            TrackMode::Normal,
+            "Auto falls back to Normal when precision goes off"
+        );
+        assert_eq!(row(&p, "track_mode").options.len(), 2);
+        p.analysis.track_mode = TrackMode::Auto; // a hand-edited file
+        assert_eq!(p.analysis.mode(), TrackMode::Normal);
+        assert_eq!(row(&p, "track_mode").current, 0);
+    }
+
+    #[test]
+    fn numbers_are_clamped_and_bar_steps_are_a_list() {
+        let mut p = Prefs::default();
+        choose(&mut p, "cue_hot", 99);
+        choose(&mut p, "cue_memory", 99);
+        assert_eq!((p.analysis.cue_hot, p.analysis.cue_memory), (8, 10));
+        choose(&mut p, "cue_repeat_bars", 2);
+        assert_eq!(p.analysis.cue_repeat_bars, 4);
+        choose(&mut p, "cue_repeat_bars", 99);
+        assert_eq!(p.analysis.cue_repeat_bars, 4);
+        p.analysis.cue_hot = 200; // a hand-edited file: the dropdown still shows a valid entry
+        assert_eq!(row(&p, "cue_hot").current, 8);
+    }
+
+    #[test]
+    fn dependent_rows_follow_their_switches() {
+        let mut p = Prefs::default();
+        assert!(
+            !row(&p, "cue_repeat_bars").enabled,
+            "N follows the repeat checkbox"
+        );
+        choose(&mut p, "cue_repeat", 1);
+        assert!(row(&p, "cue_repeat_bars").enabled && row(&p, "cue_repeat").enabled);
+        choose(&mut p, "cue_mode", 0);
+        assert!(
+            !row(&p, "cue_repeat").enabled,
+            "the bar repeat is Manual only"
+        );
+        assert!(
+            rows(&p).iter().any(|r| r.label == "PERSONAL CUE TENDENCY"),
+            "Auto explains what it follows"
+        );
+        p.analysis.part_key = false;
+        assert!(
+            !row(&p, "key_write_tag").enabled,
+            "no key analysis, no key to write"
+        );
+    }
+}

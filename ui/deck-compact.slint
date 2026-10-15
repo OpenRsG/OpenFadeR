@@ -1,0 +1,94 @@
+import { Chip, Fader } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState, DeckView } from "deck-state.slint";
+import { DeckOverview } from "deck-wave.slint";
+import { DeckTitle, Jacket, StemRow } from "deck-header.slint";
+import { JogWheel, RingColumn, SideButtons } from "deck-controls.slint";
+import { DeckDropTarget } from "dnd.slint";
+
+/// Decks C and D of the 4-deck layout (132 px): header 28, overview 28 + phrase strip 12, a 64 px control row:
+/// hot cues A-D, tempo fader, SYNC / MASTER, STEMS | CUE / PLAY | jog | SLIP Q MT, mirrored for the odd decks. Loops, key
+/// controls and the cue list stay on A and B (and on a controller's deck 3/4 layer).
+export component DeckCompact inherits Rectangle {
+    in property <int> index;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <bool> mirror: Math.mod(root.index, 2) == 1;
+    preferred-width: 100px;
+    horizontal-stretch: 1;
+    background: Theme.deck-bg;
+    VerticalLayout {
+        HorizontalLayout {
+            height: 28px;
+            padding-left: 2px;
+            padding-right: 4px;
+            spacing: 4px;
+            Jacket { index: root.index; size: 26px; y: 1px; }
+            DeckTitle { index: root.index; title-size: Theme.font-md; sub-size: Theme.font-size; min-width: 0px; horizontal-stretch: 1; }
+            Text { text: root.v.remain-text; color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+        }
+        DeckOverview { index: root.index; height: 40px; }
+        ctl := Rectangle {
+            height: 64px;
+            property <length> wm: self.width - 28px - 64px - 34px - 3 * 4px - 8px;
+            property <length> x-main: root.mirror ? 4px + 34px + 64px + 28px + 12px : 4px;
+            property <length> x-ring: root.mirror ? 4px + 34px + 64px + 8px : 4px + self.wm + 4px;
+            property <length> x-jog: root.mirror ? 4px + 34px + 4px : 4px + self.wm + 28px + 8px;
+            property <length> x-side: root.mirror ? 4px : 4px + self.wm + 28px + 64px + 12px;
+            VerticalLayout {
+                x: ctl.x-main;
+                y: 1px;
+                width: ctl.wm;
+                height: ctl.height - 2px;
+                spacing: 2px;
+                HorizontalLayout {
+                    spacing: 2px;
+                    for i in [0, 1, 2, 3]: Chip {
+                        width: 28px;
+                        horizontal-stretch: 0;
+                        text: root.v.pads[i].label;
+                        active: root.v.pads[i].set;
+                        active-color: root.v.pads[i].color;
+                        enabled: root.v.loaded || root.v.pad-mode == 6 || root.v.pad-mode == 9 || root.v.pad-mode == 10;
+                        pressed => { DeckState.pad(root.index, i); }
+                        released => { DeckState.pad-released(root.index); }
+                    }
+                    if root.v.stems && root.v.stem-buttons: StemRow { index: root.index; h: 22px; }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+                HorizontalLayout {
+                    height: 18px;
+                    spacing: 4px;
+                    Fader {
+                        detent: true;
+                        min-width: 50px;
+                        value: root.v.tempo;
+                        edited(p) => { DeckState.tempo(root.index, p); }
+                    }
+                    Text { text: root.v.tempo-text; color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; horizontal-alignment: right; width: 46px; }
+                    Chip { text: root.v.tempo-range; width: 44px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: "Tempo range"; clicked => { DeckState.tempo-range(root.index); } }
+                }
+                HorizontalLayout {
+                    height: 18px;
+                    spacing: 2px;
+                    Chip { text: "SYNC"; width: 44px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.synced; active-color: Theme.sync; clicked => { DeckState.sync(root.index); } }
+                    Chip { text: "MASTER"; width: 50px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.master; active-color: Theme.master; clicked => { DeckState.master-toggle(root.index); } }
+                    if root.v.sync-rate != "": Text { text: root.v.sync-rate; width: 22px; horizontal-stretch: 0; color: Theme.accent-hi; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+                    Text {
+                        text: (!root.v.stem-buttons && root.v.stem-text != "" ? root.v.stem-text + " · " : "") + (root.v.title != "" ? root.v.key-shift : root.v.status);
+                        color: Theme.text-dim;
+                        font-size: Theme.font-sm;
+                        overflow: elide;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        min-width: 0px;
+                    }
+                }
+            }
+            RingColumn { index: root.index; size: 28px; x: ctl.x-ring; y: 1px; width: 28px; height: 62px; }
+            JogWheel { index: root.index; x: ctl.x-jog; y: 0px; width: 64px; }
+            SideButtons { index: root.index; h: 16px; x: ctl.x-side; width: 34px; height: ctl.height; }
+        }
+    }
+    Rectangle { border-width: Theme.deck-frame-w; border-color: Theme.deck-frame; }
+    DeckDropTarget { index: root.index; }
+}

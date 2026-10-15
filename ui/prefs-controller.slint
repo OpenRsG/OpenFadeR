@@ -1,0 +1,17 @@
+import { PrefRows } from "prefs-state.slint";
+import { Theme } from "theme.slint";
+import { MidiState } from "midi.slint";
+
+/// CONTROLLER category (skeleton by S1, S2PrefsCtl owns it): rows from src/app/prefs/controller.rs.
+export component PrefsController inherits VerticalLayout {
+    spacing: Theme.space-lg;
+    PrefRows {}
+    Text {
+        text: MidiState.connected == "" ? "Controller: none connected" : "Controller: " + MidiState.connected + " · " + MidiState.link;
+        color: MidiState.connected == "" ? Theme.text-dim : Theme.play;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+        font-weight: Theme.weight-bold;
+        wrap: word-wrap;
+    }
+}

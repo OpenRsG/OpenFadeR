@@ -1,0 +1,228 @@
+import { Chip, Fader, Icon, RingButton, SegmentedChips } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState, DeckView } from "deck-state.slint";
+
+/// The jog ring: `panel-high` ring with a `danger` arc at the playhead's place on a 33⅓ rpm platter while the deck
+/// plays, `bg-deep` disc inside showing the BPM (integer 22 px bold, two decimals 12 px), the tempo offset (double-click = 0 %)
+/// and the green range (click cycles ±6 / ±10 / ±16 / WIDE). VIEW > Switch JOG Display: CURRENT CUE / SLIP adds a dot at the cue
+/// point and a red inner ring while SLIP is on; HOT CUE COUNTDOWN shows the distance to the next hot cue within
+/// 5 laps instead. Display only: scratching is the drag on the enlarged waveform. Under 80 px (decks C, D) only the integer
+/// BPM and the offset show.
+export component JogWheel inherits Rectangle {
+    in property <int> index;
+    property <DeckView> v: DeckState.decks[root.index];
+    /// Platter angle of the playhead (0 = the +x axis of the arc's coordinates).
+    property <angle> spin: DeckState.scroll[root.index].jog-angle * 1deg - 90deg;
+    property <bool> small: root.width < 80px;
+    property <length> t: root.width * 0.054;
+    /// Share of the current lap (0..1) left before the next hot cue.
+    property <float> left: root.v.jog-laps - (Math.ceil(root.v.jog-laps) - 1);
+    property <int> bpm-int: Math.floor(root.v.bpm);
+    property <int> bpm-dec: Math.round((root.v.bpm - root.bpm-int) * 100);
+    width: Theme.jog;
+    height: self.width;
+    border-radius: self.width / 2;
+    background: Theme.jog-ring;
+    Rectangle {
+        x: root.t;
+        y: root.t;
+        width: parent.width - 2 * root.t;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: Theme.jog-face;
+        // SLIP on (CURRENT CUE / SLIP): the inner ring turns red.
+        border-width: root.v.slip && !root.v.jog-countdown ? root.t / 2 : 0px;
+        border-color: Theme.danger;
+    }
+    // The playhead: a red arc on a platter that turns once in 1.8 s of track (33⅓ rpm), so it shows where the track is.
+    if root.v.playing && !root.v.jog-countdown: Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: 100;
+        viewbox-height: 100;
+        commands: "M " + (50 + 47 * Math.cos(root.spin)) + " " + (50 + 47 * Math.sin(root.spin)) + " A 47 47 0 0 1 " + (50 + 47 * Math.cos(root.spin + 60deg)) + " " + (50 + 47 * Math.sin(root.spin + 60deg));
+        stroke: Theme.jog-arc;
+        stroke-width: root.t;
+    }
+    // CURRENT CUE / SLIP: a dot on the ring where the cue point sits on the platter, red (yellow while SLIP is on).
+    if root.v.loaded && !root.v.jog-countdown: Rectangle {
+        width: root.t * 1.6;
+        height: self.width;
+        x: root.width / 2 + (root.width / 2 - root.t / 2) * Math.sin(root.v.jog-cue * 1deg) - self.width / 2;
+        y: root.height / 2 - (root.height / 2 - root.t / 2) * Math.cos(root.v.jog-cue * 1deg) - self.height / 2;
+        border-radius: self.width / 2;
+        background: root.v.slip ? Theme.cue : Theme.danger;
+        border-width: 1px;
+        border-color: Theme.text-bright;
+    }
+    // HOT CUE COUNTDOWN: within 5 laps of the next hot cue the arc is what is left of the current lap (clockwise from the top)
+    // and the pips count the laps still to go.
+    if root.v.jog-countdown && root.v.jog-laps >= 0: Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: 100;
+        viewbox-height: 100;
+        commands: "M 50 3 A 47 47 0 " + (root.left > 0.5 ? 1 : 0) + " 1 " + (50 + 47 * Math.sin(Math.min(root.left, 0.999) * 360deg)) + " " + (50 - 47 * Math.cos(Math.min(root.left, 0.999) * 360deg));
+        stroke: Theme.cue;
+        stroke-width: root.t;
+    }
+    if root.v.jog-countdown && root.v.jog-laps >= 0: HorizontalLayout {
+        y: root.height - root.t - 7px;
+        width: root.width;
+        alignment: center;
+        spacing: 2px;
+        for i in 5: Rectangle { width: 4px; height: 3px; background: i < Math.ceil(root.v.jog-laps) ? Theme.cue : Theme.line-strong; }
+    }
+    VerticalLayout {
+        alignment: center;
+        spacing: 0px;
+        HorizontalLayout {
+            alignment: center;
+            Text {
+                text: root.v.bpm > 0 ? "" + root.bpm-int : "—";
+                color: Theme.jog-bpm;
+                font-size: root.small ? Theme.font-md : Theme.font-xxl;
+                font-weight: Theme.weight-bold;
+                vertical-alignment: bottom;
+            }
+            if !root.small && root.v.bpm > 0: Text {
+                text: "." + (root.bpm-dec < 10 ? "0" : "") + root.bpm-dec;
+                color: root.v.synced ? Theme.accent-hi : Theme.jog-bpm;
+                font-size: Theme.font-md;
+                vertical-alignment: bottom;
+            }
+        }
+        Rectangle {
+            height: root.small ? 12px : 14px;
+            Text {
+                text: root.v.tempo-text;
+                color: Theme.jog-text;
+                font-size: root.small ? Theme.font-xs : Theme.font-sm;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            TouchArea { enabled: root.v.loaded; double-clicked => { DeckState.tempo(root.index, 0.5); } }
+        }
+        if !root.small: Rectangle {
+            height: 14px;
+            Text { text: root.v.tempo-range; color: Theme.jog-range; font-size: Theme.font-sm; horizontal-alignment: center; vertical-alignment: center; }
+            TouchArea { clicked => { DeckState.tempo-range(root.index); } }
+        }
+    }
+}
+
+/// CUE over PLAY: CUE is press / release (hold to preview), lit on the cue point; PLAY lit while playing.
+export component RingColumn inherits VerticalLayout {
+    in property <int> index;
+    in property <length> size: Theme.ring;
+    property <DeckView> v: DeckState.decks[root.index];
+    alignment: center;
+    spacing: 6px;
+    RingButton {
+        width: root.size;
+        height: root.size;
+        tone: Theme.cue;
+        text: "CUE";
+        lit: root.v.at-cue;
+        enabled: root.v.loaded;
+        pressed => { DeckState.cue(root.index); }
+        released => { DeckState.cue-released(root.index); }
+    }
+    RingButton {
+        width: root.size;
+        height: root.size;
+        tone: Theme.play;
+        icon: root.v.loading ? Icon.none : (root.v.playing ? Icon.pause : Icon.play);
+        text: root.v.loading ? "…" : "";
+        lit: root.v.playing;
+        enabled: root.v.loaded;
+        clicked => { DeckState.play-pause(root.index); }
+    }
+}
+
+/// SLIP (red when on) / Q (quantize) / MT (master tempo = key lock), stacked.
+export component SideButtons inherits VerticalLayout {
+    in property <int> index;
+    in property <length> h: 18px;
+    property <DeckView> v: DeckState.decks[root.index];
+    alignment: center;
+    spacing: root.h > 16px ? 4px : 2px;
+    Chip { height: root.h; font-size: Theme.font-xs; text: "SLIP"; tooltip: "Slip mode"; active: root.v.slip; active-color: Theme.danger; enabled: root.v.loaded; clicked => { DeckState.slip(root.index); } }
+    Chip { height: root.h; font-size: Theme.font-xs; text: "Q"; tooltip: "Quantize"; active: root.v.quantize; clicked => { DeckState.quantize(root.index); } }
+    Chip { height: root.h; font-size: Theme.font-xs; text: "MT"; tooltip: "Master tempo (key lock)"; active: root.v.key-lock; clicked => { DeckState.key-lock(root.index); } }
+}
+
+/// Vertical tempo fader (1 = top = fastest, as before) over the range chip that cycles ±6 / ±10 / ±16 / WIDE.
+export component TempoColumn inherits VerticalLayout {
+    in property <int> index;
+    property <DeckView> v: DeckState.decks[root.index];
+    spacing: 2px;
+    Fader {
+        vertical: true;
+        detent: true;
+        vertical-stretch: 1;
+        value: root.v.tempo;
+        edited(p) => { DeckState.tempo(root.index, p); }
+    }
+    Chip { height: 18px; font-size: Theme.font-xs; text: root.v.tempo-range; tooltip: "Tempo range"; vertical-stretch: 0; clicked => { DeckState.tempo-range(root.index); } }
+}
+
+/// Loop block (64 px): AU = number box starts / leaves an auto loop of the shown beats, `<` `>` halve / double (or
+/// change the shown length while no loop runs); MA = IN / OUT / RELOOP.
+export component LoopBlock inherits VerticalLayout {
+    in property <int> index;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <bool> manual;
+    property <int> auto-n: 4;
+    /// The < > chips picked a length here; until then the idle LOOP box shows and starts the PREFS > Auto Beat Loop length.
+    property <bool> custom;
+    property <int> shown: root.custom ? root.auto-n : (root.v.auto-beats > 0 ? root.v.auto-beats : root.auto-n);
+    property <bool> resize: root.v.loaded && (root.v.loop-active || !root.manual);
+    spacing: 4px;
+    alignment: center;
+    if !root.manual: Rectangle {
+        height: 30px;
+        background: Theme.bg-deep;
+        border-radius: Theme.radius;
+        border-width: 1px;
+        border-color: root.v.loop-active ? Theme.accent : Theme.line;
+        opacity: root.v.loaded ? 1 : 0.5;
+        Text {
+            text: root.v.loop-active ? (root.v.loop-beats > 0 ? "" + root.v.loop-beats : "LOOP") : "" + root.shown;
+            color: root.v.loop-active ? Theme.accent-hi : Theme.text-bright;
+            font-size: Theme.font-lg;
+            font-weight: Theme.weight-bold;
+        }
+        TouchArea {
+            enabled: root.v.loaded;
+            clicked => {
+                if (root.v.loop-active) { DeckState.reloop(root.index); } else { DeckState.auto-loop(root.index, root.custom ? root.auto-n : 0); }
+            }
+        }
+    }
+    if root.manual: VerticalLayout {
+        spacing: 2px;
+        HorizontalLayout {
+            spacing: 2px;
+            Chip { text: "IN"; font-size: Theme.font-xs; enabled: root.v.loaded; clicked => { DeckState.loop-in(root.index); } }
+            Chip { text: "OUT"; font-size: Theme.font-xs; enabled: root.v.loaded; clicked => { DeckState.loop-out(root.index); } }
+        }
+        Chip { text: "RELOOP"; font-size: Theme.font-xs; active: root.v.loop-active; enabled: root.v.loaded; clicked => { DeckState.reloop(root.index); } }
+    }
+    HorizontalLayout {
+        spacing: 2px;
+        Chip {
+            text: "<";
+            tooltip: "Halve the loop";
+            enabled: root.resize;
+            clicked => { if (root.v.loop-active) { DeckState.loop-halve(root.index); } else { root.auto-n = Math.max(1, Math.floor(root.shown / 2)); root.custom = true; } }
+        }
+        Chip {
+            text: ">";
+            tooltip: "Double the loop";
+            enabled: root.resize;
+            clicked => { if (root.v.loop-active) { DeckState.loop-double(root.index); } else { root.auto-n = Math.min(16, root.shown * 2); root.custom = true; } }
+        }
+    }
+    SegmentedChips { options: ["AU", "MA"]; current: root.manual ? 1 : 0; font-size: Theme.font-xs; chose(i) => { root.manual = i == 1; } }
+}

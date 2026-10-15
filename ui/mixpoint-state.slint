@@ -1,0 +1,66 @@
+/// One deck as the MIX POINT LINK panel and the enlarged waveform show it; Rust owns it (src/app/deck/mixpoint/).
+export struct MixDeckView {
+    /// Track loaded and decoded: the deck can be picked.
+    loaded: bool,
+    /// Button state: 0 no MIX POINT, 1 MIX OUT set, 2 MIX IN set, 3 MIX OUT set + linked, 4 MIX IN set + linked.
+    state: int,
+    /// Selected as the MIX OUT / MIX IN deck: blue button, blue frame around its enlarged waveform.
+    sel-out: bool,
+    sel-in: bool,
+    /// MIX OUT / MIX IN markers on the enlarged waveform: place across the wave (0..1; off the view when outside).
+    out-set: bool,
+    out-x: float,
+    in-set: bool,
+    in-x: float,
+    /// The end of the SILENT part of a MIX IN deck.
+    silent-set: bool,
+    silent-x: float,
+    /// The markers are blue: the point belongs to a link.
+    linked: bool,
+}
+
+/// The MIX POINT LINK panel (src/app/deck/mixpoint/, ui/mixpoint.slint). Rust writes the `in` properties; the panel and
+/// the enlarged waveforms call the callbacks.
+export global MixPointState {
+    /// PREFS > Controller > MIX POINT LINK > Enable MIX POINT LINK Function: the global-bar button exists.
+    in property <bool> enabled;
+    /// The panel is shown (the global-bar button).
+    in-out property <bool> open;
+    /// The panel is on screen (ui/app.slint writes it: open, enabled and a deck layout): the enlarged waveforms show the points
+    /// and a click on them picks a MIX POINT.
+    in-out property <bool> active;
+    in property <[MixDeckView]> decks;
+    /// 0 MIX IN selection mode, 1 MIX OUT selection mode.
+    in property <int> mode;
+    /// The LINK button: 0 MIX POINT not set, 1 set, 2 set and automatic playback set.
+    in property <int> link-state;
+    in property <bool> silent;
+    in property <bool> silent-edit;
+    /// "A 1:32.4" of the MIX OUT / MIX IN deck's MIX POINT; empty when none.
+    in property <string> out-text;
+    in property <string> in-text;
+    /// The panel's waveforms (MIX OUT lane, MIX IN lane) and the overview of both tracks, drawn by Rust at the element size.
+    in property <image> lane-out;
+    in property <image> lane-in;
+    in property <image> overview;
+    callback set-mode(int);
+    /// A deck button (8): selects the deck in the current mode, or clears its MIX POINT when it has one in that mode.
+    callback select-deck(int);
+    /// MIX POINT SELECT (2): the next Hot Cue / memory cue of the selected deck.
+    callback pick-cue();
+    callback silent-toggled();
+    callback silent-edit-toggled();
+    /// The LINK button (6).
+    callback link();
+    /// The X of the MIX POINT information (9): 0 MIX IN, 1 MIX OUT.
+    callback clear(int);
+    /// A click on a deck's enlarged waveform while the panel is open, at this fraction of its width.
+    callback wave-click(int, float);
+    /// Image size reports, logical px: 0 MIX OUT lane, 1 MIX IN lane, 2 overview.
+    callback resized(int, length, length);
+    /// A lane dragged by dx px (5); the overview window moved to this fraction of the overview (7); wheel over the overview
+    /// or a lane (positive = zoom in).
+    callback lane-drag(length);
+    callback overview-move(float);
+    callback zoom(float);
+}

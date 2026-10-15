@@ -1,0 +1,100 @@
+import { Theme } from "theme.slint";
+import { Icon, IconButton } from "widgets.slint";
+
+/// Dialog frame: scrim over the window, a centred `panel` card with a 1 px `line-strong` border, a 28 px `bg` title
+/// bar (12 px bold title, close button) and the body (`@children`, a VerticalLayout) under it. A click on the scrim or on the
+/// close button reports `closed`; the owner hides the dialog. `card-height` 0 = as tall as the body wants, else fixed.
+export component DialogFrame inherits Rectangle {
+    in property <string> title;
+    in property <length> card-width: 680px;
+    in property <length> card-height: 0px;
+    in property <length> body-padding: Theme.space-xl;
+    callback closed;
+    background: Theme.scrim;
+    TouchArea { clicked => { root.closed(); } }
+    // Whole-pixel size and position: centred at a half pixel (an odd leftover, or a card sized in % of the window), every
+    // line of text in the card is antialiased across two pixel columns and looks blurred.
+    Rectangle {
+        width: round(min(parent.width - 16px, root.card-width) / 1px) * 1px;
+        height: round(min(parent.height - 16px, root.card-height > 0px ? root.card-height : Theme.h-bar + body.preferred-height + 2 * root.body-padding) / 1px) * 1px;
+        x: floor((parent.width - self.width) / 2px) * 1px;
+        y: floor((parent.height - self.height) / 2px) * 1px;
+        background: Theme.panel;
+        border-color: Theme.line-strong;
+        border-width: 1px;
+        border-radius: Theme.radius-lg;
+        clip: true;
+        TouchArea {}
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: Theme.h-bar;
+            background: Theme.bg;
+            Text {
+                x: Theme.space-xl;
+                text: root.title;
+                vertical-alignment: center;
+                color: Theme.text;
+                font-family: Theme.font;
+                font-size: Theme.font-md;
+                font-weight: Theme.weight-bold;
+            }
+            IconButton {
+                x: parent.width - self.width - Theme.space-sm;
+                y: (parent.height - self.height) / 2;
+                icon: Icon.close;
+                tooltip: "Close";
+                clicked => { root.closed(); }
+            }
+        }
+        body := VerticalLayout {
+            x: 0;
+            y: Theme.h-bar;
+            width: parent.width;
+            height: parent.height - Theme.h-bar;
+            padding: root.body-padding;
+            spacing: Theme.space-lg;
+            @children
+        }
+    }
+}
+
+/// One labelled settings row: a 224 px dim label column (wide enough for "CONTROL DEVICE INFORMATION"; it never shrinks, a long label is
+/// elided), then the controls (`@children`), then an optional right-aligned hint.
+export component FormRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> hint;
+    spacing: Theme.space-sm;
+    height: Theme.h-ctl + Theme.space-xs;
+    Text {
+        text: root.label;
+        width: 224px;
+        vertical-alignment: center;
+        color: Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+        font-weight: Theme.weight-bold;
+        overflow: elide;
+    }
+    @children
+    Rectangle { horizontal-stretch: 1; }
+    Text {
+        text: root.hint;
+        width: 80px;
+        vertical-alignment: center;
+        horizontal-alignment: right;
+        color: Theme.text-faint;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+        overflow: elide;
+    }
+}
+
+/// Small dim explanatory paragraph under a form.
+export component Note inherits Text {
+    color: Theme.text-faint;
+    font-family: Theme.font;
+    font-size: Theme.font-sm;
+    wrap: word-wrap;
+}

@@ -1,0 +1,245 @@
+import { Chip, Dropdown, TextField, Toggle } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DialogFrame, Note } from "dialog.slint";
+
+/// One setting of a plugin card. `kind`: 0 switch (`on`), 1 text, 2 number (`text`), 3 choice (`choices`, `choice`), 4 secret (`text`, shown masked).
+export struct PluginSettingView {
+    label: string,
+    help: string,
+    kind: int,
+    on: bool,
+    text: string,
+    choices: [string],
+    choice: int,
+}
+
+/// One card of the plugin manager.
+export struct PluginView {
+    name: string,
+    version: string,
+    author: string,
+    description: string,
+    homepage: string,
+    /// What it runs on: LUA, PYTHON, PROGRAM or JSON (declarations only).
+    kind: string,
+    /// "2 sources · 1 action · 7 beat effects".
+    provides: string,
+    folder: string,
+    enabled: bool,
+    /// Installed by the user (bundled plugins can only be switched off).
+    removable: bool,
+    /// A change of this plugin waits for a restart.
+    restart: bool,
+    /// The card shows its details and settings.
+    open: bool,
+    settings: [PluginSettingView],
+}
+
+/// Plugins (Rust: src/app/plugins/): the Plugins menu of the menu bar, the text prompt of an action that asks for input, and
+/// the plugin manager of PREFS > EXTENSIONS.
+export global PluginState {
+    /// The entries of the Plugins menu, one per action of every plugin ("plugin: label"), in plugin order.
+    in property <[string]> actions;
+    /// An entry was chosen (index into `actions`).
+    callback run(int);
+    /// Prompt of an action with `input`: OK reports `prompt-done(true)` with the typed `prompt-text`.
+    in-out property <bool> prompt-open;
+    in property <string> prompt-title;
+    in property <string> prompt-label;
+    in-out property <string> prompt-text;
+    callback prompt-done(bool);
+
+    // Plugin manager: the cards (index = the callbacks' `int`), load errors, the restart banner ("" = none), the user's
+    // plugin folder and the last install / remove message.
+    in property <[PluginView]> plugins;
+    in property <[string]> errors;
+    in property <string> restart-text;
+    in property <string> folder;
+    in property <string> message;
+    callback toggle(int);
+    callback remove(int);
+    callback expand(int);
+    /// Open card `i`'s folder; -1 = the user's plugin folder.
+    callback open-folder(int);
+    callback homepage(int);
+    /// (card, setting, value)
+    callback setting-bool(int, int, bool);
+    callback setting-text(int, int, string);
+    callback setting-choice(int, int, int);
+    /// File chooser: a folder (`true`) or a .zip / plugin.json.
+    callback install(bool);
+    callback reload();
+    callback restart();
+}
+
+component Badge inherits Rectangle {
+    in property <string> text;
+    in property <color> tone: Theme.accent;
+    height: 16px;
+    width: t.preferred-width + 10px;
+    border-radius: Theme.radius;
+    background: root.tone.with-alpha(0.18);
+    border-width: 1px;
+    border-color: root.tone;
+    t := Text {
+        text: root.text;
+        color: root.tone;
+        font-family: Theme.font;
+        font-size: Theme.font-xs;
+        font-weight: Theme.weight-bold;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component Card inherits Rectangle {
+    in property <PluginView> v;
+    in property <int> index;
+    background: root.v.enabled ? Theme.panel : Theme.bg;
+    border-radius: Theme.radius-lg;
+    border-width: 1px;
+    border-color: root.v.restart ? Theme.cue : Theme.line;
+    VerticalLayout {
+        padding: Theme.space-lg;
+        spacing: Theme.space-sm;
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            Toggle { width: 20px; checked: root.v.enabled; toggled => { PluginState.toggle(root.index); } }
+            VerticalLayout {
+                // A short description must not shrink and centre the column (its children cap its width otherwise).
+                horizontal-stretch: 1;
+                min-width: 0px;
+                max-width: 100000px;
+                spacing: 2px;
+                HorizontalLayout {
+                    spacing: Theme.space-md;
+                    alignment: start;
+                    Text {
+                        text: root.v.name;
+                        color: root.v.enabled ? Theme.text-bright : Theme.text-dim;
+                        font-family: Theme.font;
+                        font-size: Theme.font-md;
+                        font-weight: Theme.weight-bold;
+                        vertical-alignment: center;
+                    }
+                    if root.v.version != "": Text { text: root.v.version; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
+                    Badge { text: root.v.kind; tone: root.v.kind == "LUA" ? Theme.accent-hi : root.v.kind == "PYTHON" ? Theme.cue : root.v.kind == "JSON" ? Theme.play : Theme.text-dim; y: 2px; }
+                    if !root.v.removable: Badge { text: "BUNDLED"; tone: Theme.text-dim; y: 2px; }
+                    if root.v.restart: Badge { text: "RESTART"; tone: Theme.cue; y: 2px; }
+                }
+                Text {
+                    text: root.v.description;
+                    color: Theme.text-dim;
+                    font-family: Theme.font;
+                    font-size: Theme.font-sm;
+                    wrap: word-wrap;
+                }
+                Text { text: root.v.provides; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; }
+            }
+            Chip {
+                text: root.v.open ? "LESS" : root.v.settings.length > 0 ? "SETTINGS" : "MORE";
+                width: 72px;
+                horizontal-stretch: 0;
+                font-size: Theme.font-xs;
+                clicked => { PluginState.expand(root.index); }
+            }
+        }
+        if root.v.open: VerticalLayout {
+            spacing: Theme.space-sm;
+            padding-left: 26px;
+            if root.v.author != "": Text { text: "by " + root.v.author; color: Theme.text-dim; font-size: Theme.font-sm; }
+            Text { text: root.v.folder; color: Theme.text-faint; font-size: Theme.font-xs; overflow: elide; }
+            for s[k] in root.v.settings: VerticalLayout {
+                spacing: 2px;
+                HorizontalLayout {
+                    spacing: Theme.space-md;
+                    if s.kind == 0: Toggle { text: s.label; checked: s.on; toggled(on) => { PluginState.setting-bool(root.index, k, on); } }
+                    if s.kind != 0: Text { text: s.label; width: 160px; color: Theme.text; font-size: Theme.font-sm; vertical-alignment: center; }
+                    if s.kind == 1 || s.kind == 2 || s.kind == 4: TextField {
+                        text: s.text;
+                        input-type: s.kind == 2 ? InputType.decimal : s.kind == 4 ? InputType.password : InputType.text;
+                        accepted(t) => { PluginState.setting-text(root.index, k, t); }
+                    }
+                    if s.kind == 3: Dropdown { options: s.choices; current: s.choice; chose(c) => { PluginState.setting-choice(root.index, k, c); } }
+                }
+                if s.help != "": Text { text: s.help; color: Theme.text-faint; font-size: Theme.font-xs; wrap: word-wrap; }
+            }
+            HorizontalLayout {
+                spacing: Theme.space-md;
+                alignment: start;
+                Chip { text: "OPEN FOLDER"; width: 100px; font-size: Theme.font-xs; clicked => { PluginState.open-folder(root.index); } }
+                if root.v.homepage != "": Chip { text: "WEB PAGE"; width: 90px; font-size: Theme.font-xs; clicked => { PluginState.homepage(root.index); } }
+                if root.v.removable: Chip { text: "REMOVE"; width: 80px; font-size: Theme.font-xs; active-color: Theme.danger; tooltip: "Delete this plugin's folder"; clicked => { PluginState.remove(root.index); } }
+            }
+        }
+    }
+}
+
+/// The plugin manager (PREFS > EXTENSIONS): install buttons and the drop hint, the restart banner, one card per plugin
+/// (switch, details, settings, remove), then the load errors.
+export component PluginManager inherits VerticalLayout {
+    spacing: Theme.space-md;
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        Text { text: "PLUGINS"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; }
+        Rectangle { horizontal-stretch: 1; }
+        Chip { text: "INSTALL FILE…"; width: 110px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: "A plugin .zip or its plugin.json"; clicked => { PluginState.install(false); } }
+        Chip { text: "INSTALL FOLDER…"; width: 120px; horizontal-stretch: 0; font-size: Theme.font-xs; clicked => { PluginState.install(true); } }
+        Chip { text: "OPEN PLUGINS FOLDER"; width: 150px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: PluginState.folder; clicked => { PluginState.open-folder(-1); } }
+        Chip { text: "RELOAD"; width: 70px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: "Read the plugin folders again"; clicked => { PluginState.reload(); } }
+    }
+    Rectangle {
+        height: 34px;
+        border-radius: Theme.radius-lg;
+        border-width: 1px;
+        border-color: Theme.line-strong;
+        background: Theme.bg;
+        Text {
+            text: PluginState.message != "" ? PluginState.message : "Drop a plugin folder, .zip or plugin.json (or a theme .json, or audio files) anywhere on the window to install it.";
+            color: PluginState.message != "" ? Theme.text : Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+    if PluginState.restart-text != "": Rectangle {
+        height: 32px;
+        border-radius: Theme.radius-lg;
+        background: Theme.cue.with-alpha(0.15);
+        border-width: 1px;
+        border-color: Theme.cue;
+        HorizontalLayout {
+            padding-left: Theme.space-lg;
+            padding-right: Theme.space-sm;
+            spacing: Theme.space-md;
+            Text { text: PluginState.restart-text; color: Theme.text-bright; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+            Chip { text: "RESTART NOW"; width: 110px; horizontal-stretch: 0; y: 4px; height: 24px; active: true; active-color: Theme.cue; clicked => { PluginState.restart(); } }
+        }
+    }
+    for v[i] in PluginState.plugins: Card { v: v; index: i; }
+    if PluginState.plugins.length == 0: Note { text: "No plugin found. Install one, or put plugin folders in " + PluginState.folder + "."; }
+    for e in PluginState.errors: Text { text: "⚠ " + e; color: Theme.danger; font-family: Theme.font; font-size: Theme.font-sm; wrap: word-wrap; }
+}
+
+/// The prompt dialog; instantiate once in the window. The dialog exists only while open, so its field takes the focus each time.
+export component PluginOverlays inherits Rectangle {
+    if PluginState.prompt-open: DialogFrame {
+        title: PluginState.prompt-title;
+        card-width: 560px;
+        closed => { PluginState.prompt-done(false); }
+        Note { text: PluginState.prompt-label; vertical-stretch: 0; }
+        TextField {
+            text <=> PluginState.prompt-text;
+            accepted => { PluginState.prompt-done(true); }
+            init => { self.focus-field(); }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            vertical-stretch: 0;
+            alignment: end;
+            Chip { text: "OK"; width: 80px; horizontal-stretch: 0; active: true; clicked => { PluginState.prompt-done(true); } }
+            Chip { text: "CANCEL"; width: 80px; horizontal-stretch: 0; clicked => { PluginState.prompt-done(false); } }
+        }
+    }
+}

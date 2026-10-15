@@ -1,0 +1,79 @@
+import { Browser, BrowserState } from "browser.slint";
+import { Chip } from "widgets.slint";
+import { TipOverlay } from "widgets.slint";
+import { DeckDropTarget, DragGhost, DragTracker } from "dnd.slint";
+import { Theme } from "theme.slint";
+
+/// Split-screen state in the main window (global bar button, View menu, status bar): Rust (src/app/split/) opens and closes the
+/// browser window and tells whether it is open.
+export global LayoutState {
+    in property <bool> split-open;
+    callback split-toggle();
+    /// "Switch the active window": brings the other window forward.
+    callback split-switch();
+}
+
+/// The browser in a window of its own (split screen): the whole `Browser` component (tree, Tag List, My Playlists, Tags,
+/// filter, preview, track info, right-click menu, Playlist Palette) over a strip with one drop target and LOAD chip per deck. A window
+/// root has globals of its own, so Rust (src/app/split/) copies the browser's state into this window's and forwards its callbacks to
+/// the main window's handlers; nothing here knows it is a second window.
+export component SplitWindow inherits Window {
+    title: "OpenFadeR — Browser";
+    preferred-width: 1000px;
+    preferred-height: 760px;
+    min-width: 760px;
+    min-height: 420px;
+    background: Theme.bg;
+    default-font-family: Theme.font;
+    default-font-size: Theme.font-size;
+
+    /// What each deck shows ("" = nothing loaded), one entry per deck in use (set by Rust).
+    in property <[string]> decks;
+    /// LOAD n: the browser's chosen track goes to deck n (0-based).
+    callback load(int);
+
+    // Reports the cursor of a drag where no drop target takes it (dnd.slint); under everything.
+    DragTracker { x: 0; y: 0; width: root.width; height: root.height; }
+    VerticalLayout {
+        spacing: Theme.gap;
+        Rectangle {
+            height: Theme.h-toolbar;
+            vertical-stretch: 0;
+            background: Theme.panel;
+            HorizontalLayout {
+                padding: Theme.space-sm;
+                spacing: Theme.space-md;
+                for title[d] in root.decks: Rectangle {
+                    background: Theme.panel-raised;
+                    border-radius: Theme.radius;
+                    HorizontalLayout {
+                        padding-left: Theme.space-md;
+                        padding-right: Theme.space-sm;
+                        spacing: Theme.space-md;
+                        Text { text: "DECK " + (d + 1); vertical-alignment: center; horizontal-stretch: 0; color: [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][min(d, 3)]; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+                        Text { text: title == "" ? "drop a track here" : title; vertical-alignment: center; overflow: elide; color: title == "" ? Theme.text-faint : Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
+                        Chip { text: "LOAD"; width: 50px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; enabled: BrowserState.current-row >= 0; tooltip: "Load the chosen track onto deck " + (d + 1); clicked => { root.load(d); } }
+                    }
+                    // A track dragged from the list or the Tag List onto the deck loads there.
+                    DeckDropTarget { index: d; }
+                }
+            }
+        }
+        FocusScope {
+            vertical-stretch: 1;
+            key-pressed(e) => {
+                if (e.modifiers.control && e.text == "f") { browser.focus-search(); return accept; }
+                if (!e.modifiers.control && !e.modifiers.alt && !e.repeat && e.text == "t") { BrowserState.tag-add(); return accept; }
+                reject
+            }
+            browser := Browser {
+                width: parent.width;
+                height: parent.height;
+                detached: true;
+            }
+        }
+    }
+    TipOverlay { window-w: root.width; window-h: root.height; }
+    // The label that follows the cursor while a track row is dragged (dnd.slint); above everything.
+    DragGhost { x: 0; y: 0; width: root.width; height: root.height; }
+}

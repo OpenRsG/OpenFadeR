@@ -1,0 +1,313 @@
+//! Library browser: playlist tree + session Tag List and Session history, search box, track filter and track
+//! table (`BrowserState` in ui/browser.slint). It also owns the AUTOMIX button: the visible list, from the
+//! chosen track on, is the queue handed to [`automix`](super::automix).
+//!
+//! BPM and key cells show the library value, else what bulk analysis detected ([`table::bpm_key`]); keys are written
+//! in the notation chosen in the PREFS dialog.
+//!
+//! Focus (all in ui/browser.slint, since the tree and table widgets own it): the browse view (controller VIEW, `W`) hides the
+//! deck panels, FX / sampler and mixer so the browser fills the window under the waveforms, and Area (Back+Shift, `Shift+W`)
+//! walks the focus tree → Tag List → track list → related. The Tag List's sidebar row is published as `BrowserState.tag-row`.
+//!
+//! What the sidebar rows are ([`sidebar::Entry`]) decides what [`Home`] fills the table; the user's own data (My Playlists,
+//! Tags, the play history) lives in the [`store`](openfader::store) and the library stays read-only.
+//!
+//! Children: [`wire`] (builds the [`View`], connects the `BrowserState` callbacks), [`list`] (loading a list, the
+//! search / filter / sort pass, cheap row updates), [`session`] (Tag List, session history, the deck poll),
+//! [`table`] (the cells), [`filter`] (the Track Filter and the Related-tracks ranking, pure functions), [`history`] (what
+//! played on air, the on-air rule, M3U8 export, the stored play history), [`sidebar`] (the tree's rows),
+//! [`playlists`] (My Playlists, the create / rename / delete bar, "duplicate to my playlists", ADD TO), [`tagging`]
+//! (tag categories, the assign and filter panels), [`smart`] + [`editor`] (smart playlists: evaluator and editor),
+//! [`library::dupes`](super::library::dupes) (duplicate-track finder, used by the "Duplicate tracks" list), [`hotcuebank`] (the
+//! Cue Bank node: lists of up to 8 cues A to H, loaded onto a deck's pads, carried by the device export), [`palette`]
+//! (Playlist Palette: the TAG LIST and three playlists under the track list, drag and drop), [`strip`] (the Preview column's
+//! waveform strips with the cue markers), [`preview`] (the PREVIEW button and the strips' click-to-preview player) and [`remote`]
+//! (Enter in the search box on the search entry of a plugin source searches online).
+
+mod editor;
+mod filter;
+mod history;
+mod hotcuebank;
+mod list;
+mod tagging;
+mod palette;
+mod played;
+mod playlists;
+mod preview;
+mod remote;
+mod session;
+mod sidebar;
+mod smart;
+mod sources;
+mod strip;
+mod suggest;
+mod table;
+mod wire;
+
+pub use sources::SourceType;
+pub use wire::wire;
+
+use super::{App, BrowserState, deck::Decks};
+use filter::Filter;
+use playlists::{Ask, Panel};
+use openfader::{
+    library::{Library, Playlist, Track},
+    store::{self, HotCueBank, Tag, TagGroup, Node, Store},
+};
+use sidebar::Entry;
+use slint::{ComponentHandle, ModelRc, StandardListViewItem, Timer, VecModel};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Duration};
+use table::{Look, Reference};
+
+/// Two presses on one row closer than this load it.
+const DOUBLE_CLICK: Duration = Duration::from_millis(400);
+
+/// What the library menus act on: the chosen track, the list on screen (in row order), its name, and its playlist id as an
+/// export snapshot names it (`store:<node>` for My Playlists, the library's own id otherwise; `None` for other lists).
+pub struct Context {
+    pub track: Option<Track>,
+    pub list: Vec<Track>,
+    pub name: String,
+    pub playlist: Option<String>,
+    /// An opened iTunes / xml / Explorer list on screen: where to read it again from (for IMPORT TO COLLECTION).
+    pub source: Option<(std::path::PathBuf, sources::SourceType, Option<String>)>,
+}
+
+thread_local! {
+    static VIEW: RefCell<Option<std::rc::Weak<RefCell<View>>>> = const { RefCell::new(None) };
+}
+
+/// The browser, once wired (UI thread).
+fn view() -> Option<Rc<RefCell<View>>> {
+    VIEW.with(|v| v.borrow().as_ref().and_then(std::rc::Weak::upgrade))
+}
+
+/// The browser's selection now (empty before the browser is wired).
+pub fn context() -> Context {
+    let view = view();
+    view.map_or(
+        Context {
+            track: None,
+            list: Vec::new(),
+            name: String::new(),
+            playlist: None,
+            source: None,
+        },
+        |v| {
+            let v = v.borrow();
+            Context {
+                track: v.selected.clone(),
+                list: v.shown.iter().map(|&i| v.list[i].clone()).collect(),
+                name: v.list_name(),
+                source: v.source_sel(),
+                playlist: match &v.entry {
+                    Entry::User(id) => Some(format!("store:{id}")),
+                    Entry::Lib(i) => Some(v.lib_playlists[*i].id.clone()),
+                    _ => None,
+                },
+            }
+        },
+    )
+}
+
+/// The status bar's loading line: `text` beside a bar filled to `progress` (0 to 1); `None` hides both. Each step also goes to
+/// the terminal, the readable log of a device being mounted and read.
+// ponytail: one line for the whole app; two sticks read at once take turns writing it.
+pub fn loading(app: &App, text: &str, progress: Option<f32>) {
+    if !text.is_empty() {
+        eprintln!("{text}");
+    }
+    let s = app.global::<BrowserState>();
+    s.set_load_text(text.into());
+    s.set_load_progress(progress.unwrap_or(-1.0));
+}
+
+/// Where the list comes from when Related is off.
+#[derive(Clone)]
+enum Home {
+    /// Folders and headings: no tracks of their own.
+    Nothing,
+    /// `None`: all tracks.
+    Playlist(Option<String>),
+    /// The session Tag List.
+    Tags,
+    /// Tracks that played 30 s on air this session.
+    History,
+    /// A user playlist (store node id), in its own order.
+    User(i64),
+    /// A smart playlist (store node id), evaluated over the whole library.
+    Smart(i64),
+    /// A day of the stored play history.
+    Day(String),
+    /// Every track carrying this tag.
+    Tag(i64),
+    /// A Cue Bank (store id): its banks A to H, in order.
+    Bank(i64),
+    /// Tracks that share title, artist and length with another one.
+    Dupes,
+    /// Tracks CUE Analysis set cues on ([`analyze::cue_analysed`]).
+    CueAnalysis,
+    /// A list of an opened external source (`None`: all its tracks).
+    Source(usize, Option<String>),
+}
+
+/// The whole library with each track's store key, read on first use (a stat per file, cached by the store).
+struct Cache {
+    tracks: Vec<Track>,
+    keys: Vec<String>,
+    by_key: HashMap<String, usize>,
+}
+
+/// The current list plus the search/filter/sort state that turns it into the visible rows.
+struct View {
+    lib: Rc<dyn Library>,
+    store: Arc<Store>,
+    rows: Rc<VecModel<ModelRc<StandardListViewItem>>>,
+    sidebar: Rc<VecModel<StandardListViewItem>>,
+    panel_rows: Rc<VecModel<StandardListViewItem>>,
+    list: Vec<Track>,
+    /// Visible row → index into `list`.
+    shown: Vec<usize>,
+    query: String,
+    filter: Filter,
+    /// tag ids a track must all carry (the TAG FILTER panel).
+    tag_filter: Vec<i64>,
+    /// (column, ascending); kept across playlist changes, like the header's sort arrow.
+    sort: Option<(usize, bool)>,
+    home: Home,
+    /// Related view: the tracks that mix with this one (fixed until Related is switched off).
+    related: Option<Track>,
+    /// Session Tag List, in queue order. Never written to disk.
+    tags: Vec<Track>,
+    /// Session history, in play order (see [`history`]).
+    history: Vec<Track>,
+    /// The track chosen in the table last.
+    selected: Option<Track>,
+    reference: Reference,
+    /// The settings the cells were last built with; refreshed by every [`View::refresh`].
+    look: Look,
+    /// `detected().version()` the rows were last built for.
+    detected_ver: u64,
+    /// Sidebar row → what it is; `entry` is the chosen one.
+    entries: Vec<Entry>,
+    entry: Entry,
+    lib_playlists: Vec<Playlist>,
+    nodes: Vec<Node>,
+    cats: Vec<TagGroup>,
+    mytags: Vec<Tag>,
+    /// The store's Cue Banks ([`hotcuebank`]) and the decks they load onto.
+    banks: Vec<HotCueBank>,
+    decks: Decks,
+    /// Tag ids of every tagged track, by store key.
+    tag_map: HashMap<String, Vec<i64>>,
+    cache: Option<Rc<Cache>>,
+    /// User playlist on screen: list index → index among the playlist's stored entries.
+    slots: Vec<usize>,
+    /// Groups the Duplicate tracks list found.
+    dupe_groups: usize,
+    ask: Option<Ask>,
+    panel: Panel,
+    editing: Option<editor::Editing>,
+    /// DELETE was pressed once on this entry.
+    confirm: Option<Entry>,
+    /// The mounted devices and the iTunes / xml / Explorer sources (see [`sources`]).
+    sources: Vec<sources::Source>,
+    /// Tracks the table dims, by store key; see [`played`].
+    played: std::collections::HashSet<String>,
+    _timer: Timer,
+    _preview: Timer,
+    /// The SUGGEST tab: the list ranked for a track ([`suggest`]).
+    suggest: suggest::State,
+    /// The Preview column's waveform strips ([`strip`]).
+    strips: strip::Strips,
+}
+
+impl View {
+    /// Related and the Tag List keep their own order (the header sort does not apply).
+    fn ordered(&self) -> bool {
+        self.related.is_some()
+            || self.suggest.on
+            || matches!(
+                self.home,
+                Home::Tags
+                    | Home::History
+                    | Home::User(_)
+                    | Home::Bank(_)
+                    | Home::Day(_)
+                    | Home::Dupes
+            )
+    }
+
+    /// Visible row of `t`, if it is shown.
+    fn row_of(&self, t: &Track) -> Option<usize> {
+        self.shown.iter().position(|&i| self.list[i] == *t)
+    }
+
+    /// The track after `t` in the visible list (Preferences > Controller > Continuous Playing); `None` at the end or when `t` is not shown.
+    fn next_after(&self, t: &Track) -> Option<Track> {
+        let at = self.row_of(t)?;
+        self.shown.get(at + 1).map(|&i| self.list[i].clone())
+    }
+
+    /// The shown list from the chosen track on (the first row when none is chosen or it is filtered out): what AUTOMIX plays.
+    fn queue(&self) -> Vec<Track> {
+        let from = self
+            .selected
+            .as_ref()
+            .and_then(|s| self.row_of(s))
+            .unwrap_or(0);
+        self.shown[from..]
+            .iter()
+            .map(|&i| self.list[i].clone())
+            .collect()
+    }
+
+    /// The library with store keys (read once; the library is read-only while we run).
+    fn cache(&mut self) -> Result<Rc<Cache>, String> {
+        if let Some(c) = &self.cache {
+            return Ok(c.clone());
+        }
+        let tracks = self.lib.tracks(None)?;
+        let keys: Vec<String> = tracks.iter().map(store::key).collect();
+        let mut by_key = HashMap::new();
+        for (i, k) in keys.iter().enumerate() {
+            by_key.entry(k.clone()).or_insert(i);
+        }
+        Ok(self
+            .cache
+            .insert(Rc::new(Cache {
+                tracks,
+                keys,
+                by_key,
+            }))
+            .clone())
+    }
+
+    /// The table row of the chosen track, as an index into `list`.
+    fn cursor(&self, app: &App) -> Option<usize> {
+        let row = usize::try_from(app.global::<BrowserState>().get_current_row()).ok()?;
+        self.shown.get(row).copied()
+    }
+}
+
+/// The track at visible row `i`.
+fn track_at(v: &RefCell<View>, i: i32) -> Option<Track> {
+    let v = v.borrow();
+    usize::try_from(i)
+        .ok()
+        .and_then(|i| v.shown.get(i))
+        .map(|&k| v.list[k].clone())
+}
+
+/// Case-insensitive substring test. ASCII on both sides (the usual case) compares bytes without allocating.
+fn contains_ignore_case(hay: &str, needle: &str) -> bool {
+    if hay.is_ascii() && needle.is_ascii() {
+        let n = needle.len();
+        return n == 0
+            || hay
+                .as_bytes()
+                .windows(n)
+                .any(|w| w.eq_ignore_ascii_case(needle.as_bytes()));
+    }
+    hay.to_lowercase().contains(&needle.to_lowercase())
+}

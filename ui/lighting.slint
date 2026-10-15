@@ -1,0 +1,206 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, Fader, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+
+/// One patched fixture: what the stage simulator draws and the patch list edits.
+export struct FixtureView {
+    name: string,
+    profile: string,
+    /// 0 = par, 1 = moving head, 2 = strobe (the stage rows).
+    kind: int,
+    /// Position among the fixtures of its kind, and how many there are (the stage spreads a row evenly).
+    slot: int,
+    count: int,
+    /// What the fixture shows right now (dimmer and strobe flash included).
+    colour: color,
+    universe: int,
+    address: int,
+    /// Shares DMX slots with an earlier fixture.
+    conflict: bool,
+}
+
+/// LIGHTING mode (src/app/lighting.rs). Rust owns every value; a click only reports what was asked.
+export global LightingState {
+    in-out property <bool> visible;
+    /// EXTENSIONS > Lighting: the global bar's LIGHTING button is offered and the lights are driven only while on (set from Rust).
+    in-out property <bool> enabled;
+    in property <[FixtureView]> fixtures;
+    /// The profile the ADD chip would patch, among the built-in and user profiles.
+    in property <string> profile;
+    /// "OFF" | "ART-NET" | "SACN" | "BOTH" index.
+    in property <int> protocol;
+    in property <string> ip;
+    in property <string> status;
+    /// The scene the master deck's phrase picked, e.g. "CHORUS · HIGH · CHASE".
+    in property <string> scene;
+    in property <int> palette;
+    /// 0 AUTO, 1 AMBIENT, 2 RED, 3 GREEN, 4 BLUE, 5 WHITE, 6 BLACK OUT.
+    in property <int> mode;
+    /// 0 OFF, 1 SLOW, 2 FAST.
+    in property <int> strobe;
+    in property <float> master;
+    /// Where user fixture profiles are read from.
+    in property <string> fixtures-dir;
+    callback set-protocol(int);
+    callback set-ip(string);
+    callback set-palette(int);
+    callback set-mode(int);
+    callback set-strobe(int);
+    callback set-master(float);
+    /// ◀ / ▶ over the profiles.
+    callback step-profile(int);
+    callback add-fixture;
+    callback remove-fixture(int);
+    /// Fixture, universe (0-based), address (1-based).
+    callback set-address(int, int, int);
+}
+
+component Heading inherits Text {
+    color: Theme.accent;
+    font-size: Theme.font-size;
+    font-weight: Theme.weight-bold;
+}
+
+/// The stage: three rows (moving heads at the back, strobes in the middle, pars at the front) lit with the live colours.
+component Stage inherits Rectangle {
+    background: Theme.bg-deep;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: Theme.line;
+    Rectangle { y: parent.height - 34px; height: 1px; background: Theme.line; }
+    for f in LightingState.fixtures: Rectangle {
+        property <length> size: f.kind == 0 ? 46px : f.kind == 1 ? 38px : 30px;
+        width: f.kind == 2 ? 64px : self.size;
+        height: f.kind == 2 ? 18px : self.size;
+        x: (parent.width * (f.slot + 0.5) / f.count) - self.width / 2;
+        y: parent.height * (f.kind == 0 ? 0.72 : f.kind == 1 ? 0.2 : 0.46) - self.height / 2;
+        border-radius: f.kind == 2 ? 3px : self.width / 2;
+        background: f.colour;
+        border-width: 2px;
+        border-color: f.conflict ? Theme.danger : Theme.line-strong;
+        drop-shadow-blur: 36px;
+        drop-shadow-color: f.colour;
+        Text { y: parent.height + 4px; text: f.name; color: Theme.text-faint; font-size: Theme.font-xs; }
+    }
+}
+
+component PatchRow inherits Rectangle {
+    in property <FixtureView> f;
+    in property <int> index;
+    height: 28px;
+    background: root.index.mod(2) == 0 ? Theme.panel : Theme.row-alt;
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 4px;
+        spacing: 4px;
+        Rectangle { width: 10px; height: 10px; border-radius: 5px; background: root.f.colour; border-width: 1px; border-color: Theme.text-faint; y: 9px; }
+        Text { text: root.f.name; color: root.f.conflict ? Theme.danger : Theme.text; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+        Text { text: "U"; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
+        TextField {
+            width: 60px;
+            text: root.f.universe;
+            input-type: number;
+            accepted(t) => { LightingState.set-address(root.index, Math.round(t.to-float()), root.f.address); }
+        }
+        Text { text: "@"; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
+        TextField {
+            width: 60px;
+            text: root.f.address;
+            input-type: number;
+            accepted(t) => { LightingState.set-address(root.index, root.f.universe, Math.round(t.to-float())); }
+        }
+        Chip { text: "✕"; width: 24px; height: 20px; y: 4px; horizontal-stretch: 0; clicked => { LightingState.remove-fixture(root.index); } }
+    }
+}
+
+/// Full-window view; opaque, under the global bar (ui/app.slint).
+export component LightingView inherits Rectangle {
+    visible: LightingState.visible;
+    background: Theme.bg;
+    TouchArea {}
+    VerticalLayout {
+        padding: 8px;
+        spacing: 8px;
+        HorizontalLayout {
+            height: 20px;
+            spacing: 12px;
+            Text { text: "LIGHTING"; color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+            Text { text: LightingState.scene; color: Theme.text; font-size: Theme.font-md; vertical-alignment: center; overflow: elide; }
+        }
+        Stage { vertical-stretch: 1; min-height: 180px; }
+        HorizontalLayout {
+            spacing: 12px;
+            vertical-stretch: 0;
+            // Scene: palette, override, strobe, master.
+            VerticalLayout {
+                width: 380px;
+                spacing: 4px;
+                alignment: start;
+                Heading { text: "PALETTE"; }
+                HorizontalLayout {
+                    spacing: 4px;
+                    for name[i] in ["COOL", "NATURAL", "HOT", "SUBTLE"]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.palette == i; clicked => { LightingState.set-palette(i); } }
+                }
+                HorizontalLayout {
+                    spacing: 4px;
+                    for name[i] in ["WARM", "VIVID", "CLUB 1", "CLUB 2"]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.palette == i + 4; clicked => { LightingState.set-palette(i + 4); } }
+                }
+                Heading { text: "SCENE"; }
+                HorizontalLayout {
+                    spacing: 4px;
+                    for name[i] in ["AUTO", "AMBIENT"]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.mode == i; clicked => { LightingState.set-mode(i); } }
+                    for name[i] in ["RED", "GREEN", "BLUE"]: Chip { text: name; width: 52px; horizontal-stretch: 0; active: LightingState.mode == i + 2; clicked => { LightingState.set-mode(i + 2); } }
+                }
+                HorizontalLayout {
+                    spacing: 4px;
+                    Chip { text: "WHITE"; width: 88px; horizontal-stretch: 0; active: LightingState.mode == 5; clicked => { LightingState.set-mode(5); } }
+                    Chip { text: "BLACK OUT"; width: 88px; horizontal-stretch: 0; active: LightingState.mode == 6; clicked => { LightingState.set-mode(6); } }
+                }
+                Heading { text: "STROBE"; }
+                HorizontalLayout {
+                    spacing: 4px;
+                    for name[i] in ["OFF", "SLOW", "FAST"]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.strobe == i; clicked => { LightingState.set-strobe(i); } }
+                }
+                Heading { text: "MASTER"; }
+                Fader { width: 270px; value: LightingState.master; edited(v) => { LightingState.set-master(v); } }
+            }
+            // Output.
+            VerticalLayout {
+                width: 300px;
+                spacing: 4px;
+                alignment: start;
+                Heading { text: "DMX OUTPUT"; }
+                HorizontalLayout {
+                    spacing: 4px;
+                    for name[i] in ["OFF", "ART-NET", "SACN", "BOTH"]: Chip { text: name; width: 70px; horizontal-stretch: 0; active: LightingState.protocol == i; clicked => { LightingState.set-protocol(i); } }
+                }
+                HorizontalLayout {
+                    spacing: 4px;
+                    Text { text: "TO IP"; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; width: 40px; }
+                    TextField { text: LightingState.ip; accepted(t) => { LightingState.set-ip(t); } }
+                }
+                Text { text: "Art-Net UDP 6454 · sACN E1.31 UDP 5568"; color: Theme.text-faint; font-size: Theme.font-sm; }
+                Text { text: LightingState.status; color: Theme.text; font-size: Theme.font-size; wrap: word-wrap; }
+                Text { text: "User fixtures: " + LightingState.fixtures-dir + "/*.json"; color: Theme.text-faint; font-size: Theme.font-sm; wrap: word-wrap; }
+            }
+            // Patch.
+            VerticalLayout {
+                spacing: 4px;
+                horizontal-stretch: 1;
+                Heading { text: "PATCH  (universe · DMX address)"; }
+                ListView {
+                    height: 190px;
+                    for f[i] in LightingState.fixtures: PatchRow { f: f; index: i; }
+                }
+                HorizontalLayout {
+                    spacing: 4px;
+                    height: 26px;
+                    Chip { text: "◀"; width: 28px; horizontal-stretch: 0; clicked => { LightingState.step-profile(-1); } }
+                    Chip { text: LightingState.profile; horizontal-stretch: 1; }
+                    Chip { text: "▶"; width: 28px; horizontal-stretch: 0; clicked => { LightingState.step-profile(1); } }
+                    Chip { text: "ADD FIXTURE"; width: 100px; horizontal-stretch: 0; clicked => { LightingState.add-fixture(); } }
+                }
+            }
+        }
+    }
+}

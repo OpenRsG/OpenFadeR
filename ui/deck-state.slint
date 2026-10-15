@@ -1,0 +1,204 @@
+import { CueRowView, PadView } from "pads.slint";
+import { MidiState } from "midi.slint";
+
+/// Everything one deck shows; Rust owns it (src/app/deck/).
+export struct DeckView {
+    /// Track loaded and its audio decoded: transport, cue and loop controls are enabled.
+    loaded: bool,
+    /// Audio still decoding ("loading…"); waveforms from the analysis are already shown.
+    loading: bool,
+    playing: bool,
+    detail: image,
+    overview: image,
+    time-text: string,
+    /// Elapsed "02:06.4" and remaining "-05:43.9" time of the header; title and artist of the loaded track.
+    elapsed-text: string,
+    remain-text: string,
+    title: string,
+    artist: string,
+    bpm-text: string,
+    tempo-text: string,
+    status: string,
+    /// Tempo fader position 0..1 (0.5 = 0%).
+    tempo: float,
+    pads: [PadView],
+    /// Active loop length in whole beats (0 = none / not a whole number), and whether any loop is active.
+    loop-beats: int,
+    loop-active: bool,
+    /// Tempo range label (±6% … WIDE), key lock, quantize, × (delete) pad mode, beat grid present,
+    /// detail zoom label.
+    tempo-range: string,
+    key-lock: bool,
+    quantize: bool,
+    delete-mode: bool,
+    has-grid: bool,
+    zoom-text: string,
+    /// Loaded track's library key (Camelot or musical name) and its effective BPM (0 = unknown);
+    /// the browser uses them for harmonic hints.
+    key: string,
+    bpm: float,
+    /// Total pitch change in semitones from the key shift and (key lock off) the tempo, "+2.7 st";
+    /// empty when none. The browser reads it with `key` for its harmonic hints.
+    key-shift: string,
+    /// `key` as it sounds now (the library key until something shifts it, then Camelot) and whether
+    /// anything shifts it.
+    key-eff: string,
+    key-shifted: bool,
+    /// Pad mode (0 HOT CUE, 1 BEAT JUMP, 2 KEYBOARD, 3 BEAT LOOP, 4 PAD FX, 5 KEY SHIFT, 6 S.SCRATCH, 7 STEMS), SLIP and REVERSE on.
+    pad-mode: int,
+    slip: bool,
+    reverse: bool,
+    /// Playing within the last 30 s of the track: the overview blinks red.
+    ending: bool,
+    /// GRID edit row shown instead of the key row.
+    grid-edit: bool,
+    /// SYNC latched (the tempo follows the master), this deck is the master, CUE lit (playhead on the cue point / preview).
+    synced: bool,
+    master: bool,
+    at-cue: bool,
+    /// PLAY was pressed on a synced deck and it waits for the master's next beat (the controller's SYNC light blinks).
+    sync-armed: bool,
+    /// Cue / loop list (memory cues, hot cues, loops) in track order.
+    cues: [CueRowView],
+    /// STEMS (PREFS on): show the stem row; 4 stems (else 3: bass is inside INST); ACTIVE PART is SOLO (else MUTE);
+    /// the separation finished (buttons work); per stem VOCAL / INST / BASS / DRUMS whether it is heard; progress or error text.
+    stems: bool,
+    stem-four: bool,
+    stem-solo: bool,
+    stem-ready: bool,
+    stem-on: [bool],
+    stem-text: string,
+    /// SYNC RATE next to BEAT SYNC: the multiple of the master's tempo this deck follows ("×1", "×2", "×½"); "" = not following
+    /// or VIEW > Display SYNC RATE is off.
+    sync-rate: string,
+    /// ACTIVE STEM buttons shown (PREFS > Extensions > STEMS layout).
+    stem-buttons: bool,
+    /// JOG display: the cue point's angle on a 33⅓ rpm platter (degrees, 0 = top, clockwise; the playhead's is in
+    /// `DeckScroll`), the laps to the next hot cue (-1 = none within 5 laps), and whether VIEW > Switch JOG Display is HOT CUE COUNTDOWN.
+    jog-cue: float,
+    jog-laps: float,
+    jog-countdown: bool,
+    /// Auto loop length from PREFS > Auto Beat Loop (beats; 0 = not set yet): what the idle LOOP number box shows and starts.
+    auto-beats: int,
+    /// METRO chip (GRID edit block): the deck clicks on every beat of its grid.
+    metronome: bool,
+}
+
+/// What moves every frame (src/app/deck/frame.rs sets it right before each frame is drawn, so it is kept apart from the
+/// heavier `DeckView`). The enlarged waveform is a still picture `strip-w` wide that slides under the fixed playhead.
+export struct DeckScroll {
+    /// Left edge of the `detail` picture relative to the view, and its width (whole physical pixels).
+    strip-x: length,
+    strip-w: length,
+    /// Slip ghost x in the view; negative = none.
+    slip-x: length,
+    /// VIEW > Beat Count Display text right of the playhead; empty = none.
+    beat-text: string,
+    /// Platter angle of the playhead (degrees, 0 = top, clockwise).
+    jog-angle: float,
+    /// Beat phase meter (synced decks): this deck's and the other deck's place in the 4-beat bar (0..1), and
+    /// this deck's offset from it in beats (−2..2).
+    phase-show: bool,
+    phase-own: float,
+    phase-ref: float,
+    phase-off: float,
+}
+
+/// One entry of `decks` per deck; every callback carries the deck index (0 = A … 3 = D).
+export global DeckState {
+    in property <[DeckView]> decks;
+    in property <[DeckScroll]> scroll;
+    /// Decks shown: 2 (A, B) or 4 (A to D, the 4-deck layout; the `decks` setting, written by Rust).
+    in property <int> count: 2;
+    /// Index of the master deck (the tempo source SYNC follows; the reference for browser, FX, sampler
+    /// and AUTOMIX); -1 before any deck plays or is made master. Written by Rust.
+    in-out property <int> master: -1;
+    /// Logical size of each waveform image, reported by the layout; Rust multiplies by the window
+    /// scale factor and renders buffers of exactly that many physical pixels.
+    callback detail-resized(int, length, length);
+    callback overview-resized(int, length, length);
+    callback load(int);
+    callback play-pause(int);
+    /// CUE press / release (player semantics, src/app/deck/cue.rs).
+    callback cue(int);
+    callback cue-released(int);
+    callback seek(int, float);
+    /// Tempo fader position 0..1.
+    callback tempo(int, float);
+    /// Cycle the tempo range ±6/±10/±16/WIDE; the fader keeps its position.
+    callback tempo-range(int);
+    /// Latched SYNC: the tempo follows the master and the tempo fader is ignored; MASTER button.
+    callback sync(int);
+    callback master-toggle(int);
+    /// Scratch (mouse drag on the detail waveform, jog touch): begin, platter moved by dx logical px, end.
+    callback scratch-begin(int);
+    callback scratch-move(int, length);
+    callback scratch-end(int);
+    callback key-lock(int);
+    callback quantize(int);
+    /// Detail zoom: +1 in, -1 out (span 2-32 s).
+    callback zoom(int, int);
+    /// Jump by n beats along the beat grid (±1, ±4 in the UI).
+    callback beat-jump(int, int);
+    /// Press hot-cue pad (set when empty, play when set, delete in × mode).
+    callback pad(int, int);
+    callback memory-cue(int);
+    /// Toggle × (delete) mode for the pads.
+    callback cue-delete(int);
+    callback auto-loop(int, int);
+    callback loop-in(int);
+    callback loop-out(int);
+    /// Exit the active loop, or re-enter the last one.
+    callback reloop(int);
+    callback loop-halve(int);
+    callback loop-double(int);
+    /// Cue / loop list row clicked (index into `DeckView.cues`): jump there; a loop row activates the loop.
+    callback cue-jump(int, int);
+    /// Store the active loop as a memory loop in the list.
+    callback save-loop(int);
+    /// Cue list right-click popup: (deck, row, palette index or -1 = default colour) / (deck, row, comment).
+    callback cue-color(int, int, int);
+    callback cue-comment(int, int, string);
+    /// Colours of that popup (Rust: `analysis::COLORFUL`).
+    in property <[color]> cue-palette;
+    /// Pad mode button (index as in `DeckView.pad-mode`).
+    callback pad-mode(int, int);
+    /// The pad mode buttons' labels without / with STEMS (Rust: the built-ins, then the plugin modes). Without STEMS the plugin
+    /// modes sit one place earlier in the list than their `pad-mode` index (STEMS keeps index 11).
+    in property <[string]> pad-mode-names;
+    in property <[string]> pad-mode-names-stems;
+    /// A pad was released (slip: back to the shadow playhead).
+    callback pad-released(int);
+    /// KEY − / KEY + (delta in semitones), KEY RESET, KEY SYNC to the other deck.
+    callback key-step(int, int);
+    callback key-reset(int);
+    callback key-sync(int);
+    /// ACTIVE PART button / pad of a stem (0 VOCAL, 1 INST, 2 BASS, 3 DRUMS): mute or solo it per PREFS.
+    callback stem(int, int);
+    /// STEM INSTANT DOUBLES of a part (0 VOCAL, 1 INST, 2 BASS, 3 DRUMS) from the other deck: pads 5-8 of the STEMS pad mode, the controller's rows.
+    callback stem-double(int, int);
+    callback slip(int);
+    callback reverse(int);
+    /// Vinyl stop.
+    callback brake(int);
+    /// GRID mode (src/app/deck/grid.rs): the GRID chip toggles the edit row; shift by n ms, beat 1 at
+    /// the playhead, BPM ×2 / ÷2, one TAP, reset to the library grid. Session only.
+    callback grid-toggle(int);
+    callback grid-shift(int, int);
+    callback grid-beat1(int);
+    callback grid-double(int);
+    callback grid-halve(int);
+    callback grid-tap(int);
+    callback grid-reset(int);
+    /// VIEW > Click on the waveform for PLAY and CUE: on the enlarged waveform a left click is PLAY / PAUSE and a right
+    /// press / release is the CUE button. Drag-scratching works either way. Written by Rust from the setting.
+    in property <bool> click-wave: true;
+    /// VIEW > PAD FX colour: 0 blue, 1 green, 2 orange, 3 red, 4 purple; the PAD FX pads (pad mode 4) wear it. Written by Rust.
+    in property <int> pad-fx-color: 0;
+    /// VIEW > PAD Mode: Auto switches a deck's pad area back to the pads (off the CUES list) when a controller connects.
+    /// Written by Rust; `controller-connected` follows the MIDI session.
+    in property <bool> pad-auto: true;
+    in property <bool> controller-connected: MidiState.connected != "";
+    /// METRO chip: toggles the deck's metronome (src/app/deck/grid.rs).
+    callback metronome(int);
+}

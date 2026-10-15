@@ -1,0 +1,112 @@
+import { Theme } from "theme.slint";
+
+/// Our own glyph set, drawn on a 16×16 grid. Each icon names the meaning of the glyph it stands for;
+/// the shapes are ours.
+export enum Icon {
+    none, play, pause, stop, prev, next,
+    chevron-left, chevron-right, chevron-up, chevron-down, tri-down, tri-up,
+    close, plus, minus, check, search, gear, headphones, rec, loop,
+    folder, list, grid, mixer, fx, shuffle, mix-point, video, light, link,
+    layout-2h, layout-2v, layout-4h, layout-4v, browse,
+    layout-1p, layout-2p, layout-dual, layout-simple, layout-full,
+    eject, star, tag, lock, info, expand, trash, zoom-in, zoom-out, zoom-reset, stems,
+}
+
+/// One icon in `color`, `width`/`height` 16 px by default (the viewbox is 16×16, so a bigger box scales the shape;
+/// stroke width stays `stroke-width`). Filled shapes and outlines are separate paths so an icon can have both.
+export component Glyph inherits Rectangle {
+    in property <Icon> icon;
+    in property <color> tint: Theme.text;
+    in property <length> stroke-width: 1.5px;
+    width: 16px;
+    height: 16px;
+
+    pure function fill-shape(i: Icon) -> string {
+        if i == Icon.play { return "M 4 2 L 13 8 L 4 14 Z"; }
+        if i == Icon.pause { return "M 3 2 H 6 V 14 H 3 Z M 10 2 H 13 V 14 H 10 Z"; }
+        if i == Icon.stop { return "M 3 3 H 13 V 13 H 3 Z"; }
+        if i == Icon.prev { return "M 3 2 H 5 V 14 H 3 Z M 14 2 L 6.5 8 L 14 14 Z"; }
+        if i == Icon.next { return "M 11 2 H 13 V 14 H 11 Z M 2 2 L 9.5 8 L 2 14 Z"; }
+        if i == Icon.tri-down { return "M 4 6 H 12 L 8 11 Z"; }
+        if i == Icon.tri-up { return "M 4 10 H 12 L 8 5 Z"; }
+        if i == Icon.rec { return "M 12.5 8 A 4.5 4.5 0 1 1 3.5 8 A 4.5 4.5 0 1 1 12.5 8 Z"; }
+        if i == Icon.grid { return "M 1.5 1.5 H 4.5 V 4.5 H 1.5 Z M 6.5 1.5 H 9.5 V 4.5 H 6.5 Z M 11.5 1.5 H 14.5 V 4.5 H 11.5 Z M 1.5 6.5 H 4.5 V 9.5 H 1.5 Z M 6.5 6.5 H 9.5 V 9.5 H 6.5 Z M 11.5 6.5 H 14.5 V 9.5 H 11.5 Z M 1.5 11.5 H 4.5 V 14.5 H 1.5 Z M 6.5 11.5 H 9.5 V 14.5 H 6.5 Z M 11.5 11.5 H 14.5 V 14.5 H 11.5 Z"; }
+        if i == Icon.mixer { return "M 2 9 H 5 V 11.5 H 2 Z M 6.5 4 H 9.5 V 6.5 H 6.5 Z M 11 7 H 14 V 9.5 H 11 Z"; }
+        if i == Icon.headphones { return "M 2 9.5 H 4.5 V 14 H 2 Z M 11.5 9.5 H 14 V 14 H 11.5 Z"; }
+        if i == Icon.eject { return "M 8 3 L 14 10 H 2 Z M 2 12 H 14 V 14 H 2 Z"; }
+        if i == Icon.star { return "M 8 1.5 L 9.9 6 L 14.8 6.4 L 11.1 9.6 L 12.2 14.4 L 8 11.9 L 3.8 14.4 L 4.9 9.6 L 1.2 6.4 L 6.1 6 Z"; }
+        if i == Icon.lock { return "M 4 7 H 12 V 14 H 4 Z"; }
+        if i == Icon.layout-2h { return "M 0 3.6 H 16 V 5.4 H 0 Z M 0 10.6 H 16 V 12.4 H 0 Z"; }
+        if i == Icon.layout-4h { return "M 0 2.3 H 16 V 3.5 H 0 Z M 0 5.7 H 16 V 6.9 H 0 Z M 0 9.1 H 16 V 10.3 H 0 Z M 0 12.5 H 16 V 13.7 H 0 Z"; }
+        if i == Icon.layout-2v { return "M 3.6 0 H 5.4 V 16 H 3.6 Z M 10.6 0 H 12.4 V 16 H 10.6 Z"; }
+        if i == Icon.layout-4v { return "M 2.3 0 H 3.5 V 16 H 2.3 Z M 5.7 0 H 6.9 V 16 H 5.7 Z M 9.1 0 H 10.3 V 16 H 9.1 Z M 12.5 0 H 13.7 V 16 H 12.5 Z"; }
+        if i == Icon.layout-1p { return "M 3 7 H 6 V 10 H 3 Z"; }
+        if i == Icon.layout-2p { return "M 2.5 4 H 4.5 V 6 H 2.5 Z M 2.5 10.5 H 4.5 V 12.5 H 2.5 Z"; }
+        return "";
+    }
+
+    pure function line-shape(i: Icon) -> string {
+        if i == Icon.chevron-left { return "M 10 3 L 5 8 L 10 13"; }
+        if i == Icon.chevron-right { return "M 6 3 L 11 8 L 6 13"; }
+        if i == Icon.chevron-up { return "M 3 10 L 8 5 L 13 10"; }
+        if i == Icon.chevron-down { return "M 3 6 L 8 11 L 13 6"; }
+        if i == Icon.close { return "M 3.5 3.5 L 12.5 12.5 M 12.5 3.5 L 3.5 12.5"; }
+        if i == Icon.plus { return "M 8 3 V 13 M 3 8 H 13"; }
+        if i == Icon.minus { return "M 3 8 H 13"; }
+        if i == Icon.check { return "M 3 8.5 L 6.5 12 L 13 4.5"; }
+        if i == Icon.search { return "M 10.5 7 A 4.5 4.5 0 1 1 1.5 7 A 4.5 4.5 0 1 1 10.5 7 M 9.5 10.5 L 14 15"; }
+        if i == Icon.gear { return "M 10.5 8 A 2.5 2.5 0 1 1 5.5 8 A 2.5 2.5 0 1 1 10.5 8 M 12.5 8 A 4.5 4.5 0 1 1 3.5 8 A 4.5 4.5 0 1 1 12.5 8 M 8 0.8 V 3.5 M 8 12.5 V 15.2 M 0.8 8 H 3.5 M 12.5 8 H 15.2 M 2.9 2.9 L 4.8 4.8 M 11.2 11.2 L 13.1 13.1 M 13.1 2.9 L 11.2 4.8 M 4.8 11.2 L 2.9 13.1"; }
+        if i == Icon.zoom-in { return "M 11 6.5 A 4.5 4.5 0 1 1 2 6.5 A 4.5 4.5 0 1 1 11 6.5 M 10 10 L 14.5 14.5 M 6.5 4.5 V 8.5 M 4.5 6.5 H 8.5"; }
+        if i == Icon.zoom-out { return "M 11 6.5 A 4.5 4.5 0 1 1 2 6.5 A 4.5 4.5 0 1 1 11 6.5 M 10 10 L 14.5 14.5 M 4.5 6.5 H 8.5"; }
+        if i == Icon.zoom-reset { return "M 11 6.5 A 4.5 4.5 0 1 1 2 6.5 A 4.5 4.5 0 1 1 11 6.5 M 10 10 L 14.5 14.5 M 4.5 5.5 H 8.5 M 4.5 7.5 H 8.5"; }
+        if i == Icon.headphones { return "M 2.5 10 V 8.5 A 5.5 5.5 0 0 1 13.5 8.5 V 10"; }
+        if i == Icon.loop { return "M 3 7 V 6 A 2 2 0 0 1 5 4 H 12 M 10 2 L 12.5 4 L 10 6 M 13 9 V 10 A 2 2 0 0 1 11 12 H 4 M 6 10 L 3.5 12 L 6 14"; }
+        if i == Icon.folder { return "M 2 4.5 H 6.5 L 8 6 H 14 V 12.5 H 2 Z"; }
+        if i == Icon.list { return "M 3 4 H 13 M 3 8 H 13 M 3 12 H 13"; }
+        if i == Icon.mixer { return "M 3.5 2 V 14 M 8 2 V 14 M 12.5 2 V 14"; }
+        if i == Icon.fx { return "M 1.5 3.5 V 12.5 M 1.5 3.5 H 6 M 1.5 8 H 5 M 8 3.5 L 14.5 12.5 M 14.5 3.5 L 8 12.5"; }
+        if i == Icon.shuffle { return "M 2 4.5 H 5 C 9 4.5 7 11.5 11 11.5 H 13 M 11 9.5 L 13.5 11.5 L 11 13.5 M 2 11.5 H 5 C 9 11.5 7 4.5 11 4.5 H 13 M 11 2.5 L 13.5 4.5 L 11 6.5"; }
+        if i == Icon.mix-point { return "M 2 6 V 10 M 4.5 4 V 12 M 7 2 V 14 M 9.5 5 V 11 M 12 3 V 13 M 14.5 7 V 9"; }
+        if i == Icon.video { return "M 2 3 H 14 V 13 H 2 Z M 5.5 3 V 13 M 10.5 3 V 13"; }
+        if i == Icon.light { return "M 3 3 H 13 L 10 9 H 6 Z M 8 9 V 13 M 5 13 H 11"; }
+        if i == Icon.link { return "M 6.5 9.5 L 9.5 6.5 M 7 4.5 L 8 3.5 A 2.5 2.5 0 0 1 11.5 7 L 10.5 8 M 9 11.5 L 8 12.5 A 2.5 2.5 0 0 1 4.5 9 L 5.5 8"; }
+        // Layout glyphs: 18 px grid geometry scaled to 16: bars for the deck layouts,
+        // outlined panels for the EXPORT player layouts.
+        if i == Icon.layout-1p { return "M 1 5 H 15 V 11.5 H 1 Z"; }
+        if i == Icon.layout-simple { return "M 1 5 H 15 V 11.5 H 1 Z"; }
+        if i == Icon.layout-2p { return "M 1 2.5 H 15 V 7 H 1 Z M 1 9.5 H 15 V 14 H 1 Z"; }
+        if i == Icon.layout-dual { return "M 1 3 H 12 V 10.5 H 1 Z M 4.5 6.5 H 15 V 14 H 4.5 Z"; }
+        if i == Icon.layout-full { return "M 1 3 H 15 V 13 H 1 Z M 1 5.8 H 15"; }
+        if i == Icon.browse { return "M 1 3 H 15 V 13 H 1 Z M 1 5.8 H 15"; }
+        if i == Icon.tag { return "M 2 2 H 8 L 14 8 L 8 14 L 2 8 Z"; }
+        if i == Icon.lock { return "M 5.5 7 V 5 A 2.5 2.5 0 0 1 10.5 5 V 7"; }
+        if i == Icon.info { return "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 Z M 8 7.5 V 11.5 M 8 4.8 V 5"; }
+        if i == Icon.expand { return "M 2 6 V 2 H 6 M 10 2 H 14 V 6 M 14 10 V 14 H 10 M 6 14 H 2 V 10"; }
+        if i == Icon.trash { return "M 3 4.5 H 13 M 6 4.5 V 3 H 10 V 4.5 M 4.5 4.5 L 5.2 14 H 10.8 L 11.5 4.5"; }
+        // STEM mode: the track as three stacked layers (INST / VOCAL / DRUMS).
+        if i == Icon.stems { return "M 8 2 L 14 5 L 8 8 L 2 5 Z M 2 8 L 8 11 L 14 8 M 2 11 L 8 14 L 14 11"; }
+        return "";
+    }
+
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: root.fill-shape(root.icon);
+        visible: root.fill-shape(root.icon) != "";
+        fill: root.tint;
+    }
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: root.line-shape(root.icon);
+        visible: root.line-shape(root.icon) != "";
+        stroke: root.tint;
+        stroke-width: root.stroke-width;
+        stroke-line-cap: round;
+        stroke-line-join: round;
+    }
+}

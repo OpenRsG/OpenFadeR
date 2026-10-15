@@ -1,0 +1,204 @@
+import { Chip } from "widgets.slint";
+import { Theme } from "theme.slint";
+
+/// EDIT mode (src/app/edit): the selected track as a timeline to cut up; Rust owns every value. The view is shown
+/// while `visible` (the mode selector in app.slint sets it).
+export global EditState {
+    in-out property <bool> visible;
+    /// The timeline picture, rendered at the element's physical size.
+    in property <image> timeline;
+    in property <string> title: "no track open";
+    /// Playhead position with bar and beat, the selection, lengths and clipboard, the last message.
+    in property <string> pos-text;
+    in property <string> sel-text;
+    in property <string> len-text;
+    in property <string> status;
+    in property <bool> loaded;
+    in property <bool> busy;
+    in property <bool> playing;
+    in property <bool> has-sel;
+    in property <bool> has-clip;
+    in property <bool> can-undo;
+    in property <bool> can-redo;
+    in property <bool> edited;
+    /// 0 off, 1 beat, 2 bar.
+    in property <int> snap: 2;
+    /// Decks to offer in LOAD (2 or 4).
+    in property <int> deck-count: 2;
+    /// The mode was shown.
+    callback opened();
+    callback open-selected();
+    callback resized(length, length);
+    /// Pointer on the timeline: x of the press, of the drag, of the release.
+    callback press(length);
+    callback drag(length);
+    callback release(length);
+    /// Wheel: dx, dy, pointer x, Ctrl held.
+    callback scroll(length, length, length, bool);
+    /// 1 in, -1 out, 0 fit.
+    callback zoom(int);
+    callback set-snap(int);
+    callback copy();
+    callback cut();
+    callback paste();
+    callback insert();
+    callback delete();
+    callback clear();
+    callback silence();
+    callback duplicate();
+    callback select-all();
+    callback undo();
+    callback redo();
+    callback play-toggle();
+    callback rewind();
+    callback render();
+    callback to-deck(int);
+}
+
+component Label inherits Text {
+    color: Theme.text-dim;
+    font-size: Theme.font-size;
+    font-weight: Theme.weight-bold;
+    vertical-alignment: center;
+    horizontal-stretch: 0;
+}
+
+/// Full-window EDIT view.
+export component EditView inherits Rectangle {
+    visible: EditState.visible;
+    background: Theme.bg;
+    property <bool> shown: EditState.visible;
+    changed shown => {
+        if self.shown {
+            EditState.opened();
+            keys.focus();
+        }
+    }
+    // Every key is taken here, so the performance shortcuts (space = play deck A…) stay quiet while editing.
+    keys := FocusScope {
+        key-pressed(e) => {
+            if e.modifiers.control {
+                if e.text == "c" || e.text == "\u{3}" { EditState.copy(); }
+                if e.text == "x" || e.text == "\u{18}" { EditState.cut(); }
+                if e.text == "v" || e.text == "\u{16}" { EditState.paste(); }
+                if e.text == "d" || e.text == "\u{4}" { EditState.duplicate(); }
+                if e.text == "a" || e.text == "\u{1}" { EditState.select-all(); }
+                if e.text == "i" || e.text == "\u{9}" { EditState.insert(); }
+                if e.text == "z" || e.text == "\u{1a}" { if e.modifiers.shift { EditState.redo(); } else { EditState.undo(); } }
+                if e.text == "y" || e.text == "\u{19}" { EditState.redo(); }
+                return accept;
+            }
+            if e.text == " " { EditState.play-toggle(); }
+            if e.text == Key.Delete || e.text == Key.Backspace { EditState.delete(); }
+            if e.text == Key.Home { EditState.rewind(); }
+            if e.text == "+" || e.text == "=" { EditState.zoom(1); }
+            if e.text == "-" { EditState.zoom(-1); }
+            if e.text == "0" { EditState.zoom(0); }
+            if e.text == "m" { EditState.clear(); }
+            if e.text == "s" { EditState.silence(); }
+            if e.text == "b" { EditState.set-snap(Math.mod(EditState.snap + 1, 3)); }
+            return accept;
+        }
+        VerticalLayout {
+            padding: 8px;
+            spacing: 4px;
+            HorizontalLayout {
+                spacing: 8px;
+                height: 26px;
+                vertical-stretch: 0;
+                Text { text: "EDIT"; color: Theme.text-bright; font-size: Theme.font-xl; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+                Text { text: EditState.title; color: Theme.text; font-size: Theme.font-md; vertical-alignment: center; overflow: elide; }
+                Chip { text: EditState.busy ? "LOADING…" : "OPEN SELECTED"; width: 130px; horizontal-stretch: 0; enabled: !EditState.busy; clicked => { EditState.open-selected(); } }
+            }
+            HorizontalLayout {
+                spacing: 4px;
+                height: 26px;
+                vertical-stretch: 0;
+                Chip { text: EditState.playing ? "STOP" : "PLAY"; width: 66px; horizontal-stretch: 0; enabled: EditState.loaded; active: EditState.playing; clicked => { EditState.play-toggle(); } }
+                Chip { text: "|◀"; width: 38px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.rewind(); } }
+                Rectangle { width: 10px; horizontal-stretch: 0; }
+                Label { text: "SNAP"; }
+                Chip { text: "OFF"; width: 44px; horizontal-stretch: 0; active: EditState.snap == 0; clicked => { EditState.set-snap(0); } }
+                Chip { text: "BEAT"; width: 48px; horizontal-stretch: 0; active: EditState.snap == 1; clicked => { EditState.set-snap(1); } }
+                Chip { text: "BAR"; width: 44px; horizontal-stretch: 0; active: EditState.snap == 2; clicked => { EditState.set-snap(2); } }
+                Rectangle { width: 10px; horizontal-stretch: 0; }
+                Label { text: "ZOOM"; }
+                Chip { text: "−"; width: 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(-1); } }
+                Chip { text: "+"; width: 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(1); } }
+                Chip { text: "FIT"; width: 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(0); } }
+                Rectangle { }
+                Chip { text: "RENDER WAV"; width: 100px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.render(); } }
+                Label { text: "LOAD ON"; }
+                for d in EditState.deck-count: Chip { text: "DECK " + (d + 1); width: 64px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.to-deck(d); } }
+            }
+            HorizontalLayout {
+                spacing: 4px;
+                height: 26px;
+                vertical-stretch: 0;
+                alignment: start;
+                Chip { text: "COPY"; width: 54px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.copy(); } }
+                Chip { text: "CUT"; width: 46px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.cut(); } }
+                Chip { text: "PASTE"; width: 56px; horizontal-stretch: 0; enabled: EditState.has-clip; clicked => { EditState.paste(); } }
+                Chip { text: "INSERT"; width: 58px; horizontal-stretch: 0; enabled: EditState.has-clip; clicked => { EditState.insert(); } }
+                Chip { text: "DELETE"; width: 58px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.delete(); } }
+                Chip { text: "MUTE"; width: 50px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.clear(); } }
+                Chip { text: "+ SILENCE"; width: 82px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.silence(); } }
+                Chip { text: "DUPLICATE"; width: 82px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.duplicate(); } }
+                Chip { text: "ALL"; width: 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.select-all(); } }
+                Rectangle { width: 10px; horizontal-stretch: 0; }
+                Chip { text: "UNDO"; width: 54px; horizontal-stretch: 0; enabled: EditState.can-undo; clicked => { EditState.undo(); } }
+                Chip { text: "REDO"; width: 54px; horizontal-stretch: 0; enabled: EditState.can-redo; clicked => { EditState.redo(); } }
+            }
+            Rectangle {
+                background: Theme.bg-deep;
+                border-color: Theme.line;
+                border-width: 1px;
+                Image {
+                    source: EditState.timeline;
+                    width: 100%;
+                    height: 100%;
+                    // Rust renders at the element's physical size: shown 1:1, never scaled or smoothed.
+                    image-fit: contain;
+                    image-rendering: pixelated;
+                    init => { EditState.resized(self.width, self.height); }
+                    changed width => { EditState.resized(self.width, self.height); }
+                    changed height => { EditState.resized(self.width, self.height); }
+                }
+                TouchArea {
+                    pointer-event(e) => {
+                        if e.button == PointerEventButton.left {
+                            if e.kind == PointerEventKind.down { EditState.press(self.mouse-x); }
+                            if e.kind == PointerEventKind.up { EditState.release(self.mouse-x); }
+                        }
+                    }
+                    moved => { if self.pressed { EditState.drag(self.mouse-x); } }
+                    scroll-event(e) => {
+                        EditState.scroll(e.delta-x, e.delta-y, self.mouse-x, e.modifiers.control);
+                        accept
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 16px;
+                height: 18px;
+                vertical-stretch: 0;
+                Text { text: EditState.pos-text; color: Theme.accent; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; min-width: 230px; }
+                Text { text: EditState.sel-text; color: Theme.text; font-size: Theme.font-md; vertical-alignment: center; overflow: elide; }
+            }
+            HorizontalLayout {
+                spacing: 16px;
+                height: 18px;
+                vertical-stretch: 0;
+                Text { text: EditState.len-text; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; horizontal-stretch: 0; min-width: 440px; }
+                Text { text: EditState.status; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; }
+            }
+            Text {
+                text: "click: playhead · drag: select (snapped) · wheel: scroll · Ctrl+wheel: zoom · Space play · Ctrl+C/X/V copy/cut/paste · Ctrl+I insert · Del delete · M mute · S silence · Ctrl+D duplicate · Ctrl+Z/Y undo/redo · B snap · 0 fit";
+                color: Theme.text-faint;
+                font-size: Theme.font-sm;
+                overflow: elide;
+                vertical-stretch: 0;
+            }
+        }
+    }
+}

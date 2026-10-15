@@ -1,0 +1,6 @@
+{
+  "name": "ringmod",
+  "version": "0.1.0",
+  "description": "RINGMOD Beat FX: ring modulator whose carrier follows the beat fraction (C example of the OpenFadeR plugin ABI).",
+  "effects": "libringmod.so"
+}

@@ -1,0 +1,115 @@
+import { Chip, IconButton, Icon, SegmentedChips } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DialogFrame } from "dialog.slint";
+import { ActionItem, BackupItem, DeviceItem, DeviceState, PickRow } from "device-state.slint";
+import { DevicesPage } from "device-devices.slint";
+import { ExportPage, SyncPage } from "device-export.slint";
+import { BackupPage } from "device-backup.slint";
+export { ActionItem, BackupItem, DeviceItem, DeviceState, PickRow }
+
+/// Toolbar button that opens the device windows; lit while a job writes to a device.
+export component DeviceChip inherits Chip {
+    text: "DEVICES";
+    active: DeviceState.busy;
+    clicked => {
+        DeviceState.visible = true;
+        DeviceState.opened();
+    }
+}
+
+/// Progress of the running device job with its cancel button: the bar fills with `progress`, the label names the phase.
+/// Small enough for the status bar; the dialog shows the same.
+export component DeviceProgress inherits Rectangle {
+    min-width: 220px;
+    height: 16px;
+    background: Theme.panel-raised;
+    border-radius: Theme.radius;
+    visible: DeviceState.busy;
+    Rectangle {
+        width: (parent.width - parent.height) * DeviceState.progress;
+        height: parent.height;
+        background: Theme.accent;
+        border-radius: Theme.radius;
+    }
+    Text {
+        x: Theme.space-md;
+        width: parent.width - parent.height - Theme.space-md;
+        height: parent.height;
+        text: DeviceState.phase + " " + round(DeviceState.progress * 100) + "%";
+        vertical-alignment: center;
+        overflow: elide;
+        color: Theme.text-bright;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+        font-weight: Theme.weight-bold;
+    }
+    IconButton {
+        x: parent.width - self.width;
+        width: parent.height;
+        height: parent.height;
+        icon: Icon.close;
+        icon-size: 10px;
+        tooltip: "Cancel";
+        clicked => { DeviceState.cancel(); }
+    }
+}
+
+/// The device windows in one dialog: DEVICES, EXPORT, SYNC MANAGER, BACKUPS (src/app/device/).
+component DeviceWindow inherits DialogFrame {
+    visible: DeviceState.visible;
+    title: "DEVICES";
+    card-width: 760px;
+    card-height: 640px;
+    closed => { DeviceState.visible = false; }
+    SegmentedChips {
+        options: ["DEVICES", "EXPORT", "SYNC MANAGER", "BACKUPS"];
+        current: DeviceState.tab;
+        vertical-stretch: 0;
+        alignment: start;
+        chose(i) => {
+            DeviceState.tab = i;
+            DeviceState.opened();
+        }
+    }
+    if DeviceState.tab == 0: DevicesPage {}
+    if DeviceState.tab == 1: ExportPage {}
+    if DeviceState.tab == 2: SyncPage {}
+    if DeviceState.tab == 3: BackupPage {}
+    Text {
+        text: DeviceState.status;
+        color: DeviceState.failed ? Theme.danger : Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+        wrap: word-wrap;
+        vertical-stretch: 0;
+    }
+    if DeviceState.busy: DeviceProgress { vertical-stretch: 0; }
+}
+
+/// A question the device actions ask: restore with missing tracks, a plugin's own question, delete. Above the window.
+component DeviceConfirm inherits DialogFrame {
+    visible: DeviceState.confirm-open;
+    title: "CONFIRM";
+    card-width: 460px;
+    closed => { DeviceState.confirmed(false); }
+    Text {
+        text: DeviceState.confirm-text;
+        wrap: word-wrap;
+        color: Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+    }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        alignment: end;
+        vertical-stretch: 0;
+        Chip { text: DeviceState.confirm-yes; width: 120px; horizontal-stretch: 0; active: true; clicked => { DeviceState.confirmed(true); } }
+        Chip { text: "CANCEL"; width: 80px; horizontal-stretch: 0; clicked => { DeviceState.confirmed(false); } }
+    }
+}
+
+/// Both, placed once in the window (ui/app.slint).
+export component DeviceOverlay inherits Rectangle {
+    DeviceWindow {}
+    DeviceConfirm {}
+}

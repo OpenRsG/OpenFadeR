@@ -1,0 +1,341 @@
+import { Chip, Icon, IconButton, Splitter, TextField } from "widgets.slint";
+import { PaneState } from "panes.slint";
+import { Theme } from "theme.slint";
+import { AutomixState, BrowserState } from "browser-state.slint";
+import { DeviceState } from "device-state.slint";
+import { LibraryState } from "library.slint";
+import { TrackInfo } from "trackinfo.slint";
+import { TrackTable } from "browser-table.slint";
+import { PickerPanel, SmartEditor, TreeView } from "browser-tree.slint";
+import { Palette } from "browser-palette.slint";
+import { SuggestBar } from "browser-suggest.slint";
+export { AutomixState, BrowserState }
+
+/// A tab over the list: `text-dim` idle, `text` with a 2 px accent underline when active.
+component Tab inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked;
+    width: 76px;
+    background: ta.has-hover ? Theme.panel-high : transparent;
+    Text {
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: root.active ? Theme.text : Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+        font-weight: Theme.weight-bold;
+    }
+    Rectangle { y: parent.height - 2px; height: 2px; background: root.active ? Theme.accent : transparent; }
+    ta := TouchArea { clicked => { root.clicked(); } }
+}
+
+/// Media browser : icon strip, playlist tree with the track info under it, tabs / toolbar / filter /
+/// table in the middle, action strip on the right. Fills the size it is given; the status line belongs to the window.
+export component Browser inherits Rectangle {
+    public function focus-search() { search.focus-field(); }
+    /// EXPORT mode: the tree column carries the device dock (a child of this component) instead of the track info.
+    in property <bool> dock;
+    /// The browser of the split-screen window: the main window's layout switch (browse view) is not its to flip.
+    in property <bool> detached;
+    /// Moves the track selection by `d` rows, clamped (current-row is -1 when none).
+    public function select-delta(d: int) {
+        if (root.tree-focus) { tree.set-current-item(tree.current-item + d); }
+        else { table.set-current-row(BrowserState.current-row + d); }
+    }
+    /// MIDI BACK: the browse encoder walks the playlist tree.
+    public function browse-back() { root.tree-focus = true; tree.focus(); }
+    /// MIDI browse push: from the tree, go to the tracks (false); on the tracks the caller loads the chosen one (true).
+    public function browse-push() -> bool {
+        if (root.tree-focus) { root.tree-focus = false; table.focus(); return false; }
+        return true;
+    }
+    /// MIDI Area (Back+Shift) / Shift+W: the focus walks tree → Tag List → track list → related → tree. Tag List and
+    /// track list pick their sidebar row (the track list returns to the list the tree was on); related needs a chosen track.
+    public function cycle-area() {
+        if (root.area == 0) { root.show-list(BrowserState.tag-row); }
+        else if (root.area == 1) { root.show-list(root.list-row); }
+        else if (root.area == 2) {
+            BrowserState.related-toggled(true);
+            if (BrowserState.related) { root.tree-focus = false; table.focus(); } else { root.browse-back(); }
+        } else {
+            if (BrowserState.related) { BrowserState.related-toggled(false); }
+            root.browse-back();
+        }
+    }
+    /// Sort by `col` as the table header would, toggling the direction when it is already the sorted column.
+    public function sort-by(col: int) {
+        root.sorted-asc = root.sorted-col == col ? !root.sorted-asc : true;
+        root.sorted-col = col;
+        BrowserState.sort(col, root.sorted-asc);
+    }
+    property <bool> tree-focus;
+    /// Where the focus is: 0 tree, 1 Tag List, 2 track list, 3 related. Read off the state, so clicks and MIDI agree.
+    property <int> area: root.tree-focus ? 0 : (BrowserState.related ? 3 : (BrowserState.tag-view ? 1 : 2));
+    /// Sidebar row of the last list that was not the Tag List.
+    property <int> list-row: 0;
+    property <int> sorted-col <=> BrowserState.sort-col;
+    property <bool> sorted-asc <=> BrowserState.sort-asc;
+    /// The second toolbar row (track filter) is open.
+    property <bool> filter-open;
+    /// Related off, the sidebar on `row`, the table focused.
+    function show-list(row: int) {
+        root.tree-focus = false;
+        if (BrowserState.related) { BrowserState.related-toggled(false); }
+        if (BrowserState.suggest) { BrowserState.suggest-toggled(false); }
+        tree.set-current-item(row);
+        table.focus();
+    }
+    property <int> want-row: BrowserState.side-row;
+    // Rust rebuilt the tree: select the row it asks for once the new rows are laid out (set-current-item then scrolls to it).
+    changed want-row => { reveal.running = true; }
+    reveal := Timer {
+        interval: 30ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            if (tree.current-item != root.want-row) { tree.set-current-item(root.want-row); }
+        }
+    }
+    property <bool> list-edit: BrowserState.tag-view || BrowserState.user-view;
+    /// The tree column's width, the track info's and the palette's height: the defaults moved by the user's drags (`PaneState`).
+    property <length> tree-w: PaneState.tree-w(root.width);
+    property <length> info-h: PaneState.info-h(root.height);
+    property <length> palette-h: PaneState.palette-h(root.height);
+    // Its layout asks for no size of the window's layout: the tree column, the track info and the palette follow this component's own size.
+    min-width: 0px;
+    preferred-width: 0px;
+    max-width: 100000px;
+    min-height: 0px;
+    preferred-height: 0px;
+    horizontal-stretch: 1;
+    vertical-stretch: 1;
+    max-height: 100000px;
+    background: Theme.bg;
+
+    HorizontalLayout {
+        spacing: Theme.gap;
+        // Left icon strip: the fixed sidebar rows (All tracks, Tag List, Session history, Duplicates) and Related.
+        Rectangle {
+            width: 28px;
+            background: Theme.panel;
+            VerticalLayout {
+                padding: 2px;
+                spacing: 2px;
+                alignment: start;
+                IconButton { icon: Icon.list; icon-size: 16px; tooltip: "All tracks"; active: tree.current-item == 0 && !BrowserState.related; clicked => { root.show-list(0); } }
+                IconButton { icon: Icon.tag; icon-size: 16px; tooltip: "Tag List"; active: BrowserState.tag-view && !BrowserState.related; clicked => { root.show-list(BrowserState.tag-row); } }
+                IconButton { icon: Icon.loop; icon-size: 16px; tooltip: "Session history"; active: tree.current-item == 2 && !BrowserState.related; clicked => { root.show-list(2); } }
+                IconButton { icon: Icon.grid; icon-size: 16px; tooltip: "Duplicate tracks"; active: tree.current-item == 3 && !BrowserState.related; clicked => { root.show-list(3); } }
+                if BrowserState.related-enabled: IconButton { icon: Icon.link; icon-size: 16px; tooltip: "Related tracks"; active: BrowserState.related; clicked => { BrowserState.related-toggled(!BrowserState.related); } }
+            }
+        }
+        // Tree + management buttons + track info.
+        VerticalLayout {
+            width: root.tree-w;
+            spacing: Theme.gap;
+            tree := TreeView {
+                current-item <=> BrowserState.tree-row;
+                min-height: 40px;
+                item-changed(i) => {
+                    if (i != BrowserState.tag-row) { root.list-row = i; }
+                    BrowserState.playlist-selected(i);
+                }
+                focused => { root.tree-focus = true; }
+            }
+            // NEW opens the picker (playlist / folder / smart playlist, or Tags category / tag); RENAME / DELETE apply to what is
+            // chosen; MORE edits a smart playlist and moves a playlist or folder.
+            HorizontalLayout {
+                spacing: Theme.gap;
+                vertical-stretch: 0;
+                property <bool> editable: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || (BrowserState.side-kind >= 6 && BrowserState.side-kind <= 7) || BrowserState.side-kind == 14;
+                Chip { text: "NEW"; font-size: Theme.font-xs; tooltip: "New playlist / folder / smart playlist / Tags / Cue Bank"; enabled: (BrowserState.side-kind >= 1 && BrowserState.side-kind <= 7) || BrowserState.side-kind >= 13; clicked => { BrowserState.panel-request(3); } }
+                Chip { text: "RENAME"; font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-rename(); } }
+                Chip { text: "DELETE"; font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-delete(); } }
+                Chip { text: "MORE"; font-size: Theme.font-xs; tooltip: "Edit smart playlist, move; Cue Bank: add cues, load onto a deck"; enabled: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || BrowserState.side-kind == 14; clicked => { BrowserState.panel-request(4); } }
+            }
+            // Shrinks (clipped) with the browser instead of forcing it taller than the window allows.
+            if !root.dock: TrackInfo { min-height: 0px; preferred-height: root.info-h; max-height: root.info-h; clip: true; vertical-stretch: 0; }
+            // EXPORT mode: the device dock (exportmode.slint) takes the track info's place under the tree.
+            @children
+        }
+        // Tabs, toolbar, filter row, name bar, table.
+        VerticalLayout {
+            spacing: 0;
+            Rectangle {
+                height: Theme.h-tab;
+                background: Theme.panel;
+                HorizontalLayout {
+                    padding-right: Theme.space-md;
+                    spacing: Theme.space-sm;
+                    Tab { text: "TRACKS"; active: (root.area == 2 || root.area == 0) && !BrowserState.suggest; clicked => { root.show-list(root.list-row); } }
+                    Tab { text: "TAG LIST"; active: root.area == 1; clicked => { root.show-list(BrowserState.tag-row); } }
+                    if BrowserState.related-enabled: Tab { text: "RELATED"; active: root.area == 3; clicked => { BrowserState.related-toggled(true); } }
+                    if BrowserState.suggest-enabled: Tab { text: "SUGGEST"; active: BrowserState.suggest; clicked => { BrowserState.suggest-toggled(!BrowserState.suggest); } }
+                    Rectangle { }
+                    Chip { text: "AUTOMIX"; width: 66px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: AutomixState.running; clicked => { AutomixState.toggled(); } }
+                    Chip {
+                        text: AutomixState.bars + " BARS"; width: 58px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0;
+                        clicked => { AutomixState.bars = AutomixState.bars == 8 ? 16 : (AutomixState.bars == 16 ? 32 : 8); }
+                    }
+                    Chip { text: "SKIP"; width: 44px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; enabled: AutomixState.running; clicked => { AutomixState.skip(); } }
+                    Chip { text: "EXPORT"; width: 64px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; clicked => { BrowserState.export-collection(); } }
+                }
+            }
+            if BrowserState.suggest: SuggestBar { }
+            Rectangle {
+                height: Theme.h-toolbar;
+                background: Theme.panel;
+                HorizontalLayout {
+                    padding-left: Theme.space-lg;
+                    padding-right: Theme.space-md;
+                    spacing: Theme.space-md;
+                    Text {
+                        text: AutomixState.running ? AutomixState.status : BrowserState.status;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        color: Theme.text;
+                        font-family: Theme.font;
+                        font-size: Theme.font-size;
+                    }
+                    Chip { text: "FILTER"; width: 54px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: root.filter-open; clicked => { root.filter-open = !root.filter-open; } }
+                    search := TextField {
+                        width: 200px;
+                        y: (parent.height - self.height) / 2;
+                        horizontal-stretch: 0;
+                        icon: Icon.search;
+                        placeholder-text: BrowserState.remote-search ? "Search online (Enter)" : "Search tracks (Ctrl+F)";
+                        edited(text) => { BrowserState.search-edited(text); }
+                        accepted(text) => { BrowserState.search-accepted(text); table.focus(); }
+                    }
+                }
+            }
+            if root.filter-open: Rectangle {
+                height: Theme.h-ctl + Theme.space-sm;
+                background: Theme.panel;
+                HorizontalLayout {
+                    padding-left: Theme.space-lg;
+                    padding-right: Theme.space-md;
+                    padding-bottom: Theme.space-sm;
+                    spacing: Theme.space-sm;
+                    Text { text: "BPM"; color: Theme.text-dim; vertical-alignment: center; horizontal-stretch: 0; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+                    TextField { width: 56px; horizontal-stretch: 0; placeholder-text: "min"; input-type: decimal; text <=> BrowserState.bpm-min; edited(t) => { BrowserState.filter-changed(); } }
+                    Text { text: "–"; color: Theme.text-dim; vertical-alignment: center; horizontal-stretch: 0; }
+                    TextField { width: 56px; horizontal-stretch: 0; placeholder-text: "max"; input-type: decimal; text <=> BrowserState.bpm-max; edited(t) => { BrowserState.filter-changed(); } }
+                    Chip { text: "±6% MASTER"; width: 84px; horizontal-stretch: 0; active: BrowserState.bpm-around; clicked => { BrowserState.bpm-around = !BrowserState.bpm-around; BrowserState.filter-changed(); } }
+                    Chip { text: "KEY MATCH"; width: 74px; horizontal-stretch: 0; active: BrowserState.key-match; clicked => { BrowserState.key-match = !BrowserState.key-match; BrowserState.filter-changed(); } }
+                    Chip {
+                        text: BrowserState.min-rating == 0 ? "RATING ≥ any" : "RATING ≥ " + BrowserState.min-rating + "★";
+                        width: 96px; horizontal-stretch: 0; active: BrowserState.min-rating > 0;
+                        clicked => { BrowserState.min-rating = Math.mod(BrowserState.min-rating + 1, 6); BrowserState.filter-changed(); }
+                    }
+                    Chip {
+                        text: BrowserState.tag-filter-count > 0 ? "TAG FILTER (" + BrowserState.tag-filter-count + ")" : "TAG FILTER";
+                        width: 112px; horizontal-stretch: 0; active: BrowserState.tag-filter-count > 0;
+                        clicked => { BrowserState.panel-request(2); }
+                    }
+                    Rectangle { }
+                }
+            }
+            if BrowserState.name-open: Rectangle {
+                height: Theme.h-ctl + Theme.space-sm;
+                background: Theme.panel;
+                HorizontalLayout {
+                    padding-left: Theme.space-lg;
+                    padding-right: Theme.space-md;
+                    padding-bottom: Theme.space-sm;
+                    spacing: Theme.space-sm;
+                    Text { text: BrowserState.name-prompt; color: Theme.text; vertical-alignment: center; horizontal-stretch: 0; font-family: Theme.font; font-size: Theme.font-size; font-weight: Theme.weight-bold; }
+                    name := TextField {
+                        text <=> BrowserState.name-text;
+                        accepted => { BrowserState.name-done(true); }
+                        init => { self.focus-field(); }
+                    }
+                    Chip { text: "OK"; width: 50px; horizontal-stretch: 0; active: true; clicked => { BrowserState.name-done(true); } }
+                    Chip { text: "CANCEL"; width: 64px; horizontal-stretch: 0; clicked => { BrowserState.name-done(false); } }
+                }
+            }
+            Rectangle {
+                vertical-stretch: 1;
+                min-height: 0px;
+                table := TrackTable {
+                    width: parent.width;
+                    height: parent.height;
+                    sorted-col: root.sorted-col;
+                    sorted-asc: root.sorted-asc;
+                    sort-clicked(c) => { root.sort-by(c); }
+                    focused => { root.tree-focus = false; }
+                }
+                if BrowserState.panel-open: PickerPanel {
+                    x: parent.width - self.width;
+                    width: min(320px, parent.width);
+                    height: min(parent.height, 300px);
+                }
+                if BrowserState.editor-open: SmartEditor { width: parent.width; height: parent.height; }
+            }
+            // Playlist Palette: the TAG LIST and three playlists under the track list.
+            if BrowserState.palette-enabled && BrowserState.palette-open: Palette { height: root.palette-h; vertical-stretch: 0; }
+        }
+        // Right strip: list actions on the chosen track, plus the browse view.
+        Rectangle {
+            width: 28px;
+            background: Theme.panel;
+            VerticalLayout {
+                padding: 2px;
+                spacing: 2px;
+                alignment: start;
+                IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Add to playlist"; active: BrowserState.panel-open && BrowserState.panel-title == "ADD TO PLAYLIST"; clicked => { BrowserState.panel-request(0); } }
+                IconButton { icon: Icon.tag; icon-size: 16px; tooltip: "Tags of the chosen track"; active: BrowserState.panel-open && BrowserState.panel-title == "TAGS OF THE CHOSEN TRACK"; clicked => { BrowserState.panel-request(1); } }
+                IconButton { icon: Icon.check; icon-size: 16px; tooltip: "Add to the Tag List (T)"; clicked => { BrowserState.tag-add(); } }
+                IconButton { icon: BrowserState.preview-playing ? Icon.stop : Icon.headphones; icon-size: 16px; tooltip: "Preview the chosen track on the headphones"; active: BrowserState.preview-playing; clicked => { BrowserState.preview-toggled(); } }
+                if BrowserState.palette-enabled: IconButton { icon: Icon.layout-4h; icon-size: 16px; tooltip: "Playlist Palette"; active: BrowserState.palette-open; clicked => { BrowserState.palette-open = !BrowserState.palette-open; } }
+                IconButton { icon: Icon.chevron-up; icon-size: 16px; tooltip: "Move up"; enabled: root.list-edit; clicked => { BrowserState.list-move(-1); } }
+                IconButton { icon: Icon.chevron-down; icon-size: 16px; tooltip: "Move down"; enabled: root.list-edit; clicked => { BrowserState.list-move(1); } }
+                IconButton { icon: Icon.trash; icon-size: 16px; tooltip: "Remove from the list"; enabled: root.list-edit; clicked => { BrowserState.list-remove(); } }
+                if BrowserState.side-kind == 8 || BrowserState.side-kind == 9: IconButton { icon: Icon.folder; icon-size: 16px; tooltip: "Duplicate to My Playlists"; clicked => { BrowserState.side-copy(); } }
+                if BrowserState.side-kind == 3 || BrowserState.side-kind == 8: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: "Export to a device"; clicked => { LibraryState.action("playlist-export-device"); } }
+                if BrowserState.side-kind == 11: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Import to Collection"; clicked => { LibraryState.action("source-import"); } }
+                if BrowserState.side-kind == 12: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Import to Collection as a playlist"; clicked => { DeviceState.import-playlist(BrowserState.source-device, BrowserState.source-list); } }
+                if BrowserState.side-kind == 12 && BrowserState.source-history: IconButton { icon: Icon.check; icon-size: 16px; tooltip: "Import into the play history"; clicked => { DeviceState.import-history(BrowserState.source-device, BrowserState.source-list); } }
+                if BrowserState.side-kind == 12: IconButton { icon: Icon.trash; icon-size: 16px; tooltip: "Delete from the device"; clicked => { DeviceState.delete-playlist(BrowserState.source-device, BrowserState.source-list); } }
+                if BrowserState.history-view: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: "Save as M3U8"; clicked => { BrowserState.history-save(); } }
+                if !root.detached: IconButton { icon: Icon.expand; icon-size: 16px; tooltip: "Browse view (W)"; active: BrowserState.browse-max; clicked => { BrowserState.browse-max = !BrowserState.browse-max; } }
+            }
+        }
+    }
+    // Drag handles on the borders: tree / list, tree / track info, list / palette (double-click = the default size).
+    Splitter {
+        x: 28px + Theme.gap + root.tree-w + Theme.gap / 2 - 3px;
+        y: 0px;
+        width: 6px;
+        height: root.height;
+        value <=> PaneState.tree-d;
+        lo: PaneState.tree-lo();
+        hi: PaneState.tree-hi(root.width);
+    }
+    if !root.dock: Splitter {
+        horizontal: true;
+        invert: true;
+        x: 28px + Theme.gap;
+        y: root.height - root.info-h - Theme.gap / 2 - 3px;
+        width: root.tree-w;
+        height: 6px;
+        value <=> PaneState.info-d;
+        lo: PaneState.info-lo();
+        hi: PaneState.info-hi(root.height);
+    }
+    if BrowserState.palette-enabled && BrowserState.palette-open: Splitter {
+        horizontal: true;
+        invert: true;
+        x: 28px + 2 * Theme.gap + root.tree-w;
+        y: root.height - root.palette-h - 3px;
+        width: root.width - 2 * 28px - 3 * Theme.gap - root.tree-w;
+        height: 6px;
+        value <=> PaneState.palette-d;
+        lo: PaneState.palette-lo();
+        hi: PaneState.palette-hi(root.height);
+    }
+}

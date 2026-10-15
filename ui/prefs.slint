@@ -1,0 +1,92 @@
+import { Theme } from "theme.slint";
+import { DialogFrame, Note } from "dialog.slint";
+import { PrefRowData, PrefsState } from "prefs-state.slint";
+import { PrefsView } from "prefs-view.slint";
+import { PrefsAudio } from "prefs-audio.slint";
+import { PrefsAnalysis } from "prefs-analysis.slint";
+import { PrefsController } from "prefs-controller.slint";
+import { KeyboardPage } from "prefs-keyboard.slint";
+import { PrefsExtensions } from "prefs-extensions.slint";
+import { PrefsDjSystem } from "prefs-djsystem.slint";
+import { PrefsAdvanced } from "prefs-advanced.slint";
+import { ThemesPage } from "themes.slint";
+export { PrefRowData, PrefsState }
+
+/// Category entry of the left column.
+component Category inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked;
+    height: Theme.h-row + Theme.space-sm;
+    background: root.active ? Theme.select : ta.has-hover ? Theme.panel-high : transparent;
+    Text {
+        x: Theme.space-lg;
+        text: root.text;
+        vertical-alignment: center;
+        color: root.active ? Theme.text-bright : Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+        font-weight: Theme.weight-bold;
+    }
+    ta := TouchArea { clicked => { root.clicked(); } }
+}
+
+/// PREFERENCES dialog : categories on the left, the chosen category's page on the
+/// right in a scrolling viewport. Page rows are built by Rust (src/app/prefs); a page may add its own controls.
+export component PrefsOverlay inherits DialogFrame {
+    visible: PrefsState.visible;
+    title: "PREFERENCES";
+    // The card follows the window (DialogFrame keeps 8 px of scrim around it): 80 % of the width (at least 860 px, at most 1400 px), 92 % of the height.
+    card-width: min(1400px, max(860px, root.width * 0.8));
+    card-height: root.height * 0.92;
+    body-padding: 0px;
+    closed => { PrefsState.visible = false; }
+    changed visible => {
+        if self.visible { PrefsState.category-chosen(PrefsState.category); }
+    }
+    HorizontalLayout {
+        spacing: 0px;
+        Rectangle {
+            width: 160px;
+            background: Theme.bg;
+            VerticalLayout {
+                padding-top: Theme.space-sm;
+                alignment: start;
+                // THEMES (category 8, added last so the numbers of the others stay) is listed second, next to VIEW.
+                for name[i] in ["VIEW", "THEMES", "AUDIO", "ANALYSIS", "CONTROLLER", "KEYBOARD", "EXTENSIONS", "DJ SYSTEM", "ADVANCED"]: Category {
+                    property <int> cat: i == 1 ? 8 : i > 1 ? i - 1 : i;
+                    text: name;
+                    active: PrefsState.category == self.cat;
+                    clicked => {
+                        PrefsState.category = self.cat;
+                        flick.content-y = 0;
+                        PrefsState.category-chosen(self.cat);
+                    }
+                }
+            }
+        }
+        VerticalLayout {
+            padding: Theme.space-xl;
+            spacing: Theme.space-lg;
+            flick := Flickable {
+                // Rows wider than the page (a long device name) are cut or elided, never scrolled sideways: the labels stay where they are.
+                content-width: self.width;
+                content-height: page.preferred-height;
+                page := VerticalLayout {
+                    width: flick.width;
+                    alignment: start;
+                    if PrefsState.category == 0: PrefsView {}
+                    if PrefsState.category == 1: PrefsAudio {}
+                    if PrefsState.category == 2: PrefsAnalysis {}
+                    if PrefsState.category == 3: PrefsController {}
+                    if PrefsState.category == 4: KeyboardPage {}
+                    if PrefsState.category == 5: PrefsExtensions {}
+                    if PrefsState.category == 6: PrefsDjSystem {}
+                    if PrefsState.category == 7: PrefsAdvanced {}
+                    if PrefsState.category == 8: ThemesPage {}
+                }
+            }
+            Note { text: "Saved on every change to " + PrefsState.path + "."; }
+        }
+    }
+}

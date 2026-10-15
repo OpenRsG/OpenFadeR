@@ -1,0 +1,222 @@
+import { Chip, Glyph, Icon, IconButton, SegmentedChips, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState } from "deck-state.slint";
+import { ExportModeState } from "exportmode-state.slint";
+
+/// One MEMORY or HOT CUE row: the marker (click: its colour), the time (click: jump there; an empty hot cue
+/// saves one), the comment, the loop length (click: activates the loop) and ×. `row` is the row in `DeckView.cues`.
+component CueRow inherits Rectangle {
+    in property <int> deck;
+    in property <int> list-row: -1;
+    in property <string> tag;
+    in property <color> tone;
+    in property <string> time;
+    in property <string> comment;
+    in property <string> len;
+    in property <bool> set: true;
+    callback empty-clicked;
+    height: 22px;
+    background: area.has-hover && root.set ? Theme.hover-row : transparent;
+    HorizontalLayout {
+        padding-left: 2px;
+        padding-right: 2px;
+        spacing: 3px;
+        Rectangle {
+            width: 18px;
+            height: 16px;
+            y: 3px;
+            border-radius: Theme.radius;
+            background: root.set ? root.tone : Theme.panel-high;
+            Text { text: root.tag; color: root.set ? Theme.bg-deep : Theme.text-faint; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+            TouchArea { enabled: root.set; clicked => { pop.show(); } }
+        }
+        Rectangle {
+            width: 46px;
+            Text { text: root.set ? root.time : "–"; color: root.set ? Theme.text : Theme.text-faint; font-size: Theme.font-size; vertical-alignment: center; }
+            area := TouchArea {
+                clicked => { if (root.set) { DeckState.cue-jump(root.deck, root.list-row); } else { root.empty-clicked(); } }
+            }
+        }
+        if root.set: TextField {
+            text: root.comment;
+            placeholder-text: "comment";
+            height: 20px;
+            y: 1px;
+            accepted(t) => { DeckState.cue-comment(root.deck, root.list-row, t); }
+        }
+        if !root.set: Rectangle { horizontal-stretch: 1; }
+        if root.set && root.len != "": Chip {
+            text: root.len;
+            width: 40px;
+            height: 18px;
+            y: 2px;
+            horizontal-stretch: 0;
+            font-size: Theme.font-xs;
+            active-color: Theme.cue;
+            tooltip: "Loop: click to play it";
+            clicked => { DeckState.cue-jump(root.deck, root.list-row); }
+        }
+        if root.set: IconButton {
+            icon: Icon.close;
+            icon-size: 9px;
+            width: 18px;
+            height: 18px;
+            y: 2px;
+            tooltip: "Delete";
+            clicked => { ExportModeState.cue-remove(root.deck, root.list-row); }
+        }
+    }
+    // The colour grid of the cue list's right-click menu (the last cell = default colour).
+    pop := PopupWindow {
+        x: 0px;
+        y: parent.height;
+        width: 184px;
+        height: 148px;
+        close-policy: close-on-click-outside;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-color: Theme.line-strong;
+            border-width: 1px;
+            border-radius: Theme.radius-lg;
+            Rectangle {
+                x: 4px;
+                y: 4px;
+                for p[k] in DeckState.cue-palette: Rectangle {
+                    x: Math.mod(k, 8) * 22px;
+                    y: Math.floor(k / 8) * 18px;
+                    width: 20px;
+                    height: 16px;
+                    background: p;
+                    border-radius: Theme.radius;
+                    TouchArea { clicked => { DeckState.cue-color(root.deck, root.list-row, k); pop.close(); } }
+                }
+                Rectangle {
+                    x: 7 * 22px;
+                    y: 7 * 18px;
+                    width: 20px;
+                    height: 16px;
+                    background: Theme.panel-high;
+                    border-radius: Theme.radius;
+                    Text { text: "×"; color: Theme.text; font-size: Theme.font-size; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { clicked => { DeckState.cue-color(root.deck, root.list-row, -1); pop.close(); } }
+                }
+            }
+        }
+    }
+}
+
+/// The hot cue buttons A to H of the function panel: click sets (empty) or plays (set); × on a hovered set cue deletes it.
+export component HotRow inherits HorizontalLayout {
+    in property <int> index;
+    spacing: 2px;
+    horizontal-stretch: 0;
+    for p[k] in ExportModeState.decks[root.index].hot: Rectangle {
+        width: 26px;
+        height: 22px;
+        border-radius: Theme.radius;
+        opacity: DeckState.decks[root.index].loaded ? 1 : 0.4;
+        background: p.set ? (btn.pressed ? p.color.darker(0.3) : btn.has-hover ? p.color.brighter(0.2) : p.color) : (btn.pressed ? Theme.bg-deep : btn.has-hover ? Theme.panel-high : Theme.panel-raised);
+        Text { text: p.label; color: p.set ? Theme.bg-deep : Theme.text-dim; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+        btn := TouchArea {
+            enabled: DeckState.decks[root.index].loaded;
+            clicked => { ExportModeState.hot-cue(root.index, k); }
+        }
+        if p.set && btn.has-hover: Rectangle {
+            x: parent.width - self.width;
+            width: 11px;
+            height: 11px;
+            background: Theme.bg-deep.with-alpha(0.8);
+            border-radius: Theme.radius;
+            Text { text: "×"; color: Theme.text-bright; font-size: Theme.font-size; horizontal-alignment: center; vertical-alignment: center; }
+            TouchArea { clicked => { ExportModeState.cue-remove(root.index, p.row); } }
+        }
+    }
+}
+
+/// Playback track sub-information panel: MEMORY / HOT CUE / INFO of one player.
+export component SubPanel inherits Rectangle {
+    in property <int> index;
+    property <int> tab: 0;
+    background: Theme.panel;
+    VerticalLayout {
+        padding: 2px;
+        spacing: 2px;
+        SegmentedChips {
+            options: ["MEMORY", "HOT CUE", "INFO"];
+            current: root.tab;
+            vertical-stretch: 0;
+            font-size: Theme.font-xs;
+            chose(i) => { root.tab = i; }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            min-height: 0px;
+            clip: true;
+            background: Theme.bg-deep;
+            if root.tab == 0: Flickable {
+                content-height: memory.preferred-height;
+                memory := VerticalLayout {
+                    alignment: start;
+                    for c[row] in DeckState.decks[root.index].cues: CueRow {
+                        visible: c.tag == "M";
+                        height: c.tag == "M" ? 22px : 0px;
+                        deck: root.index;
+                list-row: row;
+                        tag: "M";
+                        tone: c.color;
+                        time: c.time;
+                        comment: c.comment;
+                        len: c.kind == "loop" ? c.len : "";
+                    }
+                }
+            }
+            if root.tab == 1: VerticalLayout {
+                alignment: start;
+                for p[k] in ExportModeState.decks[root.index].hot: CueRow {
+                    deck: root.index;
+                    list-row: p.row;
+                    tag: p.label;
+                    tone: p.color;
+                    time: p.time;
+                    comment: p.comment;
+                    len: p.len;
+                    set: p.set;
+                    empty-clicked => { ExportModeState.hot-cue(root.index, k); }
+                }
+            }
+            if root.tab == 2: VerticalLayout {
+                padding: 4px;
+                spacing: 3px;
+                alignment: start;
+                HorizontalLayout {
+                    spacing: 2px;
+                    height: 14px;
+                    for s in 5: Glyph { width: 14px; height: 14px; icon: Icon.star; tint: s < ExportModeState.decks[root.index].rating ? Theme.cue : Theme.text-disabled; }
+                }
+                for line[i] in [
+                    ["Color", ExportModeState.decks[root.index].color-name],
+                    ["Comment", ExportModeState.decks[root.index].comment],
+                    ["File type", ExportModeState.decks[root.index].file-type],
+                    ["File size", ExportModeState.decks[root.index].file-size],
+                    ["Sample rate", ExportModeState.decks[root.index].sample-rate],
+                    ["Bit rate", ExportModeState.decks[root.index].bit-rate],
+                ]: HorizontalLayout {
+                    spacing: 6px;
+                    Text { text: line[0]; width: 62px; color: Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+                    if i == 0 && ExportModeState.decks[root.index].has-color: Rectangle { width: 10px; height: 10px; y: 1px; background: ExportModeState.decks[root.index].color; border-radius: Theme.radius; horizontal-stretch: 0; }
+                    Text { text: line[1]; color: Theme.text; font-size: Theme.font-size; wrap: word-wrap; }
+                }
+            }
+        }
+        // What the last edit said ("grid shifted +1 ms", the Analysis Lock refusal, ...): EXPORT mode has no status line of its own.
+        Text {
+            text: DeckState.decks[root.index].status;
+            height: 13px;
+            vertical-stretch: 0;
+            color: Theme.text-dim;
+            font-size: Theme.font-xs;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+    }
+}

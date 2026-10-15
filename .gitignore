@@ -1,0 +1,9 @@
+/target/
+/sdk/target/
+/sdk/Cargo.lock
+/sdk/examples/*/*.so
+/.local
+
+# The companion repositories, cloned in place by start.sh: OpenFadeR-Plugins, OpenFadeR-Themes, OpenFadeR-Map.
+/extension/
+/mappings/

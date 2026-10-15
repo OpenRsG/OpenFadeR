@@ -1,0 +1,164 @@
+//! The Track menu on the track chosen in the browser: Import To Collection, Analyze Track, Analysis Lock,
+//! Reload Tag, Show in file manager, Relocate, Auto Relocate, Remove from Collection.
+
+use super::{Ask, Confirm, Ctx, missing, show_in_folder};
+use crate::app::browser;
+use openfader::{
+    library::{Track, folder},
+    store,
+};
+use std::rc::Rc;
+
+pub fn act(c: &Rc<Ctx>, id: &str) {
+    let Some(t) = browser::context().track else {
+        return c.say("choose a track first");
+    };
+    match id {
+        "track-import" => import(c, t),
+        "track-analyze" => {
+            if c.store.analysis_locked(&store::key(&t)).unwrap_or(false) {
+                return c.say("this track has an Analysis Lock: unlock it first");
+            }
+            c.say(&format!("analysing “{}”…", t.title));
+            c.analyze(vec![t], true);
+        }
+        "track-lock" => lock(c, &t),
+        "track-reload-tag" => reload_tag(c, &t),
+        "track-show" => match &t.file {
+            Some(f) => show_in_folder(f),
+            None => c.say("this track has no file"),
+        },
+        "track-relocate" => c.ask_path(Ask::Relocate(vec![t]), None),
+        "track-auto-relocate" => missing::auto(c, vec![t]),
+        "track-remove" => {
+            if !c.protected("remove tracks") {
+                let text = format!(
+                    "Remove “{}” from the Collection? Its playlist places and edits are dropped; the file is not deleted.",
+                    t.title
+                );
+                c.confirm(
+                    Confirm::Remove(vec![t]),
+                    "REMOVE FROM COLLECTION",
+                    &text,
+                    "OK",
+                    "",
+                );
+            }
+        }
+        _ => c.say(&format!("unknown track action {id}")),
+    }
+}
+
+/// Import To Collection: a track of a device or another library joins ours.
+fn import(c: &Rc<Ctx>, t: Track) {
+    let Some(file) = t.file.clone() else {
+        return c.say("this track has no file");
+    };
+    if c.known().contains(&file) {
+        return c.say("already in the Collection");
+    }
+    match c.store.collection_put(std::slice::from_ref(&t), false) {
+        Ok(_) => {
+            c.say(&format!("“{}” imported to the Collection", t.title));
+            c.reload(None);
+            c.analyze(vec![t], false);
+        }
+        Err(e) => c.say(&format!("store: {e}")),
+    }
+}
+
+fn lock(c: &Rc<Ctx>, t: &Track) {
+    let key = store::key(t);
+    let on = !c.store.analysis_locked(&key).unwrap_or(false);
+    match c.store.set_analysis_lock(&key, on) {
+        Ok(()) => c.say(&format!(
+            "Analysis Lock {} for “{}”",
+            if on { "on" } else { "off" },
+            t.title
+        )),
+        Err(e) => c.say(&format!("store: {e}")),
+    }
+}
+
+/// What a re-read of the file's tags changes on `t`: tag fields come from the file, BPM and key only when the file has them.
+fn retagged(t: &Track, fresh: Track) -> Track {
+    fn or<T: Default + PartialEq>(fresh: T, old: T) -> T {
+        if fresh == T::default() { old } else { fresh }
+    }
+    Track {
+        title: fresh.title,
+        artist: fresh.artist,
+        album: fresh.album,
+        genre: fresh.genre,
+        comment: fresh.comment,
+        key: if fresh.key.is_empty() {
+            t.key.clone()
+        } else {
+            fresh.key
+        },
+        bpm_x100: or(fresh.bpm_x100, t.bpm_x100),
+        length_s: or(fresh.length_s, t.length_s),
+        bitrate: or(fresh.bitrate, t.bitrate),
+        sample_rate: or(fresh.sample_rate, t.sample_rate),
+        ..t.clone()
+    }
+}
+
+/// Reload Tag: the file's tags replace what the track shows (a Collection row shadows the source's, which stays untouched).
+fn reload_tag(c: &Rc<Ctx>, t: &Track) {
+    let Some(file) = t.file.as_deref().filter(|f| f.is_file()) else {
+        return c.say("the file is missing: relocate it first");
+    };
+    let merged = retagged(t, folder::read_track(file));
+    match c.store.collection_put(&[merged], true) {
+        Ok(_) => {
+            c.say(&format!("tags of “{}” reloaded", t.title));
+            c.reload(None);
+        }
+        Err(e) => c.say(&format!("store: {e}")),
+    }
+}
+
+/// Remove from Collection confirmed.
+pub fn remove(c: &Rc<Ctx>, tracks: Vec<Track>) {
+    c.remove_and_say(&tracks);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reloaded_tags_replace_text_but_keep_analysis_values_the_file_lacks() {
+        let old = Track {
+            title: "Old".into(),
+            artist: "A".into(),
+            key: "8A".into(),
+            bpm_x100: 12800,
+            length_s: 200,
+            rating: 3,
+            file: Some("/m/a.mp3".into()),
+            ..Track::default()
+        };
+        let fresh = Track {
+            title: "New".into(),
+            key: String::new(),
+            bpm_x100: 0,
+            length_s: 201,
+            ..Track::default()
+        };
+        let t = retagged(&old, fresh);
+        assert_eq!(
+            (
+                t.title.as_str(),
+                t.artist.as_str(),
+                t.key.as_str(),
+                t.bpm_x100,
+                t.length_s,
+                t.rating
+            ),
+            ("New", "", "8A", 12800, 201, 3)
+        );
+        assert_eq!(t.file, old.file);
+    }
+}

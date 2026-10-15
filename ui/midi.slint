@@ -1,0 +1,79 @@
+import { ListView } from "std-widgets.slint";
+import { Chip } from "widgets.slint";
+import { Theme } from "theme.slint";
+
+/// MIDI controllers and MIDI LEARN (src/app/midi/).
+export global MidiState {
+    /// The learn overlay is open: controls are captured instead of dispatched.
+    in-out property <bool> visible;
+    /// Control captured since the overlay opened ("" = none yet), e.g. "CC 7 ch 1".
+    in-out property <string> captured;
+    /// Result of the last binding.
+    in-out property <string> last;
+    /// Connected input ports, or why there are none.
+    in-out property <string> ports;
+    in-out property <int> mapped;
+    /// Controller mapping loaded for the connected controller ("Test Controller: 705 bindings, …"), or why none.
+    in-out property <string> controller;
+    /// Problems and notes: LED output lost, deck 3/4 layer ignored, unreadable mapping rows.
+    in-out property <string> status;
+    /// The connected controller that has a mapping file ("Test Controller", "" = none) and what its link did: audio output, state dump.
+    in-out property <string> connected;
+    in-out property <string> link;
+    in property <[string]> actions;
+    /// (action index, deck 0 = A / 1 = B)
+    callback assign(int, int);
+}
+
+/// Small button that opens the learn overlay.
+export component MidiChip inherits Chip {
+    text: "MIDI";
+    width: 44px;
+    height: 18px;
+    active: MidiState.mapped > 0;
+    clicked => { MidiState.captured = ""; MidiState.visible = true; }
+}
+
+export component MidiOverlay inherits Rectangle {
+    visible: MidiState.visible;
+    background: Theme.overlay-scrim;
+    TouchArea {}
+    Rectangle {
+        width: min(parent.width - 16px, 520px);
+        height: min(parent.height - 16px, 560px);
+        background: Theme.overlay-bg;
+        border-color: Theme.overlay-border;
+        border-width: 1px;
+        border-radius: Theme.radius-xl;
+        VerticalLayout {
+            padding: 16px;
+            spacing: 6px;
+            HorizontalLayout {
+                Text { text: "MIDI learn"; color: Theme.overlay-title; font-size: Theme.font-xl; font-weight: Theme.weight-bold; }
+                Rectangle {}
+                Chip { text: "DONE"; width: 60px; height: 22px; horizontal-stretch: 0; clicked => { MidiState.visible = false; } }
+            }
+            Text { text: "Inputs: " + MidiState.ports + "  ·  " + MidiState.mapped + " mapped"; color: Theme.overlay-dim; font-size: Theme.font-size; wrap: word-wrap; }
+            Text { text: MidiState.controller; color: Theme.overlay-ok; font-size: Theme.font-size; wrap: word-wrap; }
+            if MidiState.status != "": Text { text: MidiState.status; color: Theme.overlay-warn; font-size: Theme.font-size; wrap: word-wrap; }
+            Text { text: MidiState.connected == "" ? "No controller connected" : MidiState.connected + " · " + MidiState.link; color: MidiState.connected == "" ? Theme.overlay-dim : Theme.overlay-ok; font-size: Theme.font-size; font-weight: Theme.weight-bold; wrap: word-wrap; }
+            Text {
+                text: MidiState.captured == "" ? "Move a control on your controller…" : "Captured " + MidiState.captured + " — pick an action (A / B = deck):";
+                color: Theme.overlay-text;
+                font-weight: Theme.weight-bold;
+                wrap: word-wrap;
+            }
+            if MidiState.last != "": Text { text: "Bound " + MidiState.last; color: Theme.overlay-bound; font-size: Theme.font-size; wrap: word-wrap; }
+            ListView {
+                for name[i] in MidiState.actions: HorizontalLayout {
+                    height: 24px;
+                    spacing: 4px;
+                    Text { text: name; color: MidiState.captured == "" ? Theme.overlay-faint : Theme.overlay-soft; font-size: Theme.font-md; vertical-alignment: center; }
+                    Rectangle {}
+                    Chip { text: "A"; width: 30px; height: 20px; horizontal-stretch: 0; enabled: MidiState.captured != ""; clicked => { MidiState.assign(i, 0); } }
+                    Chip { text: "B"; width: 30px; height: 20px; horizontal-stretch: 0; enabled: MidiState.captured != ""; clicked => { MidiState.assign(i, 1); } }
+                }
+            }
+        }
+    }
+}

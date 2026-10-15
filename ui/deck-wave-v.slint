@@ -1,0 +1,179 @@
+import { IconButton, Icon, MixFlag } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState } from "deck-state.slint";
+import { MixPointState } from "mixpoint-state.slint";
+import { DeckDropTarget } from "dnd.slint";
+import { DeckBadge, WaveStrip } from "deck-wave.slint";
+
+/// A MIX POINT LINK marker on the vertical waveform: a 2 px line across it with a flag at its right end (above the line for
+/// OUT, below it for IN).
+component MixMarkerV inherits Rectangle {
+    in property <string> label;
+    in property <color> tone;
+    in property <bool> flag-above;
+    height: 2px;
+    background: root.tone;
+    MixFlag {
+        x: parent.width - self.width;
+        y: root.flag-above ? 2px - self.height : 0px;
+        label: root.label;
+        tone: root.tone;
+    }
+}
+
+/// Scrolling detail waveform of one deck in the 2Deck / 4Deck Vertical layouts (full height of
+/// the layout screen): a column from top to bottom, the future below the playhead (a vertical waveform scrolls
+/// that way). Rust draws the same image as for the horizontal strip, `wl` long and `wt` thick, and
+/// the picture is turned 90° clockwise here; the badge gutter sits on top, the zoom expander at the bottom, the
+/// 4-beat phase meter in the 4 px column at the right.
+export component DeckDetailV inherits Rectangle {
+    in property <int> index;
+    property <length> last-y;
+    property <length> down-y;
+    property <bool> scratching;
+    property <bool> zoom-open;
+    property <length> top: 18px;
+    property <length> bottom: 14px;
+    /// Length (time axis) and thickness of the picture.
+    property <length> wl: root.height - root.top - root.bottom;
+    property <length> wt: root.width - 4px;
+    background: Theme.wave-bg;
+    min-width: 40px;
+    Rectangle {
+        y: 0;
+        height: root.top;
+        background: Theme.panel;
+        DeckBadge { index: root.index; y: 2px; x: (parent.width - self.width) / 2; }
+    }
+    // The picture is `wl` × `wt`; turned about its centre it fills the `wt` × `wl` column.
+    Rectangle {
+        x: 0;
+        y: root.top;
+        width: root.wt;
+        height: root.wl;
+        clip: true;
+        WaveStrip {
+            x: (parent.width - root.wl) / 2;
+            y: (parent.height - root.wt) / 2;
+            width: root.wl;
+            height: root.wt;
+            transform-rotation: 90deg;
+            index: root.index;
+            resized(w, h) => { DeckState.detail-resized(root.index, w, h); }
+        }
+    }
+    // Phase meter (4 beats; the other deck's marker orange, this deck's green in time, blue off), top = start of the bar.
+    Rectangle {
+        x: root.wt;
+        y: root.top;
+        width: 4px;
+        height: root.wl;
+        background: Theme.panel;
+        for i in [1, 2, 3]: Rectangle { y: parent.height * i / 4; height: 1px; background: Theme.line-strong; }
+        if DeckState.scroll[root.index].phase-show: Rectangle {
+            y: parent.height * DeckState.scroll[root.index].phase-ref - self.height / 2;
+            height: 3px;
+            background: Theme.deck2;
+        }
+        if DeckState.scroll[root.index].phase-show: Rectangle {
+            y: parent.height * DeckState.scroll[root.index].phase-own - self.height / 2;
+            height: 3px;
+            background: abs(DeckState.scroll[root.index].phase-off) < 0.1 ? Theme.play : Theme.accent-hi;
+        }
+    }
+    // MIX POINT LINK (panel open): the blue frame of the MIX OUT / MIX IN deck and its points, as on the horizontal strip.
+    if MixPointState.active && (MixPointState.decks[root.index].sel-out || MixPointState.decks[root.index].sel-in): Rectangle {
+        x: 0;
+        y: root.top;
+        width: root.wt;
+        height: root.wl;
+        border-width: 2px;
+        border-color: Theme.accent-hi;
+    }
+    if MixPointState.active && MixPointState.decks[root.index].out-set && MixPointState.decks[root.index].out-x >= 0 && MixPointState.decks[root.index].out-x <= 1: MixMarkerV {
+        x: 0;
+        y: root.top + root.wl * MixPointState.decks[root.index].out-x - 1px;
+        width: root.wt;
+        label: "OUT";
+        flag-above: true;
+        tone: MixPointState.decks[root.index].linked ? Theme.accent-hi : Theme.cue;
+    }
+    if MixPointState.active && MixPointState.decks[root.index].in-set && MixPointState.decks[root.index].in-x >= 0 && MixPointState.decks[root.index].in-x <= 1: MixMarkerV {
+        x: 0;
+        y: root.top + root.wl * MixPointState.decks[root.index].in-x - 1px;
+        width: root.wt;
+        label: "IN";
+        tone: MixPointState.decks[root.index].linked ? Theme.accent-hi : Theme.cue;
+    }
+    if MixPointState.active && MixPointState.decks[root.index].silent-set && MixPointState.decks[root.index].silent-x >= 0 && MixPointState.decks[root.index].silent-x <= 1: MixMarkerV {
+        x: 0;
+        y: root.top + root.wl * MixPointState.decks[root.index].silent-x - 1px;
+        width: root.wt;
+        label: "SILENT";
+        flag-above: true;
+        tone: Theme.danger;
+    }
+    // Drag = scratch (the waveform follows the hand: dragging down moves the track back), a click without a drag is PLAY / PAUSE
+    // (VIEW > Click on the waveform for PLAY and CUE; the right button is CUE), or picks the MIX POINT with the panel open.
+    TouchArea {
+        x: 0;
+        y: root.top;
+        width: root.wt;
+        height: root.wl;
+        mouse-cursor: crosshair;
+        enabled: DeckState.decks[root.index].loaded;
+        pointer-event(e) => {
+            if (e.button == PointerEventButton.left) {
+                if (e.kind == PointerEventKind.down) {
+                    root.last-y = self.mouse-y;
+                    root.down-y = self.mouse-y;
+                    root.scratching = true;
+                    DeckState.scratch-begin(root.index);
+                }
+                if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) {
+                    root.scratching = false;
+                    DeckState.scratch-end(root.index);
+                    if (e.kind == PointerEventKind.up && abs(self.mouse-y - root.down-y) < 4px) {
+                        if (MixPointState.active) { MixPointState.wave-click(root.index, self.mouse-y / self.height); }
+                        else if (DeckState.click-wave) { DeckState.play-pause(root.index); }
+                    }
+                }
+            }
+            if (e.button == PointerEventButton.right && DeckState.click-wave) {
+                if (e.kind == PointerEventKind.down) { DeckState.cue(root.index); }
+                if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) { DeckState.cue-released(root.index); }
+            }
+        }
+        moved => {
+            if (self.pressed && root.scratching) {
+                DeckState.scratch-move(root.index, self.mouse-y - root.last-y);
+                root.last-y = self.mouse-y;
+            }
+        }
+    }
+    // Zoom column (drawn after the scratch area, so it keeps its clicks), above the expander: + readout – from the top.
+    if root.zoom-open: Rectangle {
+        x: (root.width - self.width) / 2;
+        y: root.height - root.bottom - self.height - 2px;
+        width: min(root.width - 4px, 44px);
+        height: 62px;
+        background: Theme.panel.with-alpha(0.85);
+        border-radius: Theme.radius;
+        VerticalLayout {
+            padding: 1px;
+            spacing: 2px;
+            IconButton { icon: Icon.plus; height: 18px; solid: true; tooltip: "Zoom in"; clicked => { DeckState.zoom(root.index, 1); } }
+            Text { text: DeckState.decks[root.index].zoom-text; color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; horizontal-alignment: center; vertical-stretch: 1; }
+            IconButton { icon: Icon.minus; height: 18px; solid: true; tooltip: "Zoom out"; clicked => { DeckState.zoom(root.index, -1); } }
+        }
+    }
+    // Bottom gutter: the expander.
+    Rectangle {
+        y: root.height - root.bottom;
+        height: root.bottom;
+        background: ex.has-hover ? Theme.panel-high : Theme.panel;
+        Text { text: root.zoom-open ? "ˆ" : "ˇ"; color: Theme.text-dim; font-size: Theme.font-lg; horizontal-alignment: center; vertical-alignment: center; }
+        ex := TouchArea { clicked => { root.zoom-open = !root.zoom-open; } }
+    }
+    DeckDropTarget { index: root.index; }
+}

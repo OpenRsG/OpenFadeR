@@ -1,0 +1,114 @@
+import { Chip, Dropdown, Fader, Knob } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState } from "deck.slint";
+
+/// One plugin rack's values (src/app/fxrack/mod.rs): SEND FX, LEVER FX or MIC FX.
+export struct RackView {
+    /// Selector labels from the plugins of the rack's slot; `has` is false when there are none ("no plugin" is shown, disabled).
+    names: [string],
+    has: bool,
+    effect: int,
+    on: bool,
+    /// RETURN level (SEND) / MIC FX LEVEL, 0..1.
+    level: float,
+    /// The plugin's parameter, 0..1 (PITCH: centre = no shift).
+    param: float,
+    beat-text: string,
+}
+
+/// The three plugin racks. Rack 0 = SEND FX, 1 = LEVER FX, 2 = MIC FX; every callback names its rack.
+export global FxRackState {
+    in-out property <[RackView]> racks;
+    /// SEND knob of each channel, 0..1.
+    in-out property <[float]> sends;
+    /// Lever position, 0 (rest)..1; it springs back to 0 when released.
+    in-out property <float> lever;
+    callback effect-selected(int, int);
+    callback toggled(int);
+    callback level-edited(int, float);
+    callback param-edited(int, float);
+    callback beat-step(int, int);
+    callback send-edited(int, float);
+    callback lever-edited(float);
+}
+
+/// SEND FX / LEVER FX / MIC FX in the FX panel's slot of the two Beat FX units (`FxState.view` 3, 4, 5; `rack` = view - 3).
+export component FxRack inherits Rectangle {
+    in property <int> rack;
+    property <RackView> r: FxRackState.racks[root.rack];
+    background: Theme.panel;
+    HorizontalLayout {
+        padding: 2px;
+        spacing: 4px;
+        Text {
+            text: ["SEND FX", "LEVER FX", "MIC FX"][root.rack];
+            color: Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.font-xs;
+            font-weight: Theme.weight-bold;
+            vertical-alignment: center;
+            horizontal-stretch: 0;
+        }
+        Dropdown {
+            options: r.has ? r.names : ["no plugin"];
+            current: r.effect;
+            enabled: r.has;
+            font-size: Theme.font-xs;
+            min-width: 90px;
+            horizontal-stretch: 0;
+            height: 18px;
+            vertical-stretch: 0;
+            chose(i) => { FxRackState.effect-selected(root.rack, i); }
+        }
+        if root.rack != 1: Chip {
+            text: "ON";
+            font-size: Theme.font-xs;
+            min-width: 34px;
+            max-width: 34px;
+            horizontal-stretch: 0;
+            height: 18px;
+            enabled: r.has;
+            active: r.on;
+            active-color: Theme.play;
+            clicked => { FxRackState.toggled(root.rack); }
+        }
+        if root.rack != 1: VerticalLayout {
+            width: 30px;
+            alignment: center;
+            Text { text: root.rack == 0 ? "RET" : "LVL"; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; horizontal-alignment: center; }
+            Knob { width: 30px; height: 20px; value: r.level; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.level-edited(root.rack, v); } } }
+        }
+        if root.rack != 1: VerticalLayout {
+            width: 30px;
+            alignment: center;
+            Text { text: "PARAM"; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; horizontal-alignment: center; }
+            Knob { width: 30px; height: 20px; value: r.param; detent: root.rack == 2; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.param-edited(root.rack, v); } } }
+        }
+        if root.rack == 0: HorizontalLayout {
+            spacing: 4px;
+            horizontal-stretch: 0;
+            for n in DeckState.count: HorizontalLayout {
+                spacing: 2px;
+                Text { text: "S" + (n + 1); color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                Knob { width: 30px; height: 30px; value: FxRackState.sends[n]; reset: 0; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.send-edited(n, v); } } }
+            }
+        }
+        if root.rack == 1: Fader {
+            min-width: 120px;
+            height: 18px;
+            horizontal-stretch: 0;
+            value: FxRackState.lever;
+            opacity: r.has ? 1 : 0.4;
+            edited(v) => { if r.has { FxRackState.lever-edited(v); } }
+            released => { FxRackState.lever-edited(0); }
+        }
+        if root.rack == 1: HorizontalLayout {
+            spacing: 3px;
+            horizontal-stretch: 0;
+            Chip { text: "◀"; font-size: Theme.font-xs; min-width: 18px; max-width: 18px; horizontal-stretch: 0; height: 18px; clicked => { FxRackState.beat-step(root.rack, -1); } }
+            Text { text: r.beat-text; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; min-width: 26px; horizontal-stretch: 0; }
+            Chip { text: "▶"; font-size: Theme.font-xs; min-width: 18px; max-width: 18px; horizontal-stretch: 0; height: 18px; clicked => { FxRackState.beat-step(root.rack, 1); } }
+        }
+        Rectangle { horizontal-stretch: 1; }
+    }
+}

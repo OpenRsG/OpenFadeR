@@ -1,0 +1,182 @@
+
+/// The state globals of the browser (Rust: src/app/browser/). The components are in browser.slint and its children.
+/// Library side: playlist tree + Tag List + search + track filter + track table. Rust drives it through this global (src/app/browser/).
+export global BrowserState {
+    in property <[StandardListViewItem]> playlists;
+    in property <[[StandardListViewItem]]> tracks;
+    /// "N of M tracks" or the last error, shown under the table.
+    in property <string> status;
+    /// A plugged-in device being mounted / read: the status bar's loading bar fills with it (0 to 1); -1 when nothing loads.
+    in property <float> load-progress: -1;
+    /// The step that read is at, one readable line ("KINGSTON: reading the library 2.1 of 4.8 MB"), shown beside the bar.
+    in property <string> load-text;
+    callback playlist-selected(int);
+    /// Row index in `tracks` (the filtered, sorted view).
+    callback track-selected(int);
+    /// Left-button press on a row (same index); Rust turns two quick presses on one row into a double-click.
+    callback track-pressed(int);
+    callback search-edited(string);
+    /// Enter in the search box (the text). On a plugin source's search entry it runs the search online (src/app/browser/remote.rs).
+    callback search-accepted(string);
+    /// The list on screen is a plugin source's search entry: the search box searches online and does not filter the rows.
+    in property <bool> remote-search;
+    /// Column index, ascending.
+    callback sort(int, bool);
+    /// "Export" pressed: Rust has the first collection-writing library plugin write the whole library on a worker thread and reports in `status`.
+    callback export-collection();
+    /// The library changed under the browser (import, remove, relocate, restore): Rust re-reads it; a node id >= 0 is shown afterwards.
+    callback reload(int);
+    /// Playlist menu: "new" / "new-folder" / "new-smart" / "delete" / "renumber" / "sort-<column>" (src/app/browser/playlists.rs).
+    callback playlist-op(string);
+    /// Shows the track with this file (a finished recording) in the list and the track panel.
+    callback select-file(string);
+    /// Preferences > Advanced > Browse > Drop-down menu: holding a track for 1 s opens its menu.
+    in property <bool> hold-menu;
+    /// Preferences > Advanced > Browse > Edit Library: double click on a playlist / folder / tag in the tree renames it.
+    in property <bool> edit-library: true;
+    /// 10 / 11 / 12 in `side-kind`: an external source (a device, iTunes, a collection file, Explorer). For a device list: its device id,
+    /// the list's id as that device names it, and whether it is a history.
+    in property <string> source-device;
+    in property <string> source-list;
+    in property <bool> source-history;
+    /// Track filter bar ("Track Filter"): BPM bounds as typed (empty = open), ±6 % around the master deck's BPM,
+    /// only keys compatible with the master deck's effective key, and a minimum star rating (0 = any).
+    in-out property <string> bpm-min;
+    in-out property <string> bpm-max;
+    in-out property <bool> bpm-around;
+    in-out property <bool> key-match;
+    in-out property <int> min-rating;
+    callback filter-changed();
+    /// Related view is on: tracks that mix with the chosen track (compatible key, BPM ±6 %).
+    in-out property <bool> related;
+    callback related-toggled(bool);
+    /// VIEW > Layout > Media Browser: "Related Tracks" is on; off hides the RELATED tab and button.
+    in property <bool> related-enabled: true;
+    /// Track Suggestion (src/app/browser/suggest/): the list is ranked for a track by `suggest-mode` (0 Collection Radar, 1 Era,
+    /// 2 Mood, 3 Association). It searches the list the tree shows. `suggest-anchor` picks the track it ranks for (index into
+    /// `suggest-anchors`: LIST = the chosen row, MASTER, deck numbers); `suggest-conditions` are the Collection Radar chips
+    /// (BPM, KEY, VOCAL) and `suggest-condition(i)` steps one.
+    in-out property <bool> suggest;
+    callback suggest-toggled(bool);
+    /// VIEW > Layout > Media Browser: "Track Suggestion" is on; off hides the SUGGEST tab.
+    in property <bool> suggest-enabled: true;
+    in property <int> suggest-mode;
+    callback suggest-mode-chosen(int);
+    in property <[string]> suggest-anchors: ["LIST", "MASTER", "1", "2"];
+    in property <int> suggest-anchor: 1;
+    callback suggest-anchor-chosen(int);
+    in property <[string]> suggest-conditions;
+    callback suggest-condition(int);
+    /// The Tag List (session queue, sidebar row 2) is on screen: remove / move buttons apply.
+    in property <bool> tag-view;
+    /// A user playlist is on screen: remove / move buttons apply (they edit the playlist in the store).
+    in property <bool> user-view;
+    /// Adds the chosen track to the Tag List (the T key calls this too).
+    callback tag-add();
+    callback list-remove();
+    /// Moves the chosen entry of the Tag List / user playlist by -1 (up) / +1 (down) among the visible rows.
+    callback list-move(int);
+    /// Table row of the chosen track (-1 none); Rust moves it when a list is rebuilt.
+    in-out property <int> current-row: -1;
+    /// The tree's chosen sidebar row and the table header's sort column / direction, kept here (not in the components) so that the browser
+    /// in the split-screen window shows the same ones (src/app/split/).
+    in-out property <int> tree-row: -1;
+    in-out property <int> sort-col: -1;
+    in-out property <bool> sort-asc;
+    /// A history list is on screen (session or a stored day): the SAVE M3U8 button applies.
+    in property <bool> history-view;
+    callback history-save();
+    /// Sidebar row of the Tag List (the Rust side owns the row layout): where Area puts the tree.
+    in property <int> tag-row;
+    /// Browse view (VIEW / W): the layout drops the deck panels, FX / sampler and mixer, so the browser fills the window under the waveforms.
+    in-out property <bool> browse-max;
+    /// VIEW > Browse > "Show the selected track to the center": choosing a row scrolls it to the middle of the list.
+    in property <bool> center-selected;
+    /// The browser preview player ([`crate::audio::preview`]) is playing the chosen track; PREVIEW toggles it.
+    in property <bool> preview-playing;
+    callback preview-toggled();
+    /// Preview column (src/app/browser/strip.rs): one waveform strip per row, drawn by Rust when the row first shows
+    /// (`preview-wanted`). A click on a strip starts the preview from that point (`x` = 0..1 of the strip; with Display Cue
+    /// Markers on Preview a click near a cue starts from the cue).
+    in property <[image]> previews;
+    callback preview-wanted(int);
+    callback preview-seek(int, float);
+    /// Playlist Palette (src/app/browser/palette/): Preferences > View > Layout > Browser panel > Playlist Palette shows the
+    /// toggle button. Palette 0 is the TAG LIST, 1..3 show the playlist assigned to them (`palette-names` "[blank list]"
+    /// when none) with its tracks as "title — artist · BPM" lines.
+    in property <bool> palette-enabled;
+    in-out property <bool> palette-open;
+    in property <[string]> palette-names;
+    in property <[[string]]> palette-tracks;
+    /// A palette Rust wants renamed (a blank palette just made "Untitled Playlist"); -1 when none. The palette resets it.
+    in-out property <int> palette-edit: -1;
+    /// Header click: the palette's playlist (or the Tag List) is chosen in the tree.
+    callback palette-header(int);
+    callback palette-rename(int, string);
+    /// Lists the playlists a palette can take in `palette-choices` (row 0 empties the palette); `palette-choose` picks one.
+    in property <[StandardListViewItem]> palette-choices;
+    callback palette-menu(int);
+    callback palette-choose(int, int);
+    /// Click / double click (loads onto a deck) / "Remove from list" on track `row` of palette `p`.
+    callback palette-track-selected(int, int);
+    callback palette-track-load(int, int);
+    callback palette-track-remove(int, int);
+    /// The right-click menu of the track table: the chosen track goes to palette `p` (0 = Tag List).
+    callback palette-add-chosen(int);
+    /// Drag and drop (Slint DragArea / DropArea): what a row carries, and a drop on palette `p`.
+    pure callback drag-track(int) -> data-transfer;
+    pure callback drag-tree(int) -> data-transfer;
+    pure callback drag-palette(int, int) -> data-transfer;
+    callback palette-drop(int, data-transfer);
+    // --- Sidebar management (src/app/browser/playlists.rs, tagging.rs) ---
+    /// What the chosen sidebar row is: 0 read-only list, 1 My Playlists, 2 folder, 3 playlist, 4 smart playlist,
+    /// 5 Tags, 6 category, 7 tag, 8 library playlist, 9 library folder, 13 Cue Bank heading, 14 a Cue Bank.
+    in property <int> side-kind;
+    /// Row Rust wants chosen after it rebuilt the tree (a create / rename moved the selection); the tree scrolls to it.
+    in property <int> side-row;
+    callback side-rename();
+    callback side-delete();
+    /// DUPLICATE TO MY PLAYLISTS: copies the chosen library playlist (or folder) into My Playlists.
+    callback side-copy();
+    /// Name bar over the table: Rust asks for a name (`name-prompt`), OK / Enter sends true, CANCEL false.
+    in property <bool> name-open;
+    in property <string> name-prompt;
+    in-out property <string> name-text;
+    callback name-done(bool);
+    /// Picker panel on the table's right edge: 0 ADD TO playlist, 1 tags of the chosen track, 2 tag filter, 3 NEW item in the tree, 4 MORE (edit / move) for a playlist node.
+    in property <bool> panel-open;
+    in property <string> panel-title;
+    in property <[StandardListViewItem]> panel-rows;
+    callback panel-request(int);
+    callback panel-row(int);
+    callback panel-close();
+    /// Number of tags the filter requires (all of them must be on the track).
+    in property <int> tag-filter-count;
+    // Smart playlist editor: one entry per condition in the three parallel models (kind, first, second box).
+    in property <bool> editor-open;
+    in property <string> editor-title;
+    in property <string> editor-error;
+    in-out property <bool> editor-any;
+    in property <[int]> cond-kinds;
+    in property <[string]> cond-a;
+    in property <[string]> cond-b;
+    callback cond-kind(int);
+    /// Row, box (0 first / 1 second), new text.
+    callback cond-edit(int, int, string);
+    callback cond-add();
+    callback cond-remove(int);
+    callback editor-save();
+    callback editor-cancel();
+}
+
+/// Automix (src/app/automix/): plays the shown list over both decks. The AUTOMIX button is handled by the browser
+/// (it knows the list), SKIP and the driver by Automix. `bars` (8 / 16 / 32) is the crossfade length.
+export global AutomixState {
+    in-out property <bool> running;
+    in-out property <int> bars: 16;
+    /// What Automix is doing; shown instead of the browser status while it runs.
+    in property <string> status;
+    callback toggled();
+    callback skip();
+}
+

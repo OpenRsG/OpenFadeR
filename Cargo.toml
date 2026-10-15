@@ -1,0 +1,51 @@
+[package]
+name = "openfader"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["app"]
+app = ["dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend"]
+
+[[bin]]
+name = "openfader"
+path = "src/main.rs"
+required-features = ["app"]
+
+[dependencies]
+rusqlite = { version = "0.40", features = ["bundled"] }
+symphonia = { version = "0.5.5", default-features = false, features = ["mp3", "aac", "isomp4", "flac", "wav", "aiff", "pcm"] }
+cpal = "0.15"
+alsa = "0.9" # the mixer of the card we open (src/audio/device/volume.rs); already in the tree through cpal
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+parking_lot = "0.12"
+# winit access: files dropped on the window (X11 / Windows / macOS) and the Wayland display for our own drag-and-drop (src/app/drop/).
+slint = { version = "1.17", optional = true, features = ["unstable-winit-030", "raw-window-handle-06"] }
+midir = { version = "0.11.1", optional = true }
+ort = { version = "2.0.0-rc.14", default-features = false, features = ["std", "download-binaries", "tls-native", "copy-dylibs", "api-31", "webgpu"] }
+ureq = "3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+flate2 = "1"
+libloading = "0.8" # Beat FX plugin libraries (src/plugin/effect.rs)
+openfader-plugin = { path = "sdk", features = ["library"] } # the plugin ABIs (effects, track libraries) and the shared library types: one definition for host and plugins
+mlua = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"] } # Lua plugins, run in-process (src/plugin/lua.rs)
+openfader-ui = { path = "ui", optional = true } # the Slint UI, built as its own crate
+
+# Drag-and-drop of files onto the window under Wayland, where winit 0.30 has none (src/app/drop/wayland.rs): a data device on
+# winit's own connection. Both are already in the tree through winit.
+[target.'cfg(target_os = "linux")'.dependencies]
+wayland-client = { version = "0.31", optional = true }
+wayland-backend = { version = "0.3", optional = true, features = ["client_system"] }
+
+# Shipping build: cross-crate optimisation and no symbol table. Keep the everyday release build's symbols for backtraces,
+# and avoid its LTO relink cost during iteration. Ship libwebgpu_dawn.so alongside either binary for GPU STEMS.
+[profile.dist]
+inherits = "release"
+lto = "thin"
+strip = "symbols"
+
+# Whole-crate optimisation for the app's own code in the shipped binary. Not for openfader-ui: its ~25 MB of generated
+# Slint code in one codegen unit would make the dist build far slower for no measured gain.
+[profile.dist.package.openfader]
+codegen-units = 1

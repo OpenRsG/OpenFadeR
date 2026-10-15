@@ -1,0 +1,209 @@
+import { Theme } from "theme.slint";
+
+/// Horizontal fader (vertical with `vertical`), a pure function of `value` (0..1): no internal state, so Rust can move
+/// it (tempo reset, SYNC) without fighting a broken binding. `edited` fires while the thumb is dragged. Vertical: 1 is
+/// the top. The groove fills from the left / bottom (from the centre with `detent`) in `fill-color`.
+export component Fader inherits Rectangle {
+    in property <float> value;
+    /// Draw a centre mark (tempo 0%, crossfader middle) and fill from it.
+    in property <bool> detent;
+    in property <bool> vertical;
+    in property <color> fill-color: Theme.accent;
+    callback edited(float);
+    /// The left button went up (a spring-back lever returns to rest here).
+    callback released;
+    height: root.vertical ? 90px : Theme.h-ctl;
+    min-width: root.vertical ? 22px : 80px;
+    property <length> cap: 12px;
+    property <length> len: root.vertical ? root.height : root.width;
+    /// Thumb centre along the travel axis.
+    property <length> at: root.cap / 2 + (root.len - root.cap) * (root.vertical ? 1 - root.value : root.value);
+    property <length> from: root.detent ? root.len / 2 : (root.vertical ? root.len - root.cap / 2 : root.cap / 2);
+    function pick(pos: length) -> float {
+        return clamp(root.vertical ? 1 - (pos - root.cap / 2) / (root.len - root.cap) : (pos - root.cap / 2) / (root.len - root.cap), 0, 1);
+    }
+    // groove
+    Rectangle {
+        x: root.vertical ? (root.width - self.width) / 2 : 0;
+        y: root.vertical ? 0 : (root.height - self.height) / 2;
+        width: root.vertical ? 4px : root.width;
+        height: root.vertical ? root.height : 4px;
+        background: Theme.bg-deep;
+        border-width: 1px;
+        border-color: Theme.line;
+        border-radius: 2px;
+    }
+    // filled part
+    Rectangle {
+        x: root.vertical ? (root.width - self.width) / 2 : min(root.from, root.at);
+        y: root.vertical ? min(root.from, root.at) : (root.height - self.height) / 2;
+        width: root.vertical ? 2px : abs(root.at - root.from);
+        height: root.vertical ? abs(root.at - root.from) : 2px;
+        background: root.fill-color;
+    }
+    if root.detent: Rectangle {
+        x: root.vertical ? 0 : root.len / 2 - 0.5px;
+        y: root.vertical ? root.len / 2 - 0.5px : 0;
+        width: root.vertical ? root.width : 1px;
+        height: root.vertical ? 1px : root.height;
+        background: Theme.line-strong;
+    }
+    // cap
+    Rectangle {
+        x: root.vertical ? (root.width - self.width) / 2 : root.at - root.cap / 2;
+        y: root.vertical ? root.at - root.cap / 2 : (root.height - self.height) / 2;
+        width: root.vertical ? min(root.width - 2px, 22px) : root.cap;
+        height: root.vertical ? root.cap : min(root.height - 2px, 20px);
+        border-radius: 2px;
+        background: ta.pressed ? Theme.text-bright : ta.has-hover ? Theme.text : Theme.fader-cap;
+        animate background { duration: Theme.t-fast; }
+        // centre line across the cap, as on the skin's channel-fader caps
+        Rectangle {
+            x: root.vertical ? 2px : (parent.width - self.width) / 2;
+            y: root.vertical ? (parent.height - self.height) / 2 : 2px;
+            width: root.vertical ? parent.width - 4px : 2px;
+            height: root.vertical ? 2px : parent.height - 4px;
+            background: Theme.panel;
+        }
+    }
+    ta := TouchArea {
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                root.edited(root.pick(root.vertical ? self.mouse-y : self.mouse-x));
+            }
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
+                root.released();
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.edited(root.pick(root.vertical ? self.mouse-y : self.mouse-x));
+            }
+        }
+    }
+}
+
+/// Rotary knob, a pure function of `value` (0..1; the pointer sweeps ±135° from the top). Drag up/down to turn (150 px =
+/// full range), double-click to snap to `reset`. `edited` carries the new value. The value arc runs from the left stop
+/// (from the top with `detent`) in `arc-color`. `stop` (0..1; negative = none) is a position one drag cannot pass: a turn
+/// that starts on one side halts there, the next drag may leave it either way (a COLOR FX knob mode, e.g. CENTER LOCK).
+export component Knob inherits Rectangle {
+    in property <float> value;
+    /// Value a double-click returns to.
+    in property <float> reset: 0.5;
+    /// Draw the centre mark (value 0.5) and start the arc there.
+    in property <bool> detent;
+    in property <color> arc-color: Theme.accent;
+    in property <float> stop: -1;
+    callback edited(float);
+    property <float> start;
+    pure function held(v: float) -> float {
+        return root.stop < 0 ? v : root.start < root.stop ? min(v, root.stop) : root.start > root.stop ? max(v, root.stop) : v;
+    }
+    property <length> c: min(root.width, root.height) / 2;
+    property <angle> sweep: (root.value - 0.5) * 270deg;
+    width: 34px;
+    height: 34px;
+    pure function pt(r: length, a: angle) -> string {
+        return "" + (root.width / 2 + r * sin(a)) / 1px + " " + (root.height / 2 - r * cos(a)) / 1px;
+    }
+    pure function arc(r: length, a0: angle, a1: angle) -> string {
+        return "M " + root.pt(r, a0) + " A " + r / 1px + " " + r / 1px + " 0 " + (abs((a1 - a0) / 1deg) > 180 ? "1" : "0") + " " + (a1 >= a0 ? "1" : "0") + " " + root.pt(r, a1);
+    }
+    // body
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: 2 * root.c - 9px;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: ta.has-hover ? Theme.panel-high : Theme.panel-raised;
+        animate background { duration: Theme.t-fast; }
+    }
+    // track, then value
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: root.arc(root.c - 2px, -135deg, 135deg);
+        stroke: Theme.line;
+        stroke-width: 2px;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: root.arc(root.c - 2px, root.detent ? 0deg : -135deg, root.sweep);
+        stroke: root.arc-color;
+        stroke-width: 2px;
+    }
+    // pointer
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: "M " + root.pt(root.c * 0.25, root.sweep) + " L " + root.pt(root.c - 6px, root.sweep);
+        stroke: Theme.text-bright;
+        stroke-width: 2px;
+        stroke-line-cap: round;
+    }
+    ta := TouchArea {
+        mouse-cursor: ns-resize;
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                root.start = root.value;
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.edited(root.held(clamp(root.start + (self.pressed-y - self.mouse-y) / 150px, 0, 1)));
+            }
+        }
+        double-clicked => { root.edited(root.reset); }
+    }
+}
+
+/// Level meter, `level` and `peak` 0..1 (peak = hold marker, 0 hides it). Green → amber → red over its length, cut into
+/// `segments` cells; horizontal by default, `vertical` fills from the bottom.
+export component Meter inherits Rectangle {
+    in property <float> level;
+    in property <float> peak;
+    in property <bool> vertical;
+    in property <int> segments: 20;
+    height: root.vertical ? 60px : 6px;
+    min-width: root.vertical ? 6px : 60px;
+    background: Theme.bg-deep;
+    property <length> len: root.vertical ? root.height : root.width;
+    // lit part: the full-length gradient, clipped to the level
+    Rectangle {
+        clip: true;
+        x: 0;
+        y: root.vertical ? root.height - self.height : 0;
+        width: root.vertical ? root.width : root.width * clamp(root.level, 0, 1);
+        height: root.vertical ? root.height * clamp(root.level, 0, 1) : root.height;
+        Rectangle {
+            x: 0;
+            y: root.vertical ? parent.height - root.height : 0;
+            width: root.width;
+            height: root.height;
+            background: @linear-gradient(root.vertical ? 0deg : 90deg, Theme.meter-lo 0%, Theme.meter-lo 60%, Theme.meter-mid 80%, Theme.meter-hi 100%);
+        }
+    }
+    for n in root.segments - 1: Rectangle {
+        x: root.vertical ? 0 : (n + 1) * root.len / root.segments - 0.5px;
+        y: root.vertical ? (n + 1) * root.len / root.segments - 0.5px : 0;
+        width: root.vertical ? root.width : 1px;
+        height: root.vertical ? 1px : root.height;
+        background: Theme.bg-deep;
+    }
+    if root.peak > 0: Rectangle {
+        x: root.vertical ? 0 : clamp(root.peak, 0, 1) * (root.width - 2px);
+        y: root.vertical ? (1 - clamp(root.peak, 0, 1)) * (root.height - 2px) : 0;
+        width: root.vertical ? root.width : 2px;
+        height: root.vertical ? 2px : root.height;
+        background: Theme.text-bright;
+    }
+}

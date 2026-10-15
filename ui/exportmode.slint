@@ -1,0 +1,185 @@
+// EXPORT mode (Rust: src/app/exportmode/): the player panel for the five layouts, the recording
+// panel and the device dock. The players are decks A and B of the one deck engine (`DeckState`), their waveforms the
+// PERFORMANCE ones (`DeckDetail`, `DeckOverview`); only what the EXPORT screen adds lives in `ExportModeState`.
+// ui/app.slint places `ExportPlayers` under the global bar and `ExportDock` in the browser's tree column.
+import { Chip, Dropdown, Icon, IconButton, Knob, Meter, RingButton } from "widgets.slint";
+import { Fader } from "gauges.slint";
+import { Theme } from "theme.slint";
+import { DeckState } from "deck-state.slint";
+import { DeckDetail, DeckOverview } from "deck-wave.slint";
+import { DeckTimes, DeckTitle, Jacket } from "deck-header.slint";
+import { MixerState } from "mixer.slint";
+import { PrefsState } from "prefs.slint";
+import { ExportDeck, ExportModeState, HotCue, PhraseSeg } from "exportmode-state.slint";
+import { CrossFader, Func, GainEq, Ops, TrackBar } from "exportmode-parts.slint";
+import { SubPanel } from "exportmode-cues.slint";
+import { ExportDock } from "exportmode-dock.slint";
+export { ExportDeck, ExportDock, ExportModeState, HotCue, PhraseSeg }
+
+/// [1 PLAYER]: operation panel, track information + full waveform + enlarged waveform + function panel, sub-information panel.
+component One inherits Rectangle {
+    background: Theme.bg;
+    HorizontalLayout {
+        spacing: 2px;
+        Ops { index: 0; search: true; jump: true; width: 64px; horizontal-stretch: 0; }
+        VerticalLayout {
+            spacing: 2px;
+            TrackBar { index: 0; height: 38px; vertical-stretch: 0; }
+            DeckOverview { index: 0; height: Theme.h-overview + Theme.h-phrase; vertical-stretch: 0; }
+            DeckDetail { index: 0; vertical-stretch: 1; min-height: 30px; }
+            Func { index: 0; tabs: true; height: 52px; vertical-stretch: 0; }
+        }
+        SubPanel { index: 0; width: 252px; horizontal-stretch: 0; }
+    }
+}
+
+/// [2 PLAYER] and [DUAL PLAYER]: each player's information, full waveform and function row, the two enlarged waveforms between
+/// them, a sub-information panel per player on the right. The DUAL layout adds the beat jump, AUTO GAIN and 3 BAND EQ columns
+/// and DUAL CONTROL.
+component Two inherits Rectangle {
+    in property <bool> dual;
+    property <length> block: 118px;
+    background: Theme.bg;
+    HorizontalLayout {
+        spacing: 2px;
+        VerticalLayout {
+            width: 64px;
+            horizontal-stretch: 0;
+            spacing: 2px;
+            Ops { index: 0; jump: root.dual; height: root.block; vertical-stretch: 0; }
+            if !root.dual: CrossFader { vertical-stretch: 1; }
+            if root.dual: Rectangle {
+                vertical-stretch: 1;
+                background: Theme.panel;
+                IconButton {
+                    icon: Icon.link;
+                    icon-size: 18px;
+                    width: 34px;
+                    height: 34px;
+                    solid: true;
+                    active: ExportModeState.dual-control;
+                    tooltip: "DUAL CONTROL: PLAY / PAUSE both players together";
+                    clicked => { ExportModeState.dual-control = !ExportModeState.dual-control; }
+                }
+            }
+            Ops { index: 1; jump: root.dual; height: root.block; vertical-stretch: 0; }
+        }
+        if root.dual: VerticalLayout {
+            width: 58px;
+            horizontal-stretch: 0;
+            spacing: 2px;
+            GainEq { index: 0; height: root.block; vertical-stretch: 0; }
+            CrossFader { vertical-stretch: 1; }
+            GainEq { index: 1; height: root.block; vertical-stretch: 0; }
+        }
+        VerticalLayout {
+            spacing: 2px;
+            TrackBar { index: 0; two: true; dual: root.dual; height: 38px; vertical-stretch: 0; }
+            DeckOverview { index: 0; height: Theme.h-overview + Theme.h-phrase; vertical-stretch: 0; }
+            Func { index: 0; height: 26px; vertical-stretch: 0; }
+            DeckDetail { index: 0; vertical-stretch: 1; min-height: 20px; }
+            DeckDetail { index: 1; vertical-stretch: 1; min-height: 20px; }
+            TrackBar { index: 1; two: true; dual: root.dual; height: 38px; vertical-stretch: 0; }
+            DeckOverview { index: 1; height: Theme.h-overview + Theme.h-phrase; vertical-stretch: 0; }
+            Func { index: 1; height: 26px; vertical-stretch: 0; }
+        }
+        VerticalLayout {
+            width: 252px;
+            horizontal-stretch: 0;
+            spacing: 2px;
+            SubPanel { index: 0; vertical-stretch: 1; }
+            SubPanel { index: 1; vertical-stretch: 1; }
+        }
+    }
+    // [Matching]: at the join of the two enlarged waveforms.
+    Chip {
+        x: root.width - 252px - 2px - self.width - 18px;
+        y: root.block + 2px + (root.height - 2 * root.block - 4px) / 2 - 9px + 2px;
+        width: 74px;
+        height: 18px;
+        font-size: Theme.font-xs;
+        text: "MATCHING";
+        active: ExportModeState.decks[0].matched;
+        tooltip: "Register the two loaded tracks as related tracks";
+        enabled: DeckState.decks[0].loaded && DeckState.decks[1].loaded;
+        clicked => { ExportModeState.matching(); }
+    }
+}
+
+/// [SIMPLE PLAYER] (69 px): PLAY, the track, its full waveform and the volume; nothing else.
+component Simple inherits Rectangle {
+    background: Theme.panel;
+    HorizontalLayout {
+        padding: 4px;
+        spacing: 8px;
+        VerticalLayout {
+            width: 36px;
+            alignment: center;
+            horizontal-stretch: 0;
+            RingButton {
+                tone: Theme.play;
+                icon: DeckState.decks[0].loading ? Icon.none : (DeckState.decks[0].playing ? Icon.pause : Icon.play);
+                text: DeckState.decks[0].loading ? "…" : "";
+                lit: DeckState.decks[0].playing;
+                enabled: DeckState.decks[0].loaded;
+                width: 34px;
+                height: 34px;
+                clicked => { ExportModeState.play(0); }
+            }
+        }
+        Jacket { index: 0; size: 56px; y: 1px; horizontal-stretch: 0; }
+        DeckTitle { index: 0; width: 240px; horizontal-stretch: 0; }
+        DeckOverview { index: 0; horizontal-stretch: 1; }
+        DeckTimes { index: 0; width: 80px; horizontal-stretch: 0; }
+        VerticalLayout {
+            width: 130px;
+            horizontal-stretch: 0;
+            alignment: center;
+            spacing: 2px;
+            Text { text: "VOLUME " + MixerState.bus.readouts[0]; color: Theme.text-dim; font-size: Theme.font-xs; font-weight: Theme.weight-bold; }
+            Fader { value: MixerState.bus.knobs[0]; detent: true; edited(v) => { MixerState.bus-knob(0, v); } }
+        }
+    }
+}
+
+/// The player panel of the chosen layout, decks A and B under the global bar. FULL BROWSER has none (`panel-h` is 0).
+export component ExportPlayers inherits Rectangle {
+    background: Theme.bg;
+    if ExportModeState.layout == 0: One { width: parent.width; height: parent.height; }
+    if ExportModeState.layout == 1: Two { dual: false; width: parent.width; height: parent.height; }
+    if ExportModeState.layout == 2: Two { dual: true; width: parent.width; height: parent.height; }
+    if ExportModeState.layout == 3: Simple { width: parent.width; height: parent.height; }
+}
+
+/// Recording panel: the source, the level (the master level: REC records the master bus), the meter, start /
+/// stop and the elapsed time. Opened from the global bar's REC button in EXPORT mode.
+export component ExportRecPanel inherits Rectangle {
+    width: 400px;
+    height: 30px;
+    background: Theme.panel-raised;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 6px;
+        Dropdown {
+            width: 76px;
+            horizontal-stretch: 0;
+            options: ["MASTER", "INPUT"];
+            current: ExportModeState.rec-source;
+            chose(i) => { PrefsState.chose("rec_source", i); }
+        }
+        Knob { width: 22px; height: 22px; horizontal-stretch: 0; detent: true; value: MixerState.bus.knobs[0]; edited(v) => { MixerState.bus-knob(0, v); } }
+        VerticalLayout { width: 90px; horizontal-stretch: 0; alignment: center; Meter { level: MixerState.bus.level; peak: MixerState.bus.peak; } }
+        Chip {
+            text: MixerState.bus.rec-armed ? "● ARMED" : "● REC";
+            width: 66px;
+            horizontal-stretch: 0;
+            active: MixerState.bus.rec;
+            active-color: Theme.rec;
+            tooltip: "Start / stop recording";
+            clicked => { MixerState.rec-toggled(); }
+        }
+        Text { text: MixerState.bus.rec ? MixerState.bus.rec-text : "0:00"; color: Theme.text; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 1; }
+    }
+}

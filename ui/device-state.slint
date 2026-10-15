@@ -1,0 +1,164 @@
+import { ListView } from "std-widgets.slint";
+import { Glyph, Icon } from "widgets.slint";
+import { Theme } from "theme.slint";
+
+/// One mounted device in the DEVICES list (src/app/device/): `summary` is "FAT32 · 3.2 GB free of 14.9 GB", `warning` the file
+/// system warning ("" = none), `library` what it holds (the plugin's library names, "no library"), `used` the filled part 0..1;
+/// the `can-` flags are what the device's plugin offers for it.
+export struct DeviceItem {
+    id: string,
+    name: string,
+    summary: string,
+    warning: string,
+    library: string,
+    used: float,
+    writable: bool,
+    has-library: bool,
+    can-export: bool,
+    can-update: bool,
+    can-histories: bool,
+    can-backup: bool,
+    can-settings: bool,
+}
+
+/// One button a device's plugin lists (`DeviceState.run-action`): `help` is the line under it, `enabled` whether it can run now,
+/// `writes` that it needs a writable device.
+export struct ActionItem {
+    id: string,
+    label: string,
+    help: string,
+    enabled: bool,
+    writes: bool,
+}
+
+/// A playlist or folder in the EXPORT / SYNC MANAGER lists.
+export struct PickRow {
+    name: string,
+    depth: int,
+    folder: bool,
+    ticked: bool,
+}
+
+/// A backup in the backup list (date and time, computer name, device name, file system).
+export struct BackupItem {
+    when: string,
+    computer: string,
+    device: string,
+    fs: string,
+    selected: bool,
+}
+
+/// The device windows (src/app/device/): detection, EXPORT to a device (create / add / update), SYNC MANAGER, backups, eject.
+/// Rust owns every value; the callbacks are the user's actions.
+export global DeviceState {
+    in-out property <bool> visible;
+    /// 0 DEVICES, 1 EXPORT, 2 SYNC MANAGER, 3 BACKUPS.
+    in-out property <int> tab;
+    in property <[DeviceItem]> devices;
+    in property <[string]> device-names;
+    /// Index into `devices` of the chosen device, -1 none.
+    in-out property <int> current: -1;
+    in property <[PickRow]> export-rows;
+    /// Export to a folder instead of a device (any folder that is not a mounted device).
+    in-out property <string> folder;
+    in property <[PickRow]> sync-rows;
+    /// Whether the Sync Manager keeps the chosen device in sync.
+    in property <bool> sync-on;
+    in property <[BackupItem]> backups;
+    /// The buttons the chosen device's plugin lists (`run-action` takes the id).
+    in property <[ActionItem]> actions;
+    in-out property <string> backup-dir;
+    /// A job runs: `phase`, `progress` 0..1 and the cancel button show.
+    in property <bool> busy;
+    in property <string> phase;
+    in property <float> progress;
+    in property <string> status;
+    in property <bool> failed;
+    /// A question is open: `confirm-text` with a yes button labelled `confirm-yes` and a cancel button.
+    in property <bool> confirm-open;
+    in property <string> confirm-text;
+    in property <string> confirm-yes;
+
+    /// The window was opened or a tab changed: Rust refreshes the lists.
+    callback opened();
+    callback select(int);
+    callback eject();
+    callback export-toggle(int);
+    callback export-clear();
+    callback export-start();
+    callback sync-toggle(int);
+    callback sync-set-on(bool);
+    callback sync-start();
+    callback backup-now();
+    callback backup-toggle(int);
+    callback restore();
+    callback backup-delete();
+    callback run-action(string);
+    callback update-collection();
+    callback import-histories();
+    /// Opens Preferences > DJ SYSTEM for the chosen device.
+    callback edit-settings();
+    callback cancel();
+    callback confirmed(bool);
+
+    // Hooks for the browser's Devices tree and the menus.
+    /// Device id, playlist id (as `Library::playlists` names them on that device).
+    callback import-playlist(string, string);
+    callback delete-playlist(string, string);
+    callback import-history(string, string);
+    /// Device id, path of the track's audio file on the device (`Track::file`).
+    callback delete-track(string, string);
+    /// Snapshot playlist id of the collection: opens EXPORT with it ticked.
+    callback export-playlists(string);
+    /// File > Library > Backed up device library management.
+    callback manage-backups();
+}
+
+/// Checkbox rows for playlists and folders.
+export component PickList inherits Rectangle {
+    in property <[PickRow]> rows;
+    callback toggled(int);
+    background: Theme.bg-deep;
+    border-color: Theme.line-strong;
+    border-width: 1px;
+    ListView {
+        for row[i] in root.rows: Rectangle {
+            height: Theme.h-row;
+            background: area.has-hover ? Theme.hover-row : transparent;
+            HorizontalLayout {
+                padding-left: Theme.space-md + row.depth * 16px;
+                spacing: Theme.space-md;
+                Rectangle {
+                    width: 14px;
+                    height: 14px;
+                    y: (parent.height - self.height) / 2;
+                    border-width: 1px;
+                    border-color: Theme.line-strong;
+                    border-radius: Theme.radius;
+                    background: row.ticked ? Theme.accent : Theme.panel-raised;
+                    horizontal-stretch: 0;
+                    if row.ticked: Glyph { width: 12px; height: 12px; icon: Icon.check; tint: Theme.text-bright; stroke-width: 2px; }
+                }
+                Text {
+                    text: (row.folder ? "▸ " : "") + row.name;
+                    color: row.folder ? Theme.text-dim : Theme.text;
+                    font-family: Theme.font;
+                    font-size: Theme.font-size;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+            area := TouchArea { clicked => { root.toggled(i); } }
+        }
+    }
+}
+
+/// A dim bold caption over a block.
+export component Caption inherits Text {
+    color: Theme.text-dim;
+    font-family: Theme.font;
+    font-size: Theme.font-md;
+    font-weight: Theme.weight-bold;
+    vertical-alignment: center;
+    vertical-stretch: 0;
+}

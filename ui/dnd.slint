@@ -1,0 +1,128 @@
+import { Theme } from "theme.slint";
+
+/// Drag and drop between the track lists, the tree and the decks (Slint `DragArea` / `DropArea`, in-window). Rust (browser/palette/
+/// target.rs) reads what a drag carries: the sources fill `data` with `BrowserState.drag-track(row)` / `drag-tree(row)` /
+/// `drag-palette(palette, row)` and report `changed dragging => { DragState.drag-changed(self.dragging, <the same data>); }`.
+///
+/// The picture under the cursor is drawn by [`DragGhost`] from `label` and the cursor `moved` reports. Slint's own `drag-image` is
+/// not used (the femtovg renderer paints it black), and a DropArea above the targets cannot track the cursor (a DropArea takes
+/// every drop that reaches it), so every `can-drop` reports the cursor and a [`DragTracker`] under everything covers the rest.
+export global DragState {
+    /// A drag was dropped on deck `index` / on tree row `row`.
+    callback deck-drop(int, data-transfer);
+    callback tree-drop(int, data-transfer);
+    /// Whether deck `index` / tree row `row` takes the drag (the target only lights up for a drag it takes).
+    pure callback accepts-deck(int, data-transfer) -> bool;
+    pure callback accepts-tree(int, data-transfer) -> bool;
+    /// The text of the picture that follows the cursor: the track's title and artist, or the tree row's label.
+    pure callback label-of(data-transfer) -> string;
+    in-out property <bool> active;
+    in-out property <string> label;
+    in-out property <length> ghost-x;
+    in-out property <length> ghost-y;
+    public function drag-changed(on: bool, data: data-transfer) {
+        active = on;
+        if (on) { label = label-of(data); }
+    }
+    /// The cursor is at (x, y) of the window.
+    public function moved(x: length, y: length) {
+        ghost-x = x;
+        ghost-y = y;
+    }
+}
+
+/// Drop target over a whole deck (header, waveform or panel): a track dropped on it is loaded there. Place it last in the deck's
+/// parent so it covers it; it passes every other pointer event through.
+export component DeckDropTarget inherits Rectangle {
+    in property <int> index;
+    background: drop.has-drag ? Theme.accent.with-alpha(0.22) : transparent;
+    border-width: drop.has-drag ? 2px : 0px;
+    border-color: Theme.accent;
+    drop := DropArea {
+        can-drop(e) => {
+            DragState.moved(root.absolute-position.x + e.position.x, root.absolute-position.y + e.position.y);
+            DragState.accepts-deck(root.index, e.data) ? DragAction.copy : DragAction.none
+        }
+        dropped(e) => { DragState.deck-drop(root.index, e.data); DragAction.copy }
+    }
+}
+
+/// Drop target over one tree row: a track dropped on a playlist is added to it, on the Tag List it is tagged, on a tag it gets the tag.
+export component TreeDropTarget inherits Rectangle {
+    in property <int> tree-row;
+    background: drop.has-drag ? Theme.accent.with-alpha(0.3) : transparent;
+    drop := DropArea {
+        can-drop(e) => {
+            DragState.moved(root.absolute-position.x + e.position.x, root.absolute-position.y + e.position.y);
+            DragState.accepts-tree(root.tree-row, e.data) ? DragAction.copy : DragAction.none
+        }
+        dropped(e) => { DragState.tree-drop(root.tree-row, e.data); DragAction.copy }
+    }
+}
+
+/// Place it as the FIRST child of the window, filling it (under everything): it accepts nothing and only reports the cursor where no
+/// other drop target takes the drag.
+export component DragTracker inherits Rectangle {
+    DropArea {
+        can-drop(e) => {
+            DragState.moved(root.absolute-position.x + e.position.x, root.absolute-position.y + e.position.y);
+            DragAction.none
+        }
+    }
+}
+
+/// The picture under the cursor while a row is dragged: its label in a small box. Place it as the LAST child of the window, filling
+/// it; it takes no input.
+export component DragGhost inherits Rectangle {
+    if DragState.active && DragState.label != "": Rectangle {
+        x: min(DragState.ghost-x + 14px, root.width - self.width);
+        y: min(DragState.ghost-y + 10px, root.height - self.height);
+        width: label.preferred-width + 2 * Theme.space-md;
+        height: label.preferred-height + Theme.space-md;
+        background: Theme.panel-raised;
+        border-width: 1px;
+        border-color: Theme.accent;
+        border-radius: Theme.radius;
+        label := Text {
+            x: Theme.space-md;
+            y: (parent.height - self.height) / 2;
+            width: self.preferred-width;
+            height: self.preferred-height;
+            text: DragState.label;
+            color: Theme.text-bright;
+            font-family: Theme.font;
+            font-size: Theme.font-size;
+        }
+    }
+}
+
+/// Files dragged onto the window from the desktop (src/app/drop/): `hovering` while such a drag is over the window.
+export global FileDropState {
+    in property <bool> hovering;
+}
+
+/// The "drop to install" picture over the whole window while files are dragged in from the desktop. Place it near the end
+/// of the window, filling it; it takes no input.
+export component FileDropOverlay inherits Rectangle {
+    if FileDropState.hovering: Rectangle {
+        background: Theme.scrim;
+        Rectangle {
+            x: Theme.space-xl;
+            y: Theme.space-xl;
+            width: parent.width - 2 * Theme.space-xl;
+            height: parent.height - 2 * Theme.space-xl;
+            border-width: 3px;
+            border-color: Theme.accent-hi;
+            border-radius: Theme.radius-xl;
+            Text {
+                text: "Drop to install plugins and themes, or to import music";
+                color: Theme.text-bright;
+                font-family: Theme.font;
+                font-size: Theme.font-xl;
+                font-weight: Theme.weight-bold;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

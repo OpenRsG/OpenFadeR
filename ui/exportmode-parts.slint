@@ -1,0 +1,334 @@
+import { Chip, Dropdown, Fader, Glyph, Icon, IconButton, Knob, RingButton, SegmentedChips } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { BrowserState } from "browser-state.slint";
+import { DeckState } from "deck-state.slint";
+import { MixerState } from "mixer.slint";
+import { PrefsState } from "prefs.slint";
+import { DeviceState } from "device-state.slint";
+import { DeckBadge } from "deck-wave.slint";
+import { DeckTimes, DeckTitle, Jacket } from "deck-header.slint";
+import { ExportModeState } from "exportmode-state.slint";
+import { HotRow } from "exportmode-cues.slint";
+import { GridTools, PhraseTools } from "exportmode-grid.slint";
+
+/// Operation panel of one player: track search, beat jump with its beat / bar count, CUE and PLAY.
+/// The 1 PLAYER layout has the track search, the DUAL PLAYER layout the beat jump.
+export component Ops inherits Rectangle {
+    in property <int> index;
+    in property <bool> search;
+    in property <bool> jump;
+    property <bool> loaded: DeckState.decks[root.index].loaded;
+    /// Beat jump length: index into `beats`; the bar entries are 4 beats each.
+    property <int> jump-i: 2;
+    property <[int]> beats: [1, 2, 4, 8, 8, 16, 32, 64];
+    /// A first click on |◀◀ went to the start; a second one soon after goes to the previous track.
+    property <bool> armed;
+    /// CUE / PLAY ring size: the DUAL layout's column also holds the beat jump.
+    property <length> ring: root.jump ? 28px : 34px;
+    /// The browser's list moves by `d` rows, then that track loads onto the deck.
+    function step(d: int) {
+        if (BrowserState.tracks.length == 0) { return; }
+        BrowserState.current-row = max(0, min(BrowserState.tracks.length - 1, BrowserState.current-row + d));
+        BrowserState.track-selected(BrowserState.current-row);
+        DeckState.load(root.index);
+    }
+    background: Theme.panel;
+    Timer { interval: 900ms; running: root.armed; triggered => { root.armed = false; } }
+    VerticalLayout {
+        padding: 3px;
+        spacing: 3px;
+        alignment: center;
+        if root.search: HorizontalLayout {
+            spacing: 2px;
+            height: 22px;
+            IconButton { icon: Icon.prev; icon-size: 12px; solid: true; width: 28px; tooltip: "Start of the track; twice: previous track"; clicked => { if (root.armed) { root.armed = false; root.step(-1); } else { DeckState.seek(root.index, 0.0); root.armed = true; } } }
+            IconButton { icon: Icon.next; icon-size: 12px; solid: true; width: 28px; tooltip: "Next track"; clicked => { root.step(1); } }
+        }
+        if root.jump: HorizontalLayout {
+            spacing: 2px;
+            height: 22px;
+            IconButton { icon: Icon.chevron-left; icon-size: 12px; solid: true; enabled: root.loaded; width: 28px; tooltip: "Jump back"; clicked => { DeckState.beat-jump(root.index, -root.beats[root.jump-i]); } }
+            IconButton { icon: Icon.chevron-right; icon-size: 12px; solid: true; enabled: root.loaded; width: 28px; tooltip: "Jump forward"; clicked => { DeckState.beat-jump(root.index, root.beats[root.jump-i]); } }
+        }
+        if root.jump: Dropdown {
+            options: ["1Beat", "2Beats", "4Beats", "8Beats", "2Bars", "4Bars", "8Bars", "16Bars"];
+            current: root.jump-i;
+            font-size: Theme.font-xs;
+            height: 18px;
+            min-width: 0px;
+            list-width: 72px;
+            chose(i) => { root.jump-i = i; }
+        }
+        HorizontalLayout {
+            alignment: center;
+            RingButton {
+                tone: Theme.cue;
+                text: "CUE";
+                lit: DeckState.decks[root.index].at-cue;
+                enabled: root.loaded;
+                width: root.ring;
+                height: root.ring;
+                pressed => { DeckState.cue(root.index); }
+                released => { DeckState.cue-released(root.index); }
+            }
+        }
+        HorizontalLayout {
+            alignment: center;
+            RingButton {
+                tone: Theme.play;
+                icon: DeckState.decks[root.index].loading ? Icon.none : (DeckState.decks[root.index].playing ? Icon.pause : Icon.play);
+                text: DeckState.decks[root.index].loading ? "…" : "";
+                lit: DeckState.decks[root.index].playing;
+                enabled: root.loaded;
+                width: root.ring;
+                height: root.ring;
+                clicked => { ExportModeState.play(root.index); }
+            }
+        }
+    }
+}
+
+/// DUAL PLAYER column: the player's AUTO GAIN knob (the gain shown is the analysed gain plus the knob's offset, saved for the track;
+/// double click = no offset; it acts while Preferences > Controller > Mixer > Auto Gain is on) and the
+/// 3 BAND EQ buttons that mute HIGH / MID / LOW.
+export component GainEq inherits Rectangle {
+    in property <int> index;
+    background: Theme.panel;
+    VerticalLayout {
+        padding: 3px;
+        spacing: 2px;
+        alignment: center;
+        Text { text: MixerState.channels[root.index].auto-gain-text; color: Theme.text; font-size: Theme.font-xs; horizontal-alignment: center; }
+        HorizontalLayout {
+            alignment: center;
+            Knob { width: 20px; height: 20px; detent: true; value: MixerState.channels[root.index].auto-gain; edited(v) => { MixerState.auto-gain-knob(root.index, v); } }
+        }
+        Text { text: "A-GAIN"; color: Theme.text-dim; font-size: Theme.font-xs; font-weight: Theme.weight-bold; horizontal-alignment: center; }
+        for band[i] in ["HIGH", "MID", "LOW"]: Chip {
+            text: band;
+            height: 18px;
+            font-size: Theme.font-xs;
+            tooltip: "Mute the band";
+            active: MixerState.channels[root.index].knobs[i + 1] < 0.02;
+            active-color: Theme.danger;
+            clicked => { MixerState.knob(root.index, i + 1, MixerState.channels[root.index].knobs[i + 1] < 0.02 ? 0.5 : 0.0); }
+        }
+    }
+}
+
+/// Crossfader between the two players (A above, B below): the mixer's own.
+export component CrossFader inherits Rectangle {
+    background: Theme.panel;
+    VerticalLayout {
+        padding: 4px;
+        spacing: 2px;
+        Text { text: "A"; color: Theme.cue; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-stretch: 0; }
+        HorizontalLayout {
+            alignment: center;
+            Fader {
+                vertical: true;
+                detent: true;
+                vertical-stretch: 1;
+                value: 1.0 - MixerState.crossfader;
+                edited(v) => { MixerState.crossfader = 1.0 - v; MixerState.crossfade(1.0 - v); }
+            }
+        }
+        Text { text: "B"; color: Theme.cue; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-stretch: 0; }
+    }
+}
+
+/// BEAT SYNC / MASTER, and in the DUAL PLAYER layout KEY SYNC, the key shift and its reset.
+component SyncBar inherits HorizontalLayout {
+    in property <int> index;
+    in property <bool> dual;
+    property <bool> loaded: DeckState.decks[root.index].loaded;
+    spacing: 2px;
+    if root.dual: Chip { width: 56px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; text: "KEY SYNC"; enabled: root.loaded; clicked => { DeckState.key-sync(root.index); } }
+    if root.dual: Chip { width: 18px; height: 18px; horizontal-stretch: 0; text: "−"; tooltip: "Key down"; enabled: root.loaded; clicked => { DeckState.key-step(root.index, -1); } }
+    if root.dual: Text { width: 44px; text: DeckState.decks[root.index].key-shift != "" ? DeckState.decks[root.index].key-shift : "±0"; color: DeckState.decks[root.index].key-shifted ? Theme.accent-hi : Theme.text-dim; font-size: Theme.font-sm; horizontal-alignment: center; vertical-alignment: center; }
+    if root.dual: Chip { width: 18px; height: 18px; horizontal-stretch: 0; text: "+"; tooltip: "Key up"; enabled: root.loaded; clicked => { DeckState.key-step(root.index, 1); } }
+    if root.dual: Chip { width: 30px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; text: "RST"; tooltip: "Back to the track's key"; enabled: root.loaded; clicked => { DeckState.key-reset(root.index); } }
+    Chip { width: 62px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; text: "BEAT SYNC"; enabled: root.loaded; active: DeckState.decks[root.index].synced; active-color: Theme.sync; clicked => { DeckState.sync(root.index); } }
+    Chip { width: 50px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; text: "MASTER"; enabled: root.loaded; active: DeckState.decks[root.index].master; active-color: Theme.master; clicked => { DeckState.master-toggle(root.index); } }
+}
+
+/// Playback track information: artwork (a click loads the browser's chosen track), title / artist, BPM and key,
+/// the remaining and elapsed time, and the sync controls.
+export component TrackBar inherits Rectangle {
+    in property <int> index;
+    in property <bool> two;
+    in property <bool> dual;
+    background: Theme.panel;
+    HorizontalLayout {
+        padding-left: 3px;
+        padding-right: 4px;
+        padding-top: 1px;
+        spacing: 6px;
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            y: 1px;
+            horizontal-stretch: 0;
+            Jacket { index: root.index; size: 36px; }
+            if ExportModeState.decks[root.index].has-art: Image { source: ExportModeState.decks[root.index].artwork; image-fit: cover; width: 36px; height: 36px; }
+            if ExportModeState.decks[root.index].has-art: DeckBadge { index: root.index; x: 0; y: 0; }
+        }
+        DeckTitle { index: root.index; min-width: 0px; horizontal-stretch: 1; }
+        if root.two: SyncBar { index: root.index; dual: root.dual; horizontal-stretch: 0; alignment: end; }
+        DeckTimes { index: root.index; width: 76px; }
+    }
+}
+
+/// The loop bar of the function panel: AU (an auto beat loop of the shown length, < > halve / double or change it) or
+/// MA (IN / OUT / RELOOP).
+component LoopBar inherits HorizontalLayout {
+    in property <int> index;
+    property <bool> manual;
+    property <int> auto-n: 4;
+    property <bool> custom;
+    property <bool> loaded: DeckState.decks[root.index].loaded;
+    property <bool> active: DeckState.decks[root.index].loop-active;
+    property <int> shown: root.custom ? root.auto-n : (DeckState.decks[root.index].auto-beats > 0 ? DeckState.decks[root.index].auto-beats : root.auto-n);
+    spacing: 2px;
+    horizontal-stretch: 0;
+    SegmentedChips { options: ["AU", "MA"]; current: root.manual ? 1 : 0; font-size: Theme.font-xs; width: 60px; horizontal-stretch: 0; chose(i) => { root.manual = i == 1; } }
+    if !root.manual: Chip {
+        text: "<";
+        width: 24px;
+        horizontal-stretch: 0;
+        enabled: root.loaded && (root.active || true);
+        tooltip: "Halve the loop";
+        clicked => { if (root.active) { DeckState.loop-halve(root.index); } else { root.auto-n = Math.max(1, Math.floor(root.shown / 2)); root.custom = true; } }
+    }
+    if !root.manual: Rectangle {
+        width: 40px;
+        background: Theme.bg-deep;
+        border-radius: Theme.radius;
+        border-width: 1px;
+        border-color: root.active ? Theme.accent : Theme.line;
+        opacity: root.loaded ? 1 : 0.5;
+        Text { text: root.active ? (DeckState.decks[root.index].loop-beats > 0 ? "" + DeckState.decks[root.index].loop-beats : "LOOP") : "" + root.shown; color: root.active ? Theme.accent-hi : Theme.text-bright; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+        TouchArea {
+            enabled: root.loaded;
+            clicked => { if (root.active) { DeckState.reloop(root.index); } else { DeckState.auto-loop(root.index, root.custom ? root.auto-n : 0); } }
+        }
+    }
+    if !root.manual: Chip {
+        text: ">";
+        width: 24px;
+        horizontal-stretch: 0;
+        enabled: root.loaded;
+        tooltip: "Double the loop";
+        clicked => { if (root.active) { DeckState.loop-double(root.index); } else { root.auto-n = Math.min(16, root.shown * 2); root.custom = true; } }
+    }
+    if root.manual: Chip { text: "IN"; width: 34px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; clicked => { DeckState.loop-in(root.index); } }
+    if root.manual: Chip { text: "OUT"; width: 38px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; clicked => { DeckState.loop-out(root.index); } }
+    if root.manual: Chip { text: "RELOOP"; width: 52px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; active: root.active; clicked => { DeckState.reloop(root.index); } }
+}
+
+/// The ≡ menu: the enlarged waveform's colours, analyse the playing track, export tracks.
+component FuncMenu inherits IconButton {
+    in property <int> index;
+    icon: Icon.list;
+    icon-size: 12px;
+    solid: true;
+    width: 24px;
+    tooltip: "Waveform colour, analyse the track, export";
+    clicked => { pop.show(); }
+    pop := PopupWindow {
+        x: root.width - self.width;
+        y: -self.height - 2px;
+        width: 150px;
+        height: 6 * Theme.h-row + 2px;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.radius;
+            VerticalLayout {
+                padding: 1px;
+                for o[i] in ["WAVEFORM: 3BAND", "WAVEFORM: RGB", "WAVEFORM: BLUE", "ANALYZE TRACK", "EXPORT TRACKS…", "DEVICES…"]: Rectangle {
+                    height: Theme.h-row;
+                    background: ma.has-hover ? Theme.select : transparent;
+                    Text { x: Theme.space-md; text: o; color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; }
+                    ma := TouchArea {
+                        clicked => {
+                            if (i < 3) { PrefsState.chose("wave", i); }
+                            if (i == 3) { ExportModeState.analyze(root.index); }
+                            if (i == 4) { DeviceState.tab = 1; DeviceState.visible = true; DeviceState.opened(); }
+                            if (i == 5) { DeviceState.tab = 0; DeviceState.visible = true; DeviceState.opened(); }
+                            pop.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Tempo of the 2 PLAYER / DUAL PLAYER function panel: MASTER TEMPO, TEMPO RESET, the tempo fader, pitch bend (hold).
+component TempoBar inherits HorizontalLayout {
+    in property <int> index;
+    property <bool> loaded: DeckState.decks[root.index].loaded;
+    spacing: 2px;
+    Chip { text: "MT"; width: 28px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; active: DeckState.decks[root.index].key-lock; tooltip: "Master tempo"; clicked => { DeckState.key-lock(root.index); } }
+    Chip { text: "RST"; width: 30px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; tooltip: "Tempo reset"; clicked => { DeckState.tempo(root.index, 0.5); } }
+    Chip { text: DeckState.decks[root.index].tempo-range; width: 40px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: "Tempo range"; clicked => { DeckState.tempo-range(root.index); } }
+    Fader { detent: true; min-width: 80px; horizontal-stretch: 1; value: DeckState.decks[root.index].tempo; edited(p) => { DeckState.tempo(root.index, p); } }
+    Text { text: DeckState.decks[root.index].tempo-text; width: 44px; color: Theme.text; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+    Chip { text: "−"; width: 22px; horizontal-stretch: 0; enabled: root.loaded; tooltip: "Pitch bend: hold to slow down"; pressed => { ExportModeState.bend(root.index, -0.08); } released => { ExportModeState.bend(root.index, 0.0); } }
+    Chip { text: "+"; width: 22px; horizontal-stretch: 0; enabled: root.loaded; tooltip: "Pitch bend: hold to speed up"; pressed => { ExportModeState.bend(root.index, 0.08); } released => { ExportModeState.bend(root.index, 0.0); } }
+}
+
+/// Function panel. 1 PLAYER (`tabs`): CUE/LOOP and GRID stacked on the left, the hot cues, MEMORY, the cue
+/// call and delete, the loop bar, Q and ≡. 2 PLAYER / DUAL PLAYER: one row, a GRID button that swaps the row for the GRID
+/// panel, MEMORY, the loop bar, the tempo controls, Q.
+export component Func inherits Rectangle {
+    in property <int> index;
+    in property <bool> tabs;
+    /// The GRID panel is open: the deck's own GRID flag, so the enlarged waveform draws blue beat lines.
+    property <bool> grid: DeckState.decks[root.index].grid-edit;
+    property <bool> loaded: DeckState.decks[root.index].loaded;
+    background: Theme.panel;
+    HorizontalLayout {
+        padding: 2px;
+        spacing: 4px;
+        if root.tabs: VerticalLayout {
+            width: 66px;
+            spacing: 2px;
+            Chip { text: "CUE/LOOP"; active: !root.grid; font-size: Theme.font-xs; clicked => { if (root.grid) { DeckState.grid-toggle(root.index); } } }
+            Chip { text: "GRID"; active: root.grid; font-size: Theme.font-xs; enabled: root.loaded; clicked => { if (!root.grid) { DeckState.grid-toggle(root.index); } } }
+        }
+        if !root.tabs: Chip { text: "GRID"; width: 38px; horizontal-stretch: 0; active: root.grid; font-size: Theme.font-xs; enabled: root.loaded; tooltip: "Adjust the beat grid"; clicked => { DeckState.grid-toggle(root.index); } }
+        if root.grid && !ExportModeState.decks[root.index].phrase-panel: VerticalLayout { alignment: center; GridTools { index: root.index; } }
+        if root.grid && ExportModeState.decks[root.index].phrase-panel: VerticalLayout { alignment: center; PhraseTools { index: root.index; } }
+        if !root.grid: HorizontalLayout {
+            spacing: 4px;
+            alignment: start;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 0;
+                HorizontalLayout {
+                    spacing: 4px;
+                    if root.tabs: HotRow { index: root.index; }
+                    Chip { text: "MEMORY"; width: 54px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; tooltip: "Save a memory cue at the playhead"; clicked => { DeckState.memory-cue(root.index); } }
+                    if root.tabs: Chip { text: "◀"; width: 24px; horizontal-stretch: 0; enabled: root.loaded; tooltip: "Previous cue or loop"; clicked => { ExportModeState.cue-step(root.index, -1); } }
+                    if root.tabs: Chip { text: "▶"; width: 24px; horizontal-stretch: 0; enabled: root.loaded; tooltip: "Next cue or loop"; clicked => { ExportModeState.cue-step(root.index, 1); } }
+                    if root.tabs: Chip { text: "×"; width: 24px; horizontal-stretch: 0; enabled: root.loaded; tooltip: "Delete the cue or loop at the playhead"; clicked => { ExportModeState.memory-delete(root.index); } }
+                    LoopBar { index: root.index; }
+                }
+            }
+            if !root.tabs: VerticalLayout { alignment: center; TempoBar { index: root.index; } }
+            if root.tabs: Rectangle { horizontal-stretch: 1; }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 0;
+                HorizontalLayout {
+                    spacing: 2px;
+                    Chip { text: "Q"; width: 24px; horizontal-stretch: 0; active: DeckState.decks[root.index].quantize; tooltip: "Quantize"; clicked => { DeckState.quantize(root.index); } }
+                    FuncMenu { index: root.index; }
+                }
+            }
+        }
+    }
+}

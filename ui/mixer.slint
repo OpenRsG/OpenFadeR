@@ -1,0 +1,284 @@
+import { Chip, Fader, Icon, Knob, Meter } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState } from "deck.slint";
+
+/// One mixer channel row. Knob positions are 0..1 in the order TRIM, HI, MID, LOW, CFX; Rust
+/// (src/app/mixer/map.rs) maps them to dB / CFX values and fills `readouts`, `level` and `peak`.
+export struct ChannelView {
+    knobs: [float],
+    readouts: [string],
+    fader: float,
+    /// Headphone CUE button (pre-fader feed to the headphones, see src/audio/bus.rs).
+    cue: bool,
+    /// VU bar and peak-hold marker, 0..1 on a −60..0 dB scale.
+    level: float,
+    peak: float,
+    /// Crossfader assignment: 0 = A side, 1 = THRU (not on the crossfader), 2 = B side. Decks A and C start on A, B and D on B.
+    xf: int,
+    /// STEM mode: the HIGH / MID / LOW knobs are the INST / VOCAL / DRUMS levels (`iso-knobs`, 0..1 = gain, in that knob order) and the EQ is flat.
+    iso: bool,
+    iso-knobs: [float],
+    /// AUTO GAIN knob position (0.5 = no adjustment) and the gain the loaded track plays with ("+1.5 dB"), set by Rust from the deck.
+    auto-gain: float,
+    auto-gain-text: string,
+}
+
+/// Master / headphone section. Knob positions are 0..1 in the order MASTER, HP MIX (0 = CUE, 1 = MASTER),
+/// HP LEVEL; Rust fills `readouts`, and `level` / `peak` (master VU, post-sum) like a channel's.
+export struct BusView {
+    knobs: [float],
+    readouts: [string],
+    /// SPLIT: mono headphone feed on the left output, mono master on the right.
+    split: bool,
+    level: float,
+    peak: float,
+    /// REC running, and its elapsed time as "M:SS".
+    rec: bool,
+    /// REC is armed but not recording yet: the start trigger waits for audio (Preferences > Advanced > Recordings).
+    rec-armed: bool,
+    rec-text: string,
+    /// Last headphone-device / recording message ("" = nothing to say).
+    status: string,
+}
+
+/// Mixer: four channels (index 0 = deck A … 3 = deck D; C and D show in the 4-deck layout), the crossfader (0 = A, 1 = B)
+/// and the master / headphone bus.
+export global MixerState {
+    in-out property <[ChannelView]> channels;
+    in-out property <BusView> bus;
+    in-out property <float> crossfader: 0.5;
+    /// Crossfader curve index in the order of prefs::CrossfaderCurve (smooth, sharp, constant); Rust mirrors the setting.
+    in-out property <int> curve: 2;
+    /// Colour FX type shared by both channels' CFX knobs: index into `cfx-names` (audio::cfx::Kind::ALL order, then the
+    /// COLOR FX plugin effects).
+    in-out property <int> cfx-type;
+    in property <[string]> cfx-names;
+    /// COLOR FX KNOB mode's stop (0..1, a position one drag cannot pass, e.g. 0.5 = CENTER LOCK); negative = NORMAL.
+    in property <float> cfx-stop: -1;
+    /// Automix transition in progress: constant-power gains whatever the curve; bit i set = channel i's LOW band is killed (bass swap).
+    in property <bool> auto-fade;
+    in property <int> auto-low-cut;
+    /// RELEASE FX is held (set by the FX panel): with "Apply RELEASE FX on CFX" the COLOR FX knobs act as centre meanwhile.
+    in-out property <bool> release-held;
+    /// The STEM ISO chip is shown (Preferences > Extensions > STEM ISO display; Rust mirrors the setting).
+    in property <bool> iso-shown: true;
+    callback curve-cycled();
+    /// (channel, side 0 = A / 2 = B) click on that side's assignment grid: to that side, or to THRU (1) when already there.
+    callback xf-assigned(int, int);
+    /// (channel) EQ ↔ STEM ISO.
+    callback iso-toggled(int);
+    /// (channel, part 0 VOCAL / 1 INST / 2 DRUMS, gain 0..1) from a controller's PART ISOLATOR knob; switches the channel to ISO mode.
+    callback iso-knob(int, int, float);
+    callback cfx-selected(int);
+    /// (channel, knob index, position)
+    callback knob(int, int, float);
+    /// (channel, position 0..1; 0.5 = no adjustment) the DUAL PLAYER AUTO GAIN knob: the track's stored offset on its analysed gain.
+    callback auto-gain-knob(int, float);
+    callback fader(int, float);
+    callback crossfade(float);
+    callback cue-toggled(int);
+    /// (bus knob index, position)
+    callback bus-knob(int, float);
+    callback split-toggled();
+    callback rec-toggled();
+}
+
+/// Channel strip: the TRIM / HIGH / MID / LOW / CFX knobs each above its label (the last named after the
+/// selected CFX type, FILTER by default) with a full-height level meter alongside the stack, CUE (and with STEMS the STEM
+/// switch, side by side when the strip is wide enough; a headphones / layers icon where the word does not fit), then the
+/// channel fader. Fills the size it is given (60 wide at 2 wide decks, 52 at 2 narrow, 44 at 4; 240 / 266 tall).
+component Channel inherits Rectangle {
+    in property <int> index;
+    property <ChannelView> ch: MixerState.channels[root.index];
+    property <bool> stems: DeckState.decks[root.index].stems && MixerState.iso-shown;
+    /// CUE and STEM side by side at 2 decks (52–60 wide); stacked in the 44-wide 4-deck strips.
+    property <bool> wide: DeckState.count != 4;
+    /// One knob and its label (18 + 1 + 10) with a 2 px gap to the next knob; more when a skin makes the strip taller.
+    property <length> row-h: clamp((root.height - 100px) / 5, 31px, 36px);
+    background: Theme.panel;
+    VerticalLayout {
+        padding-top: 3px;
+        padding-bottom: 3px;
+        padding-left: 3px;
+        padding-right: 3px;
+        spacing: 0px;
+        HorizontalLayout {
+            height: 5 * root.row-h;
+            spacing: 3px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                for label[p] in ["TRIM", "HIGH", "MID", "LOW", "CFX"]: VerticalLayout {
+                    height: root.row-h;
+                    spacing: 1px;
+                    alignment: start;
+                    property <bool> is-iso: root.ch.iso && p >= 1 && p <= 3;
+                    HorizontalLayout {
+                        alignment: center;
+                        Knob {
+                            width: 18px;
+                            height: 18px;
+                            detent: !is-iso;
+                            reset: is-iso ? 1.0 : 0.5;
+                            arc-color: is-iso ? [Theme.accent, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums][p] : p == 4 ? Theme.cue : Theme.accent;
+                            value: is-iso ? root.ch.iso-knobs[p - 1] : root.ch.knobs[p];
+                            stop: p == 4 ? MixerState.cfx-stop : -1;
+                            edited(v) => { MixerState.knob(root.index, p, v); }
+                        }
+                    }
+                    Text {
+                        // STEM mode: the HIGH / MID / LOW knobs become INST / VOCAL / DRUMS (top to bottom).
+                        text: is-iso ? ["", "INST", "VOCAL", "DRUMS"][p] : p == 4 ? MixerState.cfx-names[MixerState.cfx-type] : label;
+                        color: is-iso ? [Theme.text, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums][p] : Theme.text-dim;
+                        font-family: Theme.font;
+                        font-size: Theme.font-xs;
+                        font-weight: Theme.weight-bold;
+                        horizontal-alignment: center;
+                        overflow: elide;
+                        height: 10px;
+                    }
+                }
+            }
+            // The full knob-stack height, one continuous green → amber → red bar.
+            Meter { vertical: true; width: 4px; height: 5 * root.row-h; segments: 1; level: root.ch.level; peak: root.ch.peak; }
+        }
+        Rectangle { height: 4px; }
+        if root.wide: HorizontalLayout {
+            height: 18px;
+            spacing: 2px;
+            Chip { text: "CUE"; icon: Icon.headphones; font-size: Theme.font-xs; min-width: 0px; active: root.ch.cue; tooltip: "Headphone CUE"; clicked => { MixerState.cue-toggled(root.index); } }
+            if root.stems: Chip { text: "STEM"; icon: Icon.stems; font-size: Theme.font-xs; min-width: 0px; active: root.ch.iso; tooltip: "STEM mode: INST / VOCAL / DRUMS levels"; clicked => { MixerState.iso-toggled(root.index); } }
+        }
+        if !root.wide: Chip { text: "CUE"; icon: Icon.headphones; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.cue; tooltip: "Headphone CUE"; clicked => { MixerState.cue-toggled(root.index); } }
+        if !root.wide && root.stems: Rectangle { height: 2px; }
+        if !root.wide && root.stems: Chip { text: "STEM"; icon: Icon.stems; font-size: Theme.font-xs; height: 16px; min-width: 0px; active: root.ch.iso; tooltip: "STEM mode: INST / VOCAL / DRUMS levels"; clicked => { MixerState.iso-toggled(root.index); } }
+        Rectangle { height: 4px; }
+        // Takes what the rows above leave.
+        holder := Rectangle {
+            vertical-stretch: 1;
+            min-height: 30px;
+            Fader {
+                vertical: true;
+                x: (holder.width - 22px) / 2;
+                width: 22px;
+                height: holder.height;
+                value: root.ch.fader;
+                edited(v) => { MixerState.fader(root.index, v); }
+            }
+        }
+    }
+}
+
+/// Centre mixer strip: two channels at 2 decks; at 4 decks 1, 3 | 2, 4 (the side of the crossfader each deck starts on).
+export component Mixer inherits Rectangle {
+    background: Theme.line;
+    HorizontalLayout {
+        spacing: 1px;
+        Channel { index: 0; }
+        if DeckState.count == 4: Channel { index: 2; }
+        Channel { index: 1; }
+        if DeckState.count == 4: Channel { index: 3; }
+    }
+}
+
+component KnobLabel inherits HorizontalLayout {
+    in property <string> text;
+    in property <float> value;
+    in property <float> reset: 0.5;
+    callback edited(float);
+    spacing: 3px;
+    horizontal-stretch: 0;
+    alignment: start;
+    Text { text: root.text; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+    Knob { width: 22px; height: 22px; detent: true; reset: root.reset; value: root.value; edited(v) => { root.edited(v); } }
+}
+
+/// One side's crossfader assignment grid, decks 1 2 / 3 4: lit = on this side. A click on an unlit deck
+/// moves it to this side, on a lit one sets THRU.
+component XfGrid inherits VerticalLayout {
+    in property <int> side; // 0 = A, 2 = B
+    spacing: 2px;
+    alignment: center;
+    for row in DeckState.count / 2: HorizontalLayout {
+        spacing: 2px;
+        for col in 2: Chip {
+            property <int> n: row * 2 + col;
+            text: n + 1;
+            font-size: Theme.font-xs;
+            width: 26px;
+            height: 16px;
+            active: MixerState.channels[n].xf == side;
+            tooltip: "Crossfader assign";
+            clicked => { MixerState.xf-assigned(n, side); }
+        }
+    }
+}
+
+/// Headphone / crossfader / REC strip: MASTER, HP MIX and HP LEVEL knobs with SPLIT on the left; the crossfader centred between the
+/// A and B assignment grids, with its curve; the bus message, master meter and REC on the right.
+export component MixerBar inherits Rectangle {
+    background: Theme.panel;
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-md;
+        padding-top: 3px;
+        padding-bottom: 3px;
+        spacing: Theme.space-md;
+        for label[p] in ["MASTER", "HP MIX", "HP LEVEL"]: KnobLabel {
+            text: label;
+            value: MixerState.bus.knobs[p];
+            reset: p == 1 ? 0.0 : 0.5;
+            edited(v) => { MixerState.bus-knob(p, v); }
+        }
+        Chip { text: "SPLIT"; font-size: Theme.font-xs; min-width: 40px; horizontal-stretch: 0; active: MixerState.bus.split; tooltip: "Mono HP left / master right"; clicked => { MixerState.split-toggled(); } }
+        Rectangle { horizontal-stretch: 1; }
+        // Only while there is something to say (a headphone-device or recording message); wraps rather than elides.
+        if MixerState.bus.status != "": Text {
+            text: MixerState.bus.status;
+            color: Theme.cue;
+            font-family: Theme.font;
+            font-size: Theme.font-xs;
+            wrap: word-wrap;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+            max-width: (root.width - centre.width) / 2 - 280px;
+        }
+        VerticalLayout { width: 90px; horizontal-stretch: 0; alignment: center; Meter { level: MixerState.bus.level; peak: MixerState.bus.peak; } }
+        Chip {
+            text: MixerState.bus.rec-armed ? "● ARMED" : MixerState.bus.rec ? "● " + MixerState.bus.rec-text : "● REC";
+            font-size: Theme.font-xs;
+            min-width: 62px;
+            horizontal-stretch: 0;
+            active: MixerState.bus.rec;
+            active-color: Theme.rec;
+            tooltip: MixerState.bus.rec-armed ? "Waiting for audio, click to cancel" : "Record master";
+            clicked => { MixerState.rec-toggled(); }
+        }
+    }
+    // Centred on the window independent of what the side groups hold.
+    centre := HorizontalLayout {
+        x: (root.width - self.width) / 2;
+        width: self.preferred-width;
+        padding-top: 3px;
+        padding-bottom: 3px;
+        spacing: Theme.space-md;
+        XfGrid { side: 0; }
+        Fader {
+            width: 96px;
+            detent: true;
+            value: MixerState.crossfader;
+            edited(v) => { MixerState.crossfader = v; MixerState.crossfade(v); }
+        }
+        XfGrid { side: 2; }
+    }
+    // Outside `centre` so the fader itself sits on the window's centre line.
+    Chip {
+        x: centre.x + centre.width + Theme.space-md;
+        y: (root.height - self.height) / 2;
+        text: ["SMOOTH", "SHARP", "CONST"][MixerState.curve];
+        font-size: Theme.font-xs;
+        width: 52px;
+        height: 16px;
+        tooltip: "Crossfader curve";
+        clicked => { MixerState.curve-cycled(); }
+    }
+}

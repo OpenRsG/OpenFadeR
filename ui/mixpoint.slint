@@ -1,0 +1,159 @@
+import { Chip, Icon, SegmentedChips } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState } from "deck-state.slint";
+import { WaveView } from "deck-wave.slint";
+import { MixPointState } from "mixpoint-state.slint";
+
+/// A deck button of the panel: the deck letter, blue while the deck is the MIX OUT / MIX IN deck, and what
+/// its MIX POINT is (OUT / IN, `⇄` once linked). Clicking selects the deck, or clears a MIX POINT it has in this mode.
+component DeckButton inherits Rectangle {
+    in property <int> index;
+    property <int> state: MixPointState.decks[root.index].state;
+    property <bool> selected: MixPointState.decks[root.index].sel-out || MixPointState.decks[root.index].sel-in;
+    width: 46px;
+    height: Theme.h-ctl;
+    border-radius: Theme.radius;
+    opacity: MixPointState.decks[root.index].loaded ? 1 : 0.4;
+    background: root.selected ? (ta.has-hover ? Theme.accent-hi : Theme.accent) : ta.has-hover ? Theme.panel-high : Theme.panel-raised;
+    animate background { duration: Theme.t-fast; }
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        spacing: Theme.space-sm;
+        Text {
+            text: ["A", "B", "C", "D"][root.index];
+            vertical-alignment: center;
+            color: root.selected ? Theme.text-bright : Theme.text;
+            font-size: Theme.font-md;
+            font-weight: Theme.weight-bold;
+        }
+        Text {
+            text: root.state == 0 ? "" : (root.state == 1 || root.state == 3 ? "OUT" : "IN") + (root.state >= 3 ? "⇄" : "");
+            vertical-alignment: center;
+            color: root.state >= 3 ? Theme.accent-hi : Theme.cue;
+            font-size: Theme.font-xs;
+            font-weight: Theme.weight-bold;
+        }
+    }
+    ta := TouchArea {
+        enabled: MixPointState.decks[root.index].loaded;
+        clicked => { MixPointState.select-deck(root.index); }
+    }
+}
+
+/// One line of the MIX POINT information: which deck and where; the X clears the MIX POINT.
+component PointInfo inherits Rectangle {
+    in property <string> title;
+    in property <string> text;
+    callback clear;
+    height: Theme.h-ctl-sm;
+    HorizontalLayout {
+        spacing: Theme.space-sm;
+        Text { width: 28px; text: root.title; vertical-alignment: center; color: Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+        Text { text: root.text == "" ? "not set" : root.text; vertical-alignment: center; color: root.text == "" ? Theme.text-faint : Theme.text; font-size: Theme.font-size; horizontal-stretch: 1; }
+        if root.text != "": Rectangle {
+            width: 18px;
+            border-radius: Theme.radius;
+            background: x.has-hover ? Theme.panel-high : transparent;
+            Text { text: "×"; horizontal-alignment: center; vertical-alignment: center; color: Theme.text-dim; font-size: Theme.font-md; }
+            x := TouchArea { clicked => { root.clear(); } }
+        }
+    }
+}
+
+/// One of the panel's waveforms: Rust draws the picture at the element's size; drag = move the view, wheel = zoom.
+component Lane inherits Rectangle {
+    in property <image> source;
+    in property <string> title;
+    in property <int> which;
+    property <length> last-x;
+    background: Theme.wave-bg;
+    WaveView {
+        source: root.source;
+        resized(w, h) => { MixPointState.resized(root.which, w, h); }
+    }
+    Text { x: Theme.space-sm; y: 1px; text: root.title; color: Theme.text-faint; font-size: Theme.font-xs; font-weight: Theme.weight-bold; }
+    TouchArea {
+        mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { root.last-x = self.mouse-x; }
+        }
+        moved => {
+            if self.pressed {
+                MixPointState.lane-drag(self.mouse-x - root.last-x);
+                root.last-x = self.mouse-x;
+            }
+        }
+        scroll-event(e) => {
+            MixPointState.zoom(e.delta-y / 40px);
+            accept
+        }
+    }
+}
+
+/// The MIX POINT LINK panel: MIX IN / MIX OUT mode, MIX POINT SELECT, SILENT and SILENT EDIT, the
+/// LINK button, a button per deck and the two MIX POINT readouts on the left; the MIX OUT and MIX IN waveforms aligned at their
+/// points and an overview of both tracks (white frame = what the waveforms show) on the right.
+export component MixPointPanel inherits Rectangle {
+    background: Theme.panel;
+    HorizontalLayout {
+        padding: Theme.space-sm;
+        spacing: Theme.space-lg;
+        VerticalLayout {
+            width: 296px;
+            horizontal-stretch: 0;
+            spacing: Theme.gap;
+            HorizontalLayout {
+                spacing: Theme.gap;
+                SegmentedChips {
+                    horizontal-stretch: 0;
+                    options: ["MIX IN", "MIX OUT"];
+                    current: MixPointState.mode;
+                    chose(m) => { MixPointState.set-mode(m); }
+                }
+                Chip { text: "SELECT"; horizontal-stretch: 0; min-width: 52px; tooltip: "MIX POINT SELECT: the next Hot Cue / memory cue (the current cue without any)"; clicked => { MixPointState.pick-cue(); } }
+                Chip {
+                    text: MixPointState.link-state == 2 ? "LINKED" : "LINK";
+                    horizontal-stretch: 1;
+                    enabled: MixPointState.link-state != 0;
+                    active: MixPointState.link-state == 2;
+                    tooltip: MixPointState.link-state == 2 ? "MIX POINT LINK is set: click again to put a running MIX IN deck back in step" : "MIX POINT LINK: the MIX IN deck starts by itself at the MIX POINT";
+                    clicked => { MixPointState.link(); }
+                }
+            }
+            HorizontalLayout {
+                spacing: Theme.gap;
+                Chip { text: "SILENT"; horizontal-stretch: 0; min-width: 52px; active: MixPointState.silent; tooltip: "SILENT: mute the MIX IN deck from the start of its track to the silent end"; clicked => { MixPointState.silent-toggled(); } }
+                Chip { text: "EDIT"; horizontal-stretch: 0; min-width: 34px; active: MixPointState.silent-edit; tooltip: "SILENT EDIT: click the MIX IN waveform to move the silent end"; clicked => { MixPointState.silent-edit-toggled(); } }
+                Rectangle { horizontal-stretch: 1; }
+                for i in DeckState.count: DeckButton { index: i; horizontal-stretch: 0; }
+            }
+            PointInfo { title: "OUT"; text: MixPointState.out-text; clear => { MixPointState.clear(1); } }
+            PointInfo { title: "IN"; text: MixPointState.in-text; clear => { MixPointState.clear(0); } }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: Theme.gap;
+            Lane { source: MixPointState.lane-out; title: "MIX OUT"; which: 0; vertical-stretch: 1; preferred-height: 10px; min-height: 8px; }
+            Lane { source: MixPointState.lane-in; title: "MIX IN"; which: 1; vertical-stretch: 1; preferred-height: 10px; min-height: 8px; }
+            Rectangle {
+                height: 12px;
+                background: Theme.wave-bg;
+                WaveView {
+                    source: MixPointState.overview;
+                    resized(w, h) => { MixPointState.resized(2, w, h); }
+                }
+                TouchArea {
+                    mouse-cursor: MouseCursor.col-resize;
+                    pointer-event(e) => {
+                        if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { MixPointState.overview-move(self.mouse-x / self.width); }
+                    }
+                    moved => { if self.pressed { MixPointState.overview-move(self.mouse-x / self.width); } }
+                    scroll-event(e) => {
+                        MixPointState.zoom(e.delta-y / 40px);
+                        accept
+                    }
+                }
+            }
+        }
+    }
+}

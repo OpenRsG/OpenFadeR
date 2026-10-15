@@ -1,0 +1,18 @@
+[package]
+name = "openfader-plugin"
+version = "0.1.0"
+edition = "2024"
+description = "SDK for OpenFadeR plugins: the C ABI (v1) of effects and of track libraries, and a safe Rust trait on top of each."
+
+[features]
+# The library plugin ABI (`library` module): JSON over a C function, so it needs serde. Effect plugins stay dependency-free.
+library = ["dep:serde", "dep:serde_json"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+
+[[example]]
+name = "bitcrush"
+path = "examples/bitcrush/lib.rs"
+crate-type = ["cdylib"]

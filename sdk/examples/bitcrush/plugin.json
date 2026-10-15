@@ -1,0 +1,6 @@
+{
+  "name": "bitcrush",
+  "version": "0.1.0",
+  "description": "BITCRUSH Beat FX: beat-synced bit and sample-rate reduction (Rust example of the openfader-plugin SDK).",
+  "effects": "libbitcrush.so"
+}

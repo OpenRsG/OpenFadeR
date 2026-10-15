@@ -1,0 +1,53 @@
+import { Chip, SegmentedChips } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { BrowserState } from "browser-state.slint";
+
+/// Track Suggestion bar (the "Track Suggestion" window), shown over the table while the SUGGEST tab is on:
+/// the recommended condition (Collection Radar / Era / Mood / Association; Streaming Radar needs an online service and is not offered),
+/// for Collection Radar its conditions (BPM, KEY, VOCAL; each chip steps through its choices), and the track the list is ranked for
+/// (LIST = the chosen row, MASTER, or the track on a deck). The searched list is whatever the tree shows. Rust: src/app/browser/suggest/.
+export component SuggestBar inherits Rectangle {
+    height: Theme.h-ctl + Theme.space-sm;
+    background: Theme.panel;
+    HorizontalLayout {
+        padding-left: Theme.space-lg;
+        padding-right: Theme.space-md;
+        padding-bottom: Theme.space-sm;
+        spacing: Theme.space-sm;
+        SegmentedChips {
+            options: ["COLLECTION RADAR", "ERA", "MOOD", "ASSOCIATION"];
+            current: BrowserState.suggest-mode;
+            horizontal-stretch: 0;
+            width: 330px;
+            chose(i) => { BrowserState.suggest-mode-chosen(i); }
+        }
+        if BrowserState.suggest-mode == 0: HorizontalLayout {
+            spacing: Theme.space-sm;
+            horizontal-stretch: 0;
+            for c[i] in BrowserState.suggest-conditions: Chip {
+                text: c;
+                width: 92px;
+                horizontal-stretch: 0;
+                tooltip: i == 0 ? "Tempo window around the track (click to change)" : i == 1 ? "Key rule (click to change)" : "Vocals included / not included (click to change)";
+                clicked => { BrowserState.suggest-condition(i); }
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Text {
+            text: "FOR";
+            color: Theme.text-dim;
+            vertical-alignment: center;
+            horizontal-stretch: 0;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+            font-weight: Theme.weight-bold;
+        }
+        SegmentedChips {
+            options: BrowserState.suggest-anchors;
+            current: BrowserState.suggest-anchor;
+            horizontal-stretch: 0;
+            width: 62px + BrowserState.suggest-anchors.length * 34px;
+            chose(i) => { BrowserState.suggest-anchor-chosen(i); }
+        }
+    }
+}

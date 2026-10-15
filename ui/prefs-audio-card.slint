@@ -1,0 +1,391 @@
+import { Theme } from "theme.slint";
+import { Dropdown, Glyph, Icon, Toggle, Tooltip } from "widgets.slint";
+import { Note } from "dialog.slint";
+import { AudioCard, PrefsState } from "prefs-state.slint";
+
+/// Glyph of a device (our own drawings on the 16 grid): 0 speakers, 1 display (HDMI / DisplayPort), 2 sound server, 3 chip.
+component DeviceIcon inherits Rectangle {
+    in property <int> kind;
+    in property <color> tint: Theme.text;
+    width: 22px;
+    height: 22px;
+    if root.kind == 0: Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: "M 2 6 H 5 L 9 3 V 13 L 5 10 H 2 Z";
+        fill: root.tint;
+    }
+    if root.kind == 0: Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: "M 11 5.5 A 3.5 3.5 0 0 1 11 10.5 M 12.5 3.5 A 6 6 0 0 1 12.5 12.5";
+        stroke: root.tint;
+        stroke-width: 1.2px;
+        stroke-line-cap: round;
+    }
+    if root.kind != 0: Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: root.kind == 1 ? "M 1.5 3 H 14.5 V 11 H 1.5 Z M 5.5 14 H 10.5 M 8 11 V 14"
+            : root.kind == 2 ? "M 2 3 H 14 V 7 H 2 Z M 2 9 H 14 V 13 H 2 Z M 4.5 5 H 4.6 M 4.5 11 H 4.6"
+            : "M 4 4 H 12 V 12 H 4 Z M 6.5 1.5 V 4 M 9.5 1.5 V 4 M 6.5 12 V 14.5 M 9.5 12 V 14.5 M 1.5 6.5 H 4 M 1.5 9.5 H 4 M 12 6.5 H 14.5 M 12 9.5 H 14.5";
+        stroke: root.tint;
+        stroke-width: 1.2px;
+        stroke-line-cap: round;
+        stroke-line-join: round;
+    }
+}
+
+/// Speaker button: muted = red with a cross, otherwise the speaker with sound waves.
+component MuteButton inherits Rectangle {
+    in property <bool> muted;
+    in property <bool> enabled: true;
+    callback clicked;
+    width: 28px;
+    height: Theme.h-ctl;
+    border-radius: Theme.radius;
+    background: !root.enabled ? Theme.panel : root.muted ? Theme.danger : ta.has-hover ? Theme.panel-high : Theme.panel-raised;
+    animate background { duration: Theme.t-fast; }
+    Path {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 16px;
+        height: 16px;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: "M 2 6 H 5 L 9 3 V 13 L 5 10 H 2 Z";
+        fill: !root.enabled ? Theme.text-disabled : root.muted ? Theme.text-bright : Theme.text;
+    }
+    Path {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 16px;
+        height: 16px;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: root.muted ? "M 11 6 L 15 10 M 15 6 L 11 10" : "M 11 5.5 A 3.5 3.5 0 0 1 11 10.5 M 12.5 3.5 A 6 6 0 0 1 12.5 12.5";
+        stroke: !root.enabled ? Theme.text-disabled : root.muted ? Theme.text-bright : Theme.text;
+        stroke-width: 1.3px;
+        stroke-line-cap: round;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+    Tooltip {
+        width: root.width;
+        height: root.height;
+        text: !root.enabled ? "This device has no mute switch" : root.muted ? "Unmute" : "Mute";
+        hovered: ta.has-hover && !ta.pressed;
+    }
+}
+
+/// Green check: lit = OpenFadeR plays on this card; a click chooses it.
+component SelectCheck inherits Rectangle {
+    in property <bool> selected;
+    callback clicked;
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: root.selected ? Theme.play : ta.has-hover ? Theme.text-dim : Theme.line-strong;
+    background: root.selected ? Theme.play.with-alpha(0.18) : transparent;
+    Glyph {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 14px;
+        height: 14px;
+        icon: Icon.check;
+        tint: root.selected ? Theme.play : Theme.text-faint;
+        stroke-width: 2px;
+    }
+    ta := TouchArea { clicked => { root.clicked(); } }
+    Tooltip {
+        width: root.width;
+        height: root.height;
+        text: root.selected ? "OpenFadeR plays on this device" : "Use this device for OpenFadeR";
+        hovered: ta.has-hover && !ta.pressed;
+    }
+}
+
+/// Horizontal volume slider, 0..1. While the thumb is held it follows the pointer and reports every move; otherwise it shows
+/// `value`, so Rust can move it (a read-back, a change made in another mixer).
+component VolumeSlider inherits Rectangle {
+    in property <float> value;
+    callback edited(float);
+    horizontal-stretch: 1;
+    height: Theme.h-ctl;
+    min-width: 80px;
+    property <length> cap: 12px;
+    property <float> drag;
+    property <float> shown: ta.pressed ? root.drag : root.value;
+    property <length> at: root.cap / 2 + (root.width - root.cap) * root.shown;
+    function pick(x: length) -> float {
+        return clamp((x - root.cap / 2) / (root.width - root.cap), 0, 1);
+    }
+    Rectangle {
+        x: 0;
+        width: parent.width;
+        y: (parent.height - self.height) / 2;
+        height: 4px;
+        background: Theme.bg-deep;
+        border-width: 1px;
+        border-color: Theme.line;
+        border-radius: 2px;
+    }
+    Rectangle {
+        x: 0;
+        y: (parent.height - self.height) / 2;
+        width: root.at;
+        height: 2px;
+        background: Theme.accent;
+    }
+    Rectangle {
+        x: root.at - root.cap / 2;
+        y: (parent.height - self.height) / 2;
+        width: root.cap;
+        height: 16px;
+        border-radius: 2px;
+        background: ta.pressed ? Theme.text-bright : ta.has-hover ? Theme.text : Theme.text-dim;
+        animate background { duration: Theme.t-fast; }
+    }
+    ta := TouchArea {
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                root.drag = root.pick(self.mouse-x);
+                root.edited(root.drag);
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.drag = root.pick(self.mouse-x);
+                root.edited(root.drag);
+            }
+        }
+    }
+}
+
+/// One output device, laid out like a sound manager's card: icon and name, a mute button and the green "use this" check, the
+/// Port drop-down, the volume slider with its Silence / 100% marks, and an Advanced expander.
+component AudioCardView inherits Rectangle {
+    in property <AudioCard> c;
+    property <bool> open;
+    height: body.preferred-height;
+    background: root.c.selected ? Theme.panel-high : Theme.panel-raised;
+    border-width: 1px;
+    border-color: root.c.selected ? Theme.play : Theme.line;
+    border-radius: Theme.radius-lg;
+    body := VerticalLayout {
+        padding: Theme.space-lg;
+        spacing: Theme.space-md;
+        Rectangle {
+            height: 34px;
+            TouchArea { clicked => { PrefsState.chose(root.c.key, root.c.port); } }
+            HorizontalLayout {
+                spacing: Theme.space-lg;
+                DeviceIcon {
+                    y: (parent.height - self.height) / 2;
+                    kind: root.c.icon;
+                    tint: root.c.selected ? Theme.text-bright : Theme.text-dim;
+                }
+                VerticalLayout {
+                    horizontal-stretch: 0;
+                    alignment: center;
+                    Text {
+                        text: root.c.title;
+                        overflow: elide;
+                        color: Theme.text-bright;
+                        font-family: Theme.font;
+                        font-size: Theme.font-md;
+                        font-weight: Theme.weight-bold;
+                    }
+                    if root.c.note != "": Text {
+                        text: root.c.note;
+                        overflow: elide;
+                        color: Theme.text-dim;
+                        font-family: Theme.font;
+                        font-size: Theme.font-sm;
+                    }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                if root.c.status != "": Text {
+                    horizontal-stretch: 0;
+                    text: root.c.status;
+                    vertical-alignment: center;
+                    color: root.c.status-kind == 1 ? Theme.play : root.c.status-kind == 2 ? Theme.cue : root.c.status-kind == 3 ? Theme.danger : Theme.text-dim;
+                    font-family: Theme.font;
+                    font-size: Theme.font-sm;
+                    font-weight: Theme.weight-bold;
+                }
+                SelectCheck {
+                    y: (parent.height - self.height) / 2;
+                    selected: root.c.selected;
+                    clicked => { PrefsState.chose(root.c.key, root.c.port); }
+                }
+            }
+        }
+        HorizontalLayout {
+            height: Theme.h-ctl;
+            spacing: Theme.space-md;
+            Text {
+                width: 36px;
+                text: "Port:";
+                vertical-alignment: center;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+            }
+            Dropdown {
+                width: 300px;
+                horizontal-stretch: 0;
+                list-width: 360px;
+                options: root.c.ports;
+                current: root.c.port;
+                chose(n) => { PrefsState.chose(root.c.key, n); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        if root.c.volume-ok: VerticalLayout {
+            HorizontalLayout {
+                height: Theme.h-ctl;
+                spacing: Theme.space-md;
+                MuteButton {
+                    muted: root.c.muted;
+                    enabled: root.c.can-mute;
+                    clicked => { PrefsState.audio-mute(root.c.key, !root.c.muted); }
+                }
+                VolumeSlider {
+                    value: root.c.volume;
+                    edited(v) => { PrefsState.audio-volume(root.c.key, Math.round(v * 100)); }
+                }
+                Text {
+                    width: 120px;
+                    text: root.c.volume-text;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                    color: root.c.muted ? Theme.danger : Theme.text;
+                    font-family: Theme.font;
+                    font-size: Theme.font-size;
+                    font-weight: Theme.weight-bold;
+                }
+            }
+            HorizontalLayout {
+                height: 14px;
+                spacing: Theme.space-md;
+                Rectangle { width: 28px; horizontal-stretch: 0; }
+                Text {
+                    text: "Silence";
+                    color: Theme.text-faint;
+                    font-family: Theme.font;
+                    font-size: Theme.font-sm;
+                }
+                Text {
+                    text: root.c.volume-max;
+                    horizontal-alignment: right;
+                    color: Theme.text-faint;
+                    font-family: Theme.font;
+                    font-size: Theme.font-sm;
+                }
+                Rectangle { width: 120px; horizontal-stretch: 0; }
+            }
+        }
+        if !root.c.volume-ok: Text {
+            text: root.c.volume-note;
+            overflow: elide;
+            color: Theme.text-faint;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+        }
+        Rectangle {
+            height: 18px;
+            HorizontalLayout {
+                spacing: Theme.space-sm;
+                alignment: start;
+                Glyph {
+                    y: (parent.height - self.height) / 2;
+                    width: 12px;
+                    height: 12px;
+                    icon: root.open ? Icon.chevron-down : Icon.chevron-right;
+                    tint: Theme.text-dim;
+                }
+                Text {
+                    text: "Advanced";
+                    vertical-alignment: center;
+                    color: Theme.text-dim;
+                    font-family: Theme.font;
+                    font-size: Theme.font-sm;
+                    font-weight: Theme.weight-bold;
+                }
+            }
+            TouchArea {
+                clicked => {
+                    root.open = !root.open;
+                    PrefsState.audio-advanced(root.c.key, root.open);
+                }
+            }
+        }
+        if root.open: VerticalLayout {
+            padding-left: 16px;
+            spacing: 2px;
+            for line in root.c.details: Text {
+                text: line;
+                overflow: elide;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+            }
+        }
+    }
+}
+
+/// The AUDIO page's output devices: a heading, one card per device, and the "show all" switch for the raw ALSA names.
+export component AudioCardList inherits VerticalLayout {
+    spacing: Theme.space-md;
+    Text {
+        text: "OUTPUT DEVICE";
+        x: Theme.space-lg;
+        color: Theme.accent-hi;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+        font-weight: Theme.weight-bold;
+    }
+    Note { text: "The green check is where OpenFadeR plays. Choosing a card or port reopens the output on it."; }
+    Rectangle {
+        height: fl.height;
+        fl := Flickable {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: min(list.preferred-height, 440px);
+            content-height: list.preferred-height;
+            content-width: self.width;
+            list := VerticalLayout {
+                width: parent.width - 10px;
+                spacing: Theme.space-md;
+                for c[i] in PrefsState.audio-cards: AudioCardView { c: c; }
+            }
+        }
+        if list.preferred-height > fl.height: Rectangle {
+            x: parent.width - 5px;
+            y: -fl.content-y * fl.height / list.preferred-height;
+            width: 3px;
+            height: fl.height * fl.height / list.preferred-height;
+            border-radius: 1.5px;
+            background: Theme.line-strong;
+        }
+    }
+    HorizontalLayout {
+        padding-left: Theme.space-lg;
+        Toggle {
+            text: "Show all ALSA devices (plugins, converters and raw names)";
+            checked: PrefsState.audio-all;
+            toggled(on) => { PrefsState.chose("output_show_all", on ? 1 : 0); }
+        }
+    }
+}

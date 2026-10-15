@@ -1,0 +1,149 @@
+import { Chip, Dropdown, TextField, Toggle } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { FormRow } from "dialog.slint";
+
+/// One line of the open category (src/app/prefs/rows.rs). kind: 0 chips, 1 drop-down, 2 checkbox (current 0/1),
+/// 3 section heading, 4 read-only text (`hint` is the value). A click reports `PrefsState.chose(key, index)`.
+export struct PrefRowData {
+    key: string,
+    label: string,
+    hint: string,
+    kind: int,
+    options: [string],
+    current: int,
+    enabled: bool,
+}
+
+/// One output device card of the AUDIO page (src/app/prefs/audio/cards.rs). `key` goes back in `PrefsState.chose` and the
+/// volume callbacks. status-kind: 0 none, 1 in use (green), 2 not what was chosen (amber), 3 problem (red). icon: 0 speakers,
+/// 1 display, 2 sound server, 3 raw. `volume` is 0..1; `volume-ok` false = the device has no volume control (`volume-note` says so).
+export struct AudioCard {
+    key: string,
+    title: string,
+    note: string,
+    status: string,
+    status-kind: int,
+    icon: int,
+    selected: bool,
+    ports: [string],
+    port: int,
+    volume-ok: bool,
+    volume: float,
+    volume-text: string,
+    volume-max: string,
+    volume-note: string,
+    muted: bool,
+    can-mute: bool,
+    details: [string],
+}
+
+/// PREFERENCES dialog state. Rust owns the values and rebuilds `rows` for the open `category` after every click.
+export global PrefsState {
+    in-out property <bool> visible;
+    /// Settings file shown at the bottom.
+    in property <string> path;
+    in property <[PrefRowData]> rows;
+    /// Open category: 0 VIEW, 1 AUDIO, 2 ANALYSIS, 3 CONTROLLER, 4 KEYBOARD, 5 EXTENSIONS, 6 DJ SYSTEM, 7 ADVANCED, 8 THEMES (ui/themes.slint, no rows).
+    in-out property <int> category;
+    /// Deck shown in each enlarged-waveform slot, top to bottom (VIEW > Enlarged Waveform order, 0-based, only the decks in use).
+    in property <[int]> wave-order: [0, 1, 2, 3];
+    /// VIEW > DECK LAYOUT: the 2Deck / 4Deck Vertical layouts (enlarged waveforms side by side between the decks) are on.
+    in property <bool> vertical;
+    /// VIEW > EXPORT LAYOUT: 0 1 PLAYER, 1 2 PLAYER, 2 DUAL PLAYER, 3 SIMPLE PLAYER, 4 FULL BROWSER.
+    in property <int> export-layout: 1;
+    /// VIEW > Mixer: the mixer column and strip are shown (ui/app.slint `show-mixer`).
+    in property <bool> show-mixer: true;
+    callback chose(string, int);
+    /// A text row was accepted (Enter); `value` is the whole new text.
+    callback text-edited(string, string);
+    callback category-chosen(int);
+    /// AUDIO page: one entry per output device card (src/app/prefs/audio/cards.rs) and the "Show all ALSA devices" switch
+    /// (toggled with `chose("output_show_all", 0/1)`). A card or port is chosen with `chose(card.key, port)`.
+    in property <[AudioCard]> audio-cards;
+    in property <bool> audio-all;
+    /// A volume slider moved (card key, percent) / a mute button was pressed (card key, muted). Not a setting: no page rebuild.
+    callback audio-volume(string, int);
+    callback audio-mute(string, bool);
+    /// A card's Advanced section was opened / closed (its supported rates are only probed while open).
+    callback audio-advanced(string, bool);
+}
+
+export component PrefRowView inherits Rectangle {
+    in property <PrefRowData> r;
+    callback chose(int);
+    height: root.r.kind == 3 ? 30px : Theme.h-ctl + Theme.space-xs;
+    opacity: root.r.enabled ? 1 : 0.45;
+    if root.r.kind == 3: Text {
+        y: 8px;
+        x: Theme.space-lg;
+        text: root.r.label;
+        color: Theme.accent-hi;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+        font-weight: Theme.weight-bold;
+    }
+    if root.r.kind == 0: FormRow {
+        label: root.r.label;
+        hint: root.r.hint;
+        for name[i] in root.r.options: Chip {
+            text: name;
+            width: max(70px, name.character-count * 7px + 18px);
+            horizontal-stretch: 0;
+            enabled: root.r.enabled;
+            active: root.r.current == i;
+            clicked => { root.chose(i); }
+        }
+    }
+    if root.r.kind == 1: FormRow {
+        label: root.r.label;
+        hint: root.r.hint;
+        Dropdown {
+            width: 220px;
+            horizontal-stretch: 0;
+            enabled: root.r.enabled;
+            options: root.r.options;
+            current: root.r.current;
+            chose(n) => { root.chose(n); }
+        }
+    }
+    if root.r.kind == 2: HorizontalLayout {
+        padding-left: Theme.space-lg;
+        Toggle {
+            text: root.r.label;
+            checked: root.r.current == 1;
+            enabled: root.r.enabled;
+            toggled(on) => { root.chose(on ? 1 : 0); }
+        }
+    }
+    if root.r.kind == 5: FormRow {
+        label: root.r.label;
+        TextField {
+            width: 340px;
+            horizontal-stretch: 0;
+            text: root.r.hint;
+            accepted(t) => { PrefsState.text-edited(root.r.key, t); }
+        }
+    }
+    if root.r.kind == 4: FormRow {
+        label: root.r.label;
+        Text {
+            text: root.r.hint;
+            vertical-alignment: center;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.font-size;
+            overflow: elide;
+        }
+    }
+}
+
+/// The rows of the open category, top to bottom.
+export component PrefRows inherits VerticalLayout {
+    spacing: 0px;
+    alignment: start;
+    for r[i] in PrefsState.rows: PrefRowView {
+        r: r;
+        chose(n) => { PrefsState.chose(r.key, n); }
+    }
+}
+

@@ -1,0 +1,306 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, Fader, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState } from "deck.slint";
+import { MixerState } from "mixer.slint";
+
+/// One deck's row in the VIDEO view: its own picture (not weighted), its track and how much of it is on the output.
+export struct VideoDeckView {
+    title: string,
+    info: string,
+    thumb: image,
+    has-video: bool,
+    /// Share of the master picture, 0..1.
+    weight: float,
+    /// Playhead, 0..1 of the track; a click on the bar seeks.
+    pos: float,
+}
+
+/// A video track of the library.
+export struct VideoItem {
+    title: string,
+    info: string,
+}
+
+/// VIDEO mode (src/app/video.rs, src/video/). Rust owns the pictures; the overlay and transition values are edited here and read by Rust.
+export global VideoState {
+    /// The VIDEO view is up (set by the mode selector).
+    in-out property <bool> visible;
+    /// EXTENSIONS > Video: the global bar's VIDEO button is offered only while on (set from Rust).
+    in-out property <bool> enabled;
+    /// The master picture: the decks' frames mixed by the crossfader.
+    in property <image> out;
+    in property <[VideoDeckView]> decks;
+    in property <[VideoItem]> list;
+    in property <string> status;
+    /// The separate output window is open.
+    in property <bool> window-open;
+    /// Crossfader transition: 0 FADE, 1 CUT.
+    in-out property <int> transition: 0;
+    /// A deck's picture dims with its channel fader.
+    in-out property <bool> follow-fader: true;
+    /// Overlay: 0 TEXT, 1 IMAGE; shown on the output while `overlay-on`.
+    in-out property <int> overlay-mode: 0;
+    in-out property <bool> overlay-on;
+    in-out property <string> text: "";
+    in-out property <string> image-path: "";
+    in property <image> overlay-image;
+    in-out property <float> opacity: 1.0;
+    in-out property <float> size: 0.4;
+    /// The view opened: Rust refreshes `list`.
+    callback opened();
+    /// (list row, deck index)
+    callback load(int, int);
+    callback image-chosen(string);
+    callback clear-overlay();
+    callback window-toggled();
+    callback full-screen();
+}
+
+/// The picture with the overlay on top, kept 16:9 inside whatever room it gets. The frame itself is already letterboxed to 16:9.
+component VideoOutput inherits Rectangle {
+    in property <image> frame;
+    in property <bool> overlay-on;
+    in property <int> overlay-mode;
+    in property <string> text;
+    in property <image> overlay-image;
+    in property <float> alpha;
+    in property <float> size;
+    background: Theme.bg-deep;
+    clip: true;
+    box := Rectangle {
+        width: min(parent.width, parent.height * 16 / 9);
+        height: self.width * 9 / 16;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        Image { source: root.frame; width: 100%; height: 100%; image-fit: fill; }
+        if root.overlay-on && root.overlay-mode == 1: Image {
+            source: root.overlay-image;
+            width: parent.width * root.size;
+            height: parent.height * root.size;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            image-fit: contain;
+            opacity: root.alpha;
+        }
+        if root.overlay-on && root.overlay-mode == 0: Text {
+            text: root.text;
+            width: parent.width;
+            height: parent.height;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            color: Theme.text-bright;
+            font-weight: Theme.weight-bold;
+            font-size: parent.height * root.size * 0.25;
+            opacity: root.alpha;
+        }
+    }
+}
+
+/// The separate output window (for a projector or second screen); double-click toggles full screen. Rust pushes every property.
+export component VideoWindow inherits Window {
+    in property <image> frame;
+    in property <bool> overlay-on;
+    in property <int> overlay-mode;
+    in property <string> text;
+    in property <image> overlay-image;
+    in property <float> alpha;
+    in property <float> size;
+    callback toggle-full-screen();
+    title: "OpenFadeR — video output";
+    preferred-width: 960px;
+    preferred-height: 540px;
+    background: Theme.bg-deep;
+    VideoOutput {
+        frame: root.frame;
+        overlay-on: root.overlay-on;
+        overlay-mode: root.overlay-mode;
+        text: root.text;
+        overlay-image: root.overlay-image;
+        alpha: root.alpha;
+        size: root.size;
+    }
+    TouchArea { double-clicked => { root.toggle-full-screen(); } }
+}
+
+component DeckStrip inherits Rectangle {
+    in property <int> index;
+    in property <VideoDeckView> v;
+    background: Theme.panel;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: root.v.weight > 0.01 ? Theme.accent : Theme.line;
+    HorizontalLayout {
+        padding: 6px;
+        spacing: 8px;
+        Rectangle {
+            width: 160px;
+            background: Theme.bg-deep;
+            horizontal-stretch: 0;
+            Image { source: root.v.thumb; width: 100%; height: 100%; image-fit: contain; }
+            if !root.v.has-video: Text { text: "NO PICTURE"; color: Theme.text-faint; font-size: Theme.font-sm; }
+        }
+        VerticalLayout {
+            spacing: 3px;
+            Text { text: "DECK " + ["A", "B", "C", "D"][root.index]; color: Theme.accent; font-weight: Theme.weight-bold; font-size: Theme.font-md; }
+            Text { text: root.v.title; color: Theme.text; font-size: Theme.font-size; overflow: elide; }
+            Text { text: root.v.info; color: Theme.text-dim; font-size: Theme.font-sm; overflow: elide; }
+            HorizontalLayout {
+                spacing: 6px;
+                Chip {
+                    text: DeckState.decks[root.index].playing ? "PAUSE" : "PLAY";
+                    active: DeckState.decks[root.index].playing;
+                    enabled: DeckState.decks[root.index].loaded;
+                    width: 64px;
+                    height: 22px;
+                    horizontal-stretch: 0;
+                    clicked => { DeckState.play-pause(root.index); }
+                }
+                Text { text: DeckState.decks[root.index].time-text; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; }
+            }
+            Rectangle {
+                height: 10px;
+                background: Theme.line;
+                border-radius: 2px;
+                Rectangle { width: parent.width * root.v.pos; background: Theme.play; border-radius: 2px; }
+                TouchArea {
+                    enabled: DeckState.decks[root.index].loaded;
+                    pointer-event(e) => {
+                        if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                            DeckState.seek(root.index, clamp(self.mouse-x / self.width, 0, 1));
+                        }
+                    }
+                    moved => { if self.pressed { DeckState.seek(root.index, clamp(self.mouse-x / self.width, 0, 1)); } }
+                }
+            }
+            Rectangle {
+                height: 4px;
+                background: Theme.line;
+                Rectangle { width: parent.width * root.v.weight; background: Theme.accent; }
+            }
+        }
+    }
+}
+
+/// Full-window VIDEO view: master output with overlay controls, the deck pictures, the crossfader and the video list.
+export component VideoView inherits Rectangle {
+    visible: VideoState.visible;
+    background: Theme.bg;
+    property <bool> shown: VideoState.visible;
+    changed shown => { if (self.shown) { VideoState.opened(); } }
+    TouchArea {}
+    HorizontalLayout {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: 24px;
+        spacing: 6px;
+        Text { text: "VIDEO"; color: Theme.text-bright; font-size: Theme.font-xl; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+        Chip { text: "OUTPUT WINDOW"; active: VideoState.window-open; width: 120px; horizontal-stretch: 0; clicked => { VideoState.window-toggled(); } }
+        Chip { text: "FULL SCREEN"; width: 100px; horizontal-stretch: 0; clicked => { VideoState.full-screen(); } }
+        Rectangle {}
+    }
+    VerticalLayout {
+        x: 0;
+        y: 38px;
+        width: parent.width;
+        height: parent.height - 38px;
+        padding: 8px;
+        padding-top: 0;
+        spacing: 6px;
+        HorizontalLayout {
+            spacing: 8px;
+            VerticalLayout {
+                spacing: 6px;
+                horizontal-stretch: 3;
+                VideoOutput {
+                    frame: VideoState.out;
+                    overlay-on: VideoState.overlay-on;
+                    overlay-mode: VideoState.overlay-mode;
+                    text: VideoState.text;
+                    overlay-image: VideoState.overlay-image;
+                    alpha: VideoState.opacity;
+                    size: VideoState.size;
+                    vertical-stretch: 1;
+                }
+                HorizontalLayout {
+                    spacing: 6px;
+                    height: 26px;
+                    vertical-stretch: 0;
+                    Chip { text: "TEXT"; active: VideoState.overlay-mode == 0; width: 56px; horizontal-stretch: 0; clicked => { VideoState.overlay-mode = 0; } }
+                    Chip { text: "IMAGE"; active: VideoState.overlay-mode == 1; width: 56px; horizontal-stretch: 0; clicked => { VideoState.overlay-mode = 1; } }
+                    if VideoState.overlay-mode == 0: TextField { text <=> VideoState.text; placeholder-text: "text on the output"; }
+                    if VideoState.overlay-mode == 1: TextField {
+                        text <=> VideoState.image-path;
+                        placeholder-text: "image file, Enter to load";
+                        accepted(t) => { VideoState.image-chosen(t); }
+                    }
+                    Chip { text: "ON"; active: VideoState.overlay-on; width: 44px; horizontal-stretch: 0; clicked => { VideoState.overlay-on = !VideoState.overlay-on; } }
+                    Chip { text: "CLEAR"; width: 56px; horizontal-stretch: 0; clicked => { VideoState.clear-overlay(); } }
+                }
+                HorizontalLayout {
+                    spacing: 6px;
+                    height: 22px;
+                    vertical-stretch: 0;
+                    Text { text: "OPACITY"; color: Theme.text-dim; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 0; }
+                    Fader { value: VideoState.opacity; edited(v) => { VideoState.opacity = v; } }
+                    Text { text: "SIZE"; color: Theme.text-dim; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 0; }
+                    Fader { value: VideoState.size; edited(v) => { VideoState.size = max(v, 0.05); } }
+                }
+            }
+            VerticalLayout {
+                spacing: 4px;
+                horizontal-stretch: 1;
+                min-width: 280px;
+                Text { text: "ALL VIDEOS"; color: Theme.accent; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-stretch: 0; }
+                Rectangle {
+                    background: Theme.bg-deep;
+                    border-color: Theme.line;
+                    border-width: 1px;
+                    ListView {
+                        for item[row] in VideoState.list: HorizontalLayout {
+                            height: 28px;
+                            padding: 2px;
+                            spacing: 4px;
+                            VerticalLayout {
+                                Text { text: item.title; color: Theme.text; font-size: Theme.font-size; overflow: elide; }
+                                Text { text: item.info; color: Theme.text-faint; font-size: Theme.font-xs; overflow: elide; }
+                            }
+                            for d[di] in VideoState.decks: Chip {
+                                text: ["A", "B", "C", "D"][di];
+                                width: 26px;
+                                height: 22px;
+                                horizontal-stretch: 0;
+                                clicked => { VideoState.load(row, di); }
+                            }
+                        }
+                    }
+                    if VideoState.list.length == 0: Text { text: "no mp4 / mov / m4v tracks in this library"; color: Theme.text-faint; font-size: Theme.font-sm; }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            height: 112px;
+            vertical-stretch: 0;
+            for v[i] in VideoState.decks: DeckStrip { index: i; v: v; }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            height: 26px;
+            vertical-stretch: 0;
+            Text { text: "A"; color: Theme.accent; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+            Fader {
+                detent: true;
+                value: MixerState.crossfader;
+                edited(v) => { MixerState.crossfader = v; MixerState.crossfade(v); }
+            }
+            Text { text: "B"; color: Theme.accent; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+            Chip { text: "FADE"; active: VideoState.transition == 0; width: 60px; horizontal-stretch: 0; clicked => { VideoState.transition = 0; } }
+            Chip { text: "CUT"; active: VideoState.transition == 1; width: 60px; horizontal-stretch: 0; clicked => { VideoState.transition = 1; } }
+            Chip { text: "CH FADER DIMS"; active: VideoState.follow-fader; width: 110px; horizontal-stretch: 0; clicked => { VideoState.follow-fader = !VideoState.follow-fader; } }
+        }
+        Text { text: VideoState.status; color: Theme.text-dim; font-size: Theme.font-sm; height: 14px; vertical-stretch: 0; overflow: elide; }
+    }
+}

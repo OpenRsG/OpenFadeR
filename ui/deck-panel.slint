@@ -1,0 +1,154 @@
+import { Chip, Dropdown } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState, DeckView } from "deck-state.slint";
+import { DeckOverview } from "deck-wave.slint";
+import { DeckTimes, DeckTitle, Jacket, StemRow, SyncCluster } from "deck-header.slint";
+import { JogWheel, LoopBlock, RingColumn, SideButtons, TempoColumn } from "deck-controls.slint";
+import { DeckDropTarget } from "dnd.slint";
+import { CueList, PadGrid, PadOptions } from "pads.slint";
+
+/// GRID edit block (replaces the pads while GRID is on): shift by n ms, beat 1 at the playhead, BPM ×2 / ÷2, TAP, reset, METRO.
+component GridEdit inherits GridLayout {
+    in property <int> index;
+    property <bool> en: DeckState.decks[root.index].loaded;
+    spacing: 2px;
+    Row {
+        Chip { text: "−10"; enabled: root.en; clicked => { DeckState.grid-shift(root.index, -10); } }
+        Chip { text: "−1"; enabled: root.en; clicked => { DeckState.grid-shift(root.index, -1); } }
+        Chip { text: "+1"; enabled: root.en; clicked => { DeckState.grid-shift(root.index, 1); } }
+    }
+    Row {
+        Chip { text: "+10"; enabled: root.en; clicked => { DeckState.grid-shift(root.index, 10); } }
+        Chip { text: "BEAT 1"; enabled: root.en; clicked => { DeckState.grid-beat1(root.index); } }
+        Chip { text: "TAP"; enabled: root.en; clicked => { DeckState.grid-tap(root.index); } }
+    }
+    Row {
+        Chip { text: "×2"; enabled: root.en; clicked => { DeckState.grid-double(root.index); } }
+        Chip { text: "÷2"; enabled: root.en; clicked => { DeckState.grid-halve(root.index); } }
+        Chip { text: "RESET"; enabled: root.en; clicked => { DeckState.grid-reset(root.index); } }
+    }
+    Row {
+        Chip { text: "METRO"; tooltip: "Metronome: click on every beat of the grid"; active: DeckState.decks[root.index].metronome; enabled: root.en; colspan: 3; clicked => { DeckState.metronome(root.index); } }
+    }
+}
+
+/// One deck's panel (240 px high): header (jacket, title, times, KEY SYNC / SYNC / MASTER), overview with phrase
+/// strip, the control row (pads | loop | CUE / PLAY | jog | SLIP Q MT | tempo, mirrored for the odd decks) and the pad-mode
+/// row. The enlarged waveform is `DeckDetail`.
+export component DeckPanel inherits Rectangle {
+    in property <int> index;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <bool> mirror: Math.mod(root.index, 2) == 1;
+    /// CUES chip: the cue / loop list takes the pads' place.
+    property <bool> show-cues;
+    /// VIEW > PAD Mode Auto: a controller connecting brings the pads back (PAD display) from the CUES list.
+    property <bool> controller: DeckState.controller-connected;
+    changed controller => { if (root.controller && DeckState.pad-auto) { root.show-cues = false; } }
+    // Same preferred width and stretch: the decks share the row equally whatever their texts say.
+    preferred-width: 100px;
+    horizontal-stretch: 1;
+    background: Theme.deck-bg;
+    VerticalLayout {
+        padding-left: 4px;
+        padding-right: 4px;
+        padding-top: 2px;
+        padding-bottom: 2px;
+        spacing: 2px;
+        HorizontalLayout {
+            height: 40px;
+            spacing: 6px;
+            Jacket { index: root.index; y: 2px; }
+            DeckTitle { index: root.index; min-width: 0px; horizontal-stretch: 1; }
+            DeckTimes { index: root.index; width: 72px; }
+            SyncCluster { index: root.index; }
+        }
+        DeckOverview { index: root.index; height: Theme.h-overview + Theme.h-phrase; }
+        ctl := Rectangle {
+            vertical-stretch: 1;
+            property <length> wl: 64px;
+            property <length> wr: 44px;
+            property <length> wj: min(root.width >= 700px ? 120px : Theme.jog, self.height);
+            property <length> ws: 40px;
+            property <length> wt: 28px;
+            property <length> pw: self.width - (self.wl + self.wr + self.wj + self.ws + self.wt) - 5 * Theme.gap;
+            property <length> gap: Theme.gap;
+            // x of each block, left to right: pads loop ring jog side tempo (odd decks mirrored).
+            property <length> x-pads: root.mirror ? self.width - self.pw : 0px;
+            property <length> x-loop: root.mirror ? self.wt + self.ws + self.wj + self.wr + 4 * self.gap : self.pw + self.gap;
+            property <length> x-ring: root.mirror ? self.wt + self.ws + self.wj + 3 * self.gap : self.pw + self.wl + 2 * self.gap;
+            property <length> x-jog: root.mirror ? self.wt + self.ws + 2 * self.gap : self.pw + self.wl + self.wr + 3 * self.gap;
+            property <length> x-side: root.mirror ? self.wt + self.gap : self.pw + self.wl + self.wr + self.wj + 4 * self.gap;
+            property <length> x-tempo: root.mirror ? 0px : self.pw + self.wl + self.wr + self.wj + self.ws + 5 * self.gap;
+            // Pads, or the GRID edit block, or the cue / loop list.
+            Rectangle {
+                x: ctl.x-pads;
+                width: ctl.pw;
+                if root.v.grid-edit: GridEdit { index: root.index; height: 4 * 22px + 3 * 2px; y: 0; }
+                if !root.v.grid-edit && root.show-cues: CueList {
+                    height: parent.height;
+                    cues: root.v.cues;
+                    enabled: root.v.loaded;
+                    loop-active: root.v.loop-active;
+                    jump(row) => { DeckState.cue-jump(root.index, row); }
+                    save-loop => { DeckState.save-loop(root.index); }
+                    palette: DeckState.cue-palette;
+                    cue-color(row, c) => { DeckState.cue-color(root.index, row, c); }
+                    cue-comment(row, t) => { DeckState.cue-comment(root.index, row, t); }
+                }
+                if !root.v.grid-edit && !root.show-cues: PadGrid {
+                    y: 0;
+                    height: 94px;
+                    pads: root.v.pads;
+                    mode: root.v.pad-mode;
+                    enabled: root.v.loaded;
+                    delete-mode: root.v.delete-mode;
+                    fx-color: DeckState.pad-fx-color;
+                    pad(p) => { DeckState.pad(root.index, p); }
+                    pad-released => { DeckState.pad-released(root.index); }
+                }
+                if !root.v.grid-edit && !root.show-cues && root.v.pad-mode >= 7 && root.v.pad-mode <= 10: PadOptions { y: 96px; height: Theme.h-ctl; index: root.index; }
+                if !root.v.grid-edit && !root.show-cues && !(root.v.pad-mode >= 7 && root.v.pad-mode <= 10): HorizontalLayout {
+                    y: 96px;
+                    height: Theme.h-ctl;
+                    spacing: 2px;
+                    Chip { text: "×"; width: 30px; horizontal-stretch: 0; tooltip: "Delete a hot cue: press its pad"; active: root.v.delete-mode; active-color: Theme.danger; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.cue-delete(root.index); } }
+                    Chip { text: "MEMORY"; tooltip: "Store a memory cue at the playhead"; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.memory-cue(root.index); } }
+                }
+            }
+            LoopBlock { index: root.index; x: ctl.x-loop; width: ctl.wl; height: ctl.height; }
+            RingColumn { index: root.index; x: ctl.x-ring; width: ctl.wr; height: ctl.height; }
+            JogWheel { index: root.index; x: ctl.x-jog; y: (ctl.height - ctl.wj) / 2; width: ctl.wj; }
+            SideButtons { index: root.index; x: ctl.x-side; width: ctl.ws; height: ctl.height; }
+            TempoColumn { index: root.index; x: ctl.x-tempo; y: 4px; width: ctl.wt; height: ctl.height - 8px; }
+        }
+        HorizontalLayout {
+            height: Theme.h-ctl;
+            spacing: 2px;
+            Dropdown {
+                width: 104px;
+                horizontal-stretch: 0;
+                list-width: 120px;
+                options: root.v.stems ? DeckState.pad-mode-names-stems : DeckState.pad-mode-names;
+                current: !root.v.stems && root.v.pad-mode > 11 ? root.v.pad-mode - 1 : root.v.pad-mode;
+                chose(m) => { DeckState.pad-mode(root.index, !root.v.stems && m >= 11 ? m + 1 : m); }
+            }
+            if root.v.stems && root.v.stem-buttons: StemRow { index: root.index; }
+            // The status line (loop set, errors, grid, stem progress) takes whatever the buttons leave.
+            Text {
+                text: (!root.v.stem-buttons && root.v.stem-text != "" ? root.v.stem-text + " · " : "") + root.v.status;
+                color: Theme.text-dim;
+                font-size: Theme.font-sm;
+                overflow: elide;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                min-width: 0px;
+            }
+            Chip { text: "REV"; width: 32px; horizontal-stretch: 0; tooltip: "Reverse playback"; active: root.v.reverse; enabled: root.v.loaded; clicked => { DeckState.reverse(root.index); } }
+            Chip { text: "BRAKE"; width: 44px; horizontal-stretch: 0; tooltip: "Vinyl stop"; enabled: root.v.loaded; clicked => { DeckState.brake(root.index); } }
+            Chip { text: "GRID"; width: 40px; horizontal-stretch: 0; tooltip: "Beat grid editing"; enabled: root.v.loaded; active: root.v.grid-edit; clicked => { DeckState.grid-toggle(root.index); } }
+            Chip { text: "CUES"; width: 40px; horizontal-stretch: 0; tooltip: "Cue / loop list"; active: root.show-cues; clicked => { root.show-cues = !root.show-cues; } }
+        }
+    }
+    Rectangle { border-width: Theme.deck-frame-w; border-color: Theme.deck-frame; }
+    DeckDropTarget { index: root.index; }
+}

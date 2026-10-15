@@ -1,0 +1,175 @@
+import { Chip, Tooltip } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState, DeckView } from "deck-state.slint";
+import { DeckBadge } from "deck-wave.slint";
+import { PrefsState } from "prefs.slint";
+
+/// Jacket square: no artwork is read, so it is the empty-jacket look with the deck badge in the corner;
+/// a click loads the track selected in the browser.
+export component Jacket inherits Rectangle {
+    in property <int> index;
+    in property <length> size: 36px;
+    width: root.size;
+    height: root.size;
+    background: Theme.panel-raised;
+    Text { text: "♪"; color: Theme.panel-high; font-size: root.size * 0.6; horizontal-alignment: center; vertical-alignment: center; }
+    DeckBadge { index: root.index; x: 0; y: 0; }
+    ta := TouchArea { clicked => { DeckState.load(root.index); } mouse-cursor: pointer; }
+    Rectangle { background: Theme.text-bright.with-alpha(ta.has-hover ? 0.12 : 0); }
+}
+
+/// Title / artist · BPM · key of the loaded track. While nothing is loaded the status text (decoding, errors) takes the artist line.
+export component DeckTitle inherits VerticalLayout {
+    in property <int> index;
+    in property <length> title-size: Theme.deck-title;
+    in property <length> sub-size: Theme.deck-sub;
+    property <DeckView> v: DeckState.decks[root.index];
+    alignment: center;
+    spacing: 1px;
+    Text {
+        text: root.v.title != "" ? root.v.title : (root.v.loading ? "loading…" : "LOAD A TRACK");
+        color: root.v.title != "" ? Theme.text-bright : Theme.text-faint;
+        font-size: root.title-size;
+        font-weight: Theme.weight-bold;
+        overflow: elide;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Text { text: root.v.title != "" ? root.v.artist : root.v.status; color: Theme.text-dim; font-size: root.sub-size; overflow: elide; horizontal-stretch: 1; min-width: 0px; }
+        Text { text: root.v.bpm-text; color: root.v.synced ? Theme.accent-hi : Theme.text; font-size: Theme.deck-bpm; font-weight: Theme.deck-bpm > Theme.deck-sub ? Theme.weight-bold : Theme.weight; horizontal-stretch: 0; vertical-alignment: bottom; }
+        Text { text: root.v.key-eff; color: root.v.key-shifted ? Theme.accent-hi : Theme.text; font-size: root.sub-size; font-weight: Theme.weight-bold; horizontal-stretch: 0; }
+    }
+}
+
+/// Remaining (white) over elapsed (dim) time.
+export component DeckTimes inherits VerticalLayout {
+    in property <int> index;
+    in property <length> size: Theme.font-lg;
+    property <DeckView> v: DeckState.decks[root.index];
+    alignment: center;
+    Text { text: root.v.remain-text; color: Theme.text-bright; font-size: root.size; font-weight: Theme.weight-bold; horizontal-alignment: right; }
+    Text { text: root.v.elapsed-text; color: Theme.text-dim; font-size: root.size; font-weight: Theme.weight-bold; horizontal-alignment: right; }
+}
+
+/// Right header cluster: KEY SYNC with `< key >` (double-click the key to reset it), SYNC (beat sync) and MASTER.
+export component SyncCluster inherits VerticalLayout {
+    in property <int> index;
+    property <DeckView> v: DeckState.decks[root.index];
+    width: 152px;
+    alignment: center;
+    spacing: 2px;
+    HorizontalLayout {
+        spacing: 2px;
+        Chip { width: 54px; horizontal-stretch: 0; height: 18px; font-size: Theme.font-xs; text: "KEY SYNC"; tooltip: "Match the key of the other deck"; enabled: root.v.loaded; clicked => { DeckState.key-sync(root.index); } }
+        Chip { width: 44px; horizontal-stretch: 0; height: 18px; font-size: Theme.font-xs; text: "SYNC"; tooltip: "Beat sync to the master"; enabled: root.v.loaded; active: root.v.synced; active-color: Theme.sync; clicked => { DeckState.sync(root.index); } }
+        Chip { width: 50px; horizontal-stretch: 0; height: 18px; font-size: Theme.font-xs; text: "MASTER"; tooltip: "Tempo master"; enabled: root.v.loaded; active: root.v.master; active-color: Theme.master; clicked => { DeckState.master-toggle(root.index); } }
+    }
+    HorizontalLayout {
+        spacing: 2px;
+        Chip { width: 18px; horizontal-stretch: 0; height: 18px; text: "−"; tooltip: "Key down"; enabled: root.v.loaded; clicked => { DeckState.key-step(root.index, -1); } }
+        Rectangle {
+            width: 30px;
+            Text { text: root.v.key-eff == "" ? "KEY" : root.v.key-eff; color: root.v.key-shifted ? Theme.accent-hi : Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+            TouchArea { enabled: root.v.loaded; double-clicked => { DeckState.key-reset(root.index); } }
+        }
+        Chip { width: 18px; horizontal-stretch: 0; height: 18px; text: "+"; tooltip: "Key up"; enabled: root.v.loaded; clicked => { DeckState.key-step(root.index, 1); } }
+        if root.v.sync-rate != "": Text { text: root.v.sync-rate; width: 22px; horizontal-stretch: 0; color: Theme.accent-hi; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+        Text { text: root.v.key-shift; color: root.v.key-shifted ? Theme.accent-hi : Theme.text-dim; font-size: Theme.font-sm; vertical-alignment: center; horizontal-alignment: right; horizontal-stretch: 1; overflow: elide; }
+    }
+}
+
+/// One part's button, this app's style: an outlined pill in the part's colour with its name in that colour; muted (or, in
+/// SOLO, silenced) it is filled with the colour (INST appears filled red).
+/// `enabled: false` greys it (no track loaded); `pending` only softens it a little while the separation still runs (a press
+/// then starts / is kept and heard once the part is separated), so it never looks disabled.
+component StemButton inherits Rectangle {
+    in property <string> text;
+    in property <color> tone;
+    in property <bool> muted;
+    in property <bool> enabled;
+    in property <bool> pending;
+    in property <string> tooltip;
+    callback clicked;
+    horizontal-stretch: 0;
+    min-width: label.preferred-width + 14px;
+    border-radius: self.height / 2;
+    border-width: 1px;
+    border-color: root.enabled ? root.tone : Theme.text-disabled;
+    background: root.enabled && root.muted ? root.tone : root.enabled && ta.has-hover ? root.tone.with-alpha(0.2) : transparent;
+    opacity: !root.enabled ? 0.6 : root.pending ? 0.85 : 1;
+    label := Text {
+        text: root.text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: !root.enabled ? Theme.text-disabled : root.muted ? Theme.text-bright : root.tone;
+        font-family: Theme.font;
+        font-size: Theme.font-xs;
+        font-weight: Theme.weight-bold;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        // On press, not release: the part switches the moment the button goes down, like the controller's pads.
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { root.clicked(); }
+        }
+    }
+    Tooltip { width: root.width; height: root.height; text: root.tooltip; hovered: ta.has-hover && !ta.pressed; }
+}
+
+/// The stem controls while PREFS has STEMS on, as usual: the ACTIVE STEM mode name (MUTE or SOLO, grey text; a click
+/// switches it) and a pill per part, DRUMS VOCAL INST (3 stems) or VOCAL INST BASS DRUMS (4 stems). A part that is heard is
+/// outlined, a muted one filled. Clickable whenever a track is loaded (a press starts the separation on demand), greyed
+/// without one. `stem-text` (progress "42%" or an error) sits right after the pills, compact, never elided by the status.
+export component StemRow inherits HorizontalLayout {
+    in property <int> index;
+    in property <length> h: 22px;
+    property <DeckView> v: DeckState.decks[root.index];
+    spacing: 4px;
+    horizontal-stretch: 0;
+    Rectangle {
+        width: mode.preferred-width + 6px;
+        horizontal-stretch: 0;
+        mode := Text {
+            text: root.v.stem-solo ? "SOLO" : "MUTE";
+            color: mode-ta.has-hover ? Theme.text : Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.font-xs;
+            font-weight: Theme.weight-bold;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        mode-ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { PrefsState.chose("active_part", root.v.stem-solo ? 0 : 1); }
+        }
+        Tooltip {
+            width: parent.width;
+            height: parent.height;
+            text: root.v.stem-solo ? "ACTIVE STEM: SOLO (a press silences the other parts). Click for MUTE" : "ACTIVE STEM: MUTE (a press silences that part). Click for SOLO";
+            hovered: mode-ta.has-hover && !mode-ta.pressed;
+        }
+    }
+    for k in (root.v.stem-four ? [0, 1, 2, 3] : [3, 0, 1]): StemButton {
+        text: ["VOCAL", "INST", "BASS", "DRUMS"][k];
+        height: root.h;
+        tone: [Theme.stem-vocal, Theme.stem-inst, Theme.stem-bass, Theme.stem-drums][k];
+        muted: root.v.stem-on.length > k && !root.v.stem-on[k];
+        enabled: root.v.loaded;
+        pending: !root.v.stem-ready;
+        tooltip: !root.v.loaded ? "Load a track with STEMS on (PREFS)"
+            : (root.v.stem-solo ? "SOLO " : "MUTE ") + ["VOCAL", "INST", "BASS (rides the INST isolator)", "DRUMS"][k]
+              + (root.v.stem-text != "" ? " · " + root.v.stem-text : !root.v.stem-ready ? " · click to separate" : "");
+        clicked => { DeckState.stem(root.index, k); }
+    }
+    if root.v.stem-text != "": Text {
+        text: root.v.stem-text;
+        color: Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.font-xs;
+        font-weight: Theme.weight-bold;
+        vertical-alignment: center;
+        horizontal-stretch: 0;
+        overflow: elide;
+        max-width: 72px;
+    }
+}
