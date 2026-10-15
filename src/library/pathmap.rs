@@ -106,8 +106,8 @@ mod tests {
         ); // not a component prefix
         assert_eq!(remap_path(r"E:\Other\d.mp3", &map), "E:/Other/d.mp3"); // unmatched: only slashes normalised
         assert_eq!(
-            remap_path(r"/home/me/a\b.mp3", &Vec::new()),
-            r"/home/me/a\b.mp3"
+            remap_path(r"/home/user/a\b.mp3", &Vec::new()),
+            r"/home/user/a\b.mp3"
         ); // no map: untouched
         assert!(parse_path_map("no arrow").is_err());
         assert!(parse_path_map("=>/x").is_err());

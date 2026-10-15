@@ -50,6 +50,33 @@ bundled ones can only be switched off), then whatever went wrong while reading t
 mixer and the browser from start-up, so a change to those shows a **RESTART NOW** banner. The switches and settings are kept in
 `~/.config/openfader/plugins.json`.
 
+### Install from a repository
+
+PREFERENCES > EXTENSIONS > **GET PLUGINS** installs plugins in one click from GitHub repositories. The repository list is one list for
+plugins and themes (`~/.config/openfader/repositories.json`, a plain list of `owner/repo`); `OpenRsG/OpenFadeR-Plugins` and
+`OpenRsG/OpenFadeR-Themes` are in it on first run and can be removed with their **x**. Type `owner/repo` (or the GitHub address, with
+or without `.git`) and **ADD**; **REFRESH** downloads the repositories again (the zips are cached in `~/.cache/openfader/repos/`,
+so the page opens without the network). Every plugin found shows as a card (name, version, description, repository) with one button:
+**INSTALL**, **UPDATE** (the repository's `version` differs from the installed one) or **INSTALLED**; **INSTALL ALL** does the rest. It
+goes through the same checks and the same copy as a drop, then shows the manager's **RESTART NOW** banner when the plugin needs one.
+
+What a repository must look like: its default branch holds the plugin folders, each with a `plugin.json`, at the top or at most two
+folders deep (`<repo>/<plugin>/plugin.json`, `<repo>/<group>/<plugin>/plugin.json`). The app downloads
+`https://github.com/<owner>/<repo>/archive/HEAD.zip`; entries that leave the plugin folder (`..`, absolute paths) or are symlinks
+make the install fail.
+
+A plugin with a **native library** (`effects` naming a library, `library.lib` for this OS) is installed as is when the repository holds
+the library file. Otherwise publish a release of the repository and attach, per platform, an asset named
+
+```
+<plugin name>-<os>-<arch>.zip      os = std::env::consts::OS (linux, windows, macos), arch = std::env::consts::ARCH (x86_64, aarch64, …)
+e.g. my-fx-linux-x86_64.zip
+```
+
+fetched from `https://github.com/<owner>/<repo>/releases/latest/download/<asset>`. The zip's **root** holds the library file(s),
+named and placed as the plugin's `plugin.json` says (`libmy_fx.so` beside `plugin.json`, or `lib/x.so` for `"lib/x.so"`). Without
+that asset for the user's platform nothing is installed and the page says `no prebuilt <plugin> for <os>-<arch> yet`.
+
 ## plugin.json
 
 ```json

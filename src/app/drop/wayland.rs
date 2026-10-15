@@ -296,11 +296,11 @@ mod tests {
 
     #[test]
     fn uri_lists_become_local_paths() {
-        let list = "# comment\r\nfile:///home/me/My%20Plugin\r\nfile://host/tmp/a%C3%A9.zip\nhttps://example.com/x\n\n";
+        let list = "# comment\r\nfile:///home/user/My%20Plugin\r\nfile://host/tmp/a%C3%A9.zip\nhttps://example.com/x\n\n";
         assert_eq!(
             uri_paths(list),
             [
-                PathBuf::from("/home/me/My Plugin"),
+                PathBuf::from("/home/user/My Plugin"),
                 PathBuf::from("/tmp/aé.zip")
             ]
         );

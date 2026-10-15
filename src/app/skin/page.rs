@@ -64,8 +64,15 @@ fn color_of(values: &[Value], name: &str) -> Color {
 }
 
 /// The chosen skin's name.
-fn chosen() -> String {
+pub(super) fn chosen() -> String {
     prefs::with(|p| view::skin_name(p).to_owned())
+}
+
+/// The colours a gallery card paints its miniature with, for skin `name` among `skins` (none before a window has been styled).
+pub(super) fn colors(skins: &[Skin], name: &str) -> Vec<Color> {
+    values_of(skins, name)
+        .map(|(_, v)| PREVIEW.iter().map(|n| color_of(&v, n)).collect())
+        .unwrap_or_default()
 }
 
 /// The gallery's cards, one per skin ([`names`] order), with the chosen one marked.
@@ -74,9 +81,7 @@ fn cards(skins: &[Skin], chosen: &str) -> Vec<ThemeCard> {
         .into_iter()
         .map(|name| {
             let file = skins.iter().find(|s| s.name == name);
-            let colors: Vec<Color> = values_of(skins, &name)
-                .map(|(_, v)| PREVIEW.iter().map(|n| color_of(&v, n)).collect())
-                .unwrap_or_default();
+            let colors = colors(skins, &name);
             ThemeCard {
                 title: name.clone().into(),
                 author: file
@@ -213,7 +218,7 @@ fn close_editor(s: &ThemeState) {
 }
 
 /// Chooses the skin `name` from the gallery (what the SKIN row does): any open draft is dropped.
-fn choose(name: &str) {
+pub(super) fn choose(name: &str) {
     let Some(app) = app() else { return };
     let s = app.global::<ThemeState>();
     close_editor(&s);

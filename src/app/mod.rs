@@ -57,13 +57,18 @@ fn gain(v: f32) -> f32 {
 
 /// The "s" of "{n} track{}": empty for exactly one.
 fn plural(n: usize) -> &'static str {
-    if n == 1 { "" } else { "s" }
+    if n == 1 {
+        ""
+    } else {
+        "s"
+    }
 }
 
 mod analyze;
 mod automix;
 mod browser;
 mod camelot;
+mod catalog;
 mod deck;
 mod device;
 mod drop;
@@ -114,6 +119,7 @@ pub fn run(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let app = App::new()?;
     let _prefs = prefs::wire(&app); // before everything that reads the settings
     let _skin = skin::wire(&app); // PREFS > THEMES and the skin folder watcher; the guard holds the watcher's timer
+    catalog::wire(&app); // GET PLUGINS / THEMES / MAPPINGS; before the controller session, which asks it about a controller with no mapping
     openfader::plugin::registry(); // plugin effects join every FX unit, so they load before the engine makes its units
     prefs::audio::wire(); // hands the AUDIO settings to the engine before the decks open the output
     let lib: Rc<dyn Library> = openfader::plugin::source::wrap(inner, plugins::notify(&app)).into(); // plugin sources join the tree, outside the store's overlay

@@ -29,6 +29,7 @@ import { PluginOverlays, PluginState } from "plugins.slint";
 import { ExportDeck, ExportDock, ExportModeState, ExportPlayers, ExportRecPanel, HotCue, PhraseSeg } from "exportmode.slint";
 import { Palette } from "std-widgets.slint";
 import { ThemeCard, ThemeState, TokenRow } from "themes.slint";
+import { CatalogState, GetMapping, GetPlugin, GetTheme, OfferBanner, RepoView } from "catalog.slint";
 // Re-exported so Rust can reach them via `app.global::<…>()` and by name.
 export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowView, DeckState, DeckView, DeviceItem, DeviceState, DjEditor, DjItem, DjSystemState, DragState, DupeRow, EditState, ExportDeck, ExportModeState, FixtureView, FxState, FxUnit, HelpLine, KeymapState, KeysState, LayoutState, LibraryState, LightingState, MidiState, MissingRow, MixDeckView, MixPointState, MixerState, PadOpt, PadView, PadsState, PaneState, PluginState, PrefRowData, PrefsState, SamplerState, SlotView, SplitWindow, Theme, ToastState, TrackInfoState, VideoDeckView, VideoItem, VideoState, VideoWindow }
 export { DrumSlotView, GrooveDeckView, GrooveState, HotCue, PhraseSeg }
@@ -37,6 +38,7 @@ export { ActionItem }
 export { Palette } // the std widgets' colour scheme follows the skin's base (src/app/skin)
 export { FileDropState } // files dragged in from the desktop (src/app/drop)
 export { ThemeCard, ThemeState, TokenRow } // PREFS > THEMES (ui/themes.slint, src/app/skin/page.rs)
+export { CatalogState, GetMapping, GetPlugin, GetTheme, RepoView } // GET PLUGINS / THEMES / MAPPINGS (ui/catalog.slint, src/app/catalog)
 
 /// PERFORMANCE layouts: global bar, [FX], then either the enlarged waveforms stacked full width
 /// above the deck row (2Deck / 4Deck Horizontal) or standing side by side between the decks (2Deck / 4Deck Vertical), the deck row (decks
@@ -478,6 +480,8 @@ export component App inherits Window {
     LibraryOverlays { x: 0; y: 0; width: root.width; height: root.height; }
     PluginOverlays { x: 0; y: 0; width: root.width; height: root.height; }
     DeviceOverlay {}
+    // Top right, under the global bar: a connected controller has no mapping and a repository has one (src/app/catalog).
+    OfferBanner { x: root.width - self.width - Theme.space-lg; y: Theme.h-bar + Theme.space-lg; }
     // Top centre, under the global bar.
     ToastView { x: floor((root.width - self.width) / 2px) * 1px; y: Theme.h-bar + Theme.space-lg; }
     TipOverlay { window-w: root.width; window-h: root.height; }

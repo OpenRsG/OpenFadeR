@@ -1,11 +1,12 @@
 import { PrefRows } from "prefs-state.slint";
-import { PluginManager } from "plugins.slint";
+import { GetPlugins, PluginManager } from "plugins.slint";
 import { Theme } from "theme.slint";
 
-/// EXTENSIONS category: rows from src/app/prefs/extensions.rs (STEMS, BEAT LAB, VIDEO, LIGHTING), then the plugin
-/// manager (src/app/plugins/manager.rs).
+/// EXTENSIONS category: rows from src/app/prefs/extensions.rs (STEMS, BEAT LAB, VIDEO, LIGHTING), GET PLUGINS (repositories,
+/// src/app/catalog/), then the plugin manager (src/app/plugins/manager.rs).
 export component PrefsExtensions inherits VerticalLayout {
     spacing: Theme.space-lg;
     PrefRows {}
+    GetPlugins {}
     PluginManager {}
 }

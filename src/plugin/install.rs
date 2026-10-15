@@ -6,7 +6,7 @@
 
 use super::{Plugin, read_manifest};
 use crate::zip::Zip;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 /// Folders and files an install leaves out (build and editor leftovers).
 const SKIP: [&str; 4] = [".git", "target", "__pycache__", ".DS_Store"];
@@ -146,36 +146,8 @@ fn zip_prefix(z: &Zip) -> Result<String, String> {
 fn unzip(from: &Path, to: &Path) -> Result<(), String> {
     let mut z = Zip::open(from).map_err(|e| format!("{}: {e:?}", from.display()))?;
     let prefix = zip_prefix(&z)?;
-    let names: Vec<String> = z
-        .names()
-        .filter(|n| n.starts_with(&prefix))
-        .map(str::to_owned)
-        .collect();
-    for name in names {
-        let rel = Path::new(&name[prefix.len()..]);
-        // No absolute paths or `..`: every entry lands inside the plugin folder.
-        if rel.components().any(|c| !matches!(c, Component::Normal(_))) {
-            return Err(format!(
-                "{}: entry {name:?} leaves the plugin folder",
-                from.display()
-            ));
-        }
-        if name.ends_with('/')
-            || rel.as_os_str().is_empty()
-            || rel.iter().any(|c| SKIP.iter().any(|s| c == *s))
-        {
-            continue;
-        }
-        let dst = to.join(rel);
-        if let Some(dir) = dst.parent() {
-            crate::paths::at(std::fs::create_dir_all(dir), dir)?;
-        }
-        let bytes = z
-            .read(&name)
-            .map_err(|e| format!("{}: {e:?}", from.display()))?;
-        crate::paths::at(std::fs::write(&dst, bytes), &dst)?;
-    }
-    Ok(())
+    z.unpack(&prefix, to, &SKIP)
+        .map_err(|e| format!("{}: {e}", from.display()))
 }
 
 /// Whether `p` was installed by the user (it lives in [`user_dir`]) and so can be removed.
@@ -268,7 +240,7 @@ mod tests {
         assert!(
             install_into(&zip, &root)
                 .unwrap_err()
-                .contains("leaves the plugin folder")
+                .contains("leaves the folder")
         );
         let src = t.join("p");
         fs::create_dir_all(&src).unwrap();

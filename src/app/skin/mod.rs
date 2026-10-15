@@ -15,10 +15,12 @@
 //!
 //! Children: [`file`] (skin files: discovery, parsing, writing), [`store`] (the user's skin folder: install, save, delete),
 //! [`draft`] (the theme editor's working copy, applied live to every window instead of the chosen skin), [`page`] (PREFS > THEMES
-//! ↔ ui/themes.slint `ThemeState`). The token table and typed access are generated with the UI (`openfader_ui::skin`).
+//! ↔ ui/themes.slint `ThemeState`), [`get`] (the themes of the repositories, installed from GET THEMES, `app/catalog`). The token table
+//! and typed access are generated with the UI (`openfader_ui::skin`).
 
 mod draft;
 mod file;
+pub mod get;
 mod page;
 mod store;
 

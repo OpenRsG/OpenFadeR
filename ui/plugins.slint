@@ -1,5 +1,6 @@
 import { Chip, Dropdown, TextField, Toggle } from "widgets.slint";
 import { Theme } from "theme.slint";
+import { CatalogState, GetPlugin, RepoBar } from "catalog.slint";
 import { DialogFrame, Note } from "dialog.slint";
 
 /// One setting of a plugin card. `kind`: 0 switch (`on`), 1 text, 2 number (`text`), 3 choice (`choices`, `choice`), 4 secret (`text`, shown masked).
@@ -220,6 +221,78 @@ export component PluginManager inherits VerticalLayout {
     for v[i] in PluginState.plugins: Card { v: v; index: i; }
     if PluginState.plugins.length == 0: Note { text: "No plugin found. Install one, or put plugin folders in " + PluginState.folder + "."; }
     for e in PluginState.errors: Text { text: "⚠ " + e; color: Theme.danger; font-family: Theme.font; font-size: Theme.font-sm; wrap: word-wrap; }
+}
+
+/// A plugin of a repository: what it is, and the one button (INSTALL, UPDATE when the repository has another version than the installed
+/// one, INSTALLED).
+component GetCard inherits Rectangle {
+    in property <GetPlugin> v;
+    in property <int> index;
+    background: Theme.panel;
+    border-radius: Theme.radius-lg;
+    border-width: 1px;
+    border-color: Theme.line;
+    HorizontalLayout {
+        padding: Theme.space-lg;
+        spacing: Theme.space-lg;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            spacing: 2px;
+            HorizontalLayout {
+                spacing: Theme.space-md;
+                alignment: start;
+                Text { text: root.v.name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                if root.v.version != "": Text { text: root.v.action == 1 ? root.v.installed + " → " + root.v.version : root.v.version; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
+                if root.v.native: Badge { text: "NATIVE"; tone: Theme.text-dim; y: 2px; }
+            }
+            Text { text: root.v.description; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; wrap: word-wrap; }
+            Text { text: root.v.repo; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; }
+        }
+        VerticalLayout {
+            width: 100px;
+            horizontal-stretch: 0;
+            alignment: center;
+            Chip {
+                text: root.v.action == 0 ? "INSTALL" : root.v.action == 1 ? "UPDATE" : "INSTALLED";
+                active: root.v.action != 2;
+                enabled: root.v.action != 2 && !CatalogState.busy;
+                tooltip: root.v.native ? "Downloads the prebuilt library for this computer when the repository has one" : "";
+                clicked => { CatalogState.install-plugin(root.index); }
+            }
+        }
+    }
+}
+
+/// PREFS > EXTENSIONS > GET PLUGINS: the repositories, every plugin they hold with its install button, INSTALL ALL.
+export component GetPlugins inherits VerticalLayout {
+    spacing: Theme.space-md;
+    init => { CatalogState.opened(); }
+    Text { text: "GET PLUGINS"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+    Note { text: "Plugins and themes come from GitHub repositories. Add a repository (owner/repo), then install what it holds with one click."; }
+    RepoBar { }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        height: Theme.h-ctl;
+        Text {
+            text: CatalogState.plugins.length == 1 ? "1 plugin in your repositories" : CatalogState.plugins.length + " plugins in your repositories";
+            vertical-alignment: center;
+            color: Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Chip {
+            text: "INSTALL ALL";
+            width: 110px;
+            horizontal-stretch: 0;
+            active: CatalogState.plugins-todo > 0;
+            enabled: CatalogState.plugins-todo > 0 && !CatalogState.busy;
+            tooltip: "Install or update every plugin below";
+            clicked => { CatalogState.install-all-plugins(); }
+        }
+    }
+    for v[i] in CatalogState.plugins: GetCard { v: v; index: i; }
 }
 
 /// The prompt dialog; instantiate once in the window. The dialog exists only while open, so its field takes the focus each time.

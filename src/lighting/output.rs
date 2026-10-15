@@ -1,6 +1,6 @@
 //! UDP output of DMX universes as Art-Net and / or sACN to one unicast (or broadcast) address.
 
-use super::{Universe, artnet, sacn};
+use super::{artnet, sacn, Universe};
 use std::collections::BTreeMap;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, UdpSocket};
@@ -102,7 +102,7 @@ impl Output {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lighting::{Control, Input, Mode, Rig, SLOTS, fixtures::builtin};
+    use crate::lighting::{fixtures::builtin, Control, Input, Mode, Rig, SLOTS};
     use std::time::Duration;
 
     fn listener() -> (UdpSocket, u16) {
@@ -163,9 +163,6 @@ mod tests {
     #[test]
     fn bad_addresses_are_rejected() {
         assert!(parse_ip("not an ip").is_err());
-        assert_eq!(
-            parse_ip(" 192.168.1.9 ").unwrap().to_string(),
-            "192.168.1.9"
-        );
+        assert_eq!(parse_ip(" 192.0.2.9 ").unwrap().to_string(), "192.0.2.9");
     }
 }

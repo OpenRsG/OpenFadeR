@@ -1,0 +1,197 @@
+import { Theme } from "theme.slint";
+import { Chip, Icon, IconButton, TextField } from "widgets.slint";
+import { Note } from "dialog.slint";
+
+/// One repository of the list. `note` is what it holds ("3 plugins · 2 themes") or why it could not be read (`failed`).
+export struct RepoView {
+    name: string,
+    note: string,
+    failed: bool,
+}
+
+/// A plugin found in a repository. `action`: 0 INSTALL, 1 UPDATE (`installed` is the version now installed), 2 INSTALLED.
+/// `native`: it loads a native library, which the install downloads when the repository does not hold it.
+export struct GetPlugin {
+    name: string,
+    version: string,
+    installed: string,
+    description: string,
+    repo: string,
+    native: bool,
+    action: int,
+}
+
+/// A theme found in a repository. `action` as in `GetPlugin`; `active`: it is the applied theme; `colors` as `ThemeCard.colors`.
+export struct GetTheme {
+    name: string,
+    author: string,
+    description: string,
+    repo: string,
+    action: int,
+    active: bool,
+    colors: [color],
+}
+
+/// A controller mapping found in a repository. `action` as in `GetPlugin`; `id` is its place in the whole list, which the filtered
+/// list keeps.
+export struct GetMapping {
+    id: int,
+    controller: string,
+    port: string,
+    repo: string,
+    action: int,
+}
+
+/// PREFS > EXTENSIONS > GET PLUGINS and PREFS > THEMES > GET THEMES: the repositories (one list for both), what they hold, and the
+/// install buttons. Rust owns it (src/app/catalog/).
+export global CatalogState {
+    in property <[RepoView]> repos;
+    in property <[GetPlugin]> plugins;
+    /// How many of `plugins` are not installed or out of date (INSTALL ALL).
+    in property <int> plugins-todo;
+    in property <[GetTheme]> themes;
+    /// A read or an install is running: the buttons wait.
+    in property <bool> busy;
+    /// What the running job does ("Reading OpenRsG/OpenFadeR-Plugins…"), and the answer of the last one.
+    in property <string> status;
+    in property <string> message;
+    in property <bool> failed;
+    /// A page that shows repositories was opened (the first time reads them).
+    callback opened();
+    callback add(string);
+    callback remove(int);
+    /// Download every repository again.
+    callback refresh();
+    callback install-plugin(int);
+    callback install-all-plugins();
+    callback install-theme(int);
+    callback apply-theme(int);
+    /// The mappings shown (those of every repository that fit the search, at most a screenful; `id` is what the callbacks take) and
+    /// the line under them ("Showing 60 of 182: type to narrow the list").
+    in property <[GetMapping]> mappings;
+    in property <string> mappings-note;
+    callback search-mappings(string);
+    callback install-mapping(int);
+    /// "Mapping for MixTrack Pro 3 available" while a connected controller has no mapping and a repository has one for it ("" = none).
+    in property <string> offer;
+    callback install-offer();
+    callback dismiss-offer();
+}
+
+/// The repository list with its add field and REFRESH, and the line telling what is going on. Shared by both pages.
+export component RepoBar inherits VerticalLayout {
+    spacing: Theme.space-md;
+    for r[i] in CatalogState.repos: Rectangle {
+        height: Theme.h-ctl;
+        background: Theme.bg;
+        border-radius: Theme.radius;
+        border-width: 1px;
+        border-color: r.failed ? Theme.danger : Theme.line;
+        HorizontalLayout {
+            padding-left: Theme.space-lg;
+            padding-right: Theme.space-xs;
+            spacing: Theme.space-lg;
+            Text {
+                text: r.name;
+                width: 260px;
+                vertical-alignment: center;
+                overflow: elide;
+                color: Theme.text-bright;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+                font-weight: Theme.weight-bold;
+            }
+            Text {
+                text: r.note;
+                horizontal-stretch: 1;
+                min-width: 0px;
+                vertical-alignment: center;
+                overflow: elide;
+                color: r.failed ? Theme.danger : Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+            }
+            IconButton { icon: Icon.close; tooltip: "Remove this repository"; clicked => { CatalogState.remove(i); } }
+        }
+    }
+    if CatalogState.repos.length == 0: Note { text: "No repository yet: add one below."; }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        height: Theme.h-ctl;
+        field := TextField {
+            placeholder-text: "owner/repo or https://github.com/owner/repo";
+            accepted(t) => { CatalogState.add(t); self.text = ""; }
+        }
+        Chip { text: "ADD"; width: 70px; horizontal-stretch: 0; active: field.text != ""; tooltip: "Add this GitHub repository to the list"; clicked => { CatalogState.add(field.text); field.text = ""; } }
+        Chip { text: "REFRESH"; width: 90px; horizontal-stretch: 0; enabled: !CatalogState.busy; tooltip: "Download the repositories again"; clicked => { CatalogState.refresh(); } }
+    }
+    Text {
+        text: CatalogState.busy ? CatalogState.status : CatalogState.message;
+        visible: self.text != "";
+        wrap: word-wrap;
+        color: CatalogState.failed && !CatalogState.busy ? Theme.danger : Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+    }
+}
+
+/// PREFS > CONTROLLER > GET MAPPINGS: the repositories, a search box and a row per mapping (controller, port, repository) with its button.
+export component GetMappings inherits VerticalLayout {
+    spacing: Theme.space-md;
+    init => { CatalogState.opened(); }
+    Text { text: "GET MAPPINGS"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+    Note { text: "Controller mappings from your GitHub repositories (the same list as GET PLUGINS and GET THEMES). A controller that is plugged in without a mapping is offered one at once."; }
+    RepoBar { }
+    TextField {
+        icon: Icon.search;
+        placeholder-text: "Search by controller or port name";
+        edited(t) => { CatalogState.search-mappings(t); }
+    }
+    for m in CatalogState.mappings: Rectangle {
+        height: Theme.h-ctl + Theme.space-xs;
+        background: Theme.panel;
+        border-radius: Theme.radius;
+        HorizontalLayout {
+            padding-left: Theme.space-lg;
+            padding-right: Theme.space-xs;
+            spacing: Theme.space-lg;
+            Text { text: m.controller; width: 230px; vertical-alignment: center; overflow: elide; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+            Text { text: m.port; width: 200px; vertical-alignment: center; overflow: elide; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; }
+            Text { text: m.repo; horizontal-stretch: 1; min-width: 0px; vertical-alignment: center; overflow: elide; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; }
+            VerticalLayout {
+                width: 100px;
+                horizontal-stretch: 0;
+                alignment: center;
+                Chip {
+                    text: m.action == 0 ? "INSTALL" : m.action == 1 ? "UPDATE" : "INSTALLED";
+                    active: m.action != 2;
+                    enabled: m.action != 2 && !CatalogState.busy;
+                    font-size: Theme.font-xs;
+                    clicked => { CatalogState.install-mapping(m.id); }
+                }
+            }
+        }
+    }
+    Note { text: CatalogState.mappings-note; visible: self.text != ""; }
+}
+
+/// "Mapping for X available: INSTALL": top right, shown while a connected controller has no mapping and a repository has one for it.
+export component OfferBanner inherits Rectangle {
+    visible: CatalogState.offer != "";
+    width: row.preferred-width;
+    height: Theme.h-ctl + 2 * Theme.space-md;
+    background: Theme.toast-bg;
+    border-color: Theme.overlay-border;
+    border-width: 1px;
+    border-radius: Theme.radius-xl;
+    drop-shadow-blur: 12px;
+    drop-shadow-color: Theme.toast-shadow;
+    row := HorizontalLayout {
+        padding: Theme.space-md;
+        padding-left: Theme.space-xl;
+        spacing: Theme.space-lg;
+        Text { text: CatalogState.offer + ":"; color: Theme.toast-text; font-size: Theme.font-toast; font-weight: Theme.weight-semi; vertical-alignment: center; }
+        Chip { text: "INSTALL"; width: 80px; horizontal-stretch: 0; active: true; enabled: !CatalogState.busy; clicked => { CatalogState.install-offer(); } }
+        IconButton { icon: Icon.close; tooltip: "Not now"; clicked => { CatalogState.dismiss-offer(); } }
+    }
+}

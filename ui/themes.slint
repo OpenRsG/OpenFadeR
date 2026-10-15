@@ -1,5 +1,6 @@
 import { Theme } from "theme.slint";
 import { Chip, Dropdown, Glyph, Icon, TextField } from "widgets.slint";
+import { CatalogState, GetTheme, RepoBar } from "catalog.slint";
 import { Note } from "dialog.slint";
 
 /// A TextField that shows `value` (and follows it when it changes, which a plain `text: …` binding stops doing after the first
@@ -423,6 +424,71 @@ component Editor inherits Rectangle {
     }
 }
 
+/// A theme of a repository: the gallery's miniature, then INSTALL / UPDATE / INSTALLED and, once it is installed, APPLY.
+component GetThemeCard inherits Rectangle {
+    in property <GetTheme> t;
+    in property <int> index;
+    ThemeCardView {
+        y: 0px;
+        width: root.width;
+        height: 118px;
+        card: {
+            name: root.t.name,
+            title: root.t.name,
+            author: root.t.author,
+            description: root.t.description,
+            user: false,
+            active: root.t.active,
+            colors: root.t.colors,
+        };
+    }
+    HorizontalLayout {
+        y: 122px;
+        width: root.width;
+        height: Theme.h-ctl;
+        spacing: Theme.space-sm;
+        Chip {
+            text: root.t.action == 0 ? "INSTALL" : root.t.action == 1 ? "UPDATE" : "INSTALLED";
+            active: root.t.action != 2;
+            enabled: root.t.action != 2 && !CatalogState.busy;
+            font-size: Theme.font-xs;
+            clicked => { CatalogState.install-theme(root.index); }
+        }
+        if root.t.action != 0: Chip {
+            text: root.t.active ? "APPLIED" : "APPLY";
+            enabled: !root.t.active;
+            font-size: Theme.font-xs;
+            tooltip: "Use this theme";
+            clicked => { CatalogState.apply-theme(root.index); }
+        }
+    }
+}
+
+/// PREFS > THEMES > GET THEMES: the shared repository list, and a card per theme the repositories hold (laid out like the gallery).
+component GetThemes inherits VerticalLayout {
+    spacing: Theme.space-md;
+    property <length> cw: 204px;
+    property <length> ch: 154px;
+    property <length> gap: Theme.space-lg;
+    property <int> cols: Math.max(1, Math.floor((root.width + root.gap) / (root.cw + root.gap)));
+    init => { CatalogState.opened(); }
+    Text { text: "GET THEMES"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+    Note { text: "Themes from your GitHub repositories (the same list as GET PLUGINS): INSTALL puts one in your themes folder and in the gallery above, APPLY uses it."; }
+    RepoBar { }
+    Rectangle {
+        height: Math.ceil(CatalogState.themes.length / root.cols) * (root.ch + root.gap);
+        for t[i] in CatalogState.themes: GetThemeCard {
+            x: Math.mod(i, root.cols) * (root.cw + root.gap);
+            y: Math.floor(i / root.cols) * (root.ch + root.gap);
+            width: root.cw;
+            height: root.ch;
+            t: t;
+            index: i;
+        }
+    }
+    if CatalogState.themes.length == 0: Note { text: "No theme in your repositories yet."; }
+}
+
 /// PREFS > THEMES: the gallery (click a theme to apply it), the theme actions and, under CUSTOMIZE, the editor. Opening the page
 /// re-reads the theme folders.
 export component ThemesPage inherits VerticalLayout {
@@ -457,5 +523,6 @@ export component ThemesPage inherits VerticalLayout {
         font-family: Theme.font;
         font-size: Theme.font-size;
     }
+    GetThemes { }
     if ThemeState.editing: Editor { }
 }

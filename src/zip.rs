@@ -1,13 +1,14 @@
 //! Zip archives (PKWARE APPNOTE 4.3: local headers, central directory, end record; names UTF-8; no zip64, no encryption).
-//! [`Zip`] reads the entries of a file (stored or deflated, streamed, CRC-32 and size checked); [`write`] makes an archive
-//! of stored entries. Used by the plugin installer ([`crate::plugin::install`]) and by the store backups ([`crate::store`]).
+//! [`Zip`] reads the entries of a file (stored or deflated, streamed, CRC-32 and size checked) and unpacks a folder of it
+//! safely ([`Zip::unpack`]); [`write`] makes an archive of stored entries. Used by the plugin installer
+//! ([`crate::plugin::install`]), the repository catalog ([`crate::catalog`]) and the store backups ([`crate::store`]).
 //! ponytail: sizes and offsets are `u32`, so an archive over 4 GiB is not supported.
 
 use crate::paths;
 use flate2::{Crc, read::DeflateDecoder};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::path::{Component, Path};
 
 /// Why an archive could not be read; the caller words what the user sees.
 #[derive(Debug)]
@@ -31,6 +32,8 @@ struct Entry {
     csize: u64,
     size: u64,
     local: u64,
+    /// Made on Unix with the symlink file type in its attributes (the entry's data is the link target).
+    symlink: bool,
 }
 
 /// The central directory of a zip, with the file to read entries from.
@@ -82,6 +85,7 @@ impl Zip {
             }
             let (nl, xl, cl) = (le16(&dir, p + 28), le16(&dir, p + 30), le16(&dir, p + 32));
             let name = dir.get(p + 46..p + 46 + nl).ok_or(Error::NotZip)?;
+            let (made_by, attrs) = (le16(&dir, p + 4) >> 8, le32(&dir, p + 38) >> 16);
             entries.push(Entry {
                 name: String::from_utf8_lossy(name).into_owned(),
                 method: le16(&dir, p + 10) as u16,
@@ -89,6 +93,7 @@ impl Zip {
                 csize: le32(&dir, p + 20),
                 size: le32(&dir, p + 24),
                 local: le32(&dir, p + 42),
+                symlink: made_by == 3 && attrs & 0o170000 == 0o120000,
             });
             p += 46 + nl + xl + cl;
         }
@@ -164,6 +169,40 @@ impl Zip {
         let mut v = Vec::new();
         self.extract(name, &mut v)?;
         Ok(v)
+    }
+
+    /// Writes the files under the entry prefix `prefix` into `to` (the prefix is dropped; folders and any path component
+    /// named in `skip` are left out). An entry that would land outside `to` (`..`, an absolute path) or is a symlink is an
+    /// error, found before that entry is written; files already written stay, so unpack into a scratch folder.
+    pub fn unpack(&mut self, prefix: &str, to: &Path, skip: &[&str]) -> Result<(), String> {
+        let names: Vec<String> = self
+            .names()
+            .filter(|n| n.starts_with(prefix))
+            .map(str::to_owned)
+            .collect();
+        for name in names {
+            let rel = Path::new(&name[prefix.len()..]);
+            if rel.components().any(|c| !matches!(c, Component::Normal(_))) {
+                return Err(format!("entry {name:?} leaves the folder"));
+            }
+            if name.ends_with('/')
+                || rel.as_os_str().is_empty()
+                || rel.iter().any(|c| skip.iter().any(|s| c == *s))
+            {
+                continue;
+            }
+            if self.find(&name).is_some_and(|e| e.symlink) {
+                return Err(format!("entry {name:?} is a symlink"));
+            }
+            let dst = to.join(rel);
+            if let Some(dir) = dst.parent() {
+                paths::at(std::fs::create_dir_all(dir), dir)?;
+            }
+            let mut out = paths::at(File::create(&dst), &dst)?;
+            self.extract(&name, &mut out)
+                .map_err(|e| format!("{name}: {e:?}"))?;
+        }
+        Ok(())
     }
 }
 

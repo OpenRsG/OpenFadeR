@@ -37,10 +37,12 @@
 //!
 //! Children of this base: [`input`] (one decoded message: LEARN capture, state dump, dispatch to the binding's action), [`wheel`]
 //! (jog and platter state), [`learn`] (binding a captured control), [`lights`] (the light timer and signals), [`wire`] (set-up and the
-//! 5 ms input timer). They add methods to [`Midi`]; the types they share live here.
+//! 5 ms input timer). They add methods to [`Midi`]; the types they share live here. [`get`] is the way in for the repository catalog
+//! (`app/catalog`): mapping files read, installed into the config folder, and the session opened again with one.
 
 mod actions;
 mod dump;
+pub mod get;
 mod hotplug;
 mod input;
 mod jog;
@@ -56,8 +58,8 @@ mod wheel;
 mod wire;
 
 use super::{
+    deck::{Decks, DECKS, DECK_NAMES},
     App,
-    deck::{DECK_NAMES, DECKS, Decks},
 };
 use jog::Jog;
 use led::Leds;
@@ -223,7 +225,11 @@ fn decode(b: [u8; 3]) -> Option<Ev> {
 
 /// Relative CC, two's complement: 1..63 forward, 127..65 back (127 = −1).
 fn rel_2c(v: u8) -> i32 {
-    if v < 64 { v as i32 } else { v as i32 - 128 }
+    if v < 64 {
+        v as i32
+    } else {
+        v as i32 - 128
+    }
 }
 
 /// Relative CC centred on 64: 65 = +1, 63 = −1.

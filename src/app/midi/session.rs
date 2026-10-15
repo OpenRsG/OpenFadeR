@@ -8,11 +8,11 @@
 //! it went away it puts the previous output back. Each step is announced with a toast. One mapped controller per run
 //! (the file with the longest port name found in a port name), the others work through `midi.map` only.
 
-use super::{App, Ev, LedRow, Midi, Outcome, dump, hotplug, led, mapfile, port, prefs_audio};
+use super::{dump, hotplug, led, mapfile, port, prefs_audio, App, Ev, LedRow, Midi, Outcome};
 use crate::app::{
-    MidiState, MixerState,
-    deck::{DECKS, active},
-    toast,
+    catalog,
+    deck::{active, DECKS},
+    toast, MidiState, MixerState,
 };
 use openfader::audio;
 use slint::ComponentHandle;
@@ -154,8 +154,11 @@ impl Midi {
         let Some(name) = loaded.controller else {
             state.set_connected("".into());
             state.set_link("".into());
+            // Ports but no mapping: the repositories may have one for them ([`crate::app::catalog`]).
+            catalog::unmapped(self.names.borrow().clone());
             return;
         };
+        catalog::mapped();
         let mut link = Link {
             controller: name.clone(),
             audio: "audio unchanged".into(),

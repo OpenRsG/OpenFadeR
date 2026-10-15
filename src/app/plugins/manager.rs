@@ -172,16 +172,24 @@ fn reloaded(app: &App) {
 /// Installs the plugin at `path` (folder, `.zip` or `plugin.json`) and shows it; the message says what happened.
 pub fn install(app: &App, path: &Path) -> Result<String, String> {
     let name = install::install(path)?;
+    Ok(installed(app, &[name]))
+}
+
+/// Shows the plugins just installed (`names`, by [`install::install`]): the folders are read again, the manager and the Plugins
+/// menu follow, and the manager's restart banner appears when one needs a restart. Returns the message.
+pub fn installed(app: &App, names: &[String]) -> String {
     reloaded(app);
-    let restart = current().restart_needed().contains(&name);
-    Ok(format!(
-        "plugin {name} installed{}",
-        if restart {
+    let restart = current().restart_needed();
+    format!(
+        "plugin{} {} installed{}",
+        if names.len() > 1 { "s" } else { "" },
+        names.join(", "),
+        if names.iter().any(|n| restart.contains(n)) {
             "; restart to load its effects or sources"
         } else {
             ""
         }
-    ))
+    )
 }
 
 /// The plugin of card `i`.

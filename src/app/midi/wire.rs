@@ -1,10 +1,10 @@
 //! Set-up: the shared [`Midi`] state, the first connection, the PREFS listener and the 5 ms input timer.
 
-use super::Ev;
 use super::jog::Jog;
 use super::led::Leds;
-use super::{Guard, Midi, decode, hotplug, layer, learn, lights, prefs_audio, usermap};
-use crate::app::deck::{DECKS, Decks};
+use super::Ev;
+use super::{decode, hotplug, layer, learn, lights, prefs_audio, usermap, Guard, Midi};
+use crate::app::deck::{Decks, DECKS};
 use crate::app::{App, MidiState};
 use slint::{ComponentHandle, Timer, TimerMode};
 use std::{
@@ -67,6 +67,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         pending: RefCell::default(),
         lights: Timer::default(),
     });
+    super::get::register(&midi);
     let m = midi.clone();
     state.on_assign(move |act, deck| m.assign(act as usize, deck));
     lights::quit_on_signals();

@@ -52,6 +52,16 @@ Folders are re-read while the app runs: a file added, edited or deleted shows wi
 editing a JSON file in a text editor is a live preview), and the gallery and the SKIN row follow. Installing from code is
 `skin::install_and_choose(path)` (what a file dropped on the window uses): it validates a file, copies it into your folder, rescans, applies the theme and returns its name.
 
+### Install from a repository
+
+PREFERENCES > THEMES > **GET THEMES** lists the themes of your GitHub repositories, painted like the gallery, with one button each:
+**INSTALL**, **UPDATE** (you have a theme of that name of your own and the repository's differs) or **INSTALLED**, then **APPLY**. The
+repositories are one list shared with GET PLUGINS (`~/.config/openfader/repositories.json`; `OpenRsG/OpenFadeR-Themes` is in it on
+first run): type `owner/repo` and **ADD**, **x** removes one, **REFRESH** downloads them again. A repository's theme files are the
+`*.json` files at its top or at most two folders deep (outside plugin folders) that set at least one valid token, read from
+`https://github.com/<owner>/<repo>/archive/HEAD.zip`. Installing writes through the same store as IMPORT, so a built-in or bundled
+theme name is never replaced and the theme is in the gallery above at once.
+
 ## Install by hand
 
 Put `*.json` files in any of these folders (the first folder that has a name wins):

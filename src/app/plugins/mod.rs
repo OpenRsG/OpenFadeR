@@ -9,7 +9,7 @@
 //! ([`refresh`] after a reload).
 
 mod manager;
-pub use manager::install;
+pub use manager::{install, installed};
 
 use super::{
     App, BrowserState, PluginState, browser, deck::Decks, deck::active, keys, library, toast,
@@ -52,7 +52,7 @@ thread_local! {
 }
 
 /// Message in the status line and as a toast.
-fn say(app: &App, text: &str) {
+pub(super) fn say(app: &App, text: &str) {
     app.global::<BrowserState>().set_status(text.into());
     toast::show(app, text);
 }

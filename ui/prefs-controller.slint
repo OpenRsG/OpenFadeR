@@ -1,8 +1,10 @@
 import { PrefRows } from "prefs-state.slint";
 import { Theme } from "theme.slint";
 import { MidiState } from "midi.slint";
+import { GetMappings } from "catalog.slint";
 
-/// CONTROLLER category (skeleton by S1, S2PrefsCtl owns it): rows from src/app/prefs/controller.rs.
+/// CONTROLLER category (skeleton by S1, S2PrefsCtl owns it): rows from src/app/prefs/controller.rs, the connected controller, then
+/// GET MAPPINGS (the repositories' mapping files, src/app/catalog).
 export component PrefsController inherits VerticalLayout {
     spacing: Theme.space-lg;
     PrefRows {}
@@ -14,4 +16,5 @@ export component PrefsController inherits VerticalLayout {
         font-weight: Theme.weight-bold;
         wrap: word-wrap;
     }
+    GetMappings { }
 }

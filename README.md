@@ -46,6 +46,10 @@ Without a path the app reopens the last library, else opens `$XDG_MUSIC_DIR` or 
 | [OpenRsG/OpenFadeR-Map](https://github.com/OpenRsG/OpenFadeR-Map) | controller mapping files, checked out as `mappings/` |
 | [OpenRsG/OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) | themes, checked out as `extension/skin/` |
 
+PREFERENCES > EXTENSIONS (plugins), > THEMES and > CONTROLLER (mappings) list what any GitHub repository holds (`owner/repo`; the
+three repositories above are in the list on first run) and install it in one click; a connected controller with no mapping is offered
+one automatically (`docs/mappings.md`).
+
 ## Where plugins, themes and mappings are found
 
 Each kind is looked up, in order, in an environment-variable folder list (`:`-separated), a folder in the

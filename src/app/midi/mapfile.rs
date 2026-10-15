@@ -247,7 +247,7 @@ fn led(s: &str) -> Option<Led> {
 }
 
 /// Every mapping file of the mapping folders, by name; the earlier folder's file wins.
-fn files() -> Vec<(String, String)> {
+pub(super) fn files() -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = Vec::new();
     for dir in search_path("OPENFADER_MAPPINGS", "mappings")
         .into_iter()
@@ -274,18 +274,26 @@ pub(super) fn load(ports: &[String]) -> Result<Option<Mapping>, String> {
 }
 
 fn pick(ports: &[String], files: Vec<(String, String)>) -> Result<Option<Mapping>, String> {
-    let ports: Vec<String> = ports.iter().map(|p| p.to_lowercase()).collect();
     let mut best: Option<(usize, Mapping)> = None;
     for (name, text) in files {
         let (m, port) = parse(&text).map_err(|e| format!("{name}: {e}"))?;
-        let port = port.to_lowercase();
-        if ports.iter().any(|p| p.contains(&port))
-            && best.as_ref().is_none_or(|(l, _)| port.len() > *l)
+        if let Some(len) = match_len(ports, &port)
+            && best.as_ref().is_none_or(|(l, _)| len > *l)
         {
-            best = Some((port.len(), m));
+            best = Some((len, m));
         }
     }
     Ok(best.map(|(_, m)| m))
+}
+
+/// How well a file's `<port>` fits the connected input `ports`: its length when one port name contains it (case-insensitive), `None`
+/// when none does. The longest match wins ([`pick`]).
+pub(super) fn match_len(ports: &[String], port: &str) -> Option<usize> {
+    let port = port.to_lowercase();
+    ports
+        .iter()
+        .any(|p| p.to_lowercase().contains(&port))
+        .then_some(port.len())
 }
 
 #[cfg(test)]

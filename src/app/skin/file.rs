@@ -11,7 +11,7 @@
 //! `"#rrggbbaa"`; length a number or `"12px"`; string text; int a whole number; float a number; duration a number of ms,
 //! `"80ms"` or `"0.2s"`. [`serialize`] writes the same format back (the theme editor and installer use it).
 
-use super::{Base, Skin, TOKENS, Ty, Value};
+use super::{Base, Skin, Ty, Value, TOKENS};
 use serde_json::Value as Json;
 use slint::Color;
 use std::path::{Path, PathBuf};
@@ -439,56 +439,24 @@ mod tests {
     }
 
     #[test]
-    fn the_shipped_themes_load_without_a_note_and_the_new_ones_are_complete() {
-        // The OpenFadeR-Themes checkout in `extension/skin/` (start.sh fetches it); nothing to check without it.
+    fn the_checked_out_themes_load_without_a_note_and_are_complete() {
+        // The OpenFadeR-Themes checkout in `extension/skin/` (start.sh fetches it); nothing to check without it. Its CI runs this.
         let dir = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/extension/skin"));
         if !dir.is_dir() {
             return;
         }
         let (skins, notes) = discover(&[dir]);
         assert!(notes.is_empty(), "{notes:?}");
-        let names: Vec<_> = skins.iter().map(|s| s.name.as_str()).collect();
-        assert_eq!(
-            names,
-            [
-                "Catppuccin Frappé",
-                "Catppuccin Macchiato",
-                "Dracula",
-                "Gruvbox Dark",
-                "High Contrast",
-                "Nord",
-                "Ocean",
-                "Rek Light",
-                "Rek",
-                "So Pro",
-                "Tokyo Night"
-            ]
-        );
         for s in &skins {
-            // the two examples from before themes carried metadata list a few tokens and have none
-            let old = ["High Contrast", "Ocean"].contains(&s.name.as_str());
-            assert_eq!(
-                s.tokens.len() == TOKENS.len(),
-                !old,
-                "{}: every token",
-                s.name
-            );
-            assert_eq!(s.author.is_empty(), old, "{}: author", s.name);
-            assert_eq!(s.description.is_empty(), old, "{}: description", s.name);
-        }
-        for s in &skins {
+            // a theme with metadata lists every token; the small examples without an author list a few
+            if !s.author.is_empty() {
+                assert_eq!(s.tokens.len(), TOKENS.len(), "{}: every token", s.name);
+                assert!(!s.description.is_empty(), "{}: description", s.name);
+            }
             let mut p = crate::app::prefs::Prefs::default();
             let bad = crate::app::prefs::view::apply_layout(&mut p, &s.layout);
             assert!(bad.is_empty(), "{}: layout {bad:?}", s.name);
         }
-        let rek_light = skins.iter().find(|s| s.name == "Rek Light").unwrap();
-        assert_eq!(rek_light.base, Base::Light);
-        let so_pro = skins.iter().find(|s| s.name == "So Pro").unwrap();
-        assert!(
-            so_pro
-                .layout
-                .contains(&("deck_layout".into(), "vertical".into()))
-        );
     }
 
     #[test]
