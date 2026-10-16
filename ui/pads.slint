@@ -51,7 +51,7 @@ export component PadGrid inherits Rectangle {
     property <bool> grid: Theme.pad-style == 1;
     property <int> cols: root.grid ? 4 : 2;
     property <length> cw: (root.width - (root.cols - 1) * Theme.gap) / root.cols;
-    property <length> ch: root.grid ? (root.height - Theme.gap) / 2 : Theme.h-row;
+    property <length> ch: root.grid ? (root.height - Theme.gap) / 2 : 22px;
     /// S.SCRATCH, SAMPLER and SEQ. CALL pads work on an empty deck.
     property <bool> live: root.enabled || root.mode == 6 || root.mode == 9 || root.mode == 10;
     /// HOT CUE and the plugin modes draw the hot cue pads (letter badge, time).
