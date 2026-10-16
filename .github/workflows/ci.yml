@@ -57,7 +57,7 @@ jobs:
       - name: Build the plugins
         run: extension/plugin/build.sh --quiet
       - run: cargo build --release
-      - run: cargo test --release
+      - run: cargo test --release -- ${{ matrix.name == 'windows' && '--test-threads=1' || '' }}
       - name: Plugin tests
         run: cargo test --release --manifest-path extension/plugin/Cargo.toml
       - name: Smoke test (Linux, under Xvfb)

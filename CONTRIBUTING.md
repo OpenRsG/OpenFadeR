@@ -16,7 +16,7 @@ cd OpenFadeR
 ./start.sh        # clones the plugins, themes and mappings into place, builds and runs
 ```
 
-On Linux the build needs the ALSA, fontconfig and xkbcommon development packages.
+On Linux the build needs the ALSA, fontconfig and xkbcommon development packages. Windows (MSVC) and macOS need only the Rust toolchain; CI builds, tests and starts the app on all three (`.github/workflows/ci.yml`, `.github/smoke.sh`).
 
 ## Running the tests
 
