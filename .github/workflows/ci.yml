@@ -58,14 +58,14 @@ jobs:
       - name: Build the plugins
         run: extension/plugin/build.sh --quiet
       - run: cargo build --release
-      - name: Each binary test in its own process (Windows crash hunt)
+      # Windows: one process per test. The binary's tests share one process on the other OSes; on Windows the headless-Slint tests
+      # together crash it (STATUS_ACCESS_VIOLATION) although each passes alone; the cause is not found, the app itself is not affected
+      # (the smoke test below runs it).
+      - uses: taiki-e/install-action@nextest
         if: matrix.name == 'windows'
+      - name: Tests
         run: |
-          cargo test --release --bin openfader -- --list 2>/dev/null | sed -n 's/: test$//p' > tests.txt
-          wc -l tests.txt
-          while read -r t; do cargo test --release --bin openfader -q -- --exact "$t" > one.log 2>&1 || { echo "FAILED alone: $t"; tail -n 5 one.log; }; done < tests.txt
-          echo hunt done
-      - run: cargo test --release -- ${{ matrix.name == 'windows' && '--test-threads=1' || '' }}
+          if [ "${{ matrix.name }}" = windows ]; then cargo nextest run --release --no-fail-fast; else cargo test --release; fi
       - name: Plugin tests
         run: cargo test --release --manifest-path extension/plugin/Cargo.toml
       - name: Smoke test (Linux, under Xvfb)
