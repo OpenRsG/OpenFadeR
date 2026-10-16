@@ -226,7 +226,10 @@ mod tests {
         };
         assert_eq!(ByAudio::new(&idx).find(&store, &plain), None);
         store
-            .collection_put(&[folder::read_track(&root.join("new/renamed.wav"))], false)
+            .collection_put(
+                &[folder::read_track(&root.join("new").join("renamed.wav"))],
+                false,
+            )
             .unwrap();
         assert_eq!(ByAudio::new(&idx).find(&store, &lost), None);
         std::fs::remove_dir_all(&root).unwrap();

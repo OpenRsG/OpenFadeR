@@ -153,5 +153,6 @@ fn second_pass_hits_the_store_and_is_faster() {
         cache::Migrated { moved: 0, left: 0 }
     );
     assert!(!old_dir.exists(), "an emptied old folder is removed");
-    std::fs::remove_dir_all(&root).unwrap();
+    // Windows: the store this process opened in `root` stays open until the process ends.
+    let _ = std::fs::remove_dir_all(&root);
 }

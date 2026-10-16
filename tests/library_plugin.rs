@@ -118,5 +118,6 @@ fn bundled_plugins_read_and_write_over_the_abi() {
         .err()
         .unwrap()
         .contains("no library plugin"));
-    std::fs::remove_dir_all(&dir).unwrap();
+    // Windows: the store this process opened in `dir` stays open until the process ends.
+    let _ = std::fs::remove_dir_all(&dir);
 }
