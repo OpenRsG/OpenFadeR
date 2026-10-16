@@ -74,6 +74,8 @@ export global DeviceState {
     /// 0 DEVICES, 1 EXPORT, 2 SYNC MANAGER, 3 BACKUPS.
     in-out property <int> tab;
     in property <[DeviceItem]> devices;
+    /// A device plugin is on: without one no device is listed, and the empty list says so.
+    in property <bool> has-plugin: true;
     in property <[string]> device-names;
     /// Index into `devices` of the chosen device, -1 none.
     in-out property <int> current: -1;

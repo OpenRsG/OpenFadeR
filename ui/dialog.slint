@@ -61,7 +61,7 @@ export component DialogFrame inherits Rectangle {
 }
 
 /// One labelled settings row: a 224 px dim label column (wide enough for "CONTROL DEVICE INFORMATION"; it never shrinks, a long label is
-/// elided), then the controls (`@children`), then an optional right-aligned hint.
+/// elided), then the controls (`@children`), then an optional hint right after them (a unit or a short note; elided at the row's end).
 export component FormRow inherits HorizontalLayout {
     in property <string> label;
     in property <string> hint;
@@ -78,12 +78,11 @@ export component FormRow inherits HorizontalLayout {
         overflow: elide;
     }
     @children
-    Rectangle { horizontal-stretch: 1; }
     Text {
         text: root.hint;
-        width: 80px;
+        min-width: 0px;
+        horizontal-stretch: 1;
         vertical-alignment: center;
-        horizontal-alignment: right;
         color: Theme.text-faint;
         font-family: Theme.font;
         font-size: Theme.font-sm;

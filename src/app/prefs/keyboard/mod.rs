@@ -11,8 +11,8 @@ mod page;
 
 pub use page::wire;
 
-use super::{Prefs, Row, section};
-use crate::app::keys::{self, Bind, Capture, Row as KeyRow, capture, conflicts, fit};
+use super::{section, Prefs, Row};
+use crate::app::keys::{self, capture, conflicts, fit, Bind, Capture, Row as KeyRow};
 
 section!(
     Keyboard {
@@ -177,10 +177,9 @@ mod tests {
             e.key(&rows(), "s", false, false).is_empty(),
             "S is deck A's SYNC"
         );
-        assert!(
-            e.status(&rows())
-                .contains("S is already used by sync (latch) to the other deck — deck A")
-        );
+        assert!(e
+            .status(&rows())
+            .contains("S is already used by sync (latch) to the other deck, deck A"));
         assert!(
             e.key(&rows(), "q", false, false).is_empty(),
             "other keys are ignored while asking"

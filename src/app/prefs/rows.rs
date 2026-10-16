@@ -17,7 +17,8 @@ pub enum Kind {
     Header = 3,
     /// A read-only line: label, then `hint` as value text.
     Info = 4,
-    /// A text field holding `hint`; Enter reports the text to the handler registered with `prefs::on_text(key, …)`.
+    /// A text field holding `hint` (`options[0]`, if any, is its placeholder); Enter reports the text to the handler
+    /// registered with `prefs::on_text(key, …)`.
     Text = 5,
 }
 
@@ -99,9 +100,13 @@ impl Row {
         }
     }
 
-    /// Short grey text at the right end of the row.
+    /// Short grey text after the row's controls; on a text row, the field's placeholder (the value stays).
     pub fn hint(mut self, hint: &str) -> Row {
-        self.hint = hint.into();
+        if self.kind == Kind::Text {
+            self.options = vec![hint.into()];
+        } else {
+            self.hint = hint.into();
+        }
         self
     }
 

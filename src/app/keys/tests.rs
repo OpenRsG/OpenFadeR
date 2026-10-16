@@ -110,7 +110,7 @@ fn every_binding_is_unique_and_labelled() {
         .iter()
         .map(|r| (help_line(r).keys.to_string(), help_line(r).what.to_string()))
         .collect();
-    assert_eq!(lines[0], ("Space".into(), "play / pause — deck A".into()));
+    assert_eq!(lines[0], ("Space".into(), "play / pause, deck A".into()));
     assert_eq!(lines[1].0, "Shift+Space");
     assert_eq!(
         lines[lines.len() - 2],

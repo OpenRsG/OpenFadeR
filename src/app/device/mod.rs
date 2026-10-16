@@ -36,14 +36,14 @@ mod sync;
 pub use link::{track_edited, track_loading};
 
 use super::{
-    ActionItem, App, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow,
-    deck::Decks, toast,
+    deck::Decks, toast, ActionItem, App, BackupItem, DeviceItem, DeviceState, FormatItem,
+    FormatOption, PickRow,
 };
 use openfader::{
-    device::{self, Device, export::Written},
-    library::{Library, snapshot::Snapshot},
+    device::{self, export::Written, Device},
+    library::{snapshot::Snapshot, Library},
     plugin::device::{Control, ExportOptions, ExportReport, Feature, Provider},
-    store::{self, Store, device_settings},
+    store::{self, device_settings, Store},
 };
 use pick::Pick;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
@@ -376,6 +376,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     });
     let s = app.global::<DeviceState>();
     s.set_devices(ModelRc::from(cx.models.devices.clone()));
+    s.set_has_plugin(!openfader::plugin::device::providers().is_empty());
     s.set_device_names(ModelRc::from(cx.models.names.clone()));
     s.set_actions(ModelRc::from(cx.models.actions.clone()));
     s.set_backups(ModelRc::from(cx.models.backups.clone()));

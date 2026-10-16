@@ -182,7 +182,10 @@ export component App inherits Window {
                 MenuItem { title: "Restore Library…"; activated => { LibraryState.action("restore"); } }
                 MenuItem { title: "Backed up device library management…"; activated => { DeviceState.manage-backups(); } }
             }
-            for label[i] in LibraryState.export-writers: MenuItem { title: label; activated => { LibraryState.action("export-collection:" + i); } }
+            Menu {
+                title: "Export Collection";
+                for label[i] in LibraryState.export-writers: MenuItem { title: label; activated => { LibraryState.action("export-collection:" + i); } }
+            }
             MenuSeparator {}
             MenuItem { title: "Preferences…"; activated => { PrefsState.visible = true; } }
             MenuItem { title: "Exit"; activated => { LibraryState.action("exit"); } }

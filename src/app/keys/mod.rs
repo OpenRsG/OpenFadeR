@@ -115,7 +115,7 @@ pub fn label(b: &Bind) -> String {
 /// What a row does, followed by its deck letter for deck actions.
 pub fn name(r: &Row) -> String {
     let deck = r.deck.map_or(String::new(), |d| {
-        format!(" — deck {}", DECK_NAMES[d as usize])
+        format!(", deck {}", DECK_NAMES[d as usize])
     });
     format!("{}{deck}", r.what)
 }

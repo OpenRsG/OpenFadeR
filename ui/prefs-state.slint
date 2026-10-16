@@ -75,7 +75,7 @@ export component PrefRowView inherits Rectangle {
     opacity: root.r.enabled ? 1 : 0.45;
     if root.r.kind == 3: Text {
         y: 8px;
-        x: Theme.space-lg;
+        x: 0px;
         text: root.r.label;
         color: Theme.accent-hi;
         font-family: Theme.font;
@@ -107,12 +107,24 @@ export component PrefRowView inherits Rectangle {
         }
     }
     if root.r.kind == 2: HorizontalLayout {
-        padding-left: Theme.space-lg;
+        padding-left: 0px;
+        spacing: Theme.space-md;
         Toggle {
             text: root.r.label;
+            horizontal-stretch: 0;
             checked: root.r.current == 1;
             enabled: root.r.enabled;
             toggled(on) => { root.chose(on ? 1 : 0); }
+        }
+        Text {
+            text: root.r.hint;
+            min-width: 0px;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            color: Theme.text-faint;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+            overflow: elide;
         }
     }
     if root.r.kind == 5: FormRow {
@@ -121,6 +133,7 @@ export component PrefRowView inherits Rectangle {
             width: 340px;
             horizontal-stretch: 0;
             text: root.r.hint;
+            placeholder-text: root.r.options.length > 0 ? root.r.options[0] : "";
             accepted(t) => { PrefsState.text-edited(root.r.key, t); }
         }
     }

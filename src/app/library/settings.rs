@@ -91,11 +91,11 @@ pub fn wire() {
 pub fn database_rows(p: &Prefs) -> Vec<Row> {
     let l = Lib::of(p);
     vec![
-        Row::header("Auto Relocate Search Folders"),
+        Row::header("AUTO RELOCATE SEARCH FOLDERS"),
         Row::check("lib_search_user", "User specified folders", l.search_user),
         Row::text(
             "lib_search",
-            "Folders",
+            "FOLDERS",
             &l.search
                 .iter()
                 .map(|f| f.display().to_string())
@@ -104,9 +104,9 @@ pub fn database_rows(p: &Prefs) -> Vec<Row> {
         )
         .hint("separate with ;")
         .enabled(l.search_user),
-        Row::header("Database management"),
-        Row::text("lib_db", "Library database", &l.db)
-            .hint("library database opened at start-up when no path is given"),
+        Row::header("DATABASE MANAGEMENT"),
+        Row::text("lib_db", "LIBRARY DATABASE", &l.db)
+            .hint("opened at start-up when no path is given"),
     ]
 }
 
@@ -117,16 +117,16 @@ pub fn database_choose(p: &mut Prefs, key: &str, i: usize) -> bool {
 pub fn browse_rows(p: &Prefs) -> Vec<Row> {
     let l = Lib::of(p);
     vec![
-        Row::header("Tags"),
+        Row::header("TAGS"),
         Row::check(
             "lib_mytag_comment",
             "Add Tags to the Comments",
             l.mytag_comment,
         )
         .hint("writes /*Tag Tag*/ into the comment"),
-        Row::header("Browse"),
+        Row::header("TRACK LIST"),
         Row::check("lib_dropdown", "Drop-down menu", l.dropdown).hint("hold a track for 1 s"),
-        Row::header("Tag List"),
+        Row::header("TAG LIST"),
         Row::check(
             "lib_taglist_load",
             "Delete the track from the Tag List when loading it to a deck",
@@ -137,7 +137,7 @@ pub fn browse_rows(p: &Prefs) -> Vec<Row> {
             "Delete all tracks from the Tag List when quitting",
             l.taglist_quit,
         ),
-        Row::header("Library"),
+        Row::header("LIBRARY"),
         Row::check("lib_protect", "Library Protection", l.protect)
             .hint("no accidental edit / delete"),
         Row::check("lib_edit", "Edit Library", l.edit).hint("rename by double click"),

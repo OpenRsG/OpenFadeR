@@ -32,7 +32,7 @@ export component KeyboardPage inherits Rectangle {
         width: parent.width;
         spacing: Theme.space-lg;
         FormRow {
-            label: "Preset";
+            label: "PRESET";
             for name[i] in KeymapState.presets: Chip {
                 text: name;
                 width: 110px;
@@ -77,12 +77,9 @@ export component KeyboardPage inherits Rectangle {
                 clicked => { KeymapState.key-captured("\u{1b}", false, false); }
             }
         }
-        Flickable {
-            height: 420px;
-            content-height: KeymapState.rows.length * Theme.h-row;
+        // Every row at full height: the page scrolls, no box scrolling inside it.
+        VerticalLayout {
             for r[i] in KeymapState.rows: Rectangle {
-                y: i * Theme.h-row;
-                width: parent.width;
                 height: Theme.h-row;
                 background: KeymapState.selected == i ? Theme.select : ta.has-hover ? Theme.hover-row : transparent;
                 HorizontalLayout {

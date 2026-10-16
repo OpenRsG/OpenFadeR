@@ -17,9 +17,11 @@ export component Jacket inherits Rectangle {
     Rectangle { background: Theme.text-bright.with-alpha(ta.has-hover ? 0.12 : 0); }
 }
 
-/// Title / artist · BPM · key of the loaded track. While nothing is loaded the status text (decoding, errors) takes the artist line.
+/// Title / artist · BPM · key of the loaded track. While nothing is loaded the artist line is empty: the deck's own status
+/// line says what to do, except in a layout without one (`show-status`), where the status (decoding, errors) takes this line.
 export component DeckTitle inherits VerticalLayout {
     in property <int> index;
+    in property <bool> show-status;
     in property <length> title-size: Theme.deck-title;
     in property <length> sub-size: Theme.deck-sub;
     property <DeckView> v: DeckState.decks[root.index];
@@ -34,7 +36,7 @@ export component DeckTitle inherits VerticalLayout {
     }
     HorizontalLayout {
         spacing: 8px;
-        Text { text: root.v.title != "" ? root.v.artist : root.v.status; color: Theme.text-dim; font-size: root.sub-size; overflow: elide; horizontal-stretch: 1; min-width: 0px; }
+        Text { text: root.v.title != "" ? root.v.artist : root.show-status ? root.v.status : ""; color: Theme.text-dim; font-size: root.sub-size; overflow: elide; horizontal-stretch: 1; min-width: 0px; }
         Text { text: root.v.bpm-text; color: root.v.synced ? Theme.accent-hi : Theme.text; font-size: Theme.deck-bpm; font-weight: Theme.deck-bpm > Theme.deck-sub ? Theme.weight-bold : Theme.weight; horizontal-stretch: 0; vertical-alignment: bottom; }
         Text { text: root.v.key-eff; color: root.v.key-shifted ? Theme.accent-hi : Theme.text; font-size: root.sub-size; font-weight: Theme.weight-bold; horizontal-stretch: 0; }
     }

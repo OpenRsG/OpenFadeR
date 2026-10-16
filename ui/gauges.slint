@@ -114,7 +114,8 @@ export component Knob inherits Rectangle {
     Rectangle {
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
-        width: 2 * root.c - 9px;
+        // Body and pointer scale with the size, so an 18 px mixer knob still shows where it points.
+        width: round(1.4 * root.c / 1px) * 1px;
         height: self.width;
         border-radius: self.width / 2;
         background: ta.has-hover ? Theme.panel-high : Theme.panel-raised;
@@ -145,7 +146,7 @@ export component Knob inherits Rectangle {
         height: root.height;
         viewbox-width: root.width / 1px;
         viewbox-height: root.height / 1px;
-        commands: "M " + root.pt(root.c * 0.25, root.sweep) + " L " + root.pt(root.c - 6px, root.sweep);
+        commands: "M " + root.pt(root.c * 0.25, root.sweep) + " L " + root.pt(root.c * 0.65, root.sweep);
         stroke: Theme.text-bright;
         stroke-width: 2px;
         stroke-line-cap: round;

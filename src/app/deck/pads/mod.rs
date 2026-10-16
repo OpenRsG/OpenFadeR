@@ -21,18 +21,17 @@ mod cues;
 mod layout;
 mod plugin;
 
-use super::{Deck, Loaded, beats_between, grid_bpm};
+use super::{beats_between, grid_bpm, Deck, Loaded};
 use crate::app::{
-    PadView,
     fx::pad_fx_rgb,
     prefs,
     prefs::view::{PadFxColor, SamplerColor},
-    sampler,
+    sampler, PadView,
 };
 use openfader::analysis::{Analysis, Cue};
 use openfader::audio::{
     self,
-    fx::{BEAT_TEXT, Effect},
+    fx::{Effect, BEAT_TEXT},
 };
 use openfader::library::Track;
 use slint::{Color, Model, ModelRc, VecModel};
@@ -444,7 +443,7 @@ impl Deck {
             (v.loaded, v.loading, v.playing, v.at_cue, v.ending) =
                 (false, false, false, false, false);
             (v.detail, v.overview) = Default::default();
-            v.status = "empty: select a track, then LOAD".into();
+            v.status = "Select a track, then LOAD".into();
         });
         self.scroll.set_row_data(self.index, Default::default());
         openfader::plugin::event::fire(

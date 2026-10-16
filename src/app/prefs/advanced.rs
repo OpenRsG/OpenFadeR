@@ -2,7 +2,7 @@
 //! BROWSE are the library's ([`crate::app::library::settings`]); BEAT/BPM SYNC and HOT CUE are the CONTROLLER >
 //! Deck settings shown again. Streaming services, Tribe XR and PRO DJ LINK items need a network and are left out.
 
-use super::{Prefs, Row, section};
+use super::{section, Prefs, Row};
 use crate::app::library::settings as library;
 use openfader::audio::RecOptions;
 use std::path::PathBuf;
@@ -155,9 +155,8 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         .position(|&h| h == a.loop_hz())
         .unwrap_or(0);
     let rates: Vec<String> = LOOP_RATES.iter().map(|h| format!("{h} Hz")).collect();
-    let mut rows = vec![Row::header("DATABASE")];
-    rows.extend(library::database_rows(p));
-    rows.push(Row::header("BROWSE"));
+    // The database and browse rows bring their own headings.
+    let mut rows = library::database_rows(p);
     rows.extend(library::browse_rows(p));
     rows.push(Row::header("RECORDINGS"));
     rows.extend(recording_rows(a));

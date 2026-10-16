@@ -12,9 +12,10 @@ use openfader::library::connect::{Mode, Wins};
 const NONE: usize = usize::MAX;
 
 pub fn rows(_: &Prefs) -> Vec<Row> {
-    let mut rows = vec![Row::header("CONNECTED")];
+    let mut rows = Vec::new();
     let views = connect::views();
     if views.is_empty() {
+        rows.push(Row::header("CONNECTED"));
         rows.push(Row::info("", "No library is connected."));
     }
     for v in views {
@@ -25,25 +26,26 @@ pub fn rows(_: &Prefs) -> Vec<Row> {
         } else {
             c.plugin.clone()
         };
-        rows.push(Row::info(
-            &c.label,
-            &format!("{source}: {}", c.path.display()),
-        ));
         let state = if v.busy {
             "syncing…".to_owned()
         } else {
             format!("synced {}", connect::ago(c.last_sync))
         };
-        rows.push(Row::info("", &format!("{} tracks, {state}", v.tracks)));
+        rows.push(Row::header(&c.label));
+        rows.push(Row::info(
+            "SOURCE",
+            &format!("{source}: {}", c.path.display()),
+        ));
+        rows.push(Row::info("TRACKS", &format!("{}, {state}", v.tracks)));
         rows.push(Row::chips(
             &format!("conn.{id}.mode"),
-            "Mode",
+            "MODE",
             &["IMPORT", "TWO-WAY"],
             c.mode as usize,
         ));
         rows.push(Row::chips(
             &format!("conn.{id}.wins"),
-            "On conflict",
+            "ON CONFLICT",
             &["SOURCE WINS", "OURS WINS", "NEWEST WINS"],
             c.wins as usize,
         ));
@@ -57,10 +59,12 @@ pub fn rows(_: &Prefs) -> Vec<Row> {
     rows.push(Row::header("DETECTED"));
     let found = connect::found();
     if found.is_empty() {
-        rows.push(Row::info(
-            "",
-            "No library of another app found in its usual place.",
-        ));
+        let text = if openfader::plugin::registry().libraries.is_empty() {
+            "No library plugin is on: switch one on in EXTENSIONS, then restart, to find other apps' libraries."
+        } else {
+            "No library of another app found in its usual place."
+        };
+        rows.push(Row::info("", text));
     }
     for (i, f) in found.iter().enumerate() {
         rows.push(
@@ -68,7 +72,7 @@ pub fn rows(_: &Prefs) -> Vec<Row> {
                 .hint(&f.path.display().to_string()),
         );
     }
-    rows.push(Row::chips("add", "Add", &["FILE…", "FOLDER…"], NONE));
+    rows.push(Row::chips("add", "ADD", &["FILE…", "FOLDER…"], NONE));
     rows
 }
 

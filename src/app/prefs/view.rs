@@ -2,7 +2,7 @@
 //! our choice). Typed section [`View`] plus the page rows. Consumers read `prefs::with(|p| p.view.*)` (the owners are named
 //! per field); [`super::look`] pushes the look (skin, tooltips, browse font and line space) into the Slint `Theme` global.
 
-use super::{Prefs, Row, Section, choice, section};
+use super::{choice, section, Prefs, Row, Section};
 use crate::app::skin;
 
 /// The chosen skin's name (a built-in one ([`skin::BUILTIN`], the first is the default) or a skin file's `name`; the old names
@@ -217,7 +217,7 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     };
     vec![
         Row::header("DISPLAY TYPE"),
-        Row::info("LANGUAGE", "English: no other UI translations are bundled"),
+        Row::info("LANGUAGE", "English (the only language so far)"),
         Row::check("tooltips", "Tooltips", v.tooltips),
         Row::header("BROWSE"),
         Row::of("browse_font", "FONT SIZE", v.browse_font),
@@ -261,11 +261,7 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         Row::of("traffic_light", "TRAFFIC LIGHT", v.traffic_light),
         Row::header("LAYOUT: MEDIA BROWSER"),
         Row::check("media_related", "Related Tracks", v.media_related),
-        Row::check(
-            "media_hot_cue_bank",
-            "Cue Bank",
-            v.media_hot_cue_bank,
-        ),
+        Row::check("media_hot_cue_bank", "Cue Bank", v.media_hot_cue_bank),
         Row::check(
             "media_track_suggestion",
             "Track Suggestion",

@@ -256,7 +256,7 @@ impl Deck {
         let (player, status) = match audio::Player::new() {
             Ok(p) => (
                 Some(RefCell::new(p)),
-                "empty: select a track, then LOAD".to_owned(),
+                "Select a track, then LOAD".to_owned(),
             ),
             Err(e) => (None, format!("audio disabled: {e}")),
         };

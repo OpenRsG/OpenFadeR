@@ -121,7 +121,7 @@ export component DevicesPage inherits HorizontalLayout {
                 x: Theme.space-xl;
                 width: parent.width - 2 * Theme.space-xl;
                 height: parent.height;
-                text: "No USB drive or SD card is mounted. Insert one: it shows up here, and as a USB icon on the left of the browser, as soon as it is mounted.";
+                text: !DeviceState.has-plugin ? "No device plugin is on. Switch one on in PREFERENCES > EXTENSIONS, then restart." : "No USB drive or SD card is mounted. Insert one: it shows up here, and as a USB icon on the left of the browser, as soon as it is mounted.";
                 wrap: word-wrap;
                 vertical-alignment: center;
                 color: Theme.text-faint;
@@ -154,7 +154,7 @@ export component DevicesPage inherits HorizontalLayout {
             }
         }
     }
-    if !root.picked: Text {
+    if !root.picked && DeviceState.devices.length > 0: Text {
         text: "Choose a device on the left.";
         vertical-alignment: center;
         horizontal-alignment: center;
@@ -162,6 +162,7 @@ export component DevicesPage inherits HorizontalLayout {
         font-family: Theme.font;
         font-size: Theme.font-md;
     }
+    if !root.picked && DeviceState.devices.length == 0: Rectangle {}
     if root.picked: VerticalLayout {
         spacing: Theme.space-lg;
         HorizontalLayout {

@@ -20,7 +20,7 @@ export global TrackInfoState {
     /// "detected 125.00 BPM (library 128.00) · detected 9A (library 8A)": what our own analysis found where it differs from
     /// the library; empty when it agrees or nothing was analysed.
     in property <string> detected;
-    /// Bulk analysis: "analyzing 3/12" while it runs, then "analyzed 12 …".
+    /// Bulk analysis: "analyzing 3/12" while it runs, then "analyzed 12 …"; shown at the right end of the status bar.
     in property <string> progress;
     /// Stars, 0..5; click on a star.
     in property <int> rating;
@@ -134,13 +134,5 @@ export component TrackInfo inherits Rectangle {
             placeholder-text: "comment (Enter saves)";
             accepted(t) => { TrackInfoState.comment-edited(t); }
         }
-    }
-    if TrackInfoState.progress != "": Text {
-        x: parent.width - self.width - 8px;
-        y: parent.height - self.height - 4px;
-        text: TrackInfoState.progress;
-        color: Theme.accent-hi;
-        font-family: Theme.font;
-        font-size: Theme.font-size;
     }
 }
