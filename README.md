@@ -19,9 +19,13 @@ OpenFadeR is an open-source DJ application for two or four decks, written in Rus
 
 Every screenshot on this page comes from the running app, with a library of synthetic tracks generated for these pictures. There is no copyrighted music in them.
 
-## Quick start
+## Download
 
-You need `git` and a [Rust toolchain](https://rustup.rs). There is no prebuilt release yet.
+Get the archive for your system from the [releases page](https://github.com/OpenRsG/OpenFadeR/releases): Linux (x86_64), Windows (x86_64) or macOS (Apple silicon). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `OpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
+
+## Build from source
+
+You need `git` and a [Rust toolchain](https://rustup.rs).
 
 ```sh
 git clone https://github.com/OpenRsG/OpenFadeR.git
