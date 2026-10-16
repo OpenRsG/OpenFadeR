@@ -2,7 +2,7 @@
 # Builds OpenFadeR from this checkout and installs it for the current user (Linux):
 #   ~/.local/lib/openfader/   the program with its bundled plugins, themes and controller mappings (as in a release archive)
 #   ~/.local/bin/openfader    the command
-#   ~/.local/share/applications/openfader.desktop   the menu entry
+#   ~/.local/share/applications/openfader.desktop   the menu entry, with its icon in ~/.local/share/icons
 # and adds the default plugin, theme and mapping repositories to PREFERENCES (GET PLUGINS / GET THEMES / GET MAPPINGS)
 # unless you already have a repository list. Run it again to update. Remove with: ./install.sh --uninstall
 set -euo pipefail
@@ -10,11 +10,12 @@ root="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 lib="${OPENFADER_PREFIX:-$HOME/.local}/lib/openfader"
 bin="${OPENFADER_PREFIX:-$HOME/.local}/bin"
 apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+icons="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
 config="${XDG_CONFIG_HOME:-$HOME/.config}/openfader"
 repos=(OpenRsG/OpenFadeR-Plugins OpenRsG/OpenFadeR-Themes OpenRsG/OpenFadeR-Map) # = src/catalog/list.rs DEFAULTS
 
 if [ "${1:-}" = --uninstall ]; then
-	rm -f "$bin/openfader" "$apps/openfader.desktop"
+	rm -f "$bin/openfader" "$apps/openfader.desktop" "$icons/openfader.png"
 	[ -d "$lib" ] && rm -r "$lib"
 	echo "removed (your settings, library edits and installed add-ons in $config stay)"
 	exit
@@ -28,18 +29,20 @@ extension/plugin/build.sh --quiet
 cargo build --release --quiet
 
 [ -d "$lib" ] && rm -r "$lib"
-mkdir -p "$lib" "$bin" "$apps"
+mkdir -p "$lib" "$bin" "$apps" "$icons"
 cp target/release/openfader "$lib/"
 cp -L target/release/*.so* "$lib/" 2>/dev/null || true # ONNX Runtime / WebGPU for STEMS, found next to the program
 python3 .github/bundle.py "$lib"
 ln -sf "$lib/openfader" "$bin/openfader"
+cp assets/icon.png "$icons/openfader.png"
 cat >"$apps/openfader.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=OpenFadeR
 Comment=DJ software
 Exec=$lib/openfader %F
-Icon=multimedia-audio-player
+Icon=openfader
+StartupWMClass=openfader
 Terminal=false
 Categories=AudioVideo;Audio;Player;
 EOF

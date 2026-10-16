@@ -6,6 +6,7 @@ import { Mixer, MixerBar, MixerState, ChannelView, BusView } from "mixer.slint";
 import { TrackInfoState } from "trackinfo.slint";
 import { CueRowView, PadOpt, PadView, PadsState } from "pads.slint";
 import { HelpOverlay, HelpLine, KeysState } from "help.slint";
+import { AboutOverlay, AboutState } from "about.slint";
 import { MidiChip, MidiOverlay, MidiState } from "midi.slint";
 import { ActionItem, BackupItem, DeviceChip, DeviceItem, DeviceOverlay, DeviceProgress, DeviceState, PickRow } from "device.slint";
 import { DupeRow, LibraryOverlays, LibraryState, MissingRow } from "library.slint";
@@ -39,6 +40,7 @@ export { Palette } // the std widgets' colour scheme follows the skin's base (sr
 export { FileDropState } // files dragged in from the desktop (src/app/drop)
 export { ThemeCard, ThemeState, TokenRow } // PREFS > THEMES (ui/themes.slint, src/app/skin/page.rs)
 export { CatalogState, GetMapping, GetPlugin, GetTheme, RepoView } // GET PLUGINS / THEMES / MAPPINGS (ui/catalog.slint, src/app/catalog)
+export { AboutState } // Help > About (ui/about.slint, src/app/about.rs)
 
 /// PERFORMANCE layouts: global bar, [FX], then either the enlarged waveforms stacked full width
 /// above the deck row (2Deck / 4Deck Horizontal) or standing side by side between the decks (2Deck / 4Deck Vertical), the deck row (decks
@@ -49,6 +51,7 @@ export component App inherits Window {
     /// Set by Rust once the library is open ("OpenFadeR — USB (device library) — <root>").
     in property <string> window-title: "OpenFadeR";
     title: root.window-title;
+    icon: @image-url("../assets/icon.png");
     preferred-width: 1100px;
     preferred-height: 960px;
     min-width: root.vert ? 1100px : 1000px;
@@ -261,6 +264,7 @@ export component App inherits Window {
         Menu {
             title: "Help";
             MenuItem { title: "Keyboard Shortcuts"; activated => { KeysState.help-visible = !KeysState.help-visible; } }
+            MenuItem { title: "About OpenFadeR"; activated => { AboutState.visible = true; } }
         }
     }
 
@@ -477,6 +481,7 @@ export component App inherits Window {
     }
 
     HelpOverlay {}
+    AboutOverlay {}
     MidiOverlay {}
     PrefsOverlay {}
     LibraryOverlays { x: 0; y: 0; width: root.width; height: root.height; }

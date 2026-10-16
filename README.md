@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/openfader.png" alt="OpenFadeR logo" width="160">
+</p>
+
 <h1 align="center">OpenFadeR</h1>
 
 <p align="center">
@@ -185,4 +189,4 @@ Bug reports, mapping files, themes and plugins are all welcome. Read [CONTRIBUTI
 
 ## License
 
-AGPL-3.0, see [LICENSE](LICENSE).
+AGPL-3.0, see [LICENSE](LICENSE). Made by [OpenRsG](https://github.com/OpenRsG).

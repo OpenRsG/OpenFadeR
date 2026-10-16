@@ -47,6 +47,10 @@ libc = "0.2"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_Threading"] }
 
+# The program icon in the .exe (build.rs, assets/openfader.rc).
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "3"
+
 # Shipping build: cross-crate optimisation and no symbol table. Keep the everyday release build's symbols for backtraces,
 # and avoid its LTO relink cost during iteration. Ship libwebgpu_dawn.so alongside either binary for GPU STEMS.
 [profile.dist]

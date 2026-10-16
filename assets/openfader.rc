@@ -1,0 +1,2 @@
+// Windows: the program's icon in Explorer, the taskbar and shortcuts (compiled by build.rs).
+1 ICON "openfader.ico"

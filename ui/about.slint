@@ -1,0 +1,59 @@
+import { Theme } from "theme.slint";
+import { DialogFrame, Note } from "dialog.slint";
+
+/// Help > About (src/app/about.rs): the logo, version, author and the project's links.
+export global AboutState {
+    in-out property <bool> visible;
+    in property <string> version;
+    /// Opens a web address in the browser.
+    callback open(string);
+}
+
+/// One "label   link" row; the link opens `url`.
+component Link inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> text;
+    in property <string> url;
+    spacing: Theme.space-lg;
+    Text { text: root.label; width: 90px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+    Text {
+        text: root.text;
+        color: ta.has-hover ? Theme.text-bright : Theme.accent-hi;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+        overflow: elide;
+        ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { AboutState.open(root.url); }
+        }
+    }
+}
+
+export component AboutOverlay inherits DialogFrame {
+    visible: AboutState.visible;
+    title: "ABOUT OPENFADER";
+    card-width: 460px;
+    closed => { AboutState.visible = false; }
+    HorizontalLayout {
+        alignment: center;
+        Image { source: @image-url("../assets/icon.png"); width: 112px; height: 112px; }
+    }
+    VerticalLayout {
+        spacing: Theme.space-xs;
+        Text { text: "OpenFadeR"; horizontal-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md * 1.6; font-weight: Theme.weight-bold; }
+        Text { text: "Version " + AboutState.version; horizontal-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-md; }
+        Text { text: "Open-source DJ software for two or four decks"; horizontal-alignment: center; color: Theme.text; font-family: Theme.font; font-size: Theme.font-md; }
+    }
+    Rectangle { height: 1px; background: Theme.line; }
+    VerticalLayout {
+        spacing: Theme.space-sm;
+        Link { label: "AUTHOR"; text: "OpenRsG"; url: "https://github.com/OpenRsG"; }
+        Link { label: "SOURCE"; text: "github.com/OpenRsG/OpenFadeR"; url: "https://github.com/OpenRsG/OpenFadeR"; }
+        Link { label: "PLUGINS"; text: "github.com/OpenRsG/OpenFadeR-Plugins"; url: "https://github.com/OpenRsG/OpenFadeR-Plugins"; }
+        Link { label: "THEMES"; text: "github.com/OpenRsG/OpenFadeR-Themes"; url: "https://github.com/OpenRsG/OpenFadeR-Themes"; }
+        Link { label: "MAPPINGS"; text: "github.com/OpenRsG/OpenFadeR-Map"; url: "https://github.com/OpenRsG/OpenFadeR-Map"; }
+        Link { label: "ISSUES"; text: "Report a bug or ask for a feature"; url: "https://github.com/OpenRsG/OpenFadeR/issues"; }
+        Link { label: "LICENSE"; text: "GNU AGPL v3"; url: "https://github.com/OpenRsG/OpenFadeR/blob/main/LICENSE"; }
+    }
+    Note { text: "Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."; wrap: word-wrap; horizontal-alignment: center; }
+}

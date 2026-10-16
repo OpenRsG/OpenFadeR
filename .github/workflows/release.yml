@@ -74,6 +74,7 @@ jobs:
             cp -L target/dist/*.so* "$d/"
             python .github/bundle.py "$d"
             cp LICENSE README.md "$d/"
+            cp assets/icon.png "$d/openfader.png"
             tar czf "out/$d.tar.gz" "$d"
             ;;
           windows)
@@ -94,6 +95,7 @@ jobs:
             cp -L target/dist/*.dylib "$d/Contents/MacOS/"
             python .github/bundle.py "$d/Contents/Resources"
             cp LICENSE README.md "$d/Contents/Resources/"
+            cp assets/openfader.icns "$d/Contents/Resources/"
             cat > "$d/Contents/Info.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -103,6 +105,7 @@ jobs:
             <key>CFBundleDisplayName</key><string>OpenFadeR</string>
             <key>CFBundleIdentifier</key><string>org.openrsg.openfader</string>
             <key>CFBundleExecutable</key><string>openfader</string>
+            <key>CFBundleIconFile</key><string>openfader</string>
             <key>CFBundlePackageType</key><string>APPL</string>
             <key>CFBundleVersion</key><string>$VERSION</string>
             <key>CFBundleShortVersionString</key><string>$VERSION</string>

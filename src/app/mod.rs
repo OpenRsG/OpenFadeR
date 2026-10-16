@@ -11,7 +11,8 @@
 //! Browse; the choice lives in the VIEW settings) / EDIT ([`edit`]) / LIGHTING ([`lighting`], DMX lights following the master deck) /
 //! VIDEO ([`video`]) full-window views; [`split`] opens the browser in a window of its own (split screen, status bar / View menu);
 //! [`skin`] restyles the `Theme` global of every window from skin files (VIEW > Color > Skin, applied by [`prefs`]);
-//! [`plugins`] is the Plugins menu and what plugin actions answer with (the plugin track sources join the library in [`run`]).
+//! [`plugins`] is the Plugins menu and what plugin actions answer with (the plugin track sources join the library in [`run`]);
+//! [`about`] is Help > About.
 
 /// Wires one callback of a Slint global: `on!(state, owner, on_x, |o, args..| body)` moves a clone of `owner` into the
 /// closure and binds it as `o`. The first word of the owner picks a variant:
@@ -64,6 +65,7 @@ fn plural(n: usize) -> &'static str {
     }
 }
 
+mod about;
 mod analyze;
 mod automix;
 mod browser;
@@ -117,6 +119,9 @@ pub use openfader_ui::*;
 pub fn run(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let inner = openfader::store::overlay(openfader::library::open(path)?); // the store's edits (cues, grid, rating, comment) win over the library
     let app = App::new()?;
+    // Wayland / X11 match the window to the menu entry `openfader.desktop` (its icon) by this id; set before the window shows.
+    let _ = slint::set_xdg_app_id("openfader");
+    about::wire(&app);
     let _prefs = prefs::wire(&app); // before everything that reads the settings
     let _skin = skin::wire(&app); // PREFS > THEMES and the skin folder watcher; the guard holds the watcher's timer
     catalog::wire(&app); // GET PLUGINS / THEMES / MAPPINGS; before the controller session, which asks it about a controller with no mapping
