@@ -116,6 +116,29 @@ impl Snapshot {
         })
     }
 
+    /// A snapshot of just these tracks, no playlists: what a device export refreshes on tracks it holds (their cues, grid,
+    /// phrases), leaving its playlists alone.
+    pub fn of_tracks(tracks: Vec<(Track, Option<Analysis>)>) -> Self {
+        Self {
+            tracks,
+            pls: Vec::new(),
+            members: Vec::new(),
+            colors: HashMap::new(),
+            mytags: Vec::new(),
+            tagged: Vec::new(),
+        }
+    }
+
+    /// Points every track whose [`crate::store::key`] is in `copies` at that file instead (the copy a device holds), so the
+    /// next format written to that device uses the audio already there.
+    pub fn retarget(&mut self, copies: &HashMap<String, std::path::PathBuf>) {
+        for (t, _) in &mut self.tracks {
+            if let Some(f) = copies.get(&crate::store::key(t)) {
+                t.file = Some(f.clone());
+            }
+        }
+    }
+
     /// Number of tracks in the snapshot.
     pub fn len(&self) -> usize {
         self.tracks.len()

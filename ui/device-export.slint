@@ -3,11 +3,30 @@ import { Theme } from "theme.slint";
 import { DialogFrame, FormRow, Note } from "dialog.slint";
 import { Caption, DeviceState, PickList } from "device-state.slint";
 
+/// The library formats written to the chosen device: one chip per format a plugin can write there (a dot: its library is on
+/// the device already).
+component FormatChips inherits FormRow {
+    label: "FORMATS";
+    vertical-stretch: 0;
+    HorizontalLayout {
+        spacing: Theme.space-xs;
+        for f[i] in DeviceState.formats: Chip {
+            text: f.held ? f.label + " •" : f.label;
+            min-width: self.fit-width;
+            horizontal-stretch: 0;
+            active: f.on;
+            enabled: !DeviceState.busy;
+            tooltip: f.held ? "Its library is on the device" : "Not on the device yet: an export creates it";
+            clicked => { DeviceState.format-toggle(i); }
+        }
+    }
+}
+
 /// EXPORT tab: the library, or the ticked playlists, onto a device (new library) or into the one it holds (new tracks are
 /// copied and analysed, tracks it has are refreshed, same-named playlists replaced, everything else stays).
 export component ExportPage inherits VerticalLayout {
     spacing: Theme.space-lg;
-    Note { text: "Writes the library, its analysis files and the audio in the format of the device's plugin. A library already on the device is extended, never wiped."; vertical-stretch: 0; }
+    Note { text: "Writes the library, its analysis and the audio in every format that is on: several formats share one copy of each track, so the device works with any software. A library already on the device is extended, never wiped."; vertical-stretch: 0; }
     FormRow {
         label: "DEVICE";
         vertical-stretch: 0;
@@ -20,6 +39,7 @@ export component ExportPage inherits VerticalLayout {
             chose(i) => { DeviceState.select(i); }
         }
     }
+    if DeviceState.folder == "" && DeviceState.formats.length > 0: FormatChips {}
     FormRow {
         label: "OR A FOLDER";
         vertical-stretch: 0;
@@ -58,6 +78,7 @@ export component SyncPage inherits VerticalLayout {
         toggled(on) => { DeviceState.sync-set-on(on); }
     }
     Note { text: "The ticked playlists are exported always in the latest state: new tracks are copied, tracks the device has are updated, the playlists get the current content."; vertical-stretch: 0; }
+    if DeviceState.formats.length > 0: FormatChips {}
     Caption { text: "PLAYLISTS TO KEEP IN SYNC"; }
     PickList { rows: DeviceState.sync-rows; toggled(i) => { DeviceState.sync-toggle(i); } }
     HorizontalLayout {

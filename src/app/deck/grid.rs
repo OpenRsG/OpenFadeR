@@ -218,12 +218,14 @@ impl Deck {
         self.commit_grid(beats, status);
     }
 
-    /// [`Deck::apply_grid`], then saved to the store (it comes back on the next LOAD).
+    /// [`Deck::apply_grid`], then saved to the store (it comes back on the next LOAD) and soon to the device copies (cue sync).
     pub(super) fn commit_grid(&self, beats: Vec<Beat>, mut status: String) {
-        let saved = {
+        let saved: Result<(), String> = {
             let l = self.loaded.borrow();
             l.track.as_ref().map_or(Ok(()), |t| {
-                store::global().set_grid(&store::key(t), &beats, &l.lib_beats)
+                store::global().set_grid(&store::key(t), &beats, &l.lib_beats)?;
+                crate::app::device::track_edited(t);
+                Ok(())
             })
         };
         if let Err(e) = saved {
@@ -239,7 +241,9 @@ impl Deck {
         l.base_bpm = grid.unwrap_or(l.lib_bpm);
         l.analysis.beats = beats;
         l.invalidate();
-        let loop_beats = l.loop_.map_or(0, |lp| loops::beats_len(&l.analysis.beats, lp));
+        let loop_beats = l
+            .loop_
+            .map_or(0, |lp| loops::beats_len(&l.analysis.beats, lp));
         let pads = self.pad_views(&l);
         drop(l);
         self.show(|v| {
@@ -269,7 +273,8 @@ impl Deck {
         let l = self.loaded.borrow();
         let (pos, _) = self.clock(&l);
         let per = per_bar(&l.analysis.beats);
-        let (head, tail) = exportedit::split(&l.analysis.beats, pos, ranged && l.grid_hist.from_here);
+        let (head, tail) =
+            exportedit::split(&l.analysis.beats, pos, ranged && l.grid_hist.from_here);
         let r = edit(tail, pos).map(|(b, s)| (exportedit::join(head, b, per), s));
         drop(l);
         match r {

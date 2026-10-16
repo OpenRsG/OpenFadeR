@@ -109,7 +109,9 @@ impl Deck {
             }
         };
         let saved = match (&l.track, save) {
-            (Some(t), true) => store::global().set_phrase_edit(&store::key(t), &p),
+            (Some(t), true) => store::global()
+                .set_phrase_edit(&store::key(t), &p)
+                .inspect(|()| crate::app::device::track_edited(t)),
             _ => Ok(()),
         };
         l.analysis.phrases = Some(p);

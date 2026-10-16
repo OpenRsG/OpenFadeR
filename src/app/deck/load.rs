@@ -7,8 +7,8 @@
 //! With STEMS and the STEM waveform on, [`stemwave`](super::stemwave) swaps in the waves of the mix heard once the stems are ready.
 
 use super::{
-    at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm, render, tempo_text, Deck, Decoded,
-    Loaded, Pending,
+    Deck, Decoded, Loaded, Pending, at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm,
+    render, tempo_text,
 };
 use crate::app::prefs;
 use openfader::{
@@ -20,7 +20,7 @@ use serde_json::json;
 use slint::{ModelRc, VecModel};
 use std::{
     cell::RefCell,
-    sync::mpsc::{channel, Receiver, TryRecvError},
+    sync::mpsc::{Receiver, TryRecvError, channel},
 };
 
 /// Decode `path`; when `need` (no grid, no 3-band waveform) is set, also analyse the audio before
@@ -63,6 +63,7 @@ impl Deck {
         self.download.borrow_mut().take(); // a download in progress is for a track that is no longer wanted
         let downloading = t.file.is_none() && t.remote.is_some();
         let mut notes = Vec::new();
+        crate::app::device::track_loading(t); // cue sync: the copy loaded wins over its other copies, before it is read
         let a = match lib.analysis(t) {
             Some(a) => a,
             None => {

@@ -448,6 +448,7 @@ mod tests {
             free: 0,
             provider: None,
             info: Default::default(),
+            formats: Vec::new(),
         };
         assert!(Kind::Device(dev("u1", "A")).same(&Kind::Device(dev("u1", "B"))));
         assert!(!Kind::Device(dev("u1", "A")).same(&Kind::Device(dev("u2", "A"))));

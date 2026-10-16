@@ -99,7 +99,7 @@ LIGHTING patches fixtures (RGB pars, RGBW pars, moving heads, strobes) and drive
 
 ### Export and video
 
-EXPORT mode shows cues and memory points for the two decks next to a DEVICES panel; USB sticks and SD cards are written by device plugins.
+EXPORT mode shows cues and memory points for the two decks next to a DEVICES panel. USB sticks and SD cards are written by device plugins, several formats side by side on one stick sharing one copy of the audio, so the same stick plays on different players and apps. A track that is both in the collection and on a stick keeps the same cues, grid and phrases on both copies: plugging the stick in fills the copy that has none, and loading a track makes the copy you loaded win.
 
 <p align="center"><img src="docs/media/export.png" alt="EXPORT mode with cue editing for two decks and a devices panel" width="100%"></p>
 

@@ -175,11 +175,13 @@ impl Deck {
         }
     }
 
-    /// Writes the cue list to the store (every cue edit goes through [`Deck::cues_changed`], which calls this).
-    /// Nothing to write for a track without a library identity (sampler slice).
+    /// Writes the cue list to the store (every cue edit goes through [`Deck::cues_changed`], which calls this), and soon to the
+    /// track's device copies (cue sync). Nothing to write for a track without a library identity (sampler slice).
     pub(super) fn persist_cues(&self, l: &Loaded) -> Result<(), String> {
         l.track.as_ref().map_or(Ok(()), |t| {
-            store::global().set_cues(&store::key(t), Some(&l.analysis.cues))
+            store::global().set_cues(&store::key(t), Some(&l.analysis.cues))?;
+            crate::app::device::track_edited(t);
+            Ok(())
         })
     }
 

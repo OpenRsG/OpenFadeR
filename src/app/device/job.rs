@@ -33,10 +33,14 @@ impl Ctx {
         let ctl = Arc::new(Control::default());
         let (worker, (tx, rx)) = (ctl.clone(), mpsc::channel());
         thread::spawn(move || drop(tx.send(work(worker))));
+        let before = self
+            .with_state(|s| (s.get_status().to_string(), s.get_failed()))
+            .unwrap_or_default();
         *self.job.borrow_mut() = Some(Job {
             ctl,
             rx,
             device,
+            before,
             then: Box::new(then),
         });
         self.with_state(|s| {
@@ -80,7 +84,7 @@ impl Ctx {
                 toast::show(&app, text.lines().next().unwrap_or(text));
             }
         } else {
-            self.say("", false);
+            self.say(&job.before.0, job.before.1); // nothing to report: what the window said before stays
         }
         (job.then)(self, &outcome);
         self.refresh_devices();

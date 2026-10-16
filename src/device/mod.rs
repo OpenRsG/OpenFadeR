@@ -11,13 +11,16 @@
 //! Support (players read FAT16/FAT32; exFAT only on some models and HFS+ only from USB, both flagged [`Support::Warn`]; NTFS and
 //! anything else is [`Support::Unsupported`]: use FAT32, or HFS+ on a Mac). SD cards: FAT16/FAT32 only.
 //!
-//! Children: [`eject`] (unmount + power off), [`backup`] (copy the plugin's backup folders, restore them), [`sync`] (Sync Manager),
-//! [`update`] (Update Collection: apply what the plugin read back), [`history`] (import the players' play histories), [`plug`]
-//! (mount a stick nobody mounted, read its library files with progress).
+//! Children: [`eject`] (unmount + power off), [`backup`] (copy the plugin's backup folders, restore them), [`export`] (several
+//! library formats on one device), [`sync`] (Sync Manager), [`update`] (Update Collection: apply what the plugin read back),
+//! [`link`] (cue sync between the collection and the device copy of a track), [`history`] (import the players' play
+//! histories), [`plug`] (mount a stick nobody mounted, read its library files with progress).
 
 pub mod backup;
 pub mod eject;
+pub mod export;
 pub mod history;
+pub mod link;
 pub mod plug;
 pub mod sync;
 pub mod update;
@@ -107,6 +110,9 @@ pub struct Device {
     pub provider: Option<String>,
     /// What that plugin found on it; the default when there is no provider.
     pub info: DeviceInfo,
+    /// Every library format a plugin can write here (or holds here), the provider first: `(plugin name, its answer)`
+    /// ([`plugin::device::formats`]). An export writes those the user picked ([`Device::default_formats`] until then).
+    pub formats: Vec<(String, DeviceInfo)>,
 }
 
 impl Device {
@@ -128,6 +134,7 @@ impl Device {
             free: 0,
             provider: None,
             info: DeviceInfo::default(),
+            formats: Vec::new(),
             mount,
         }
     }
@@ -145,6 +152,22 @@ impl Device {
     /// Whether the plugin offers `f` for this device.
     pub fn can(&self, f: plugin::device::Feature) -> bool {
         self.info.features.contains(&f)
+    }
+
+    /// The formats an export writes when the user picked none for this device: those whose library is on it, else all (a blank
+    /// device gets every format: it then works with any software).
+    pub fn default_formats(&self) -> Vec<String> {
+        let held: Vec<String> = self
+            .formats
+            .iter()
+            .filter(|(_, i)| !i.libraries.is_empty())
+            .map(|(n, _)| n.clone())
+            .collect();
+        if held.is_empty() {
+            self.formats.iter().map(|(n, _)| n.clone()).collect()
+        } else {
+            held
+        }
     }
 
     /// Whether an export may write here.
@@ -222,24 +245,25 @@ pub fn space(path: &Path) -> Option<(u64, u64)> {
 }
 
 /// What the plugins said about one mount, asked at most every [`SPACE_TTL`] (they read the device).
-static PROBED: LazyLock<Mutex<HashMap<PathBuf, (Instant, Option<String>, DeviceInfo)>>> =
+static PROBED: LazyLock<Mutex<HashMap<PathBuf, (Instant, Vec<(String, DeviceInfo)>)>>> =
     LazyLock::new(Mutex::default);
 
-fn probe(mount: &Path) -> (Option<String>, DeviceInfo) {
-    if let Some((_, p, i)) = PROBED
+fn probe(mount: &Path) -> Vec<(String, DeviceInfo)> {
+    if let Some((_, f)) = PROBED
         .lock()
         .get(mount)
         .filter(|e| e.0.elapsed() < SPACE_TTL)
     {
-        return (p.clone(), i.clone());
+        return f.clone();
     }
-    let (p, i) = plugin::device::find(mount).map_or((None, DeviceInfo::default()), |(p, i)| {
-        (Some(p.name().to_owned()), i)
-    });
+    let f: Vec<_> = plugin::device::formats(mount)
+        .into_iter()
+        .map(|(p, i)| (p.name().to_owned(), i))
+        .collect();
     PROBED
         .lock()
-        .insert(mount.to_owned(), (Instant::now(), p.clone(), i.clone()));
-    (p, i)
+        .insert(mount.to_owned(), (Instant::now(), f.clone()));
+    f
 }
 
 /// Drops the cached space and plugin answer of `path` so the next [`scan`] asks again (after a job wrote to it).
@@ -259,7 +283,13 @@ pub fn scan() -> Vec<Device> {
         if let Some((total, free)) = space(&d.mount) {
             (d.total, d.free) = (total, free);
         }
-        (d.provider, d.info) = probe(&d.mount);
+        d.formats = probe(&d.mount);
+        (d.provider, d.info) = d
+            .formats
+            .first()
+            .map_or((None, DeviceInfo::default()), |(p, i)| {
+                (Some(p.clone()), i.clone())
+            });
     }
     v
 }

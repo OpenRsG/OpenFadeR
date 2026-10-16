@@ -73,18 +73,31 @@ pub fn provider(name: &str) -> Option<Provider> {
     providers().into_iter().find(|p| p.name() == name)
 }
 
-/// The provider for the device mounted at `root`: the first whose [`Provider::info`] lists a library there, else the first that
-/// can write one.
-pub fn find(root: &Path) -> Option<(Provider, DeviceInfo)> {
-    let all: Vec<_> = providers()
+/// The device plugins that hold a library at `root` or can write one, each with its answer; the first is the one that handles
+/// the device (opens its library, updates from it): one that holds a library, the one offering the most there.
+pub fn formats(root: &Path) -> Vec<(Provider, DeviceInfo)> {
+    let mut all: Vec<_> = providers()
         .into_iter()
         .filter_map(|p| p.info(root).ok().map(|i| (p, i)))
+        .filter(|(_, i)| i.can_write || !i.libraries.is_empty())
         .collect();
-    let at = all
-        .iter()
-        .position(|(_, i)| !i.libraries.is_empty())
-        .or_else(|| all.iter().position(|(_, i)| i.can_write))?;
-    all.into_iter().nth(at)
+    if let Some(best) = (0..all.len()).max_by_key(|&i| {
+        let info = &all[i].1;
+        (
+            !info.libraries.is_empty(),
+            info.features.len(),
+            usize::MAX - i,
+        )
+    }) {
+        let first = all.remove(best);
+        all.insert(0, first);
+    }
+    all
+}
+
+/// The plugin that handles the device mounted at `root` (the first of [`formats`]).
+pub fn find(root: &Path) -> Option<(Provider, DeviceInfo)> {
+    formats(root).into_iter().next()
 }
 
 /// The schemas answered so far, with the plugin settings they were asked under.

@@ -24,7 +24,7 @@
 use super::{Analysis, Beat, Cue};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// What the plugin does with devices; the host shows only what is listed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -354,4 +354,97 @@ pub fn track_key(t: &super::Track) -> String {
         ),
         None => format!("meta|{}|{}", t.title, t.artist),
     }
+}
+
+/// A file or folder name on a device: characters FAT file systems and players reject become `_`, at most 120 characters, no
+/// surrounding spaces or trailing dots; empty → `fallback`. Every device plugin names the audio it copies with it.
+pub fn clean_name(s: &str, fallback: &str) -> String {
+    let s: String = s
+        .chars()
+        .map(|c| {
+            if c.is_control() || "/\\:*?\"<>|".contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .take(120)
+        .collect();
+    let s = s.trim().trim_end_matches('.');
+    if s.is_empty() {
+        fallback.into()
+    } else {
+        s.into()
+    }
+}
+
+/// Where the audio of `t` lives on the device mounted at `root`, the same for every format written there so a device holds one
+/// copy: `t.file` itself when it is already below `root` (the host points a track the device holds at that copy); else
+/// `Contents/<artist>/<album>/<name>` or its ` (2)`, ` (3)` … variant that holds a file of the same size; else the first of
+/// those that is free. Returns the path relative to `root` with `/` separators and whether the file is there already. `Err`:
+/// `t` has no readable audio file.
+pub fn audio_slot(root: &Path, t: &super::Track) -> Result<(String, bool), String> {
+    let file = t
+        .file
+        .as_deref()
+        .ok_or_else(|| format!("{}: no audio file", t.title))?;
+    if let Ok(rel) = file.strip_prefix(root) {
+        let rel: Vec<_> = rel.iter().map(|c| c.to_string_lossy()).collect();
+        return Ok((rel.join("/"), file.is_file()));
+    }
+    let size = std::fs::metadata(file)
+        .map_err(|e| format!("{}: {e}", file.display()))?
+        .len();
+    let name = clean_name(
+        &file
+            .file_name()
+            .map(|n| n.to_string_lossy())
+            .unwrap_or_default(),
+        "track",
+    );
+    let dir = format!(
+        "Contents/{}/{}",
+        clean_name(&t.artist, "UnknownArtist"),
+        clean_name(&t.album, "UnknownAlbum")
+    );
+    let (stem, ext) = name
+        .rsplit_once('.')
+        .map_or((name.as_str(), String::new()), |(s, e)| {
+            (s, format!(".{e}"))
+        });
+    for n in 1.. {
+        let rel = if n == 1 {
+            format!("{dir}/{name}")
+        } else {
+            format!("{dir}/{stem} ({n}){ext}")
+        };
+        match std::fs::metadata(root.join(&rel)) {
+            Ok(m) if m.len() == size => return Ok((rel, true)),
+            Ok(_) => {}
+            Err(_) => return Ok((rel, false)),
+        }
+    }
+    unreachable!()
+}
+
+/// [`audio_slot`], copying the audio there when the device does not hold it yet (through a temporary file, so a cut copy never
+/// looks whole). Returns the relative path and whether it was copied.
+pub fn place_audio(root: &Path, t: &super::Track) -> Result<(String, bool), String> {
+    let (rel, there) = audio_slot(root, t)?;
+    if there {
+        return Ok((rel, false));
+    }
+    let (src, dest) = (t.file.as_deref().unwrap_or(Path::new("")), root.join(&rel));
+    let tmp: PathBuf = dest.with_extension("part");
+    let err = |e: std::io::Error| format!("{}: {e}", dest.display());
+    if let Some(dir) = dest.parent() {
+        std::fs::create_dir_all(dir).map_err(err)?;
+    }
+    std::fs::copy(src, &tmp)
+        .and_then(|_| std::fs::rename(&tmp, &dest))
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            err(e)
+        })?;
+    Ok((rel, true))
 }

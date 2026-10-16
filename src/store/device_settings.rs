@@ -6,12 +6,13 @@
 //!
 //! A scope's effective value is the schema's default, then the [`GLOBAL`] row, then the device's own row. What the device
 //! operations receive as `config` is [`config`]: the stored rows only, the plugin applies its own defaults to the rest.
-//! Two kinds of row are not settings: `written` ([`record_fingerprint`]) and `behaviour.*` ([`Behaviour`]).
+//! Three kinds of row are not settings: `written` ([`record_fingerprint`]), `behaviour.*` ([`Behaviour`]) and a device's
+//! `behaviour.formats` ([`formats`]).
 //!
 //! A file setting (a picture) is a copy under `<data dir>/device-files/<scope>/<key>.<ext>` ([`import_file`]); its row holds
 //! that path.
 
-use super::{query_all, Store, R};
+use super::{R, Store, query_all};
 use crate::paths;
 use rusqlite::params;
 use std::{
@@ -26,6 +27,8 @@ pub const GLOBAL: &str = "";
 const WRITTEN: &str = "written";
 /// Prefix of the [`Behaviour`] keys.
 const BEHAVIOUR: &str = "behaviour.";
+/// Key of the library formats an export writes to a device (plugin names, comma-separated).
+const FORMATS: &str = "behaviour.formats";
 
 impl Store {
     /// The rows of `scope`.
@@ -92,6 +95,23 @@ pub fn player_changed(store: &Store, scope: &str, fingerprint: &str) -> bool {
         .ok()
         .and_then(|r| r.get(WRITTEN).map(|w| w != fingerprint))
         .unwrap_or(true)
+}
+
+/// The library formats (device plugin names) the user picked for the device `id`; `None` when never picked.
+pub fn formats(store: &Store, id: &str) -> Option<Vec<String>> {
+    let rows = store.device_settings(id).ok()?;
+    let list = rows.get(FORMATS)?;
+    Some(
+        list.split(',')
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned)
+            .collect(),
+    )
+}
+
+/// Remembers the formats picked for the device `id`.
+pub fn set_formats(store: &Store, id: &str, names: &[String]) -> R<()> {
+    store.set_device_setting(id, FORMATS, &names.join(","))
 }
 
 /// `<data dir>/device-files`.
@@ -165,6 +185,9 @@ pub struct Behaviour {
     pub delete_history_after_import: bool,
     /// Back up the device library automatically before it is removed. Off.
     pub auto_backup: bool,
+    /// Keep the cues, beat grid and phrases of a track that is in the collection and on a device the same on both copies
+    /// (`device::link`). On.
+    pub sync_cues: bool,
     /// Name of this computer, shown in the device backup list. Empty = the host name.
     pub computer_name: String,
 }
@@ -176,17 +199,19 @@ impl Default for Behaviour {
             import_history: true,
             delete_history_after_import: false,
             auto_backup: false,
+            sync_cues: true,
             computer_name: String::new(),
         }
     }
 }
 
 impl Behaviour {
-    const KEYS: [&'static str; 5] = [
+    const KEYS: [&'static str; 6] = [
         "delete_tracks",
         "import_history",
         "delete_history_after_import",
         "auto_backup",
+        "sync_cues",
         "computer_name",
     ];
 
@@ -205,6 +230,7 @@ impl Behaviour {
                 d.delete_history_after_import,
             ),
             auto_backup: flag("auto_backup", d.auto_backup),
+            sync_cues: flag("sync_cues", d.sync_cues),
             computer_name: rows
                 .get(&format!("{BEHAVIOUR}computer_name"))
                 .cloned()

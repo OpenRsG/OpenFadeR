@@ -71,16 +71,21 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
         };
         (g.beats.as_slice(), g.phrases.clone().or_else(own))
     };
-    let cues =
-        auto::for_analysis(beats, phrases.as_ref(), &s.options.cue, g.has_cues).is_some_and(|c| {
-            match store_cues(store, &job.key, &c) {
+    // Cues stored after the job was made (a pad pressed meanwhile, cue sync from a device) are newer than this analysis: they stay.
+    let arrived = !g.has_cues
+        && store
+            .edits(&job.key)
+            .is_ok_and(|e| e.cues.is_some_and(|c| !c.is_empty()));
+    let cues = !arrived
+        && auto::for_analysis(beats, phrases.as_ref(), &s.options.cue, g.has_cues).is_some_and(
+            |c| match store_cues(store, &job.key, &c) {
                 Ok(()) => true,
                 Err(e) => {
                     eprintln!("analyze: {}: cues not stored: {e}", job.path.display());
                     false
                 }
-            }
-        });
+            },
+        );
     let tag = s
         .tag
         .as_ref()
@@ -278,6 +283,22 @@ mod tests {
                 .all(|c| c.time_ms == 100),
             "1.1 of the library grid"
         );
+    }
+
+    #[test]
+    fn cues_stored_while_the_track_was_analysed_stay() {
+        let store = Store::in_memory().unwrap();
+        let j = job("/m/a.mp3", Guide::default());
+        let mine = vec![openfader::analysis::Cue {
+            hot_cue: 1,
+            time_ms: 4_000,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        }];
+        store.set_cues(&j.key, Some(&mine)).unwrap();
+        assert!(!finish(&j, &analysed(), src(), &settings(false), &store).cues);
+        assert_eq!(store.edits(&j.key).unwrap().cues, Some(mine));
     }
 
     #[test]

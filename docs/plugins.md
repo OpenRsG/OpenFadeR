@@ -630,6 +630,20 @@ plugin's own settings; `config` the device's settings, key → text):
 | `settings_write` | `root`, `values` | `{"fingerprint"}`: writes the settings to the device. |
 | `backup_tracks` | `dir` | `{"tracks": [{"title", "name", "size", "file"}]}`: the tracks the library inside a backup folder lists. |
 
+**Several formats on one device.** Every device plugin is probed for every device. Those that hold a library there or `can_write`
+are its formats; the one holding a library with the most `features` reads it (browse, update, histories). The device window's
+FORMATS chips pick which formats an export or a sync writes. By default these are the ones already on the device, or all of them on
+an empty device, and the choice is kept per device. The formats are written one after the other. The first copies the audio. Each
+later one gets the snapshot's tracks pointed at the files the first one's library lists, so every format shares one copy. A plugin
+that writes audio should place it with the SDK's `place_audio` (`Contents/<artist>/<album>/<file>`); then the formats agree even
+when the first one reads nothing back.
+
+**Cue sync.** A track that is in the collection and on a device, same file name and size, has its cues, hot cues, loops, beat grid
+and phrases kept the same on both copies (PREFERENCES > DJ SYSTEM > DEVICE > CUE SYNC, on by default). This needs a device whose
+plugin offers `update`, so that it reads back. When a device is plugged in, each copy that lacks one of these parts is filled from the
+other. When a track is loaded on a deck, the copy loaded wins. Edits of a loaded track reach its device copies a few seconds after the
+last one. A device copy is written with an `export` of just those tracks, in the device's picked formats.
+
 A job (`export`, `update`, `remove`, `device_action`) runs inside its call on a thread of the app. Meanwhile the plugin calls back
 through the `host` table every request receives (`openfader_plugin::library::host` in Rust): `analysis` (the beat grid, cues,
 waveforms of a track: `computed: false` what the track's own library holds, `true` the app's analysis of the audio, cached),
@@ -656,8 +670,9 @@ the app prefixes them with its name at start-up.
 
 Rust crates of one Cargo workspace, the plugins repository's `Cargo.toml` (`extension/plugin/Cargo.toml` in a core checkout), are library plugins: `itunes` (reads a media player's
 library file), a collection-file plugin (reads and writes a collection file), a plugin for the device libraries on USB sticks and
-SD cards (reads them, exports to them, updates the collection from them, backs them up, converts them and edits their settings), one
-for a desktop collection database (a key as a `secret` setting), and one for sampler packs (a zip of audio and a list file; the
+SD cards (reads them, exports to them, updates the collection from them, backs them up, converts them and edits their settings), four
+more device plugins that only write the libraries of other players and apps beside it on the same stick, one for a desktop collection
+database (a key as a `secret` setting), and one for sampler packs (a zip of audio and a list file; the
 samples are extracted to the plugin's cache folder and served as a library; with `"samples": true` the first list also fills the
 sampler after File > Import). Crates for what they share sit beside them. They need building once: `extension/plugin/build.sh` builds
 the workspace in release mode and copies each library next to its `plugin.json` (`start.sh` runs it first). Their settings are on their

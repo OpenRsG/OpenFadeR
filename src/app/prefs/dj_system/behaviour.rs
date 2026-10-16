@@ -24,6 +24,16 @@ pub fn rows(store: &Store) -> Vec<Row> {
             "Delete from the device after importing the play history",
             b.delete_history_after_import,
         ),
+        Row::header("CUE SYNC"),
+        Row::check(
+            "djs.beh.sync_cues",
+            "Keep cues, grid and phrases the same on the collection and the device copy of a track",
+            b.sync_cues,
+        ),
+        Row::info(
+            "How",
+            "Plugging a device in fills the copy that has none; loading a track makes the copy you loaded win",
+        ),
         Row::header("DEVICE LIBRARY BACKUP"),
         Row::check(
             "djs.beh.auto_backup",

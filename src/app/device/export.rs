@@ -1,10 +1,11 @@
-//! EXPORT tab: the library, or the ticked playlists, onto the chosen device or any folder ([`openfader::plugin::device::Provider::export`]:
-//! a new library when there is none, else the existing one is extended). The list is the collection's playlists as the export sees
-//! them (ids = `Snapshot` playlist ids), ticking none exports everything. After a device export the baselines for Update
-//! Collection and the settings fingerprint are kept ([`record_export`]).
+//! EXPORT tab: the library, or the ticked playlists, onto the chosen device in every format picked for it
+//! ([`openfader::device::export::export`]: a new library when there is none, else the existing one is extended), or into any
+//! folder in the format of the plugin that handles it. The list is the collection's playlists as the export sees them (ids =
+//! `Snapshot` playlist ids), ticking none exports everything. After a device export the baselines for Update Collection and the
+//! settings fingerprint are kept ([`record_all`]).
 
-use super::{App, Ctx, DeviceState, record_export, report_text};
-use openfader::plugin::device::{self, Feature};
+use super::{App, Ctx, DeviceState, record_all};
+use openfader::{device, plugin::device as plugins};
 use slint::ComponentHandle;
 use std::{path::PathBuf, rc::Rc};
 
@@ -70,14 +71,14 @@ fn start(cx: &Rc<Ctx>) {
     if dev.as_ref().is_some_and(|d| !cx.writable(d)) {
         return;
     }
-    let provider = match &dev {
-        Some(d) => cx.provider_for(d, Feature::Export),
-        None => device::find(&dest).map(|f| f.0).or_else(|| {
+    let writers = match &dev {
+        Some(d) => cx.writers(d),
+        None => plugins::find(&dest).map(|f| vec![f.0]).or_else(|| {
             cx.say("No device plugin can write a library there", true);
             None
         }),
     };
-    let Some(provider) = provider else { return };
+    let Some(writers) = writers else { return };
     let Some(full) = cx.snap.borrow().clone() else {
         return cx.say("Nothing to export: reopen the window", true);
     };
@@ -100,13 +101,14 @@ fn start(cx: &Rc<Ctx>) {
         dev_id.clone(),
         "Exporting",
         move |ctl| {
-            let r = provider.export(&dest, &snap, &o, &ctl)?;
-            let mut text = report_text(&r, &name);
-            if let Some(id) = &dev_id {
-                record_export(&store, id, &r, &mut text);
-            }
-            Ok(text)
+            let done = device::export::export(&writers, &dest, &snap, &o, &ctl)?;
+            record_all(&store, dev_id.as_deref(), &done, &name)
         },
-        |cx, _| refresh(cx, false),
+        move |cx, _| {
+            refresh(cx, false);
+            if let Some(d) = &dev {
+                cx.relink(&d.id);
+            }
+        },
     );
 }

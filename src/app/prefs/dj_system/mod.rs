@@ -200,11 +200,14 @@ fn pages(scope: &str, devices: &[Device]) -> Vec<Entry> {
         Some(d) => d.provider().into_iter().collect(),
         None => plugin::providers(),
     };
-    let named = providers.len() > 1;
+    // A provider without settings answers an error: it has no tab. Tabs carry the plugin's name only when several have some.
+    let schemas: Vec<_> = providers
+        .iter()
+        .filter_map(|p| Some((p, p.schema().ok()?)))
+        .collect();
+    let named = schemas.len() > 1;
     let mut pages = Vec::new();
-    for p in &providers {
-        // A provider without settings answers an error: it has no tab.
-        let Ok(schema) = p.schema() else { continue };
+    for (p, schema) in schemas {
         for tab in schema
             .tabs
             .into_iter()

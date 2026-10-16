@@ -138,9 +138,14 @@ impl Ctx {
                     .borrow_mut()
                     .push_back((d.id.clone(), Auto::Sync));
             }
+            self.autos
+                .borrow_mut()
+                .push_back((d.id.clone(), Auto::Link));
         }
         for d in before.iter().filter(|d| !now.iter().any(|n| n.id == d.id)) {
             say(&format!("{} removed", d.label));
+            self.links.borrow_mut().remove(&d.id);
+            self.pushes.borrow_mut().remove(&d.id);
         }
         self.models
             .devices
@@ -181,5 +186,6 @@ impl Ctx {
         drop(devices);
         self.models.actions.set_vec(actions);
         self.with_state(|s| s.set_current(at.map_or(-1, |i| i as i32)));
+        self.show_formats();
     }
 }
