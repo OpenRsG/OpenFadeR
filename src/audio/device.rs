@@ -200,6 +200,11 @@ pub fn output_named(name: &str) -> Option<cpal::Device> {
     named(false, name)
 }
 
+/// Whether `name` is an HDMI / DisplayPort output the system reports nothing connected to: it opens, but plays silence.
+pub fn unplugged(name: &str) -> bool {
+    card::hdmi_port(name).is_some_and(|k| sys::facts().plugged.get(&k) == Some(&false))
+}
+
 fn named(input: bool, name: &str) -> Option<cpal::Device> {
     devices(input).find(|d| d.name().is_ok_and(|n| n == name))
 }

@@ -2,13 +2,14 @@
 //! ([`openfader::stems::Job`]) for each loaded library track, shown as a progress text in the stem row. The stems go to
 //! the player ([`openfader::audio::Player::set_stems`]) as soon as the job starts and fill in while the track plays: frames not
 //! separated yet play as the original track. SPEED separates the play position and the HOT CUEs first, QUALITY goes from the start of the track
-//! ([`openfader::stems::schedule`]). The VOCAL / INST / BASS / DRUMS buttons (outlined pills: heard = outlined,
-//! muted = filled; clickable as soon as a track is loaded), the STEMS pad mode, the controller's ACTIVE PART buttons
+//! ([`openfader::stems::schedule`]). The VOCAL / INST / BASS / DRUMS buttons (pills filled while their part plays at full
+//! level, outlined below it; clickable as soon as a track is loaded), the STEMS pad mode, the controller's ACTIVE PART buttons
 //! and the mixer's STEM-mode knobs drive
 //! per-stem gains, ramped in the audio thread, so nothing clicks and key lock, scratch, loops and slip carry on.
 //!
-//! Gain of a stem = its mute state × its isolator knob. ACTIVE PART (PREFS: MUTE or SOLO) switches the part to zero/full
-//! and moves its rotary accordingly. SOLO silences every other part (pressing the sole part again brings all back).
+//! Gain of a stem = its mute state × its isolator knob. A deck button silences a part at full level and brings any other
+//! level back to full. The pads and the controller's ACTIVE PART follow PREFS (MUTE: the same as the buttons; SOLO: silence
+//! every other part, pressing the sole part again brings all back); either way the part's rotary moves with it.
 //! The mixer has three knobs, top to bottom INST, VOCAL, DRUMS; BASS rides the INST knob. With 3 STEMS
 //! (PREFS) bass is part of INST: it follows INST's mute and has no button.
 //! The mute state resets on LOAD unless PREFS says KEEP. Without the model the first separation downloads it
@@ -56,7 +57,11 @@ pub fn press(mute: &mut [bool; STEM_COUNT], k: usize, solo: bool, four: bool) {
     mute[k] = false;
 }
 
-/// Button gain endpoints; INST and BASS share one rotary without muting each other.
+/// A stem at this gain or above counts as full: its button is filled, a press silences it.
+const FULL: f32 = 0.99;
+
+/// Button gain endpoints; INST and BASS share one rotary without muting each other. Without `solo` a press silences a part at
+/// full level and brings any other level (silenced or turned down on the mixer) back to full.
 fn activate(
     mute: &mut [bool; STEM_COUNT],
     iso: [f32; 3],
@@ -64,8 +69,13 @@ fn activate(
     solo: bool,
     four: bool,
 ) -> [f32; 3] {
-    *mute = gains(*mute, iso, four).map(|g| g == 0.0);
-    press(mute, k, solo, four);
+    let before = gains(*mute, iso, four);
+    *mute = before.map(|g| g == 0.0);
+    if solo {
+        press(mute, k, solo, four);
+    } else if k < STEM_COUNT && (four || k != BASS) {
+        mute[k] = before[k] >= FULL;
+    }
     let audible = [
         !mute[VOCAL],
         !mute[INST] || (four && !mute[BASS]),
@@ -121,29 +131,22 @@ impl Default for State {
 impl Deck {
     pub(in crate::app) fn show_stems(&self) {
         let (s, swapped) = (self.stems.borrow(), self.drums_swapped());
-        let (stems, four, solo, buttons) = prefs::with(|p| {
-            (
-                p.stems,
-                p.stems_four,
-                p.active_part_solo,
-                p.extensions.stem_displays()[0],
-            )
-        });
+        let (stems, four, buttons) =
+            prefs::with(|p| (p.stems, p.stems_four, p.extensions.stem_displays()[0]));
         let effective = gains(s.mute, s.iso, four);
-        let on: Vec<bool> = effective
+        let full: Vec<bool> = effective
             .iter()
             .enumerate()
-            .map(|(k, g)| *g > 0.0 && !(swapped && k == DRUMS))
+            .map(|(k, g)| *g >= FULL && !(swapped && k == DRUMS))
             .collect();
         let (ready, text) = (s.ready, s.text.clone());
         drop(s);
         self.show(|v| {
             v.stems = stems;
             v.stem_four = four;
-            v.stem_solo = solo;
             v.stem_buttons = buttons;
             v.stem_ready = ready;
-            v.stem_on = ModelRc::new(VecModel::from(on));
+            v.stem_full = ModelRc::new(VecModel::from(full));
             v.stem_text = text.into();
         });
     }
@@ -206,10 +209,19 @@ impl Deck {
         self.show_stems();
     }
 
-    /// ACTIVE PART: starts separation on demand and switches the selected part to zero/full gain.
-    /// SOLO retains its preference semantics; the mixer rotaries follow the resulting part levels.
+    /// ACTIVE PART of the pads and the controller: starts separation on demand and switches the selected part to zero/full
+    /// gain, MUTE or SOLO as PREFS says; the mixer rotaries follow the resulting part levels.
     pub fn stem_press(&self, k: usize) {
-        let (solo, four) = prefs::with(|p| (p.active_part_solo, p.stems_four));
+        self.stem_switch(k, prefs::with(|p| p.active_part_solo));
+    }
+
+    /// A deck's part button: a part at full level is silenced, any other level goes back to full (never a solo).
+    pub fn stem_click(&self, k: usize) {
+        self.stem_switch(k, false);
+    }
+
+    fn stem_switch(&self, k: usize, solo: bool) {
+        let four = prefs::with(|p| p.stems_four);
         if !self.ready() || k >= STEM_COUNT || (k == BASS && !four) {
             return;
         }
@@ -293,6 +305,29 @@ mod tests {
         assert_eq!(gains(mute, iso, true), [0.0, 0.0, 1.0, 0.0]);
         let iso = activate(&mut mute, iso, BASS, true, true);
         assert_eq!(gains(mute, iso, true), [1.0; STEM_COUNT]);
+    }
+
+    #[test]
+    fn a_press_silences_a_full_part_and_brings_a_turned_down_one_to_full() {
+        let mut mute = ALL;
+        let iso = activate(&mut mute, [1.0, 0.5, 1.0], DRUMS, false, true);
+        assert_eq!(
+            gains(mute, iso, true),
+            [1.0, 0.5, 0.5, 0.0],
+            "full DRUMS silenced"
+        );
+        let iso = activate(&mut mute, iso, INST, false, true);
+        assert_eq!(
+            gains(mute, iso, true),
+            [1.0, 1.0, 1.0, 0.0],
+            "INST at half goes to full"
+        );
+        let iso = activate(&mut mute, iso, BASS, false, true);
+        assert_eq!(
+            gains(mute, iso, true),
+            [1.0, 1.0, 0.0, 0.0],
+            "BASS alone, INST stays heard"
+        );
     }
 
     #[test]

@@ -76,6 +76,14 @@ fn marks(cards: &[Card], saved: &str, st: &Status, controller: Option<&str>) -> 
                 (true, false, "OPENFADER_OUTPUT_DEVICE") => {
                     ("OVERRIDDEN BY OPENFADER_OUTPUT_DEVICE".to_owned(), 2)
                 }
+                (true, false, "system default")
+                    if c.find(saved).and_then(|p| c.ports[p].plugged) == Some(false) =>
+                {
+                    (
+                        "NOTHING PLUGGED IN · THE SYSTEM DEFAULT PLAYS".to_owned(),
+                        3,
+                    )
+                }
                 (true, false, "system default") if c.busy => {
                     ("BUSY · THE SYSTEM DEFAULT PLAYS".to_owned(), 3)
                 }
@@ -444,6 +452,20 @@ mod tests {
         // Not chosen, a busy card only says who holds it.
         let m = marks(&cards, "", &status("system default", "default"), None);
         assert_eq!(m[a50].status, "IN USE BY THE SOUND SERVER");
+    }
+
+    #[test]
+    fn a_chosen_hdmi_port_with_nothing_plugged_in_says_so() {
+        let saved = "hdmi:CARD=NVidia,DEV=1";
+        let mut cards = group(&machine(), false, saved);
+        let nv = cards.iter().position(|c| c.id == "NVidia").unwrap();
+        let port = cards[nv].find(saved).unwrap();
+        cards[nv].ports[port].plugged = Some(false);
+        let m = marks(&cards, saved, &status("system default", "default"), None);
+        assert_eq!(
+            (m[nv].status.as_str(), m[nv].kind),
+            ("NOTHING PLUGGED IN · THE SYSTEM DEFAULT PLAYS", 3)
+        );
     }
 
     #[test]

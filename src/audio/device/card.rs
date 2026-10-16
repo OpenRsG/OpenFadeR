@@ -144,6 +144,15 @@ fn parse(name: &str) -> Parsed<'_> {
     Parsed { plugin, card, dev }
 }
 
+/// `(card id, DEV)` of an HDMI / DisplayPort cpal name (`hdmi:CARD=Generic,DEV=0`); `None` for any other name.
+pub(super) fn hdmi_port(name: &str) -> Option<(String, u32)> {
+    let p = parse(name);
+    if p.plugin != "hdmi" {
+        return None;
+    }
+    Some((p.card?.to_owned(), p.dev.unwrap_or(0)))
+}
+
 /// The visible port of a known plugin: `(sort rank, port)`; `None` for everything that stays hidden.
 fn known(name: &str, p: &Parsed) -> Option<(u32, Port)> {
     let dev = p.dev.unwrap_or(0);

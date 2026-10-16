@@ -143,17 +143,28 @@ pub(super) fn choose() -> Result<Output, String> {
             let (n, d) = find_wanted(want)?;
             (n, d, "controller")
         }
-        (None, None) if !set.device.is_empty() => match device::output_named(&set.device) {
-            Some(d) => (set.device.clone(), d, "settings"),
-            None => {
-                notes.push(format!(
-                    "{:?} is not available: the system default plays",
-                    set.device
-                ));
-                let (n, d) = device::default_output()?;
-                (n, d, "system default")
+        (None, None) if !set.device.is_empty() => {
+            // An HDMI port without a screen opens fine and plays silence: the default plays until something is plugged in.
+            let unplugged = device::unplugged(&set.device);
+            match (!unplugged)
+                .then(|| device::output_named(&set.device))
+                .flatten()
+            {
+                Some(d) => (set.device.clone(), d, "settings"),
+                None => {
+                    notes.push(if unplugged {
+                        format!(
+                            "nothing is plugged into {:?} (no screen or receiver): the system default plays",
+                            set.device
+                        )
+                    } else {
+                        format!("{:?} is not available: the system default plays", set.device)
+                    });
+                    let (n, d) = device::default_output()?;
+                    (n, d, "system default")
+                }
             }
-        },
+        }
         (None, None) => {
             let (n, d) = device::default_output()?;
             (n, d, "system default")

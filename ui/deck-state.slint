@@ -60,13 +60,12 @@ export struct DeckView {
     sync-armed: bool,
     /// Cue / loop list (memory cues, hot cues, loops) in track order.
     cues: [CueRowView],
-    /// STEMS (PREFS on): show the stem row; 4 stems (else 3: bass is inside INST); ACTIVE PART is SOLO (else MUTE);
-    /// the separation finished (buttons work); per stem VOCAL / INST / BASS / DRUMS whether it is heard; progress or error text.
+    /// STEMS (PREFS on): show the stem row; 4 stems (else 3: bass is inside INST); the separation finished (buttons work);
+    /// per stem VOCAL / INST / BASS / DRUMS whether it plays at full level (its button filled); progress or error text.
     stems: bool,
     stem-four: bool,
-    stem-solo: bool,
     stem-ready: bool,
-    stem-on: [bool],
+    stem-full: [bool],
     stem-text: string,
     /// SYNC RATE next to BEAT SYNC: the multiple of the master's tempo this deck follows ("×1", "×2", "×½"); "" = not following
     /// or VIEW > Display SYNC RATE is off.
@@ -173,8 +172,10 @@ export global DeckState {
     callback key-step(int, int);
     callback key-reset(int);
     callback key-sync(int);
-    /// ACTIVE PART button / pad of a stem (0 VOCAL, 1 INST, 2 BASS, 3 DRUMS): mute or solo it per PREFS.
+    /// ACTIVE PART pad / controller button of a stem (0 VOCAL, 1 INST, 2 BASS, 3 DRUMS): mute or solo it per PREFS.
     callback stem(int, int);
+    /// The deck's button of a stem: silences it at full level, brings any other level back to full.
+    callback stem-click(int, int);
     /// STEM INSTANT DOUBLES of a part (0 VOCAL, 1 INST, 2 BASS, 3 DRUMS) from the other deck: pads 5-8 of the STEMS pad mode, the controller's rows.
     callback stem-double(int, int);
     callback slip(int);

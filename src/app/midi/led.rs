@@ -55,7 +55,7 @@ pub struct DeckSnap {
     level: u8,
     /// Playhead, track ms (jog ring).
     pub pos_ms: f64,
-    /// STEMS: parts heard (VOCAL, INST, BASS, DRUMS; none until the stems are ready) and the channel's PART ISOLATOR mode.
+    /// STEMS: parts at full level (VOCAL, INST, BASS, DRUMS; none until the stems are ready) and the channel's PART ISOLATOR mode.
     stem_on: [bool; 4],
     iso: bool,
     /// BEAT LAB: the bank in view's 4 slots playing or waiting for the beat, the bank in view, MULTI mode, DRUM CAPTURE armed.
@@ -175,7 +175,7 @@ pub fn snap(app: &App, vinyl: [bool; DECKS], cutter: [bool; DECKS], pos_ms: [f64
                 .map_or(0, |c| (c.level.clamp(0.0, 1.0) * 127.0).round() as u8),
             pos_ms: pos_ms[i],
             stem_on: std::array::from_fn(|n| {
-                v.stem_ready && v.stem_on.row_data(n).unwrap_or(false)
+                v.stem_ready && v.stem_full.row_data(n).unwrap_or(false)
             }),
             iso: ch.as_ref().is_some_and(|c| c.iso),
             drum: std::array::from_fn(|n| {

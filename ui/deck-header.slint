@@ -2,7 +2,6 @@ import { Chip, Tooltip } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DeckState, DeckView } from "deck-state.slint";
 import { DeckBadge } from "deck-wave.slint";
-import { PrefsState } from "prefs.slint";
 
 /// Jacket square: no artwork is read, so it is the empty-jacket look with the deck badge in the corner;
 /// a click loads the track selected in the browser.
@@ -78,14 +77,14 @@ export component SyncCluster inherits VerticalLayout {
     }
 }
 
-/// One part's button, this app's style: an outlined pill in the part's colour with its name in that colour; muted (or, in
-/// SOLO, silenced) it is filled with the colour (INST appears filled red).
+/// One part's button, this app's style: a pill in the part's colour, filled while the part plays at full level, outlined
+/// (name in the colour) when it is silenced or turned down.
 /// `enabled: false` greys it (no track loaded); `pending` only softens it a little while the separation still runs (a press
 /// then starts / is kept and heard once the part is separated), so it never looks disabled.
 component StemButton inherits Rectangle {
     in property <string> text;
     in property <color> tone;
-    in property <bool> muted;
+    in property <bool> full;
     in property <bool> enabled;
     in property <bool> pending;
     in property <string> tooltip;
@@ -95,13 +94,13 @@ component StemButton inherits Rectangle {
     border-radius: self.height / 2;
     border-width: 1px;
     border-color: root.enabled ? root.tone : Theme.text-disabled;
-    background: root.enabled && root.muted ? root.tone : root.enabled && ta.has-hover ? root.tone.with-alpha(0.2) : transparent;
+    background: root.enabled && root.full ? root.tone : root.enabled && ta.has-hover ? root.tone.with-alpha(0.2) : transparent;
     opacity: !root.enabled ? 0.6 : root.pending ? 0.85 : 1;
     label := Text {
         text: root.text;
         horizontal-alignment: center;
         vertical-alignment: center;
-        color: !root.enabled ? Theme.text-disabled : root.muted ? Theme.text-bright : root.tone;
+        color: !root.enabled ? Theme.text-disabled : root.full ? Theme.bg-deep : root.tone;
         font-family: Theme.font;
         font-size: Theme.font-xs;
         font-weight: Theme.weight-bold;
@@ -116,50 +115,27 @@ component StemButton inherits Rectangle {
     Tooltip { width: root.width; height: root.height; text: root.tooltip; hovered: ta.has-hover && !ta.pressed; }
 }
 
-/// The stem controls while PREFS has STEMS on, as usual: the ACTIVE STEM mode name (MUTE or SOLO, grey text; a click
-/// switches it) and a pill per part, DRUMS VOCAL INST (3 stems) or VOCAL INST BASS DRUMS (4 stems). A part that is heard is
-/// outlined, a muted one filled. Clickable whenever a track is loaded (a press starts the separation on demand), greyed
-/// without one. `stem-text` (progress "42%" or an error) sits right after the pills, compact, never elided by the status.
+/// The stem controls while PREFS has STEMS on: a pill per part, DRUMS VOCAL INST (3 stems) or VOCAL INST BASS DRUMS (4
+/// stems), filled while the part plays at full level; a press silences a full part and brings any other level back to full.
+/// Clickable whenever a track is loaded (a press starts the separation on demand), greyed without one. `stem-text`
+/// (progress "42%" or an error) sits right after the pills, compact, never elided by the status.
 export component StemRow inherits HorizontalLayout {
     in property <int> index;
     in property <length> h: 22px;
     property <DeckView> v: DeckState.decks[root.index];
     spacing: 4px;
     horizontal-stretch: 0;
-    Rectangle {
-        width: mode.preferred-width + 6px;
-        horizontal-stretch: 0;
-        mode := Text {
-            text: root.v.stem-solo ? "SOLO" : "MUTE";
-            color: mode-ta.has-hover ? Theme.text : Theme.text-dim;
-            font-family: Theme.font;
-            font-size: Theme.font-xs;
-            font-weight: Theme.weight-bold;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
-        mode-ta := TouchArea {
-            mouse-cursor: pointer;
-            clicked => { PrefsState.chose("active_part", root.v.stem-solo ? 0 : 1); }
-        }
-        Tooltip {
-            width: parent.width;
-            height: parent.height;
-            text: root.v.stem-solo ? "ACTIVE STEM: SOLO (a press silences the other parts). Click for MUTE" : "ACTIVE STEM: MUTE (a press silences that part). Click for SOLO";
-            hovered: mode-ta.has-hover && !mode-ta.pressed;
-        }
-    }
     for k in (root.v.stem-four ? [0, 1, 2, 3] : [3, 0, 1]): StemButton {
         text: ["VOCAL", "INST", "BASS", "DRUMS"][k];
         height: root.h;
         tone: [Theme.stem-vocal, Theme.stem-inst, Theme.stem-bass, Theme.stem-drums][k];
-        muted: root.v.stem-on.length > k && !root.v.stem-on[k];
+        full: root.v.stem-full.length > k && root.v.stem-full[k];
         enabled: root.v.loaded;
         pending: !root.v.stem-ready;
         tooltip: !root.v.loaded ? "Load a track with STEMS on (PREFS)"
-            : (root.v.stem-solo ? "SOLO " : "MUTE ") + ["VOCAL", "INST", "BASS (rides the INST isolator)", "DRUMS"][k]
+            : ["VOCAL", "INST", "BASS (rides the INST isolator)", "DRUMS"][k] + ": a click turns it off, or back to full"
               + (root.v.stem-text != "" ? " · " + root.v.stem-text : !root.v.stem-ready ? " · click to separate" : "");
-        clicked => { DeckState.stem(root.index, k); }
+        clicked => { DeckState.stem-click(root.index, k); }
     }
     if root.v.stem-text != "": Text {
         text: root.v.stem-text;

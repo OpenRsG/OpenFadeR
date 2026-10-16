@@ -90,6 +90,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
     on!(state, at decks, on_scratch_end, |d| d.scratch_end());
     on!(state, at decks, on_key_sync, |d| d.key_sync());
     on!(state, at decks, on_stem, |d, k| d.stem_press(k as usize));
+    on!(state, at decks, on_stem_click, |d, k| d.stem_click(k as usize));
     on!(state, at decks, on_stem_double, |d, k| d.stem_double(k as usize));
     // The 2/4-deck layout: the UI shows `count` decks; decks C and D leave the layout paused.
     state.set_count(active() as i32);

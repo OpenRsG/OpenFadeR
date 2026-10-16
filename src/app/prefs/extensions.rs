@@ -123,7 +123,8 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             "ACTIVE STEM SETTING",
             &["MUTE", "SOLO"],
             p.active_part_solo as usize,
-        ),
+        )
+        .hint("pads and controller"),
         Row::chips(
             "stems_reset",
             "MUTE/SOLO ON LOAD",
