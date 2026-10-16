@@ -14,11 +14,21 @@ fn temp(name: &str) -> PathBuf {
 }
 
 fn cue(hot: u16, ms: u32) -> Cue {
-    Cue { hot_cue: hot, time_ms: ms, loop_end_ms: None, color: None, comment: None }
+    Cue {
+        hot_cue: hot,
+        time_ms: ms,
+        loop_end_ms: None,
+        color: None,
+        comment: None,
+    }
 }
 
 fn beat(bar_pos: u16, time_ms: u32) -> Beat {
-    Beat { bar_pos, bpm_x100: 12800, time_ms }
+    Beat {
+        bar_pos,
+        bpm_x100: 12800,
+        time_ms,
+    }
 }
 
 #[test]
@@ -26,10 +36,25 @@ fn edits_round_trip_through_a_reopen() {
     let dir = temp("roundtrip");
     let path = dir.join("store.db");
     let cues = vec![
-        Cue { hot_cue: 1, time_ms: 1500, loop_end_ms: None, color: Some([0xff, 0x00, 0x17]), comment: Some("drop".into()) },
-        Cue { hot_cue: 0, time_ms: 4000, loop_end_ms: Some(6000), color: None, comment: None },
+        Cue {
+            hot_cue: 1,
+            time_ms: 1500,
+            loop_end_ms: None,
+            color: Some([0xff, 0x00, 0x17]),
+            comment: Some("drop".into()),
+        },
+        Cue {
+            hot_cue: 0,
+            time_ms: 4000,
+            loop_end_ms: Some(6000),
+            color: None,
+            comment: None,
+        },
     ];
-    let (grid, orig) = (vec![beat(1, 100), beat(2, 569)], vec![beat(1, 0), beat(2, 469)]);
+    let (grid, orig) = (
+        vec![beat(1, 100), beat(2, 569)],
+        vec![beat(1, 0), beat(2, 469)],
+    );
     {
         let s = Store::open_at(&path).unwrap();
         assert_eq!(s.edits("k").unwrap(), Default::default());
@@ -43,7 +68,10 @@ fn edits_round_trip_through_a_reopen() {
     }
     let s = Store::open_at(&path).unwrap();
     let e = s.edits("k").unwrap();
-    assert_eq!((e.rating, e.comment.as_deref(), e.color), (Some(4), Some("warm-up"), Some(7)));
+    assert_eq!(
+        (e.rating, e.comment.as_deref(), e.color),
+        (Some(4), Some("warm-up"), Some(7))
+    );
     assert_eq!(e.cues.as_deref(), Some(&cues[..]));
     assert_eq!(e.grid.as_deref(), Some(&grid[..]));
     assert_eq!(s.track_color("other").unwrap(), None);
@@ -54,6 +82,7 @@ fn edits_round_trip_through_a_reopen() {
     assert_eq!(s.edits("k").unwrap().cues, None);
     s.set_cues("k", Some(&[])).unwrap(); // every cue deleted is an edit, not "no edit"
     assert_eq!(s.edits("k").unwrap().cues, Some(vec![]));
+    drop(s); // Windows cannot delete a database that is still open
     std::fs::remove_dir_all(dir).unwrap();
 }
 
@@ -64,7 +93,13 @@ fn playlists_mytags_and_history() {
     let a = s.add_node(Some(folder), "A", NodeKind::Playlist).unwrap();
     let b = s.add_node(Some(folder), "B", NodeKind::Smart).unwrap();
     let top = s.add_node(None, "Top", NodeKind::Playlist).unwrap();
-    let names = |s: &Store| s.nodes().unwrap().into_iter().map(|n| n.name).collect::<Vec<_>>();
+    let names = |s: &Store| {
+        s.nodes()
+            .unwrap()
+            .into_iter()
+            .map(|n| n.name)
+            .collect::<Vec<_>>()
+    };
     assert_eq!(names(&s), ["Sets", "A", "B", "Top"]);
     s.move_node(b, Some(folder), 0).unwrap();
     s.move_node(top, None, 0).unwrap();
@@ -119,7 +154,11 @@ impl Library for Lib {
         Ok(self.0.clone())
     }
     fn analysis(&self, _: &Track) -> Option<Analysis> {
-        Some(Analysis { beats: vec![beat(1, 0), beat(2, 469)], cues: vec![cue(1, 1000), cue(2, 2000)], ..Default::default() })
+        Some(Analysis {
+            beats: vec![beat(1, 0), beat(2, 469)],
+            cues: vec![cue(1, 1000), cue(2, 2000)],
+            ..Default::default()
+        })
     }
 }
 
@@ -130,7 +169,13 @@ fn the_store_wins_over_the_library_but_only_where_it_has_an_edit() {
     for f in &files {
         std::fs::write(f, b"audio").unwrap();
     }
-    let track = |f: &PathBuf| Track { title: "t".into(), file: Some(f.clone()), rating: 1, comment: "library".into(), ..Default::default() };
+    let track = |f: &PathBuf| Track {
+        title: "t".into(),
+        file: Some(f.clone()),
+        rating: 1,
+        comment: "library".into(),
+        ..Default::default()
+    };
     let tracks: Vec<Track> = files.iter().map(track).collect();
     let store = Arc::new(Store::in_memory().unwrap());
     let lib = Overlay::new(Box::new(Lib(tracks.clone())), store.clone());
