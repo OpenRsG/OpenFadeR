@@ -33,10 +33,14 @@ fn is_zip(path: &Path) -> bool {
         .is_some_and(|e| e.eq_ignore_ascii_case("zip"))
 }
 
-/// Installs the plugin at `from` into [`user_dir`]; returns its name. An uninstalled plugin of that name is back.
+/// Installs the plugin at `from` into [`user_dir`] and switches it on; returns its name. An uninstalled plugin of that
+/// name is back.
 pub fn install(from: &Path) -> Result<String, String> {
     let name = install_into(from, &user_dir().ok_or("no config folder (set HOME)")?)?;
-    super::config::update(|c| c.removed.retain(|n| *n != name))?;
+    super::config::update(|c| {
+        c.removed.retain(|n| *n != name);
+        c.set_enabled(&name, true);
+    })?;
     Ok(name)
 }
 

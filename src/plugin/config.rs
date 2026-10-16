@@ -1,9 +1,9 @@
-//! What the user decided about the plugins, kept in `<config dir>/plugins.json`: the plugins switched off, the plugins
-//! uninstalled (a bundled copy stays hidden until the plugin is installed again) and every plugin's [`SettingDecl`] values.
-//! Read once ([`get`]), written on every change ([`update`]).
+//! What the user decided about the plugins, kept in `<config dir>/plugins.json`: the plugins switched on (a plugin is off
+//! until the user switches it on or installs it), the plugins uninstalled (a bundled copy stays hidden until the plugin is
+//! installed again) and every plugin's [`SettingDecl`] values. Read once ([`get`]), written on every change ([`update`]).
 //!
 //! ```json
-//! {"disabled": ["now-playing"], "removed": ["mix-log"], "settings": {"yt-dlp": {"results": 50}}}
+//! {"enabled": ["now-playing"], "removed": ["mix-log"], "settings": {"yt-dlp": {"results": 50}}}
 //! ```
 
 use super::{Manifest, SettingDecl};
@@ -15,7 +15,11 @@ use std::{path::PathBuf, sync::LazyLock};
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Config {
     #[serde(default)]
-    pub disabled: Vec<String>,
+    pub enabled: Vec<String>,
+    /// The older file listed the plugins switched off and had every other one on; [`Config::adopt`] turns it into
+    /// `enabled` once.
+    #[serde(default, skip_serializing)]
+    disabled: Option<Vec<String>>,
     /// Uninstalled plugins: no copy of them is read ([`super::install::uninstall`]; an install takes the name out).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub removed: Vec<String>,
@@ -26,15 +30,27 @@ pub struct Config {
 
 impl Config {
     pub fn enabled(&self, plugin: &str) -> bool {
-        !self.disabled.iter().any(|d| d == plugin)
+        self.enabled.iter().any(|d| d == plugin)
     }
 
     pub fn set_enabled(&mut self, plugin: &str, on: bool) {
-        self.disabled.retain(|d| d != plugin);
-        if !on {
-            self.disabled.push(plugin.to_owned());
-            self.disabled.sort();
+        self.enabled.retain(|d| d != plugin);
+        if on {
+            self.enabled.push(plugin.to_owned());
+            self.enabled.sort();
         }
+    }
+
+    /// An older file kept every plugin on but the ones it listed: `found` minus those is switched on, so an upgrade
+    /// keeps what the user had. Whether there was such a file.
+    pub fn adopt(&mut self, found: &[&str]) -> bool {
+        let Some(off) = self.disabled.take() else {
+            return false;
+        };
+        for p in found.iter().filter(|p| !off.iter().any(|o| o == *p)) {
+            self.set_enabled(p, true);
+        }
+        true
     }
 
     /// Every setting of `m` with the user's value where it fits the setting's type, else the default.
@@ -139,9 +155,15 @@ mod tests {
             c.values(&m),
             json!({"on": true, "n": 3.5, "mode": "a", "t": "", "k": "s3"})
         );
-        c.set_enabled("p", false);
-        assert!(!c.enabled("p"));
+        assert!(!c.enabled("p"), "off until switched on");
         c.set_enabled("p", true);
-        assert!(c.enabled("p") && c.disabled.is_empty());
+        assert!(c.enabled("p"));
+        c.set_enabled("p", false);
+        assert!(!c.enabled("p") && c.enabled.is_empty());
+        // The older file: everything on but what it lists; read once.
+        let mut old: Config = serde_json::from_value(json!({"disabled": ["b"]})).unwrap();
+        assert!(old.adopt(&["a", "b"]) && old.enabled == ["a"]);
+        assert!(!old.adopt(&["a", "b", "c"]) && old.enabled == ["a"]);
+        assert!(!serde_json::to_string(&old).unwrap().contains("disabled"));
     }
 }

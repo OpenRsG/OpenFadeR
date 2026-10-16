@@ -43,7 +43,8 @@ The app reads plugins from
 
 An entry of that search path is either one plugin folder or a folder of plugin folders; the first plugin of a name wins.
 
-PREFERENCES > EXTENSIONS lists every plugin as a card: a switch to turn it on or off, what it runs on (LUA, PYTHON, PROGRAM or
+PREFERENCES > EXTENSIONS lists every plugin as a card: a switch to turn it on or off (every plugin starts off, the bundled ones
+too; installing one switches it on), what it runs on (LUA, PYTHON, PROGRAM or
 JSON), what it brings, its settings (**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`), then whatever went wrong while
 reading the plugins. The card's **⋮** menu opens its folder or **uninstalls** it: an installed plugin's folder is deleted, and a
 bundled one is hidden (listed under `removed`) until you install it again, from GET PLUGINS or a drop. **RELOAD** reads the folders

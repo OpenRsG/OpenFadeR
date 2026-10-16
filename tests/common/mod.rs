@@ -50,9 +50,13 @@ pub fn device_plugin() -> Option<&'static str> {
         let config =
             std::env::temp_dir().join(format!("openfader-test-config-{}", std::process::id()));
         std::fs::create_dir_all(config.join("openfader")).unwrap();
+        let all: Vec<Value> = manifests()
+            .into_iter()
+            .map(|(_, m)| m["name"].clone())
+            .collect();
         std::fs::write(
             config.join("openfader/plugins.json"),
-            json!({"settings": {&name: secrets}}).to_string(),
+            json!({"enabled": all, "settings": {&name: secrets}}).to_string(),
         )
         .unwrap();
         // SAFETY: set once, before the plugin registry is first read; the tests of a binary share this value. The store and

@@ -41,14 +41,22 @@ fn bundled_plugins_read_and_write_over_the_abi() {
         eprintln!("skipped: no extension/plugin checkout");
         return;
     };
-    let unbuilt = entries.flatten().any(|e| {
-        let manifest: serde_json::Value = serde_json::from_slice(
-            &std::fs::read(e.path().join("plugin.json")).unwrap_or_default(),
-        )
-        .unwrap_or_default();
-        manifest["library"]["lib"][std::env::consts::OS]
+    let manifests: Vec<serde_json::Value> = entries
+        .flatten()
+        .filter_map(|e| {
+            let m: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(e.path().join("plugin.json")).ok()?).ok()?;
+            Some((e.path(), m))
+        })
+        .map(|(dir, mut m)| {
+            m["dir"] = serde_json::json!(dir);
+            m
+        })
+        .collect();
+    let unbuilt = manifests.iter().any(|m| {
+        m["library"]["lib"][std::env::consts::OS]
             .as_str()
-            .is_some_and(|lib| !e.path().join(lib).is_file())
+            .is_some_and(|lib| !Path::new(m["dir"].as_str().unwrap()).join(lib).is_file())
     });
     if unbuilt {
         eprintln!("skipped: run extension/plugin/build.sh first");
@@ -60,7 +68,11 @@ fn bundled_plugins_read_and_write_over_the_abi() {
     std::fs::write(&plist, ITUNES).unwrap();
     std::fs::write(
         dir.join("config/openfader/plugins.json"),
-        serde_json::json!({"settings": {"itunes": {"file": plist}}}).to_string(),
+        serde_json::json!({
+            "enabled": manifests.iter().map(|m| &m["name"]).collect::<Vec<_>>(),
+            "settings": {"itunes": {"file": plist}}
+        })
+        .to_string(),
     )
     .unwrap();
     // SAFETY: the only test of this binary; set before the plugin registry and its settings are first read.
