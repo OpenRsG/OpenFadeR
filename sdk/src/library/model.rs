@@ -23,6 +23,9 @@ pub struct Remote {
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Track {
+    /// The host's own track id (its library database); plugins leave it `None` and the host ignores what they send.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<i64>,
     pub title: String,
     pub artist: String,
     pub album: String,
@@ -60,6 +63,44 @@ impl Track {
     /// "m:ss".
     pub fn length_text(&self) -> String {
         format!("{}:{:02}", self.length_s / 60, self.length_s % 60)
+    }
+}
+
+/// What a library format can hold ([`crate::library::LibraryPlugin::capabilities`]): the host fits a collection to it
+/// before writing one and reports what did not fit. The default holds everything.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Capabilities {
+    /// Hot cue slots per track (A, B, …); `None` = no limit.
+    pub hot_cues: Option<u16>,
+    /// Memory cues per track; `None` = no limit.
+    pub memory_cues: Option<u16>,
+    /// Loops (a cue with a loop end) are kept; `false` writes them as plain cues.
+    pub loops: bool,
+    /// The cue colours the format has (RGB); a cue colour is snapped to the nearest. Empty = any colour.
+    pub cue_colors: Vec<[u8; 3]>,
+    /// Highest rating written (5 = five stars); 0 = the format keeps no rating.
+    pub rating_max: u8,
+    /// The beat grid may change tempo; `false` keeps one tempo from the first beat.
+    pub tempo_changes: bool,
+    /// Added to every cue and beat time of an MP3 file when written (the format's decoder starts this much later), ms.
+    pub mp3_offset_ms: i32,
+    /// The plugin writes this format back (`write_collection`) to an existing library file.
+    pub write_back: bool,
+}
+
+impl Default for Capabilities {
+    fn default() -> Self {
+        Self {
+            hot_cues: None,
+            memory_cues: None,
+            loops: true,
+            cue_colors: Vec::new(),
+            rating_max: 5,
+            tempo_changes: true,
+            mp3_offset_ms: 0,
+            write_back: false,
+        }
     }
 }
 

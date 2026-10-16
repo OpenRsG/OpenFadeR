@@ -11,12 +11,11 @@
 //! [`Watcher`] samples the decks from the browser's 200 ms timer.
 
 use crate::app::{
-    App, DeckState, MixerState,
-    deck::{Decks, active},
-    mixer,
+    deck::{active, Decks},
+    mixer, App, DeckState, MixerState,
 };
 use openfader::{
-    library::{Track, playlist_file::m3u8},
+    library::{playlist_file::m3u8, Track},
     paths,
     store::{self, Store},
 };
@@ -153,21 +152,9 @@ mod tests {
         Track {
             title: title.into(),
             artist: artist.into(),
-            album: String::new(),
-            key: String::new(),
-            genre: String::new(),
-            label: String::new(),
-            bpm_x100: 0,
             length_s,
             file: file.map(PathBuf::from),
-            analysis_ref: None,
-            artwork: None,
-            rating: 0,
-            comment: String::new(),
-            date_added: String::new(),
-            bitrate: 0,
-            sample_rate: 0,
-            remote: None,
+            ..Track::default()
         }
     }
 
@@ -189,7 +176,8 @@ mod tests {
         let mut s = Slot::default();
         assert!((0..29).all(|_| !advance(&mut s, Some(1), true, S, MIN_ON_AIR)));
         assert!(advance(&mut s, Some(1), true, S, MIN_ON_AIR)); // the 30th second
-        assert!((0..60).all(|_| !advance(&mut s, Some(1), true, S, MIN_ON_AIR))); // never again for this load
+        assert!((0..60).all(|_| !advance(&mut s, Some(1), true, S, MIN_ON_AIR)));
+        // never again for this load
     }
 
     #[test]

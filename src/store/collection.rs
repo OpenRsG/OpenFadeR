@@ -9,10 +9,10 @@
 //! [`Store::collection_view`] lays these over a source's track list; `library::collection` is the `Library` around it.
 //! Paths are stored as (lossy) UTF-8 text.
 
-use super::{R, Sql, Store, column, exec, exec_count, exists, in_tx, key, query_all, scalar};
+use super::{column, exec, exec_count, exists, in_tx, key, query_all, scalar, Sql, Store, R};
 use crate::library::Track;
 use openfader_plugin::library::{owned_ref, split_ref};
-use rusqlite::{Row, params};
+use rusqlite::{params, Row};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -21,6 +21,7 @@ const COLS: &str = "path, title, artist, album, tkey, genre, bpm_x100, length_s,
 fn from_row(r: &Row) -> rusqlite::Result<Track> {
     let opt = |i| r.get::<_, Option<String>>(i).map(|s| s.map(PathBuf::from));
     Ok(Track {
+        id: None,
         file: Some(PathBuf::from(r.get::<_, String>(0)?)),
         title: r.get(1)?,
         artist: r.get(2)?,

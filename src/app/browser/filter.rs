@@ -2,7 +2,7 @@
 //! [`Track`]s and the master deck's [`Reference`].
 
 use super::super::camelot::related as key_related;
-use super::table::{Facts, Look, Reference, bpm_close};
+use super::table::{bpm_close, Facts, Look, Reference};
 use openfader::{library::Track, store};
 
 /// The filter bar's state. Combines (AND) with the search box.
@@ -118,22 +118,10 @@ mod tests {
     fn track(title: &str, key: &str, bpm: f64, rating: u8) -> Track {
         Track {
             title: title.into(),
-            artist: String::new(),
-            album: String::new(),
             key: key.into(),
-            genre: String::new(),
-            label: String::new(),
             bpm_x100: (bpm * 100.0) as i64,
-            length_s: 0,
-            file: None,
-            analysis_ref: None,
-            artwork: None,
             rating,
-            comment: String::new(),
-            date_added: String::new(),
-            bitrate: 0,
-            sample_rate: 0,
-            remote: None,
+            ..Track::default()
         }
     }
 

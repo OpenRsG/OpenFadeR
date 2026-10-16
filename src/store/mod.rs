@@ -36,19 +36,19 @@ mod sequence;
 mod tag;
 mod track;
 
-pub use backup::{Backup, MUSIC_DIR, Restored};
-pub use bank::{BankSlot, HotCueBank, collect_banks};
+pub use backup::{Backup, Restored, MUSIC_DIR};
+pub use bank::{collect_banks, BankSlot, HotCueBank};
 pub use device::{DeviceBackup, NewBackup};
-pub use gain::{TrackGain, effective_db};
+pub use gain::{effective_db, TrackGain};
 pub use node::{Node, NodeKind};
-pub use overlay::{Overlay, apply, overlay};
-pub use sequence::{MAX_SEQUENCES, Sequence};
+pub use overlay::{apply, overlay, Overlay};
+pub use sequence::{Sequence, MAX_SEQUENCES};
 pub use tag::{Tag, TagGroup};
 pub use track::{Edits, TRACK_COLORS};
 
 use crate::{analysis::Cue, library::Track, paths};
 use parking_lot::{Mutex, MutexGuard};
-use rusqlite::{Connection, OptionalExtension, Params, Row, types::FromSql};
+use rusqlite::{types::FromSql, Connection, OptionalExtension, Params, Row};
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -126,6 +126,40 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE phrase_edit (key TEXT PRIMARY KEY, mood INTEGER NOT NULL, list BLOB NOT NULL) WITHOUT ROWID;",
     // v12: the collection's analysis path column is an opaque `analysis_ref` now (the first schema calls it by its old name).
     concat!("ALTER TABLE collection RENAME COLUMN an", "lz TO analysis_ref;"),
+    // v13: our Collection is the library (src/library/own.rs): every track is a `collection` row and `t<id>` its [`key`].
+    // `size` / `mtime` (s) of the file when last seen, `fingerprint` of its decoded audio (found again after a move or a
+    // retag), `key_id` the musical key 0..=23 (`1A`..`12B` as 0..=23: (camelot number − 1) × 2 + (B = 1)), `added_at` unix s.
+    // `connection`: a library of another app (or a folder) synced into the Collection by a plugin (src/library/connect/);
+    // `mode` 0 import only, 1 two-way; `wins` on conflict 0 source, 1 ours, 2 newest; `stamp` the source file's state at the
+    // last sync; `last_seq` the journal seq written back last. `source_map` / `source_node`: a source's track / playlist id → ours,
+    // `sig` a hash of what the source last said about the track.
+    "ALTER TABLE collection ADD COLUMN size INTEGER NOT NULL DEFAULT 0;
+     ALTER TABLE collection ADD COLUMN mtime INTEGER NOT NULL DEFAULT 0;
+     ALTER TABLE collection ADD COLUMN fingerprint TEXT;
+     ALTER TABLE collection ADD COLUMN key_id INTEGER;
+     ALTER TABLE collection ADD COLUMN added_at INTEGER NOT NULL DEFAULT 0;
+     CREATE INDEX collection_fingerprint ON collection(fingerprint);
+     CREATE INDEX collection_bpm ON collection(bpm_x100);
+     CREATE INDEX collection_key ON collection(key_id);
+     CREATE TABLE connection (
+        id INTEGER PRIMARY KEY, plugin TEXT NOT NULL, path TEXT NOT NULL, label TEXT NOT NULL,
+        mode INTEGER NOT NULL DEFAULT 0, wins INTEGER NOT NULL DEFAULT 0, last_sync INTEGER NOT NULL DEFAULT 0,
+        stamp TEXT NOT NULL DEFAULT '', last_seq INTEGER NOT NULL DEFAULT 0, UNIQUE (plugin, path));
+     CREATE TABLE source_map (
+        conn INTEGER NOT NULL REFERENCES connection(id) ON DELETE CASCADE, foreign_id TEXT NOT NULL,
+        track INTEGER NOT NULL REFERENCES collection(id) ON DELETE CASCADE, sig INTEGER NOT NULL,
+        PRIMARY KEY (conn, foreign_id)) WITHOUT ROWID;
+     CREATE INDEX source_map_track ON source_map(track);
+     CREATE TABLE source_node (
+        conn INTEGER NOT NULL REFERENCES connection(id) ON DELETE CASCADE, foreign_id TEXT NOT NULL,
+        node INTEGER NOT NULL REFERENCES node(id) ON DELETE CASCADE, PRIMARY KEY (conn, foreign_id)) WITHOUT ROWID;",
+    // v14: the change journal (src/store/journal.rs): one `journal_action` per user action, one `journal` row per row it
+    // changed (`op` 0 insert, 1 update, 2 delete; `old` / `new` the row as JSON), for undo / redo and write-back.
+    "CREATE TABLE journal_action (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, label TEXT NOT NULL, undone INTEGER NOT NULL DEFAULT 0);
+     CREATE TABLE journal (
+        seq INTEGER PRIMARY KEY, action INTEGER NOT NULL REFERENCES journal_action(id) ON DELETE CASCADE,
+        tbl TEXT NOT NULL, op INTEGER NOT NULL, old TEXT, new TEXT);
+     CREATE INDEX journal_by_action ON journal(action);",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as
@@ -282,6 +316,12 @@ impl Store {
     /// [`in_tx`] on the locked connection.
     fn write<T>(&self, f: impl FnOnce(&Connection) -> R<T>) -> R<T> {
         in_tx(&mut self.db(), false, f)
+    }
+
+    /// Changes with every row this store has written (inserted, updated or deleted) since it was opened: what a cache of
+    /// a query result compares to know it is still current.
+    pub fn generation(&self) -> u64 {
+        self.db().total_changes()
     }
 }
 

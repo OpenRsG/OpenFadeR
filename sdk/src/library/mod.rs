@@ -19,6 +19,7 @@
 //! | `analysis_ref` | `reference`, `settings` | `{"analysis": `[`Analysis`]` or null}`: the analysis behind a [`Track::analysis_ref`] |
 //! | `close` | `handle` | `{}` |
 //! | `write_collection` | `path`, `snapshot`, `settings` | `{"count": tracks written}` |
+//! | `capabilities` | `settings` | [`Capabilities`]: what the format holds (a plugin older than this op answers an error: the host assumes the default) |
 //! | device ops | see [`device`] | |
 //!
 //! `settings` is the plugin's own settings from `plugin.json` (id → value). The host keeps a track's `analysis_ref` as
@@ -34,9 +35,9 @@ pub use model::*;
 pub use tree::*;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
-use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -171,6 +172,10 @@ pub enum Request {
         #[serde(default)]
         settings: Value,
     },
+    Capabilities {
+        #[serde(default)]
+        settings: Value,
+    },
 }
 
 /// Answer of `probe`.
@@ -227,6 +232,10 @@ pub trait LibraryPlugin {
     /// when the plugin holds none.
     fn analysis_ref(_reference: &str, _settings: &Value) -> Option<Analysis> {
         None
+    }
+    /// What the format this plugin writes can hold; the host fits a collection to it before `write_collection` / `export`.
+    fn capabilities(_settings: &Value) -> Capabilities {
+        Capabilities::default()
     }
 
     // Devices (see [`device`]): a plugin that declares `"device": true` implements what its `DeviceInfo::features` lists.
@@ -399,6 +408,7 @@ fn dispatch<P: LibraryPlugin>(req: &[u8]) -> Result<Value, String> {
         Request::BackupTracks { dir, settings } => {
             json!({ "tracks": P::backup_tracks(&dir, &settings)? })
         }
+        Request::Capabilities { settings } => json!(P::capabilities(&settings)),
     })
 }
 
