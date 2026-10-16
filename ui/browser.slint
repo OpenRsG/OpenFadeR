@@ -118,7 +118,8 @@ export component Browser inherits Rectangle {
 
     HorizontalLayout {
         spacing: Theme.gap;
-        // Left icon strip: the fixed sidebar rows (All tracks, Tag List, Session history, Duplicates) and Related.
+        // Left icon strip: the fixed sidebar rows (All tracks, Tag List, Session history, Duplicates), Related, then one USB icon
+        // per connected device that opens the DEVICES window on it.
         Rectangle {
             width: 28px;
             background: Theme.panel;
@@ -131,6 +132,19 @@ export component Browser inherits Rectangle {
                 IconButton { icon: Icon.loop; icon-size: 16px; tooltip: "Session history"; active: tree.current-item == 2 && !BrowserState.related; clicked => { root.show-list(2); } }
                 IconButton { icon: Icon.grid; icon-size: 16px; tooltip: "Duplicate tracks"; active: tree.current-item == 3 && !BrowserState.related; clicked => { root.show-list(3); } }
                 if BrowserState.related-enabled: IconButton { icon: Icon.link; icon-size: 16px; tooltip: "Related tracks"; active: BrowserState.related; clicked => { BrowserState.related-toggled(!BrowserState.related); } }
+                if DeviceState.devices.length > 0: Rectangle { height: 1px; background: Theme.line-strong; }
+                for d[i] in DeviceState.devices: IconButton {
+                    icon: Icon.usb;
+                    icon-size: 16px;
+                    tooltip: d.name + " (" + d.library + "): open its device window";
+                    active: DeviceState.visible && DeviceState.current == i;
+                    clicked => {
+                        DeviceState.tab = 0;
+                        DeviceState.visible = true;
+                        DeviceState.select(i);
+                        DeviceState.opened();
+                    }
+                }
             }
         }
         // Tree + management buttons + track info.

@@ -48,12 +48,23 @@ export struct BackupItem {
     selected: bool,
 }
 
-/// A library format a plugin can write to the chosen device (the FORMATS chips): `held` = its library is on the device, `on` =
-/// an export writes it.
-export struct FormatItem {
+/// A device option of a library format: a switch (`choices` empty, `on`) or one of `choices` (`current`); `hint` explains it.
+export struct FormatOption {
     label: string,
-    held: bool,
+    hint: string,
     on: bool,
+    choices: [string],
+    current: int,
+}
+
+/// A library format a plugin can write to the chosen device: `title` and `about` (what reads it) are the plugin's, `held` what
+/// of it the device holds ("" = nothing yet), `on` = exports write it, `options` how it is written there.
+export struct FormatItem {
+    title: string,
+    about: string,
+    held: string,
+    on: bool,
+    options: [FormatOption],
 }
 
 /// The device windows (src/app/device/): detection, EXPORT to a device (create / add / update), SYNC MANAGER, backups, eject.
@@ -69,6 +80,8 @@ export global DeviceState {
     in property <[PickRow]> export-rows;
     /// The library formats of the chosen device; an export, SYNC and the cue sync write the ones that are on.
     in property <[FormatItem]> formats;
+    /// Every format of the chosen device is on: it works with every app and player the formats list.
+    in property <bool> universal;
     /// Export to a folder instead of a device (any folder that is not a mounted device).
     in-out property <string> folder;
     in property <[PickRow]> sync-rows;
@@ -98,6 +111,10 @@ export global DeviceState {
     callback export-start();
     /// Switches format `i` of `formats` for the chosen device.
     callback format-toggle(int);
+    /// `true`: every format on; `false`: only the format that handles the device (the user then ticks the others).
+    callback format-universal(bool);
+    /// Format `i`, its option `k`: a switch gets 1 / 0, a choice the index of the chosen entry.
+    callback format-option(int, int, int);
     callback sync-toggle(int);
     callback sync-set-on(bool);
     callback sync-start();

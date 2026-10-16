@@ -13,10 +13,9 @@ use slint::SharedString;
 use std::rc::Rc;
 
 fn item(d: &Device) -> DeviceItem {
-    let library = if d.has_library() {
-        d.info.libraries.join(" + ")
-    } else {
-        "no library".to_owned()
+    let library = match d.held() {
+        h if h.is_empty() => "no library yet".to_owned(),
+        h => h,
     };
     let warning = d
         .support

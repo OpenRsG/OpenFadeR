@@ -170,6 +170,29 @@ impl Device {
         }
     }
 
+    /// The name shown for the format of `plugin` here: what its plugin calls it, else the plugin name in capitals
+    /// ("my-format" → "MY FORMAT").
+    pub fn format_title(&self, plugin: &str) -> String {
+        match self.formats.iter().find(|(n, _)| n == plugin) {
+            Some((_, i)) if !i.title.is_empty() => i.title.clone(),
+            _ => plugin.replace(['-', '_'], " ").to_uppercase(),
+        }
+    }
+
+    /// The formats whose library is on the device, with the libraries when a format holds several:
+    /// "My Format (Library A + Library B) · Other Format"; empty: none.
+    pub fn held(&self) -> String {
+        self.formats
+            .iter()
+            .filter(|(_, i)| !i.libraries.is_empty())
+            .map(|(n, i)| match i.libraries.len() {
+                1 => self.format_title(n),
+                _ => format!("{} ({})", self.format_title(n), i.libraries.join(" + ")),
+            })
+            .collect::<Vec<_>>()
+            .join(" · ")
+    }
+
     /// Whether an export may write here.
     pub fn writable(&self) -> bool {
         !self.read_only && !matches!(self.support, Support::Unsupported(_))

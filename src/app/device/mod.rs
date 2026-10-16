@@ -12,7 +12,8 @@
 //! Children: [`job`] (the background job), [`scan`] (the live device list), [`pick`] (the tick lists of EXPORT and SYNC MANAGER),
 //! then one per tab / family: [`export`] (EXPORT tab, also called from the browser), [`sync`] (SYNC MANAGER), [`backup`]
 //! (BACKUPS, and the eject that backs up first), [`actions`] (the plugin's buttons, Update Collection, histories, delete / import
-//! from the Devices tree), [`link`] (cue sync between the collection and the device copies of a track).
+//! from the Devices tree), [`link`] (cue sync between the collection and the device copies of a track), [`formats`] (which
+//! library formats a device gets: UNIVERSAL or the ticked ones, and their options).
 //!
 //! `Rc<dyn Library>` cannot leave the UI thread, so a press snapshots the cheap part there ([`Ctx::snapshot`]: the overlaid
 //! tracks, the store's colours / tags / user playlists, the decks' session edits) and the work runs on a worker with a
@@ -25,6 +26,7 @@
 mod actions;
 mod backup;
 mod export;
+mod formats;
 mod job;
 mod link;
 mod pick;
@@ -34,7 +36,8 @@ mod sync;
 pub use link::{track_edited, track_loading};
 
 use super::{
-    ActionItem, App, BackupItem, DeviceItem, DeviceState, FormatItem, PickRow, deck::Decks, toast,
+    ActionItem, App, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow,
+    deck::Decks, toast,
 };
 use openfader::{
     device::{self, Device, export::Written},
@@ -149,16 +152,19 @@ fn record_export(store: &Store, id: &str, r: &ExportReport, text: &mut String) {
     }
 }
 
-/// A device plugin's name as a format chip and in reports: "my-format" → "MY FORMAT".
-fn format_label(plugin: &str) -> String {
-    plugin.replace(['-', '_'], " ").to_uppercase()
+/// The name of format `plugin` in reports: its title on device `dev`, else the plugin name in capitals.
+fn format_label(dev: Option<&Device>, plugin: &str) -> String {
+    dev.map_or_else(
+        || plugin.replace(['-', '_'], " ").to_uppercase(),
+        |d| d.format_title(plugin),
+    )
 }
 
 /// What a multi-format export did, one part per format (labelled when there are several), keeping each written format's
-/// baselines and settings fingerprint for device `id`; `Err` when every format failed.
+/// baselines and settings fingerprint for device `dev`; `Err` when every format failed.
 fn record_all(
     store: &Store,
-    id: Option<&str>,
+    dev: Option<&Device>,
     done: &[Written],
     name: &str,
 ) -> Result<String, String> {
@@ -169,11 +175,11 @@ fn record_all(
                 Ok(r) => report_text(r, name),
                 Err(e) => format!("failed: {e}"),
             };
-            if let (Ok(r), Some(id)) = (r, id) {
-                record_export(store, id, r, &mut text);
+            if let (Ok(r), Some(d)) = (r, dev) {
+                record_export(store, &d.id, r, &mut text);
             }
             if done.len() > 1 {
-                format!("{}: {text}", format_label(plugin))
+                format!("{}: {text}", format_label(dev, plugin))
             } else {
                 text
             }
@@ -297,70 +303,6 @@ impl Ctx {
         p
     }
 
-    /// The formats picked for `d` (its [`Device::default_formats`] until the user picks), in the device's order.
-    fn picked(&self, d: &Device) -> Vec<String> {
-        device_settings::formats(&self.store, &d.id).unwrap_or_else(|| d.default_formats())
-    }
-
-    /// The plugins an export to `d` writes with: the picked formats that can export, the one handling the device first; says
-    /// so when none is on.
-    fn writers(&self, d: &Device) -> Option<Vec<Provider>> {
-        let picked = self.picked(d);
-        let w: Vec<Provider> = d
-            .formats
-            .iter()
-            .filter(|(n, i)| picked.contains(n) && i.features.contains(&Feature::Export))
-            .filter_map(|(n, _)| openfader::plugin::device::provider(n))
-            .collect();
-        if w.is_empty() {
-            self.say(
-                &format!("{}: switch on at least one library format", d.label),
-                true,
-            );
-            return None;
-        }
-        Some(w)
-    }
-
-    /// The FORMATS chips of the chosen device.
-    fn show_formats(&self) {
-        let items = self.current().map_or_else(Vec::new, |d| {
-            let picked = self.picked(&d);
-            d.formats
-                .iter()
-                .filter(|(_, i)| i.features.contains(&Feature::Export))
-                .map(|(n, i)| FormatItem {
-                    label: format_label(n).into(),
-                    held: !i.libraries.is_empty(),
-                    on: picked.contains(n),
-                })
-                .collect()
-        });
-        self.models.formats.set_vec(items);
-    }
-
-    /// Switches the `i`-th chip of [`Self::show_formats`] for the chosen device.
-    fn toggle_format(&self, i: usize) {
-        let Some(d) = self.current() else { return };
-        let Some((name, _)) = d
-            .formats
-            .iter()
-            .filter(|(_, f)| f.features.contains(&Feature::Export))
-            .nth(i)
-        else {
-            return;
-        };
-        let mut picked = self.picked(&d);
-        match picked.iter().position(|p| p == name) {
-            Some(at) => drop(picked.remove(at)),
-            None => picked.push(name.clone()),
-        }
-        if let Err(e) = device_settings::set_formats(&self.store, &d.id, &picked) {
-            self.say(&e, true);
-        }
-        self.show_formats();
-    }
-
     /// Asks `text`; "yes" (button `yes`) runs `then`.
     fn confirm(&self, text: &str, yes: &str, then: impl FnOnce(&Rc<Ctx>) + 'static) {
         *self.ask.borrow_mut() = Some(Box::new(then));
@@ -440,6 +382,12 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     s.set_formats(ModelRc::from(cx.models.formats.clone()));
     let c = cx.clone();
     s.on_format_toggle(move |i| c.toggle_format(i.max(0) as usize));
+    let c = cx.clone();
+    s.on_format_universal(move |on| c.set_universal(on));
+    let c = cx.clone();
+    s.on_format_option(move |i, k, v| {
+        c.set_option(i.max(0) as usize, k.max(0) as usize, v.max(0) as usize)
+    });
     s.set_export_rows(ModelRc::from(cx.export.rows.clone()));
     s.set_sync_rows(ModelRc::from(cx.sync.rows.clone()));
     s.set_backup_dir(

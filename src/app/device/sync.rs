@@ -73,7 +73,7 @@ pub(super) fn run(cx: &Rc<Ctx>, dev: &Device, auto: bool) {
         "Syncing",
         move |ctl| {
             let done = sync::sync(&writers, &snap, &ticked, &dev.mount, &o, &ctl)?;
-            record_all(&store, Some(&dev.id), &done, &dev.label).map(|t| format!("synced: {t}"))
+            record_all(&store, Some(&dev), &done, &dev.label).map(|t| format!("synced: {t}"))
         },
         move |cx, _| cx.relink(&id),
     );

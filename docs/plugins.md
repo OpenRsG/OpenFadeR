@@ -620,7 +620,7 @@ plugin's own settings; `config` the device's settings, key → text):
 
 | `op` | Fields | Answer |
 |---|---|---|
-| `device_probe` | `root` | `{"libraries": ["name", …], "can_write": bool, "features": […], "actions": [{"id", "label", "help", "enabled", "writes"}], "prefetch": [file…], "backup": [folder…], "modified": unix seconds or null}`. `libraries` names what the plugin found on the device (empty: nothing yet, it may still `can_write`). `features`: `export`, `update`, `remove`, `histories`, `backup`, `settings`; the app offers only those. `prefetch`: files (relative to `root`) read once with a progress bar before the library is opened; `backup`: folders a backup copies. |
+| `device_probe` | `root` | `{"libraries": ["name", …], "can_write": bool, "features": […], "actions": [{"id", "label", "help", "enabled", "writes"}], "prefetch": [file…], "backup": [folder…], "modified": unix seconds or null, "title", "about", "options": [field…]}`. `libraries` names what the plugin found on the device (empty: nothing yet, it may still `can_write`). `features`: `export`, `update`, `remove`, `histories`, `backup`, `settings`; the app offers only those. `prefetch`: files (relative to `root`) read once with a progress bar before the library is opened; `backup`: folders a backup copies. `title`: the format's name in the device window (empty: the plugin name); `about`: one line on the software and players, with versions, that read it; `options`: settings fields (`bool` or `choice` only) shown under the format and kept per device, passed in `config`. |
 | `export` | `root`, `snapshot`, `options` (`free`, `config`, `banks`) | `{"tracks", "added", "updated", "playlists", "warnings": […], "notes": […], "baselines": [[key, n]…], "fingerprint"}`: writes the collection (or the playlists the user ticked) to the device: a new library when it has none, else it is extended. Audio and artwork are copied by the plugin. |
 | `update` | `root`, `snapshot`, `baselines` | `{"matched", "unmatched", "edits": [{"key", "rating", "comment", "color", "cues", "grid"}], "baselines": […]}`: "Update Collection": what was edited on the player since `baselines`. The app applies `edits` to its store. |
 | `remove` | `root`, `target`, `delete_tracks`, `config` | `{"tracks", "playlists", "histories", "warnings"}`; `target` is `{"kind": "playlist", "path": [names]}`, `{"kind": "histories", "names": […]}` or `{"kind": "track", "file": path}`. |
@@ -631,9 +631,11 @@ plugin's own settings; `config` the device's settings, key → text):
 | `backup_tracks` | `dir` | `{"tracks": [{"title", "name", "size", "file"}]}`: the tracks the library inside a backup folder lists. |
 
 **Several formats on one device.** Every device plugin is probed for every device. Those that hold a library there or `can_write`
-are its formats; the one holding a library with the most `features` reads it (browse, update, histories). The device window's
-FORMATS chips pick which formats an export or a sync writes. By default these are the ones already on the device, or all of them on
-an empty device, and the choice is kept per device. The formats are written one after the other. The first copies the audio. Each
+are its formats; the one holding a library with the most `features` reads it (browse, update, histories). The DEVICES tab of the
+device window lists them with their `title`, `about` and `options`: UNIVERSAL switches every format on, DEDICATED keeps the ticked
+ones (the EXPORT and SYNC MANAGER tabs show the same as chips). By default these are the ones already on the device, or all of them
+on an empty device, and the choice is kept per device. Each connected device also has a USB icon on the browser's left strip that
+opens this tab on it. The formats are written one after the other. The first copies the audio. Each
 later one gets the snapshot's tracks pointed at the files the first one's library lists, so every format shares one copy. A plugin
 that writes audio should place it with the SDK's `place_audio` (`Contents/<artist>/<album>/<file>`); then the formats agree even
 when the first one reads nothing back.

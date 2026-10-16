@@ -110,7 +110,7 @@ impl Ctx {
                         &o,
                         &ctl,
                     )?;
-                    record_all(&store, Some(&dev.id), &done, &dev.label)?;
+                    record_all(&store, Some(&dev), &done, &dev.label)?;
                 }
                 Ok(if pulled + pushed > 0 {
                     format!(
@@ -218,7 +218,7 @@ impl Ctx {
         self.start(Some(id), "Writing cues", move |ctl| {
             let done =
                 device::export::export(&writers, &d.mount, &Snapshot::of_tracks(tracks), &o, &ctl)?;
-            record_all(&store, Some(&d.id), &done, &d.label)?;
+            record_all(&store, Some(&d), &done, &d.label)?;
             Ok(format!("cues of {n} track(s) written to {}", d.label))
         });
     }

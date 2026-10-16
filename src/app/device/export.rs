@@ -93,16 +93,16 @@ fn start(cx: &Rc<Ctx>) {
         }
     };
     let (o, store) = (cx.options(dev.as_ref()), cx.store.clone());
-    let dev_id = dev.as_ref().map(|d| d.id.clone());
     let name = dev
         .as_ref()
         .map_or_else(|| dest.display().to_string(), |d| d.label.clone());
+    let target = dev.clone();
     cx.start_then(
-        dev_id.clone(),
+        dev.as_ref().map(|d| d.id.clone()),
         "Exporting",
         move |ctl| {
             let done = device::export::export(&writers, &dest, &snap, &o, &ctl)?;
-            record_all(&store, dev_id.as_deref(), &done, &name)
+            record_all(&store, target.as_ref(), &done, &name)
         },
         move |cx, _| {
             refresh(cx, false);

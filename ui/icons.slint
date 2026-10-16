@@ -9,7 +9,7 @@ export enum Icon {
     folder, list, grid, mixer, fx, shuffle, mix-point, video, light, link,
     layout-2h, layout-2v, layout-4h, layout-4v, browse,
     layout-1p, layout-2p, layout-dual, layout-simple, layout-full,
-    eject, star, tag, lock, info, expand, trash, zoom-in, zoom-out, zoom-reset, stems, more,
+    eject, star, tag, lock, info, expand, trash, zoom-in, zoom-out, zoom-reset, stems, more, usb,
 }
 
 /// One icon in `color`, `width`/`height` 16 px by default (the viewbox is 16×16, so a bigger box scales the shape;
@@ -43,6 +43,7 @@ export component Glyph inherits Rectangle {
         if i == Icon.layout-1p { return "M 3 7 H 6 V 10 H 3 Z"; }
         if i == Icon.layout-2p { return "M 2.5 4 H 4.5 V 6 H 2.5 Z M 2.5 10.5 H 4.5 V 12.5 H 2.5 Z"; }
         if i == Icon.more { return "M 9.5 3 A 1.5 1.5 0 1 1 6.5 3 A 1.5 1.5 0 1 1 9.5 3 Z M 9.5 8 A 1.5 1.5 0 1 1 6.5 8 A 1.5 1.5 0 1 1 9.5 8 Z M 9.5 13 A 1.5 1.5 0 1 1 6.5 13 A 1.5 1.5 0 1 1 9.5 13 Z"; }
+        if i == Icon.usb { return "M 6.6 2.6 H 7.6 V 3.6 H 6.6 Z M 8.4 2.6 H 9.4 V 3.6 H 8.4 Z"; }
         return "";
     }
 
@@ -84,6 +85,8 @@ export component Glyph inherits Rectangle {
         if i == Icon.info { return "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 Z M 8 7.5 V 11.5 M 8 4.8 V 5"; }
         if i == Icon.expand { return "M 2 6 V 2 H 6 M 10 2 H 14 V 6 M 14 10 V 14 H 10 M 6 14 H 2 V 10"; }
         if i == Icon.trash { return "M 3 4.5 H 13 M 6 4.5 V 3 H 10 V 4.5 M 4.5 4.5 L 5.2 14 H 10.8 L 11.5 4.5"; }
+        // A USB stick: the plug on top of the body.
+        if i == Icon.usb { return "M 5.5 5 V 1.5 H 10.5 V 5 M 4 5 H 12 V 13.5 A 1.5 1.5 0 0 1 10.5 15 H 5.5 A 1.5 1.5 0 0 1 4 13.5 Z M 6.5 9.5 H 9.5"; }
         // STEM mode: the track as three stacked layers (INST / VOCAL / DRUMS).
         if i == Icon.stems { return "M 8 2 L 14 5 L 8 8 L 2 5 Z M 2 8 L 8 11 L 14 8 M 2 11 L 8 14 L 14 11"; }
         return "";

@@ -1,11 +1,11 @@
 import { Chip, IconButton, Icon, SegmentedChips } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DialogFrame } from "dialog.slint";
-import { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, PickRow } from "device-state.slint";
+import { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow } from "device-state.slint";
 import { DevicesPage } from "device-devices.slint";
 import { ExportPage, SyncPage } from "device-export.slint";
 import { BackupPage } from "device-backup.slint";
-export { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, PickRow }
+export { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow }
 
 /// Toolbar button that opens the device windows; lit while a job writes to a device.
 export component DeviceChip inherits Chip {
@@ -58,8 +58,8 @@ export component DeviceProgress inherits Rectangle {
 component DeviceWindow inherits DialogFrame {
     visible: DeviceState.visible;
     title: "DEVICES";
-    card-width: 760px;
-    card-height: 640px;
+    card-width: 900px;
+    card-height: 780px;
     closed => { DeviceState.visible = false; }
     SegmentedChips {
         options: ["DEVICES", "EXPORT", "SYNC MANAGER", "BACKUPS"];

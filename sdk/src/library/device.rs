@@ -77,6 +77,15 @@ pub struct DeviceInfo {
     pub backup: Vec<String>,
     /// Unix seconds the library was last written, when the plugin can tell.
     pub modified: Option<i64>,
+    /// The name the host shows for this library format ("My Format"); empty: the plugin's name.
+    pub title: String,
+    /// One line on what reads this format (software and players, with their versions), shown under the title.
+    pub about: String,
+    /// How this format is written to this device: one [`FieldKind::Bool`] or [`FieldKind::Choice`] field each (other kinds are
+    /// not shown), drawn under the format in the device window and kept per device. The values reach `export`, `remove` and
+    /// `device_action` in `config` under the field's key (no value stored: the plugin applies the field's `default`), so a key
+    /// should carry the plugin's name.
+    pub options: Vec<Field>,
 }
 
 /// A Cue Bank: the cues of tracks (by audio file) a device can load onto its pads.

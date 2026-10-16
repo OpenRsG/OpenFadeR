@@ -4,19 +4,19 @@ import { DialogFrame, FormRow, Note } from "dialog.slint";
 import { Caption, DeviceState, PickList } from "device-state.slint";
 
 /// The library formats written to the chosen device: one chip per format a plugin can write there (a dot: its library is on
-/// the device already).
+/// the device already). The DEVICES tab shows the same with what reads each format and its options.
 component FormatChips inherits FormRow {
     label: "FORMATS";
     vertical-stretch: 0;
     HorizontalLayout {
         spacing: Theme.space-xs;
         for f[i] in DeviceState.formats: Chip {
-            text: f.held ? f.label + " •" : f.label;
+            text: f.held != "" ? f.title + " •" : f.title;
             min-width: self.fit-width;
             horizontal-stretch: 0;
             active: f.on;
             enabled: !DeviceState.busy;
-            tooltip: f.held ? "Its library is on the device" : "Not on the device yet: an export creates it";
+            tooltip: f.about;
             clicked => { DeviceState.format-toggle(i); }
         }
     }
