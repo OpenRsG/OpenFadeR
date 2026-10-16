@@ -1,31 +1,11 @@
 import { ListView } from "std-widgets.slint";
-import { Glyph, Icon, Splitter } from "widgets.slint";
+import { Glyph, Icon, MenuItem, Splitter } from "widgets.slint";
 import { PaneState } from "panes.slint";
 import { Theme } from "theme.slint";
 import { BrowserState } from "browser-state.slint";
 import { LibraryState } from "library.slint";
 import { DragState } from "dnd.slint";
 import { DeckState } from "deck-state.slint";
-
-component MenuItem inherits Rectangle {
-    in property <string> text;
-    in property <bool> enabled: true;
-    callback activated;
-    height: Theme.h-row;
-    background: ta.has-hover && root.enabled ? Theme.select : transparent;
-    Text {
-        x: Theme.space-lg;
-        width: parent.width - 2 * Theme.space-lg;
-        height: parent.height;
-        text: root.text;
-        vertical-alignment: center;
-        overflow: elide;
-        color: root.enabled ? Theme.text : Theme.text-disabled;
-        font-family: Theme.font;
-        font-size: Theme.font-size;
-    }
-    ta := TouchArea { enabled: root.enabled; clicked => { root.activated(); } }
-}
 
 component HeaderCell inherits Rectangle {
     in property <string> title;

@@ -1,4 +1,5 @@
-import { Chip, Dropdown, TextField, Toggle } from "widgets.slint";
+import { ListView } from "std-widgets.slint";
+import { Chip, Dropdown, Icon, IconButton, MenuItem, TextField, Toggle } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { CatalogState, GetPlugin, RepoBar } from "catalog.slint";
 import { DialogFrame, Note } from "dialog.slint";
@@ -93,6 +94,31 @@ component Badge inherits Rectangle {
     }
 }
 
+/// The ⋮ of a plugin card: open its folder, uninstall it (a bundled plugin stays hidden until it is installed again).
+component CardMenu inherits IconButton {
+    in property <int> index;
+    icon: Icon.more;
+    tooltip: "More";
+    clicked => { pop.show(); }
+    pop := PopupWindow {
+        x: root.width - self.width;
+        y: root.height + 2px;
+        width: 150px;
+        height: 2 * Theme.h-row + 2px;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.radius;
+            VerticalLayout {
+                padding: 1px;
+                MenuItem { text: "Open folder"; activated => { PluginState.open-folder(root.index); pop.close(); } }
+                MenuItem { text: "Uninstall"; activated => { PluginState.remove(root.index); pop.close(); } }
+            }
+        }
+    }
+}
+
 component Card inherits Rectangle {
     in property <PluginView> v;
     in property <int> index;
@@ -144,6 +170,7 @@ component Card inherits Rectangle {
                 font-size: Theme.font-xs;
                 clicked => { PluginState.expand(root.index); }
             }
+            CardMenu { index: root.index; horizontal-stretch: 0; }
         }
         if root.v.open: VerticalLayout {
             spacing: Theme.space-sm;
@@ -170,7 +197,6 @@ component Card inherits Rectangle {
                 alignment: start;
                 Chip { text: "OPEN FOLDER"; width: 100px; font-size: Theme.font-xs; clicked => { PluginState.open-folder(root.index); } }
                 if root.v.homepage != "": Chip { text: "WEB PAGE"; width: 90px; font-size: Theme.font-xs; clicked => { PluginState.homepage(root.index); } }
-                if root.v.removable: Chip { text: "REMOVE"; width: 80px; font-size: Theme.font-xs; active-color: Theme.danger; tooltip: "Delete this plugin's folder"; clicked => { PluginState.remove(root.index); } }
             }
         }
     }
@@ -223,41 +249,42 @@ export component PluginManager inherits VerticalLayout {
     for e in PluginState.errors: Text { text: "⚠ " + e; color: Theme.danger; font-family: Theme.font; font-size: Theme.font-sm; wrap: word-wrap; }
 }
 
-/// A plugin of a repository: what it is, and the one button (INSTALL, UPDATE when the repository has another version than the installed
-/// one, INSTALLED).
-component GetCard inherits Rectangle {
+/// One row of GET PLUGINS: name, version, NATIVE, repository and a one-line description, and the one button (INSTALL, UPDATE when
+/// the repository has another version than the installed one, INSTALLED). Fixed height, so the list only builds the rows on screen.
+component GetRow inherits Rectangle {
     in property <GetPlugin> v;
     in property <int> index;
-    background: Theme.panel;
-    border-radius: Theme.radius-lg;
-    border-width: 1px;
-    border-color: Theme.line;
+    height: 44px;
+    background: Math.mod(root.index, 2) == 0 ? Theme.bg-deep : Theme.row-alt;
     HorizontalLayout {
-        padding: Theme.space-lg;
+        padding-left: Theme.space-lg;
+        padding-right: Theme.space-md;
         spacing: Theme.space-lg;
         VerticalLayout {
             horizontal-stretch: 1;
             min-width: 0px;
-            spacing: 2px;
+            alignment: center;
+            spacing: 1px;
             HorizontalLayout {
                 spacing: Theme.space-md;
                 alignment: start;
-                Text { text: root.v.name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; }
-                if root.v.version != "": Text { text: root.v.action == 1 ? root.v.installed + " → " + root.v.version : root.v.version; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
-                if root.v.native: Badge { text: "NATIVE"; tone: Theme.text-dim; y: 2px; }
+                Text { text: root.v.name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                if root.v.version != "": Text { text: root.v.action == 1 ? root.v.installed + " → " + root.v.version : root.v.version; color: Theme.text-faint; font-size: Theme.font-xs; vertical-alignment: center; }
+                if root.v.native: Badge { text: "NATIVE"; tone: Theme.text-dim; }
+                Text { text: root.v.repo; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; vertical-alignment: center; }
             }
-            Text { text: root.v.description; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; wrap: word-wrap; }
-            Text { text: root.v.repo; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; }
+            Text { text: root.v.description; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; overflow: elide; }
         }
         VerticalLayout {
-            width: 100px;
+            width: 96px;
             horizontal-stretch: 0;
             alignment: center;
             Chip {
                 text: root.v.action == 0 ? "INSTALL" : root.v.action == 1 ? "UPDATE" : "INSTALLED";
                 active: root.v.action != 2;
                 enabled: root.v.action != 2 && !CatalogState.busy;
-                tooltip: root.v.native ? "Downloads the prebuilt library for this computer when the repository has one" : "";
+                font-size: Theme.font-xs;
+                tooltip: root.v.native ? "Downloads the prebuilt library for this computer when the repository has one" : root.v.description;
                 clicked => { CatalogState.install-plugin(root.index); }
             }
         }
@@ -292,7 +319,21 @@ export component GetPlugins inherits VerticalLayout {
             clicked => { CatalogState.install-all-plugins(); }
         }
     }
-    for v[i] in CatalogState.plugins: GetCard { v: v; index: i; }
+    // At most 7 rows high, then it scrolls; a ListView makes only the visible rows, so a long list stays light.
+    if CatalogState.plugins.length > 0: Rectangle {
+        height: Math.min(CatalogState.plugins.length, 7) * 44px + 2px;
+        border-radius: Theme.radius-lg;
+        border-width: 1px;
+        border-color: Theme.line;
+        clip: true;
+        ListView {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            for v[i] in CatalogState.plugins: GetRow { v: v; index: i; }
+        }
+    }
 }
 
 /// The prompt dialog; instantiate once in the window. The dialog exists only while open, so its field takes the focus each time.

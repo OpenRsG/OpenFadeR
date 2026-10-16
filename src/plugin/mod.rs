@@ -274,13 +274,15 @@ impl Registry {
     }
 }
 
-/// The plugin folders read, the switched-off plugins set apart.
+/// The plugin folders read, the uninstalled plugins left out and the switched-off ones set apart.
 fn read_all() -> Registry {
     let mut r = discover(&crate::paths::search_path(
         "OPENFADER_PLUGINS",
         "extension/plugin",
     ));
     let cfg = config::get();
+    r.plugins
+        .retain(|p| !cfg.removed.contains(&p.manifest.name));
     (r.plugins, r.disabled) = r
         .plugins
         .into_iter()
@@ -536,7 +538,11 @@ impl Plugin {
 
 /// The Python interpreter for `*.py` scripts: `python` on Windows, where `python3` is often missing.
 fn python() -> &'static str {
-    if cfg!(windows) { "python" } else { "python3" }
+    if cfg!(windows) {
+        "python"
+    } else {
+        "python3"
+    }
 }
 
 #[cfg(test)]

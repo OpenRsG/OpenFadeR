@@ -89,7 +89,7 @@ fn report(app: &App, text: &str, failed: bool) {
 }
 
 /// Fills `CatalogState` from what was read, and the installed plugins and themes as they are now.
-fn show(app: &App) {
+pub(in crate::app) fn show(app: &App) {
     let s = app.global::<CatalogState>();
     STATE.with_borrow(|st| {
         let repos: Vec<RepoView> = st

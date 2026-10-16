@@ -1,10 +1,10 @@
 //! Installing and removing plugins. A plugin folder, a `.zip` of one (the folder's files at the archive root, or one top
 //! folder holding them) or the `plugin.json` of a folder is copied into the user's plugin folder
 //! ([`user_dir`]: `<config dir>/extension/plugin/<name>/`), replacing an older copy of the same plugin. The copy is
-//! checked as [`super::discover`] would read it before it replaces anything. Only plugins in that folder can be removed;
-//! bundled ones can be switched off ([`super::config`]).
+//! checked as [`super::discover`] would read it before it replaces anything. Uninstalling deletes the user's copy and
+//! lists the name as removed ([`super::config`]), so a copy bundled with the app is not read either until an install.
 
-use super::{Plugin, read_manifest};
+use super::{read_manifest, Plugin};
 use crate::zip::Zip;
 use std::path::{Path, PathBuf};
 
@@ -33,9 +33,11 @@ fn is_zip(path: &Path) -> bool {
         .is_some_and(|e| e.eq_ignore_ascii_case("zip"))
 }
 
-/// Installs the plugin at `from` into [`user_dir`]; returns its name.
+/// Installs the plugin at `from` into [`user_dir`]; returns its name. An uninstalled plugin of that name is back.
 pub fn install(from: &Path) -> Result<String, String> {
-    install_into(from, &user_dir().ok_or("no config folder (set HOME)")?)
+    let name = install_into(from, &user_dir().ok_or("no config folder (set HOME)")?)?;
+    super::config::update(|c| c.removed.retain(|n| *n != name))?;
+    Ok(name)
 }
 
 /// [`install`] into `root`.
@@ -150,20 +152,23 @@ fn unzip(from: &Path, to: &Path) -> Result<(), String> {
         .map_err(|e| format!("{}: {e}", from.display()))
 }
 
-/// Whether `p` was installed by the user (it lives in [`user_dir`]) and so can be removed.
+/// Whether `p` was installed by the user (it lives in [`user_dir`]); a bundled one is hidden by [`uninstall`] instead.
 pub fn removable(p: &Plugin) -> bool {
     user_dir().is_some_and(|u| p.dir.starts_with(u))
 }
 
-/// Deletes an installed plugin's folder.
+/// Uninstalls a plugin: the user's copy is deleted and the name listed as removed, which hides a bundled copy too.
 pub fn uninstall(p: &Plugin) -> Result<(), String> {
-    if !removable(p) {
-        return Err(format!(
-            "{} is bundled with the app: switch it off instead",
-            p.manifest.name
-        ));
+    if removable(p) {
+        crate::paths::at(std::fs::remove_dir_all(&p.dir), &p.dir)?;
     }
-    crate::paths::at(std::fs::remove_dir_all(&p.dir), &p.dir)
+    let name = &p.manifest.name;
+    super::config::update(|c| {
+        if !c.removed.contains(name) {
+            c.removed.push(name.clone());
+            c.removed.sort();
+        }
+    })
 }
 
 #[cfg(test)]
@@ -199,11 +204,9 @@ mod tests {
             install_into(&src.join("plugin.json"), &root).unwrap(),
             "hello"
         );
-        assert!(
-            fs::read_to_string(root.join("hello/plugin.json"))
-                .unwrap()
-                .contains("\"2\"")
-        );
+        assert!(fs::read_to_string(root.join("hello/plugin.json"))
+            .unwrap()
+            .contains("\"2\""));
         assert!(
             !root.join("hello/lib/util.lua").exists(),
             "the old copy is replaced, not merged"
@@ -237,11 +240,9 @@ mod tests {
             crate::zip::write(&[("plugin.json", JSON.into()), ("../../x.lua", b"x".to_vec())]),
         )
         .unwrap();
-        assert!(
-            install_into(&zip, &root)
-                .unwrap_err()
-                .contains("leaves the folder")
-        );
+        assert!(install_into(&zip, &root)
+            .unwrap_err()
+            .contains("leaves the folder"));
         let src = t.join("p");
         fs::create_dir_all(&src).unwrap();
         fs::write(src.join("plugin.json"), JSON).unwrap(); // main.lua is missing

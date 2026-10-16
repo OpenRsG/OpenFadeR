@@ -1,8 +1,9 @@
-//! What the user decided about the plugins, kept in `<config dir>/plugins.json`: the plugins switched off and every
-//! plugin's [`SettingDecl`] values. Read once ([`get`]), written on every change ([`update`]).
+//! What the user decided about the plugins, kept in `<config dir>/plugins.json`: the plugins switched off, the plugins
+//! uninstalled (a bundled copy stays hidden until the plugin is installed again) and every plugin's [`SettingDecl`] values.
+//! Read once ([`get`]), written on every change ([`update`]).
 //!
 //! ```json
-//! {"disabled": ["now-playing"], "settings": {"yt-dlp": {"results": 50}}}
+//! {"disabled": ["now-playing"], "removed": ["mix-log"], "settings": {"yt-dlp": {"results": 50}}}
 //! ```
 
 use super::{Manifest, SettingDecl};
@@ -15,6 +16,9 @@ use std::{path::PathBuf, sync::LazyLock};
 pub struct Config {
     #[serde(default)]
     pub disabled: Vec<String>,
+    /// Uninstalled plugins: no copy of them is read ([`super::install::uninstall`]; an install takes the name out).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<String>,
     /// Plugin name → setting id → value.
     #[serde(default)]
     pub settings: Map<String, Value>,

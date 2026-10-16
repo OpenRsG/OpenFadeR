@@ -158,6 +158,27 @@ export component IconButton inherits Rectangle {
     if root.tooltip != "": Tooltip { width: root.width; height: root.height; text: root.tooltip; hovered: ta.has-hover && !ta.pressed; }
 }
 
+/// One row of a popup menu (the track table's right-click menu, a plugin card's ⋮ menu).
+export component MenuItem inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback activated;
+    height: Theme.h-row;
+    background: ta.has-hover && root.enabled ? Theme.select : transparent;
+    Text {
+        x: Theme.space-lg;
+        width: parent.width - 2 * Theme.space-lg;
+        height: parent.height;
+        text: root.text;
+        vertical-alignment: center;
+        overflow: elide;
+        color: root.enabled ? Theme.text : Theme.text-disabled;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+    }
+    ta := TouchArea { enabled: root.enabled; clicked => { root.activated(); } }
+}
+
 /// Round CUE / PLAY button: a 1.5 px `tone` ring around a disc (ring #FFB937 or
 /// #2DD728, disc #282828, label and glyph white; disabled = 40% ring, darker disc, grey glyph). `lit` tints the disc
 /// with `tone` (CUE lit on the cue point, PLAY lit while playing). Give `icon` or `text`.

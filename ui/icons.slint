@@ -9,7 +9,7 @@ export enum Icon {
     folder, list, grid, mixer, fx, shuffle, mix-point, video, light, link,
     layout-2h, layout-2v, layout-4h, layout-4v, browse,
     layout-1p, layout-2p, layout-dual, layout-simple, layout-full,
-    eject, star, tag, lock, info, expand, trash, zoom-in, zoom-out, zoom-reset, stems,
+    eject, star, tag, lock, info, expand, trash, zoom-in, zoom-out, zoom-reset, stems, more,
 }
 
 /// One icon in `color`, `width`/`height` 16 px by default (the viewbox is 16×16, so a bigger box scales the shape;
@@ -42,6 +42,7 @@ export component Glyph inherits Rectangle {
         if i == Icon.layout-4v { return "M 2.3 0 H 3.5 V 16 H 2.3 Z M 5.7 0 H 6.9 V 16 H 5.7 Z M 9.1 0 H 10.3 V 16 H 9.1 Z M 12.5 0 H 13.7 V 16 H 12.5 Z"; }
         if i == Icon.layout-1p { return "M 3 7 H 6 V 10 H 3 Z"; }
         if i == Icon.layout-2p { return "M 2.5 4 H 4.5 V 6 H 2.5 Z M 2.5 10.5 H 4.5 V 12.5 H 2.5 Z"; }
+        if i == Icon.more { return "M 9.5 3 A 1.5 1.5 0 1 1 6.5 3 A 1.5 1.5 0 1 1 9.5 3 Z M 9.5 8 A 1.5 1.5 0 1 1 6.5 8 A 1.5 1.5 0 1 1 9.5 8 Z M 9.5 13 A 1.5 1.5 0 1 1 6.5 13 A 1.5 1.5 0 1 1 9.5 13 Z"; }
         return "";
     }
 

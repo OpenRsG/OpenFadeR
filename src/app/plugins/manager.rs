@@ -5,8 +5,8 @@
 //! folders read again ([`openfader::plugin::reload`]) and the Plugins menu refreshed.
 
 use super::{refresh_menu, say};
-use crate::app::{App, PluginSettingView, PluginState, PluginView, library};
-use openfader::plugin::{self, Plugin, SettingKind, config, current, install, registry};
+use crate::app::{library, App, PluginSettingView, PluginState, PluginView};
+use openfader::plugin::{self, config, current, install, registry, Plugin, SettingKind};
 use serde_json::Value;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::path::Path;
@@ -180,7 +180,7 @@ pub fn install(app: &App, path: &Path) -> Result<String, String> {
 pub fn installed(app: &App, names: &[String]) -> String {
     reloaded(app);
     let restart = current().restart_needed();
-    format!(
+    let text = format!(
         "plugin{} {} installed{}",
         if names.len() > 1 { "s" } else { "" },
         names.join(", "),
@@ -189,7 +189,10 @@ pub fn installed(app: &App, names: &[String]) -> String {
         } else {
             ""
         }
-    )
+    );
+    app.global::<PluginState>()
+        .set_message(text.as_str().into());
+    text
 }
 
 /// The plugin of card `i`.
@@ -259,10 +262,11 @@ pub(super) fn wire(app: &App) {
         };
         let r = install::uninstall(&p);
         let text = match &r {
-            Ok(()) => format!("plugin {} removed", p.manifest.name),
+            Ok(()) => format!("plugin {} uninstalled", p.manifest.name),
             Err(e) => e.clone(),
         };
         changed(&app, r);
+        crate::app::catalog::show(&app); // GET PLUGINS offers it again
         app.global::<PluginState>()
             .set_message(text.as_str().into());
     });

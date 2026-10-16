@@ -44,11 +44,12 @@ The app reads plugins from
 An entry of that search path is either one plugin folder or a folder of plugin folders; the first plugin of a name wins.
 
 PREFERENCES > EXTENSIONS lists every plugin as a card: a switch to turn it on or off, what it runs on (LUA, PYTHON, PROGRAM or
-JSON), what it brings, its settings (**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`) and **REMOVE** (installed plugins;
-bundled ones can only be switched off), then whatever went wrong while reading the plugins. **RELOAD** reads the folders again
-(after you edit a plugin). Actions, events and settings apply at once; effects, sources, knob and pad modes are part of the
-mixer and the browser from start-up, so a change to those shows a **RESTART NOW** banner. The switches and settings are kept in
-`~/.config/openfader/plugins.json`.
+JSON), what it brings, its settings (**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`), then whatever went wrong while
+reading the plugins. The card's **⋮** menu opens its folder or **uninstalls** it: an installed plugin's folder is deleted, and a
+bundled one is hidden (listed under `removed`) until you install it again, from GET PLUGINS or a drop. **RELOAD** reads the folders
+again (after you edit a plugin). Actions, events and settings apply at once; effects, sources, knob and pad modes are part of the
+mixer and the browser from start-up, so a change to those shows a **RESTART NOW** banner. The switches, the uninstalled plugins and
+the settings are kept in `~/.config/openfader/plugins.json`.
 
 ### Install from a repository
 
