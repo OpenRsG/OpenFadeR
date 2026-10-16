@@ -159,13 +159,16 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: package-?*
+          pattern: package-*
           path: out
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
-          files: out/*
+          # the smoke artifacts (app.log, screenshot.png) are downloaded too: only the archives are release assets
+          files: |
+            out/*.zip
+            out/*.tar.gz
           generate_release_notes: true
           body: |
             Archives (each holds the app with its themes, controller mappings and plugins, ready to run):
