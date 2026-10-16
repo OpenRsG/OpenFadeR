@@ -2,8 +2,9 @@
 //!
 //! * [`Target::Alsa`]: a physical card. The engine opens it as an ALSA PCM (`front:CARD=…`, `sysdefault:CARD=…`,
 //!   `hdmi:CARD=…`), which goes to the hardware and bypasses every sound-server volume, so the card's own **ALSA mixer**
-//!   (the `alsa` crate: `snd_mixer_selem_*`, already in the tree through cpal) is the control that changes what we play.
-//!   The control is the first of [`PREFERRED`] with a playback volume, else any; "Silence" is its minimum step. [observed]
+//!   (the `alsa` crate: `snd_mixer_selem_*`, already in the tree through cpal) is the control that changes what we play
+//!   ([`super::mixer`], Linux only; on Windows and macOS no card has a mixer here and the page shows no slider, see
+//!   `prefs::audio::cards`). The control is the first of its `PREFERRED` list with a playback volume, else any; "Silence" is its minimum step. [observed]
 //!   the A50's USB mixer and the HDA cards expose a dB scale; an HDMI card has no volume control (the monitor owns it),
 //!   which [`read`] reports as `None`, and the page then says so instead of showing a dead slider.
 //! * [`Target::Sink`]: the system default and the sound-server PCMs (`pipewire`, `pulse`, `default`). They play on the
@@ -17,19 +18,27 @@
 //! raw steps linearly.
 
 use super::sys;
-use alsa::Round;
-use alsa::mixer::{MilliBel, Mixer, Selem, SelemChannelId, SelemId};
 
-/// ALSA controls tried in this order for the playback volume.
-const PREFERRED: [&str; 7] = [
-    "Master",
-    "PCM",
-    "Speaker",
-    "Headphone",
-    "Front",
-    "Line Out",
-    "Headset",
-];
+#[cfg(target_os = "linux")]
+use super::mixer;
+
+/// Windows and macOS: no ALSA, so no card has a mixer and every read is `None`.
+#[cfg(not(target_os = "linux"))]
+mod mixer {
+    use super::Level;
+
+    pub fn read(_: &str) -> Option<Level> {
+        None
+    }
+
+    pub fn set_percent(_: &str, _: u32) -> Option<Level> {
+        None
+    }
+
+    pub fn set_muted(_: &str, _: bool) -> Option<Level> {
+        None
+    }
+}
 
 /// What a volume control acts on.
 #[derive(Clone, Debug, PartialEq)]
@@ -89,94 +98,6 @@ pub fn percent_of(db: f32) -> f32 {
     100.0 * 10f32.powf(db / 60.0)
 }
 
-/// The dB range of one ALSA control and the percent <-> dB mapping over it.
-struct Scale {
-    min: f32,
-    max: f32,
-}
-
-impl Scale {
-    /// The dB of 100%.
-    fn top(&self) -> f32 {
-        self.max.min(0.0)
-    }
-
-    fn db(&self, percent: u32) -> f32 {
-        (self.top() + db_of(percent as f32))
-            .max(self.min)
-            .min(self.top())
-    }
-
-    fn percent(&self, db: f32) -> u32 {
-        percent_of(db - self.top()).round().clamp(0.0, 100.0) as u32
-    }
-}
-
-const FRONT: SelemChannelId = SelemChannelId::FrontLeft;
-
-/// The card's playback control (see [`PREFERRED`]) handed to `f`; `None` when the card has no mixer or no such control.
-fn with_selem<R>(card: &str, f: impl FnOnce(&Selem) -> Option<R>) -> Option<R> {
-    let mixer = Mixer::new(&format!("hw:{card}"), false).ok()?;
-    let names: Vec<String> = mixer
-        .iter()
-        .filter_map(Selem::new)
-        .filter(|s| s.has_playback_volume())
-        .filter_map(|s| s.get_id().get_name().ok().map(str::to_owned))
-        .collect();
-    let name = PREFERRED
-        .iter()
-        .find(|p| names.iter().any(|n| n == *p))
-        .map(|p| (*p).to_owned())
-        .or_else(|| names.first().cloned())?;
-    f(&mixer.find_selem(&SelemId::new(&name, 0))?)
-}
-
-/// The scale of `sel` when it has a usable dB scale.
-fn scale(sel: &Selem) -> Option<Scale> {
-    let (lo, hi) = sel.get_playback_db_range();
-    (hi > lo && sel.get_playback_vol_db(FRONT).is_ok()).then(|| Scale {
-        min: lo.to_db(),
-        max: hi.to_db(),
-    })
-}
-
-fn level_of(sel: &Selem) -> Option<Level> {
-    let can_mute = sel.has_playback_switch();
-    let muted = can_mute && sel.get_playback_switch(FRONT).ok() == Some(0);
-    let (percent, db, top_db) = match scale(sel) {
-        Some(s) => {
-            let db = sel.get_playback_vol_db(FRONT).ok()?.to_db();
-            (s.percent(db), Some(db), Some(s.top()))
-        }
-        None => {
-            let (lo, hi) = sel.get_playback_volume_range();
-            let v = sel.get_playback_volume(FRONT).ok()?;
-            let percent = ((v - lo) * 100 + (hi - lo) / 2) / (hi - lo).max(1);
-            (percent.clamp(0, 100) as u32, None, None)
-        }
-    };
-    Some(Level {
-        percent,
-        db,
-        top_db,
-        muted,
-        can_mute,
-    })
-}
-
-fn set_percent_of(sel: &Selem, percent: u32) -> Option<()> {
-    match scale(sel) {
-        Some(s) => sel
-            .set_playback_db_all(MilliBel::from_db(s.db(percent)), Round::Ceil)
-            .ok(),
-        None => {
-            let (lo, hi) = sel.get_playback_volume_range();
-            sel.set_playback_volume_all(lo + ((hi - lo) * percent as i64 + 50) / 100)
-                .ok()
-        }
-    }
-}
-
 fn sink_level() -> Option<Level> {
     let name = sys::default_sink()?;
     let s = sys::sinks().into_iter().find(|s| s.name == name)?;
@@ -192,7 +113,7 @@ fn sink_level() -> Option<Level> {
 /// The current level; `None` = the device has no volume control (or its mixer / the sound server is unreachable).
 pub fn read(t: &Target) -> Option<Level> {
     match t {
-        Target::Alsa(card) => with_selem(card, level_of),
+        Target::Alsa(card) => mixer::read(card),
         Target::Sink => sink_level(),
     }
 }
@@ -201,10 +122,7 @@ pub fn read(t: &Target) -> Option<Level> {
 pub fn set_percent(t: &Target, percent: u32, cur: &Level) -> Option<Level> {
     let percent = percent.min(100);
     match t {
-        Target::Alsa(card) => with_selem(card, |sel| {
-            set_percent_of(sel, percent)?;
-            level_of(sel)
-        }),
+        Target::Alsa(card) => mixer::set_percent(card, percent),
         Target::Sink => {
             sys::pactl(&["set-sink-volume", "@DEFAULT_SINK@", &format!("{percent}%")])?;
             Some(Level {
@@ -219,10 +137,7 @@ pub fn set_percent(t: &Target, percent: u32, cur: &Level) -> Option<Level> {
 /// Mutes or unmutes; returns the new level.
 pub fn set_muted(t: &Target, muted: bool, cur: &Level) -> Option<Level> {
     match t {
-        Target::Alsa(card) => with_selem(card, |sel| {
-            sel.set_playback_switch_all(i32::from(!muted)).ok()?;
-            level_of(sel)
-        }),
+        Target::Alsa(card) => mixer::set_muted(card, muted),
         Target::Sink => {
             sys::pactl(&[
                 "set-sink-mute",
@@ -248,32 +163,6 @@ mod tests {
         assert_eq!(db_of(100.0), 0.0);
         assert!(db_of(0.0).is_infinite());
         assert!((percent_of(-41.94) - 20.0).abs() < 0.01);
-    }
-
-    #[test]
-    fn a_control_reaches_its_minimum_before_zero_and_never_exceeds_100() {
-        // A control from -65 dB to +12 dB: 100% is 0 dB, below ~8% it sits at the minimum.
-        let s = Scale {
-            min: -65.0,
-            max: 12.0,
-        };
-        assert_eq!(s.db(100), 0.0);
-        assert!((s.db(50) - -18.06).abs() < 0.01);
-        assert_eq!((s.db(0), s.db(5)), (-65.0, -65.0));
-        assert_eq!(
-            (s.percent(0.0), s.percent(12.0), s.percent(-65.0)),
-            (100, 100, 8)
-        );
-        assert_eq!(s.percent(s.db(37)), 37);
-        // A control that tops out below 0 dB: its maximum is 100%.
-        let q = Scale {
-            min: -40.0,
-            max: -10.0,
-        };
-        assert_eq!(
-            (q.db(100), q.percent(-10.0), q.percent(-40.0)),
-            (-10.0, 100, 32)
-        );
     }
 
     #[test]

@@ -7,13 +7,14 @@
 //! takes seconds), with its steps in the status bar's loading line ([`loading`]) and a toast when done.
 
 use super::{
-    App, BrowserState, Home, View, loading,
+    loading,
     sidebar::{Entry, SourceRows},
+    App, BrowserState, Home, View,
 };
 use crate::app::{prefs, toast};
 use openfader::{
-    device::{self, Device, plug},
-    library::{self, Library, Playlist, folder::Folder},
+    device::{self, plug, Device},
+    library::{self, folder::Folder, Library, Playlist},
     plugin,
 };
 use slint::ComponentHandle;
@@ -110,7 +111,7 @@ pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
             }),
     );
     // `$XDG_MUSIC_DIR`, else `~/Music`, else home: the whole home holds caches and build trees, read for minutes.
-    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let home = openfader::paths::home();
     let music = std::env::var_os("XDG_MUSIC_DIR")
         .map(PathBuf::from)
         .or_else(|| home.as_ref().map(|h| h.join("Music")))

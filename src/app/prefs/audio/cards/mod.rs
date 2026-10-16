@@ -13,17 +13,17 @@
 mod level;
 mod sync;
 
-use sync::Job;
 pub(super) use sync::sync;
+use sync::Job;
 
 use crate::app::{AudioCard, PrefsState};
 use openfader::audio::{
-    Status,
     device::{
         self,
         card::{Card, Kind},
         volume::{self, Level, Target},
     },
+    Status,
 };
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::{
@@ -115,8 +115,12 @@ pub(super) fn pick(cards: &[Card], key: &str, i: usize) -> Option<String> {
     c.ports.get(i).map(|p| p.name.clone())
 }
 
-/// What a volume control of this card acts on.
+/// What a volume control of this card acts on. Only Linux has one (the ALSA mixer of a card, the sound server's default sink): on
+/// Windows and macOS the card shows [`no_volume`]'s note instead of a slider, the volume stays the system's.
 fn target(c: &Card) -> Option<Target> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
     match c.kind {
         Kind::Default | Kind::Server => Some(Target::Sink),
         Kind::Card if !c.missing => Some(Target::Alsa(c.id.clone())),
@@ -125,6 +129,9 @@ fn target(c: &Card) -> Option<Target> {
 }
 
 fn no_volume(c: &Card) -> &'static str {
+    if !cfg!(target_os = "linux") && !c.missing {
+        return "Volume is the system's: set it in the sound settings of Windows or macOS.";
+    }
     match c.kind {
         _ if c.missing => "Not connected.",
         Kind::Raw => "No volume control for raw ALSA devices.",
@@ -141,7 +148,12 @@ fn details(c: &Card, port: usize, in_use: Option<String>, caps: bool) -> Vec<Str
         return Vec::new();
     };
     let mut d = vec![format!(
-        "ALSA name: {}",
+        "{} name: {}",
+        if cfg!(target_os = "linux") {
+            "ALSA"
+        } else {
+            "Device"
+        },
         if p.name.is_empty() {
             "(the system default)"
         } else {
@@ -152,7 +164,7 @@ fn details(c: &Card, port: usize, in_use: Option<String>, caps: bool) -> Vec<Str
         d.push("Not connected.".to_owned());
         return d;
     }
-    let found = if caps && c.kind != Kind::Raw {
+    let found = if caps && (c.kind != Kind::Raw || !cfg!(target_os = "linux")) {
         device::output_caps(&p.name)
     } else {
         None
@@ -305,7 +317,7 @@ pub(super) fn wire() {
     sync::watch();
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use openfader::audio::device::card::group;

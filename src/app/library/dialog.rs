@@ -2,7 +2,7 @@
 //! zenity) behind their Browse button.
 
 use super::settings;
-use openfader::library::{Track, playlist_file::Format};
+use openfader::library::{playlist_file::Format, Track};
 use std::path::{Path, PathBuf};
 
 /// What the path-entry dialog is asking for.
@@ -120,7 +120,7 @@ impl Ask {
 
 /// The newest file of one of the plugin's `formats` in the Downloads or music folder: where a downloaded collection lands.
 fn downloaded(formats: &[String]) -> Option<String> {
-    let downloads = std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Downloads"));
+    let downloads = openfader::paths::home().map(|h| h.join("Downloads"));
     [downloads, settings::music_dir()]
         .into_iter()
         .flatten()
@@ -136,8 +136,49 @@ fn downloaded(formats: &[String]) -> Option<String> {
         .map(|p| p.display().to_string())
 }
 
-/// A file chooser program on this machine (kdialog or zenity), if any.
+/// Windows: one script for the four picks (`$env:OF_PICK`), the start folder comes in `$env:OF_START` so nothing needs quoting.
+/// The dialogs are children of a topmost form, or they open behind the window.
+const POWERSHELL: &str = r#"
+Add-Type -AssemblyName System.Windows.Forms
+$f = New-Object System.Windows.Forms.Form; $f.TopMost = $true
+$s = $env:OF_START; $dir = ($s -ne '.') -and (Test-Path -PathType Container $s)
+switch ($env:OF_PICK) {
+  'folder' { $d = New-Object System.Windows.Forms.FolderBrowserDialog; if ($dir) { $d.SelectedPath = $s }
+             if ($d.ShowDialog($f) -eq 'OK') { $d.SelectedPath } }
+  'save' { $d = New-Object System.Windows.Forms.SaveFileDialog; $d.OverwritePrompt = $true; if ($dir) { $d.InitialDirectory = $s }
+           if ($d.ShowDialog($f) -eq 'OK') { $d.FileName } }
+  default { $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Multiselect = ($env:OF_PICK -eq 'files'); if ($dir) { $d.InitialDirectory = $s }
+            if ($d.ShowDialog($f) -eq 'OK') { $d.FileNames -join '|' } }
+}
+"#;
+
+/// macOS: the AppleScript of a pick; several files come back joined by `|`.
+fn applescript(pick: Pick, start: &str) -> String {
+    let at = Path::new(start)
+        .is_dir()
+        .then(|| {
+            let q = start.replace('\\', "\\\\").replace('"', "\\\"");
+            format!(" default location (POSIX file \"{q}\")")
+        })
+        .unwrap_or_default();
+    match pick {
+        Pick::Files => format!(
+            "set o to {{}}\nrepeat with f in (choose file with multiple selections allowed{at})\nset end of o to POSIX path of f\nend repeat\nset AppleScript's text item delimiters to \"|\"\no as text"
+        ),
+        Pick::File => format!("POSIX path of (choose file{at})"),
+        Pick::Folder => format!("POSIX path of (choose folder{at})"),
+        Pick::Save => format!("POSIX path of (choose file name{at})"),
+    }
+}
+
+/// A file chooser on this machine, if any: PowerShell's dialogs on Windows, osascript's on macOS, kdialog or zenity on Linux.
 pub fn chooser() -> Option<&'static str> {
+    if cfg!(windows) {
+        return Some("powershell");
+    }
+    if cfg!(target_os = "macos") {
+        return Some("osascript");
+    }
     let on_path = |p: &str| {
         std::env::var_os("PATH")
             .is_some_and(|v| std::env::split_paths(&v).any(|d| d.join(p).is_file()))
@@ -150,27 +191,44 @@ pub fn chooser() -> Option<&'static str> {
 pub fn browse(pick: Pick, start: &str) -> Option<String> {
     let mut cmd = std::process::Command::new(chooser()?);
     let start = if start.is_empty() { "." } else { start };
-    if cmd.get_program() == "kdialog" {
-        match pick {
-            Pick::Files => cmd.args([
-                "--multiple",
-                "--separate-output",
-                "--getopenfilename",
-                start,
-            ]),
-            Pick::File => cmd.args(["--getopenfilename", start]),
-            Pick::Folder => cmd.args(["--getexistingdirectory", start]),
-            Pick::Save => cmd.args(["--getsavefilename", start]),
-        };
-    } else {
-        cmd.arg("--file-selection")
-            .arg(format!("--filename={start}"));
-        match pick {
-            Pick::Files => cmd.args(["--multiple", "--separator=|"]),
-            Pick::File => &mut cmd,
-            Pick::Folder => cmd.arg("--directory"),
-            Pick::Save => cmd.args(["--save", "--confirm-overwrite"]),
-        };
+    match cmd.get_program().to_str() {
+        Some("powershell") => {
+            let pick = match pick {
+                Pick::Files => "files",
+                Pick::File => "file",
+                Pick::Folder => "folder",
+                Pick::Save => "save",
+            };
+            cmd.args(["-NoProfile", "-STA", "-Command", POWERSHELL])
+                .env("OF_PICK", pick)
+                .env("OF_START", start);
+        }
+        Some("osascript") => {
+            cmd.arg("-e").arg(applescript(pick, start));
+        }
+        Some("kdialog") => {
+            match pick {
+                Pick::Files => cmd.args([
+                    "--multiple",
+                    "--separate-output",
+                    "--getopenfilename",
+                    start,
+                ]),
+                Pick::File => cmd.args(["--getopenfilename", start]),
+                Pick::Folder => cmd.args(["--getexistingdirectory", start]),
+                Pick::Save => cmd.args(["--getsavefilename", start]),
+            };
+        }
+        _ => {
+            cmd.arg("--file-selection")
+                .arg(format!("--filename={start}"));
+            match pick {
+                Pick::Files => cmd.args(["--multiple", "--separator=|"]),
+                Pick::File => &mut cmd,
+                Pick::Folder => cmd.arg("--directory"),
+                Pick::Save => cmd.args(["--save", "--confirm-overwrite"]),
+            };
+        }
     }
     let out = cmd.output().ok().filter(|o| o.status.success())?;
     let text = String::from_utf8_lossy(&out.stdout)

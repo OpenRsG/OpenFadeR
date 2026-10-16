@@ -64,7 +64,7 @@ pub fn get() -> Lib {
 pub fn music_dir() -> Option<PathBuf> {
     std::env::var_os("XDG_MUSIC_DIR")
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Music")))
+        .or_else(|| openfader::paths::home().map(|h| h.join("Music")))
 }
 
 /// Folders Auto Relocate searches: the user's list when "User specified folders" is on, else the Music folder.

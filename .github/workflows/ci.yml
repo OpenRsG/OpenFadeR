@@ -1,19 +1,74 @@
 name: CI
 
+# Build, test and run the app on Linux, Windows and macOS (arm64), with the companion repositories checked out in place:
+# the plugins are built and tested, then the built app is started with a private home, left running, screenshotted and closed
+# (.github/smoke.sh). The screenshot and the app's output are uploaded.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux, os: ubuntu-latest }
+          - { name: windows, os: windows-latest }
+          - { name: macos, os: macos-latest }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
+      # Sources, themes and test data are read as LF text: no CRLF conversion on Windows.
+      - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
+      - name: Companions (plugins, themes, mappings)
+        run: |
+          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
+          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
+          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
       - name: System libraries
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libfontconfig1-dev libxkbcommon-dev libwayland-dev libudev-dev pkg-config
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libfontconfig1-dev libxkbcommon-dev libwayland-dev libudev-dev pkg-config \
+            xvfb imagemagick libxkbcommon-x11-0 libgl1 libegl1 libgl1-mesa-dri libxcursor1 libxi6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # The core alone: tests that need the plugins, themes or mappings checkouts skip.
+        with:
+          workspaces: |
+            .
+            extension/plugin
+          key: ${{ matrix.name }}
+      - name: Build the plugins
+        run: extension/plugin/build.sh --quiet
       - run: cargo build --release
       - run: cargo test --release
+      - name: Plugin tests
+        run: cargo test --release --manifest-path extension/plugin/Cargo.toml
+      - name: Smoke test (Linux, under Xvfb)
+        if: matrix.name == 'linux'
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" bash .github/smoke.sh target/release/openfader smoke
+      - name: Smoke test
+        if: matrix.name != 'linux'
+        run: bash .github/smoke.sh target/release/openfader smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ matrix.name }}
+          path: smoke/
+          if-no-files-found: ignore

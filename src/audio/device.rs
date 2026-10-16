@@ -1,8 +1,9 @@
 //! What the OS audio devices offer: names, channel counts, supported sample rates and buffer sizes, for the
 //! Preferences dropdowns. Enumerating hardware can take a while (ALSA opens every PCM), so the answers are cached for
 //! [`TTL`]; the lists are rebuilt after every click of the dialog. Children: [`card`] (the raw cpal names grouped into
-//! cards with named ports), [`volume`] (volume and mute of the device in use), and `sys` (what `pactl`, `/proc/asound`,
-//! udev and the HDA jack controls say, shared by both).
+//! cards with named ports), [`volume`] (volume and mute of the device in use; Linux only, see there), and `sys` (what
+//! `pactl`, `/proc/asound`, udev and the HDA jack controls say, shared by both: nothing on Windows and macOS, whose cpal
+//! hosts list each device by one plain name).
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{SupportedBufferSize, SupportedStreamConfigRange};
@@ -12,6 +13,8 @@ use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
 pub mod card;
+#[cfg(target_os = "linux")]
+mod mixer;
 mod sys;
 pub mod volume;
 
@@ -26,8 +29,14 @@ const TTL: Duration = Duration::from_secs(5);
 
 /// Stop alsa-lib printing to stderr. Listing devices opens every PCM (dmix, dsnoop, OSS, surround maps), and each
 /// one that does not apply prints an `ALSA lib … [error.pcm]` line although cpal handles the failure. Real errors
-/// still reach us as cpal `Result`s.
+/// still reach us as cpal `Result`s. Nothing to do on Windows and macOS.
 pub fn quiet_alsa() {
+    #[cfg(target_os = "linux")]
+    quiet_alsa_lib();
+}
+
+#[cfg(target_os = "linux")]
+fn quiet_alsa_lib() {
     use std::ffi::{c_char, c_int};
     type Handler =
         unsafe extern "C" fn(*const c_char, c_int, *const c_char, c_int, *const c_char, ...);

@@ -2,11 +2,11 @@
 //! ones with their file system, free space and the plugin that handles them ([`scan`]), opening the library on one read-only
 //! ([`open_library`]).
 //!
-//! Detection: `/proc/self/mountinfo` lists every mount; a mount counts as a device when it is under `/run/media` or `/media`
-//! (where udisks and the desktops mount removable media) or when its disk is removable (`/sys/block/<disk>/removable`) or on
-//! USB (its sysfs path runs through a `usb` bus: USB SSDs report not removable), so a stick mounted by hand shows up too. `OPENFADER_DEVICE_ROOTS=<dir>[:<dir>…]` adds
-//! folders as pretend FAT32 sticks (testing). Nothing is spawned except `stat -f` for the free space,
-//! which is cached for a few seconds. What a device holds is not known here: the device plugins answer ([`Device::info`]).
+//! Detection is the OS's own, one child each (`os`): Linux (`linux`) reads `/proc/self/mountinfo` (a mount counts as a device when
+//! it is under `/run/media` or `/media` or its disk is removable or on USB), Windows (`windows`) lists the removable drive
+//! letters, macOS (`macos`) the local volumes below `/Volumes`. `OPENFADER_DEVICE_ROOTS=<dir>[:<dir>…]` adds folders as pretend
+//! FAT32 sticks (testing). Nothing is spawned for the free space (`statvfs` / `GetDiskFreeSpaceExW`), which is cached for a few
+//! seconds. What a device holds is not known here: the device plugins answer ([`Device::info`]).
 //!
 //! Support (players read FAT16/FAT32; exFAT only on some models and HFS+ only from USB, both flagged [`Support::Warn`]; NTFS and
 //! anything else is [`Support::Unsupported`]: use FAT32, or HFS+ on a Mac). SD cards: FAT16/FAT32 only.
@@ -22,10 +22,16 @@ pub mod plug;
 pub mod sync;
 pub mod update;
 
+#[cfg_attr(target_os = "linux", path = "linux.rs")]
+#[cfg_attr(target_os = "macos", path = "macos.rs")]
+#[cfg_attr(windows, path = "windows.rs")]
+mod os;
+
 use crate::library::{self, Library};
 use crate::plugin::{self, device::DeviceInfo};
 use parking_lot::Mutex;
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
@@ -150,6 +156,7 @@ impl Device {
     pub fn summary(&self) -> String {
         let fs = match self.fs.as_str() {
             "vfat" => "FAT32".to_owned(),
+            "msdos" => "FAT".into(),
             "exfat" => "exFAT".into(),
             "hfsplus" => "HFS+".into(),
             "ntfs" | "ntfs3" | "fuseblk" => "NTFS".into(),
@@ -173,148 +180,41 @@ pub fn size(bytes: u64) -> String {
     }
 }
 
-/// One line of `/proc/self/mountinfo` that matters here.
-struct Mount {
-    point: String,
-    fs: String,
-    source: String,
-    ro: bool,
-}
-
-/// `\040` and friends: the kernel escapes space, tab, newline and backslash in mount paths.
-fn unescape(s: &str) -> String {
-    let b = s.as_bytes();
-    let mut out = Vec::with_capacity(b.len());
-    let mut i = 0;
-    while i < b.len() {
-        match (
-            b[i],
-            s.get(i + 1..i + 4)
-                .and_then(|o| u8::from_str_radix(o, 8).ok()),
-        ) {
-            (b'\\', Some(v)) => {
-                out.push(v);
-                i += 4;
-            }
-            (c, _) => {
-                out.push(c);
-                i += 1;
-            }
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
-/// Spec: proc(5) `mountinfo`: `id parent maj:min root point options [optional…] - fstype source super-options`.
-fn parse_mountinfo(text: &str) -> Vec<Mount> {
-    text.lines()
-        .filter_map(|l| {
-            let (left, right) = l.split_once(" - ")?;
-            let f: Vec<&str> = left.split(' ').collect();
-            let r: Vec<&str> = right.split(' ').collect();
-            Some(Mount {
-                point: unescape(f.get(4)?),
-                ro: f.get(5)?.split(',').any(|o| o == "ro"),
-                fs: (*r.first()?).to_owned(),
-                source: unescape(r.get(1)?),
-            })
-        })
-        .collect()
-}
-
-/// Whether the mount is at a place removable media gets mounted.
-fn media_path(p: &str) -> bool {
-    p.starts_with("/run/media/") || p.starts_with("/media/")
-}
-
-/// What sysfs and `/dev/disk/by-uuid` know about a block device.
-trait Sys {
-    /// The disk (`sdb`, `mmcblk0`) behind a partition (`sdb1`, `mmcblk0p1`) with whether the kernel calls it removable.
-    fn disk(&self, part: &str) -> Option<(String, bool)>;
-    fn uuid(&self, part: &str) -> Option<String>;
-}
-
-struct Linux;
-
-impl Sys for Linux {
-    fn disk(&self, part: &str) -> Option<(String, bool)> {
-        let real = std::fs::canonicalize(format!("/sys/class/block/{part}")).ok()?;
-        // A partition lives below its disk's folder; a whole disk is its own folder (it has no `partition` file).
-        let disk = if real.join("partition").exists() {
-            real.parent()?
-        } else {
-            real.as_path()
-        };
-        let removable = std::fs::read_to_string(disk.join("removable"))
-            .is_ok_and(|s| s.trim() == "1")
-            || disk
-                .components()
-                .any(|c| c.as_os_str().to_string_lossy().starts_with("usb"));
-        Some((disk.file_name()?.to_string_lossy().into_owned(), removable))
-    }
-
-    fn uuid(&self, part: &str) -> Option<String> {
-        std::fs::read_dir("/dev/disk/by-uuid")
-            .ok()?
-            .flatten()
-            .find(|e| {
-                std::fs::canonicalize(e.path())
-                    .is_ok_and(|t| t.file_name().is_some_and(|n| n == part))
-            })
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-    }
-}
-
-fn devices_in(mountinfo: &str, sys: &dyn Sys) -> Vec<Device> {
-    let mut out: Vec<Device> = Vec::new();
-    for m in parse_mountinfo(mountinfo) {
-        if out.iter().any(|d| d.mount == Path::new(&m.point)) {
-            continue;
-        }
-        let part = m.source.strip_prefix("/dev/").unwrap_or("");
-        let disk = (!part.is_empty()).then(|| sys.disk(part)).flatten();
-        if !(media_path(&m.point) || disk.as_ref().is_some_and(|d| d.1)) {
-            continue;
-        }
-        let kind = if disk.as_ref().is_some_and(|d| d.0.starts_with("mmcblk")) {
-            Kind::Sd
-        } else {
-            Kind::Usb
-        };
-        let id = sys.uuid(part).unwrap_or_else(|| m.point.clone());
-        let support = Support::of(&m.fs, kind);
-        out.push(Device {
-            source: m.source,
-            read_only: m.ro,
-            ..Device::new(id, m.point.into(), m.fs, kind, support)
-        });
-    }
-    out.sort_by(|a, b| a.mount.cmp(&b.mount));
-    out
-}
-
-/// Space of one mount, looked up at most every [`SPACE_TTL`] (it takes a process).
+/// Space of one mount, looked up at most every [`SPACE_TTL`].
 static SPACE: LazyLock<Mutex<HashMap<PathBuf, (Instant, u64, u64)>>> =
     LazyLock::new(Mutex::default);
 const SPACE_TTL: Duration = Duration::from_secs(5);
 
-/// `(total, free)` bytes of the file system at `path` (`stat -f`: block size, blocks, blocks free to a user); `None` if `stat` is
-/// missing or the path is gone. Cached; [`forget`] after writing.
+/// `(total, free to a user)` bytes of the file system at `path` (`statvfs`: fragment size, blocks, blocks free to a user).
+#[cfg(unix)]
+fn fs_space(path: &Path) -> Option<(u64, u64)> {
+    use std::os::unix::ffi::OsStrExt;
+    let c = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
+    let mut s = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    // SAFETY: `c` is NUL-terminated and `s` is a live out-buffer; it is read only when the call says it was filled.
+    let s = unsafe { (libc::statvfs(c.as_ptr(), s.as_mut_ptr()) == 0).then(|| s.assume_init())? };
+    let unit = s.f_frsize as u64;
+    Some((unit * s.f_blocks as u64, unit * s.f_bavail as u64))
+}
+
+/// `(total, free to the user)` bytes of the volume at `path` (`GetDiskFreeSpaceExW`).
+#[cfg(windows)]
+fn fs_space(path: &Path) -> Option<(u64, u64)> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+    let w: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let (mut avail, mut total, mut free) = (0u64, 0u64, 0u64);
+    // SAFETY: `w` is NUL-terminated and the three out-pointers are live locals.
+    let ok = unsafe { GetDiskFreeSpaceExW(w.as_ptr(), &mut avail, &mut total, &mut free) };
+    (ok != 0).then_some((total, avail))
+}
+
+/// `(total, free)` bytes of the file system at `path`; `None` if the path is gone. Cached; [`forget`] after writing.
 pub fn space(path: &Path) -> Option<(u64, u64)> {
     if let Some(&(_, total, free)) = SPACE.lock().get(path).filter(|e| e.0.elapsed() < SPACE_TTL) {
         return Some((total, free));
     }
-    let out = std::process::Command::new("stat")
-        .args(["-f", "-c", "%S %b %a"])
-        .arg(path)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())?;
-    let n: Vec<u64> = String::from_utf8_lossy(&out.stdout)
-        .split_whitespace()
-        .filter_map(|v| v.parse().ok())
-        .collect();
-    let (total, free) = (n.first()? * n.get(1)?, n.first()? * n.get(2)?);
+    let (total, free) = fs_space(path)?;
     SPACE
         .lock()
         .insert(path.to_owned(), (Instant::now(), total, free));
@@ -351,11 +251,10 @@ pub fn forget(path: &Path) {
 /// The devices mounted right now, by mount path, with file system, space, the plugin that handles them and what it found.
 // ponytail: the app polls this every second and compares ids; udev / udisks D-Bus signals would avoid the poll, but need a bus crate.
 pub fn scan() -> Vec<Device> {
-    let text = std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default();
-    let mut v = devices_in(&text, &Linux);
-    v.extend(pretend_devices(
+    let mut v = os::mounted();
+    v.extend(pretend_devices(OsStr::new(
         &std::env::var("OPENFADER_DEVICE_ROOTS").unwrap_or_default(),
-    ));
+    )));
     for d in &mut v {
         if let Some((total, free)) = space(&d.mount) {
             (d.total, d.free) = (total, free);
@@ -365,16 +264,16 @@ pub fn scan() -> Vec<Device> {
     v
 }
 
-/// `OPENFADER_DEVICE_ROOTS=<dir>[:<dir>…]`: every existing folder listed counts as a mounted FAT32 USB stick (for tests and
-/// demos on a machine without removable media). Never set in normal use; ejecting one runs the real eject commands on the folder.
-fn pretend_devices(roots: &str) -> Vec<Device> {
-    roots
-        .split(':')
-        .filter(|r| Path::new(r).is_dir())
+/// `OPENFADER_DEVICE_ROOTS=<dir>[:<dir>…]` (`;` on Windows): every existing folder listed counts as a mounted FAT32 USB stick
+/// (for tests and demos on a machine without removable media). Never set in normal use; ejecting one runs the real eject
+/// commands on the folder.
+fn pretend_devices(roots: &OsStr) -> Vec<Device> {
+    std::env::split_paths(roots)
+        .filter(|r| r.is_dir())
         .map(|r| {
             Device::new(
-                r.to_owned(),
-                r.into(),
+                r.to_string_lossy().into_owned(),
+                r,
                 "vfat".into(),
                 Kind::Usb,
                 Support::Ok,
@@ -409,74 +308,29 @@ pub fn playlist_path(playlists: &[library::Playlist], id: &str) -> Option<Vec<St
 mod tests {
     use super::*;
 
-    struct Fake;
-
-    impl Sys for Fake {
-        fn disk(&self, part: &str) -> Option<(String, bool)> {
-            match part {
-                "sdb1" => Some(("sdb".into(), true)),
-                "mmcblk0p1" => Some(("mmcblk0".into(), true)),
-                "sda2" => Some(("sda".into(), false)),
-                _ => None,
-            }
-        }
-
-        fn uuid(&self, part: &str) -> Option<String> {
-            (part == "sdb1").then(|| "ABCD-1234".into())
-        }
-    }
-
-    const MOUNTINFO: &str = "\
-24 1 8:2 / / rw,relatime shared:1 - ext4 /dev/sda2 rw
-25 24 0:5 / /proc rw - proc proc rw
-80 24 8:17 / /run/media/dj/MY\\040KEY rw,nosuid,relatime - vfat /dev/sdb1 rw,fmask=0022
-81 24 179:1 / /mnt/card ro,relatime - exfat /dev/mmcblk0p1 ro
-82 24 8:3 / /media/dj/data rw - ntfs3 /dev/sdc1 rw
-83 24 7:0 / /run/media/dj/loop rw - ext4 /dev/loop0 rw
-";
-
     #[test]
-    fn finds_removable_mounts_with_their_file_systems() {
-        let v = devices_in(MOUNTINFO, &Fake);
-        let shape: Vec<_> = v
-            .iter()
-            .map(|d| {
-                (
-                    d.mount.to_str().unwrap(),
-                    d.label.as_str(),
-                    d.fs.as_str(),
-                    d.kind,
-                    d.read_only,
-                )
-            })
-            .collect();
+    fn file_systems_are_judged_by_what_the_players_read() {
         assert_eq!(
-            shape,
-            [
-                ("/media/dj/data", "data", "ntfs3", Kind::Usb, false),
-                ("/mnt/card", "card", "exfat", Kind::Sd, true), // not under /media, but the kernel says removable
-                ("/run/media/dj/MY KEY", "MY KEY", "vfat", Kind::Usb, false),
-                ("/run/media/dj/loop", "loop", "ext4", Kind::Usb, false),
-            ]
-        );
-        assert_eq!(v[2].id, "ABCD-1234");
-        assert_eq!(v[0].id, "/media/dj/data", "no uuid: the mount path");
-        assert!(v[2].writable() && !v[0].writable() && !v[1].writable());
-        assert_eq!(
-            v[1].support,
+            Support::of("exfat", Kind::Sd),
             Support::Unsupported("exFAT on an SD card: players read FAT16 / FAT32 cards only")
         );
         assert_eq!(
             Support::of("exfat", Kind::Usb),
             Support::Warn("exFAT: only some players read it; FAT32 works on all")
         );
-        assert!(Support::of("vfat", Kind::Sd).message().is_none());
+        for fat in ["vfat", "msdos", "fat32"] {
+            assert!(Support::of(fat, Kind::Sd).message().is_none(), "{fat}");
+        }
+        assert!(matches!(
+            Support::of("ntfs", Kind::Usb),
+            Support::Unsupported(_)
+        ));
     }
 
     #[test]
     fn device_roots_make_folders_into_fat32_sticks() {
         let dir = std::env::temp_dir();
-        let spec = format!("{}:/no/such/folder", dir.display());
+        let spec = std::env::join_paths([dir.clone(), "/no/such/folder".into()]).unwrap();
         let v = pretend_devices(&spec);
         assert_eq!(v.len(), 1);
         assert!(v[0].writable() && v[0].fs == "vfat" && v[0].mount == dir);
@@ -488,5 +342,12 @@ mod tests {
             (size(999_000), size(32_000_000), size(15_300_000_000)),
             ("999 kB".into(), "32 MB".into(), "15.3 GB".into())
         );
+    }
+
+    #[test]
+    fn the_space_of_a_folder_is_its_file_systems() {
+        let (total, free) =
+            space(&std::env::temp_dir()).expect("the temp folder has a file system");
+        assert!(total > 0 && free <= total, "{free} of {total}");
     }
 }

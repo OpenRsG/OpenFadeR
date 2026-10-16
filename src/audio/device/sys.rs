@@ -12,7 +12,9 @@
 //!   monitor sits on codec pin 0x5 while PCM 3 (DEV=0) is the first HDMI PCM, so the ELD files cannot be
 //!   matched to a DEV by position, the jack control carries the PCM number itself).
 //!
-//! Everything is read with a plain process / file read; a missing tool or file just leaves its facts out.
+//! Everything is read with a plain process / file read; a missing tool or file just leaves its facts out. All of it is Linux's:
+//! on Windows and macOS [`facts`] is empty (cpal names each device plainly there) and the parsers below are unused.
+#![cfg_attr(not(target_os = "linux"), allow(dead_code))]
 
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -153,6 +155,7 @@ pub fn hdmi_index(info: &str) -> Option<u32> {
 }
 
 /// Connection state of every HDMI / DisplayPort PCM of card `num`: `(DEV n, connected)`.
+#[cfg(target_os = "linux")]
 fn hdmi_plugged(num: u32) -> Vec<(u32, bool)> {
     let Ok(dir) = std::fs::read_dir(format!("/proc/asound/card{num}")) else {
         return Vec::new();
@@ -180,6 +183,12 @@ fn hdmi_plugged(num: u32) -> Vec<(u32, bool)> {
         .collect()
 }
 
+#[cfg(not(target_os = "linux"))]
+fn read_facts() -> Facts {
+    Facts::default()
+}
+
+#[cfg(target_os = "linux")]
 fn read_facts() -> Facts {
     let mut cards = std::fs::read_to_string("/proc/asound/cards")
         .map_or_else(|_| Vec::new(), |t| parse_cards(&t));

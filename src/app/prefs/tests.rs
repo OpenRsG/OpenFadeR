@@ -2,7 +2,7 @@ use super::dialog::PAGES;
 use super::file::{load_from, path_from, save_to};
 use super::live::update_with;
 use super::*;
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 #[test]
 fn round_trips_every_field_and_keeps_unknown_keys() {
@@ -143,11 +143,6 @@ fn save_and_load_use_the_file() {
     save_to(&file, &p).unwrap();
     assert_eq!(load_from(&file), (p, vec![]));
     std::fs::remove_dir_all(&dir).unwrap();
-    let home = |k: &str| (k == "HOME").then(|| "/h".to_string());
-    assert_eq!(
-        path_from(home),
-        Some(PathBuf::from("/h/.config/openfader/settings.conf"))
-    );
     assert_eq!(
         path_from(|k| Some(String::new()).filter(|_| k != "HOME")),
         None

@@ -1,3 +1,6 @@
+// A windowed program on Windows: no console behind the window (output still goes where the launcher redirected it).
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 mod app;
 
 use std::path::PathBuf;

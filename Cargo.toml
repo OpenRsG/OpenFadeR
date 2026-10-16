@@ -16,7 +16,6 @@ required-features = ["app"]
 rusqlite = { version = "0.40", features = ["bundled"] }
 symphonia = { version = "0.5.5", default-features = false, features = ["mp3", "aac", "isomp4", "flac", "wav", "aiff", "pcm"] }
 cpal = "0.15"
-alsa = "0.9" # the mixer of the card we open (src/audio/device/volume.rs); already in the tree through cpal
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 parking_lot = "0.12"
 # winit access: files dropped on the window (X11 / Windows / macOS) and the Wayland display for our own drag-and-drop (src/app/drop/).
@@ -32,11 +31,21 @@ openfader-plugin = { path = "sdk", features = ["library"] } # the plugin ABIs (e
 mlua = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"] } # Lua plugins, run in-process (src/plugin/lua.rs)
 openfader-ui = { path = "ui", optional = true } # the Slint UI, built as its own crate
 
-# Drag-and-drop of files onto the window under Wayland, where winit 0.30 has none (src/app/drop/wayland.rs): a data device on
-# winit's own connection. Both are already in the tree through winit.
+# Linux only: the mixer of the card we open (src/audio/device/mixer.rs, already in the tree through cpal), and drag-and-drop of
+# files onto the window under Wayland, where winit 0.30 has none (src/app/drop/wayland.rs): a data device on winit's own connection.
+# All of them are already in the tree through winit / cpal.
 [target.'cfg(target_os = "linux")'.dependencies]
+alsa = "0.9"
 wayland-client = { version = "0.31", optional = true }
 wayland-backend = { version = "0.3", optional = true, features = ["client_system"] }
+
+# Free space of a mount (statvfs), the macOS volume list (getfsstat) and the background priority of the analysis threads.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# Removable drives (GetDriveTypeW...), ejecting them (DeviceIoControl) and the analysis threads' priority.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_Threading"] }
 
 # Shipping build: cross-crate optimisation and no symbol table. Keep the everyday release build's symbols for backtraces,
 # and avoid its LTO relink cost during iteration. Ship libwebgpu_dawn.so alongside either binary for GPU STEMS.

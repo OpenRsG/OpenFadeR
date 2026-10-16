@@ -116,8 +116,16 @@ struct Parsed<'a> {
     dev: Option<u32>,
 }
 
-/// `plugin:CARD=id,DEV=n`, or the positional `plugin:id,n` of `hw:0,0`.
+/// `plugin:CARD=id,DEV=n`, or the positional `plugin:id,n` of `hw:0,0`. Only ALSA names have that shape: the WASAPI and CoreAudio
+/// hosts name a device by plain text ("Speakers (Realtek Audio)"), which belongs to no card.
 fn parse(name: &str) -> Parsed<'_> {
+    if !ALSA {
+        return Parsed {
+            plugin: name,
+            card: None,
+            dev: None,
+        };
+    }
     let (plugin, args) = name.split_once(':').unwrap_or((name, ""));
     let (mut card, mut dev) = (None, None);
     if args.contains('=') {
@@ -192,8 +200,19 @@ const SERVER: [(&str, &str); 3] = [
     ("default", "ALSA default"),
 ];
 
+/// The names cpal lists are ALSA's (Linux); on Windows and macOS every name is a plain device, all of them shown.
+const ALSA: bool = cfg!(target_os = "linux");
+
 fn raw_card() -> Card {
-    blank(Kind::Raw, "", "Raw ALSA devices")
+    blank(
+        Kind::Raw,
+        "",
+        if ALSA {
+            "Raw ALSA devices"
+        } else {
+            "Audio devices"
+        },
+    )
 }
 
 fn blank(kind: Kind, id: &str, title: &str) -> Card {
@@ -222,7 +241,7 @@ pub fn group(names: &[String], show_all: bool, saved: &str) -> Vec<Card> {
             server.ports.push(Port::plain(label, key));
         }
     }
-    let wanted = |n: &str| show_all || (!saved.is_empty() && n == saved);
+    let wanted = |n: &str| !ALSA || show_all || (!saved.is_empty() && n == saved);
     for n in names {
         if SERVER.iter().any(|(k, _)| k == n) {
             continue;
@@ -394,7 +413,7 @@ pub fn choices(cards: &[Card]) -> Vec<(String, String)> {
     out
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use crate::audio::device::sys::{Sink, SysCard};
@@ -634,10 +653,9 @@ mod tests {
         );
         // A card-less hidden name (a rate converter) goes to the raw card.
         let g = group(&machine(), false, "lavrate");
-        assert!(
-            g.last()
-                .is_some_and(|c| c.kind == Kind::Raw && c.find("lavrate").is_some() && !c.missing)
-        );
+        assert!(g
+            .last()
+            .is_some_and(|c| c.kind == Kind::Raw && c.find("lavrate").is_some() && !c.missing));
         // The empty name is the System default card.
         assert_eq!(group(&machine(), false, "")[0].find(""), Some(0));
     }
@@ -747,7 +765,7 @@ mod tests {
             .collect();
         let mut f = facts();
         f.cards.retain(|c| c.id != "Generic"); // machine() has no names for it
-        // Never seen before: only the card's own default stands in for it.
+                                               // Never seen before: only the card's own default stands in for it.
         assert_eq!(unlisted(&listed, &[], &f), ["sysdefault:CARD=A50"]);
         assert!(
             unlisted(&machine(), &machine(), &f).is_empty(),

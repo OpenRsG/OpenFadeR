@@ -3673,6 +3673,7 @@ dependencies = [
  "chrono",
  "cpal",
  "flate2",
+ "libc",
  "libloading 0.8.9",
  "midir",
  "mlua",
@@ -3688,6 +3689,7 @@ dependencies = [
  "ureq",
  "wayland-backend",
  "wayland-client",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -11,7 +11,7 @@
 //! A file setting (a picture) is a copy under `<data dir>/device-files/<scope>/<key>.<ext>` ([`import_file`]); its row holds
 //! that path.
 
-use super::{R, Store, query_all};
+use super::{query_all, Store, R};
 use crate::paths;
 use rusqlite::params;
 use std::{
@@ -230,7 +230,15 @@ impl Behaviour {
         if !self.computer_name.is_empty() {
             return self.computer_name.clone();
         }
+        // `/proc` is Linux's; Windows and macOS both ship a `hostname` program.
         std::fs::read_to_string("/proc/sys/kernel/hostname")
+            .ok()
+            .or_else(|| {
+                let out = std::process::Command::new("hostname").output().ok()?;
+                out.status
+                    .success()
+                    .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+            })
             .map(|h| h.trim().to_owned())
             .unwrap_or_default()
     }

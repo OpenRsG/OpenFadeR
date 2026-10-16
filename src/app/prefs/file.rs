@@ -1,21 +1,18 @@
-//! The settings file: `$XDG_CONFIG_HOME/openfader/settings.conf`, else `~/.config/openfader/settings.conf`;
+//! The settings file: `settings.conf` in the config folder ([`openfader::paths::config_dir`]);
 //! atomic writes (temp file + rename); a missing file is all defaults, bad lines are reported on stderr.
 
 use super::Prefs;
+use openfader::paths::{base_from, Base};
 use std::{
     io,
     path::{Path, PathBuf},
 };
 
 pub(super) fn path_from(get: impl Fn(&str) -> Option<String>) -> Option<PathBuf> {
-    let get = |k: &str| get(k).filter(|v| !v.is_empty());
-    let dir = get("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| get("HOME").map(|h| Path::new(&h).join(".config")))?;
-    Some(dir.join("openfader").join("settings.conf"))
+    Some(base_from(Base::Config, get)?.join("settings.conf"))
 }
 
-/// `$XDG_CONFIG_HOME/openfader/settings.conf`, else `~/.config/openfader/settings.conf`.
+/// `settings.conf` in the config folder.
 pub fn path() -> Option<PathBuf> {
     path_from(|k| std::env::var(k).ok())
 }

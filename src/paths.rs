@@ -3,12 +3,21 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
+/// The user's home folder: `$HOME`, else `%USERPROFILE%` (Windows); empty values count as unset.
+pub fn home() -> Option<PathBuf> {
+    env_path("HOME").or_else(|| env_path("USERPROFILE"))
+}
+
 fn dir_from(env_var: &str, get: impl Fn(&str) -> Option<String>) -> Option<PathBuf> {
     let get = |k: &str| get(k).filter(|v| !v.is_empty());
     get(env_var)
         .or_else(|| get("XDG_MUSIC_DIR"))
         .map(PathBuf::from)
-        .or_else(|| get("HOME").map(|h| Path::new(&h).join("Music").join("OpenFadeR")))
+        .or_else(|| {
+            get("HOME")
+                .or_else(|| get("USERPROFILE"))
+                .map(|h| Path::new(&h).join("Music").join("OpenFadeR"))
+        })
 }
 
 /// Output directory: `$env_var`, else `$XDG_MUSIC_DIR`, else `~/Music/OpenFadeR` (empty values count as unset).
@@ -40,7 +49,11 @@ pub fn file_stem(title: &str, max: usize) -> String {
         })
         .collect();
     let s: String = s.trim().chars().take(max).collect();
-    if s.is_empty() { "track".into() } else { s }
+    if s.is_empty() {
+        "track".into()
+    } else {
+        s
+    }
 }
 
 /// Whether `path` ends in one of `exts` (ASCII case-insensitive, no dot).
@@ -65,27 +78,79 @@ pub fn capture_dir(setting: &str, env_var: &str, sub: &str) -> Option<PathBuf> {
     env_path(env_var).or_else(|| output_dir(env_var).map(|b| b.join(sub)))
 }
 
-/// `$XDG_DATA_HOME/openfader` (else `~/.local/share/openfader`): where our own persistent store lives
-/// (`store.db`, see [`crate::store`]); `None` when neither variable is set. Empty values count as unset.
+/// Which of the per-user folders [`base_from`] means.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Base {
+    /// Settings and user files.
+    Config,
+    /// Our own persistent data (the store, downloaded plugins).
+    Data,
+    /// What can be rebuilt (analysis, stems, models).
+    Cache,
+}
+
+/// `<per-user folder>/openfader` of `base`, by each OS's convention: `$XDG_*_HOME` where set (on any OS: it is also how tests and
+/// portable setups point elsewhere), else Linux `~/.config`, `~/.local/share`, `~/.cache`; macOS `~/Library/Application Support`
+/// (config and data) and `~/Library/Caches`; Windows `%APPDATA%` (config), `%LOCALAPPDATA%` (data) and
+/// `%LOCALAPPDATA%\openfader\cache`. `None` when the variables it needs are unset; `get` reads them (empty counts as unset).
+pub fn base_from(base: Base, get: impl Fn(&str) -> Option<String>) -> Option<PathBuf> {
+    let var = |k: &str| get(k).filter(|v| !v.is_empty()).map(PathBuf::from);
+    let (xdg, linux, windows, mac) = match base {
+        Base::Config => (
+            "XDG_CONFIG_HOME",
+            ".config",
+            "APPDATA",
+            "Library/Application Support",
+        ),
+        Base::Data => (
+            "XDG_DATA_HOME",
+            ".local/share",
+            "LOCALAPPDATA",
+            "Library/Application Support",
+        ),
+        Base::Cache => ("XDG_CACHE_HOME", ".cache", "LOCALAPPDATA", "Library/Caches"),
+    };
+    if let Some(x) = var(xdg) {
+        return Some(x.join("openfader"));
+    }
+    if cfg!(windows) {
+        let d = var(windows)?.join("openfader");
+        return Some(if base == Base::Cache {
+            d.join("cache")
+        } else {
+            d
+        });
+    }
+    let sub = if cfg!(target_os = "macos") {
+        mac
+    } else {
+        linux
+    };
+    Some(var("HOME")?.join(sub).join("openfader"))
+}
+
+fn base(b: Base) -> Option<PathBuf> {
+    base_from(b, |k| std::env::var(k).ok())
+}
+
+/// Where our own persistent store lives (`store.db`, see [`crate::store`]); see [`base_from`].
 pub fn data_dir() -> Option<PathBuf> {
-    Some(
-        env_path("XDG_DATA_HOME")
-            .or_else(|| env_path("HOME").map(|h| h.join(".local").join("share")))?
-            .join("openfader"),
-    )
+    base(Base::Data)
 }
 
-/// `$XDG_CONFIG_HOME/openfader` (else `~/.config/openfader`): settings and user files (lighting fixtures); `None` when neither variable is set.
+/// Settings and user files (lighting fixtures); see [`base_from`].
 pub fn config_dir() -> Option<PathBuf> {
-    Some(
-        env_path("XDG_CONFIG_HOME")
-            .or_else(|| env_path("HOME").map(|h| h.join(".config")))?
-            .join("openfader"),
-    )
+    base(Base::Config)
 }
 
-/// Folders to look for user add-ons in: each entry of `$env_var` (`:`-separated), then `<config_dir>/<sub>`, then the
-/// bundled `<sub>` next to the executable or in a folder above it (so `target/release/openfader` finds the repository's).
+/// The parent of every cache folder (analysis, stems, models); see [`base_from`].
+pub fn cache_dir() -> Option<PathBuf> {
+    base(Base::Cache)
+}
+
+/// Folders to look for user add-ons in: each entry of `$env_var` (a path list: `:`-separated, `;` on Windows), then
+/// `<config_dir>/<sub>`, then the bundled `<sub>` next to the executable, in a `Resources` folder beside it (a macOS app
+/// bundle's `Contents/Resources`), or in a folder above it (so `target/release/openfader` finds the repository's).
 /// Used by plugins (`extension/plugin`), skins (`extension/skin`) and mappings; folders that do not exist are kept
 /// (callers skip them).
 pub fn search_path(env_var: &str, sub: &str) -> Vec<PathBuf> {
@@ -94,7 +159,7 @@ pub fn search_path(env_var: &str, sub: &str) -> Vec<PathBuf> {
     let bundled = exe
         .iter()
         .flat_map(|e| e.ancestors().skip(1))
-        .map(|d| d.join(sub))
+        .flat_map(|d| [d.join(sub), d.join("Resources").join(sub)])
         .find(|d| d.is_dir());
     let mut dirs: Vec<PathBuf> = Vec::new();
     let all = std::env::split_paths(&env)
@@ -152,6 +217,43 @@ mod tests {
             Some(PathBuf::from("/h/Music/OpenFadeR"))
         );
         assert_eq!(dir_from("X_DIR", env(&[])), None);
+    }
+
+    #[test]
+    fn per_user_folders_follow_each_os() {
+        let env = |pairs: &'static [(&str, &str)]| {
+            move |k: &str| pairs.iter().find(|p| p.0 == k).map(|p| p.1.to_string())
+        };
+        let all = &[
+            ("HOME", "/h"),
+            ("APPDATA", "/a"),
+            ("LOCALAPPDATA", "/l"),
+            ("XDG_CACHE_HOME", "/x"),
+        ];
+        assert_eq!(
+            base_from(Base::Cache, env(all)),
+            Some(PathBuf::from("/x/openfader")),
+            "XDG wins on every OS"
+        );
+        let got =
+            [Base::Config, Base::Data, Base::Cache].map(|b| base_from(b, env(&all[..3])).unwrap());
+        let want: [&str; 3] = if cfg!(windows) {
+            ["/a/openfader", "/l/openfader", "/l/openfader/cache"]
+        } else if cfg!(target_os = "macos") {
+            [
+                "/h/Library/Application Support/openfader",
+                "/h/Library/Application Support/openfader",
+                "/h/Library/Caches/openfader",
+            ]
+        } else {
+            [
+                "/h/.config/openfader",
+                "/h/.local/share/openfader",
+                "/h/.cache/openfader",
+            ]
+        };
+        assert_eq!(got, want.map(PathBuf::from));
+        assert_eq!(base_from(Base::Data, env(&[])), None);
     }
 
     #[test]

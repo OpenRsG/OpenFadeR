@@ -3,22 +3,21 @@
 //! stores cues ([`super::cue`]) and Key Analysis writes the key into the file's tag. Everything here
 //! runs off the UI thread; results go back over a channel.
 
-use super::{Outcome, store_cues, summary};
+use super::{store_cues, summary, Outcome};
 use openfader::{
     analysis::{
-        Analysis, Beat, Phrases, auto,
+        auto,
         cache::{self, Source},
         options::Options,
-        tag,
+        tag, Analysis, Beat, Phrases,
     },
     store::Store,
 };
 use std::{
     path::PathBuf,
     sync::{
-        Arc,
         atomic::{AtomicUsize, Ordering},
-        mpsc,
+        mpsc, Arc,
     },
 };
 
@@ -96,8 +95,8 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
     }
 }
 
-/// Lowers the calling thread's priority (nice 19). Linux only: niceness is per thread there; elsewhere nothing happens
-/// (ponytail: no Windows / macOS priority classes, this build targets Linux).
+/// Lowers the calling thread's priority: nice 19 on Linux (niceness is per thread there), the background QoS class on macOS, the
+/// lowest thread priority on Windows.
 fn lower_priority() {
     #[cfg(target_os = "linux")]
     {
@@ -106,6 +105,19 @@ fn lower_priority() {
         }
         // PRIO_PROCESS = 0 with who = 0 is the calling thread on Linux.
         unsafe { setpriority(0, 0, 19) };
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // SAFETY: acts on the calling thread only.
+        unsafe { libc::pthread_set_qos_class_self_np(libc::qos_class_t::QOS_CLASS_BACKGROUND, 0) };
+    }
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::System::Threading::{
+            GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_LOWEST,
+        };
+        // SAFETY: acts on the calling thread only.
+        unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_LOWEST) };
     }
 }
 
@@ -151,7 +163,7 @@ pub fn spawn(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openfader::analysis::{Mood, Phrase, PhraseKind, auto::CueOptions};
+    use openfader::analysis::{auto::CueOptions, Mood, Phrase, PhraseKind};
 
     fn beats() -> Vec<Beat> {
         (0..256)
@@ -323,17 +335,15 @@ mod tests {
         let path = file.to_str().unwrap();
         let before = std::fs::read(&file).unwrap();
         // off: the file is never touched
-        assert!(
-            finish(
-                &job(path, Guide::default()),
-                &analysed(),
-                src(),
-                &settings(false),
-                &store
-            )
-            .tag
-            .is_none()
-        );
+        assert!(finish(
+            &job(path, Guide::default()),
+            &analysed(),
+            src(),
+            &settings(false),
+            &store
+        )
+        .tag
+        .is_none());
         assert_eq!(std::fs::read(&file).unwrap(), before);
         // on: the key in the user's spelling
         let out = finish(
@@ -352,11 +362,9 @@ mod tests {
             key: Some("9B".into()),
             ..analysed()
         };
-        assert!(
-            finish(&j, &analysed_9b, src(), &settings(true), &store)
-                .tag
-                .is_none()
-        );
+        assert!(finish(&j, &analysed_9b, src(), &settings(true), &store)
+            .tag
+            .is_none());
         j.explicit = true;
         assert_eq!(
             finish(&j, &analysed_9b, src(), &settings(true), &store).tag,
@@ -368,17 +376,15 @@ mod tests {
             key: None,
             ..analysed()
         };
-        assert!(
-            finish(
-                &job(path, Guide::default()),
-                &no_key,
-                src(),
-                &settings(true),
-                &store
-            )
-            .tag
-            .is_none()
-        );
+        assert!(finish(
+            &job(path, Guide::default()),
+            &no_key,
+            src(),
+            &settings(true),
+            &store
+        )
+        .tag
+        .is_none());
         // an unsupported file is refused, not damaged
         let m4a = dir.join("a.m4a");
         std::fs::write(&m4a, b"x").unwrap();

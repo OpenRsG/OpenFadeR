@@ -1,6 +1,6 @@
 //! Persistent cache of our own [`analyze`] results (beats, key, 3-band waveforms) so a track is analysed once.
-//! One file per audio file: `$XDG_CACHE_HOME/openfader/analysis/<hash of path + size + mtime>.bin` (default
-//! `~/.cache/…`). Changing the audio file changes the name, so a stale entry is never found.
+//! One file per audio file: `<cache folder>/analysis/<hash of path + size + mtime>.bin` (the cache folder is
+//! [`crate::paths::cache_dir`]). Changing the audio file changes the name, so a stale entry is never found.
 //!
 //! Own format, little-endian: `"RKAC"`, `version u32`, `profile u64` (what the result was
 //! made with, [`Profile`]), `key_len u8` + key text (0 = none), then counted tables: beats (`bar_pos u16, bpm_x100 u16,
@@ -9,9 +9,9 @@
 //! recomputes over; it is never trusted. A result whose profile does not cover the current options is recomputed.
 
 use super::{
-    Analysis, Beat,
     detect::VocalRegion,
     options::{self, Options, Profile},
+    Analysis, Beat,
 };
 use crate::paths::at;
 use std::path::{Path, PathBuf};
@@ -20,18 +20,9 @@ const MAGIC: &[u8; 4] = b"RKAC";
 /// Bump when the layout or the detectors change enough that old results should be recomputed.
 const VERSION: u32 = 3;
 
-/// `$XDG_CACHE_HOME/openfader` (else `$HOME/.cache/…`): the parent of every cache folder (analysis, stems, models); `None` when neither variable is set.
+/// [`crate::paths::cache_dir`]: the parent of every cache folder (analysis, stems, models).
 pub fn root() -> Option<PathBuf> {
-    let var = |k| {
-        std::env::var_os(k)
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-    };
-    Some(
-        var("XDG_CACHE_HOME")
-            .or_else(|| var("HOME").map(|h| h.join(".cache")))?
-            .join("openfader"),
-    )
+    crate::paths::cache_dir()
 }
 
 /// `<root>/analysis`.
