@@ -126,6 +126,7 @@ mod tests {
         let e = store.edits("a|1").unwrap();
         assert_eq!((e.rating, e.comment.as_deref()), (Some(4), Some("hi")));
         assert_eq!(store.device_sigs("dev").unwrap().get("a|1"), Some(&7));
+        drop(store); // Windows cannot delete a database that is still open
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

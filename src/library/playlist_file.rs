@@ -7,7 +7,7 @@
 //!   `OPENFADER_PATH_MAP` like XML locations.
 //! * Text export: tab-separated, one header row.
 
-use super::{PathMap, Track, location, path_map_from_env, remap_path};
+use super::{location, path_map_from_env, remap_path, PathMap, Track};
 use crate::paths::at;
 use std::path::{Path, PathBuf};
 
@@ -119,7 +119,11 @@ fn display_name(t: &Track) -> String {
 
 /// Track length for `#EXTINF` / `LengthN`: whole seconds, -1 when unknown.
 fn extinf_seconds(t: &Track) -> i64 {
-    if t.length_s > 0 { t.length_s } else { -1 }
+    if t.length_s > 0 {
+        t.length_s
+    } else {
+        -1
+    }
 }
 
 /// `#EXTM3U` playlist (UTF-8, absolute audio paths) of the tracks that have a file, and how many that is.
@@ -268,13 +272,10 @@ mod tests {
             assert_eq!(write(&p, &tracks, format).unwrap(), 2);
             assert!(write(&p, &tracks, format).is_err());
             let back = read(&p).unwrap();
-            assert_eq!(
-                (back.name.as_str(), back.files),
-                (
-                    "list",
-                    vec![PathBuf::from("/m/one.mp3"), PathBuf::from("/m/two.flac")]
-                )
-            );
+            // On Windows a root without a drive takes the playlist folder's drive: compare the tails.
+            assert_eq!(back.name, "list");
+            assert_eq!(back.files.len(), 2);
+            assert!(back.files[0].ends_with("m/one.mp3") && back.files[1].ends_with("m/two.flac"));
         }
         let (txt, n) = text(&tracks);
         assert_eq!((n, txt.lines().count()), (3, 4));

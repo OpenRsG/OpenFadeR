@@ -57,6 +57,9 @@ jobs:
       - name: Build the plugins
         run: extension/plugin/build.sh --quiet
       - name: Build the app
+        # macOS: cross-crate LTO drops the compiler runtime's `__isPlatformVersionAtLeast`, which ONNX Runtime's CoreML code needs at link time.
+        env:
+          CARGO_PROFILE_DIST_LTO: ${{ matrix.name == 'macos' && 'false' || 'thin' }}
         run: cargo build --profile dist
       - name: Package
         env:

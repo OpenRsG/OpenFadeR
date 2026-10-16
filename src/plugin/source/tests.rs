@@ -2,10 +2,10 @@ use super::fetch::file_name;
 use super::reply::{Listed, MAX_DEPTH};
 use super::*;
 use crate::library::Remote;
-use crate::plugin::Registry;
 use crate::plugin::tests::{registry_of, temp};
+use crate::plugin::Registry;
 use std::{
-    sync::mpsc::{Receiver, channel},
+    sync::mpsc::{channel, Receiver},
     time::{Duration, Instant},
 };
 
@@ -146,7 +146,11 @@ fn a_read_never_waits_for_the_plugin_and_the_next_one_has_the_answer() {
         })
     );
     assert_eq!(got[0].file, None);
-    assert_eq!(got[1].file, Some("/m/two.mp3".into()));
+    // Not "/m/two.mp3" on Windows, where a root without a drive takes the plugin folder's drive.
+    assert!(got[1]
+        .file
+        .as_deref()
+        .is_some_and(|f| f.ends_with("m/two.mp3")));
     assert_eq!(got[1].remote, None);
 }
 
@@ -272,11 +276,9 @@ fn a_bad_fetch_reply_is_an_error() {
         assert!(e.contains(want), "{e}");
     }
     let none = Registry::default();
-    assert!(
-        fetch_in(&none, &d, &remote("x"))
-            .unwrap_err()
-            .contains("not installed")
-    );
+    assert!(fetch_in(&none, &d, &remote("x"))
+        .unwrap_err()
+        .contains("not installed"));
 }
 
 #[test]
