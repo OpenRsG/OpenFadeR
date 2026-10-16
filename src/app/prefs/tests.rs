@@ -113,13 +113,15 @@ fn extra_settings_are_stored_in_the_file() {
 #[test]
 fn every_row_of_every_page_is_clickable() {
     let p = Prefs::default();
-    for (rows, _) in PAGES {
+    for (i, (rows, _)) in PAGES.iter().enumerate() {
+        eprintln!("TRACE page {i}: rows");
         for r in rows(&p).iter().filter(|r| {
             matches!(
                 r.kind,
                 rows::Kind::Chips | rows::Kind::Dropdown | rows::Kind::Check
             )
         }) {
+            eprintln!("TRACE page {i}: {}", r.key);
             assert!(
                 PAGES.iter().any(|(_, c)| c(&mut p.clone(), &r.key, 0))
                     || p.clone().choose(&r.key, 0),

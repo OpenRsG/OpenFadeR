@@ -71,6 +71,11 @@ if grep -qiE "panicked at|RUST_BACKTRACE|stack overflow" "$out/app.log"; then
 	echo "::error::the app panicked (see app.log)"
 	status=1
 fi
+# The plugins checkout (or the release archive's extension/plugin) must have been found next to the executable.
+if ! grep -qE "^plugins: ([1-9][0-9]*) loaded" "$out/app.log"; then
+	echo "::error::no plugin was loaded"
+	status=1
+fi
 if [ ! -s "$out/screenshot.png" ]; then
 	echo "::error::no screenshot was taken"
 	status=1

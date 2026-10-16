@@ -54,9 +54,13 @@ jobs:
             .
             extension/plugin
           key: ${{ matrix.name }}
+          cache-on-failure: true
       - name: Build the plugins
         run: extension/plugin/build.sh --quiet
       - run: cargo build --release
+      - name: Trace of the Windows crash
+        if: matrix.name == 'windows'
+        run: cargo test --release --bin openfader every_row -- --nocapture || true
       - run: cargo test --release -- ${{ matrix.name == 'windows' && '--test-threads=1' || '' }}
       - name: Plugin tests
         run: cargo test --release --manifest-path extension/plugin/Cargo.toml
