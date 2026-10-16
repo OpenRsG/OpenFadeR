@@ -3,7 +3,7 @@
 //! The LED output is one connection to the output port of the mapped controller, written by a [`Sink`] thread.
 
 use midir::{MidiInput, MidiInputConnection, MidiOutput, MidiOutputConnection};
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::{thread::JoinHandle, time::Duration};
 
 /// Gap between two LED messages in ms when the mapping file has no `<outInterval>`: 2 is the commonest value
@@ -151,7 +151,7 @@ impl Drop for Sink {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use midir::os::unix::{VirtualInput, VirtualOutput};
@@ -185,8 +185,8 @@ mod tests {
     #[test]
     fn sink_gap_lets_a_slow_receiver_keep_up() {
         use std::sync::{
-            Arc,
             atomic::{AtomicUsize, Ordering::SeqCst},
+            Arc,
         };
         let got = Arc::new(AtomicUsize::new(0));
         let g = got.clone();

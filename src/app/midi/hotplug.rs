@@ -10,7 +10,7 @@ use super::port::is_own;
 use midir::MidiInput;
 use std::{
     fmt,
-    sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel},
+    sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender},
     thread::JoinHandle,
     time::Duration,
 };
@@ -155,7 +155,8 @@ impl Drop for Watcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use midir::{MidiOutput, os::unix::VirtualOutput};
+    #[cfg(unix)]
+    use midir::{os::unix::VirtualOutput, MidiOutput};
 
     fn list(names: &[&str]) -> Vec<String> {
         names.iter().map(|n| n.to_string()).collect()
@@ -241,12 +242,16 @@ mod tests {
         // unrelated devices swap: gone, then appeared
         assert_eq!(
             diff(&list(&[DECK4]), &list(&[a])),
-            vec![Change::Disappeared(DECK4.into()), Change::Appeared(a.into())]
+            vec![
+                Change::Disappeared(DECK4.into()),
+                Change::Appeared(a.into())
+            ]
         );
     }
 
     /// A virtual ALSA port named like a controller shows up in the snapshot and in the watcher's report, and goes away again.
     /// Skipped without ALSA seq. The real hot-plug is the same list changing.
+    #[cfg(unix)]
     #[test]
     fn watcher_reports_a_virtual_port_coming_and_going() {
         const NAME: &str = "rk-hotplug-test";

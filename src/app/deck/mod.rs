@@ -63,7 +63,7 @@ mod transport;
 mod wire;
 pub use wire::wire;
 
-use super::{App, DeckScroll, DeckState, DeckView, prefs, render};
+use super::{prefs, render, App, DeckScroll, DeckState, DeckView};
 use openfader::{
     analysis::{self, Beat},
     audio,
@@ -93,10 +93,12 @@ pub fn active() -> usize {
 type Decoded = (audio::Pcm, Option<analysis::Analysis>);
 
 /// Audio still decoding (and analysing): the receiver (dropping it cancels the result) and the
-/// status text to show when it arrives.
+/// track title and status notes to rebuild the status line from when it arrives.
 struct Pending {
     rx: Receiver<Result<Decoded, String>>,
-    status: String,
+    title: String,
+    /// Status notes after the summary; the summary itself is rebuilt from the finished analysis.
+    notes: Vec<String>,
 }
 
 #[derive(Default)]
@@ -367,7 +369,10 @@ impl Deck {
     }
 
     /// Runs `f` on the loaded analysis (this session's cues and grid included) and the duration in ms.
-    pub(in crate::app) fn with_analysis<R>(&self, f: impl FnOnce(&analysis::Analysis, u32) -> R) -> R {
+    pub(in crate::app) fn with_analysis<R>(
+        &self,
+        f: impl FnOnce(&analysis::Analysis, u32) -> R,
+    ) -> R {
         let l = self.loaded.borrow();
         f(&l.analysis, l.duration_ms)
     }

@@ -1,0 +1,174 @@
+name: Release
+
+# Tag v*: build the app on Linux, Windows and macOS (arm64), bundle it with the themes, the controller mappings and the plugins
+# (the native ones prebuilt) in the folders it finds next to its executable, run the app from the packaged files, and create a
+# DRAFT release with the three archives. A manual run (workflow_dispatch) builds and uploads the archives as workflow artifacts only.
+# Publish a draft with: gh release edit <tag> --draft=false
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux, os: ubuntu-latest, arch: x86_64 }
+          - { name: windows, os: windows-latest, arch: x86_64 }
+          - { name: macos, os: macos-latest, arch: arm64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - name: Companions (plugins, themes, mappings)
+        run: |
+          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
+          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
+          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
+      - name: System libraries
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libfontconfig1-dev libxkbcommon-dev libwayland-dev libudev-dev pkg-config \
+            xvfb imagemagick libxkbcommon-x11-0 libgl1 libegl1 libgl1-mesa-dri libxcursor1 libxi6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            extension/plugin
+          key: release-${{ matrix.name }}
+      - name: Version
+        id: version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then v=${GITHUB_REF_NAME#v}; else v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)-dev; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - name: Build the plugins
+        run: extension/plugin/build.sh --quiet
+      - name: Build the app
+        run: cargo build --profile dist
+      - name: Package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p out
+          case "${{ matrix.name }}" in
+          linux)
+            d=openfader-$VERSION-linux-x86_64
+            mkdir "$d"
+            cp target/dist/openfader "$d/"
+            cp -L target/dist/*.so* "$d/"
+            python .github/bundle.py "$d"
+            cp LICENSE README.md "$d/"
+            tar czf "out/$d.tar.gz" "$d"
+            ;;
+          windows)
+            d=openfader-$VERSION-windows-x86_64
+            mkdir "$d"
+            cp target/dist/openfader.exe "$d/"
+            cp target/dist/*.dll "$d/"
+            # The Visual C++ runtime next to the program: it starts on a machine that never installed the redistributable.
+            for f in vcruntime140.dll vcruntime140_1.dll msvcp140.dll; do cp "/c/Windows/System32/$f" "$d/"; done
+            python .github/bundle.py "$d"
+            cp LICENSE README.md "$d/"
+            7z a -tzip "out/$d.zip" "$d" > /dev/null
+            ;;
+          macos)
+            d=OpenFadeR.app
+            mkdir -p "$d/Contents/MacOS" "$d/Contents/Resources"
+            cp target/dist/openfader "$d/Contents/MacOS/"
+            cp -L target/dist/*.dylib "$d/Contents/MacOS/"
+            python .github/bundle.py "$d/Contents/Resources"
+            cp LICENSE README.md "$d/Contents/Resources/"
+            cat > "$d/Contents/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>OpenFadeR</string>
+            <key>CFBundleDisplayName</key><string>OpenFadeR</string>
+            <key>CFBundleIdentifier</key><string>org.openrsg.openfader</string>
+            <key>CFBundleExecutable</key><string>openfader</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>$VERSION</string>
+            <key>CFBundleShortVersionString</key><string>$VERSION</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
+            <key>NSHighResolutionCapable</key><true/>
+            <key>NSMicrophoneUsageDescription</key><string>OpenFadeR records from an audio input when you use REC or the microphone.</string>
+          </dict>
+          </plist>
+          EOF
+            # Ad-hoc signature (no developer identity): Apple silicon wants every program signed at least this way.
+            codesign --force --deep -s - "$d"
+            ditto -c -k --keepParent "$d" "out/OpenFadeR-$VERSION-macos-arm64.zip"
+            ;;
+          esac
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.name }}
+          path: out/*
+      # The packaged files, unpacked somewhere else, must start and show their window (the smoke test of ci.yml).
+      - name: Unpack the archive
+        run: |
+          mkdir unpacked
+          cd unpacked
+          case "${{ matrix.name }}" in
+          linux) tar xzf ../out/*.tar.gz ;;
+          windows) 7z x -y ../out/*.zip > /dev/null ;;
+          macos) ditto -x -k ../out/*.zip . ;;
+          esac
+          ls
+      - name: Smoke test of the packaged app (Linux, under Xvfb)
+        if: matrix.name == 'linux'
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" bash .github/smoke.sh unpacked/openfader-*/openfader smoke
+      - name: Smoke test of the packaged app
+        if: matrix.name == 'windows'
+        run: bash .github/smoke.sh unpacked/openfader-*/openfader.exe smoke
+      - name: Smoke test of the packaged app (macOS)
+        if: matrix.name == 'macos'
+        run: bash .github/smoke.sh unpacked/OpenFadeR.app/Contents/MacOS/openfader smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-smoke-${{ matrix.name }}
+          path: smoke/
+          if-no-files-found: ignore
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-?*
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: out/*
+          generate_release_notes: true
+          body: |
+            Archives (each holds the app with its themes, controller mappings and plugins, ready to run):
+
+            - **Linux** (x86_64): `openfader-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
+            - **Windows** (x86_64): `openfader-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
+            - **macOS** (Apple silicon): `OpenFadeR-<version>-macos-arm64.zip` holds `OpenFadeR.app`. It is **not signed or notarized**: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/OpenFadeR.app`.
+
+            Optional: `ffmpeg` on the PATH for video; `python` (3) for the Python plugins. Volume sliders of the audio page exist on Linux only: on Windows and macOS the volume is the system's.

@@ -7,8 +7,8 @@
 //! With STEMS and the STEM waveform on, [`stemwave`](super::stemwave) swaps in the waves of the mix heard once the stems are ready.
 
 use super::{
-    Deck, Decoded, Loaded, Pending, at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm,
-    render, tempo_text,
+    at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm, render, tempo_text, Deck, Decoded,
+    Loaded, Pending,
 };
 use crate::app::prefs;
 use openfader::{
@@ -20,7 +20,7 @@ use serde_json::json;
 use slint::{ModelRc, VecModel};
 use std::{
     cell::RefCell,
-    sync::mpsc::{Receiver, TryRecvError, channel},
+    sync::mpsc::{channel, Receiver, TryRecvError},
 };
 
 /// Decode `path`; when `need` (no grid, no 3-band waveform) is set, also analyse the audio before
@@ -152,20 +152,11 @@ impl Deck {
                 .map_or(0, |c| c.time_ms)
         });
         let grid = grid_bpm(&a.beats);
-        let summary = format!(
-            "{} — {} beats @ {}, {} cues",
-            t.title,
-            a.beats.len(),
-            bpm_text(grid, 1.0),
-            a.cues.len()
-        );
-        let mut status = std::iter::once(summary)
-            .chain(notes)
-            .collect::<Vec<_>>()
-            .join(" · ");
+        let mut notes = notes;
         if self.player.is_some() && t.file.is_none() && t.remote.is_none() && pcm.is_none() {
-            status += " · no file path";
+            notes.push("no file path".into());
         }
+        let mut status = summary(&t.title, &a, grid, &notes);
         let library = pcm.is_none(); // a sampler slice is no library track: not exported, not in the history
         let downloading = library && t.file.is_none() && t.remote.is_some();
         self.rate.set(1.0);
@@ -199,7 +190,8 @@ impl Deck {
             };
             pending = rx.map(|rx| Pending {
                 rx,
-                status: status.clone(),
+                title: t.title.clone(),
+                notes,
             });
         }
         if pending.is_some() {
@@ -308,24 +300,28 @@ impl Deck {
             Ok(r) => r,
             Err(TryRecvError::Disconnected) => Err("decoder stopped".into()),
         };
-        let mut status = l.pending.take().map_or_else(String::new, |p| p.status);
+        let (title, mut notes) = l
+            .pending
+            .take()
+            .map_or_else(Default::default, |p| (p.title, p.notes));
         let mut added_cues = false;
         let mut stem_src = None;
         match res {
             Ok((pcm, analysed)) => {
                 // Fill only what the library lacked; keep its beats / waveform otherwise.
                 if let Some(an) = analysed {
+                    notes.retain(|n| n != "not analysed");
                     l.analysis.key = an.key.clone();
                     if l.analysis.beats.is_empty() && !an.beats.is_empty() {
                         l.lib_beats = an.beats.clone();
                         l.analysis.beats = an.beats;
-                        status += " · grid: analysed";
+                        notes.push("grid: analysed".into());
                     }
                     if l.analysis.three_band_detail.is_empty() && !an.three_band_detail.is_empty() {
                         l.analysis.three_band_detail = an.three_band_detail;
                         l.analysis.three_band_preview = an.three_band_preview;
                         l.detail = render::detail::wave(&l.analysis, Some(&pcm));
-                        status += " · waveform: analysed";
+                        notes.push("waveform: analysed".into());
                     }
                 }
                 // The analysis may have just given this track a grid and waveform: phrases and automatic cues follow.
@@ -337,7 +333,7 @@ impl Deck {
                 }
                 if l.detail.is_none() {
                     l.detail = render::detail::wave(&l.analysis, Some(&pcm));
-                    status += " · detail: from audio";
+                    notes.push("detail: from audio".into());
                 }
                 // AUTO GAIN comes from the store (measured and saved on the track's first load, [`gain::resolve`]); AUTO CUE
                 // puts the cue point (and the playhead) on the first sound unless LOAD SETTING chose a cue. A sampler slice is no track to cue.
@@ -363,10 +359,11 @@ impl Deck {
                 }
                 l.overview = render::overview::wave(&l.analysis, l.duration_ms);
             }
-            Err(e) => status += &format!(" · audio: {e}"),
+            Err(e) => notes.push(format!("audio: {e}")),
         }
         l.invalidate();
         let grid = grid_bpm(&l.analysis.beats);
+        let status = summary(&title, &l.analysis, grid, &notes);
         if let Some(g) = grid {
             l.base_bpm = g;
         }
@@ -433,4 +430,17 @@ impl Deck {
             None => self.say("continuous playing: no next track in the list"),
         }
     }
+}
+
+/// The deck status line: `<title> — N beats @ BPM, N cues · notes…`, rebuilt when the analysis arrives.
+fn summary(title: &str, a: &analysis::Analysis, grid: Option<f64>, notes: &[String]) -> String {
+    std::iter::once(format!(
+        "{title} — {} beats @ {}, {} cues",
+        a.beats.len(),
+        bpm_text(grid, 1.0),
+        a.cues.len()
+    ))
+    .chain(notes.iter().cloned())
+    .collect::<Vec<_>>()
+    .join(" · ")
 }
