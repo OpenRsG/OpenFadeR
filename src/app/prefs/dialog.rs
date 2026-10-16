@@ -1,8 +1,8 @@
 //! The PREFERENCES dialog: page table, row refresh, clicks and the start-up wiring.
 
 use super::{
-    Prefs, Row, advanced, analysis, audio, controller, dj_system, extensions, keyboard, live, look,
-    panes, view,
+    advanced, analysis, audio, controller, dj_system, extensions, keyboard, libraries, live, look,
+    panes, view, Prefs, Row,
 };
 use crate::app::{App, PrefRowData, PrefsState};
 use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
@@ -19,7 +19,7 @@ pub(super) fn app() -> Option<App> {
 
 /// The dialog pages in category order: rows and click handler of each (see the module doc).
 type Page = (fn(&Prefs) -> Vec<Row>, fn(&mut Prefs, &str, usize) -> bool);
-pub(super) const PAGES: [Page; 8] = [
+pub(super) const PAGES: [Page; 10] = [
     (view::rows, view::choose),
     (audio::rows, audio::choose),
     (analysis::rows, analysis::choose),
@@ -28,6 +28,8 @@ pub(super) const PAGES: [Page; 8] = [
     (extensions::rows, extensions::choose),
     (dj_system::rows, dj_system::choose),
     (advanced::rows, advanced::choose),
+    (|_| Vec::new(), |_, _, _| false), // THEMES (8) has its own page, no rows
+    (libraries::rows, libraries::choose),
 ];
 
 /// Redraws the open category's rows (call after changing a setting kept outside [`Prefs`], e.g. in store.db).

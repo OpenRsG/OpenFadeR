@@ -67,7 +67,13 @@ fn digits_are_pads_and_shifted_digits_are_deck_b() {
 fn ctrl_f_arrives_as_letter_or_control_char() {
     assert_eq!(hit("f", false, true), Some((Act::FocusSearch, None, 0)));
     assert_eq!(hit("\u{6}", false, true), Some((Act::FocusSearch, None, 0)));
-    assert_eq!(hit("z", false, true), None, "Ctrl+Z is not Z");
+    assert_eq!(
+        hit("z", false, true),
+        Some((Act::Undo, None, 0)),
+        "Ctrl+Z is not CUE"
+    );
+    assert_eq!(hit("\u{1a}", true, true), Some((Act::Redo, None, 0)));
+    assert_eq!(hit("\u{19}", false, true), Some((Act::RedoAlt, None, 0)));
 }
 
 #[test]

@@ -120,7 +120,8 @@ fn conflicts_see_ranges_named_keys_and_modifiers() {
         "inside the 1-8 range"
     );
     assert!(hits("deck.cue.A", "9").is_empty());
-    assert!(hits("deck.cue.A", "ctrl+z").is_empty());
+    assert!(hits("deck.cue.A", "ctrl+q").is_empty());
+    assert_eq!(hits("deck.cue.A", "ctrl+z"), ["app.undo"], "Ctrl+Z is undo");
     assert_eq!(
         hits("deck.cue.A", "s"),
         ["deck.sync.A"],

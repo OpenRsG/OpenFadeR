@@ -38,6 +38,7 @@ pub mod dj_system;
 pub mod extensions;
 mod file;
 pub mod keyboard;
+pub mod libraries;
 mod live;
 mod look;
 mod panes;
@@ -53,8 +54,8 @@ pub use live::set_for_test;
 pub use live::{get, notify, on_action, on_change, on_text, run_action, update, with};
 pub use look::apply_theme;
 pub use rows::Row;
-pub use section::{Choice, Section, Setting};
 pub(crate) use section::{choice, section};
+pub use section::{Choice, Section, Setting};
 pub use view::{FontSize, HotCueColors, KeyNotation, LineSpace, WaveColors};
 
 use openfader::audio::fx::DEFAULT_BEAT;

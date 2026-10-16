@@ -309,7 +309,7 @@ Ids of `key`: `app.<name>` or `deck.<name>.<A-D>`. Names: deck actions `play_pau
 (the first hot-cue pad), `auto_loop`, `export_loop`, `jump_back`, `jump_fwd`, `loop_in`, `loop_out`, `reloop`, `key_sync`,
 `key_down`, `key_up`, `key_reset`, `slip`, `reverse`, `brake`, `pad_mode`, `grid_toggle`, `grid_tap`, `grid_beat1`, `grid_back`,
 `grid_fwd`; app actions `deck_layout`, `tag_track`, `sampler_toggle`, `automix_toggle`, `automix_skip`, `fx_beat_down`,
-`fx_beat_up`, `fx_toggle`, `browse_view`, `browse_area`, `focus_search`, `help`. Only rows the shortcut table has exist (the `?`
+`fx_beat_up`, `fx_toggle`, `browse_view`, `browse_area`, `undo`, `redo`, `redo_alt`, `focus_search`, `help`. Only rows the shortcut table has exist (the `?`
 overlay lists them; `deck.cue.A` and `deck.cue.B` do, `deck.cue.C` too); an id that matches no row is reported. Which key a row
 is bound to does not matter, a cleared binding still runs.
 
@@ -537,6 +537,7 @@ that format. It is a native shared library (Rust or C) built against the library
 | `browser` | A Media Browser source: `label` is its name in the tree, `path_setting` the id of a `text` setting that holds the library file. Set the file in the plugin's settings and the source appears. |
 | `device` | `true`: the plugin also works with removable devices, see [Devices](#devices). `formats` must then list `dir`. |
 | `legacy_analysis_refs` | `true`: the plugin also answers `analysis_ref` for references that carry no plugin name (stored by older versions). |
+| `detect` | Where the app this format belongs to keeps its library by default: a list of path patterns, or one list per OS (`linux`, `windows`, `macos`). `~`, `$HOME`, `%USERPROFILE%`, `%APPDATA%` and `%LOCALAPPDATA%` expand and `*` matches within one path part. A match that is not connected yet is offered in PREFERENCES > LIBRARIES. |
 | `samples` | `true`: the plugin's libraries are sample collections: after File > Import the first list's files fill the sampler's empty slots. |
 
 **How a path is opened.** `library::open` asks every enabled library plugin that may read the path (by `formats`) to `probe` it and
@@ -566,10 +567,12 @@ ops.
 | `close` | `handle` | `{}` |
 | `analysis_ref` | `reference`, `settings` | `{"analysis": Analysis or null}`: the analysis behind a track's `analysis_ref`, without an open library. |
 | `write_collection` | `path`, `snapshot`, `settings` | `{"count": tracks written}`: writes a new file at `path`. |
+| `capabilities` | `settings` | What the format holds: `hot_cues` and `memory_cues` (`null` = no limit), `loops`, `cue_colors` (RGB palette; empty = any), `rating_max` (0 = none), `tempo_changes`, `mp3_offset_ms`, `write_back` (can rewrite an existing library file). The app fits the Collection to it before `write_collection` or `export` and reports what was not kept. A plugin without this op holds everything. |
 | device ops | | see [Devices](#devices). |
 
 A `Track` has `title`, `artist`, `album`, `key`, `genre`, `label`, `bpm_x100`, `length_s`, `file` (the audio file path),
 `analysis_ref`, `artwork`, `rating` (0 to 5), `comment`, `date_added`, `bitrate`, `sample_rate`; every field may be left out.
+`id` is the app's own track id in snapshots it sends; a plugin leaves it out of what it returns.
 `analysis_ref` is opaque to the app: it hands the whole track back in `analysis`, so a path or an id that finds the analysis
 again goes there. An `Analysis` holds `beats` (`bar_pos`, `bpm_x100`, `time_ms`), `cues` (`hot_cue` 0 = memory, 1.. = hot cue,
 `time_ms`, `loop_end_ms`, `color`, `comment`), the waveforms (`preview`, `detail`, `color_preview`, `color_detail`,
@@ -673,7 +676,8 @@ the app prefixes them with its name at start-up.
 Rust crates of one Cargo workspace, the plugins repository's `Cargo.toml` (`extension/plugin/Cargo.toml` in a core checkout), are library plugins: `itunes` (reads a media player's
 library file), a collection-file plugin (reads and writes a collection file), a plugin for the device libraries on USB sticks and
 SD cards (reads them, exports to them, updates the collection from them, backs them up, converts them and edits their settings), four
-more device plugins that only write the libraries of other players and apps beside it on the same stick, one for a desktop collection
+more device plugins that write the libraries of other players and apps beside it on the same stick and also read those apps' desktop
+libraries (with `detect` patterns, so PREFERENCES > LIBRARIES offers to connect them), one for a desktop collection
 database (a key as a `secret` setting), and one for sampler packs (a zip of audio and a list file; the
 samples are extracted to the plugin's cache folder and served as a library; with `"samples": true` the first list also fills the
 sampler after File > Import). Crates for what they share sit beside them. They need building once: `extension/plugin/build.sh` builds

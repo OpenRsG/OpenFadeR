@@ -2,7 +2,7 @@
 //! they are not) are probed for a path, answer playlists, tracks and analysis over the C ABI, write the Collection back as
 //! a file that opens again, and list a library of their own setting in the Media Browser.
 
-use openfader::library::{self, Library, snapshot::Snapshot};
+use openfader::library::{self, snapshot::Snapshot, Library};
 use openfader::plugin;
 use std::path::Path;
 
@@ -67,6 +67,8 @@ fn bundled_plugins_read_and_write_over_the_abi() {
     unsafe {
         std::env::set_var("OPENFADER_PLUGINS", &plugins);
         std::env::set_var("XDG_CONFIG_HOME", dir.join("config"));
+        std::env::set_var("XDG_DATA_HOME", dir.join("data"));
+        std::env::set_var("XDG_CACHE_HOME", dir.join("cache"));
     }
 
     let xml = dir.join("collection.xml");
@@ -105,20 +107,16 @@ fn bundled_plugins_read_and_write_over_the_abi() {
         (it.kind(), titles(&*it, None)),
         ("iTunes", vec!["Tune".to_owned()])
     );
-    assert!(
-        plugin::library::sources()
-            .iter()
-            .any(|s| s.plugin == "itunes" && s.path == plist)
-    );
+    assert!(plugin::library::sources()
+        .iter()
+        .any(|s| s.plugin == "itunes" && s.path == plist));
 
     // Nothing claims a text file; the error says so.
     let txt = dir.join("notes.txt");
     std::fs::write(&txt, "hello").unwrap();
-    assert!(
-        library::open(&txt)
-            .err()
-            .unwrap()
-            .contains("no library plugin")
-    );
+    assert!(library::open(&txt)
+        .err()
+        .unwrap()
+        .contains("no library plugin"));
     std::fs::remove_dir_all(&dir).unwrap();
 }

@@ -6,7 +6,7 @@
 //! - [`phrase_edit`]: manual phrase edits (cut, type, boundary, clear) as pure functions on [`Phrases`]
 //! - [`key`]: musical key (Camelot) from decoded PCM, also part of [`analyze`]
 //! - [`auto`]: our own phrases (from the beat grid + 3-band waveform) and suggested cues
-//! - [`cache`]: the on-disk analysis cache
+//! - [`cache`]: our analysis results on disk, user data named by the track's identity (moves with the track)
 //! - [`options`]: what [`analyze`] does (Preferences > Analysis); [`tag`]: writing the detected key into the audio file's tag
 //! - [`similar`]: Track Suggestion's measurements (timbre / energy [`similar::Features`], year and composer tags, a background profile index)
 
@@ -14,16 +14,17 @@ pub mod auto;
 pub mod cache;
 mod colors;
 pub mod detect;
+pub mod fingerprint;
 pub mod key;
 pub mod options;
 pub mod phrase_edit;
 pub mod similar;
 pub mod tag;
 
-pub use colors::{COLORFUL, color_detail_rgbh, picker};
+pub use colors::{color_detail_rgbh, picker, COLORFUL};
 pub use openfader_plugin::library::{
-    Analysis, Beat, Cue, DETAIL_ENTRIES_PER_SEC, Kind as PhraseKind, Mood, PREVIEW_ENTRIES, Phrase,
-    Phrases,
+    Analysis, Beat, Cue, Kind as PhraseKind, Mood, Phrase, Phrases, DETAIL_ENTRIES_PER_SEC,
+    PREVIEW_ENTRIES,
 };
 
 /// Beat grid, 3-band waveforms, musical key, vocal regions and phrases (`beats`, `three_band_detail`,

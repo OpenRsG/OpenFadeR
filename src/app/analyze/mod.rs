@@ -25,20 +25,20 @@ mod job;
 mod progress;
 mod sync;
 
-pub use cue::{Learnt, library_cues};
-pub use detected::{Detected, keys_differ};
+pub use cue::{library_cues, Learnt};
+pub use detected::{keys_differ, Detected};
 
 use super::{
-    App, camelot,
+    camelot,
     prefs::{
         self,
         analysis::{CueSetting, Process},
     },
-    trackinfo,
+    trackinfo, App,
 };
 use job::{Guide, Job, Settings, TagText};
 use openfader::{
-    analysis::{Analysis, cache::Source, options},
+    analysis::{cache, cache::Source, options, Analysis},
     library::{Library, Track},
     store::{self, Store},
 };
@@ -48,16 +48,12 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashSet,
     rc::Rc,
-    sync::{Arc, mpsc},
+    sync::{mpsc, Arc},
     time::Duration,
 };
 
 /// Results are drained (and the browser told) this often.
 const TICK: Duration = Duration::from_millis(500);
-
-/// Settings table scope that marks the tracks CUE Analysis set cues on (the CUE Analysis playlist); the row key is
-/// [`store::key`].
-const MARKER: &str = "cue_analysis";
 
 /// (BPM × 100, Camelot key); 0 / "" = this part was not found.
 pub type Found = (i64, String);
@@ -102,16 +98,15 @@ fn summary(a: &Analysis) -> Found {
     )
 }
 
-/// Stores `cues` as the whole cue list of `key` and marks the track as cue-analysed ([`MARKER`]; no store API fits better).
+/// Stores `cues` as the whole cue list of `key`, marked as CUE Analysis's ([`Store::set_auto_cues`]).
 fn store_cues(store: &Store, key: &str, cues: &[openfader::analysis::Cue]) -> Result<(), String> {
-    store.set_cues(key, Some(cues))?;
-    store.set_device_setting(MARKER, key, "1")
+    store.set_auto_cues(key, cues)
 }
 
-/// Keys ([`store::key`]) of the tracks CUE Analysis set cues on.
+/// Keys ([`store::key`]) of the tracks whose cue list CUE Analysis set and nobody edited since.
 fn analysed(store: &Store) -> HashSet<String> {
     store
-        .device_settings(MARKER)
+        .device_settings(store::AUTO_CUES)
         .map(|m| m.into_keys().collect())
         .unwrap_or_default()
 }
@@ -157,10 +152,45 @@ pub fn wire(app: &App, lib: Rc<dyn Library>) -> Analyzer {
     set_options(&prefs::get());
     prefs::on_change(set_options);
     prefs::on_action("analyze_now", run_pending);
-    if prefs::with(|p| p.analysis.auto_analysis) {
+    let auto = prefs::with(|p| p.analysis.auto_analysis);
+    if cache::legacy_dir().is_some_and(|d| d.is_dir()) {
+        migrate_then(auto);
+    } else if auto {
         run_pending();
     }
     Analyzer
+}
+
+/// Moves the old per-path analysis entries into the data folder on a worker thread ([`cache::migrate`]); the background run
+/// (`then_run`) starts once it has finished, so no track is analysed again for an entry that was only waiting to move.
+fn migrate_then(then_run: bool) {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let tracks = store::global().collection_tracks().unwrap_or_default();
+        let m = cache::migrate(&tracks);
+        if m.moved > 0 {
+            eprintln!("analysis: {} entries moved to the data folder", m.moved);
+        }
+        let _ = tx.send(());
+    });
+    let (timer, done) = (Rc::new(Timer::default()), Rc::new(Cell::new(false)));
+    let (weak_timer, finished) = (Rc::downgrade(&timer), done.clone());
+    timer.start(TimerMode::Repeated, TICK, move || {
+        if rx.try_recv() == Err(mpsc::TryRecvError::Empty) {
+            return;
+        }
+        finished.set(true);
+        weak_timer.upgrade().inspect(|t| t.stop());
+        if then_run {
+            run_pending();
+        }
+    });
+    RUNS.with(|r| {
+        r.borrow_mut().push(Run {
+            _timer: timer,
+            done,
+        })
+    });
 }
 
 /// The settings as analysis options; chooses CUE Analysis Auto's tendency from the collection when Auto is selected.
@@ -194,7 +224,7 @@ fn context() -> Option<(App, Rc<dyn Library>)> {
 /// Analyses what the enabled parts would fill in (the Auto Analysis set), whatever the Auto Analysis setting says.
 fn run_pending() {
     let Some((app, lib)) = context() else { return };
-    let tracks = match lib.tracks(None) {
+    let tracks = match lib.tracks_all() {
         Ok(t) => t,
         Err(e) => {
             return trackinfo::set_progress(&app, &format!("analysis: library query failed: {e}"));
@@ -244,6 +274,7 @@ fn jobs(lib: &dyn Library, tracks: &[&Track], explicit: bool) -> Vec<Job> {
                 .unwrap_or_default();
             Some(Job {
                 path,
+                track: (*t).clone(),
                 key,
                 explicit,
                 library_key: !t.key.is_empty(),

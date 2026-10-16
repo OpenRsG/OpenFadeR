@@ -2,11 +2,11 @@
 //! libraries (DJ-library XML, iTunes) with their playlists, ratings, comments, cues and beat grids.
 //!
 //! `known` is the set of files the Collection already lists (what `Library::tracks(None)` returns); those are skipped, never
-//! duplicated. Edits of an imported library (rating, comment, cues, grid) are stored only for tracks whose file exists,
-//! because the store's identity ([`crate::store::key`]) contains the file size.
+//! duplicated. Edits of an imported library (rating, comment, cues, grid) and playlist entries are stored under the key of the
+//! track's Collection row ([`crate::store::Store::key_of`]), so a file that is missing now keeps them too.
 
-use super::{Library, Playlist, Track, file_key, folder, playlist_file, today};
-use crate::store::{NodeKind, R, Store, key};
+use super::{folder, playlist_file, today, Library, Playlist, Track};
+use crate::store::{NodeKind, Store, R};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -90,7 +90,8 @@ pub fn files(
     Ok(r)
 }
 
-/// A playlist file: its existing tracks join the Collection and a new playlist of that name lists them in file order.
+/// A playlist file: its existing tracks join the Collection and a new playlist of that name lists them in file order. One undo
+/// step.
 pub fn playlist_file(
     store: &Store,
     known: &HashSet<PathBuf>,
@@ -104,14 +105,24 @@ pub fn playlist_file(
         .filter(|f| f.is_file())
         .cloned()
         .collect();
-    let mut r = files(store, known, &found, progress)?;
-    r.failed = parsed.files.len() - found.len();
-    let keys: Vec<String> = found.iter().map(|f| file_key(f)).collect();
-    let id = store.add_node(None, &parsed.name, NodeKind::Playlist)?;
-    store.add_entries(id, &keys)?;
-    r.playlists = 1;
-    r.node = Some(id);
-    Ok(r)
+    store.action("Import playlist", || {
+        let mut r = files(store, known, &found, progress)?;
+        r.failed = parsed.files.len() - found.len();
+        let keys: Vec<String> = found
+            .iter()
+            .map(|f| {
+                store.key_of(&Track {
+                    file: Some(f.clone()),
+                    ..Track::default()
+                })
+            })
+            .collect();
+        let id = store.add_node(None, &parsed.name, NodeKind::Playlist)?;
+        store.add_entries(id, &keys)?;
+        r.playlists = 1;
+        r.node = Some(id);
+        Ok(r)
+    })
 }
 
 /// What of a source [`library`] imports.
@@ -124,8 +135,20 @@ pub enum Scope<'a> {
 }
 
 /// The tracks of `src` named by `scope` join the Collection (those with a file, new ones only) with their rating, comment,
-/// cues and grid; the playlists of `scope` become new top-level items of My Playlists.
+/// cues and grid; the playlists of `scope` become new top-level items of My Playlists. One undo step.
 pub fn library(
+    store: &Store,
+    src: &dyn Library,
+    known: &HashSet<PathBuf>,
+    scope: Scope,
+    progress: &dyn Fn(usize, usize),
+) -> R<Report> {
+    store.action("Import", || {
+        import_library(store, src, known, scope, progress)
+    })
+}
+
+fn import_library(
     store: &Store,
     src: &dyn Library,
     known: &HashSet<PathBuf>,
@@ -154,11 +177,8 @@ pub fn library(
         }
     }
     r.added = store.collection_put(&fresh, false)?;
-    for t in fresh
-        .iter()
-        .filter(|t| t.file.as_deref().is_some_and(Path::is_file))
-    {
-        let k = key(t);
+    for t in &fresh {
+        let k = store.key_of(t);
         if t.rating > 0 {
             store.set_rating(&k, Some(t.rating))?;
         }
@@ -211,7 +231,11 @@ pub fn copy_playlists(store: &Store, src: &dyn Library, tree: &[Playlist]) -> R<
         if p.is_folder {
             parents.push(Some(store.add_node(parent, &p.name, NodeKind::Folder)?));
         } else {
-            let keys: Vec<String> = src.tracks(Some(&p.id))?.iter().map(key).collect();
+            let keys: Vec<String> = src
+                .tracks(Some(&p.id))?
+                .iter()
+                .map(|t| store.key_of(t))
+                .collect();
             let id = store.add_node(parent, &p.name, NodeKind::Playlist)?;
             store.add_entries(id, &keys)?;
         }
@@ -222,6 +246,7 @@ pub fn copy_playlists(store: &Store, src: &dyn Library, tree: &[Playlist]) -> R<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::store::id_key;
 
     fn tmp(name: &str) -> PathBuf {
         let d =
@@ -267,7 +292,8 @@ mod tests {
         let node = &store.nodes().unwrap()[0];
         assert_eq!(node.name, "set");
         let keys = store.entries(node.id).unwrap();
-        assert_eq!(keys, [key(&tracks[1]), key(&tracks[0])]); // file order, the missing entry skipped
+        let ids: Vec<_> = tracks.iter().map(|t| id_key(t.id.unwrap())).collect();
+        assert_eq!(keys, [ids[1].clone(), ids[0].clone()]); // file order, the missing entry skipped
         std::fs::remove_dir_all(&d).unwrap();
     }
 
@@ -315,10 +341,13 @@ mod tests {
         let all = Scope::All { playlists: true };
         let r = library(&store, &src, &HashSet::new(), all, &|_, _| {}).unwrap();
         assert_eq!((r.added, r.failed, r.playlists), (2, 1, 2));
-        let k = key(&src.0[0]);
+        let k = store.key_of(&src.0[0]);
         let e = store.edits(&k).unwrap();
         assert_eq!((e.rating, e.comment.as_deref()), (Some(4), Some("c-Real")));
-        assert_eq!(store.edits(&key(&src.0[1])).unwrap().rating, None); // missing file: no edits keyed by size 0
+        assert_eq!(
+            store.edits(&store.key_of(&src.0[1])).unwrap().rating,
+            Some(5)
+        ); // a missing file keeps its edits too
         let nodes = store.nodes().unwrap();
         assert_eq!(
             nodes
@@ -351,16 +380,14 @@ mod tests {
             (nodes.len(), nodes[0].name.as_str(), nodes[0].parent),
             (1, "P", None)
         ); // not under the folder "F"
-        assert!(
-            library(
-                &store,
-                &src,
-                &HashSet::new(),
-                Scope::List("nope"),
-                &|_, _| {}
-            )
-            .is_err()
-        );
+        assert!(library(
+            &store,
+            &src,
+            &HashSet::new(),
+            Scope::List("nope"),
+            &|_, _| {}
+        )
+        .is_err());
         std::fs::remove_dir_all(&d).unwrap();
     }
 }

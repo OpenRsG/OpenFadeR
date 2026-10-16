@@ -7,29 +7,34 @@
 //! With STEMS and the STEM waveform on, [`stemwave`](super::stemwave) swaps in the waves of the mix heard once the stems are ready.
 
 use super::{
-    Deck, Decoded, Loaded, Pending, at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm,
-    render, tempo_text,
+    at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm, render, tempo_text, Deck, Decoded,
+    Loaded, Pending,
 };
-use crate::app::prefs;
+use crate::app::prefs::{self, analysis::GridSource};
 use openfader::{
     analysis, audio,
     library::{Library, Track},
     plugin::{event, source},
+    store,
 };
 use serde_json::json;
 use slint::{ModelRc, VecModel};
 use std::{
     cell::{Cell, RefCell},
-    sync::mpsc::{Receiver, TryRecvError, channel},
+    sync::mpsc::{channel, Receiver, TryRecvError},
 };
 
-/// Decode `path`; when `need` (no grid, no 3-band waveform) is set, also analyse the audio before
-/// sending, so the PCM is never cloned.
-fn decode_and_analyze(path: std::path::PathBuf, need: bool) -> Receiver<Result<Decoded, String>> {
+/// Decode the file of `t`; when `need` (no grid, no 3-band waveform) is set, also analyse the audio before
+/// sending, so the PCM is never cloned. A Collection track that has no fingerprint yet gets one from the audio.
+fn decode_and_analyze(t: Track, need: bool) -> Receiver<Result<Decoded, String>> {
     let (tx, rx) = channel();
     std::thread::spawn(move || {
-        let _ = tx.send(audio::decode(&path).map(|pcm| {
-            let a = need.then(|| analysis::cache::analyze_cached(&path, &pcm.samples, pcm.rate).0);
+        let Some(file) = t.file.as_deref() else {
+            return;
+        };
+        let _ = tx.send(audio::decode(file).map(|pcm| {
+            analysis::cache::remember_fingerprint(&t, &pcm);
+            let a = need.then(|| analysis::cache::analyze_cached(&t, &pcm.samples, pcm.rate).0);
             (pcm, a)
         }));
     });
@@ -64,7 +69,7 @@ impl Deck {
         let downloading = t.file.is_none() && t.remote.is_some();
         let mut notes = Vec::new();
         crate::app::device::track_loading(t); // cue sync: the copy loaded wins over its other copies, before it is read
-        let a = match lib.analysis(t) {
+        let mut a = match lib.analysis(t) {
             Some(a) => a,
             None => {
                 notes.push(
@@ -78,7 +83,23 @@ impl Deck {
                 analysis::Analysis::default()
             }
         };
+        let mut base = None;
+        if t.file.is_some() && prefs::with(|p| p.analysis.grid_source) == GridSource::Ours {
+            // Our grid replaces the library's; the user's own edits (grid, cues, phrases) stay on top of both.
+            let ours = analysis::cache::load_for(t, &analysis::options::get())
+                .ok()
+                .flatten();
+            analysis::cache::take_ours(&mut a, ours);
+            base = Some(a.beats.clone());
+            let edits = store::global().edits(&store::key(t)).unwrap_or_default();
+            store::apply(&mut a, &edits);
+        }
         self.install(t, a, notes, None);
+        if let Some(b) = base {
+            let mut l = self.loaded.borrow_mut();
+            l.lib_beats.clone_from(&b);
+            l.base_beats = Some(b);
+        }
         if let Some(remote) = t.remote.clone().filter(|_| downloading) {
             let (tx, rx) = channel();
             std::thread::spawn(move || {
@@ -137,7 +158,7 @@ impl Deck {
             .then(|| autocue::nearest(&a.cues))
             .flatten();
         analysis::auto::fill(&mut a); // phrases from the grid + 3-band waveform when the library has none
-        // session-only automatic cues (none without a grid or when the track has cues)
+                                      // session-only automatic cues (none without a grid or when the track has cues)
         let auto_cues = a.cues.is_empty() && {
             let auto = analysis::auto::cues(&a);
             a.cues.extend(auto);
@@ -189,7 +210,10 @@ impl Deck {
                     let _ = tx.send(Ok((pcm, None)));
                     Some(rx)
                 }
-                None => t.file.as_ref().map(|f| decode_and_analyze(f.clone(), need)),
+                None => t
+                    .file
+                    .is_some()
+                    .then(|| decode_and_analyze(t.clone(), need)),
             };
             pending = rx.map(|rx| Pending {
                 rx,

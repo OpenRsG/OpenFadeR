@@ -1,13 +1,13 @@
 //! Missing File Manager (File > Display All Missing Files): the tracks whose audio file is gone, with
 //! RELOCATE (new file for the first track, the others from its folder, or a folder for all), AUTO RELOCATE (search the
-//! Auto Relocate Search Folders by file name, [`relocate`]) and DELETE (remove from the Collection). Ticking nothing
+//! Auto Relocate Search Folders by file name, else by the track's audio fingerprint, [`relocate`]) and DELETE (remove from the Collection). Ticking nothing
 //! acts on every listed track. Also the Track menu's Relocate / Auto Relocate for the chosen track.
 //!
 //! A scan stats every track's file on a thread (a USB stick is slow); [`is_missing`] answers from the last scan.
 
-use super::{Ask, Confirm, Ctx, settings};
-use crate::app::{LibraryState, MissingRow, plural};
-use openfader::library::{Track, relocate};
+use super::{settings, Ask, Confirm, Ctx};
+use crate::app::{plural, LibraryState, MissingRow};
+use openfader::library::{relocate, Track};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::{
     cell::RefCell,
@@ -162,7 +162,8 @@ pub fn relocate_to(c: &Rc<Ctx>, tracks: Vec<Track>, path: PathBuf) {
     }
 }
 
-/// Auto Relocate: finds each of `tracks` by name in the search folders.
+/// Auto Relocate: finds each of `tracks` by name in the search folders, else by its audio ([`relocate::ByAudio`]: a renamed
+/// file; at most [`relocate::MAX_DECODES`] candidates are decoded per track).
 pub fn auto(c: &Rc<Ctx>, tracks: Vec<Track>) {
     let folders = settings::search_folders(&settings::get());
     if folders.is_empty() {
@@ -181,6 +182,7 @@ pub fn auto(c: &Rc<Ctx>, tracks: Vec<Track>) {
     c.spawn(
         move || {
             let idx = relocate::index(&folders);
+            let mut by_audio = relocate::ByAudio::new(&idx);
             let total = tracks.len();
             let mut found = 0;
             for t in &tracks {
@@ -188,6 +190,7 @@ pub fn auto(c: &Rc<Ctx>, tracks: Vec<Track>) {
                     .file
                     .as_deref()
                     .and_then(|f| relocate::find(&idx, f))
+                    .or_else(|| by_audio.find(&store, t))
                     .map(Path::to_path_buf);
                 if let Some(new) = new {
                     if store.relocate(t, &new).is_ok() {

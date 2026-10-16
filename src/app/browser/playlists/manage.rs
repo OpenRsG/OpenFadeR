@@ -1,11 +1,11 @@
 //! The sidebar's management bar: name bar, + NEW, rename, delete, DUPLICATE TO MY PLAYLISTS, MORE and ADD TO PLAYLIST.
 
-use super::{Act, Ask, Panel, is_named, more_rows, playlist_labels};
+use super::{is_named, more_rows, playlist_labels, Act, Ask, Panel};
 use crate::app::{
     browser::{
-        App, BrowserState, Home, View, tagging,
         sidebar::{self, Entry},
         smart::Smart,
+        tagging, App, BrowserState, Home, View,
     },
     plural,
 };
@@ -220,11 +220,14 @@ impl View {
                 format!("press DELETE again to delete “{name}” (the tracks stay in the library)"),
             );
         }
+        let (s, label) = (&self.store, "Delete ");
         let r = match &e {
-            Entry::User(id) => self.store.delete_node(*id),
-            Entry::Category(id) => self.store.delete_mytag_category(*id),
-            Entry::Tag(id) => self.store.delete_mytag(*id),
-            Entry::Bank(id) => self.store.delete_bank(*id),
+            Entry::User(id) => s.action(&format!("{label}playlist"), || s.delete_node(*id)),
+            Entry::Category(id) => s.action(&format!("{label}tag category"), || {
+                s.delete_mytag_category(*id)
+            }),
+            Entry::Tag(id) => s.action(&format!("{label}tag"), || s.delete_mytag(*id)),
+            Entry::Bank(id) => s.action(&format!("{label}cue bank"), || s.delete_bank(*id)),
             _ => return,
         };
         if self.try_store(app, r).is_none() {

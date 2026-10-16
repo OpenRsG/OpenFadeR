@@ -36,10 +36,8 @@ fn answer(req: &[u8]) -> Value {
         Err(e) => json!({ "error": format!("bad request: {e}") }),
         Ok(HostRequest::Analysis { track, computed }) => {
             let a = if computed {
-                track
-                    .file
-                    .as_deref()
-                    .and_then(|f| crate::analysis::cache::get_or_analyze(f).ok())
+                crate::analysis::cache::get_or_analyze(&track)
+                    .ok()
                     .map(|(a, _)| a)
             } else {
                 load_ref(&track)

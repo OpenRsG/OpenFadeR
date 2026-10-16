@@ -183,20 +183,23 @@ pub fn settle(device: &Marks, collection: &Marks, w: Winner) -> Moves {
 }
 
 /// Writes `parts` of the track `key` into the store (the collection copy, and what we show for the device copy too); `before`
-/// is the collection's grid before (what RESET goes back to). A track under an Analysis Lock keeps its grid.
+/// is the collection's grid before (what RESET goes back to). A track under an Analysis Lock keeps its grid. A sync, not an
+/// undo step.
 pub fn pull(store: &Store, key: &str, parts: &Parts, before: &[Beat]) -> Result<(), String> {
-    if let Some(c) = &parts.cues {
-        store.set_cues(key, Some(c))?;
-    }
-    if let Some(b) = &parts.beats
-        && !store.analysis_locked(key)?
-    {
-        store.set_grid(key, b, before)?;
-    }
-    if let Some(p) = &parts.phrases {
-        store.set_phrase_edit(key, p)?;
-    }
-    Ok(())
+    store.system(|| {
+        if let Some(c) = &parts.cues {
+            store.set_cues(key, Some(c))?;
+        }
+        if let Some(b) = &parts.beats
+            && !store.analysis_locked(key)?
+        {
+            store.set_grid(key, b, before)?;
+        }
+        if let Some(p) = &parts.phrases {
+            store.set_phrase_edit(key, p)?;
+        }
+        Ok(())
+    })
 }
 
 /// The tracks of `collection` that the device library `device` (mounted at `mount`) also holds, by key. Collection tracks that

@@ -1,6 +1,6 @@
 import { Theme } from "theme.slint";
 import { DialogFrame, Note } from "dialog.slint";
-import { PrefRowData, PrefsState } from "prefs-state.slint";
+import { PrefRowData, PrefRows, PrefsState } from "prefs-state.slint";
 import { PrefsView } from "prefs-view.slint";
 import { PrefsAudio } from "prefs-audio.slint";
 import { PrefsAnalysis } from "prefs-analysis.slint";
@@ -53,8 +53,8 @@ export component PrefsOverlay inherits DialogFrame {
                 padding-top: Theme.space-sm;
                 alignment: start;
                 // THEMES (category 8, added last so the numbers of the others stay) is listed second, next to VIEW.
-                for name[i] in ["VIEW", "THEMES", "AUDIO", "ANALYSIS", "CONTROLLER", "KEYBOARD", "EXTENSIONS", "DJ SYSTEM", "ADVANCED"]: Category {
-                    property <int> cat: i == 1 ? 8 : i > 1 ? i - 1 : i;
+                for name[i] in ["VIEW", "THEMES", "AUDIO", "ANALYSIS", "CONTROLLER", "KEYBOARD", "EXTENSIONS", "DJ SYSTEM", "ADVANCED", "LIBRARIES"]: Category {
+                    property <int> cat: i == 9 ? 9 : i == 1 ? 8 : i > 1 ? i - 1 : i;
                     text: name;
                     active: PrefsState.category == self.cat;
                     clicked => {
@@ -84,6 +84,7 @@ export component PrefsOverlay inherits DialogFrame {
                     if PrefsState.category == 6: PrefsDjSystem {}
                     if PrefsState.category == 7: PrefsAdvanced {}
                     if PrefsState.category == 8: ThemesPage {}
+                    if PrefsState.category == 9: PrefRows {}
                 }
             }
             Note { text: "Saved on every change to " + PrefsState.path + "."; }

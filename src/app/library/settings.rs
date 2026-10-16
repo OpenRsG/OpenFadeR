@@ -4,7 +4,7 @@
 //! | key | item | effect here |
 //! | --- | --- | --- |
 //! | `lib_search_user`, `lib_search` | Auto Relocate Search Folders, "User specified folders" | folders Auto Relocate searches |
-//! | `lib_db` | Database management | the device library opened at start-up when no path is given |
+//! | `lib_db` | Database management | a library connected at start-up when no path is given ([`crate::app::connect`]) |
 //! | `lib_mytag_comment` | Add Tags to the Comments | assigning tags rewrites the comment |
 //! | `lib_dropdown` | Drop-down menu | holding a track for 1 s opens its menu |
 //! | `lib_taglist_load`, `lib_taglist_quit` | Tag List | removal on load / on quit |

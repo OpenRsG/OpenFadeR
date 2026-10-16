@@ -4,7 +4,7 @@
 #![allow(dead_code)] // each test binary uses a subset
 
 use openfader::library::{self, Library};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -55,10 +55,13 @@ pub fn device_plugin() -> Option<&'static str> {
             json!({"settings": {&name: secrets}}).to_string(),
         )
         .unwrap();
-        // SAFETY: set once, before the plugin registry is first read; the tests of a binary share this value.
+        // SAFETY: set once, before the plugin registry is first read; the tests of a binary share this value. The store and
+        // the analysis of the tests go to the same temp folder, never the user's.
         unsafe {
             std::env::set_var("OPENFADER_PLUGINS", root().join("extension/plugin"));
             std::env::set_var("XDG_CONFIG_HOME", &config);
+            std::env::set_var("XDG_DATA_HOME", config.join("data"));
+            std::env::set_var("XDG_CACHE_HOME", config.join("cache"));
         }
         Some(name)
     });

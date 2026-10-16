@@ -20,6 +20,10 @@ pub enum Ask {
     ExportList(Format),
     /// Missing tracks to relocate: the file (or folder) to take them from.
     Relocate(Vec<Track>),
+    /// Preferences > Libraries > ADD: a library file, or a folder.
+    Connect {
+        folder: bool,
+    },
 }
 
 /// What the confirmation dialog is asking.
@@ -29,6 +33,8 @@ pub enum Confirm {
     Restore(PathBuf),
     Remove(Vec<Track>),
     RemoveMissing(Vec<Track>),
+    /// A two-way connection's write-back, after its dry run (the plan is held by [`crate::app::connect`]).
+    WriteBack,
 }
 
 /// How a file chooser picks.
@@ -44,7 +50,9 @@ impl Ask {
     pub(super) fn pick(&self) -> Pick {
         match self {
             Ask::ImportFiles => Pick::Files,
-            Ask::ImportFolder | Ask::BackupTo { .. } => Pick::Folder,
+            Ask::ImportFolder | Ask::BackupTo { .. } | Ask::Connect { folder: true } => {
+                Pick::Folder
+            }
             Ask::ExportList(_) => Pick::Save,
             _ => Pick::File,
         }
@@ -113,6 +121,15 @@ impl Ask {
                 "RELOCATE",
                 "The new file of the first track — the others are looked for in its folder — or a folder to look in for all of them.",
                 String::new(),
+            ),
+            Ask::Connect { folder } => (
+                "ADD LIBRARY",
+                if *folder {
+                    "A folder of music: its files and sub-folders are synced into the Collection and follow the folder."
+                } else {
+                    "A library file another app wrote, read by an enabled library plugin: its tracks and playlists are synced into the Collection."
+                },
+                settings::music_dir().map(|p| p.display().to_string()).unwrap_or_default(),
             ),
         }
     }

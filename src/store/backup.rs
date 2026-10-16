@@ -11,7 +11,7 @@
 //! ponytail: no deflate on write (the entries are one SQLite file and two text files; `flate2` is already a dependency if backups
 //! get large) and no zip64.
 
-use super::{MIGRATIONS, R, Sql, Store, in_tx};
+use super::{in_tx, Sql, Store, MIGRATIONS, R};
 use crate::paths::at;
 use crate::zip::{self, Zip};
 use rusqlite::{Connection, OpenFlags};
@@ -116,8 +116,11 @@ impl Store {
         let db = get(STORE)?
             .ok_or("this zip holds no store.db (it is not a backup made by this program)")?;
         let (settings, index) = (get(SETTINGS)?, get(MUSIC_INDEX)?);
+        // One file per restore: two stores restoring at once (the tests do) never share it.
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let temp =
-            std::env::temp_dir().join(format!("openfader-restore-{}.db", std::process::id()));
+            std::env::temp_dir().join(format!("openfader-restore-{}-{n}.db", std::process::id()));
         at(std::fs::write(&temp, db), &temp)?;
         let r = self.copy_tables_from(&temp);
         let _ = std::fs::remove_file(&temp);
@@ -151,6 +154,9 @@ impl Store {
                 out.music_lost += 1;
             }
         }
+        // A backup from before the canonical columns holds rows still to be backfilled and edits under legacy keys; the
+        // music is back by now, so their files can be read.
+        self.system(|| super::rekey::backfill(&mut self.db()))?;
         Ok(out)
     }
 
@@ -168,7 +174,7 @@ impl Store {
         let mut db = self.db();
         db.execute("ATTACH DATABASE ?1 AS bak", [other.to_string_lossy()])
             .s()?;
-        let done = replace_tables(&mut db);
+        let done = self.system(|| replace_tables(&mut db));
         let _ = db.execute("DETACH DATABASE bak", []);
         done
     }
@@ -203,12 +209,19 @@ fn columns(db: &Connection, schema: &str, table: &str) -> R<Vec<String>> {
 
 /// Empties every table of `main` and refills the ones `bak` also has from it, in one transaction.
 fn replace_tables(db: &mut Connection) -> R<()> {
-    let mine = tables(db, "main")?;
+    // The journal stays this store's own: it describes edits of the data being replaced, so it is emptied below.
+    let mine: Vec<String> = tables(db, "main")?
+        .into_iter()
+        .filter(|t| !t.starts_with("journal") && t != "collection_hwm") // the high-water mark of ids only grows
+        .collect();
     let shared: Vec<String> = tables(db, "bak")?
         .into_iter()
         .filter(|t| mine.contains(t))
         .collect();
     in_tx(db, true, |tx| {
+        tx.execute("DELETE FROM main.journal", []).s()?;
+        tx.execute("DELETE FROM main.journal_action WHERE id > 0", [])
+            .s()?;
         for t in &mine {
             tx.execute(&format!("DELETE FROM main.\"{t}\""), []).s()?;
         }
@@ -226,6 +239,9 @@ fn replace_tables(db: &mut Connection) -> R<()> {
             )
             .s()?;
         }
+        // The journal restarts at seq 1: a cursor into the old one would hide every new edit from write-back.
+        tx.execute("UPDATE main.connection SET last_seq = 0", [])
+            .s()?;
         Ok(())
     })
 }
@@ -292,6 +308,18 @@ mod tests {
         // Restoring twice: the music is there now.
         assert_eq!(s.restore(&b.zip).unwrap().music_present, 1);
         assert!(s.restore(&d.join("missing.zip")).is_err());
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn restore_resets_connection_cursors_with_the_journal() {
+        let d = std::env::temp_dir().join(format!("openfader-backup-seq-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let s = Store::in_memory().unwrap();
+        s.connection_add("p", Path::new("/x"), "L", 500).unwrap();
+        let b = s.backup(&d, None, &[], "t").unwrap();
+        s.restore(&b.zip).unwrap();
+        assert_eq!(s.connections().unwrap()[0].last_seq, 0);
         std::fs::remove_dir_all(&d).unwrap();
     }
 }

@@ -2,9 +2,9 @@
 //! grid. `None` = never edited, the library's value stands; `Some` = the store's value wins (a stored
 //! cue list replaces the library's as a whole, so a deleted library cue stays deleted).
 
-use super::{R, Sql, Store, cue_at, exec, query_all, query_opt, rgb, scalar};
+use super::{cue_at, exec, exists, query_all, query_opt, rgb, scalar, Sql, Store, R};
 use crate::analysis::{Beat, Cue, Phrases};
-use rusqlite::{ToSql, params};
+use rusqlite::{params, Connection, ToSql};
 use std::collections::HashMap;
 
 /// Track colours by colour id − 1: name and RGB.
@@ -63,6 +63,48 @@ fn grid_from(blob: &[u8]) -> Vec<Beat> {
         .collect()
 }
 
+/// The `device_setting` scope listing the keys whose cue list CUE Analysis made.
+pub const AUTO_CUES: &str = "cue_analysis";
+
+fn put_cues(tx: &Connection, key: &str, cues: Option<&[Cue]>, auto: bool) -> R<()> {
+    exec(
+        tx,
+        "INSERT INTO track(key, cues_set) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET cues_set = ?2",
+        params![key, cues.is_some()],
+    )?;
+    exec(tx, "DELETE FROM cue WHERE key = ?1", [key])?;
+    let mut ins = tx
+        .prepare_cached(
+            "INSERT INTO cue(key, pos, hot, time_ms, loop_end_ms, color, comment) VALUES (?1,?2,?3,?4,?5,?6,?7)",
+        )
+        .s()?;
+    for (pos, c) in cues.unwrap_or_default().iter().enumerate() {
+        ins.execute(params![
+            key,
+            pos as i64,
+            c.hot_cue,
+            c.time_ms,
+            c.loop_end_ms,
+            c.color.map(rgb),
+            c.comment
+        ])
+        .s()?;
+    }
+    if auto {
+        exec(
+            tx,
+            "INSERT OR REPLACE INTO device_setting VALUES (?1, ?2, '1')",
+            params![AUTO_CUES, key],
+        )
+    } else {
+        exec(
+            tx,
+            "DELETE FROM device_setting WHERE scope = ?1 AND key = ?2",
+            params![AUTO_CUES, key],
+        )
+    }
+}
+
 impl Store {
     /// Sets one nullable column of `key`'s row (created on demand); `None` clears it.
     fn set_field(&self, col: &str, key: &str, v: impl ToSql) -> R<()> {
@@ -89,34 +131,23 @@ impl Store {
     }
 
     /// Stores the whole cue list of `key` (hot cues, memory cues, loops; list order kept); `None` drops it
-    /// so the library's cues show again.
+    /// so the library's cues show again. The list is the user's from now on (no longer [`Store::cues_are_auto`]).
     pub fn set_cues(&self, key: &str, cues: Option<&[Cue]>) -> R<()> {
-        self.write(|tx| {
-            exec(
-                tx,
-                "INSERT INTO track(key, cues_set) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET cues_set = ?2",
-                params![key, cues.is_some()],
-            )?;
-            exec(tx, "DELETE FROM cue WHERE key = ?1", [key])?;
-            let mut ins = tx
-                .prepare_cached(
-                    "INSERT INTO cue(key, pos, hot, time_ms, loop_end_ms, color, comment) VALUES (?1,?2,?3,?4,?5,?6,?7)",
-                )
-                .s()?;
-            for (pos, c) in cues.unwrap_or_default().iter().enumerate() {
-                ins.execute(params![
-                    key,
-                    pos as i64,
-                    c.hot_cue,
-                    c.time_ms,
-                    c.loop_end_ms,
-                    c.color.map(rgb),
-                    c.comment
-                ])
-                .s()?;
-            }
-            Ok(())
-        })
+        self.write(|tx| put_cues(tx, key, cues, false))
+    }
+
+    /// [`Store::set_cues`] for cues CUE Analysis made: marked so a connected library's own cues may replace them.
+    pub fn set_auto_cues(&self, key: &str, cues: &[Cue]) -> R<()> {
+        self.write(|tx| put_cues(tx, key, Some(cues), true))
+    }
+
+    /// Whether the stored cue list of `key` is the one CUE Analysis made ([`Store::set_auto_cues`]), untouched since.
+    pub fn cues_are_auto(&self, key: &str) -> R<bool> {
+        exists(
+            &self.db(),
+            "SELECT 1 FROM device_setting WHERE scope = ?1 AND key = ?2",
+            params![AUTO_CUES, key],
+        )
     }
 
     /// Stores an edited beat grid. `original` is the grid before the edit; the first call for a track keeps

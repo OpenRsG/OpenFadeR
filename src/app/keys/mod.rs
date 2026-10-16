@@ -15,14 +15,14 @@ mod table;
 #[cfg(test)]
 mod tests;
 
-pub use keymap::{Capture, Keymap, Preset, capture, conflicts, fit};
+pub use keymap::{capture, conflicts, fit, Capture, Keymap, Preset};
 pub use table::{Act, Bind, Row};
 
-use table::{Def, TABLE, span};
+use table::{span, Def, TABLE};
 
 use super::{
-    App, AutomixState, BrowserState, DeckState, FxState, HelpLine, KeysState, PrefsState,
-    SamplerState, deck::DECK_NAMES, prefs,
+    deck::DECK_NAMES, prefs, App, AutomixState, BrowserState, DeckState, FxState, HelpLine,
+    KeysState, LibraryState, PrefsState, SamplerState,
 };
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::{
@@ -175,6 +175,8 @@ fn dispatch(app: &App, r: &Row, n: usize) {
         Act::FocusSearch => app.invoke_focus_search(),
         Act::BrowseView => app.invoke_browse_view(),
         Act::BrowseArea => app.invoke_browse_area(),
+        Act::Undo => app.global::<LibraryState>().invoke_action("undo".into()),
+        Act::Redo | Act::RedoAlt => app.global::<LibraryState>().invoke_action("redo".into()),
         Act::Help => {
             let keys = app.global::<KeysState>();
             keys.set_help_visible(!keys.get_help_visible());

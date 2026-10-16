@@ -1,10 +1,12 @@
 //! Several library formats on one device: an export writes the formats picked for the device one after the other (each is a
 //! device plugin, [`Provider::export`]). The first copies the audio; before the next ones run, the snapshot's tracks are pointed
 //! at the copies the first one's library lists ([`Snapshot::retarget`]), so the device holds one copy of each track whatever
-//! folders that library files them under.
+//! folders that library files them under. Each format gets the snapshot fitted to what it can hold
+//! ([`translate::fit_tracks`]); what did not fit is added to the report's notes.
 
-use crate::library::{Library, snapshot::Snapshot};
+use crate::library::{Library, snapshot::Snapshot, translate};
 use crate::plugin::device::{Control, ExportOptions, ExportReport, Provider};
+use crate::plugin::library::capabilities_of;
 use crate::store;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -31,7 +33,16 @@ pub fn export(
         {
             snap.to_mut().retarget(&copies);
         }
-        let r = w.export(dest, &snap, o, ctl);
+        let caps = capabilities_of(w.name());
+        let mut fitted = Cow::Borrowed(&*snap);
+        let mut loss = translate::Loss::default();
+        if !translate::is_noop(&caps) {
+            loss = translate::fit_tracks(fitted.to_mut().tracks_mut(), &caps);
+        }
+        let mut r = w.export(dest, &fitted, o, ctl);
+        if let (Ok(report), false) = (&mut r, loss.is_empty()) {
+            report.notes.push(format!("Not kept by this format: {loss}"));
+        }
         if ctl.cancelled() {
             return Err("cancelled".into());
         }

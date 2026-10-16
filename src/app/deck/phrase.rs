@@ -8,7 +8,7 @@
 use super::Deck;
 use crate::app::render::phrase::phrase_color;
 use openfader::{
-    analysis::{self, Beat, Mood, Phrases, phrase_edit},
+    analysis::{self, phrase_edit, Beat, Mood, Phrases},
     store,
 };
 
@@ -183,18 +183,7 @@ impl Deck {
             return;
         };
         let saved = store::global().clear_phrase_edit(&key);
-        let own = l
-            .track
-            .as_ref()
-            .and_then(|t| self.lib.analysis(t))
-            .and_then(|a| a.phrases);
-        let phrases = own.or_else(|| {
-            analysis::options::get()
-                .parts
-                .phrase
-                .then(|| analysis::auto::phrases(&l.analysis.beats, &l.analysis.three_band_detail))
-                .flatten()
-        });
+        let phrases = self.unedited_phrases(&l);
         l.analysis.phrases = phrases;
         l.invalidate();
         drop(l);
@@ -202,5 +191,22 @@ impl Deck {
             Ok(()) => "phrases back to the analysis".to_owned(),
             Err(e) => format!("phrases: {e}"),
         });
+    }
+
+    /// The loaded track's phrases without the stored edit: the library's, else ours from the grid.
+    pub(super) fn unedited_phrases(&self, l: &super::Loaded) -> Option<Phrases> {
+        l.track
+            .as_ref()
+            .and_then(|t| self.lib.analysis(t))
+            .and_then(|a| a.phrases)
+            .or_else(|| {
+                analysis::options::get()
+                    .parts
+                    .phrase
+                    .then(|| {
+                        analysis::auto::phrases(&l.analysis.beats, &l.analysis.three_band_detail)
+                    })
+                    .flatten()
+            })
     }
 }

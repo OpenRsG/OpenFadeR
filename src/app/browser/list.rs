@@ -2,23 +2,23 @@
 //! sort pass, and the cheaper row updates (a new reference, an edited track).
 
 use super::{
-    App, BrowserState, Home, View, contains_ignore_case, filter,
-    table::{self, BPM, Facts, Look, RATING, Reference, TIME, cell_of},
+    filter,
+    table::{self, Facts, Look, Reference},
+    App, BrowserState, Home, View,
 };
-use crate::app::camelot;
 use openfader::{library::Track, store};
 use slint::{ComponentHandle, Model};
 
 impl View {
     /// Rebuilds `list` from the current source and refreshes the rows.
-    // ponytail: Related re-reads the whole library per toggle; cache it if a source is slow.
+    // ponytail: the whole-library list is cloned out of the cache per view change; share it (Arc) if that shows up in profiles.
     pub(super) fn load(&mut self, app: &App) {
         let (home, anchor) = (self.home.clone(), self.related.clone());
         self.slots.clear();
         let list = match (&anchor, &home) {
-            (Some(a), _) => self.lib.tracks(None).map(|all| {
+            (Some(a), _) => self.cache().map(|all| {
                 let partners = self.store.matches_of(&store::key(a)).unwrap_or_default();
-                filter::related_with(a, &all, &partners, &Look::now())
+                filter::related_with(a, &all.tracks, &partners, &Look::now())
                     .into_iter()
                     .cloned()
                     .collect()
@@ -26,6 +26,7 @@ impl View {
             (None, Home::Nothing) => Ok(Vec::new()),
             (None, Home::Tags) => Ok(self.tags.clone()),
             (None, Home::History) => Ok(self.history.clone()),
+            (None, Home::Playlist(None)) => self.cache().map(|c| c.tracks.to_vec()),
             (None, Home::Playlist(id)) => self.lib.tracks(id.as_deref()),
             (None, Home::User(id)) => self.user_list(*id),
             (None, Home::Smart(id)) => self.smart_list(*id),
@@ -61,9 +62,8 @@ impl View {
 
     /// Search box, filter bar, tag filter and header sort over `list`, then the rows and the status line.
     ///
-    /// BPM and key are resolved once per track ([`Facts`]) and the search compares without lowercasing each field.
-    /// A key sorts as text ("10A" < "2A"), not by Camelot number.
-    // ponytail: refilters and resorts the whole list per keystroke; index it if lists reach 100k tracks.
+    /// BPM and key are resolved once per track ([`Facts`]) and the search compares without lowercasing each field
+    /// ([`filter::shown`], [`filter::sort`]).
     pub(super) fn refresh(&mut self, app: &App) {
         self.look = Look::now();
         let look = self.look;
@@ -73,35 +73,17 @@ impl View {
             self.query.to_lowercase()
         };
         let facts: Vec<Facts> = self.list.iter().map(Facts::of).collect();
-        let list = &self.list;
-        let matches = |i: usize| {
-            let (t, x) = (&list[i], &facts[i]);
-            q.is_empty()
-                || [&t.title, &t.artist, &t.genre, &x.key, &t.comment]
-                    .iter()
-                    .any(|f| contains_ignore_case(f, &q))
-                // the key as shown; the raw name (Camelot) matched above
-                || contains_ignore_case(&camelot::display(&x.key, look.notation), &q)
-        };
-        self.shown = (0..list.len())
-            .filter(|&i| {
-                matches(i)
-                    && filter::passes(&list[i], &facts[i], &self.filter, &self.reference, &look)
-                    && super::tagging::passes(&self.tag_map, &self.tag_filter, &list[i])
-            })
-            .collect();
+        self.shown = filter::shown(
+            &self.list,
+            &facts,
+            &q,
+            &self.filter,
+            &self.reference,
+            &look,
+            |t| super::tagging::passes(&self.tag_map, &self.tag_filter, t),
+        );
         if let Some((col, asc)) = self.sort.filter(|_| !self.ordered()) {
-            match col {
-                BPM => self.shown.sort_by_key(|&i| facts[i].bpm_x100),
-                TIME => self.shown.sort_by_key(|&i| list[i].length_s),
-                RATING => self.shown.sort_by_key(|&i| list[i].rating),
-                _ => self.shown.sort_by_cached_key(|&i| {
-                    cell_of(&list[i], &facts[i], col, &look).to_lowercase()
-                }),
-            }
-            if !asc {
-                self.shown.reverse();
-            }
+            filter::sort(&mut self.shown, &self.list, &facts, col, asc, &look);
         }
         let rows: Vec<_> = self
             .shown

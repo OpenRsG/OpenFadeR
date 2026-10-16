@@ -7,13 +7,14 @@
 //! | high precision | `high_precision` | [`openfader::analysis::detect::GridOptions::precision`] (1 ms flux frames, sub-frame onsets) |
 //! | mode, BPM range | `track_mode`, `bpm_range` | [`openfader::analysis::detect::Mode`], `bpm_range` (octave fold + search band); Auto only with high precision |
 //! | parts | `part_*` | [`openfader::analysis::options::Parts`]: a part off is not computed and left empty |
+//! | grid source | `grid_source` | which beat grid and cues a LOAD uses first: the connected library's or ours ([`crate::app::deck`]); the user's own edits win over both |
 //! | Auto Analysis | `auto_analysis` | the background run at start ([`crate::app::analyze::wire`]); off = only ANALYZE NOW / the track menu |
 //! | write key | `key_write_tag` | [`openfader::analysis::tag::write_key`] after each analysis, never otherwise |
 //! | process | `process` | worker threads and their priority ([`crate::app::analyze`]) |
 //! | CUE | `cue_*` | [`openfader::analysis::auto::CueOptions`] (pure cue generation), stored through the store overlay |
 //! | playlist | `view.panel_cue_analysis` | shared with VIEW; the tracks are [`crate::app::analyze::cue_analysed`] |
 
-use super::{Prefs, Row, choice, section};
+use super::{choice, section, Prefs, Row};
 use openfader::analysis::auto::{MAX_HOT, MAX_MEMORY, MIN_TRACKS};
 
 choice!(
@@ -33,6 +34,11 @@ choice!(
 choice!(
     /// Set CUE during analysis.
     CueSetting { Auto = "auto", #[default] Manual = "manual" }
+);
+choice!(
+    /// Where a LOAD takes a track's beat grid and cues from first: the connected library (what it holds, ours fills the gaps)
+    /// or our own analysis (the library's grid and cues are ignored). The user's own edits win over both.
+    GridSource { #[default] Library = "library", Ours = "ours" }
 );
 
 impl BpmRange {
@@ -65,6 +71,8 @@ section!(
         part_key: bool = true;
         part_phrase: bool = true;
         part_vocal: bool = true;
+        /// Beat grid and cues from the connected library or from our own analysis.
+        grid_source: GridSource = GridSource::Library;
         /// Key Analysis > Write the value to the ID3 tag.
         key_write_tag: bool = false;
         /// Analysis Process.
@@ -136,6 +144,13 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         Row::check("part_key", "KEY", a.part_key),
         Row::check("part_phrase", "Phrase", a.part_phrase).hint("needs the grid"),
         Row::check("part_vocal", "Vocal", a.part_vocal).hint("heuristic"),
+        Row::chips(
+            "grid_source",
+            "BEAT GRID AND CUES FROM",
+            &["THE CONNECTED LIBRARY", "OPENFADER ANALYSIS"],
+            a.grid_source as usize,
+        )
+        .hint("your own edits win over both"),
         Row::header("AUTO ANALYSIS"),
         Row::check("auto_analysis", "Auto Analysis", a.auto_analysis)
             .hint("tracks without a BPM or key"),

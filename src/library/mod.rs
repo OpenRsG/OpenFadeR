@@ -4,24 +4,29 @@
 //! also owns the "Histories" folder convention ([`is_history`]). [`markup`] is the mini XML tag reader and [`pathmap`] the
 //! `OPENFADER_PATH_MAP` remapping.
 //!
-//! Children: [`folder`] (plain directory of audio), [`collection`] (our own Collection laid over any source), [`snapshot`]
+//! Children: [`own`] (our own Collection, the library the app opens), [`folder`] (plain directory of audio), [`snapshot`]
 //! (the owned export input of a library), [`playlist_file`] (M3U / M3U8 / PLS files), [`relocate`] (finding moved files by
-//! name), [`import`] (files, playlists and other libraries into the Collection). Every other format is a library plugin.
+//! name), [`import`] (files, playlists and other libraries into the Collection), [`translate`] (fitting a collection to what
+//! a format can hold, with a loss report), [`open_format`] (our documented JSON / CSV export, `docs/library-format.md`).
+//! Every other format is a library plugin.
 
-pub mod collection;
+pub mod connect;
 pub mod folder;
 pub mod import;
+pub mod open_format;
+pub mod own;
 pub mod playlist_file;
 pub mod relocate;
 pub mod snapshot;
+pub mod translate;
 
 pub mod markup;
 mod pathmap;
 
+use openfader_plugin::library::{playlist_tree, PlaylistRow};
 pub use openfader_plugin::library::{Playlist, Remote, Track};
-use openfader_plugin::library::{PlaylistRow, playlist_tree};
 use pathmap::path_map_from_env;
-pub use pathmap::{PathMap, location, parse_path_map, remap_path};
+pub use pathmap::{location, parse_path_map, remap_path, PathMap};
 
 use std::path::{Path, PathBuf};
 
@@ -48,14 +53,6 @@ pub(crate) fn today() -> String {
     chrono::Local::now().format("%Y-%m-%d").to_string()
 }
 
-/// The store key ([`crate::store::key`]) of the track at `file`.
-fn file_key(file: &Path) -> String {
-    crate::store::key(&Track {
-        file: Some(file.to_path_buf()),
-        ..Track::default()
-    })
-}
-
 pub use crate::plugin::library::load_ref;
 
 /// Whether a [`Playlist::id`] names a history playlist or the "Histories" folder.
@@ -80,6 +77,11 @@ pub trait Library {
     fn playlists(&self) -> Result<Vec<Playlist>, String>;
     /// `None`: all tracks. `Some(id)`: that playlist's tracks in playlist order.
     fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String>;
+    /// All tracks, shared: what callers that only read use, so a library that keeps its list (the Collection) hands it out
+    /// without a copy.
+    fn tracks_all(&self) -> Result<std::sync::Arc<Vec<Track>>, String> {
+        self.tracks(None).map(std::sync::Arc::new)
+    }
     /// Runs the search `query` in the search entry `playlist` (a playlist id this library listed) in the background;
     /// the results appear in `tracks(Some(playlist))` once the source has answered. `false`: `playlist` is no search entry.
     fn search(&self, _playlist: &str, _query: &str) -> bool {
@@ -130,18 +132,14 @@ mod tests {
         let file = dir.join("notes.xyz");
         std::fs::write(&file, b"?").unwrap();
         assert_eq!(open(&dir).map(|l| l.kind().to_owned()), Ok("Folder".into()));
-        assert!(
-            open(&file)
-                .err()
-                .unwrap()
-                .starts_with("no library plugin reads")
-        );
-        assert!(
-            open(&dir.join("gone"))
-                .err()
-                .unwrap()
-                .contains("no such file")
-        );
+        assert!(open(&file)
+            .err()
+            .unwrap()
+            .starts_with("no library plugin reads"));
+        assert!(open(&dir.join("gone"))
+            .err()
+            .unwrap()
+            .contains("no such file"));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

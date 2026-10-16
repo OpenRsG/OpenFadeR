@@ -129,8 +129,23 @@ pub fn base_from(base: Base, get: impl Fn(&str) -> Option<String>) -> Option<Pat
     Some(var("HOME")?.join(sub).join("openfader"))
 }
 
+/// [`base_from`] of the environment. A test binary (cargo puts every one in a `deps` folder, the app never runs from one)
+/// that did not point `$XDG_*_HOME` elsewhere gets a temp folder of its own: tests never read or write the user's settings,
+/// store or analysis.
 fn base(b: Base) -> Option<PathBuf> {
-    base_from(b, |k| std::env::var(k).ok())
+    let test = std::env::current_exe()
+        .ok()
+        .is_some_and(|e| e.parent().and_then(Path::file_name) == Some("deps".as_ref()));
+    base_from(b, |k| {
+        std::env::var(k).ok().or_else(|| {
+            (test && k.starts_with("XDG_")).then(|| {
+                std::env::temp_dir()
+                    .join(format!("openfader-test-{}/{k}", std::process::id()))
+                    .to_string_lossy()
+                    .into_owned()
+            })
+        })
+    })
 }
 
 /// Where our own persistent store lives (`store.db`, see [`crate::store`]); see [`base_from`].

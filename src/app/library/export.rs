@@ -1,37 +1,96 @@
-//! File > Export (and the browser's EXPORT button): the whole Collection as a file a library plugin writes in its format
-//! ([`openfader::plugin::library::writers`]; the menu labels come from the plugins' manifests), in the shared output folder
-//! ([`paths`]). It carries the store's edits (the overlaid library: rating, comment, cues, grid; the store's colours, tags
+//! File > Export (and the browser's EXPORT button): the whole Collection as a file, in the shared output folder ([`paths`]).
+//! The choices are the library plugins that write a collection ([`openfader::plugin::library::writers`]; the menu labels come
+//! from the plugins' manifests) followed by our own open formats ([`BUILTIN`], `docs/library-format.md`). A plugin's format
+//! cannot hold everything: the Collection is fitted to its capabilities first ([`translate::fit`]) and the status line says
+//! what did not fit. It carries the store's edits (the overlaid library: rating, comment, cues, grid; the store's colours, tags
 //! and user playlists via [`Snapshot::add_store`]) and tracks loaded in a deck carry the deck's session edits instead.
 //!
-//! `Rc<dyn Library>` cannot leave the UI thread, so the press snapshots the library there ([`Snapshot::take`]); the plugin
-//! writes the file on a thread.
+//! `Rc<dyn Library>` cannot leave the UI thread, so the press snapshots the library there ([`Snapshot::take`]); the file is
+//! written on a thread.
 
 use super::{BrowserState, Ctx, LibraryState};
 use crate::app::App;
 use openfader::{
-    library::snapshot::Snapshot,
+    library::{
+        open_format,
+        snapshot::Snapshot,
+        translate::{self, Loss},
+    },
     paths,
-    plugin::library::{extension, write_collection, writers},
+    plugin::library::{capabilities_of, extension, write_collection, writers},
     store,
 };
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
-use std::rc::Rc;
+use std::{path::Path, rc::Rc};
 
-/// `<$OPENFADER_EXPORT_DIR | …>/<plugin>-YYYYmmdd-HHMMSS.<extension>` (see [`paths`]), written by `plugin`, removed again
-/// when it fails.
-fn write(plugin: &str, snap: &Snapshot) -> Result<String, String> {
-    let dir =
-        paths::output_dir("OPENFADER_EXPORT_DIR").ok_or("set OPENFADER_EXPORT_DIR or HOME")?;
-    let ext = extension(plugin).ok_or_else(|| format!("{plugin}: writes no collection"))?;
-    let path = paths::at(paths::timestamped(&dir, plugin, &ext), &dir)?;
-    write_collection(plugin, &path, &snap.to_wire())
-        .map(|n| format!("exported {n} tracks to {}", path.display()))
+/// A format of our own: menu label, file extension, writer (returns the number of tracks written).
+struct Builtin {
+    label: &'static str,
+    ext: &'static str,
+    write: fn(&Path, &Snapshot) -> Result<usize, String>,
 }
 
-/// Exports with the `i`th collection-writing plugin.
+const BUILTIN: [Builtin; 3] = [
+    Builtin {
+        label: "OpenFadeR JSON (.json)",
+        ext: "json",
+        write: open_format::write_json,
+    },
+    Builtin {
+        label: "CSV table (.csv)",
+        ext: "csv",
+        write: open_format::write_csv,
+    },
+    Builtin {
+        label: "M3U8 playlist (.m3u8)",
+        ext: "m3u8",
+        write: open_format::write_m3u8,
+    },
+];
+
+/// Where an export goes.
+enum Target {
+    Plugin(String),
+    Builtin(&'static Builtin),
+}
+
+/// `<$OPENFADER_EXPORT_DIR | …>/<plugin | openfader>-YYYYmmdd-HHMMSS.<extension>` (see [`paths`]), written by the target, removed
+/// again when it fails. The message says what a plugin's format could not keep.
+fn write(target: &Target, snap: &Snapshot) -> Result<String, String> {
+    let dir =
+        paths::output_dir("OPENFADER_EXPORT_DIR").ok_or("set OPENFADER_EXPORT_DIR or HOME")?;
+    let (prefix, ext) = match target {
+        Target::Plugin(p) => (
+            p.as_str(),
+            extension(p).ok_or_else(|| format!("{p}: writes no collection"))?,
+        ),
+        Target::Builtin(b) => ("openfader", b.ext.to_owned()),
+    };
+    let path = paths::at(paths::timestamped(&dir, prefix, &ext), &dir)?;
+    let (n, loss) = match target {
+        Target::Plugin(p) => {
+            let mut wire = snap.to_wire();
+            let loss = translate::fit(&mut wire, &capabilities_of(p));
+            (write_collection(p, &path, &wire)?, loss)
+        }
+        Target::Builtin(b) => ((b.write)(&path, snap)?, Loss::default()),
+    };
+    let mut msg = format!("exported {n} tracks to {}", path.display());
+    if !loss.is_empty() {
+        msg.push_str(&format!(" · not kept by this format: {loss}"));
+    }
+    Ok(msg)
+}
+
+/// Exports with the `i`th choice: the collection-writing plugins, then [`BUILTIN`].
 pub fn collection(c: &Rc<Ctx>, i: usize) {
-    let Some(plugin) = writers().into_iter().nth(i).map(|w| w.plugin) else {
-        return c.say("no library plugin writes a collection (see Preferences > Extensions)");
+    let plugins = writers();
+    let target = match plugins.get(i) {
+        Some(w) => Target::Plugin(w.plugin.clone()),
+        None => match BUILTIN.get(i - plugins.len()) {
+            Some(b) => Target::Builtin(b),
+            None => return c.say("no such export format"),
+        },
     };
     let mut snap =
         match Snapshot::take(&*c.lib).and_then(|mut s| s.add_store(&store::global()).map(|()| s)) {
@@ -43,24 +102,33 @@ pub fn collection(c: &Rc<Ctx>, i: usize) {
     }
     c.say(&format!("exporting {} tracks…", snap.len()));
     c.spawn(
-        move || write(&plugin, &snap),
+        move || write(&target, &snap),
         |c, r| c.say(&r.unwrap_or_else(|e| format!("export failed: {e}"))),
     );
 }
 
-/// The File menus' entries for the plugins that read / write a collection file, and the browser's EXPORT button (the first
-/// writer).
+/// The File menus' entries for the plugins that read / write a collection file plus our own formats, and the browser's EXPORT
+/// button (the first choice).
 pub fn wire(app: &App, c: &Rc<Ctx>) {
-    let labels = |v: Vec<openfader::plugin::library::Entry>| {
+    let labels = |v: Vec<String>| {
         ModelRc::new(VecModel::from(
-            v.into_iter()
-                .map(|e| SharedString::from(e.label))
-                .collect::<Vec<_>>(),
+            v.into_iter().map(SharedString::from).collect::<Vec<_>>(),
         ))
     };
     let s = app.global::<LibraryState>();
-    s.set_import_readers(labels(openfader::plugin::library::readers()));
-    s.set_export_writers(labels(writers()));
+    s.set_import_readers(labels(
+        openfader::plugin::library::readers()
+            .into_iter()
+            .map(|e| e.label)
+            .collect(),
+    ));
+    s.set_export_writers(labels(
+        writers()
+            .into_iter()
+            .map(|e| e.label)
+            .chain(BUILTIN.iter().map(|b| b.label.to_owned()))
+            .collect(),
+    ));
     let k = c.clone();
     app.global::<BrowserState>()
         .on_export_collection(move || collection(&k, 0));

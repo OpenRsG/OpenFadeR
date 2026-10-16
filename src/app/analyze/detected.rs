@@ -1,6 +1,6 @@
 //! The session map of what our own analysis found, and the choice of which tracks a background run still has to analyse.
 
-use super::{Found, summary};
+use super::{summary, Found};
 use crate::app::camelot::camelot;
 use openfader::{
     analysis::{cache, options::Parts},
@@ -51,10 +51,11 @@ impl Detected {
         )
     }
 
-    /// [`get`](Self::get), else whatever the persistent cache holds for the file (remembered, so a repeat is free).
-    pub fn lookup(&self, audio: &Path) -> Option<Found> {
+    /// [`get`](Self::get), else whatever the stored analysis holds for `t` (remembered, so a repeat is free).
+    pub fn lookup(&self, t: &Track) -> Option<Found> {
+        let audio = t.file.as_deref()?;
         self.get(audio).or_else(|| {
-            let found = summary(&cache::load(audio).ok()??);
+            let found = summary(&cache::load(t).ok()??);
             self.0
                 .map
                 .borrow_mut()

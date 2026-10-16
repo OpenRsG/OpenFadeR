@@ -139,6 +139,62 @@ pub fn detect(samples: &[f32], rate: u32) -> Option<String> {
     from_chroma(&chroma(samples, rate))
 }
 
+/// A key as `(Camelot number 1..=12, major)`: "A" = minor = `false`, "B" = major = `true`.
+pub type Key = (u8, bool);
+
+/// The key a text names, in any notation: Camelot ("10A"), Open Key ("1m" minor / "1d" major, C major = 1d, A minor = 1m,
+/// +1 per fifth) or a musical name ("F#m", "Bb", "Am", "C#min", "Dmaj", "E♭"). Musical names map by the standard Camelot
+/// wheel (Am = 8A, C = 8B; a fifth up = +1), computed from the tonic's pitch class. `None` for text that is no key.
+pub fn parse(text: &str) -> Option<Key> {
+    let k = text.trim();
+    // "12A" / "1m": a number then one letter.
+    if let Some(split) = k.len().checked_sub(1).filter(|&i| k.is_char_boundary(i)) {
+        let (digits, last) = (&k[..split], &k[split..]);
+        if let Ok(n @ 1..=12) = digits.parse::<u8>() {
+            match last {
+                "A" | "a" => return Some((n, false)),
+                "B" | "b" => return Some((n, true)),
+                // Open Key number n is Camelot (n + 6) mod 12 + 1.
+                "m" | "M" | "d" | "D" => {
+                    return Some(((n + 6) % 12 + 1, matches!(last, "d" | "D")));
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut it = k.chars();
+    let mut pc = match it.next()?.to_ascii_uppercase() {
+        'C' => 0,
+        'D' => 2,
+        'E' => 4,
+        'F' => 5,
+        'G' => 7,
+        'A' => 9,
+        'B' => 11,
+        _ => return None,
+    } as i32;
+    let rest = it.as_str();
+    let (acc, rest) = match rest.chars().next() {
+        Some(c @ ('#' | '♯')) => (1, &rest[c.len_utf8()..]),
+        Some(c @ '♭') => (-1, &rest[c.len_utf8()..]),
+        Some('b') => (-1, &rest[1..]),
+        _ => (0, rest),
+    };
+    pc += acc;
+    let minor = match rest.to_lowercase().as_str() {
+        "" | "maj" | "major" => false,
+        "m" | "min" | "minor" => true,
+        _ => return None,
+    };
+    let steps = (pc - if minor { 9 } else { 0 }).rem_euclid(12) * 7 % 12;
+    Some((((steps + 7) % 12 + 1) as u8, !minor))
+}
+
+/// [`parse`] as the `collection.key_id` column: 0..=23, `(Camelot number − 1) × 2 + (B = 1)`.
+pub fn key_id(text: &str) -> Option<u8> {
+    parse(text).map(|(n, major)| (n - 1) * 2 + u8::from(major))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,5 +271,40 @@ mod tests {
     fn silence_and_too_short_have_no_key() {
         assert_eq!(detect(&vec![0.0; RATE as usize * 20], RATE), None);
         assert_eq!(detect(&[0.1; 2000], RATE), None);
+    }
+
+    #[test]
+    fn key_ids_from_every_notation() {
+        for (text, id) in [
+            ("1A", Some(0)),
+            ("1B", Some(1)),
+            ("8A", Some(14)),
+            ("12B", Some(23)),
+            ("8a", Some(14)),
+            (" 8B ", Some(15)),
+            ("1m", Some(14)), // Open Key: A minor = 8A
+            ("1d", Some(15)), // C major = 8B
+            ("6m", Some(0)),
+            ("6d", Some(1)),
+            ("12d", Some(13)), // = 7B
+            ("Am", Some(14)),
+            ("C", Some(15)),
+            ("C#", Some(5)),   // Db major = 3B
+            ("Dbm", Some(22)), // = 12A
+            ("C#m", Some(22)),
+            ("Bb", Some(11)),
+            ("A♭", Some(7)),
+            ("Gb", Some(3)),
+            ("F#min", Some(20)),
+            ("Dmaj", Some(19)),
+            ("", None),
+            ("?", None),
+            ("13A", None),
+            ("0B", None),
+            ("H", None),
+            ("Xm", None),
+        ] {
+            assert_eq!(key_id(text), id, "{text:?}");
+        }
     }
 }

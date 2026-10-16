@@ -4,7 +4,7 @@
 //! settings are saved per track. The analysed dB and the manual
 //! offset are kept in two columns and `analysed + adjust` is applied (within +-[`MAX_GAIN_DB`]), so a re-analysis replaces only the first.
 
-use super::{R, Store, query_opt};
+use super::{query_opt, Store, R};
 use crate::audio::loudness::MAX_GAIN_DB;
 use rusqlite::params;
 
@@ -50,10 +50,13 @@ impl Store {
 
     /// Stores what the analysis measured; the user's adjustment stays.
     pub fn set_gain_analysed(&self, key: &str, db: f32) -> R<()> {
-        self.run(
-            "INSERT INTO gain(key, analysed_db) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET analysed_db = ?2",
-            params![key, f64::from(db)],
-        )
+        // Not an edit of the user's: never an undo step.
+        self.system(|| {
+            self.run(
+                "INSERT INTO gain(key, analysed_db) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET analysed_db = ?2",
+                params![key, f64::from(db)],
+            )
+        })
     }
 
     /// Stores the user's offset (0 = none); the analysed value stays.

@@ -11,6 +11,7 @@ use openfader::{
         options::Options,
         tag, Analysis, Beat, Phrases,
     },
+    library::Track,
     store::Store,
 };
 use std::{
@@ -32,6 +33,8 @@ pub struct Guide {
 
 pub struct Job {
     pub path: PathBuf,
+    /// What the analysis is of: its identity names the stored entry ([`cache`]).
+    pub track: Track,
     /// [`openfader::store::key`] of the track.
     pub key: String,
     /// Asked for by the user (the track menu): analysed again whatever the cache holds, and its key is written to the tag
@@ -78,7 +81,7 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
             .is_ok_and(|e| e.cues.is_some_and(|c| !c.is_empty()));
     let cues = !arrived
         && auto::for_analysis(beats, phrases.as_ref(), &s.options.cue, g.has_cues).is_some_and(
-            |c| match store_cues(store, &job.key, &c) {
+            |c| match store.system(|| store_cues(store, &job.key, &c)) {
                 Ok(()) => true,
                 Err(e) => {
                     eprintln!("analyze: {}: cues not stored: {e}", job.path.display());
@@ -128,9 +131,9 @@ fn lower_priority() {
 
 fn analyse(job: &Job) -> Result<(Analysis, Source), String> {
     if job.explicit {
-        cache::reanalyze(&job.path).map(|a| (a, Source::Computed { ignored: None }))
+        cache::reanalyze(&job.track).map(|a| (a, Source::Computed { ignored: None }))
     } else {
-        cache::get_or_analyze(&job.path)
+        cache::get_or_analyze(&job.track)
     }
 }
 
@@ -209,6 +212,10 @@ mod tests {
     fn job(path: &str, guide: Guide) -> Job {
         Job {
             path: path.into(),
+            track: Track {
+                file: Some(path.into()),
+                ..Track::default()
+            },
             key: format!("{path}|1"),
             explicit: false,
             library_key: false,

@@ -5,11 +5,11 @@
 //!
 //! The default categories are Genre, Components and Situation ([`DEFAULT_CATEGORIES`]); we create them when missing and keep them from being renamed or deleted. They start without tags.
 
-use super::{App, BrowserState, Home, View, playlists::Panel};
+use super::{playlists::Panel, App, BrowserState, Home, View};
 use crate::app::trackinfo;
 use openfader::{
     library::Track,
-    store::{self, Tag, TagGroup, Store},
+    store::{self, Store, Tag, TagGroup},
 };
 use slint::{ComponentHandle, Model};
 use std::collections::HashMap;
@@ -20,17 +20,19 @@ pub fn is_default(name: &str) -> bool {
     DEFAULT_CATEGORIES.contains(&name)
 }
 
-/// Adds the [`DEFAULT_CATEGORIES`] the store lacks (by name).
+/// Adds the [`DEFAULT_CATEGORIES`] the store lacks (by name); set-up, not an undo step.
 pub fn ensure_defaults(store: &Store) {
     let have = store.mytag_categories().unwrap_or_default();
-    for name in DEFAULT_CATEGORIES
-        .iter()
-        .filter(|n| !have.iter().any(|c| c.name == **n))
-    {
-        if let Err(e) = store.add_mytag_category(name) {
-            eprintln!("mytag: {e}");
+    store.system(|| {
+        for name in DEFAULT_CATEGORIES
+            .iter()
+            .filter(|n| !have.iter().any(|c| c.name == **n))
+        {
+            if let Err(e) = store.add_mytag_category(name) {
+                eprintln!("mytag: {e}");
+            }
         }
-    }
+    })
 }
 
 /// Whether a track carrying `tags` carries every tag in `wanted` (an empty `wanted` passes everything).
@@ -229,11 +231,7 @@ impl View {
             .map(|m| m.name.as_str());
         self.say(
             app,
-            format!(
-                "added “{}” to tag “{}”",
-                t.title,
-                name.unwrap_or_default()
-            ),
+            format!("added “{}” to tag “{}”", t.title, name.unwrap_or_default()),
         );
         if self.selected.as_ref().is_some_and(|s| store::key(s) == key) {
             self.tags_into_comment(app);

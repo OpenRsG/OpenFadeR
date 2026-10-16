@@ -29,7 +29,6 @@ mod filter;
 mod history;
 mod hotcuebank;
 mod list;
-mod tagging;
 mod palette;
 mod played;
 mod playlists;
@@ -42,18 +41,19 @@ mod sources;
 mod strip;
 mod suggest;
 mod table;
+mod tagging;
 mod wire;
 
 pub use sources::SourceType;
 pub use wire::wire;
 
-use super::{App, BrowserState, deck::Decks};
+use super::{deck::Decks, App, BrowserState};
 use filter::Filter;
-use playlists::{Ask, Panel};
 use openfader::{
     library::{Library, Playlist, Track},
-    store::{self, HotCueBank, Tag, TagGroup, Node, Store},
+    store::{self, HotCueBank, Node, Store, Tag, TagGroup},
 };
+use playlists::{Ask, Panel};
 use sidebar::Entry;
 use slint::{ComponentHandle, ModelRc, StandardListViewItem, Timer, VecModel};
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Duration};
@@ -151,9 +151,10 @@ enum Home {
     Source(usize, Option<String>),
 }
 
-/// The whole library with each track's store key, read on first use (a stat per file, cached by the store).
+/// The whole library with each track's store key, read again only when the store changed ([`Store::generation`]).
 struct Cache {
-    tracks: Vec<Track>,
+    generation: u64,
+    tracks: Arc<Vec<Track>>,
     keys: Vec<String>,
     by_key: HashMap<String, usize>,
 }
@@ -262,12 +263,14 @@ impl View {
             .collect()
     }
 
-    /// The library with store keys (read once; the library is read-only while we run).
+    /// The library with store keys: read once per [`Store::generation`], so a refresh or a Related toggle never reads the
+    /// whole library again while nothing changed.
     fn cache(&mut self) -> Result<Rc<Cache>, String> {
-        if let Some(c) = &self.cache {
+        let generation = self.store.generation();
+        if let Some(c) = self.cache.as_ref().filter(|c| c.generation == generation) {
             return Ok(c.clone());
         }
-        let tracks = self.lib.tracks(None)?;
+        let tracks = self.lib.tracks_all()?;
         let keys: Vec<String> = tracks.iter().map(store::key).collect();
         let mut by_key = HashMap::new();
         for (i, k) in keys.iter().enumerate() {
@@ -276,6 +279,7 @@ impl View {
         Ok(self
             .cache
             .insert(Rc::new(Cache {
+                generation,
                 tracks,
                 keys,
                 by_key,

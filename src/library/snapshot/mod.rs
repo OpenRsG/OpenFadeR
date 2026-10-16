@@ -36,6 +36,11 @@ impl Snapshot {
         &self.tracks
     }
 
+    /// The tracks, to be fitted to a format ([`crate::library::translate::fit_tracks`]).
+    pub fn tracks_mut(&mut self) -> &mut [(Track, Option<Analysis>)] {
+        &mut self.tracks
+    }
+
     /// Playlists and folders in tree order with the indexes (into [`Snapshot::tracks`]) of their tracks.
     pub fn playlists(&self) -> impl Iterator<Item = (&Playlist, &[usize])> {
         self.pls.iter().zip(self.members.iter().map(Vec::as_slice))

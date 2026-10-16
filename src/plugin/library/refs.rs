@@ -3,7 +3,7 @@
 //! plugins that declare `legacy_analysis_refs` answer it, in registry order. A ref whose plugin is missing or switched off has
 //! no analysis (callers fall back to detecting from the audio).
 
-use super::{Loaded, enabled};
+use super::{enabled, Loaded};
 use crate::analysis::Analysis;
 use crate::library::Track;
 use openfader_plugin::library::split_ref;
@@ -36,8 +36,8 @@ pub fn migrate_refs(libs: &[Loaded], store: &crate::store::Store) -> Result<usiz
 mod tests {
     use super::*;
     use crate::plugin::{Manifest, Plugin};
-    use openfader_plugin::library::{Buf, LibraryApi, host::Host};
-    use serde_json::{Value, json};
+    use openfader_plugin::library::{host::Host, Buf, LibraryApi};
+    use serde_json::{json, Value};
 
     /// A plugin table that answers `analysis_ref` with an analysis whose `path` is the reference it got.
     unsafe extern "C" fn call(req: *const u8, len: usize, _: *const Host) -> Buf {
@@ -128,8 +128,8 @@ mod tests {
         let got: Vec<_> = store
             .collection_tracks()
             .unwrap()
-            .into_iter()
-            .map(|t| t.analysis_ref)
+            .iter()
+            .map(|t| t.analysis_ref.clone())
             .collect();
         assert_eq!(
             got,

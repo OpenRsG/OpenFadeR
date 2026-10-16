@@ -1,8 +1,9 @@
 //! Track filter and related-track ranking: pure functions over
 //! [`Track`]s and the master deck's [`Reference`].
 
-use super::super::camelot::related as key_related;
-use super::table::{bpm_close, Facts, Look, Reference};
+use super::super::camelot::{self, related as key_related};
+use super::contains_ignore_case;
+use super::table::{bpm_close, cell_of, Facts, Look, Reference, BPM, RATING, TIME};
 use openfader::{library::Track, store};
 
 /// The filter bar's state. Combines (AND) with the search box.
@@ -48,6 +49,57 @@ pub fn passes(t: &Track, x: &Facts, f: &Filter, r: &Reference, look: &Look) -> b
     !(f.key_match
         && r.key
             .is_some_and(|k| !x.wheel.is_some_and(|c| key_related(k, c, look.level))))
+}
+
+/// Whether the lowercase search `q` (empty = everything) is in `t`'s title, artist, genre, comment or key, the key as named
+/// and as shown in the chosen notation.
+fn matches(t: &Track, x: &Facts, q: &str, look: &Look) -> bool {
+    q.is_empty()
+        || [&t.title, &t.artist, &t.genre, &x.key, &t.comment]
+            .iter()
+            .any(|f| contains_ignore_case(f, q))
+        || contains_ignore_case(&camelot::display(&x.key, look.notation), q)
+}
+
+/// The indices of `list` (whose [`Facts`] are `facts`) that match the search `q` and pass the filter bar and `tags` (the tag
+/// filter), in list order.
+pub fn shown(
+    list: &[Track],
+    facts: &[Facts],
+    q: &str,
+    f: &Filter,
+    r: &Reference,
+    look: &Look,
+    tags: impl Fn(&Track) -> bool,
+) -> Vec<usize> {
+    (0..list.len())
+        .filter(|&i| {
+            matches(&list[i], &facts[i], q, look)
+                && passes(&list[i], &facts[i], f, r, look)
+                && tags(&list[i])
+        })
+        .collect()
+}
+
+/// Orders `shown` (indices of `list`) by column `col`, descending unless `asc`. A key sorts as text ("10A" < "2A"), not by
+/// Camelot number.
+pub fn sort(
+    shown: &mut [usize],
+    list: &[Track],
+    facts: &[Facts],
+    col: usize,
+    asc: bool,
+    look: &Look,
+) {
+    match col {
+        BPM => shown.sort_by_key(|&i| facts[i].bpm_x100),
+        TIME => shown.sort_by_key(|&i| list[i].length_s),
+        RATING => shown.sort_by_key(|&i| list[i].rating),
+        _ => shown.sort_by_cached_key(|&i| cell_of(&list[i], &facts[i], col, look).to_lowercase()),
+    }
+    if !asc {
+        shown.reverse();
+    }
 }
 
 /// Tracks of `all` (except `anchor`) with a key compatible with `anchor`'s and a BPM within ±6 %,
@@ -237,5 +289,149 @@ mod tests {
             titles(&related_with(&bare, &all, &keys(&["near"]))),
             ["near"]
         );
+    }
+
+    fn listed(list: &[Track], q: &str, f: &Filter) -> Vec<String> {
+        let facts: Vec<Facts> = list.iter().map(Facts::of).collect();
+        shown(
+            list,
+            &facts,
+            q,
+            f,
+            &Reference::default(),
+            &Look::now(),
+            |_| true,
+        )
+        .into_iter()
+        .map(|i| list[i].title.clone())
+        .collect()
+    }
+
+    #[test]
+    fn search_matches_any_text_field_and_the_key_and_combines_with_the_filter() {
+        let mut a = track("Blue Monday", "8A", 130.0, 5);
+        a.artist = "New Order".into();
+        let mut b = track("Strobe", "9B", 128.0, 1);
+        b.comment = "peak time BLUE".into();
+        let list = [a, b, track("Other", "", 0.0, 0)];
+        assert_eq!(listed(&list, "", &Filter::default()).len(), 3);
+        assert_eq!(
+            listed(&list, "blue", &Filter::default()),
+            ["Blue Monday", "Strobe"]
+        );
+        assert_eq!(listed(&list, "order", &Filter::default()), ["Blue Monday"]);
+        assert_eq!(listed(&list, "9b", &Filter::default()), ["Strobe"]);
+        let rated = Filter {
+            min_rating: 3,
+            ..Default::default()
+        };
+        assert_eq!(listed(&list, "blue", &rated), ["Blue Monday"]);
+    }
+
+    #[test]
+    fn sort_orders_numbers_by_value_text_case_insensitively_and_reverses() {
+        let list = [
+            track("b", "10A", 90.0, 0),
+            track("A", "2A", 130.0, 0),
+            track("c", "1B", 100.0, 0),
+        ];
+        let facts: Vec<Facts> = list.iter().map(Facts::of).collect();
+        let order = |col, asc| {
+            let mut s = vec![0, 1, 2];
+            sort(&mut s, &list, &facts, col, asc, &Look::now());
+            s
+        };
+        assert_eq!(order(0, true), [1, 0, 2]);
+        assert_eq!(order(0, false), [2, 0, 1]);
+        assert_eq!(order(BPM, true), [0, 2, 1]);
+        assert_eq!(
+            order(super::super::table::KEY, true),
+            [0, 2, 1],
+            "a key sorts as text"
+        );
+    }
+
+    /// `cargo test --release --lib bench_search -- --ignored --nocapture`: the passes `View::refresh` runs per keystroke.
+    #[test]
+    #[ignore = "bench: 100k tracks"]
+    fn bench_search_filter_and_sort_over_100k_tracks() {
+        use std::time::Instant;
+        const N: usize = 100_000;
+        let list: Vec<Track> = (0..N)
+            .map(|i| {
+                let mut t = track(
+                    &format!("Track number {i}"),
+                    &format!("{}{}", i % 12 + 1, ["A", "B"][i % 2]),
+                    90.0 + (i % 90) as f64,
+                    (i % 6) as u8,
+                );
+                t.artist = format!("Artist {}", i % 700);
+                t.genre = ["House", "Techno", "Trance", "Drum & Bass"][i % 4].into();
+                t.length_s = 120 + (i % 300) as i64;
+                t
+            })
+            .collect();
+        let look = Look::now();
+        let run = |name: &str, f: &mut dyn FnMut()| {
+            let t = Instant::now();
+            f();
+            eprintln!("{name}: {:?}", t.elapsed());
+            t.elapsed()
+        };
+        let mut facts = Vec::new();
+        run("facts of 100k", &mut || {
+            facts = list.iter().map(Facts::of).collect();
+        });
+        let r = Reference::default();
+        let mut hits = 0;
+        let search = run("search \"techno\"", &mut || {
+            hits = shown(
+                &list,
+                &facts,
+                "techno",
+                &Filter::default(),
+                &r,
+                &look,
+                |_| true,
+            )
+            .len();
+        });
+        assert_eq!(hits, N / 4);
+        let miss = run("search \"zzzz\" (no hit)", &mut || {
+            hits = shown(&list, &facts, "zzzz", &Filter::default(), &r, &look, |_| {
+                true
+            })
+            .len();
+        });
+        assert_eq!(hits, 0);
+        let bar = Filter {
+            bpm_min: 120.0,
+            min_rating: 3,
+            ..Default::default()
+        };
+        run("filter bar bpm >= 120, 3+ stars", &mut || {
+            hits = shown(&list, &facts, "", &bar, &r, &look, |_| true).len();
+        });
+        let mut all = shown(&list, &facts, "", &Filter::default(), &r, &look, |_| true);
+        let sort_title = run("sort by title", &mut || {
+            sort(&mut all, &list, &facts, 0, true, &look)
+        });
+        let sort_bpm = run("sort by BPM", &mut || {
+            sort(&mut all, &list, &facts, BPM, false, &look)
+        });
+        let mut rows = 0;
+        let reference = Reference::default();
+        run("table rows of 100k", &mut || {
+            rows = all
+                .iter()
+                .map(|&i| super::super::table::row(&list[i], &facts[i], &reference, false, &look))
+                .count();
+        });
+        assert_eq!(rows, N);
+        assert!(
+            search.as_millis() < 10 && miss.as_millis() < 10,
+            "search should take < 10 ms: {search:?}, {miss:?}"
+        );
+        eprintln!("sorts: {sort_title:?}, {sort_bpm:?}");
     }
 }

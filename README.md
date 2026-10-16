@@ -37,9 +37,9 @@ cd OpenFadeR
 ./start.sh ~/Music
 ```
 
-The first run clones the plugins, themes and mappings next to the code, builds everything and opens the folder you gave as a library. You should see your tracks in the browser, with BPM, key and waveform previews filling in as the analysis finishes. Double-click a track to load it on deck 1, press `Space` to play.
+The first run clones the plugins, themes and mappings next to the code, builds everything and connects the folder you gave to the Collection. You should see your tracks in the browser, with BPM, key and waveform previews filling in as the analysis finishes. Double-click a track to load it on deck 1, press `Space` to play.
 
-`start.sh` without a path reopens the last library, or opens `$XDG_MUSIC_DIR` (else `~/Music/OpenFadeR`). To build only the core: `cargo build --release`.
+`start.sh` without a path opens the Collection as you left it; every connected library and folder syncs at start and whenever it changes, and `$XDG_MUSIC_DIR` (else `~/Music/OpenFadeR`) is always connected. To build only the core: `cargo build --release`.
 
 To install it for your user on Linux instead (the `openfader` command and an application menu entry, with the plugins, themes and mappings bundled): `./install.sh`. It also sets the default plugin, theme and mapping repositories of PREFERENCES (GET PLUGINS / GET THEMES / GET MAPPINGS), which the app uses anyway until you edit the list. Run it again to update; `./install.sh --uninstall` removes it.
 
@@ -105,6 +105,10 @@ EXPORT mode shows cues and memory points for the two decks next to a DEVICES pan
 
 VIDEO (beta) plays video tracks on an output window and crossfades between the two decks' pictures. Like LIGHTING, it shows in the mode menu once enabled in PREFERENCES > EXTENSIONS.
 
+### Your library is yours
+
+The Collection is OpenFadeR's own database. Other apps' libraries connect to it through library plugins (PREFERENCES > LIBRARIES) and are synced in; a format that holds less than the Collection (fewer hot cues, no loops, a smaller colour palette) is written from a fitted copy, and the status line says what did not fit. File > Export Collection also writes an open JSON file, a CSV table and an M3U8 playlist, described with the database tables in [docs/library-format.md](docs/library-format.md).
+
 ## Themes
 
 <p align="center"><img src="docs/media/themes-grid.jpg" alt="The same view in Catppuccin Mocha, Latte, Rek, So Pro, Dracula, Nord, Tokyo Night and Gruvbox Dark" width="100%"></p>
@@ -145,7 +149,7 @@ One table drives dispatch and the `?` help overlay (Shift = deck B, Ctrl = deck 
 | Up / Down | browser selection | ? | help overlay |
 | G / Y / N | grid row / tap / beat 1 here | `,` / `.` | grid shift ∓1 ms |
 | P | sampler strip | A / Shift+A | AUTOMIX on/off / skip |
-| D | 2 / 4-deck layout | | |
+| D | 2 / 4-deck layout | Ctrl+Z / Ctrl+Shift+Z (Ctrl+Y) | undo / redo a library edit |
 
 The table is editable in PREFERENCES > KEYBOARD.
 
@@ -159,7 +163,7 @@ Each kind is looked up in an environment-variable folder list (`:`-separated), a
 | Themes | `OPENFADER_SKINS` | `~/.config/openfader/extension/skin/` | `extension/skin/` |
 | Controller mappings | `OPENFADER_MAPPINGS` | `~/.config/openfader/mappings/` | `mappings/` |
 
-`start.sh` clones the three repositories into those bundled folders (git ignores them here) and the native plugins build with `extension/plugin/build.sh` against this checkout's `sdk/`. Settings live in `$XDG_CONFIG_HOME/openfader/` (default `~/.config/openfader/`), analysis in `$XDG_CACHE_HOME/openfader/analysis`.
+`start.sh` clones the three repositories into those bundled folders (git ignores them here) and the native plugins build with `extension/plugin/build.sh` against this checkout's `sdk/`. Settings live in `$XDG_CONFIG_HOME/openfader/` (default `~/.config/openfader/`), the Collection (`store.db`) and our analysis in `$XDG_DATA_HOME/openfader/` (default `~/.local/share/openfader/`).
 
 ### Linux, Windows and macOS
 
@@ -168,8 +172,8 @@ The docs write the Linux folders; the others follow their system's convention (`
 | | Linux | macOS | Windows |
 | --- | --- | --- | --- |
 | Settings, your plugins, themes, mappings (`~/.config/openfader/` in these docs) | `~/.config/openfader/` | `~/Library/Application Support/openfader/` | `%APPDATA%\openfader\` |
-| Store, downloaded plugin files | `~/.local/share/openfader/` | `~/Library/Application Support/openfader/` | `%LOCALAPPDATA%\openfader\` |
-| Caches (analysis, stems, models) | `~/.cache/openfader/` | `~/Library/Caches/openfader/` | `%LOCALAPPDATA%\openfader\cache\` |
+| Store, analysis, downloaded plugin files | `~/.local/share/openfader/` | `~/Library/Application Support/openfader/` | `%LOCALAPPDATA%\openfader\` |
+| Caches (stems, models) | `~/.cache/openfader/` | `~/Library/Caches/openfader/` | `%LOCALAPPDATA%\openfader\cache\` |
 
 The release archives hold the bundled folders next to the executable (`OpenFadeR.app/Contents/Resources/` on macOS). Removable devices are found as USB sticks mounted below `/run/media` or `/media` (Linux), removable drive letters (Windows) and volumes below `/Volumes` (macOS); ejecting uses udisks, the volume's own eject request, or `diskutil`. Linux alone has the per-card volume sliders on the audio page (ALSA mixer, the sound server) and mounts a plugged stick itself (udisks): on Windows and macOS the volume is the system's and the OS mounts the stick. File choosers are zenity or kdialog on Linux, PowerShell's dialogs on Windows and `osascript` on macOS.
 
@@ -180,6 +184,7 @@ Audio, MIDI and folder behaviour can be set with `OPENFADER_OUTPUT_DEVICE`, `OPE
 - [docs/plugins.md](docs/plugins.md): plugin format and the library / device ABI, with the SDK in [`sdk/`](sdk/)
 - [docs/skins.md](docs/skins.md): theme files, every token, layout hints
 - [docs/mappings.md](docs/mappings.md): controller mapping files
+- [docs/library-format.md](docs/library-format.md): the open JSON / CSV export and the library database tables
 
 The code follows `.omp/rules/code-structure.md`: one folder per section (`library/`, `analysis/`, `audio/`, `plugin/`, `app/`, …), a base `mod.rs` and one child per variant. Only `app/` and the `ui/` crate use Slint.
 

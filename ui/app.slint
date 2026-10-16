@@ -188,6 +188,11 @@ export component App inherits Window {
             MenuItem { title: "Exit"; activated => { LibraryState.action("exit"); } }
         }
         Menu {
+            title: "Edit";
+            MenuItem { title: LibraryState.undo-label == "" ? "Undo (Ctrl+Z)" : "Undo " + LibraryState.undo-label + " (Ctrl+Z)"; enabled: LibraryState.undo-label != ""; activated => { LibraryState.action("undo"); } }
+            MenuItem { title: LibraryState.redo-label == "" ? "Redo (Ctrl+Shift+Z)" : "Redo " + LibraryState.redo-label + " (Ctrl+Shift+Z)"; enabled: LibraryState.redo-label != ""; activated => { LibraryState.action("redo"); } }
+        }
+        Menu {
             title: "Track";
             MenuItem { title: "Import To Collection"; activated => { LibraryState.action("track-import"); } }
             MenuItem { title: "Analyze Track"; activated => { LibraryState.action("track-analyze"); } }

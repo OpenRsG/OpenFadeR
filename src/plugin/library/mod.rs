@@ -13,18 +13,18 @@ mod decl;
 mod host;
 mod refs;
 
-use super::{Plugin, config};
+use super::{config, Plugin};
 use crate::analysis::Analysis;
 use crate::library::{AnalysisReader, Library, Playlist, Track};
-pub use decl::{BrowserDecl, LibFile, LibraryDecl, check};
+pub use decl::{check, BrowserDecl, Detect, LibFile, LibraryDecl};
 pub(super) use host::with_job;
 use libloading::Library as Dylib;
 use openfader_plugin::library::{
-    Analysed, LIBRARY_ABI, LIBRARY_ENTRY, LibraryApi, Opened, Probe, Request, Snapshot, owned_ref,
-    split_ref,
+    owned_ref, split_ref, Analysed, Capabilities, LibraryApi, Opened, Probe, Request, Snapshot,
+    LIBRARY_ABI, LIBRARY_ENTRY,
 };
 pub use refs::{load_ref, migrate_refs};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
@@ -263,21 +263,60 @@ impl Drop for PluginLibrary {
     }
 }
 
-/// The library plugin that reads `path` best (the highest `probe` score above 0), opened; `None` when no enabled plugin
-/// claims it. A plugin whose `probe` fails is reported on stderr and does not take part.
-pub fn open(path: &Path) -> Result<Option<PluginLibrary>, String> {
-    let mut best: Option<(u8, &Loaded)> = None;
+/// The library plugin that reads `path` best (the highest `probe` score above 0) with what its probe called the source;
+/// `None` when no enabled plugin claims it. A plugin whose `probe` fails is reported on stderr and does not take part.
+fn best(path: &Path) -> Option<(&'static Loaded, Probe)> {
+    let mut best: Option<(&Loaded, Probe)> = None;
     for l in enabled() {
         if !l.may_read(path) {
             continue;
         }
         match l.probe(path) {
-            Ok(p) if p.score > best.map_or(0, |b| b.0) => best = Some((p.score, l)),
+            Ok(p) if p.score > best.as_ref().map_or(0, |b| b.1.score) => best = Some((l, p)),
             Ok(_) => {}
             Err(e) => eprintln!("plugin: {e}"),
         }
     }
-    best.map(|(_, l)| l.open(path)).transpose()
+    best
+}
+
+/// [`best`]'s library, opened; `None` when no enabled plugin claims `path`.
+pub fn open(path: &Path) -> Result<Option<PluginLibrary>, String> {
+    best(path).map(|(l, _)| l.open(path)).transpose()
+}
+
+/// Which plugin reads `path` (its name) and what it calls the source (the probe's `kind`), without opening it.
+pub fn claim(path: &Path) -> Option<(String, String)> {
+    best(path).map(|(l, p)| (l.name().to_owned(), p.kind))
+}
+
+/// What the format of plugin `plugin` can hold ([`Capabilities`]); the default (holds everything) for a plugin that is
+/// not loaded or does not answer the op.
+pub fn capabilities_of(plugin: &str) -> Capabilities {
+    named(plugin)
+        .and_then(|l| {
+            l.call(&Request::Capabilities {
+                settings: l.settings(),
+            })
+        })
+        .unwrap_or_default()
+}
+
+/// A plugin's default library locations for this OS ([`decl::Detect`]).
+pub struct Detector {
+    pub plugin: String,
+    pub patterns: Vec<String>,
+}
+
+/// The enabled library plugins that declare where their app keeps its library.
+pub fn detectors() -> Vec<Detector> {
+    enabled()
+        .filter(|l| !l.decl().detect.patterns().is_empty())
+        .map(|l| Detector {
+            plugin: l.name().to_owned(),
+            patterns: l.decl().detect.patterns().to_vec(),
+        })
+        .collect()
 }
 
 /// A plugin's menu entry: its name, the manifest's label and the library file its settings name (where the file dialog starts).

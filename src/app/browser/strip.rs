@@ -109,10 +109,7 @@ fn analysis_of(lib: &dyn Library, t: &Track) -> Analysis {
     match own {
         Some(a) if overview::wave(&a, 1).is_some() => a,
         own => {
-            let cached = t
-                .file
-                .as_deref()
-                .and_then(|f| analysis::cache::load(f).ok().flatten());
+            let cached = analysis::cache::load(t).ok().flatten();
             let mut a = cached.unwrap_or_default();
             a.cues = own.map(|o| o.cues).unwrap_or_default();
             a

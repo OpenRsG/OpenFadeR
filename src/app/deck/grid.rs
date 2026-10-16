@@ -9,7 +9,7 @@
 //! ponytail: bar length is the grid's largest bar position (4/4 and 3/4 keep their length); no
 //! per-segment tempo edit, a TAP replaces the whole grid with a constant-tempo one.
 
-use super::{Deck, Loaded, exportedit, fmt_ms, grid_bpm, loops};
+use super::{exportedit, fmt_ms, grid_bpm, loops, Deck, Loaded};
 use openfader::{analysis::Beat, store};
 use std::{
     sync::{Arc, LazyLock},
@@ -235,7 +235,7 @@ impl Deck {
     }
 
     /// Makes `beats` the deck's grid and pushes it everywhere the grid shows or is read.
-    fn apply_grid(&self, beats: Vec<Beat>, status: String) {
+    pub(super) fn apply_grid(&self, beats: Vec<Beat>, status: String) {
         let mut l = self.loaded.borrow_mut();
         let grid = grid_bpm(&beats);
         l.base_bpm = grid.unwrap_or(l.lib_bpm);

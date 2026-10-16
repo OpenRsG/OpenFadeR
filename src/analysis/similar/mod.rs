@@ -8,10 +8,10 @@
 mod index;
 mod meta;
 
-pub use index::{Index, index};
-pub use meta::{Tags, read_tags, year_of};
+pub use index::{index, Index};
+pub use meta::{read_tags, year_of, Tags};
 
-use super::{Analysis, DETAIL_ENTRIES_PER_SEC, Mood, auto, options};
+use super::{auto, options, Analysis, Mood, DETAIL_ENTRIES_PER_SEC};
 use std::path::Path;
 
 /// Slices of the waveform the dynamics are measured over (length independent).
@@ -136,9 +136,14 @@ pub type Theirs = Box<dyn FnOnce() -> Option<Analysis> + Send>;
 /// in the bass), so a library is ranked on one source wherever it can be: the library's own.
 pub fn profile(audio: &Path, theirs: Option<Theirs>) -> Profile {
     let o = options::get();
-    let ours = match super::cache::load_for(audio, &o).ok().flatten() {
+    // The index is keyed by file: a Collection track is found by its file name and size ([`crate::store::key`]).
+    let t = crate::library::Track {
+        file: Some(audio.to_owned()),
+        ..Default::default()
+    };
+    let ours = match super::cache::load_for(&t, &o).ok().flatten() {
         Some(a) => Features::of(&a, o.parts.vocal),
-        None => super::cache::load(audio)
+        None => super::cache::load(&t)
             .ok()
             .flatten()
             .and_then(|a| Features::of(&a, !a.vocal.is_empty())),
@@ -162,7 +167,7 @@ pub fn profile(audio: &Path, theirs: Option<Theirs>) -> Profile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::{Phrases, detect::VocalRegion};
+    use crate::analysis::{detect::VocalRegion, Phrases};
 
     fn analysis(wave: Vec<[u8; 3]>) -> Analysis {
         Analysis {

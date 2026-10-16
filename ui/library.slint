@@ -28,6 +28,9 @@ export global LibraryState {
     /// `i`th runs the action `import-collection:<i>` / `export-collection:<i>`.
     in property <[string]> import-readers;
     in property <[string]> export-writers;
+    /// Edit > Undo / Redo: what the next step is called ("" = nothing to undo / redo); the actions are `undo` and `redo`.
+    in property <string> undo-label;
+    in property <string> redo-label;
     /// Path / name entry: `path-done(true)` = OK. `path-browse` says a file chooser program (kdialog / zenity) exists.
     in-out property <bool> path-open;
     in property <string> path-title;

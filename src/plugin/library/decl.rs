@@ -29,6 +29,11 @@ pub struct LibraryDecl {
     /// The plugin reads sample packs: importing one also fills the sampler's empty slots with its first playlist.
     #[serde(default)]
     pub samples: bool,
+    /// Where the app this plugin reads usually keeps its library: glob patterns per OS (`linux`, `windows`, `macos`), or one
+    /// list for every OS. `~`, `$HOME`, `%APPDATA%` and `%USERPROFILE%` expand; `*` matches within one path part.
+    /// Found libraries are offered by Preferences > Libraries.
+    #[serde(default)]
+    pub detect: Detect,
 }
 
 /// A Media Browser source of a library plugin.
@@ -53,6 +58,32 @@ impl LibFile {
         match self {
             LibFile::One(f) => Some(f),
             LibFile::PerOs(m) => m.get(std::env::consts::OS).map(String::as_str),
+        }
+    }
+}
+
+/// `"detect"` of [`LibraryDecl`]: default library locations, one list or one per OS.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum Detect {
+    All(Vec<String>),
+    PerOs(BTreeMap<String, Vec<String>>),
+}
+
+impl Default for Detect {
+    fn default() -> Self {
+        Detect::All(Vec::new())
+    }
+}
+
+impl Detect {
+    /// The patterns for this OS (`linux`, `windows`, `macos`).
+    pub fn patterns(&self) -> &[String] {
+        match self {
+            Detect::All(v) => v,
+            Detect::PerOs(m) => m
+                .get(std::env::consts::OS)
+                .map_or(&[][..], Vec::as_slice),
         }
     }
 }

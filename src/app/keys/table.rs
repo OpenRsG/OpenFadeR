@@ -49,6 +49,10 @@ pub enum Act {
     AutomixSkip,
     /// Switch between the 2-deck and the 4-deck layout.
     DeckLayout,
+    /// Undo / redo the last library edit (the change journal); the second redo is the Ctrl+Y binding.
+    Undo,
+    Redo,
+    RedoAlt,
     Help,
 }
 
@@ -90,13 +94,20 @@ impl Act {
             Act::AutomixToggle => "automix_toggle",
             Act::AutomixSkip => "automix_skip",
             Act::DeckLayout => "deck_layout",
+            Act::Undo => "undo",
+            Act::Redo => "redo",
+            Act::RedoAlt => "redo_alt",
             Act::Help => "help",
         }
     }
 
     /// How many consecutive keys the action's binding covers (the 8 hot-cue pads), else 1.
     pub(super) fn span(self) -> usize {
-        if self == Act::Pad { 8 } else { 1 }
+        if self == Act::Pad {
+            8
+        } else {
+            1
+        }
     }
 }
 
@@ -252,6 +263,9 @@ pub(super) const TABLE: &[Def] = &[
     row("f", false, false, None, Act::FxToggle, "FX on / off"),
     row("w", false, false, None, Act::BrowseView, "browse view: waveforms + browser only"),
     row("w", true, false, None, Act::BrowseArea, "browser area: tree, Tag List, tracks, related"),
+    row("z", false, true, None, Act::Undo, "undo the last library edit"),
+    row("z", true, true, None, Act::Redo, "redo the edit undone last"),
+    row("y", false, true, None, Act::RedoAlt, "redo the edit undone last (Ctrl+Y)"),
     row("f", false, true, None, Act::FocusSearch, "focus the search box"),
     row("?", false, false, None, Act::Help, "show / hide this help"),
 ];

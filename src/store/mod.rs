@@ -3,10 +3,11 @@
 //! [`paths::data_dir`]. The user's library sources (the library database, USB, XML) are never written; the store is overlaid on what
 //! they load, and the store wins.
 //!
-//! Track identity ([`key`]): `<file name>|<file size in bytes>`. It survives a different mount point or
-//! library source (the library database, the device library, the device library and XML name the same file), and changes when
-//! the audio file is replaced; two same-named, same-sized files in different folders share their edits.
-//! A track without a file is keyed `meta|<title>|<artist>`.
+//! Track identity ([`key`]): `t<id>`, `id` the track's row in `collection` ([`Track::id`]): our own Collection is the
+//! library and every track in it has one, so the identity survives a move, a rename or a new file. A track without an id
+//! (a device, another source's list) is keyed `t<id>` of the one Collection row with its file name and size when there is
+//! exactly one, else `<file name>|<file size in bytes>` (edits made that way move to `t<id>` when the row is added, see
+//! [`Store::collection_put`]). A track without a file is keyed `meta|<title>|<artist>`.
 //!
 //! Schema versions: `PRAGMA user_version` counts the applied [`MIGRATIONS`]; opening a store written by
 //! a newer build fails instead of guessing.
@@ -18,20 +19,23 @@
 //! removed / relocated source tracks, analysis locks, Tag List, re-keying), [`backup`] (zip backup / restore of the whole
 //! store), [`device`] (known devices, Sync Manager playlists, device backups, export baselines), [`device_settings`]
 //! (DJ System settings), [`bank`] (Cue Banks), [`gain`] (AUTO GAIN: analysed dB + the user's adjustment),
-//! [`phrase`] (manual phrase edits), [`sequence`] (saved sampler sequences), [`matching`] (MATCHING pairs); [`overlay`]
-//! applies the track data to a [`crate::library::Library`].
+//! [`phrase`] (manual phrase edits), [`sequence`] (saved sampler sequences), [`matching`] (MATCHING pairs), [`journal`] (change
+//! journal: undo / redo, [`Store::system`]); [`overlay`] applies the track data to a [`crate::library::Library`].
 
 mod backup;
 mod bank;
 mod collection;
+pub mod connect;
 mod device;
 pub mod device_settings;
 mod gain;
 mod history;
+mod journal;
 mod matching;
 mod node;
 mod overlay;
 mod phrase;
+mod rekey;
 mod sequence;
 mod tag;
 mod track;
@@ -44,7 +48,7 @@ pub use node::{Node, NodeKind};
 pub use overlay::{apply, overlay, Overlay};
 pub use sequence::{Sequence, MAX_SEQUENCES};
 pub use tag::{Tag, TagGroup};
-pub use track::{Edits, TRACK_COLORS};
+pub use track::{Edits, AUTO_CUES, TRACK_COLORS};
 
 use crate::{analysis::Cue, library::Track, paths};
 use parking_lot::{Mutex, MutexGuard};
@@ -53,7 +57,10 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::{Arc, LazyLock},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, LazyLock, OnceLock,
+    },
 };
 
 pub type R<T> = Result<T, String>;
@@ -160,12 +167,22 @@ const MIGRATIONS: &[&str] = &[
         seq INTEGER PRIMARY KEY, action INTEGER NOT NULL REFERENCES journal_action(id) ON DELETE CASCADE,
         tbl TEXT NOT NULL, op INTEGER NOT NULL, old TEXT, new TEXT);
      CREATE INDEX journal_by_action ON journal(action);",
+    // v15: collection ids are never reused (a deleted track's `t<id>` key, analysis file and journal rows stay its own):
+    // `collection_hwm.n` is the highest id ever deleted; the next id is above it and above every live id.
+    "CREATE TABLE collection_hwm (n INTEGER NOT NULL);
+     INSERT INTO collection_hwm SELECT COALESCE(MAX(id), 0) FROM collection;
+     CREATE TRIGGER collection_hwm_d AFTER DELETE ON collection BEGIN UPDATE collection_hwm SET n = MAX(n, OLD.id); END;",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as
-/// `Arc<Store>` between the UI thread and workers.
+/// `Arc<Store>` between the UI thread and workers. Lock order: `cache` before `db`.
 pub struct Store {
     db: Mutex<Connection>,
+    /// Counts the row changes of the `collection` table whoever makes them (SQLite's update hook): what [`Store::collection_generation`]
+    /// reports and the `cache` compares.
+    collection_changes: Arc<AtomicU64>,
+    /// The track list and the file-name index of the Collection, each as of a [`Store::collection_generation`].
+    cache: Mutex<collection::Cache>,
 }
 
 /// SQLite errors as the `String`s the rest of the core uses.
@@ -291,9 +308,21 @@ impl Store {
         conn.pragma_update(None, "foreign_keys", true).s()?;
         // The children run roughly a hundred distinct statements; the default cache of 16 would evict most of them.
         conn.set_prepared_statement_cache_capacity(128);
+        let collection_changes = Arc::new(AtomicU64::new(0));
+        let count = collection_changes.clone();
+        conn.update_hook(Some(move |_, _: &str, table: &str, _| {
+            if table == "collection" {
+                count.fetch_add(1, Ordering::Relaxed);
+            }
+        }))
+        .s()?;
         migrate(&mut conn)?;
+        rekey::backfill(&mut conn)?;
+        journal::install(&conn)?;
         Ok(Self {
             db: Mutex::new(conn),
+            collection_changes,
+            cache: Mutex::default(),
         })
     }
 
@@ -348,14 +377,18 @@ fn migrate(conn: &mut Connection) -> R<()> {
 /// The process-wide store ([`Store::open`]). If it cannot be opened (no `HOME`, read-only disk, newer
 /// schema) the reason goes to stderr and edits live in memory for this run only.
 pub fn global() -> Arc<Store> {
-    static STORE: LazyLock<Arc<Store>> = LazyLock::new(|| {
-        Arc::new(Store::open().unwrap_or_else(|e| {
-            eprintln!("store: {e}; edits are kept in memory for this run only");
-            Store::in_memory().expect("in-memory sqlite")
-        }))
-    });
-    STORE.clone()
+    GLOBAL
+        .get_or_init(|| {
+            Arc::new(Store::open().unwrap_or_else(|e| {
+                eprintln!("store: {e}; edits are kept in memory for this run only");
+                Store::in_memory().expect("in-memory sqlite")
+            }))
+        })
+        .clone()
 }
+
+/// [`global`]'s store once something asked for it; [`key`] must not open the store just to find it unused.
+static GLOBAL: OnceLock<Arc<Store>> = OnceLock::new();
 
 /// Sizes already looked up (a stat per track per call would crawl on a USB stick).
 static SIZES: LazyLock<Mutex<HashMap<PathBuf, u64>>> = LazyLock::new(Mutex::default);
@@ -373,23 +406,73 @@ fn file_size(p: &Path) -> u64 {
     }
 }
 
-/// The file-name part of a track's [`key`] (what the overlay indexes the store by before it stats anything).
+/// The file-name part of a track's [`key`].
 fn file_name(p: &Path) -> Cow<'_, str> {
     p.file_name()
         .map_or(Cow::Borrowed(""), |n| n.to_string_lossy())
 }
 
-/// Stable identity of `t` in the store (see the module docs). A file that cannot be stat'ed counts as size 0.
+/// What a track with a file is keyed by when it has no row id and no single Collection row to take the id from.
+fn legacy_key(name: &str, size: u64) -> String {
+    format!("{name}|{size}")
+}
+
+/// The key of Collection row `id`.
+pub fn id_key(id: i64) -> String {
+    format!("t{id}")
+}
+
+/// `(size in bytes, mtime in unix s)` of the file at `p` right now; `(0, 0)` when it cannot be stat'ed.
+fn file_stamp(p: &Path) -> (i64, i64) {
+    let Ok(m) = std::fs::metadata(p) else {
+        return (0, 0);
+    };
+    let mtime = m
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_secs() as i64);
+    (m.len() as i64, mtime)
+}
+
+/// Unix s of a `date_added` that starts `YYYY-MM-DD` (UTC midnight); `None` for any other text.
+fn date_secs(date: &str) -> Option<i64> {
+    let d = chrono::NaiveDate::parse_from_str(date.get(..10)?, "%Y-%m-%d").ok()?;
+    Some(d.and_hms_opt(0, 0, 0)?.and_utc().timestamp())
+}
+
+/// Stable identity of `t` in the process-wide store (see the module docs), the legacy identity while nothing has asked
+/// for that store yet. A file that cannot be stat'ed counts as size 0.
 pub fn key(t: &Track) -> String {
-    match &t.file {
-        Some(f) => format!("{}|{}", file_name(f), file_size(f)),
-        None => format!("meta|{}|{}", t.title, t.artist),
+    key_with(GLOBAL.get().map(|s| &**s), t)
+}
+
+fn key_with(store: Option<&Store>, t: &Track) -> String {
+    if let Some(id) = t.id {
+        return id_key(id);
+    }
+    let Some(f) = &t.file else {
+        return format!("meta|{}|{}", t.title, t.artist);
+    };
+    let (name, size) = (file_name(f), file_size(f));
+    let id = store.and_then(|s| {
+        // The row of this very file, else the only row with this name and size.
+        s.id_of_path(f)
+            .ok()
+            .flatten()
+            .or_else(|| s.id_of_file(&name, size))
+    });
+    match id {
+        Some(id) => id_key(id),
+        None => legacy_key(&name, size),
     }
 }
 
-/// The name part of a key made by [`key`].
-fn name_of(key: &str) -> &str {
-    key.rsplit_once('|').map_or(key, |(n, _)| n)
+impl Store {
+    /// [`key`] looked up in this store.
+    pub fn key_of(&self, t: &Track) -> String {
+        key_with(Some(self), t)
+    }
 }
 
 #[cfg(test)]
@@ -429,7 +512,27 @@ mod tests {
         };
         assert_eq!(key(&t("a")), "x.mp3|5");
         assert_eq!(key(&t("a")), key(&t("b")));
-        assert_eq!(name_of(&key(&t("a"))), "x.mp3");
+        let s = Store::in_memory().unwrap();
+        assert_eq!(s.key_of(&t("a")), "x.mp3|5"); // not in the Collection
+        s.collection_put(&[t("a")], false).unwrap();
+        let id = s.id_of_path(&dir.join("a").join("x.mp3")).unwrap().unwrap();
+        assert_eq!(s.key_of(&t("a")), id_key(id)); // its own row
+        assert_eq!(s.key_of(&t("b")), id_key(id)); // the only row with this name and size
+        s.collection_put(&[t("b")], false).unwrap();
+        assert_eq!(s.key_of(&t("b")), id_key(id + 1));
+        std::fs::write(dir.join("x.mp3"), b"12345").unwrap();
+        let other = Track {
+            file: Some(dir.join("x.mp3")),
+            ..Default::default()
+        };
+        assert_eq!(s.key_of(&other), "x.mp3|5"); // two rows share the name and size: ambiguous, so the legacy key
+        assert_eq!(
+            s.key_of(&Track {
+                id: Some(9),
+                ..other
+            }),
+            "t9"
+        );
         assert_eq!(
             key(&Track {
                 title: "T".into(),

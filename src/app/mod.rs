@@ -71,6 +71,7 @@ mod automix;
 mod browser;
 mod camelot;
 mod catalog;
+mod connect;
 mod deck;
 mod device;
 mod drop;
@@ -98,7 +99,7 @@ mod video;
 
 use openfader::library::Library;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 /// Set by [`restart`]: `main` starts the app again once the window has closed.
 static RESTART: AtomicBool = AtomicBool::new(false);
@@ -116,8 +117,16 @@ pub fn restart_requested() -> bool {
 
 pub use openfader_ui::*;
 
-pub fn run(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let inner = openfader::store::overlay(openfader::library::open(path)?); // the store's edits (cues, grid, rating, comment) win over the library
+/// Opens the Collection. `legacy` (a path given at start, or the old Database setting) and `music` (the own music folder)
+/// are connected libraries that sync into it ([`connect`]).
+pub fn run(
+    legacy: Option<PathBuf>,
+    music: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let store = openfader::store::global();
+    connect::adopt_startup(&store, legacy, music);
+    // the store's edits (cues, grid, rating, comment) win over the Collection's rows
+    let inner = openfader::store::overlay(Box::new(openfader::library::own::Own::new(store)));
     let app = App::new()?;
     // Wayland / X11 match the window to the menu entry `openfader.desktop` (its icon) by this id; set before the window shows.
     let _ = slint::set_xdg_app_id("openfader");
@@ -132,16 +141,7 @@ pub fn run(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     prefs::audio::wire(); // hands the AUDIO settings to the engine before the decks open the output
     let lib: Rc<dyn Library> = openfader::plugin::source::wrap(inner, plugins::notify(&app)).into(); // plugin sources join the tree, outside the store's overlay
-    app.set_window_title(
-        format!(
-            "OpenFadeR — {} — {}",
-            lib.kind(),
-            path.file_name()
-                .unwrap_or(path.as_os_str())
-                .to_string_lossy()
-        )
-        .into(),
-    );
+    app.set_window_title("OpenFadeR".into());
     let selected = Rc::new(RefCell::new(None));
     let decks = deck::wire(&app, lib.clone(), selected.clone());
     fx::wire(&app, &decks);
@@ -164,6 +164,7 @@ pub fn run(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         *selected.borrow_mut() = Some(t.clone())
     })?;
     let _analyzer = analyze::wire(&app, lib.clone()); // dropping it cancels the worker: lives until the window closes
+    connect::wire(&app); // live sync of the connected libraries; after the browser, which it asks to reload
     app.run()?;
     openfader::plugin::event::fire("app_quit", serde_json::json!({}));
     Ok(())

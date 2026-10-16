@@ -1,36 +1,49 @@
-//! Persistent cache of our own [`analyze`] results (beats, key, 3-band waveforms) so a track is analysed once.
-//! One file per audio file: `<cache folder>/analysis/<hash of path + size + mtime>.bin` (the cache folder is
-//! [`crate::paths::cache_dir`]). Changing the audio file changes the name, so a stale entry is never found.
+//! Persistent store of our own [`analyze`] results (beats, key, 3-band waveforms) so a track is analysed once. This is user
+//! data, not a cache: `<data folder>/analysis/<hash of the track's identity>.bin` (the data folder is
+//! [`crate::paths::data_dir`]), named by [`crate::store::key`] (`t<id>` for a Collection track), so the entry follows a
+//! track whose file moved or was renamed. The audio file's size is in the header: another size is a changed file and the
+//! entry is stale.
 //!
-//! Own format, little-endian: `"RKAC"`, `version u32`, `profile u64` (what the result was
+//! Own format, little-endian: `"RKAC"`, `version u32`, `audio size u64`, `profile u64` (what the result was
 //! made with, [`Profile`]), `key_len u8` + key text (0 = none), then counted tables: beats (`bar_pos u16, bpm_x100 u16,
 //! time_ms u32`), 3-band detail and 3-band preview (`[u8; 3]` each) and vocal regions (`start_ms u32, end_ms u32`), each
 //! with its `count u32` first. A wrong magic or version, a short or over-long file is an error the caller reports and
 //! recomputes over; it is never trusted. A result whose profile does not cover the current options is recomputed.
+//!
+//! Older results lived in `<cache folder>/analysis/<hash of path + size + mtime>.bin` (version 3, no size field);
+//! [`migrate`] moves those of the Collection's tracks here once.
 
 use super::{
     detect::VocalRegion,
     options::{self, Options, Profile},
     Analysis, Beat,
 };
-use crate::paths::at;
+use crate::{library::Track, paths::at, store};
 use std::path::{Path, PathBuf};
 
 const MAGIC: &[u8; 4] = b"RKAC";
 /// Bump when the layout or the detectors change enough that old results should be recomputed.
-const VERSION: u32 = 3;
+const VERSION: u32 = 4;
+/// The layout before the audio size was stored: [`migrate`] upgrades these.
+const VERSION_BEFORE_SIZE: u32 = 3;
 
-/// [`crate::paths::cache_dir`]: the parent of every cache folder (analysis, stems, models).
+/// [`crate::paths::cache_dir`]: the parent of every cache folder (stems, models, folder tags).
 pub fn root() -> Option<PathBuf> {
     crate::paths::cache_dir()
 }
 
-/// `<root>/analysis`.
+/// `<data folder>/analysis`: where our analysis results live.
 pub fn dir() -> Option<PathBuf> {
+    Some(crate::paths::data_dir()?.join("analysis"))
+}
+
+/// `<cache folder>/analysis`: where they lived before they became data (see [`migrate`]).
+pub fn legacy_dir() -> Option<PathBuf> {
     Some(root()?.join("analysis"))
 }
 
-/// Cache key of an audio file: FNV-1a 64 over path, size and mtime as 16 hex digits (stable across Rust versions, unlike `DefaultHasher`).
+/// Key of an audio file by its path, size and mtime: FNV-1a 64 as 16 hex digits (stable across Rust versions, unlike
+/// `DefaultHasher`). The name of an old analysis entry and what the stems cache is keyed by.
 pub fn key(audio: &Path) -> Result<String, String> {
     let m = at(std::fs::metadata(audio), audio)?;
     let mtime = m
@@ -57,20 +70,35 @@ pub fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> u64 {
     })
 }
 
-fn file_name(audio: &Path) -> Result<String, String> {
-    Ok(format!("{}.bin", key(audio)?))
+/// The audio file of `t`, which an analysis is of.
+fn audio_of(t: &Track) -> Result<&Path, String> {
+    t.file
+        .as_deref()
+        .ok_or_else(|| format!("{}: the track has no audio file", t.title))
 }
 
-fn encode(a: &Analysis, profile: Profile) -> Vec<u8> {
+/// File name of `t`'s entry: the hash of its [`store::key`].
+fn file_name(t: &Track) -> String {
+    format!("{:016x}.bin", fnv1a(store::key(t).bytes()))
+}
+
+/// Size of `t`'s audio file: what a stored entry must match.
+fn audio_size(t: &Track) -> Result<u64, String> {
+    let audio = audio_of(t)?;
+    Ok(at(std::fs::metadata(audio), audio)?.len())
+}
+
+fn encode(a: &Analysis, profile: Profile, size: u64) -> Vec<u8> {
     let key = a.key.as_deref().unwrap_or("").as_bytes();
     let key = &key[..key.len().min(255)];
     let mut o = Vec::with_capacity(
-        40 + a.beats.len() * 8
+        48 + a.beats.len() * 8
             + (a.three_band_detail.len() + a.three_band_preview.len()) * 3
             + a.vocal.len() * 8,
     );
     o.extend_from_slice(MAGIC);
     o.extend_from_slice(&VERSION.to_le_bytes());
+    o.extend_from_slice(&size.to_le_bytes());
     o.extend_from_slice(&profile.0.to_le_bytes());
     o.push(key.len() as u8);
     o.extend_from_slice(key);
@@ -107,6 +135,9 @@ impl<'a> Cur<'a> {
     fn u32(&mut self) -> Result<u32, String> {
         Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
     }
+    fn u64(&mut self) -> Result<u64, String> {
+        Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
+    }
     /// `count u32` then `count` records of `size` bytes; the count is checked against what is left before allocating.
     fn table(&mut self, size: usize) -> Result<&'a [u8], String> {
         let n = self.u32()? as usize;
@@ -114,7 +145,8 @@ impl<'a> Cur<'a> {
     }
 }
 
-fn decode(b: &[u8]) -> Result<(Analysis, Profile), String> {
+/// The analysis, the profile it was made with and the audio size it was made for.
+fn decode(b: &[u8]) -> Result<(Analysis, Profile, u64), String> {
     let mut c = Cur(b);
     if c.take(4)? != MAGIC {
         return Err("not an analysis cache file".into());
@@ -123,7 +155,8 @@ fn decode(b: &[u8]) -> Result<(Analysis, Profile), String> {
     if v != VERSION {
         return Err(format!("cache version {v}, expected {VERSION}"));
     }
-    let profile = Profile(u64::from_le_bytes(c.take(8)?.try_into().unwrap()));
+    let size = c.u64()?;
+    let profile = Profile(c.u64()?);
     let n = c.take(1)?[0] as usize;
     let key = std::str::from_utf8(c.take(n)?).map_err(|_| "bad key text")?;
     let beats: Vec<Beat> = c
@@ -167,58 +200,61 @@ fn decode(b: &[u8]) -> Result<(Analysis, Profile), String> {
             ..Default::default()
         },
         profile,
+        size,
     ))
 }
 
-fn load_from(dir: &Path, audio: &Path) -> Result<Option<(Analysis, Profile)>, String> {
-    let file = dir.join(file_name(audio)?);
-    match std::fs::read(&file) {
+/// `Ok(None)`: no entry, or one made for a file of another size (the audio changed).
+fn load_from(dir: &Path, t: &Track) -> Result<Option<(Analysis, Profile)>, String> {
+    let size = audio_size(t)?;
+    match std::fs::read(dir.join(file_name(t))) {
         Ok(b) => decode(&b)
-            .map(Some)
+            .map(|(a, p, s)| (s == size).then_some((a, p)))
             .map_err(|e| format!("analysis cache ignored ({e})")),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(format!("analysis cache ignored ({e})")),
     }
 }
 
-fn store_in(dir: &Path, audio: &Path, a: &Analysis, profile: Profile) -> Result<(), String> {
+/// Writes `bytes` as `name` in `dir` (created): beside the target and renamed, so a concurrent reader (deck load vs bulk
+/// worker) never sees half a file.
+fn put(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), String> {
     at(std::fs::create_dir_all(dir), dir)?;
-    let name = file_name(audio)?;
-    // Write beside the target and rename, so a concurrent reader (deck load vs bulk worker) never sees half a file.
     let tmp = dir.join(format!(
         "{name}.{}.{:?}.tmp",
         std::process::id(),
         std::thread::current().id()
     ));
-    std::fs::write(&tmp, encode(a, profile))
+    std::fs::write(&tmp, bytes)
         .and_then(|()| std::fs::rename(&tmp, dir.join(name)))
         .map_err(|e| format!("analysis cache write: {e}"))
 }
 
-fn cache_dir() -> Result<PathBuf, String> {
-    dir().ok_or_else(|| "no cache directory (set XDG_CACHE_HOME or HOME)".to_owned())
+fn store_in(dir: &Path, t: &Track, a: &Analysis, profile: Profile) -> Result<(), String> {
+    put(dir, &file_name(t), &encode(a, profile, audio_size(t)?))
 }
 
-/// The cached analysis of `audio` as it was stored, whatever options it was made with (what a track list shows):
-/// `Ok(None)` = not cached; `Err` = the file is corrupt, old or unreadable and is ignored (report it, then recompute and
-/// [`store`] over it).
-pub fn load(audio: &Path) -> Result<Option<Analysis>, String> {
-    Ok(load_from(&cache_dir()?, audio)?.map(|x| x.0))
+fn data_dir() -> Result<PathBuf, String> {
+    dir().ok_or_else(|| "no data directory (set XDG_DATA_HOME or HOME)".to_owned())
 }
 
-/// The vocal regions the analysis cache holds for `audio` ([`super::detect::vocal_regions`], an inferred heuristic);
+/// The stored analysis of `t` as it was saved, whatever options it was made with (what a track list shows):
+/// `Ok(None)` = not stored (or the audio file changed since); `Err` = the file is corrupt, old or unreadable and is
+/// ignored (report it, then recompute and [`store`] over it).
+pub fn load(t: &Track) -> Result<Option<Analysis>, String> {
+    Ok(load_from(&data_dir()?, t)?.map(|x| x.0))
+}
+
+/// The vocal regions the analysis cache holds for `t` ([`super::detect::vocal_regions`], an inferred heuristic);
 /// empty when the track was not analysed or the Vocal part was off. What VIEW > Layout > Vocal draws.
-pub fn vocal(audio: &Path) -> Vec<VocalRegion> {
-    load(audio)
-        .ok()
-        .flatten()
-        .map_or_else(Vec::new, |a| a.vocal)
+pub fn vocal(t: &Track) -> Vec<VocalRegion> {
+    load(t).ok().flatten().map_or_else(Vec::new, |a| a.vocal)
 }
 
-/// The cached analysis of `audio` when it covers `o` (every part `o` runs, the same grid settings), with the parts `o`
-/// switches off emptied; `Ok(None)` = not cached or made with other options.
-pub fn load_for(audio: &Path, o: &Options) -> Result<Option<Analysis>, String> {
-    Ok(load_from(&cache_dir()?, audio)?
+/// The stored analysis of `t` when it covers `o` (every part `o` runs, the same grid settings), with the parts `o`
+/// switches off emptied; `Ok(None)` = not stored or made with other options.
+pub fn load_for(t: &Track, o: &Options) -> Result<Option<Analysis>, String> {
+    Ok(load_from(&data_dir()?, t)?
         .filter(|x| x.1.covers(o.profile()))
         .map(|mut x| {
             o.restrict(&mut x.0);
@@ -226,9 +262,9 @@ pub fn load_for(audio: &Path, o: &Options) -> Result<Option<Analysis>, String> {
         }))
 }
 
-/// Saves `a`, made with `profile`, for `audio`, replacing any old entry.
-pub fn store(audio: &Path, a: &Analysis, profile: Profile) -> Result<(), String> {
-    store_in(&cache_dir()?, audio, a, profile)
+/// Saves `a`, made with `profile`, for `t`, replacing any old entry.
+pub fn store(t: &Track, a: &Analysis, profile: Profile) -> Result<(), String> {
+    store_in(&data_dir()?, t, a, profile)
 }
 
 /// Where an analysis came from.
@@ -240,47 +276,153 @@ pub enum Source {
     },
 }
 
-/// Cached analysis under the current [`options`], else [`super::analyze`] of the decoded `samples` + [`store`].
+/// Stored analysis under the current [`options`], else [`super::analyze`] of the decoded `samples` + [`store`].
 /// ponytail: a failed cache write is dropped silently; the result is still returned.
-pub fn analyze_cached(audio: &Path, samples: &[f32], rate: u32) -> (Analysis, Source) {
+pub fn analyze_cached(t: &Track, samples: &[f32], rate: u32) -> (Analysis, Source) {
     let o = options::get();
-    let ignored = match load_for(audio, &o) {
+    let ignored = match load_for(t, &o) {
         Ok(Some(a)) => return (a, Source::Cache),
         Ok(None) => None,
         Err(e) => Some(e),
     };
     (
-        analyze_fresh(audio, samples, rate, &o),
+        analyze_fresh(t, samples, rate, &o),
         Source::Computed { ignored },
     )
 }
 
-/// [`super::analyze_with`] `o`, stored for `audio` whatever the cache held.
-pub fn analyze_fresh(audio: &Path, samples: &[f32], rate: u32, o: &Options) -> Analysis {
+/// [`super::analyze_with`] `o`, stored for `t` whatever the cache held.
+pub fn analyze_fresh(t: &Track, samples: &[f32], rate: u32, o: &Options) -> Analysis {
     let a = super::analyze_with(samples, rate, o);
-    let _ = store(audio, &a, o.profile());
+    let _ = store(t, &a, o.profile());
     a
 }
 
 /// [`analyze_cached`] for a file not decoded yet: a cache hit skips the decode entirely (bulk analysis).
-pub fn get_or_analyze(audio: &Path) -> Result<(Analysis, Source), String> {
-    if let Ok(Some(a)) = load_for(audio, &options::get()) {
+pub fn get_or_analyze(t: &Track) -> Result<(Analysis, Source), String> {
+    if let Ok(Some(a)) = load_for(t, &options::get()) {
         return Ok((a, Source::Cache));
     }
-    let pcm = crate::audio::decode(audio)?;
-    Ok(analyze_cached(audio, &pcm.samples, pcm.rate))
+    let pcm = crate::audio::decode(audio_of(t)?)?;
+    remember_fingerprint(t, &pcm);
+    Ok(analyze_cached(t, &pcm.samples, pcm.rate))
 }
 
-/// Analyses `audio` again under the current options, ignoring and replacing what the cache holds (an explicit
+/// Analyses `t` again under the current options, ignoring and replacing what the cache holds (an explicit
 /// "Analyze Track").
-pub fn reanalyze(audio: &Path) -> Result<Analysis, String> {
-    let pcm = crate::audio::decode(audio)?;
-    Ok(analyze_fresh(
-        audio,
-        &pcm.samples,
-        pcm.rate,
-        &options::get(),
-    ))
+pub fn reanalyze(t: &Track) -> Result<Analysis, String> {
+    let pcm = crate::audio::decode(audio_of(t)?)?;
+    remember_fingerprint(t, &pcm);
+    Ok(analyze_fresh(t, &pcm.samples, pcm.rate, &options::get()))
+}
+
+/// Gives a Collection track the fingerprint of its decoded audio ([`super::fingerprint`]) when it has none yet: what finds
+/// the file again after it moved. Tracks outside the Collection (no id) and failed writes are skipped silently.
+pub fn remember_fingerprint(t: &Track, pcm: &crate::audio::Pcm) {
+    let Some(id) = t.id else { return };
+    let store = store::global();
+    if store.fingerprint(id).ok().flatten().is_some() {
+        return;
+    }
+    let fp = super::fingerprint::of(pcm);
+    if !fp.is_empty() {
+        let _ = store.set_fingerprint(id, &fp);
+    }
+}
+
+/// Preferences > Analysis "Beat grid and cues from OpenFadeR analysis": drops the library's grid, phrases and cues from `a`
+/// and puts `ours` (the stored analysis, `None` = not analysed yet) in their place. With no analysis yet the grid stays empty
+/// so the analysis a LOAD runs fills it. The library's waveform and key stay where `ours` has none; the caller puts the
+/// user's own edits back on top ([`crate::store::apply`]).
+pub fn take_ours(a: &mut Analysis, ours: Option<Analysis>) {
+    a.beats.clear();
+    a.cues.clear();
+    a.phrases = None;
+    let Some(o) = ours else { return };
+    a.beats = o.beats;
+    a.phrases = o.phrases;
+    if a.three_band_detail.is_empty() {
+        (a.three_band_detail, a.three_band_preview) = (o.three_band_detail, o.three_band_preview);
+    }
+    if a.key.is_none() {
+        a.key = o.key;
+    }
+}
+
+/// What [`migrate`] did.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Migrated {
+    /// Entries moved into [`dir`].
+    pub moved: usize,
+    /// Entries still in [`legacy_dir`] (tracks that are not in the Collection, files that are gone).
+    pub left: usize,
+}
+
+/// `old` (a version 3 entry) as the current layout for an audio file of `size`; `None` when it is not a version 3 file.
+fn upgrade(old: &[u8], size: u64) -> Option<Vec<u8>> {
+    let (head, rest) = old.split_at_checked(8)?;
+    if &head[..4] != MAGIC || head[4..] != VERSION_BEFORE_SIZE.to_le_bytes() {
+        return None;
+    }
+    Some(
+        [
+            MAGIC.as_slice(),
+            &VERSION.to_le_bytes(),
+            &size.to_le_bytes(),
+            rest,
+        ]
+        .concat(),
+    )
+}
+
+/// One-time move of the old per-path entries of `tracks` (the Collection) into [`dir`] under their identity names; the old
+/// folder is removed when it ends up empty, else left alone. Slow for a big library (a stat per track): run it off the UI thread.
+pub fn migrate(tracks: &[Track]) -> Migrated {
+    let (Some(old), Some(new)) = (legacy_dir(), dir()) else {
+        return Migrated::default();
+    };
+    let Ok(entries) = std::fs::read_dir(&old) else {
+        return Migrated::default();
+    };
+    let mut left = entries
+        .filter_map(Result::ok)
+        .filter(|e| e.path().extension().is_some_and(|x| x == "bin"))
+        .count();
+    let mut moved = 0;
+    for t in tracks {
+        if left == 0 {
+            break;
+        }
+        let Some(audio) = t.file.as_deref() else {
+            continue;
+        };
+        let Ok(k) = key(audio) else { continue };
+        let from = old.join(format!("{k}.bin"));
+        let Ok(bytes) = std::fs::read(&from) else {
+            continue;
+        };
+        let name = file_name(t);
+        let size = std::fs::metadata(audio).map_or(0, |m| m.len());
+        // A newer entry already there (analysed since the update) wins; the old one is dropped either way.
+        let fresh = !new.join(&name).exists();
+        let ok = match upgrade(&bytes, size).filter(|u| decode(u).is_ok()) {
+            Some(u) => !fresh || put(&new, &name, &u).is_ok(),
+            None => false,
+        };
+        if ok && std::fs::remove_file(&from).is_ok() {
+            moved += 1;
+            left -= 1;
+        }
+    }
+    if left == 0 {
+        let _ = std::fs::remove_dir(&old);
+    } else {
+        eprintln!(
+            "analysis: {left} old entries stay in {} (no Collection track owns them)",
+            old.display()
+        );
+    }
+    Migrated { moved, left }
 }
 
 #[cfg(test)]
@@ -308,15 +450,20 @@ mod tests {
         }
     }
 
-    /// (cache dir, an audio file inside a fresh temp dir)
-    fn fixture(name: &str) -> (PathBuf, PathBuf) {
+    /// (cache dir, a track with an audio file inside a fresh temp dir, its id fixed so a move keeps the identity)
+    fn fixture(name: &str) -> (PathBuf, Track) {
         let root =
             std::env::temp_dir().join(format!("openfader-cache-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let audio = root.join("a.wav");
         std::fs::write(&audio, b"audio").unwrap();
-        (root.join("cache"), audio)
+        let t = Track {
+            id: Some(7),
+            file: Some(audio),
+            ..Track::default()
+        };
+        (root.join("cache"), t)
     }
 
     fn profile() -> Profile {
@@ -324,9 +471,9 @@ mod tests {
     }
 
     #[test]
-    fn round_trips_and_follows_the_file() {
-        let (dir, audio) = fixture("rt");
-        assert!(load_from(&dir, &audio).unwrap().is_none());
+    fn round_trips_and_follows_the_track_not_the_path() {
+        let (dir, t) = fixture("rt");
+        assert!(load_from(&dir, &t).unwrap().is_none());
         let s = Analysis {
             vocal: vec![VocalRegion {
                 start_ms: 1000,
@@ -334,8 +481,8 @@ mod tests {
             }],
             ..sample()
         };
-        store_in(&dir, &audio, &s, profile()).unwrap();
-        let (a, p) = load_from(&dir, &audio).unwrap().unwrap();
+        store_in(&dir, &t, &s, profile()).unwrap();
+        let (a, p) = load_from(&dir, &t).unwrap().unwrap();
         assert_eq!(p, profile());
         assert_eq!(
             (
@@ -357,17 +504,32 @@ mod tests {
             key: None,
             ..sample()
         };
-        store_in(&dir, &audio, &none, profile()).unwrap();
-        assert_eq!(load_from(&dir, &audio).unwrap().unwrap().0.key, None);
-        // A changed file (size) is a different entry.
-        std::fs::write(&audio, b"audio, edited").unwrap();
-        assert!(load_from(&dir, &audio).unwrap().is_none());
+        store_in(&dir, &t, &none, profile()).unwrap();
+        assert_eq!(load_from(&dir, &t).unwrap().unwrap().0.key, None);
+
+        // The same track (id) after its file moved and was renamed: still found.
+        let moved = t.file.as_ref().unwrap().with_file_name("renamed.wav");
+        std::fs::rename(t.file.as_ref().unwrap(), &moved).unwrap();
+        let t2 = Track {
+            file: Some(moved),
+            ..t.clone()
+        };
+        assert!(load_from(&dir, &t2).unwrap().is_some());
+        // Another track is another entry.
+        let other = Track {
+            id: Some(8),
+            ..t2.clone()
+        };
+        assert!(load_from(&dir, &other).unwrap().is_none());
+        // A changed file (size) makes the entry stale, not an error.
+        std::fs::write(t2.file.as_ref().unwrap(), b"audio, edited").unwrap();
+        assert!(load_from(&dir, &t2).unwrap().is_none());
         std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
     }
 
     #[test]
     fn an_entry_answers_only_options_its_profile_covers() {
-        let (dir, audio) = fixture("prof");
+        let (dir, t) = fixture("prof");
         let fewer = Options {
             parts: options::Parts {
                 key: false,
@@ -377,7 +539,7 @@ mod tests {
         };
         store_in(
             &dir,
-            &audio,
+            &t,
             &Analysis {
                 key: None,
                 ..sample()
@@ -385,14 +547,14 @@ mod tests {
             fewer.profile(),
         )
         .unwrap();
-        let (_, p) = load_from(&dir, &audio).unwrap().unwrap();
+        let (_, p) = load_from(&dir, &t).unwrap().unwrap();
         assert!(p.covers(fewer.profile()), "answers what it was made for");
         assert!(
             !p.covers(Options::default().profile()),
             "a key was never computed: the key part must run"
         );
-        store_in(&dir, &audio, &sample(), profile()).unwrap();
-        let (a, p) = load_from(&dir, &audio).unwrap().unwrap();
+        store_in(&dir, &t, &sample(), profile()).unwrap();
+        let (a, p) = load_from(&dir, &t).unwrap().unwrap();
         assert!(p.covers(fewer.profile()) && a.key.is_some());
         let mut restricted = a;
         fewer.restrict(&mut restricted);
@@ -405,12 +567,12 @@ mod tests {
 
     #[test]
     fn old_version_and_damaged_files_are_errors() {
-        let (dir, audio) = fixture("bad");
-        let good = encode(&sample(), profile());
+        let (dir, t) = fixture("bad");
+        let good = encode(&sample(), profile(), 5);
         let put = |b: &[u8]| {
             std::fs::create_dir_all(&dir).unwrap();
-            std::fs::write(dir.join(file_name(&audio).unwrap()), b).unwrap();
-            load_from(&dir, &audio)
+            std::fs::write(dir.join(file_name(&t)), b).unwrap();
+            load_from(&dir, &t)
         };
         let mut old = good.clone();
         old[4..8].copy_from_slice(&(VERSION + 1).to_le_bytes());
@@ -422,10 +584,61 @@ mod tests {
             assert!(put(&good[..cut]).is_err(), "truncated at {cut}");
         }
         let mut huge = good.clone();
-        huge[17 + 2..17 + 6].copy_from_slice(&u32::MAX.to_le_bytes()); // beat count past the end
+        huge[25 + 2..25 + 6].copy_from_slice(&u32::MAX.to_le_bytes()); // beat count past the end
         assert!(put(&huge).is_err());
         assert!(put(&[good.clone(), vec![0]].concat()).is_err());
         assert!(put(&good).unwrap().is_some());
         std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
+
+    /// A version 3 entry as the old code wrote it: the current layout without the audio size.
+    fn old_entry(a: &Analysis) -> Vec<u8> {
+        let mut b = encode(a, profile(), 0);
+        b[4..8].copy_from_slice(&VERSION_BEFORE_SIZE.to_le_bytes());
+        b.drain(8..16);
+        b
+    }
+
+    #[test]
+    fn upgrade_turns_a_version_3_entry_into_a_valid_current_one() {
+        let up = upgrade(&old_entry(&sample()), 5).unwrap();
+        let (a, p, size) = decode(&up).unwrap();
+        assert_eq!((a.beats, p, size), (sample().beats, profile(), 5));
+        assert!(
+            upgrade(&encode(&sample(), profile(), 5), 5).is_none(),
+            "a current entry is not an old one"
+        );
+        assert!(upgrade(b"RKA", 5).is_none());
+    }
+
+    #[test]
+    fn our_analysis_replaces_the_librarys_grid_and_cues_but_not_its_waveform() {
+        let cue = crate::analysis::Cue {
+            hot_cue: 0,
+            time_ms: 5,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        };
+        let theirs = || Analysis {
+            beats: vec![Beat {
+                bar_pos: 1,
+                bpm_x100: 9000,
+                time_ms: 1,
+            }],
+            cues: vec![cue.clone()],
+            three_band_detail: vec![[9, 9, 9]],
+            ..Default::default()
+        };
+        let mut a = theirs();
+        take_ours(&mut a, Some(sample()));
+        assert_eq!(a.beats, sample().beats);
+        assert!(a.cues.is_empty());
+        assert_eq!(a.three_band_detail, [[9, 9, 9]], "their waveform stays");
+        assert_eq!(a.key.as_deref(), Some("8A"), "a key they lack is ours");
+        // Not analysed yet: nothing of theirs is left to mislead the deck, the load analyses.
+        let mut a = theirs();
+        take_ours(&mut a, None);
+        assert!(a.beats.is_empty() && a.cues.is_empty() && a.phrases.is_none());
     }
 }

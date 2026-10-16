@@ -1,7 +1,7 @@
 //! Selected-track details panel (`TrackInfoState` in ui/trackinfo.slint): cover, tags, rating, comment, phrase mood,
 //! our detected BPM/key where it differs from the library's, and the bulk-analysis progress ([`super::analyze`]).
 
-use super::{App, TrackInfoState, analyze, camelot::display, prefs};
+use super::{analyze, camelot::display, prefs, App, TrackInfoState};
 use openfader::{
     library::{Library, Track},
     store,
@@ -30,8 +30,36 @@ pub fn use_library(lib: Rc<dyn Library>) {
     LIBRARY.with_borrow_mut(|l| *l = Some(lib));
 }
 
+/// The shown track as the library lists it (the store's edits are read again on every [`show`]).
 fn shown() -> Option<Track> {
     SHOWN.with_borrow(|t| t.clone())
+}
+
+/// Re-shows the shown track as the library lists it now (after an undo or redo changed its row or its edits).
+pub fn reshow(app: &App) {
+    let Some(t) = shown() else {
+        return;
+    };
+    let fresh = t.id.and_then(|id| {
+        LIBRARY.with_borrow(|l| {
+            l.as_ref()?
+                .tracks_all()
+                .ok()?
+                .iter()
+                .find(|x| x.id == Some(id))
+                .cloned()
+        })
+    });
+    show(app, &fresh.unwrap_or(t));
+}
+
+/// `t` with the store's rating and comment, and every edit of it.
+fn edited(t: &Track) -> (Track, store::Edits) {
+    let edits = store::global().edits(&store::key(t)).unwrap_or_default();
+    let mut t = t.clone();
+    t.rating = edits.rating.unwrap_or(t.rating);
+    t.comment = edits.comment.clone().unwrap_or(t.comment);
+    (t, edits)
 }
 
 /// Re-shows the selected track when it is `path` (its analysis just arrived).
@@ -47,9 +75,7 @@ pub fn set_progress(app: &App, text: &str) {
 
 /// (BPM × 100, key) our analysis found for `t` (bulk run or cache), `None` when not analysed.
 fn found(t: &Track) -> Option<analyze::Found> {
-    t.file
-        .as_deref()
-        .and_then(|f| analyze::detected().lookup(f))
+    analyze::detected().lookup(t)
 }
 
 /// "detected 125.00 BPM (library 128.00)" / "detected 9A (library 8A)" for each value that exists on both sides and differs.
@@ -87,9 +113,8 @@ fn edit(app: &App, save: impl FnOnce(&store::Store, &str) -> Result<(), String>)
         return set_progress(app, &format!("not saved: {e}"));
     }
     show(app, &t);
-    if let Some(t) = shown() {
-        LISTENER.with_borrow(|l| l.iter().for_each(|f| f(&t)));
-    }
+    let (t, _) = edited(&t);
+    LISTENER.with_borrow(|l| l.iter().for_each(|f| f(&t)));
 }
 
 /// Connects the panel's edit callbacks and the notation-change refresh (once).
@@ -103,7 +128,7 @@ fn wire(app: &App) {
     let s = app.global::<TrackInfoState>();
     let weak = app.as_weak();
     s.on_rating_set(move |n| {
-        let Some(cur) = SHOWN.with_borrow(|t| t.as_ref().map(|t| t.rating)) else {
+        let Some(cur) = shown().map(|t| edited(&t).0.rating) else {
             return;
         };
         let n = if i32::from(cur) == n {
@@ -139,12 +164,9 @@ pub fn show(app: &App, t: &Track) {
         wire(app);
     }
     // The browser's list may predate an edit made here: what the store holds wins.
-    let edits = store::global().edits(&store::key(t)).unwrap_or_default();
-    let mut t = t.clone();
-    t.rating = edits.rating.unwrap_or(t.rating);
-    t.comment = edits.comment.unwrap_or(t.comment);
-    let t = &t;
     SHOWN.with_borrow_mut(|s| *s = Some(t.clone()));
+    let (t, edits) = edited(t);
+    let t = &t;
     let s = app.global::<TrackInfoState>();
     s.set_color(edits.color.map_or(0, i32::from));
     let (ours, notation) = (

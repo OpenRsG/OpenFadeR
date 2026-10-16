@@ -6,7 +6,7 @@
 //! [`track`] (the Track menu on the chosen track), [`missing`] (Missing File Manager, relocate, auto relocate),
 //! [`dupes`] (duplicate finder + manager), [`backup`] (Backup / Restore Library), [`playlist`] (Playlist menu: files,
 //! sort, renumber), [`export`] (Export Collection: a library plugin writes it), [`settings`] (Preferences > Advanced > Database / Browse),
-//! [`dialog`] (what the dialogs ask, the file chooser).
+//! [`dialog`] (what the dialogs ask, the file chooser), [`undo`] (Edit > Undo / Redo over the store's change journal).
 //!
 //! The browser owns what is selected; the menus read it through [`browser::context`](super::browser::context) and make it
 //! reload through `BrowserState.reload`. Our Collection data lives in the store ([`openfader::store`]); the opened library
@@ -24,8 +24,9 @@ mod missing;
 mod playlist;
 pub mod settings;
 mod track;
+mod undo;
 
-use super::{App, BrowserState, LibraryState, analyze, deck::Decks, plural, prefs, toast};
+use super::{analyze, deck::Decks, plural, prefs, toast, App, BrowserState, LibraryState};
 use openfader::{
     library::{Library, Track},
     store::{self, Store},
@@ -39,7 +40,7 @@ use std::{
     sync::Arc,
 };
 
-pub use dialog::{Ask, Confirm, Pick, browse, chooser, open_external, show_in_folder};
+pub use dialog::{browse, chooser, open_external, show_in_folder, Ask, Confirm, Pick};
 pub use missing::is_missing;
 
 #[derive(Default)]
@@ -106,24 +107,28 @@ impl Ctx {
 
     /// Removes `tracks` from the Collection; playlist places of keys no listed track carries any more go too.
     pub fn remove_tracks(&self, tracks: &[Track]) {
-        for t in tracks {
-            if let Err(e) = self.store.collection_remove(t) {
-                return self.say(&format!("store: {e}"));
-            }
+        let done = self
+            .store
+            .action("Remove from Collection", || -> Result<(), String> {
+                for t in tracks {
+                    self.store.collection_remove(t)?;
+                }
+                let left: HashSet<String> = self
+                    .lib
+                    .tracks(None)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(store::key)
+                    .collect();
+                for k in tracks.iter().map(store::key).filter(|k| !left.contains(k)) {
+                    self.store.forget_entries(&k)?;
+                }
+                Ok(())
+            });
+        match done {
+            Ok(()) => self.reload(None),
+            Err(e) => self.say(&format!("store: {e}")),
         }
-        let left: HashSet<String> = self
-            .lib
-            .tracks(None)
-            .unwrap_or_default()
-            .iter()
-            .map(store::key)
-            .collect();
-        for k in tracks.iter().map(store::key).filter(|k| !left.contains(k)) {
-            if let Err(e) = self.store.forget_entries(&k) {
-                return self.say(&format!("store: {e}"));
-            }
-        }
-        self.reload(None);
     }
 
     /// [`Ctx::remove_tracks`], then says how many left the Collection.
@@ -210,6 +215,7 @@ fn path_done(c: &Rc<Ctx>, ok: bool) {
         Ask::Restore => backup::confirm_restore(c, path),
         Ask::ExportList(f) => playlist::write(c, path, f),
         Ask::Relocate(tracks) => missing::relocate_to(c, tracks, path),
+        Ask::Connect { .. } => super::connect::add(&path),
     }
 }
 
@@ -220,12 +226,27 @@ fn confirm_done(c: &Rc<Ctx>, answer: i32) {
         return;
     };
     match (what, answer) {
+        (Confirm::WriteBack, n) => super::connect::writeback_answer(n == 1),
         (_, 0) => {}
         (Confirm::BackupMusic, n) => c.ask_path(Ask::BackupTo { music: n == 1 }, None),
         (Confirm::Restore(p), 1) => backup::restore(c, p),
         (Confirm::Remove(t), 1) => track::remove(c, t),
         (Confirm::RemoveMissing(t), 1) => missing::remove(c, t),
         _ => {}
+    }
+}
+
+/// Opens the ADD dialog of Preferences > Libraries (a folder, or a library file).
+pub(in crate::app) fn ask_connect(folder: bool) {
+    if let Some(c) = CTX.with(|c| c.borrow().clone()) {
+        c.ask_path(Ask::Connect { folder }, None);
+    }
+}
+
+/// Asks whether to write the planned changes back to a connected library file ([`super::connect`]).
+pub(in crate::app) fn ask_writeback(text: &str) {
+    if let Some(c) = CTX.with(|c| c.borrow().clone()) {
+        c.confirm(Confirm::WriteBack, "WRITE BACK", text, "WRITE", "CANCEL");
     }
 }
 
@@ -278,6 +299,7 @@ fn action_index(id: &str) -> Option<usize> {
 fn act(c: &Rc<Ctx>, id: &str) {
     match id {
         "source-import" => import::source(c),
+        "source-connect" => super::connect::connect_context(),
         "import-track" => c.ask_path(Ask::ImportFiles, None),
         "import-folder" => c.ask_path(Ask::ImportFolder, None),
         "import-playlist" => c.ask_path(Ask::ImportPlaylist, None),
@@ -301,6 +323,8 @@ fn act(c: &Rc<Ctx>, id: &str) {
                 export::collection(c, i);
             }
         }
+        "undo" => undo::run(c, false),
+        "redo" => undo::run(c, true),
         "exit" => {
             let _ = slint::quit_event_loop();
         }
@@ -348,6 +372,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) {
             },
         );
     });
+    undo::wire(&c);
     missing::wire(&c);
     let k = c.clone();
     s.on_dupes_toggle(move |i| dupes::toggle(&k, i as usize));

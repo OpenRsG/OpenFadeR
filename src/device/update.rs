@@ -50,8 +50,14 @@ pub fn update_collection(
     )
 }
 
-/// Writes the edits of `report` to `store` and remembers its baselines for `device_id`.
+/// Writes the edits of `report` to `store` (one undo step) and remembers its baselines for `device_id`.
 fn apply(report: &UpdateReport, device_id: &str, store: &Store) -> Result<Updated, String> {
+    store.action("Update Collection", || {
+        apply_edits(report, device_id, store)
+    })
+}
+
+fn apply_edits(report: &UpdateReport, device_id: &str, store: &Store) -> Result<Updated, String> {
     let mut u = Updated {
         matched: report.matched,
         unmatched: report.unmatched,

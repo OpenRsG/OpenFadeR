@@ -2,47 +2,9 @@
 //! A key is `(number 1 to 12, major)`: "A" = minor = `false`, "B" = major = `true`.
 //! [`display`] writes a key in the notation the user picked (PREFS).
 
-use super::prefs::{KeyNotation, view::TrafficLight};
+use super::prefs::{view::TrafficLight, KeyNotation};
 
-pub type Key = (u8, bool);
-
-/// Camelot position of a key given either as Camelot ("10A") or as a musical name ("F#m", "Bb",
-/// "Am", "C#min", "Dmaj"). Musical names map by the
-/// standard Camelot wheel (Am = 8A, C = 8B; a fifth up = +1), computed from the tonic's pitch class.
-pub fn camelot(key: &str) -> Option<Key> {
-    let k = key.trim();
-    if let Some(l @ ('A' | 'B' | 'a' | 'b')) = k.chars().last() {
-        if let Ok(n @ 1..=12) = k[..k.len() - 1].parse::<u8>() {
-            return Some((n, l.eq_ignore_ascii_case(&'B')));
-        }
-    }
-    let mut it = k.chars();
-    let mut pc = match it.next()?.to_ascii_uppercase() {
-        'C' => 0,
-        'D' => 2,
-        'E' => 4,
-        'F' => 5,
-        'G' => 7,
-        'A' => 9,
-        'B' => 11,
-        _ => return None,
-    } as i32;
-    let rest = it.as_str();
-    let (acc, rest) = match rest.chars().next() {
-        Some('#' | '♯') => (1, &rest[rest.chars().next()?.len_utf8()..]),
-        Some('♭') => (-1, &rest['♭'.len_utf8()..]),
-        Some('b') => (-1, &rest[1..]),
-        _ => (0, rest),
-    };
-    pc += acc;
-    let minor = match rest.to_lowercase().as_str() {
-        "" | "maj" | "major" => false,
-        "m" | "min" | "minor" => true,
-        _ => return None,
-    };
-    let steps = (pc - if minor { 9 } else { 0 }).rem_euclid(12) * 7 % 12;
-    Some((((steps + 7) % 12 + 1) as u8, !minor))
-}
+pub use openfader::analysis::key::{parse as camelot, Key};
 
 /// Keys that count as matching `a` at traffic-light range `level` (VIEW > Traffic Light): `Same` the key itself;
 /// `Related1` also the relative key (same number, other letter); `Related2` also ±1 on the wheel with the same letter

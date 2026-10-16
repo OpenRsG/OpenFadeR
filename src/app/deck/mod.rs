@@ -51,6 +51,7 @@ pub use pads::PadMode;
 mod phrase;
 pub(in crate::app) use phrase::Hit;
 mod quantize;
+mod reedit;
 mod sequencer;
 mod slicer;
 mod slip;
@@ -113,6 +114,8 @@ struct Loaded {
     /// The track as the browser gave it, its library (or analysed) grid for GRID RESET and its tempo.
     track: Option<Track>,
     lib_beats: Vec<Beat>,
+    /// The grid before the user's stored edits, when the load knew it (our own analysis); else the library's is asked again.
+    base_beats: Option<Vec<Beat>>,
     lib_bpm: f64,
     /// Tempo at rate 1.0 in BPM (grid, else library; 0 = unknown).
     base_bpm: f64,
