@@ -37,6 +37,8 @@ The first run clones the plugins, themes and mappings next to the code, builds e
 
 `start.sh` without a path reopens the last library, or opens `$XDG_MUSIC_DIR` (else `~/Music/OpenFadeR`). To build only the core: `cargo build --release`.
 
+To install it for your user on Linux instead (the `openfader` command and an application menu entry, with the plugins, themes and mappings bundled): `./install.sh`. It also sets the default plugin, theme and mapping repositories of PREFERENCES (GET PLUGINS / GET THEMES / GET MAPPINGS), which the app uses anyway until you edit the list. Run it again to update; `./install.sh --uninstall` removes it.
+
 ## A tour
 
 ### Analysis that is ready when you load
