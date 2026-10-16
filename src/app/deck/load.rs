@@ -19,7 +19,7 @@ use openfader::{
 use serde_json::json;
 use slint::{ModelRc, VecModel};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     sync::mpsc::{Receiver, TryRecvError, channel},
 };
 
@@ -137,10 +137,12 @@ impl Deck {
             .then(|| autocue::nearest(&a.cues))
             .flatten();
         analysis::auto::fill(&mut a); // phrases from the grid + 3-band waveform when the library has none
-        if a.cues.is_empty() {
-            let auto = analysis::auto::cues(&a); // session-only automatic cues (empty without a grid or when cues exist)
+        // session-only automatic cues (none without a grid or when the track has cues)
+        let auto_cues = a.cues.is_empty() && {
+            let auto = analysis::auto::cues(&a);
             a.cues.extend(auto);
-        }
+            !a.cues.is_empty()
+        };
         let duration = if t.length_s > 0 {
             t.length_s as u32 * 1000
         } else {
@@ -157,7 +159,7 @@ impl Deck {
         if self.player.is_some() && t.file.is_none() && t.remote.is_none() && pcm.is_none() {
             notes.push("no file path".into());
         }
-        let mut status = summary(&t.title, &a, grid, &notes);
+        let mut status = summary(&t.title, &a, grid, auto_cues, &notes);
         let library = pcm.is_none(); // a sampler slice is no library track: not exported, not in the history
         let downloading = library && t.file.is_none() && t.remote.is_some();
         self.rate.set(1.0);
@@ -217,6 +219,7 @@ impl Deck {
             key: t.key.clone(),
             lib_bpm: t.bpm_x100 as f64 / 100.0,
             track: library.then(|| t.clone()),
+            auto_cues: Cell::new(auto_cues),
             ..Default::default()
         };
         let pad_views = self.pad_views(&self.loaded.borrow());
@@ -330,6 +333,7 @@ impl Deck {
                 if l.analysis.cues.is_empty() {
                     let auto = analysis::auto::cues(&l.analysis);
                     added_cues = !auto.is_empty();
+                    l.auto_cues.set(added_cues);
                     l.analysis.cues.extend(auto);
                 }
                 if l.detail.is_none() {
@@ -364,7 +368,7 @@ impl Deck {
         }
         l.invalidate();
         let grid = grid_bpm(&l.analysis.beats);
-        let status = summary(&title, &l.analysis, grid, &notes);
+        let status = summary(&title, &l.analysis, grid, l.auto_cues.get(), &notes);
         if let Some(g) = grid {
             l.base_bpm = g;
         }
@@ -433,13 +437,21 @@ impl Deck {
     }
 }
 
-/// The deck status line: `<title> — N beats @ BPM, N cues · notes…`, rebuilt when the analysis arrives.
-fn summary(title: &str, a: &analysis::Analysis, grid: Option<f64>, notes: &[String]) -> String {
+/// The deck status line: `<title> — N beats @ BPM, N cues · notes…` (`N automatic cues` for this session's own),
+/// rebuilt when the analysis arrives.
+fn summary(
+    title: &str,
+    a: &analysis::Analysis,
+    grid: Option<f64>,
+    auto_cues: bool,
+    notes: &[String],
+) -> String {
     std::iter::once(format!(
-        "{title} — {} beats @ {}, {} cues",
+        "{title} — {} beats @ {}, {} {}cues",
         a.beats.len(),
         bpm_text(grid, 1.0),
-        a.cues.len()
+        a.cues.len(),
+        if auto_cues { "automatic " } else { "" }
     ))
     .chain(notes.iter().cloned())
     .collect::<Vec<_>>()

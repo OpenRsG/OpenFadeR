@@ -251,6 +251,11 @@ impl Deck {
             l.loop_.and_then(|lp| beats_between(&l.analysis.beats, lp)),
             self.pad_page.get(),
         );
+        if mode == PadMode::HotCue && l.auto_cues.get() {
+            v.iter_mut()
+                .filter(|p| p.set)
+                .for_each(|p| p.time = format!("AUTO  {}", p.time).into());
+        }
         match mode {
             PadMode::PadFx => {
                 // PAD FX pads take the colour of VIEW > Color

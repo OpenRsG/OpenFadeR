@@ -180,6 +180,7 @@ impl Deck {
     pub(super) fn persist_cues(&self, l: &Loaded) -> Result<(), String> {
         l.track.as_ref().map_or(Ok(()), |t| {
             store::global().set_cues(&store::key(t), Some(&l.analysis.cues))?;
+            l.auto_cues.set(false);
             crate::app::device::track_edited(t);
             Ok(())
         })

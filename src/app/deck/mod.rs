@@ -107,6 +107,8 @@ struct Loaded {
     pending: Option<Pending>,
     /// Analysis as loaded plus this session's cue edits (session only, never written back).
     analysis: analysis::Analysis,
+    /// The cues are automatic ones made for this session (the track has none saved); the first cue edit saves them.
+    auto_cues: Cell<bool>,
     duration_ms: u32,
     /// The track as the browser gave it, its library (or analysed) grid for GRID RESET and its tempo.
     track: Option<Track>,
