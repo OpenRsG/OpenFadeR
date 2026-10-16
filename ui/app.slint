@@ -106,7 +106,9 @@ export component App inherits Window {
         MixPointState.active = root.show-mix;
         ExportModeState.layout = root.export-layout;
     }
-    property <length> y-mix: root.y-fx + (root.show-fx ? Theme.h-fx + Theme.gap : 0px);
+    /// FX panel height; themes written before the panel's tabs set 62 px, too small for its three rows.
+    property <length> h-fx: max(Theme.h-fx, 110px);
+    property <length> y-mix: root.y-fx + (root.show-fx ? root.h-fx + Theme.gap : 0px);
     property <length> y-wave: root.y-mix + (root.show-mix ? Theme.h-mixpoint + Theme.gap : 0px);
     property <length> y-deck: root.y-wave + (root.vert ? 0px : root.waves-h + Theme.gap);
     property <length> y-strip: root.y-deck + (root.browse-on ? 0px : root.deck-h + Theme.gap);
@@ -282,7 +284,7 @@ export component App inherits Window {
             if (KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
         }
 
-        if root.show-fx: FxPanel { x: 0; y: root.y-fx; width: root.width; height: Theme.h-fx; }
+        if root.show-fx: FxPanel { x: 0; y: root.y-fx; width: root.width; height: root.h-fx; }
         if root.show-mix: MixPointPanel { x: 0; y: root.y-mix; width: root.width; height: Theme.h-mixpoint; }
         for i in root.waves-n: DeckDetail {
             index: PrefsState.wave-order[i];

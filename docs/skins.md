@@ -314,7 +314,7 @@ and brightness of the key column's colours, whose hue is the key's.
 | `h-phrase` | length | `14px` |
 | `h-deck-2` | length | `240px` |
 | `h-deck-4` | length | `132px` |
-| `h-fx` | length | `62px` |
+| `h-fx` | length | `110px` |
 | `h-mixpoint` | length | `96px` |
 | `h-sampler` | length | `96px` |
 | `w-channel` | length | `52px` |

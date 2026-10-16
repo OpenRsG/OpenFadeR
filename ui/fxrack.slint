@@ -32,83 +32,109 @@ export global FxRackState {
     callback lever-edited(float);
 }
 
+/// Dim caption naming the control group it precedes (FX panel).
+export component FxLabel inherits Text {
+    color: Theme.text-dim;
+    font-family: Theme.font;
+    font-size: Theme.font-xs;
+    font-weight: Theme.weight-bold;
+    vertical-alignment: center;
+    horizontal-stretch: 0;
+}
+
+/// Hairline between two control groups of the FX panel.
+export component FxDivider inherits Rectangle {
+    width: 1px;
+    horizontal-stretch: 0;
+    background: Theme.line;
+}
+
 /// SEND FX / LEVER FX / MIC FX in the FX panel's slot of the two Beat FX units (`FxState.view` 3, 4, 5; `rack` = view - 3).
+/// One row of 20 px controls, centred, so every group lines up.
 export component FxRack inherits Rectangle {
     in property <int> rack;
     property <RackView> r: FxRackState.racks[root.rack];
+    property <length> ctl-h: 20px;
     background: Theme.panel;
-    HorizontalLayout {
-        padding: 2px;
-        spacing: 4px;
-        Text {
-            text: ["SEND FX", "LEVER FX", "MIC FX"][root.rack];
-            color: Theme.text-dim;
-            font-family: Theme.font;
-            font-size: Theme.font-xs;
-            font-weight: Theme.weight-bold;
-            vertical-alignment: center;
-            horizontal-stretch: 0;
-        }
-        Dropdown {
-            options: r.has ? r.names : ["no plugin"];
-            current: r.effect;
-            enabled: r.has;
-            font-size: Theme.font-xs;
-            min-width: 90px;
-            horizontal-stretch: 0;
-            height: 18px;
-            vertical-stretch: 0;
-            chose(i) => { FxRackState.effect-selected(root.rack, i); }
-        }
-        if root.rack != 1: Chip {
-            text: "ON";
-            font-size: Theme.font-xs;
-            min-width: 34px;
-            max-width: 34px;
-            horizontal-stretch: 0;
-            height: 18px;
-            enabled: r.has;
-            active: r.on;
-            active-color: Theme.play;
-            clicked => { FxRackState.toggled(root.rack); }
-        }
-        if root.rack != 1: VerticalLayout {
-            width: 30px;
-            alignment: center;
-            Text { text: root.rack == 0 ? "RET" : "LVL"; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; horizontal-alignment: center; }
-            Knob { width: 30px; height: 20px; value: r.level; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.level-edited(root.rack, v); } } }
-        }
-        if root.rack != 1: VerticalLayout {
-            width: 30px;
-            alignment: center;
-            Text { text: "PARAM"; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; horizontal-alignment: center; }
-            Knob { width: 30px; height: 20px; value: r.param; detent: root.rack == 2; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.param-edited(root.rack, v); } } }
-        }
-        if root.rack == 0: HorizontalLayout {
-            spacing: 4px;
-            horizontal-stretch: 0;
-            for n in DeckState.count: HorizontalLayout {
-                spacing: 2px;
-                Text { text: "S" + (n + 1); color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; vertical-alignment: center; }
-                Knob { width: 30px; height: 30px; value: FxRackState.sends[n]; reset: 0; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.send-edited(n, v); } } }
+    VerticalLayout {
+        alignment: center;
+        padding-left: 8px;
+        padding-right: 8px;
+        HorizontalLayout {
+            height: root.ctl-h;
+            spacing: 10px;
+            HorizontalLayout {
+                spacing: 6px;
+                horizontal-stretch: 0;
+                FxLabel { text: "EFFECT"; }
+                Dropdown {
+                    options: r.has ? r.names : ["no plugin"];
+                    current: r.effect;
+                    enabled: r.has;
+                    font-size: Theme.font-xs;
+                    min-width: 140px;
+                    horizontal-stretch: 0;
+                    height: root.ctl-h;
+                    chose(i) => { FxRackState.effect-selected(root.rack, i); }
+                }
+                if root.rack != 1: Chip {
+                    text: "ON";
+                    font-size: Theme.font-xs;
+                    min-width: 34px;
+                    max-width: 34px;
+                    horizontal-stretch: 0;
+                    height: root.ctl-h;
+                    enabled: r.has;
+                    active: r.on;
+                    active-color: Theme.play;
+                    clicked => { FxRackState.toggled(root.rack); }
+                }
             }
+            FxDivider { }
+            if root.rack != 1: HorizontalLayout {
+                spacing: 4px;
+                horizontal-stretch: 0;
+                FxLabel { text: root.rack == 0 ? "RETURN" : "LEVEL"; }
+                Knob { width: root.ctl-h; height: root.ctl-h; value: r.level; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.level-edited(root.rack, v); } } }
+                Rectangle { width: 6px; }
+                FxLabel { text: "PARAM"; }
+                Knob { width: root.ctl-h; height: root.ctl-h; value: r.param; detent: root.rack == 2; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.param-edited(root.rack, v); } } }
+            }
+            if root.rack == 0: FxDivider { }
+            if root.rack == 0: HorizontalLayout {
+                spacing: 4px;
+                horizontal-stretch: 0;
+                FxLabel { text: "SEND"; }
+                for n in DeckState.count: HorizontalLayout {
+                    spacing: 2px;
+                    FxLabel { text: "" + (n + 1); }
+                    Knob { width: root.ctl-h; height: root.ctl-h; value: FxRackState.sends[n]; reset: 0; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.send-edited(n, v); } } }
+                }
+            }
+            if root.rack == 1: HorizontalLayout {
+                spacing: 6px;
+                horizontal-stretch: 0;
+                FxLabel { text: "LEVER"; }
+                Fader {
+                    width: 160px;
+                    height: root.ctl-h;
+                    value: FxRackState.lever;
+                    opacity: r.has ? 1 : 0.4;
+                    edited(v) => { if r.has { FxRackState.lever-edited(v); } }
+                    released => { FxRackState.lever-edited(0); }
+                }
+            }
+            if root.rack == 1: FxDivider { }
+            if root.rack == 1: HorizontalLayout {
+                spacing: 3px;
+                horizontal-stretch: 0;
+                FxLabel { text: "BEAT"; }
+                Rectangle { width: 3px; }
+                Chip { text: "◀"; font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; clicked => { FxRackState.beat-step(root.rack, -1); } }
+                Text { text: r.beat-text; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; min-width: 30px; }
+                Chip { text: "▶"; font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; clicked => { FxRackState.beat-step(root.rack, 1); } }
+            }
+            Rectangle { horizontal-stretch: 1; }
         }
-        if root.rack == 1: Fader {
-            min-width: 120px;
-            height: 18px;
-            horizontal-stretch: 0;
-            value: FxRackState.lever;
-            opacity: r.has ? 1 : 0.4;
-            edited(v) => { if r.has { FxRackState.lever-edited(v); } }
-            released => { FxRackState.lever-edited(0); }
-        }
-        if root.rack == 1: HorizontalLayout {
-            spacing: 3px;
-            horizontal-stretch: 0;
-            Chip { text: "◀"; font-size: Theme.font-xs; min-width: 18px; max-width: 18px; horizontal-stretch: 0; height: 18px; clicked => { FxRackState.beat-step(root.rack, -1); } }
-            Text { text: r.beat-text; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; min-width: 26px; horizontal-stretch: 0; }
-            Chip { text: "▶"; font-size: Theme.font-xs; min-width: 18px; max-width: 18px; horizontal-stretch: 0; height: 18px; clicked => { FxRackState.beat-step(root.rack, 1); } }
-        }
-        Rectangle { horizontal-stretch: 1; }
     }
 }
