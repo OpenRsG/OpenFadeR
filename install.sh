@@ -35,6 +35,11 @@ cp -L target/release/*.so* "$lib/" 2>/dev/null || true # ONNX Runtime / WebGPU f
 python3 .github/bundle.py "$lib"
 ln -sf "$lib/openfader" "$bin/openfader"
 cp assets/icon.png "$icons/openfader.png"
+# A stale icon-theme.cache hides icons added after it was written: refresh it when there is one.
+theme="${icons%/256x256/apps}"
+if [ -e "$theme/icon-theme.cache" ] && command -v gtk-update-icon-cache >/dev/null; then
+	gtk-update-icon-cache -q -f -t "$theme" || true
+fi
 cat >"$apps/openfader.desktop" <<EOF
 [Desktop Entry]
 Type=Application
