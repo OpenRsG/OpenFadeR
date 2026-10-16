@@ -166,9 +166,9 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         Row::of("drum_source", "EXTRACT", e.drum_source),
         Row::text("drum_dir", "LOCATION OF FILES", &e.drum_dir),
         Row::info("", "empty = ~/Music/OpenFadeR/Drums"),
-        Row::header("VIDEO"),
+        Row::header("VIDEO (BETA)"),
         Row::check("video", "Enable Video Function", e.video),
-        Row::header("LIGHTING"),
+        Row::header("LIGHTING (BETA)"),
         Row::check("lighting", "Enable Lighting Function", e.lighting),
     ]
 }

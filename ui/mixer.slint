@@ -145,13 +145,13 @@ component Channel inherits Rectangle {
         if root.wide: HorizontalLayout {
             height: 18px;
             spacing: 2px;
-            Chip { text: "CUE"; icon: Icon.headphones; font-size: Theme.font-xs; min-width: 0px; active: root.ch.cue; tooltip: "Headphone CUE"; clicked => { MixerState.cue-toggled(root.index); } }
-            if root.stems: Chip { text: "STEM"; icon: Icon.stems; font-size: Theme.font-xs; min-width: 0px; active: root.ch.iso; tooltip: "STEM mode: INST / VOCAL / DRUMS levels"; clicked => { MixerState.iso-toggled(root.index); } }
+            Chip { text: "CUE"; icon: Icon.headphones; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.cue; tooltip: "Headphone CUE"; clicked => { MixerState.cue-toggled(root.index); } }
+            if root.stems: Chip { text: "STEM"; icon: Icon.stems; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.iso; tooltip: "STEM mode: INST / VOCAL / DRUMS levels"; clicked => { MixerState.iso-toggled(root.index); } }
         }
         if !root.wide: Chip { text: "CUE"; icon: Icon.headphones; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.cue; tooltip: "Headphone CUE"; clicked => { MixerState.cue-toggled(root.index); } }
         if !root.wide && root.stems: Rectangle { height: 2px; }
         if !root.wide && root.stems: Chip { text: "STEM"; icon: Icon.stems; font-size: Theme.font-xs; height: 16px; min-width: 0px; active: root.ch.iso; tooltip: "STEM mode: INST / VOCAL / DRUMS levels"; clicked => { MixerState.iso-toggled(root.index); } }
-        Rectangle { height: 4px; }
+        Rectangle { height: 6px; }
         // Takes what the rows above leave.
         holder := Rectangle {
             vertical-stretch: 1;

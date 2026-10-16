@@ -404,12 +404,17 @@ export component App inherits Window {
             padding-left: Theme.space-md;
             padding-right: Theme.space-md;
             spacing: Theme.space-sm;
+            // LIGHTING and VIDEO (beta) are listed only when enabled in PREFS > EXTENSIONS; VIDEO takes LIGHTING's place when it is off.
             Dropdown {
                 width: 120px;
                 horizontal-stretch: 0;
-                options: ["EXPORT", "PERFORMANCE", "EDIT", "LIGHTING", "VIDEO"];
-                current: root.mode;
-                chose(n) => { root.set-mode(n); }
+                list-width: 150px;
+                options: LightingState.enabled && VideoState.enabled ? ["EXPORT", "PERFORMANCE", "EDIT", "LIGHTING (BETA)", "VIDEO (BETA)"]
+                    : LightingState.enabled ? ["EXPORT", "PERFORMANCE", "EDIT", "LIGHTING (BETA)"]
+                    : VideoState.enabled ? ["EXPORT", "PERFORMANCE", "EDIT", "VIDEO (BETA)"]
+                    : ["EXPORT", "PERFORMANCE", "EDIT"];
+                current: root.mode == 4 && !LightingState.enabled ? 3 : root.mode;
+                chose(n) => { root.set-mode(n == 3 && !LightingState.enabled ? 4 : n); }
             }
             if root.mode == 1: Dropdown {
                 width: 52px;
@@ -446,8 +451,8 @@ export component App inherits Window {
                     tooltip: root.mode == 0 ? "REC panel" : "REC (master out)";
                     clicked => { if (root.mode == 0) { ExportModeState.rec-open = !ExportModeState.rec-open; } else { MixerState.rec-toggled(); } }
                 }
-                if VideoState.enabled: IconButton { icon: Icon.video; active: root.mode == 4; tooltip: "VIDEO"; clicked => { root.set-mode(root.mode == 4 ? 1 : 4); } }
-                if LightingState.enabled: IconButton { icon: Icon.light; active: root.mode == 3; tooltip: "LIGHTING"; clicked => { root.set-mode(root.mode == 3 ? 1 : 3); } }
+                if VideoState.enabled: IconButton { icon: Icon.video; active: root.mode == 4; tooltip: "VIDEO (BETA)"; clicked => { root.set-mode(root.mode == 4 ? 1 : 4); } }
+                if LightingState.enabled: IconButton { icon: Icon.light; active: root.mode == 3; tooltip: "LIGHTING (BETA)"; clicked => { root.set-mode(root.mode == 3 ? 1 : 3); } }
             }
             if MixerState.bus.rec: Text { text: MixerState.bus.rec-text; vertical-alignment: center; horizontal-stretch: 0; color: Theme.rec.brighter(0.4); font-size: Theme.font-md; font-weight: Theme.weight-bold; }
             Rectangle { horizontal-stretch: 1; }
