@@ -9,7 +9,8 @@
 //!
 //! Gain of a stem = its mute state × its isolator knob. A deck button silences a part at full level and brings any other
 //! level back to full. The pads and the controller's ACTIVE PART follow PREFS (MUTE: the same as the buttons; SOLO: silence
-//! every other part, pressing the sole part again brings all back); either way the part's rotary moves with it.
+//! every other part, pressing the sole part again brings all back); either way the part's rotary moves with it, and turning a
+//! rotary up brings back the parts it drives.
 //! The mixer has three knobs, top to bottom INST, VOCAL, DRUMS; BASS rides the INST knob. With 3 STEMS
 //! (PREFS) bass is part of INST: it follows INST's mute and has no button.
 //! The mute state resets on LOAD unless PREFS says KEEP. Without the model the first separation downloads it
@@ -93,6 +94,17 @@ fn activate(
             iso[part]
         }
     })
+}
+
+/// Mixer knob `p` (VOCAL, INST, DRUMS) moved from `old` to a level above zero while every part it drives is silenced: those
+/// parts come back, so the knob sets what is heard.
+fn knob_moved(mute: &mut [bool; STEM_COUNT], old: [f32; 3], new: [f32; 3], four: bool) {
+    let inst: &[usize] = if four { &[INST, BASS] } else { &[INST] };
+    for (p, parts) in [&[VOCAL][..], inst, &[DRUMS]].into_iter().enumerate() {
+        if new[p] > 0.0 && new[p] != old[p] && parts.iter().all(|&k| mute[k]) {
+            parts.iter().for_each(|&k| mute[k] = false);
+        }
+    }
 }
 
 pub(super) struct State {
@@ -249,14 +261,25 @@ impl Deck {
         self.refresh_pads();
     }
 
-    /// The mixer's isolator knobs (VOCAL, INST, DRUMS, 0..=1; all 1 while the channel is in EQ mode).
-    pub(in crate::app) fn set_isolators(&self, iso: [f32; 3]) {
+    /// The mixer's isolator knobs (VOCAL, INST, DRUMS, 0..=1; `None` while the channel is in EQ mode: all at 1, and a part
+    /// silenced by a button stays silent).
+    pub(in crate::app) fn set_isolators(&self, knobs: Option<[f32; 3]>) {
+        let iso = knobs.unwrap_or([1.0; 3]);
         let mut s = self.stems.borrow_mut();
         if s.iso != iso {
+            let (old, mute) = (s.iso, s.mute);
             s.iso = iso;
+            if knobs.is_some() {
+                knob_moved(&mut s.mute, old, iso, prefs::with(|p| p.stems_four));
+            }
+            let unmuted = s.mute != mute;
             drop(s);
-            self.apply_stems();
-            self.show_stems();
+            if unmuted {
+                self.refresh_stem_buttons();
+            } else {
+                self.apply_stems();
+                self.show_stems();
+            }
         }
     }
 
@@ -328,6 +351,22 @@ mod tests {
             [1.0, 1.0, 0.0, 0.0],
             "BASS alone, INST stays heard"
         );
+    }
+
+    #[test]
+    fn turning_up_a_knob_brings_back_the_parts_a_button_silenced() {
+        let mut mute = ALL;
+        let iso = activate(&mut mute, [1.0; 3], DRUMS, false, true);
+        knob_moved(&mut mute, iso, [1.0, 1.0, 0.5], true);
+        assert_eq!(
+            gains(mute, [1.0, 1.0, 0.5], true),
+            [1.0, 1.0, 1.0, 0.5],
+            "DRUMS at half heard"
+        );
+        // BASS silenced alone: INST's knob still drives INST, BASS stays silent
+        let iso = activate(&mut mute, [1.0, 1.0, 0.5], BASS, false, true);
+        knob_moved(&mut mute, iso, [1.0, 0.5, 0.5], true);
+        assert_eq!(gains(mute, [1.0, 0.5, 0.5], true), [1.0, 0.5, 0.0, 0.5]);
     }
 
     #[test]

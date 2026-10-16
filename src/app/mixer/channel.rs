@@ -109,7 +109,7 @@ impl Mixer {
         let iso = row
             .iso
             .then(|| swap_vocal_inst([0, 1, 2].map(|i| row.iso_knobs.row_data(i).unwrap_or(1.0))));
-        self.decks[ch].set_isolators(iso.unwrap_or([1.0; 3]));
+        self.decks[ch].set_isolators(iso);
         // RELEASE FX held with "Apply RELEASE FX on CFX": the COLOR FX knob acts as centre meanwhile.
         let cfx = if cfg.release_cfx_off && held {
             0.0
