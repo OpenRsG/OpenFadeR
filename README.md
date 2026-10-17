@@ -186,7 +186,7 @@ Audio, MIDI and folder behaviour can be set with `OPENFADER_OUTPUT_DEVICE`, `OPE
 - [docs/mappings.md](docs/mappings.md): controller mapping files
 - [docs/library-format.md](docs/library-format.md): the open JSON / CSV export and the library database tables
 
-The code follows `.omp/rules/code-structure.md`: one folder per section (`library/`, `analysis/`, `audio/`, `plugin/`, `app/`, …), a base `mod.rs` and one child per variant. Only `app/` and the `ui/` crate use Slint.
+The code follows [docs/code-structure.md](docs/code-structure.md): one folder per section (`library/`, `analysis/`, `audio/`, `plugin/`, `app/`, …), a base `mod.rs` and one child per variant. Only `app/` and the `ui/` crate use Slint.
 
 ## Contributing
 
