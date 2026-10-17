@@ -6,7 +6,7 @@
 //! The plugin manager
 //! under these rows is `app/plugins` (`PluginManager` in ui/plugins.slint).
 
-use super::{Prefs, Row, choice, section};
+use super::{choice, section, Prefs, Row};
 
 choice!(
     /// STEMS > Layout: the ACTIVE STEM / STEM ISO / STEM FX displays follow the layout (Auto: all), show the
@@ -89,7 +89,7 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             &["OFF", "ON"],
             p.stems as usize,
         )
-        .hint("model on first use"),
+        .hint("ON downloads a 316 MB model once"),
         Row::chips(
             "stems_mode",
             "STEMS MODE",

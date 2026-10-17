@@ -7,6 +7,8 @@ import { TrackInfoState } from "trackinfo.slint";
 import { CueRowView, PadOpt, PadView, PadsState } from "pads.slint";
 import { HelpOverlay, HelpLine, KeysState } from "help.slint";
 import { AboutOverlay, AboutState } from "about.slint";
+import { WelcomeOverlay, WelcomeState, SuggestView } from "welcome.slint";
+import { StemsModelCard, StemsModelState } from "stems-model.slint";
 import { MidiChip, MidiOverlay, MidiState } from "midi.slint";
 import { ActionItem, BackupItem, DeviceChip, DeviceItem, DeviceOverlay, DeviceProgress, DeviceState, FormatItem, FormatOption, PickRow } from "device.slint";
 import { DupeRow, LibraryOverlays, LibraryState, MissingRow } from "library.slint";
@@ -41,6 +43,8 @@ export { FileDropState } // files dragged in from the desktop (src/app/drop)
 export { ThemeCard, ThemeState, TokenRow } // PREFS > THEMES (ui/themes.slint, src/app/skin/page.rs)
 export { CatalogState, GetMapping, GetPlugin, GetTheme, RepoView } // GET PLUGINS / THEMES / MAPPINGS (ui/catalog.slint, src/app/catalog)
 export { AboutState } // Help > About (ui/about.slint, src/app/about.rs)
+export { WelcomeState, SuggestView } // first start and Help > Welcome (ui/welcome.slint, src/app/welcome.rs)
+export { StemsModelState } // STEMS model download (ui/stems-model.slint, src/app/stems_model.rs)
 
 /// PERFORMANCE layouts: global bar, [FX], then either the enlarged waveforms stacked full width
 /// above the deck row (2Deck / 4Deck Horizontal) or standing side by side between the decks (2Deck / 4Deck Vertical), the deck row (decks
@@ -272,6 +276,7 @@ export component App inherits Window {
         Menu {
             title: "Help";
             MenuItem { title: "Keyboard Shortcuts"; activated => { KeysState.help-visible = !KeysState.help-visible; } }
+            MenuItem { title: "Welcome"; activated => { WelcomeState.show(); } }
             MenuItem { title: "About OpenFadeR"; activated => { AboutState.visible = true; } }
         }
     }
@@ -495,6 +500,8 @@ export component App inherits Window {
 
     HelpOverlay {}
     AboutOverlay {}
+    WelcomeOverlay {}
+    StemsModelCard { x: root.width - self.width - Theme.space-xl; y: root.height - self.height - Theme.h-bar - Theme.space-xl; } // above the dialogs: it runs on while they are open
     MidiOverlay {}
     PrefsOverlay {}
     LibraryOverlays { x: 0; y: 0; width: root.width; height: root.height; }

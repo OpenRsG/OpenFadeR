@@ -1,0 +1,67 @@
+import { Theme } from "theme.slint";
+import { Chip } from "widgets.slint";
+
+/// The STEMS model download (src/app/stems_model.rs): a card at the bottom right while the model downloads after STEMS was
+/// switched on, and after a failure until closed.
+export global StemsModelState {
+    in property <bool> shown;
+    /// 0 to 1.
+    in property <float> progress;
+    /// "120 of 316 MB", or what went wrong.
+    in property <string> text;
+    in property <bool> failed;
+    callback retry();
+    callback close();
+}
+
+export component StemsModelCard inherits Rectangle {
+    visible: StemsModelState.shown;
+    width: 340px;
+    height: col.preferred-height;
+    background: Theme.panel;
+    border-color: Theme.line-strong;
+    border-width: 1px;
+    border-radius: Theme.radius-lg;
+    TouchArea {}
+    col := VerticalLayout {
+        padding: Theme.space-xl;
+        spacing: Theme.space-md;
+        Text {
+            text: StemsModelState.failed ? "STEMS model download failed" : "Downloading the STEMS model";
+            color: StemsModelState.failed ? Theme.danger : Theme.text-bright;
+            font-family: Theme.font;
+            font-size: Theme.font-md;
+            font-weight: Theme.weight-bold;
+        }
+        Text {
+            text: StemsModelState.failed ? StemsModelState.text : "Needed once to split tracks into vocals, instruments and drums. STEMS works as soon as it is done.";
+            color: Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+            wrap: word-wrap;
+        }
+        if !StemsModelState.failed: Rectangle {
+            height: 6px;
+            background: Theme.bg;
+            border-radius: 3px;
+            Rectangle {
+                x: 0;
+                width: parent.width * clamp(StemsModelState.progress, 0, 1);
+                background: Theme.accent;
+                border-radius: 3px;
+            }
+        }
+        if !StemsModelState.failed: Text {
+            text: round(StemsModelState.progress * 100) + "%   " + StemsModelState.text;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+        }
+        if StemsModelState.failed: HorizontalLayout {
+            alignment: end;
+            spacing: Theme.space-sm;
+            Chip { text: "CLOSE"; width: 70px; horizontal-stretch: 0; clicked => { StemsModelState.close(); } }
+            Chip { text: "RETRY"; width: 70px; horizontal-stretch: 0; active: true; clicked => { StemsModelState.retry(); } }
+        }
+    }
+}

@@ -110,6 +110,7 @@ that asset for the user's platform nothing is installed and the page says `no pr
 |---|---|
 | `name` | Required. Unique, no `:`. Shown in the Plugins menu, PREFS and error messages. |
 | `version`, `description`, `author`, `homepage` | Shown on the plugin's card. |
+| `suggest` | The software the plugin makes OpenFadeR compatible with (its name). The welcome window, at the first start and from Help > Welcome, offers to switch on every plugin found with one and names that software. |
 | `script` | The file serving sources, actions and events, in the plugin folder: `*.lua` runs inside the app ([Lua plugins](#lua-plugins)), `*.py` with `python3` (`python` on Windows), anything else is run as a program. |
 | `command` | Instead of `script`: the program and its arguments, started once per request. A relative program or argument that names a file in the plugin folder becomes that file's path (`["node", "main.js"]` runs the plugin's `main.js`). |
 | `sources` | Track sources. `id` (no `:`, unique in the plugin), `name` (the folder's label), `search` (the source has a search entry). |

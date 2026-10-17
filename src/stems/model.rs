@@ -15,8 +15,8 @@ use ort::{environment::Environment, ep, logging::LogLevel, session::Session, val
 use parking_lot::Mutex;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
 use std::sync::LazyLock;
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::time::{Duration, Instant};
 
 pub const URL: &str = "https://huggingface.co/StemSplitio/htdemucs-onnx/resolve/main/htdemucs.onnx";
@@ -67,9 +67,31 @@ pub fn missing_hint() -> String {
     )
 }
 
+/// Bytes of the download in progress; `u64::MAX` while none runs.
+static GOT: AtomicU64 = AtomicU64::new(u64::MAX);
+
+/// The bytes downloaded so far while [`fetch`] runs (of [`SIZE`]), from any thread.
+pub fn downloading() -> Option<u64> {
+    Some(GOT.load(Relaxed)).filter(|&g| g != u64::MAX)
+}
+
 /// Downloads the model to [`path`] (via a `.part` file, so a failure never leaves a truncated model), reporting 0..=1.
-/// Offline or a short download is an error naming what to do by hand.
+/// Offline or a short download is an error naming what to do by hand. One download at a time: a second caller waits
+/// for the first and finds the model in place.
 pub fn fetch(progress: &dyn Fn(f32)) -> Result<(), String> {
+    static ONE: Mutex<()> = Mutex::new(());
+    let _one = ONE.lock();
+    if present() {
+        return Ok(());
+    }
+    struct Done;
+    impl Drop for Done {
+        fn drop(&mut self) {
+            GOT.store(u64::MAX, Relaxed);
+        }
+    }
+    GOT.store(0, Relaxed);
+    let _done = Done;
     let dest = path()?;
     let hand = |e: String| {
         format!(
@@ -92,6 +114,7 @@ pub fn fetch(progress: &dyn Fn(f32)) -> Result<(), String> {
         }
         out.write_all(&buf[..n]).map_err(|e| hand(e.to_string()))?;
         got += n as u64;
+        GOT.store(got, Relaxed);
         progress((got as f32 / SIZE as f32).min(1.0));
     }
     out.flush().map_err(|e| hand(e.to_string()))?;
@@ -522,11 +545,9 @@ mod tests {
             None,
             "shader compile on the first run"
         );
-        assert!(
-            gpu_verdict(&Ok(()), Duration::from_secs(30))
-                .unwrap()
-                .contains("software")
-        );
+        assert!(gpu_verdict(&Ok(()), Duration::from_secs(30))
+            .unwrap()
+            .contains("software"));
         assert_eq!(
             gpu_verdict::<()>(&Err("device lost".into()), Duration::ZERO).as_deref(),
             Some("device lost")

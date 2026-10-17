@@ -104,7 +104,7 @@ pub struct Prefs {
     pub fx_beat: usize,
     /// Decks shown and playable: 2 (A, B) or 4 (A to D), see `deck::active`.
     pub decks: usize,
-    /// STEMS (track separation, `openfader::stems`): off by default (it downloads a 316 MB model on first use and uses
+    /// STEMS (track separation, `openfader::stems`): off by default (switching it on downloads a 316 MB model once, `app/stems_model`, and it uses
     /// CPU); the stem set is 3 (VOCAL, INST, DRUMS: bass inside INST) or 4 stems; the ACTIVE PART buttons / pads mute
     /// or solo a part; the mute/solo state resets on LOAD.
     pub stems: bool,

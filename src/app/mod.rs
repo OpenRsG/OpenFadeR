@@ -12,7 +12,7 @@
 //! VIDEO ([`video`]) full-window views; [`split`] opens the browser in a window of its own (split screen, status bar / View menu);
 //! [`skin`] restyles the `Theme` global of every window from skin files (VIEW > Color > Skin, applied by [`prefs`]);
 //! [`plugins`] is the Plugins menu and what plugin actions answer with (the plugin track sources join the library in [`run`]);
-//! [`about`] is Help > About.
+//! [`about`] is Help > About; [`welcome`] the first-start window (also Help > Welcome); [`stems_model`] the STEMS model download.
 
 /// Wires one callback of a Slint global: `on!(state, owner, on_x, |o, args..| body)` moves a clone of `owner` into the
 /// closure and binds it as `o`. The first word of the owner picks a variant:
@@ -93,9 +93,11 @@ mod render;
 mod sampler;
 mod skin;
 mod split;
+mod stems_model;
 mod toast;
 mod trackinfo;
 mod video;
+mod welcome;
 
 use openfader::library::Library;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -132,6 +134,7 @@ pub fn run(
     let _ = slint::set_xdg_app_id("openfader");
     about::wire(&app);
     let _prefs = prefs::wire(&app); // before everything that reads the settings
+    stems_model::wire(&app);
     let _skin = skin::wire(&app); // PREFS > THEMES and the skin folder watcher; the guard holds the watcher's timer
     catalog::wire(&app); // GET PLUGINS / THEMES / MAPPINGS; before the controller session, which asks it about a controller with no mapping
                          // plugin effects join every FX unit, so they load before the engine makes its units; the count is what the smoke test reads
@@ -161,6 +164,7 @@ pub fn run(
     let _split = split::wire(&app); // the split-screen browser window is made on first use
     edit::wire(&app, lib.clone(), decks.clone(), selected.clone());
     plugins::wire(&app, lib.clone(), decks.clone());
+    welcome::wire(&app); // after the plugin manager, which ACCEPT refreshes
     drop::wire(&app);
     browser::wire(&app, lib.clone(), decks, move |t| {
         *selected.borrow_mut() = Some(t.clone())

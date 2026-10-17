@@ -1,0 +1,113 @@
+import { ListView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Chip } from "widgets.slint";
+import { DialogFrame, Note } from "dialog.slint";
+
+export struct SuggestView {
+    name: string,
+    /// What it brings: LIBRARY, DEVICES, EFFECTS, PAD MODE, KNOB MODE, FEATURE.
+    kind: string,
+    description: string,
+}
+
+/// The welcome window (src/app/welcome.rs): shown at the first start and from Help > Welcome. It offers the suggested
+/// plugins that are found but off; ACCEPT switches them on, SKIP leaves them off.
+export global WelcomeState {
+    in-out property <bool> visible;
+    /// The plugins offered.
+    in property <[SuggestView]> plugins;
+    /// The paragraph over the list: what the suggestions are for.
+    in property <string> intro;
+    /// Set after ACCEPT: what was switched on, and whether a restart loads it.
+    in property <string> done;
+    in property <bool> restart;
+    /// Help > Welcome: fills the window and shows it.
+    callback show();
+    callback accept();
+    callback skip();
+    callback restart-now();
+}
+
+/// One suggestion as a card: an accent bar, the name with what it brings as a badge, and three lines of description.
+component Suggestion inherits Rectangle {
+    in property <SuggestView> v;
+    height: 78px;
+    Rectangle {
+        y: 0;
+        height: parent.height - Theme.space-md;
+        background: ta.has-hover ? Theme.hover-row : Theme.bg-deep;
+        border-color: ta.has-hover ? Theme.accent : Theme.line;
+        border-width: 1px;
+        border-radius: Theme.radius-xl;
+        clip: true;
+        ta := TouchArea {}
+        Rectangle { x: 0; width: 3px; background: Theme.accent-hi; }
+        VerticalLayout {
+            padding: Theme.space-lg;
+            padding-left: Theme.space-xl;
+            spacing: Theme.space-xs;
+            HorizontalLayout {
+                spacing: Theme.space-md;
+                Text { text: root.v.name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-lg; font-weight: Theme.weight-bold; vertical-alignment: center; overflow: elide; horizontal-stretch: 0; }
+                Rectangle {
+                    width: badge.preferred-width + 2 * Theme.space-md;
+                    height: 16px;
+                    y: (parent.height - self.height) / 2;
+                    background: Theme.panel-raised;
+                    border-radius: 8px;
+                    badge := Text { text: root.v.kind; horizontal-alignment: center; vertical-alignment: center; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; }
+                }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            Text { text: root.v.description; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; wrap: word-wrap; overflow: elide; vertical-stretch: 1; }
+        }
+    }
+}
+
+export component WelcomeOverlay inherits DialogFrame {
+    visible: WelcomeState.visible;
+    title: "Welcome";
+    card-width: 680px;
+    closed => { WelcomeState.skip(); }
+    HorizontalLayout {
+        alignment: center;
+        Image { source: @image-url("../assets/icon.png"); width: 96px; height: 96px; }
+    }
+    VerticalLayout {
+        spacing: Theme.space-xs;
+        Text { text: "Welcome to OpenFadeR"; horizontal-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-xxl; font-weight: Theme.weight-bold; }
+        Text { text: "Open-source DJ software for two or four decks. Load a track, press play, and mix."; horizontal-alignment: center; color: Theme.text; font-family: Theme.font; font-size: Theme.font-md; }
+    }
+    Rectangle { height: 1px; background: Theme.line; }
+    if WelcomeState.done == "" && WelcomeState.plugins.length > 0: VerticalLayout {
+        spacing: Theme.space-md;
+        Text { text: "SUGGESTED EXTENSIONS (" + WelcomeState.plugins.length + ")"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+        Note { text: WelcomeState.intro; }
+        ListView {
+            height: min(320px, WelcomeState.plugins.length * 78px);
+            for v in WelcomeState.plugins: Suggestion { v: v; }
+        }
+    }
+    if WelcomeState.done == "" && WelcomeState.plugins.length == 0: Note {
+        text: "Every suggested extension is already on. More are in PREFERENCES > EXTENSIONS > GET PLUGINS.";
+        horizontal-alignment: center;
+    }
+    if WelcomeState.done != "": Text {
+        text: WelcomeState.done;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+        color: Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+    }
+    Note { text: "You can change this later in PREFERENCES > EXTENSIONS, and open this window again from Help > Welcome."; horizontal-alignment: center; }
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.space-sm;
+        if WelcomeState.done == "" && WelcomeState.plugins.length > 0: Chip { text: "SKIP"; width: 80px; horizontal-stretch: 0; clicked => { WelcomeState.skip(); } }
+        if WelcomeState.done == "" && WelcomeState.plugins.length > 0: Chip { text: "SWITCH ON " + WelcomeState.plugins.length; width: 120px; horizontal-stretch: 0; active: true; clicked => { WelcomeState.accept(); } }
+        if WelcomeState.done != "" && WelcomeState.restart: Chip { text: "LATER"; width: 80px; horizontal-stretch: 0; clicked => { WelcomeState.skip(); } }
+        if WelcomeState.done != "" && WelcomeState.restart: Chip { text: "RESTART NOW"; width: 120px; horizontal-stretch: 0; active: true; clicked => { WelcomeState.restart-now(); } }
+        if WelcomeState.plugins.length == 0 || (WelcomeState.done != "" && !WelcomeState.restart): Chip { text: "START"; width: 80px; horizontal-stretch: 0; active: true; clicked => { WelcomeState.skip(); } }
+    }
+}

@@ -54,6 +54,10 @@ pub struct Manifest {
     /// Web page of the plugin, shown in the plugin manager.
     #[serde(default)]
     pub homepage: String,
+    /// The software the plugin makes the app compatible with (its name, e.g. a DJ program's). The welcome window
+    /// offers to switch on every plugin found with one; empty: not suggested.
+    #[serde(default)]
+    pub suggest: String,
     /// Script serving sources, actions and events, relative to the plugin folder: `*.lua` runs inside the app ([`lua`]),
     /// `*.py` with `python3`, anything else as a program. Shorthand for `command`, which wins when both are given.
     #[serde(default)]
