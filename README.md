@@ -95,7 +95,7 @@ EDIT shows the whole track with its beat grid. Select with snap to beat or bar, 
 
 <p align="center"><img src="docs/media/lighting.png" alt="LIGHTING mode with fixtures lit by the phrase of the playing track" width="100%"></p>
 
-LIGHTING patches fixtures (RGB pars, RGBW pars, moving heads, strobes) and drives them from the phrase that is playing, so a chorus looks different from a breakdown. Pick a palette and a scene, or let AUTO choose. DMX goes out over Art-Net or sACN, or nowhere: the stage view works without any hardware. It is off by default: turn it on in PREFERENCES > EXTENSIONS to add LIGHTING to the mode menu.
+LIGHTING patches fixtures (RGB pars, RGBW pars, moving heads, strobes) and drives them from the phrase that is playing, so a chorus looks different from a breakdown. Pick a palette and a scene, or let AUTO choose. DMX goes out over Art-Net or sACN, or nowhere: the stage view works without any hardware. It is disabled by default: turn it on in PREFERENCES > EXTENSIONS to add LIGHTING to the mode menu.
 
 ### Export and video
 
@@ -103,7 +103,7 @@ EXPORT mode shows cues and memory points for the two decks next to a DEVICES pan
 
 <p align="center"><img src="docs/media/export.png" alt="EXPORT mode with cue editing for two decks and a devices panel" width="100%"></p>
 
-VIDEO (beta) plays video tracks on an output window and crossfades between the two decks' pictures. Like LIGHTING, it shows in the mode menu once enabled in PREFERENCES > EXTENSIONS.
+VIDEO (beta) plays video tracks on an output window and crossfades between the two decks' pictures. It is disabled by default: like LIGHTING, it shows in the mode menu once turned on in PREFERENCES > EXTENSIONS.
 
 ### Your library is yours
 
