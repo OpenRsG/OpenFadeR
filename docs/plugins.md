@@ -111,8 +111,9 @@ that asset for the user's platform nothing is installed and the page says `no pr
 | `name` | Required. Unique, no `:`. Shown in the Plugins menu, PREFS and error messages. |
 | `version`, `description`, `author`, `homepage` | Shown on the plugin's card. |
 | `suggest` | The software the plugin makes OpenFadeR compatible with (its name). The welcome window, at the first start and from Help > Welcome, offers to switch on every plugin found with one and names that software. |
-| `script` | The file serving sources, actions and events, in the plugin folder: `*.lua` runs inside the app ([Lua plugins](#lua-plugins)), `*.py` with `python3` (`python` on Windows), anything else is run as a program. |
+| `script` | The file serving sources, actions and events, in the plugin folder: `*.lua` runs inside the app ([Lua plugins](#lua-plugins)), `*.py` with `python3` (on Windows the `py` launcher, else `python`), anything else is run as a program. |
 | `command` | Instead of `script`: the program and its arguments, started once per request. A relative program or argument that names a file in the plugin folder becomes that file's path (`["node", "main.js"]` runs the plugin's `main.js`). |
+| `persistent` | `true`: one process (or one Lua state) serves every request instead of a new one each: no start-up cost per request, and the plugin keeps its state. See [Persistent plugins](#persistent-plugins). |
 | `sources` | Track sources. `id` (no `:`, unique in the plugin), `name` (the folder's label), `search` (the source has a search entry). |
 | `actions` | Menu entries: `id`, `label`, and `input`, the prompt of a text field asked for before the action runs (leave it out to run at once). |
 | `events` | Names of the events the plugin wants to hear (see [Events](#events)). |
@@ -139,6 +140,37 @@ inside the app and answers through a function instead ([Lua plugins](#lua-plugin
   else. Several requests of one plugin may run at the same time, so do not keep state in files without care.
 * Timeouts: playlist lists, track lists and searches 2 minutes, downloads and actions 15 minutes, events 30 seconds.
 
+### Persistent plugins
+
+With `"persistent": true` the process starts at the plugin's first request and stays: a request costs a line written and a line
+read, well under a millisecond, instead of a program start. It reads one request per line on stdin and writes one reply per line
+on stdout (one JSON object per line, no line breaks inside).
+
+* Every request carries an `"id"` number; the reply must carry the same `id`. Replies may come in any order, and requests may
+  overlap: answer them as they come or one by one, as you like.
+* A line without `id` is the plugin's own message at any time: its `commands` (as an action's reply) run at once. This is how a
+  plugin reacts to something it watches (a network peer, a file, a timer of its own) without waiting for a request.
+* **Exit when stdin closes** (end of file). That is how the app quits the plugin, and on macOS the only way the plugin learns
+  that the app has ended. At quit, or when the plugin is switched off, a plugin still running a second after its stdin closed is
+  killed.
+* A request without a reply in time kills the process; the next request starts a new one. So does a change of the plugin's
+  folder, `command` or `version`.
+* The app ends its plugin processes however it ends: on Linux the kernel kills them when the app dies (even on a crash), on
+  Windows they live in a job the system closes with the app. A normal quit or a switch-off also ends what the plugin started
+  (its process group, its job). After a crash on Linux or macOS, children of the plugin's own must end themselves.
+
+```python
+import json, sys
+count = 0
+for line in sys.stdin:  # ends when the app closes stdin
+    req = json.loads(line)
+    count += 1
+    print(json.dumps({"id": req["id"], "commands": [{"cmd": "toast", "text": f"request {count}"}]}), flush=True)
+```
+
+A persistent Lua plugin keeps one Lua state: globals survive between requests (the script is loaded again when its file or the
+plugin's `version` changes), and its requests take turns instead of running at the same time.
+
 You can test a Python plugin without the app:
 
 ```sh
@@ -147,7 +179,8 @@ echo '{"op":"search","source":"youtube","query":"daft punk","settings":{}}' | py
 
 ### Lua plugins
 
-`"script": "main.lua"` runs the script inside the app (Lua 5.4, nothing to install), a fresh Lua state per request. The script
+`"script": "main.lua"` runs the script inside the app (Lua 5.4, nothing to install), a fresh Lua state per request (one kept
+state with [`persistent`](#persistent-plugins)). The script
 defines `handle(request)`, as a global or in the table it returns, which gets the request as a Lua table and returns the reply
 table (`nil` = `{}`); `error("…")` fails the request like an `error` reply. `require("util")` loads `util.lua` of the plugin folder.
 The standard library is Lua's safe one (no `debug`, no C modules); the `rk` table adds:
@@ -733,7 +766,7 @@ else:
 Drop the folder on the window: **Plugins > hello: Say hello**. In Lua the same is a `main.lua` with `function handle(req) … end`
 ([Lua plugins](#lua-plugins)) and `"script": "main.lua"`. Any other language works through `command` as long as it reads stdin and
 writes stdout. A program that is slow to start (a JVM, a Python with big imports) makes every request slow: keep start-up small,
-or use Lua, which starts in microseconds.
+make it [persistent](#persistent-plugins), or use Lua, which starts in microseconds.
 
 ## Limits
 

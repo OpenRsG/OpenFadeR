@@ -131,6 +131,8 @@ INSTALL installs one. Add any repository by its GitHub path (`user/name`) and th
 
 Plugins start switched off. At the first start a welcome window offers the suggested ones (the plugins that read and write other DJ software's libraries, devices and effects) and STEMS; ACCEPT switches them on, SKIP leaves them off. Help > Welcome opens it again.
 
+At each start the app asks GitHub for the newest release; when it is newer than the running version a window offers to open its download page. Offline, nothing is shown.
+
 Plug in a controller that has no mapping yet and the app offers the matching file from the mapping repository: one click on INSTALL and the controller works. Mapping files cover the default layer of each controller; MIDI learn and LED feedback are built in, and hot-plug detection picks controllers up while the app runs. The format is described in [docs/mappings.md](docs/mappings.md).
 
 ## Keyboard shortcuts

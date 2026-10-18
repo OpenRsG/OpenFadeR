@@ -185,3 +185,25 @@ fn call_reports_error_replies_bad_output_failures_and_timeouts() {
         assert!(e.starts_with(want), "{name}: {e}");
     }
 }
+
+#[test]
+fn a_persistent_process_serves_every_request_and_ends_with_the_app() {
+    let d = temp("persistent");
+    let action = json!({"persistent": true, "actions": [{"id": "a", "label": "A"}]});
+    let counter = r#"n=0
+while IFS= read -r line; do
+  n=$((n+1)); id=${line##*\"id\":}; id=${id%%[!0-9]*}
+  printf '{"id":%s,"n":%s,"pid":%s}\n' "$id" "$n" "$$"
+done"#;
+    let r = registry_of(&d, "keep", action.clone(), counter);
+    let ask = || r.plugins[0].call(&json!({"op": "x"}), Duration::from_secs(5)).unwrap();
+    let (a, b) = (ask(), ask());
+    assert_eq!((&a["n"], &b["n"]), (&json!(1), &json!(2)));
+    assert_eq!(a["pid"], b["pid"], "one process for both requests");
+    let r2 = registry_of(&d, "mute", action, "while read -r l; do :; done");
+    let e = r2.plugins[0].call(&json!({}), Duration::from_millis(300)).unwrap_err();
+    assert!(e.starts_with("mute: no reply within"), "{e}");
+    process::stop_all();
+    #[cfg(unix)]
+    assert_ne!(unsafe { libc::kill(a["pid"].as_i64().unwrap() as i32, 0) }, 0, "still running after stop_all");
+}

@@ -60,13 +60,16 @@ pub fn fire_one(plugin: &Plugin, event: &str, data: &Value) -> JoinHandle<()> {
         {
             Err(e) => eprintln!("plugin event {}: {e}", request["event"]),
             Ok(c) if c.is_empty() => {}
-            Ok(c) => {
-                if let Some(sink) = SINK.get() {
-                    sink(name, c);
-                }
-            }
+            Ok(c) => deliver(name, c),
         }
     })
+}
+
+/// Hands `plugin`'s `commands` to the [`set_sink`] sink (an event reply's, or a persistent plugin's own).
+pub(super) fn deliver(plugin: String, commands: Vec<Result<Command, String>>) {
+    if let Some(sink) = SINK.get() {
+        sink(plugin, commands);
+    }
 }
 
 /// The plugins whose `timer` event is due at `now`: every plugin listing `timer` with a period, whose last one (`last`,

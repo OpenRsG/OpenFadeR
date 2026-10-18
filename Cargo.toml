@@ -1,6 +1,6 @@
 [package]
 name = "openfader"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 [features]
@@ -43,9 +43,10 @@ wayland-backend = { version = "0.3", optional = true, features = ["client_system
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
-# Removable drives (GetDriveTypeW...), ejecting them (DeviceIoControl) and the analysis threads' priority.
+# Removable drives (GetDriveTypeW...), ejecting them (DeviceIoControl), the analysis threads' priority and the job
+# objects that end plugin processes with the app (src/plugin/process.rs).
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_Threading"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_Threading"] }
 
 # The program icon in the .exe (build.rs, assets/openfader.rc).
 [target.'cfg(windows)'.build-dependencies]

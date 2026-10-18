@@ -1,5 +1,7 @@
 //! Lua plugins (`"script": "main.lua"`): the script runs inside the app, in a fresh Lua 5.4 state per request (as a
-//! process plugin is a fresh process per request), on the thread that asked. It answers through a function
+//! process plugin is a fresh process per request), on the thread that asked. A `persistent` plugin keeps one state, loaded
+//! at its first request (again when the script file or the plugin's version changes): its globals live on, and its
+//! requests take turns. It answers through a function
 //! `handle(request)` (global, or a field of the table the script returns) that gets the request as a Lua table and returns
 //! the reply table; `error(...)` or a reply with an `error` field is a failed request. The standard library is the safe
 //! one (no `debug`, no C modules); `require` finds `*.lua` files of the plugin folder. A script running past the request's
@@ -18,30 +20,76 @@
 
 use super::Plugin;
 use mlua::{
-    HookTriggers, Lua, LuaOptions, LuaSerdeExt, MultiValue, StdLib, Table, Value as LuaValue,
-    VmState,
+    Function, HookTriggers, Lua, LuaOptions, LuaSerdeExt, MultiValue, StdLib, Table,
+    Value as LuaValue, VmState,
 };
+use parking_lot::Mutex;
 use serde_json::Value;
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
+    sync::{Arc, LazyLock},
     time::{Duration, Instant},
 };
 
-/// Runs `script` of `plugin` on `request` (see the module doc).
+/// Runs `script` of `plugin` on `request` (see the module doc): in a fresh state, or in the plugin's kept one.
 pub(super) fn call(
     plugin: &Plugin,
     script: &str,
     request: &Value,
     timeout: Duration,
+    persistent: bool,
 ) -> Result<Value, String> {
     let name = &plugin.manifest.name;
-    run(plugin, script, request, timeout).map_err(|e| format!("{name}: {e}"))
+    let r = if persistent {
+        kept(plugin, script, request, timeout)
+    } else {
+        load(plugin, script, timeout).and_then(|(lua, handle)| ask(&lua, &handle, request, timeout))
+    };
+    r.map_err(|e| format!("{name}: {e}"))
 }
 
-fn run(plugin: &Plugin, script: &str, request: &Value, timeout: Duration) -> Result<Value, String> {
+/// A persistent plugin's loaded script, and what it was loaded from (folder, script, version, file time).
+struct Kept {
+    key: String,
+    lua: Lua,
+    handle: Function,
+}
+
+/// The persistent plugins' states, by plugin name; requests to one plugin take turns.
+static KEPT: LazyLock<Mutex<HashMap<String, Arc<Mutex<Option<Kept>>>>>> =
+    LazyLock::new(Default::default);
+
+fn kept(
+    plugin: &Plugin,
+    script: &str,
+    request: &Value,
+    timeout: Duration,
+) -> Result<Value, String> {
+    let slot = KEPT
+        .lock()
+        .entry(plugin.manifest.name.clone())
+        .or_default()
+        .clone();
+    let mut slot = slot.lock();
     let file = plugin.dir.join(script);
-    let source = std::fs::read_to_string(&file).map_err(|e| format!("{}: {e}", file.display()))?;
-    let lua = Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()).map_err(|e| e.to_string())?;
+    let time = std::fs::metadata(&file).and_then(|m| m.modified()).ok();
+    let key = format!("{file:?} {} {time:?}", plugin.manifest.version);
+    if slot.as_ref().is_none_or(|k| k.key != key) {
+        let (lua, handle) = load(plugin, script, timeout)?;
+        *slot = Some(Kept { key, lua, handle });
+    }
+    let k = slot.as_ref().expect("just loaded");
+    ask(&k.lua, &k.handle, request, timeout)
+}
+
+/// Drops the kept states of the plugins not named in `keep` (switched off or removed).
+pub(super) fn retain(keep: &[&str]) {
+    KEPT.lock().retain(|n, _| keep.contains(&n.as_str()));
+}
+
+/// Stops the script once `timeout` from now has passed.
+fn deadline(lua: &Lua, timeout: Duration) -> Result<(), String> {
     let deadline = Instant::now() + timeout;
     let secs = timeout.as_secs();
     lua.set_hook(
@@ -54,7 +102,15 @@ fn run(plugin: &Plugin, script: &str, request: &Value, timeout: Duration) -> Res
             }
         },
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| e.to_string())
+}
+
+/// A new state with `script` run and its `handle` function.
+fn load(plugin: &Plugin, script: &str, timeout: Duration) -> Result<(Lua, Function), String> {
+    let file = plugin.dir.join(script);
+    let source = std::fs::read_to_string(&file).map_err(|e| format!("{}: {e}", file.display()))?;
+    let lua = Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()).map_err(|e| e.to_string())?;
+    deadline(&lua, timeout)?;
     api(&lua, plugin).map_err(|e| e.to_string())?;
     let module: LuaValue = lua
         .load(&source)
@@ -63,7 +119,7 @@ fn run(plugin: &Plugin, script: &str, request: &Value, timeout: Duration) -> Res
         .map_err(|e| e.to_string())?;
     let handle = match &module {
         LuaValue::Table(t) => t
-            .get::<Option<mlua::Function>>("handle")
+            .get::<Option<Function>>("handle")
             .map_err(|e| e.to_string())?,
         _ => None,
     };
@@ -71,10 +127,16 @@ fn run(plugin: &Plugin, script: &str, request: &Value, timeout: Duration) -> Res
         Some(h) => h,
         None => lua
             .globals()
-            .get::<Option<mlua::Function>>("handle")
+            .get::<Option<Function>>("handle")
             .map_err(|e| e.to_string())?
             .ok_or("the script defines no `handle(request)` function")?,
     };
+    Ok((lua, handle))
+}
+
+/// One request to a loaded script.
+fn ask(lua: &Lua, handle: &Function, request: &Value, timeout: Duration) -> Result<Value, String> {
+    deadline(lua, timeout)?;
     let reply: LuaValue = handle
         .call(lua.to_value(request).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
@@ -216,10 +278,12 @@ fn api(lua: &Lua, plugin: &Plugin) -> mlua::Result<()> {
     rk.set(
         "run",
         lua.create_function(move |_, (program, args): (String, Option<Vec<String>>)| {
-            let out = std::process::Command::new(&program)
-                .args(args.unwrap_or_default())
+            let mut cmd = std::process::Command::new(&program);
+            cmd.args(args.unwrap_or_default())
                 .current_dir(&d)
-                .stderr(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit());
+            super::process::no_window(&mut cmd);
+            let out = cmd
                 .output()
                 .map_err(|e| mlua::Error::runtime(format!("cannot start {program:?}: {e}")))?;
             Ok((
@@ -361,5 +425,20 @@ mod tests {
         );
         std::fs::remove_dir_all(dir).ok();
         std::fs::remove_dir_all(dir2).ok();
+    }
+
+    #[test]
+    fn a_persistent_script_keeps_its_globals() {
+        let (mut p, dir) = plugin(
+            "count = count or 0\nfunction handle(req) count = count + 1 return {n = count} end",
+        );
+        p.manifest.name = "lua-keep".into();
+        p.manifest.persistent = true;
+        let n =
+            |p: &Plugin| p.call(&json!({"op": "x"}), Duration::from_secs(5)).unwrap()["n"].clone();
+        assert_eq!([n(&p), n(&p), n(&p)], [json!(1), json!(2), json!(3)]);
+        p.manifest.persistent = false;
+        assert_eq!(n(&p), json!(1));
+        std::fs::remove_dir_all(dir).ok();
     }
 }

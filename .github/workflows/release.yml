@@ -83,7 +83,7 @@ jobs:
             cp target/dist/openfader.exe "$d/"
             cp target/dist/*.dll "$d/"
             # The Visual C++ runtime next to the program: it starts on a machine that never installed the redistributable.
-            for f in vcruntime140.dll vcruntime140_1.dll msvcp140.dll; do cp "/c/Windows/System32/$f" "$d/"; done
+            for f in vcruntime140.dll vcruntime140_1.dll msvcp140.dll msvcp140_1.dll msvcp140_atomic_wait.dll; do cp "/c/Windows/System32/$f" "$d/"; done
             python .github/bundle.py "$d"
             cp LICENSE README.md "$d/"
             7z a -tzip "out/$d.zip" "$d" > /dev/null

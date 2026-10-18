@@ -173,5 +173,6 @@ pub fn run(
     connect::wire(&app); // live sync of the connected libraries; after the browser, which it asks to reload
     app.run()?;
     openfader::plugin::event::fire("app_quit", serde_json::json!({}));
+    openfader::plugin::process::stop_all(); // closes their stdin, kills what has not exited within a second
     Ok(())
 }
