@@ -17,8 +17,9 @@ export component JogWheel inherits Rectangle {
     property <length> t: root.width * 0.054;
     /// Share of the current lap (0..1) left before the next hot cue.
     property <float> left: root.v.jog-laps - (Math.ceil(root.v.jog-laps) - 1);
-    property <int> bpm-int: Math.floor(root.v.bpm);
-    property <int> bpm-dec: Math.round((root.v.bpm - root.bpm-int) * 100);
+    property <int> bpm-hundredths: Math.round(root.v.bpm * 100);
+    property <int> bpm-int: Math.floor(root.bpm-hundredths / 100);
+    property <int> bpm-dec: Math.mod(root.bpm-hundredths, 100);
     width: Theme.jog;
     height: self.width;
     border-radius: self.width / 2;

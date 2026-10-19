@@ -1,7 +1,5 @@
-//! 5×7 bitmap glyphs for phrase labels (our own drawing, the classic dot-matrix shapes): only the
-//! characters [`openfader::analysis::Phrase::label`] can produce, upper-cased. Canvas pixels have no
-//! font access, so labels are blitted from this table. The EDIT timeline adds the digits `0 7 8 9`, `:`, `.` and `L`
-//! (clock and bar numbers, "SILENCE").
+//! 5×7 bitmap glyphs for phrase labels, hot cue letters A-H and the EDIT timeline's clock and bar numbers.
+//! Canvas pixels have no font access, so labels are blitted from these classic dot-matrix shapes.
 
 pub const W: usize = 5;
 pub const H: usize = 7;
@@ -9,6 +7,9 @@ pub const H: usize = 7;
 /// Rows top to bottom; bit 4 is the leftmost column. `None` for characters outside the table (spaces).
 pub fn glyph(c: char) -> Option<[u8; H]> {
     Some(match c.to_ascii_uppercase() {
+        'A' => [
+            0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,
+        ],
         'B' => [
             0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110,
         ],
@@ -20,6 +21,9 @@ pub fn glyph(c: char) -> Option<[u8; H]> {
         ],
         'E' => [
             0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111,
+        ],
+        'F' => [
+            0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000,
         ],
         'G' => [
             0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01111,

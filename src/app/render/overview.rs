@@ -7,10 +7,13 @@
 //! With the STEM waveform on (PREFS) and a part muted, the 3-band wave of the stems heard ([`wave_3band`]) replaces these.
 
 use super::{
-    Axis, Canvas, Col, Layers, Src, Wave, cue_letter, hot_cue_rgb, mono_layers,
-    phrase::phrase_band, playhead, slip_ghost, sources, three_band,
+    cue_letter, hot_cue_rgb, mono_layers, phrase::phrase_band, playhead, slip_ghost, sources,
+    three_band, Axis, Canvas, Col, Layers, Src, Wave,
 };
-use crate::app::prefs::{self, view::OverviewSize};
+use crate::app::prefs::{
+    self,
+    view::{BeatGrid, CueMarkers, OverviewSize},
+};
 use openfader::analysis::Analysis;
 
 /// Colour preview → two layers (bytes 0..2 "whiteness" are ignored):
@@ -85,12 +88,19 @@ pub fn render(wave: Option<&Wave>, a: &Analysis, duration_ms: u32, w: usize, h: 
         return c.extended(strip);
     }
     let axis = axis(w, duration_ms);
-    for b in a.beats.iter().filter(|b| b.bar_pos == 1) {
-        c.vline(axis.col(b.time_ms as f64), 0..hw, [48, 48, 48]);
+    if view.beat_grid == BeatGrid::Normal {
+        for b in a.beats.iter().filter(|b| b.bar_pos == 1) {
+            c.vline(axis.col(b.time_ms as f64), 0..hw, [48, 48, 48]);
+        }
     }
     if let Some(wave) = wave {
         // VIEW > Full / Half waveform: Full is symmetric around the middle row, Half grows from the bottom.
         wave.draw(&mut c, &axis, view.overview == OverviewSize::Full);
+    }
+    if view.beat_grid == BeatGrid::Bold {
+        for b in a.beats.iter().filter(|b| b.bar_pos == 1) {
+            c.bold_grid(axis.col(b.time_ms as f64), true);
+        }
     }
     if view.vocal_full {
         for r in &a.vocal {
@@ -110,7 +120,13 @@ pub fn render(wave: Option<&Wave>, a: &Analysis, duration_ms: u32, w: usize, h: 
         );
         c.vline(x, 0..hw, rgb);
         if cue.hot_cue > 0 && hw >= 20 {
-            c.cue_box(x, 0, cue_letter(cue.hot_cue as u8), rgb);
+            c.cue_box(
+                x,
+                0,
+                cue_letter(cue.hot_cue as u8),
+                rgb,
+                view.cue_markers == CueMarkers::Large,
+            );
         }
     }
     let mut c = c.extended(strip);

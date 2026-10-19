@@ -42,6 +42,8 @@ mod groove;
 mod key;
 mod light;
 mod load;
+#[cfg(test)]
+mod readout_tests;
 pub use load::set_next_track;
 mod loops;
 mod mixpoint;

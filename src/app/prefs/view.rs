@@ -47,6 +47,14 @@ choice!(
     OverviewSize { #[default] Full = "full", Half = "half" }
 );
 choice!(
+    /// Bold grid lines sit above the waveform; downbeats are wider than other beats.
+    BeatGrid { #[default] Normal = "normal", Bold = "bold" }
+);
+choice!(
+    /// Hot cue letter boxes in waveforms: normal size or twice as large.
+    CueMarkers { #[default] Normal = "normal", Large = "large" }
+);
+choice!(
     /// Beat Count Display: bars since the start of the track, or the bars / beats to the next memory cue.
     BeatCount { #[default] Position = "position", NextBars = "next-bars", NextBeats = "next-beats" }
 );
@@ -103,6 +111,9 @@ section!(
         /// Waveform Drawing Rate and Full/Half overview.
         draw_rate: DrawRate = DrawRate::Fps60;
         overview: OverviewSize = OverviewSize::Full;
+        /// Waveform beat grid visibility and hot cue letter box size.
+        beat_grid: BeatGrid = BeatGrid::Normal;
+        cue_markers: CueMarkers = CueMarkers::Normal;
         /// Beat Count Display, Click on the waveform for PLAY and CUE, JOG display.
         beat_count: BeatCount = BeatCount::Position;
         click_wave: bool = true;
@@ -247,6 +258,9 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             v.overview as usize,
         ),
         Row::of("beat_count", "BEAT COUNT", v.beat_count),
+        Row::of("beat_grid", "BEAT GRID", v.beat_grid).hint("Bold: thicker lines, wider downbeats"),
+        Row::of("cue_markers", "HOT CUE MARKERS", v.cue_markers)
+            .hint("Large: double-size flags and letters"),
         Row::check(
             "click_wave",
             "Click on the waveform for PLAY and CUE",

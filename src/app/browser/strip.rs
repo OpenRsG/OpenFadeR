@@ -12,6 +12,7 @@
 use super::View;
 use crate::app::{
     App, BrowserState, analyze, prefs,
+    prefs::view::CueMarkers,
     render::{Axis, Canvas, cue_color, cue_letter, overview},
 };
 use openfader::{
@@ -49,7 +50,7 @@ struct Drawn {
 /// strip scale and the cue-markers setting, so a sort, filter or scroll does not read the analysis again.
 pub(super) struct Strips {
     model: Rc<VecModel<Image>>,
-    cache: RefCell<HashMap<(PathBuf, usize, bool), Drawn>>,
+    cache: RefCell<HashMap<(PathBuf, usize, bool, bool), Drawn>>,
 }
 
 impl Strips {
@@ -78,7 +79,8 @@ impl Strips {
         };
         let edits = store::global().edits(&store::key(t)).unwrap_or_default();
         let detected = analyze::detected().version();
-        let key = (file.clone(), scale, cues);
+        let large = prefs::with(|p| p.view.cue_markers == CueMarkers::Large);
+        let key = (file.clone(), scale, cues, large);
         let mut cache = self.cache.borrow_mut();
         if let Some(d) = cache
             .get(&key)
@@ -138,11 +140,12 @@ fn draw(a: &Analysis, duration_ms: u32, cues: bool, scale: usize) -> Image {
         if let Some(wave) = overview::wave(a, duration_ms) {
             wave.draw(&mut c, &axis, true);
         }
+        let large = prefs::with(|p| p.view.cue_markers == CueMarkers::Large);
         for cue in a.cues.iter().filter(|_| cues) {
             let (x, rgb) = (axis.col(f64::from(cue.time_ms)), cue_color(cue));
             c.vline(x, 0..h, rgb);
             if cue.hot_cue > 0 {
-                c.cue_box(x, 0, cue_letter(cue.hot_cue as u8), rgb);
+                c.cue_box(x, 0, cue_letter(cue.hot_cue as u8), rgb, large);
             }
         }
     }
@@ -190,9 +193,10 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
     });
     // The setting changed: the rows are made again, so every visible strip asks for its drawing again.
     let (v, weak) = (view.clone(), app.as_weak());
-    let cues = Cell::new(prefs::with(|p| p.view.panel_preview_cues));
+    let cues = Cell::new(prefs::with(|p| (p.view.panel_preview_cues, p.view.cue_markers)));
     prefs::on_change(move |p| {
-        if cues.replace(p.view.panel_preview_cues) != p.view.panel_preview_cues
+        let next = (p.view.panel_preview_cues, p.view.cue_markers);
+        if cues.replace(next) != next
             && let (Ok(mut v), Some(app)) = (v.try_borrow_mut(), weak.upgrade())
         {
             v.refresh(&app);

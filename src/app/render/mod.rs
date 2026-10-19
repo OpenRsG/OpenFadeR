@@ -221,6 +221,17 @@ impl Canvas {
             }
         }
     }
+    /// Bold grid above the waveform: a contrasting outline and wider downbeats, not colour alone.
+    pub fn bold_grid(&mut self, x: i64, downbeat: bool) {
+        let p = palette();
+        let (left, right, rgb) = if downbeat {
+            (x - 1, x + 3, p.cue)
+        } else {
+            (x, x + 2, p.band[2])
+        };
+        self.shade(left - 1, right + 1, 0..self.h, p.bg, 1.0);
+        self.shade(left, right, 0..self.h, rgb, 1.0);
+    }
     /// Translucent colour `c` (coverage `cov`) over pixel `rows` of columns `x0..x1`, clipped to the canvas. Coverage 1 fills
     /// (see [`Canvas::vline`]); below 1, [`blend`]'s result per old byte is tabulated once (3×256 entries) instead of
     /// computed per pixel, which is the same value: the phrase band, a loop and the vocal band are tens of thousands of pixels.
@@ -288,16 +299,17 @@ impl Canvas {
         c.buf.make_mut_slice()[..self.w * self.h].copy_from_slice(self.buf.as_slice());
         c
     }
-    /// Letter box of a cue: `letter` in black on a `rgb` box (8×9 px) with its top-left at (`x`, `y`).
-    pub fn cue_box(&mut self, x: i64, y: usize, letter: char, rgb: Rgb) {
-        self.shade(x, x + 8, y..y + 9, rgb, 1.0);
+    /// Cue letter box anchored at (`x`, `y`): 8×9 px, or 16×18 with a double-size letter.
+    pub fn cue_box(&mut self, x: i64, y: usize, letter: char, rgb: Rgb, large: bool) {
+        let scale = if large { 2 } else { 1 };
+        self.shade(x, x + (8 * scale) as i64, y..y + 9 * scale, rgb, 1.0);
         self.text(
-            x + 2,
-            y + 1,
+            x + (2 * scale) as i64,
+            y + scale,
             letter.encode_utf8(&mut [0; 4]),
-            1,
+            scale,
             [0; 3],
-            x + 8,
+            x + (8 * scale) as i64,
         );
     }
 }
@@ -776,6 +788,58 @@ mod tests {
                 "{px_per_ms} px/ms, {h} rows"
             );
         }
+    }
+
+    #[test]
+    fn large_cue_letters_scale_with_the_flag_and_clip_at_the_canvas_edge() {
+        let mut normal = black_canvas(8, 9);
+        normal.cue_box(0, 0, 'A', [255, 180, 0], false);
+        assert_eq!(
+            normal.buf.as_slice()[8 + 3],
+            Rgba8Pixel::new(0, 0, 0, 255),
+            "A has a visible top"
+        );
+        assert_eq!(
+            normal.buf.as_slice()[4 * 8 + 4],
+            Rgba8Pixel::new(0, 0, 0, 255),
+            "A has a crossbar"
+        );
+        let mut large = black_canvas(16, 18);
+        large.cue_box(0, 0, 'A', [255, 180, 0], true);
+        for y in 0..18 {
+            for x in 0..16 {
+                assert_eq!(
+                    large.buf.as_slice()[y * 16 + x],
+                    normal.buf.as_slice()[(y / 2) * 8 + x / 2]
+                );
+            }
+        }
+        let mut clipped = black_canvas(12, 13);
+        clipped.cue_box(-4, 0, 'A', [255, 180, 0], true);
+        for y in 0..13 {
+            for x in 0..12 {
+                assert_eq!(
+                    clipped.buf.as_slice()[y * 12 + x],
+                    large.buf.as_slice()[y * 16 + x + 4]
+                );
+            }
+        }
+        normal.cue_box(0, 0, 'F', [255, 180, 0], false);
+        assert_eq!(
+            normal.buf.as_slice()[8 + 6],
+            Rgba8Pixel::new(0, 0, 0, 255),
+            "F has a top bar"
+        );
+        assert_eq!(
+            normal.buf.as_slice()[7 * 8 + 2],
+            Rgba8Pixel::new(0, 0, 0, 255),
+            "F has a stem"
+        );
+        assert_eq!(
+            normal.buf.as_slice()[7 * 8 + 6],
+            Rgba8Pixel::new(255, 180, 0, 255),
+            "F has no bottom bar"
+        );
     }
 
     #[test]

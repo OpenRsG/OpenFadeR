@@ -10,10 +10,13 @@
 //! With the STEM waveform on (PREFS) and a part muted, the 3-band wave of the stems heard ([`wave_3band`]) replaces these.
 
 use super::{
-    Axis, Canvas, Layers, Src, Wave, cue_letter, hot_cue_rgb, mono_layers, mono_rgbh,
-    phrase::phrase_band, single, sources, three_band,
+    cue_letter, hot_cue_rgb, mono_layers, mono_rgbh, phrase::phrase_band, single, sources,
+    three_band, Axis, Canvas, Layers, Src, Wave,
 };
-use crate::app::prefs::{self, view::BeatCount};
+use crate::app::prefs::{
+    self,
+    view::{BeatCount, BeatGrid, CueMarkers},
+};
 use openfader::analysis::{self, Analysis, Beat, Cue, DETAIL_ENTRIES_PER_SEC};
 use openfader::audio::Pcm;
 
@@ -122,18 +125,25 @@ pub fn render_strip(
         start_ms,
         px_per_ms,
     };
-    for b in &a.beats {
-        let rgb = if b.bar_pos == 1 {
-            [230, 40, 40] // Theme.wave-bar
-        } else if grid_edit {
-            [61, 139, 255] // Theme.accent-hi: the grid being edited
-        } else {
-            [128, 128, 128] // Theme.wave-grid (white at 50%)
-        };
-        c.vline(axis.col(b.time_ms as f64), 0..h, rgb);
+    if view.beat_grid == BeatGrid::Normal {
+        for b in &a.beats {
+            let rgb = if b.bar_pos == 1 {
+                [230, 40, 40] // Theme.wave-bar
+            } else if grid_edit {
+                [61, 139, 255] // Theme.accent-hi: the grid being edited
+            } else {
+                [128, 128, 128] // Theme.wave-grid (white at 50%)
+            };
+            c.vline(axis.col(b.time_ms as f64), 0..h, rgb);
+        }
     }
     if let Some(wave) = wave {
         wave.draw(&mut c, &axis, true);
+    }
+    if view.beat_grid == BeatGrid::Bold {
+        for b in &a.beats {
+            c.bold_grid(axis.col(b.time_ms as f64), b.bar_pos == 1);
+        }
     }
     if view.vocal_enlarged {
         // Voice regions (heuristic, `analysis::detect::vocal_regions`): a band along the bottom.
@@ -174,7 +184,13 @@ pub fn render_strip(
         );
         c.vline(x, (0..h).step_by(2), rgb);
         if cue.hot_cue > 0 && h >= 40 {
-            c.cue_box(x, box_y, cue_letter(cue.hot_cue as u8), rgb);
+            c.cue_box(
+                x,
+                box_y,
+                cue_letter(cue.hot_cue as u8),
+                rgb,
+                view.cue_markers == CueMarkers::Large,
+            );
         }
     }
     super::cue_marker(&mut c, axis.col(cue_ms as f64), (h / 12).clamp(5, 12));
@@ -184,6 +200,49 @@ pub fn render_strip(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bold_grid_stays_visible_over_audio_and_marks_downbeats_by_width() {
+        let a = Analysis {
+            beats: vec![
+                Beat {
+                    bar_pos: 1,
+                    bpm_x100: 12700,
+                    time_ms: 10,
+                },
+                Beat {
+                    bar_pos: 2,
+                    bpm_x100: 12700,
+                    time_ms: 30,
+                },
+            ],
+            ..Default::default()
+        };
+        let wave = Wave {
+            layers: vec![single([80, 90, 100], 1.0); 80],
+            per_ms: 1.0,
+        };
+        prefs::set_for_test(|p| p.view.beat_grid = BeatGrid::Bold);
+        let image = render_strip(Some(&wave), &a, 0.0, 1.0, u32::MAX, None, 80, 60, false)
+            .to_rgba8()
+            .unwrap();
+        let pixel = |x: usize| {
+            let p = image.as_slice()[40 * 80 + x];
+            [p.r, p.g, p.b]
+        };
+        let palette = super::super::palette();
+        for x in 9..13 {
+            assert_eq!(pixel(x), palette.cue, "downbeat at {x}");
+        }
+        for x in 30..32 {
+            assert_eq!(pixel(x), palette.band[2], "beat at {x}");
+        }
+        for x in [8, 13, 29, 32] {
+            assert_eq!(pixel(x), palette.bg, "outline at {x}");
+        }
+        assert_eq!(pixel(20), [80, 90, 100], "audio remains between grid lines");
+        prefs::set_for_test(|p| p.view.beat_grid = BeatGrid::Normal);
+    }
 
     #[test]
     fn peaks_cover_the_audio_at_150_per_second() {
@@ -213,7 +272,7 @@ mod tests {
 #[cfg(test)]
 mod mode_tests {
     use super::*;
-    use crate::app::prefs::{WaveColors, set_for_test};
+    use crate::app::prefs::{set_for_test, WaveColors};
 
     #[test]
     fn waveform_mode_picks_the_stored_family_and_falls_back() {
