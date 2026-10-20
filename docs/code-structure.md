@@ -73,7 +73,7 @@ tests/
 ## Performance contracts
 
 - Delay-line reset invalidates history in constant time. Interpolated reads must treat both unwritten taps as silence; resetting an effect must not clear its full buffer inside the callback.
-- `audio/fx/prepare.rs` owns replacement construction and retirement. Each unit keeps its selected stage and bounded handoff slots. Initial stages are built during stream setup; callbacks only try a handoff when selection changes. Pending selections pass dry audio, and the latest selection wins.
+- `audio/fx/prepare.rs` owns replacement construction and retirement. Each unit keeps its selected stage and bounded handoff slots. Initialize the handoff mutex during construction because Darwin allocates its native mutex on first lock. Initial stages are built during stream setup; callbacks only try a handoff when selection changes. Pending selections pass dry audio, and the latest selection wins.
 - Deck loading sends playable `Arc<Track16>` after worker-side gain and auto-cue preparation, before optional analysis. Late results merge into the current load without overwriting edits or disturbing transport.
 - Bulk runs share `app/analyze/job.rs`'s process-wide budget. Compatible queued or running requests share computation; cue guides, tag writes and progress remain subscriber-specific. Bulk detectors run sequentially per track rather than nesting detector threads inside track workers.
 - Cancellation is checked between decode packets, during detector scans and after acquiring inference locks. An active ORT inference cannot be interrupted. Video decode cancellation kills and reaps its ffmpeg child; dropping a result receiver alone is insufficient.

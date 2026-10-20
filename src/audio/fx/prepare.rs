@@ -32,7 +32,7 @@ pub(super) struct Exchange {
 
 impl Exchange {
     pub fn new(rate: u32, beat: bool, effects: &[Effect]) -> Arc<Self> {
-        Arc::new(Self {
+        let exchange = Arc::new(Self {
             desired: AtomicUsize::new(0),
             active: AtomicUsize::new(0),
             handoff: Mutex::new(Handoff::default()),
@@ -40,7 +40,10 @@ impl Exchange {
             rate,
             beat,
             effects: effects.to_vec(),
-        })
+        });
+        // Darwin lazily allocates the native mutex on its first lock, never in the audio callback.
+        drop(exchange.handoff.lock().unwrap());
+        exchange
     }
 
     fn prepare(&self) {
@@ -95,27 +98,25 @@ impl Worker {
         let s = state.clone();
         let thread = thread::Builder::new()
             .name("fx-prepare".into())
-            .spawn(move || {
-                loop {
-                    thread::park();
-                    let mut exchanges = s.exchanges.lock().unwrap();
-                    exchanges.retain(|e| {
-                        if e.alive.load(Acquire) {
-                            return true;
-                        }
-                        let mut h = e.handoff.lock().unwrap();
-                        drop(h.ready.take());
-                        drop(h.retired.take());
-                        drop(h.closing.take());
-                        false
-                    });
-                    if s.stop.load(Acquire) {
-                        exchanges.clear();
-                        break;
+            .spawn(move || loop {
+                thread::park();
+                let mut exchanges = s.exchanges.lock().unwrap();
+                exchanges.retain(|e| {
+                    if e.alive.load(Acquire) {
+                        return true;
                     }
-                    for exchange in exchanges.iter() {
-                        exchange.prepare();
-                    }
+                    let mut h = e.handoff.lock().unwrap();
+                    drop(h.ready.take());
+                    drop(h.retired.take());
+                    drop(h.closing.take());
+                    false
+                });
+                if s.stop.load(Acquire) {
+                    exchanges.clear();
+                    break;
+                }
+                for exchange in exchanges.iter() {
+                    exchange.prepare();
                 }
             })
             .expect("FX preparation thread");
