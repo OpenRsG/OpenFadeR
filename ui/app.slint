@@ -405,12 +405,13 @@ export component App inherits Window {
     }
 
     // The full-window views start under the global bar.
-    EditView { x: 0; y: Theme.h-bar; width: root.width; height: root.height - Theme.h-bar; }
-    LightingView { x: 0; y: Theme.h-bar; width: root.width; height: root.height - Theme.h-bar; }
-    VideoView { x: 0; y: Theme.h-bar; width: root.width; height: root.height - Theme.h-bar; }
+    // Permanent conditional instances give these large views separate heap-allocated item trees.
+    if true: EditView { x: 0; y: Theme.h-bar; width: root.width; height: root.height - Theme.h-bar; }
+    if true: LightingView { x: 0; y: Theme.h-bar; width: root.width; height: root.height - Theme.h-bar; }
+    if true: VideoView { x: 0; y: Theme.h-bar; width: root.width; height: root.height - Theme.h-bar; }
 
     // Global bar. Drawn after the views so it stays on top in every mode.
-    Rectangle {
+    if true: Rectangle {
         x: 0;
         y: 0;
         width: root.width;
@@ -513,11 +514,17 @@ export component App inherits Window {
         DeckState.zoom(3, dir);
     }
 
+    // Separate persistent item trees keep nested overlay constructors within a 1 MiB startup stack.
+    if true: Rectangle {
+    width: root.width; height: root.height;
     HelpOverlay {}
     AboutOverlay {}
     UpdateOverlay {}
     WelcomeOverlay {}
     StemsModelCard { x: root.width - self.width - Theme.space-xl; y: root.height - self.height - Theme.h-bar - Theme.space-xl; } // above the dialogs: it runs on while they are open
+    }
+    if true: Rectangle {
+    width: root.width; height: root.height;
     MidiOverlay {}
     PrefsOverlay {}
     LibraryOverlays { x: 0; y: 0; width: root.width; height: root.height; }
@@ -531,4 +538,5 @@ export component App inherits Window {
     // The label that follows the cursor while a track row is dragged (dnd.slint); above everything.
     DragGhost { x: 0; y: 0; width: root.width; height: root.height; }
     FileDropOverlay { x: 0; y: 0; width: root.width; height: root.height; }
+    }
 }

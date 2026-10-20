@@ -52,6 +52,7 @@ tests/
   (e.g. `animate background`), and every use given children, `clip` or layout padding. For widgets used many times, put such
   bindings on a child element (`face := Rectangle { … animate background … }`), never on the root: each inlined use is a full
   copy in the generated code.
+- Large views and overlay groups use permanent `if true` item trees to create separate heap-allocation boundaries. Named Slint components alone remain embedded by value. Keep both individual constructors and nested initialization within the 1 MiB stack budget exercised by `.github/smoke.sh` on Linux; dialog visibility and state retain their existing lifetimes.
 - Each Slint section talks to Rust only through its `<Section>State` global. Rust sets it via `app.global::<…State>()`. Do not add root `App` properties for a section.
 - Multi-instance sections (decks) use ONE global holding an indexed model plus index-taking callbacks. Never write per-instance A/B copies.
 

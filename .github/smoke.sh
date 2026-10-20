@@ -27,7 +27,13 @@ if [ "$os" = windows ]; then
 	export USERPROFILE="$w" APPDATA="$w\\AppData\\Roaming" LOCALAPPDATA="$w\\AppData\\Local"
 fi
 
-"$bin" >"$out/app.log" 2>&1 &
+(
+	# Catch oversized UI constructors on Linux too, using the Windows executable's default stack budget.
+	if [ "$os" = linux ]; then
+		ulimit -s 1024
+	fi
+	exec "$bin"
+) >"$out/app.log" 2>&1 &
 pid=$!
 sleep "$wait_s"
 
