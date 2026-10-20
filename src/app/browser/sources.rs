@@ -7,14 +7,13 @@
 //! takes seconds), with its steps in the status bar's loading line ([`loading`]) and a toast when done.
 
 use super::{
-    loading,
+    App, BrowserState, Home, View, loading,
     sidebar::{Entry, SourceRows},
-    App, BrowserState, Home, View,
 };
 use crate::app::{prefs, toast};
 use openfader::{
-    device::{self, plug, Device},
-    library::{self, folder::Folder, Library, Playlist},
+    device::{self, Device, plug},
+    library::{self, Library, Playlist, folder::Folder},
     plugin,
 };
 use slint::ComponentHandle;
@@ -315,7 +314,7 @@ impl View {
         let text = match read {
             Ok((lib, playlists, tracks)) => {
                 let lists = playlists.iter().filter(|p| !p.is_folder).count();
-                let lib: Rc<dyn Library> = Rc::<dyn Library + Send>::from(lib);
+                let lib: Rc<dyn Library> = openfader::store::overlay(lib).into();
                 (s.lib, s.playlists) = (Some(lib), playlists);
                 let s_ = |n: usize| if n == 1 { "" } else { "s" };
                 format!(

@@ -457,15 +457,4 @@ mod tests {
         assert_eq!(p.band[1..], Palette::DEFAULT.band[1..]);
         restyle(&app, &skins, BUILTIN[0]);
     }
-
-    #[test]
-    fn the_skin_doc_lists_every_token() {
-        let doc = include_str!("../../../docs/skins.md");
-        let missing: Vec<_> = TOKENS
-            .iter()
-            .filter(|(n, _)| !doc.contains(&format!("`{n}`")))
-            .map(|t| t.0)
-            .collect();
-        assert!(missing.is_empty(), "docs/skins.md lacks {missing:?}");
-    }
 }

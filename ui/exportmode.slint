@@ -21,15 +21,15 @@ component One inherits Rectangle {
     background: Theme.bg;
     HorizontalLayout {
         spacing: 2px;
-        Ops { index: 0; search: true; jump: true; width: 64px; horizontal-stretch: 0; }
+        Ops { index: 0; search: true; jump: true; width: Theme.layout-profile == 1 ? 100px : 64px; horizontal-stretch: 0; }
         VerticalLayout {
             spacing: 2px;
-            TrackBar { index: 0; height: 38px; vertical-stretch: 0; }
+            TrackBar { index: 0; height: Theme.target-size(38px); vertical-stretch: 0; }
             DeckOverview { index: 0; height: Theme.h-overview + Theme.h-phrase; vertical-stretch: 0; }
             DeckDetail { index: 0; vertical-stretch: 1; min-height: 30px; }
-            Func { index: 0; tabs: true; height: 52px; vertical-stretch: 0; }
+            Func { index: 0; tabs: true; height: Theme.layout-profile == 1 ? 2 * Theme.touch-target + 8px : 52px; vertical-stretch: 0; }
         }
-        SubPanel { index: 0; width: 252px; horizontal-stretch: 0; }
+        SubPanel { index: 0; width: Theme.layout-profile == 1 ? 380px : 252px; horizontal-stretch: 0; }
     }
 }
 
@@ -38,12 +38,12 @@ component One inherits Rectangle {
 /// and DUAL CONTROL.
 component Two inherits Rectangle {
     in property <bool> dual;
-    property <length> block: 118px;
+    property <length> block: Theme.layout-profile == 1 ? 3 * Theme.touch-target + Theme.h-overview + Theme.h-phrase + 10px : 118px;
     background: Theme.bg;
     HorizontalLayout {
         spacing: 2px;
         VerticalLayout {
-            width: 64px;
+            width: Theme.layout-profile == 1 ? 100px : 64px;
             horizontal-stretch: 0;
             spacing: 2px;
             Ops { index: 0; jump: root.dual; height: root.block; vertical-stretch: 0; }
@@ -54,8 +54,8 @@ component Two inherits Rectangle {
                 IconButton {
                     icon: Icon.link;
                     icon-size: 18px;
-                    width: 34px;
-                    height: 34px;
+                    width: Theme.target-size(34px);
+                    height: Theme.target-size(34px);
                     solid: true;
                     active: ExportModeState.dual-control;
                     tooltip: "DUAL CONTROL: PLAY / PAUSE both players together";
@@ -65,7 +65,7 @@ component Two inherits Rectangle {
             Ops { index: 1; jump: root.dual; height: root.block; vertical-stretch: 0; }
         }
         if root.dual: VerticalLayout {
-            width: 58px;
+            width: Theme.layout-profile == 1 ? 70px : 58px;
             horizontal-stretch: 0;
             spacing: 2px;
             GainEq { index: 0; height: root.block; vertical-stretch: 0; }
@@ -74,17 +74,17 @@ component Two inherits Rectangle {
         }
         VerticalLayout {
             spacing: 2px;
-            TrackBar { index: 0; two: true; dual: root.dual; height: 38px; vertical-stretch: 0; }
+            TrackBar { index: 0; two: true; dual: root.dual; height: Theme.layout-profile == 1 ? 2 * Theme.touch-target : 38px; vertical-stretch: 0; }
             DeckOverview { index: 0; height: Theme.h-overview + Theme.h-phrase; vertical-stretch: 0; }
-            Func { index: 0; height: 26px; vertical-stretch: 0; }
+            Func { index: 0; height: Theme.layout-profile == 1 ? Theme.touch-target + 4px : 26px; vertical-stretch: 0; }
             DeckDetail { index: 0; vertical-stretch: 1; min-height: 20px; }
             DeckDetail { index: 1; vertical-stretch: 1; min-height: 20px; }
-            TrackBar { index: 1; two: true; dual: root.dual; height: 38px; vertical-stretch: 0; }
+            TrackBar { index: 1; two: true; dual: root.dual; height: Theme.layout-profile == 1 ? 2 * Theme.touch-target : 38px; vertical-stretch: 0; }
             DeckOverview { index: 1; height: Theme.h-overview + Theme.h-phrase; vertical-stretch: 0; }
-            Func { index: 1; height: 26px; vertical-stretch: 0; }
+            Func { index: 1; height: Theme.layout-profile == 1 ? Theme.touch-target + 4px : 26px; vertical-stretch: 0; }
         }
         VerticalLayout {
-            width: 252px;
+            width: Theme.layout-profile == 1 ? 380px : 252px;
             horizontal-stretch: 0;
             spacing: 2px;
             SubPanel { index: 0; vertical-stretch: 1; }
@@ -93,10 +93,10 @@ component Two inherits Rectangle {
     }
     // [Matching]: at the join of the two enlarged waveforms.
     Chip {
-        x: root.width - 252px - 2px - self.width - 18px;
-        y: root.block + 2px + (root.height - 2 * root.block - 4px) / 2 - 9px + 2px;
-        width: 74px;
-        height: 18px;
+        x: root.width - (Theme.layout-profile == 1 ? 380px : 252px) - 2px - self.width - 18px;
+        y: root.height / 2 - self.height / 2 + 2px;
+        width: Theme.layout-profile == 1 ? 90px : 74px;
+        height: Theme.target-size(18px);
         font-size: Theme.font-xs;
         text: "MATCHING";
         active: ExportModeState.decks[0].matched;
@@ -113,7 +113,7 @@ component Simple inherits Rectangle {
         padding: 4px;
         spacing: 8px;
         VerticalLayout {
-            width: 36px;
+            width: Theme.target-size(36px);
             alignment: center;
             horizontal-stretch: 0;
             RingButton {
@@ -122,8 +122,8 @@ component Simple inherits Rectangle {
                 text: DeckState.decks[0].loading ? "…" : "";
                 lit: DeckState.decks[0].playing;
                 enabled: DeckState.decks[0].loaded;
-                width: 34px;
-                height: 34px;
+                width: Theme.target-size(34px);
+                height: Theme.target-size(34px);
                 clicked => { ExportModeState.play(0); }
             }
         }
@@ -154,8 +154,8 @@ export component ExportPlayers inherits Rectangle {
 /// Recording panel: the source, the level (the master level: REC records the master bus), the meter, start /
 /// stop and the elapsed time. Opened from the global bar's REC button in EXPORT mode.
 export component ExportRecPanel inherits Rectangle {
-    width: 400px;
-    height: 30px;
+    width: Theme.layout-profile == 1 ? 500px : 400px;
+    height: Theme.layout-profile == 1 ? Theme.touch-target + 6px : 30px;
     background: Theme.panel-raised;
     border-width: 1px;
     border-color: Theme.line-strong;
@@ -169,11 +169,11 @@ export component ExportRecPanel inherits Rectangle {
             current: ExportModeState.rec-source;
             chose(i) => { PrefsState.chose("rec_source", i); }
         }
-        Knob { width: 22px; height: 22px; horizontal-stretch: 0; detent: true; value: MixerState.bus.knobs[0]; edited(v) => { MixerState.bus-knob(0, v); } }
+        Knob { width: Theme.target-size(22px); height: Theme.target-size(22px); horizontal-stretch: 0; detent: true; value: MixerState.bus.knobs[0]; edited(v) => { MixerState.bus-knob(0, v); } }
         VerticalLayout { width: 90px; horizontal-stretch: 0; alignment: center; Meter { level: MixerState.bus.level; peak: MixerState.bus.peak; } }
         Chip {
             text: MixerState.bus.rec-armed ? "● ARMED" : "● REC";
-            width: 66px;
+            width: Theme.layout-profile == 1 ? 88px : 66px;
             horizontal-stretch: 0;
             active: MixerState.bus.rec;
             active-color: Theme.rec;

@@ -1,0 +1,55 @@
+import { Theme } from "../../ui/theme.slint";
+export { Theme }
+
+export struct DeckView {
+    title: string, artist: string, ready: bool, loading: bool,
+    playing: bool, position: float, duration: float, time: string,
+    bpm: string, key: string, tempo: float, key-lock: bool,
+    looping: bool, loop-index: int, wave: image, level: float,
+    gain: float, low: float, mid: float, high: float,
+    effect: int, amount: float, cues: [bool], cue-mode: int,
+}
+
+export global DeckState {
+    in property <[DeckView]> decks;
+    callback play(int);
+    callback cue(int, bool);
+    callback seek(int, float);
+    callback tempo(int, float);
+    callback key-lock(int);
+    callback sync(int);
+    callback loop(int, int);
+    callback hot-cue(int, int, int);
+    callback cue-mode(int, int);
+    callback mix(int, int, float);
+    callback effect(int, int);
+    callback loop-size(int, int);
+}
+
+export struct TrackRow { index: int, title: string, artist: string }
+export global LibraryState {
+    in property <[TrackRow]> tracks;
+    in-out property <string> query;
+    in property <bool> busy;
+    callback search(string);
+    callback import-music();
+    callback load(int, int);
+}
+export global MixerState {
+    in property <float> crossfade: 0.5;
+    in property <float> master: 0.8;
+    in property <bool> split;
+    in property <[bool]> headphones: [false, false];
+    callback change-crossfade(float);
+    callback change-master(float);
+    callback change-split(bool);
+    callback change-headphones(int, bool);
+}
+export global MobileState {
+    in property <string> status: "Import music to start mixing";
+    in property <bool> landscape-only;
+    // 0 decks, 1 library, 2 mixer/output, 3 EQ/FX, 4 help, 5 hot cue pads.
+    in-out property <int> view;
+    in-out property <bool> menu-open;
+    callback background();
+}

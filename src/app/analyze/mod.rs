@@ -13,7 +13,7 @@
 //!   Analysis "Write the value to the ID3 tag" ([`job`]) and CUE Analysis stores cues in the store ([`cue`]).
 //!   Progress shows in the track info panel ([`super::trackinfo`]).
 //!
-//! Cancelling = dropping the receiver: the workers stop after the track they are on. Dropping the [`Analyzer`] does that.
+//! Cancelling drops the run's subscription: queued work is skipped and a shared in-flight result still reaches other runs.
 //!
 //! This base owns the types the children share ([`Found`], [`Outcome`]) and the run on the UI thread. Children: `detected`
 //! (session results, which tracks are pending), `progress` (counters and text), `job` (worker pool), `cue` (library grid
@@ -25,20 +25,20 @@ mod job;
 mod progress;
 mod sync;
 
-pub use cue::{library_cues, Learnt};
-pub use detected::{keys_differ, Detected};
+pub use cue::{Learnt, library_cues};
+pub use detected::{Detected, keys_differ};
 
 use super::{
-    camelot,
+    App, camelot,
     prefs::{
         self,
         analysis::{CueSetting, Process},
     },
-    trackinfo, App,
+    trackinfo,
 };
 use job::{Guide, Job, Settings, TagText};
 use openfader::{
-    analysis::{cache, cache::Source, options, Analysis},
+    analysis::{Analysis, cache, cache::Source, options},
     library::{Library, Track},
     store::{self, Store},
 };
@@ -48,7 +48,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashSet,
     rc::Rc,
-    sync::{mpsc, Arc},
+    sync::{Arc, mpsc},
     time::Duration,
 };
 
@@ -77,6 +77,8 @@ struct Ctx {
 struct Run {
     _timer: Rc<Timer>,
     done: Rc<Cell<bool>>,
+    _cancel: Option<job::Cancellation>,
+    progress: Option<Rc<RefCell<Progress>>>,
 }
 
 thread_local! {
@@ -189,6 +191,8 @@ fn migrate_then(then_run: bool) {
         r.borrow_mut().push(Run {
             _timer: timer,
             done,
+            _cancel: None,
+            progress: None,
         })
     });
 }
@@ -284,20 +288,31 @@ fn jobs(lib: &dyn Library, tracks: &[&Track], explicit: bool) -> Vec<Job> {
         .collect()
 }
 
+fn progress_text() -> String {
+    RUNS.with(|runs| {
+        let mut total = Progress::default();
+        for progress in runs.borrow().iter().filter_map(|r| r.progress.as_ref()) {
+            total.include(&progress.borrow());
+        }
+        total.text()
+    })
+}
+
 /// Starts the pool on `jobs` and a timer that collects its results into [`Detected`] and the progress text.
 fn start_run(app: &App, jobs: Vec<Job>, settings: Settings) {
     if jobs.is_empty() {
-        return trackinfo::set_progress(app, "");
+        return;
     }
     let have = detected();
-    let mut progress = Progress::new(jobs.len());
-    trackinfo::set_progress(app, &progress.text());
+    let progress = Rc::new(RefCell::new(Progress::new(jobs.len())));
     let (tx, rx) = mpsc::channel();
-    job::spawn(jobs, settings, store::global(), tx);
+    let cancel = job::spawn(jobs, settings, store::global(), tx);
+    let run_progress = progress.clone();
     let (timer, done) = (Rc::new(Timer::default()), Rc::new(Cell::new(false)));
     let (weak, weak_timer, finished) = (app.as_weak(), Rc::downgrade(&timer), done.clone());
     timer.start(TimerMode::Repeated, TICK, move || {
         let Some(app) = weak.upgrade() else { return };
+        let mut progress = progress.borrow_mut();
         for (path, r) in rx.try_iter() {
             progress.done += 1;
             match r {
@@ -312,8 +327,10 @@ fn start_run(app: &App, jobs: Vec<Job>, settings: Settings) {
                 }
             }
         }
-        trackinfo::set_progress(&app, &progress.text());
-        if progress.done == progress.total {
+        let complete = progress.done == progress.total;
+        drop(progress);
+        trackinfo::set_progress(&app, &progress_text());
+        if complete {
             finished.set(true);
             weak_timer.upgrade().inspect(|t| t.stop());
         }
@@ -324,8 +341,11 @@ fn start_run(app: &App, jobs: Vec<Job>, settings: Settings) {
         r.push(Run {
             _timer: timer,
             done,
+            _cancel: Some(cancel),
+            progress: Some(run_progress.clone()),
         });
     });
+    trackinfo::set_progress(app, &progress_text());
 }
 
 #[cfg(test)]

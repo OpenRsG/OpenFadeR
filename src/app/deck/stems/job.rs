@@ -17,6 +17,14 @@ fn progress_text(phase: Phase, f: f32) -> String {
     }
 }
 
+fn compatible_stems(stems: &audio::Stems, pcm: &audio::Track16, fast: bool) -> bool {
+    let quality = openfader::stems::separate::grid(pcm.rate, Quality::Quality);
+    let speed = openfader::stems::separate::grid(pcm.rate, Quality::Speed);
+    stems.is_complete()
+        && stems.frames() == pcm.frames()
+        && (stems.grid() == quality || (fast && stems.grid() == speed))
+}
+
 static FIRST_TICK: LazyLock<Instant> = LazyLock::new(Instant::now);
 /// The engines were opened (a warm-up or a job) and not released since.
 static WARM: AtomicBool = AtomicBool::new(false);
@@ -68,12 +76,14 @@ impl Deck {
 }
 
 impl Deck {
-    /// Starts separating `pcm` (the decoded `file`), when STEMS is on: the stems go to the player at once (frames not
-    /// separated yet play as the original track) and the buttons work from now on.
+    /// Starts allocation and separation off the UI thread; unseparated frames play the original.
     pub(in crate::app::deck) fn stems_start(&self, file: PathBuf, pcm: Arc<audio::Track16>) {
         let (stems, fast, multithread) =
             prefs::with(|p| (p.stems, p.stems_fast, p.extensions.stems_multithread));
         if !stems {
+            return;
+        }
+        if self.stems.borrow().job.is_some() || self.stems.borrow().ready {
             return;
         }
         self.stemwave_pcm(&pcm);
@@ -83,31 +93,76 @@ impl Deck {
             Quality::Quality
         };
         let job = openfader::stems::Job::start(file, pcm, quality, multithread);
-        let attached = self.with_player(|pl| pl.set_stems(Some(job.stems().clone())));
         let mut s = self.stems.borrow_mut();
         s.complete = false;
         s.focus = None;
-        match attached {
+        s.text = progress_text(Phase::Opening, 0.0);
+        s.job = Some(job);
+        drop(s);
+        self.show_stems();
+    }
+
+    pub(in crate::app::deck) fn completed_stems(&self) -> Option<Arc<audio::Stems>> {
+        let s = self.stems.borrow();
+        s.complete.then(|| s.attached.clone()).flatten()
+    }
+
+    pub(in crate::app::deck) fn stems_attach_completed(
+        &self,
+        file: PathBuf,
+        pcm: Arc<audio::Track16>,
+        stems: Arc<audio::Stems>,
+    ) -> bool {
+        let enabled = prefs::with(|p| p.stems);
+        let same_file = self
+            .loaded
+            .borrow()
+            .track
+            .as_ref()
+            .and_then(|t| t.file.as_ref())
+            .is_some_and(|f| *f == file);
+        let same_pcm = self
+            .with_player(|p| Arc::ptr_eq(&p.pcm(), &pcm))
+            .unwrap_or(false);
+        let fast = prefs::with(|p| p.stems_fast);
+        let compatible = compatible_stems(&stems, &pcm, fast);
+        if !enabled || !same_file || !same_pcm || !compatible {
+            return false;
+        }
+        if !self.attach_stems(&stems) {
+            return false;
+        }
+        self.stemwave_pcm(&pcm);
+        self.stemwave_stems(&stems);
+        let mut s = self.stems.borrow_mut();
+        s.job = None;
+        s.complete = true;
+        s.text = "100% READY".into();
+        drop(s);
+        self.show_stems();
+        true
+    }
+
+    fn attach_stems(&self, stems: &Arc<audio::Stems>) -> bool {
+        match self.with_player(|p| p.set_stems(Some(stems.clone()))) {
             Some(Ok(())) => {
+                let mut s = self.stems.borrow_mut();
+                s.attached = Some(stems.clone());
                 s.ready = true;
-                s.text = progress_text(Phase::Opening, 0.0);
-                s.job = Some(job);
+                drop(s);
+                self.apply_stems();
+                true
             }
             failed => {
-                s.text = "NO STEMS".into();
-                drop(s);
                 self.say(format!(
                     "stems: {}",
                     failed
                         .and_then(Result::err)
                         .unwrap_or_else(|| "no audio".into())
                 ));
-                return self.show_stems();
+                false
             }
         }
-        drop(s);
-        self.apply_stems();
-        self.show_stems();
     }
 
     /// SPEED separates the play position and the HOT CUEs first: tells the job where they are, when the play position
@@ -121,13 +176,14 @@ impl Deck {
         let hot = || loaded.analysis.cues.iter().filter(|c| c.hot_cue > 0);
         let mut s = self.stems.borrow_mut();
         let Some(job) = &s.job else { return };
-        let frames = job.stems().frames();
+        let Some(stems) = job.stems() else { return };
+        let frames = stems.frames();
         let at = |ms: f64| {
             (((ms / f64::from(dur)).clamp(0.0, 1.0) * frames as f64) as usize)
                 .min(frames.saturating_sub(1))
         };
         let play = at(pos);
-        let key = (play / job.stems().grid().stride(), hot().count());
+        let key = (play / stems.grid().stride(), hot().count());
         if s.focus != Some(key) {
             let cues: Vec<usize> = hot().map(|c| at(f64::from(c.time_ms))).collect();
             job.focus(play, &cues);
@@ -138,6 +194,19 @@ impl Deck {
     /// Tick: shows the job's progress, keeps it pointed at the play position and takes its outcome.
     pub(in crate::app::deck) fn poll_stems(&self) {
         engines_tick(self.stems.borrow().job.is_some());
+        let pending = {
+            let s = self.stems.borrow();
+            (!s.ready)
+                .then(|| s.job.as_ref().and_then(|j| j.stems().cloned()))
+                .flatten()
+        };
+        if let Some(stems) = pending {
+            if !self.attach_stems(&stems) {
+                self.stems_clear_job();
+                return;
+            }
+            self.show_stems();
+        }
         let result = {
             let mut s = self.stems.borrow_mut();
             let Some(job) = &s.job else { return };
@@ -155,13 +224,20 @@ impl Deck {
                     return;
                 }
                 Some(r) => {
-                    let stems = s.job.take().map(|j| j.stems().clone());
+                    let stems = s.job.take().and_then(|j| j.stems().cloned());
                     r.map(|()| stems)
                 }
             }
         };
         match result {
             Ok(stems) => {
+                if let Some(stems) = &stems {
+                    let ready = self.stems.borrow().ready;
+                    if !ready && !self.attach_stems(stems) {
+                        self.stems_clear_job();
+                        return;
+                    }
+                }
                 {
                     let mut s = self.stems.borrow_mut();
                     (s.complete, s.text) = (true, "100% READY".into());
@@ -173,9 +249,10 @@ impl Deck {
                 self.finish_double();
             }
             Err(e) => {
-                self.double.set(None);
+                self.double.borrow_mut().take();
                 self.with_player(|p| p.set_stems(None).ok());
                 let mut s = self.stems.borrow_mut();
+                s.attached = None;
                 s.ready = false;
                 s.text = if e.starts_with("STEMS model") {
                     "NO MODEL".into()
@@ -245,9 +322,48 @@ impl Deck {
     fn stems_clear_job(&self) {
         let mut s = self.stems.borrow_mut();
         s.job = None;
+        s.attached = None;
         (s.ready, s.complete) = (false, false);
         s.text.clear();
         drop(s);
         self.with_player(|p| p.set_stems(None).ok());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shared_stems_require_completion_rate_length_and_sufficient_quality() {
+        let pcm = audio::Track16::from(audio::Pcm {
+            rate: 48_000,
+            samples: vec![0.1; 32],
+        });
+        for quality in [Quality::Quality, Quality::Speed] {
+            let stems = audio::Stems::new(
+                pcm.frames(),
+                openfader::stems::separate::grid(pcm.rate, quality),
+            );
+            assert!(!compatible_stems(&stems, &pcm, true));
+            stems.finish();
+            assert!(compatible_stems(&stems, &pcm, true));
+            assert_eq!(
+                compatible_stems(&stems, &pcm, false),
+                quality == Quality::Quality
+            );
+        }
+        let wrong_rate = audio::Stems::new(
+            pcm.frames(),
+            openfader::stems::separate::grid(44_100, Quality::Quality),
+        );
+        wrong_rate.finish();
+        assert!(!compatible_stems(&wrong_rate, &pcm, true));
+        let wrong_length = audio::Stems::new(
+            pcm.frames() - 1,
+            openfader::stems::separate::grid(pcm.rate, Quality::Quality),
+        );
+        wrong_length.finish();
+        assert!(!compatible_stems(&wrong_length, &pcm, true));
     }
 }

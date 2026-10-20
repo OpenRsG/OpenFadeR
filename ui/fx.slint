@@ -46,6 +46,7 @@ export struct FxUnit {
 export global FxState {
     /// Panel shown (the global bar's FX toggle).
     in-out property <bool> open;
+    out property <length> panel-h: Theme.layout-profile == 1 ? 7 * Theme.touch-target + 46px : 110px;
     in-out property <[FxUnit]> units;
     /// Beat FX selector labels: the nine built-ins, then the effects of the plugin libraries (set from Rust at start).
     in-out property <[string]> effects;
@@ -94,27 +95,31 @@ component FxSlotView inherits HorizontalLayout {
     in property <FxSlot> s;
     in property <bool> target;
     in property <length> ctl-h;
-    spacing: 3px;
+    property <bool> touch: Theme.layout-profile == 1;
+    spacing: root.touch ? 6px : 3px;
     Chip { text: "" + (root.i + 1); font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; active: root.s.on; active-color: Theme.play; tooltip: "FX" + (root.unit + 1) + "-" + (root.i + 1) + " ON"; clicked => { FxState.toggled(root.unit, root.i); } }
     Dropdown {
         options: FxState.effects;
         current: root.s.effect;
         font-size: Theme.font-xs;
-        min-width: 56px;
+        min-width: root.touch ? 80px : 56px;
+        list-width: root.touch ? 6 * root.ctl-h : 0px;
         height: root.ctl-h;
         chose(e) => { FxState.effect-selected(root.unit, root.i, e); }
     }
-    Chip { text: root.s.beat-text; font-size: Theme.font-xs; min-width: 32px; max-width: 32px; horizontal-stretch: 0; height: root.ctl-h; active: root.target; tooltip: "Beat (lit: BEAT ◀ ▶ step this slot)"; clicked => { FxState.target-selected(root.unit, root.i); } }
+    Chip { text: root.s.beat-text; font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 32px; max-width: root.touch ? root.ctl-h : 32px; horizontal-stretch: 0; height: root.ctl-h; active: root.target; tooltip: "Beat (lit: BEAT ◀ ▶ step this slot)"; clicked => { FxState.target-selected(root.unit, root.i); } }
     Knob { width: root.ctl-h; height: root.ctl-h; value: root.s.level; edited(v) => { FxState.level-edited(root.unit, root.i, v); } }
 }
 
-/// One Beat FX unit, two rows of 20 px controls split into labelled groups: the unit chip, its three slots (MULTI mode)
+/// One Beat FX unit, two rows split into labelled groups: the unit chip, its three slots (MULTI mode)
 /// and the tempo; then BEAT ◀ ▶ (the target slot), TAP / AUTO / REL, the channel targets with FX PART, and the unit's
 /// MERGE FX side (preset, build-up, GO).
 component Unit inherits Rectangle {
     in property <int> n;
     property <FxUnit> u: FxState.units[root.n];
-    property <length> ctl-h: 20px;
+    property <bool> touch: Theme.layout-profile == 1;
+    property <length> ctl-h: root.touch ? Theme.touch-target : 20px;
+    property <length> button-w: root.touch ? Theme.touch-target : 32px;
     background: Theme.panel;
     HorizontalLayout {
         padding-left: 6px;
@@ -122,11 +127,11 @@ component Unit inherits Rectangle {
         spacing: 8px;
         VerticalLayout {
             alignment: center;
-            Chip { text: "FX" + (root.n + 1); font-size: Theme.font-xs; min-width: 36px; max-width: 36px; height: 46px; active: FxState.unit == root.n; tooltip: "Unit the keyboard edits"; clicked => { FxState.unit = root.n; } }
+            Chip { text: "FX" + (root.n + 1); font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 36px; max-width: root.touch ? root.ctl-h : 36px; height: root.touch ? 2 * root.ctl-h + 8px : 46px; active: FxState.unit == root.n; tooltip: "Unit the keyboard edits"; clicked => { FxState.unit = root.n; } }
         }
         VerticalLayout {
             alignment: center;
-            spacing: 6px;
+            spacing: root.touch ? 8px : 6px;
             if FxState.view == 0: HorizontalLayout {
                 height: root.ctl-h;
                 spacing: 10px;
@@ -172,11 +177,11 @@ component Unit inherits Rectangle {
                 Chip { text: "M" + (root.n + 1) + " " + u.merge-name; font-size: Theme.font-xs; min-width: 80px; horizontal-stretch: 0; height: root.ctl-h; enabled: FxState.merge-enabled; tooltip: "MERGE FX preset (click: next)"; clicked => { FxState.merge-preset(root.n, 1); } }
                 Rectangle { width: 6px; }
                 FxLabel { text: "BUILD-UP"; }
-                Fader { min-width: 60px; height: root.ctl-h; opacity: FxState.merge-enabled ? 1 : 0.4; value: u.merge-knob; edited(v) => { FxState.merge-knob(root.n, v); } }
+                Fader { min-width: root.touch ? 3 * root.ctl-h : 60px; height: root.ctl-h; opacity: FxState.merge-enabled ? 1 : 0.4; value: u.merge-knob; edited(v) => { FxState.merge-knob(root.n, v); } }
                 Chip {
                     text: "GO";
                     font-size: Theme.font-xs;
-                    min-width: 32px;
+                    min-width: root.button-w;
                     horizontal-stretch: 0;
                     height: root.ctl-h;
                     enabled: FxState.merge-enabled;
@@ -192,11 +197,11 @@ component Unit inherits Rectangle {
                 height: root.ctl-h;
                 spacing: 4px;
                 FxLabel { text: "SAMPLE"; }
-                Fader { min-width: 60px; height: root.ctl-h; detent: true; opacity: FxState.merge-enabled ? 1 : 0.4; value: u.merge-volume; edited(v) => { FxState.merge-volume(root.n, v); } }
+                Fader { min-width: root.touch ? 3 * root.ctl-h : 60px; height: root.ctl-h; detent: true; opacity: FxState.merge-enabled ? 1 : 0.4; value: u.merge-volume; edited(v) => { FxState.merge-volume(root.n, v); } }
             }
             if FxState.view != 2: HorizontalLayout {
                 height: root.ctl-h;
-                spacing: 10px;
+                spacing: root.touch ? 6px : 10px;
                 if FxState.view == 0: HorizontalLayout {
                     spacing: 3px;
                     horizontal-stretch: 0;
@@ -211,12 +216,12 @@ component Unit inherits Rectangle {
                     horizontal-stretch: 0;
                     FxLabel { text: "TEMPO"; }
                     Rectangle { width: 2px; }
-                    Chip { text: "TAP"; font-size: Theme.font-xs; min-width: 32px; horizontal-stretch: 0; height: root.ctl-h; tooltip: "Tap the tempo"; clicked => { FxState.tapped(root.n); } }
-                    Chip { text: "AUTO"; font-size: Theme.font-xs; min-width: 38px; horizontal-stretch: 0; height: root.ctl-h; active: !u.tapped; tooltip: "Follow the master deck's tempo"; clicked => { FxState.auto-beat(root.n); } }
+                    Chip { text: "TAP"; font-size: Theme.font-xs; min-width: root.button-w; horizontal-stretch: 0; height: root.ctl-h; tooltip: "Tap the tempo"; clicked => { FxState.tapped(root.n); } }
+                    Chip { text: "AUTO"; font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 38px; horizontal-stretch: 0; height: root.ctl-h; active: !u.tapped; tooltip: "Follow the master deck's tempo"; clicked => { FxState.auto-beat(root.n); } }
                     Chip {
                         text: "REL";
                         font-size: Theme.font-xs;
-                        min-width: 32px;
+                        min-width: root.button-w;
                         horizontal-stretch: 0;
                         height: root.ctl-h;
                         active: u.releasing;
@@ -234,8 +239,8 @@ component Unit inherits Rectangle {
                     for name[i] in DeckState.count == 4 ? ["1", "2", "3", "4", "M"] : ["1", "2", "M"]: Chip {
                         text: name;
                         font-size: Theme.font-xs;
-                        min-width: 22px;
-                        max-width: 22px;
+                        min-width: root.touch ? root.ctl-h : 22px;
+                        max-width: root.touch ? root.ctl-h : 22px;
                         horizontal-stretch: 0;
                         height: root.ctl-h;
                         tooltip: name == "M" ? "Apply to the master" : "Apply to channel " + name;
@@ -272,11 +277,11 @@ component Unit inherits Rectangle {
                         tooltip: "MERGE FX preset (click: next)";
                         clicked => { FxState.merge-preset(root.n, 1); }
                     }
-                    Fader { min-width: 40px; max-width: 80px; height: root.ctl-h; opacity: FxState.merge-enabled ? 1 : 0.4; value: u.merge-knob; edited(v) => { FxState.merge-knob(root.n, v); } }
+                    Fader { min-width: root.touch ? root.ctl-h : 40px; max-width: 80px; height: root.ctl-h; opacity: FxState.merge-enabled ? 1 : 0.4; value: u.merge-knob; edited(v) => { FxState.merge-knob(root.n, v); } }
                     Chip {
                         text: "GO";
                         font-size: Theme.font-xs;
-                        min-width: 30px;
+                        min-width: root.touch ? root.ctl-h : 30px;
                         horizontal-stretch: 0;
                         height: root.ctl-h;
                         enabled: FxState.merge-enabled;
@@ -293,25 +298,27 @@ component Unit inherits Rectangle {
 }
 
 /// FX panel, top to bottom: the effect-family tabs (they switch the area under them), FX1 | FX2 side by side (or the
-/// SEND / LEVER / MIC rack), and the COLOR FX row: type chips and each channel's COLOR knob. Fits `Theme.h-fx` (110 px).
+/// SEND / LEVER / MIC rack), and the COLOR FX controls. Touch stacks the units and separates COLOR type selection from its channel knobs.
 export component FxPanel inherits Rectangle {
+    property <bool> touch: Theme.layout-profile == 1;
+    property <length> ctl-h: root.touch ? Theme.touch-target : 20px;
     background: Theme.bg;
     VerticalLayout {
         spacing: 2px;
         Rectangle {
-            height: 26px;
+            height: root.touch ? root.ctl-h + 12px : 26px;
             background: Theme.panel;
             HorizontalLayout {
                 padding-left: 6px;
                 padding-right: 6px;
-                padding-top: 3px;
-                padding-bottom: 3px;
-                spacing: 2px;
+                padding-top: root.touch ? 6px : 3px;
+                padding-bottom: root.touch ? 6px : 3px;
+                spacing: root.touch ? 6px : 2px;
                 alignment: start;
                 for name[i] in ["BEAT FX", "RELEASE FX", "MERGE FX", "SEND FX", "LEVER FX", "MIC FX"]: Chip {
                     text: name;
                     font-size: Theme.font-xs;
-                    height: 20px;
+                    height: root.ctl-h;
                     min-width: self.fit-width + 16px;
                     horizontal-stretch: 0;
                     active: FxState.view == i;
@@ -319,17 +326,25 @@ export component FxPanel inherits Rectangle {
                 }
             }
         }
-        HorizontalLayout {
-            height: 54px;
-            spacing: 2px;
-            if FxState.view < 3: Unit { n: 0; }
-            if FxState.view < 3: Unit { n: 1; }
-            if FxState.view >= 3: FxRack { rack: FxState.view - 3; }
+        Rectangle {
+            height: root.touch ? 4 * root.ctl-h + 20px : 54px;
+            if !root.touch: HorizontalLayout {
+                spacing: 2px;
+                if FxState.view < 3: Unit { n: 0; }
+                if FxState.view < 3: Unit { n: 1; }
+                if FxState.view >= 3: FxRack { rack: FxState.view - 3; }
+            }
+            if root.touch: VerticalLayout {
+                spacing: 4px;
+                if FxState.view < 3: Unit { n: 0; }
+                if FxState.view < 3: Unit { n: 1; }
+                if FxState.view >= 3: FxRack { rack: FxState.view - 3; }
+            }
         }
         Rectangle {
-            height: 26px;
+            height: root.touch ? 2 * root.ctl-h + 10px : 26px;
             background: Theme.panel;
-            HorizontalLayout {
+            if !root.touch: HorizontalLayout {
                 padding-left: 6px;
                 padding-right: 8px;
                 padding-top: 3px;
@@ -361,6 +376,53 @@ export component FxPanel inherits Rectangle {
                         stop: MixerState.cfx-stop;
                         value: MixerState.channels[n].knobs[4];
                         edited(v) => { MixerState.knob(n, 4, v); }
+                    }
+                }
+            }
+            if root.touch: VerticalLayout {
+                padding: 4px;
+                spacing: 2px;
+                HorizontalLayout {
+                    height: root.ctl-h;
+                    spacing: 8px;
+                    FxLabel { text: "COLOR FX"; }
+                    Flickable {
+                        content-width: max(self.width, color-types.preferred-width);
+                        content-height: self.height;
+                        color-types := HorizontalLayout {
+                            width: parent.content-width;
+                            height: root.ctl-h;
+                            spacing: 6px;
+                            for name[i] in MixerState.cfx-names: Chip {
+                                text: name;
+                                tooltip: name;
+                                font-size: Theme.font-xs;
+                                height: root.ctl-h;
+                                min-width: max(root.ctl-h, self.fit-width + 12px);
+                                active: MixerState.cfx-type == i;
+                                active-color: Theme.cue;
+                                clicked => { MixerState.cfx-selected(i); }
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    height: root.ctl-h;
+                    spacing: 12px;
+                    alignment: start;
+                    for n in DeckState.count: HorizontalLayout {
+                        spacing: 6px;
+                        horizontal-stretch: 0;
+                        FxLabel { text: "CH " + (n + 1); }
+                        Knob {
+                            width: root.ctl-h;
+                            height: root.ctl-h;
+                            detent: true;
+                            arc-color: Theme.cue;
+                            stop: MixerState.cfx-stop;
+                            value: MixerState.channels[n].knobs[4];
+                            edited(v) => { MixerState.knob(n, 4, v); }
+                        }
                     }
                 }
             }

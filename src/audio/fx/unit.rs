@@ -1,14 +1,15 @@
-//! The unit: audio-thread state around a list of [`Stage`]s, with the engage ramp, tempo slew, knob smoothing, trails and
-//! idle detection they share. Everything is allocated in [`Unit::new`] / [`Unit::rack`]. A Beat FX unit holds the nine
-//! built-ins and one stage per Beat FX plugin; a rack holds one stage per plugin effect of another slot (mic, send,
-//! lever, fader) and nothing built in. A unit is either a whole-channel unit (the engine's [`Unit::apply`]) or one its
-//! owner feeds frame by frame (`set` / `process` / `release`: a voice's stem part, the mic, the send bus, a fader).
+//! The selected effect's audio-thread state: engage ramp, tempo slew, knob smoothing, trails and idle detection.
+//! Stage replacements are prepared by one shared worker and exchanged without waiting in [`Unit::set`].
+//! A pending selection passes audio through until its stage is ready; the old selection is never activated.
 
+use super::prepare::{Exchange, Prepared, Worker};
 use super::{
     Assign, BEATS, Controls, Ctx, DEFAULT_BEAT, Effect, FALLBACK_BPM, Frame, MAX_DELAY_S, Settings,
     Stage, echo, filter, finite, flanger, moved, phaser, ramp, reverb, roll, trans,
 };
 use crate::plugin::effect::{Effect as PluginEffect, Slot};
+use std::sync::Arc;
+use std::sync::atomic::Ordering::Release;
 
 const ENGAGE_S: f32 = 0.005;
 const TEMPO_SLEW_S: f32 = 0.03;
@@ -16,7 +17,7 @@ const TEMPO_SLEW_S: f32 = 0.03;
 const KNOB_S: f32 = 0.01;
 
 /// The stage of selector entry `e`; plugin effects come from `plugins`.
-fn stage(e: Effect, rate: u32, plugins: &[PluginEffect]) -> Box<dyn Stage> {
+pub(super) fn stage(e: Effect, rate: u32, plugins: &[PluginEffect]) -> Box<dyn Stage> {
     match e {
         Effect::Echo => Box::new(echo::Echo::echo(rate)),
         Effect::Delay => Box::new(echo::Echo::delay(rate)),
@@ -33,11 +34,11 @@ fn stage(e: Effect, rate: u32, plugins: &[PluginEffect]) -> Box<dyn Stage> {
 
 pub struct Unit {
     rate: f32,
-    /// One per selector entry, in [`Effect::index`] order (a rack: its slot's order). May be empty (a rack of a slot no
-    /// plugin fills): the unit then stays idle.
-    stages: Vec<Box<dyn Stage>>,
-    /// Index into `stages` of `s.effect`.
-    cur: usize,
+    stage: Option<Prepared>,
+    len: usize,
+    exchange: Arc<Exchange>,
+    worker: Arc<Worker>,
+    pending: bool,
     s: Settings,
     g: f32,
     ramp: f32,
@@ -58,32 +59,43 @@ impl Unit {
         Unit::with(rate, crate::plugin::registry().slot(Slot::Beat))
     }
 
-    /// A unit with the built-ins and `plugins` as the plugin effects.
+    /// A Beat FX unit with `plugins` after the built-ins.
     pub(crate) fn with(rate: u32, plugins: &[PluginEffect]) -> Unit {
-        Unit::of(
-            rate,
-            (0..Effect::ALL.len() + plugins.len())
-                .map(|i| stage(Effect::from_index_in(i, plugins.len()), rate, plugins))
-                .collect(),
-        )
+        Unit::of(rate, true, plugins)
     }
 
-    /// A rack: one stage per plugin effect of `slot`, selected by [`Controls::set_index`].
+    /// A rack of plugin effects of `slot`, selected by [`Controls::set_index`].
     pub fn rack(slot: Slot, rate: u32) -> Unit {
         Unit::rack_with(rate, crate::plugin::registry().slot(slot))
     }
 
     /// A rack of `effects`.
     pub(crate) fn rack_with(rate: u32, effects: &[PluginEffect]) -> Unit {
-        Unit::of(rate, effects.iter().map(|e| e.stage(rate)).collect())
+        Unit::of(rate, false, effects)
     }
 
-    fn of(rate: u32, stages: Vec<Box<dyn Stage>>) -> Unit {
+    fn of(rate: u32, beat: bool, effects: &[PluginEffect]) -> Unit {
         let r = rate as f32;
+        let len = if beat {
+            Effect::ALL.len() + effects.len()
+        } else {
+            effects.len()
+        };
+        let selected = if beat {
+            Some(stage(Effect::Echo, rate, effects))
+        } else {
+            effects.first().map(|e| e.stage(rate))
+        };
+        let exchange = Exchange::new(rate, beat, effects);
+        let worker = Worker::shared();
+        worker.register(exchange.clone());
         Unit {
             rate: r,
-            stages,
-            cur: 0,
+            stage: selected.map(|stage| Prepared { index: 0, stage }),
+            len,
+            exchange,
+            worker,
+            pending: false,
             s: Settings {
                 effect: 0,
                 beats: BEATS[DEFAULT_BEAT],
@@ -104,13 +116,35 @@ impl Unit {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn prepare(&mut self, effect: usize) {
+        use std::time::{Duration, Instant};
+        if self.is_empty() {
+            return;
+        }
+        let desired = effect.min(self.len - 1);
+        self.exchange.desired.store(desired, Release);
+        self.worker.wake();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let previous = self.s;
+        loop {
+            self.set(Settings { effect, ..previous });
+            if !self.pending {
+                self.s = previous;
+                return;
+            }
+            assert!(Instant::now() < deadline, "FX preparation timed out");
+            std::thread::sleep(Duration::from_micros(100));
+        }
+    }
+
     /// Effects this unit can select.
     pub fn len(&self) -> usize {
-        self.stages.len()
+        self.len
     }
 
     pub fn is_empty(&self) -> bool {
-        self.stages.is_empty()
+        self.len == 0
     }
 
     /// Off, faded out and every trail below [`QUIET`]: [`Unit::process`] would return its input unchanged.
@@ -120,19 +154,37 @@ impl Unit {
 
     /// Takes the knob values for the next frames: effect switch, ON edge, tempo.
     pub(crate) fn set(&mut self, s: Settings) {
-        if self.stages.is_empty() {
+        if self.is_empty() {
             return;
         }
-        let idle = self.idle();
-        let (changed, edge) = (s.effect != self.s.effect, s.on && !self.s.on);
-        // An entry the unit was not built with (a different plugin list) falls back to the last stage.
-        self.cur = s.effect.min(self.stages.len() - 1);
-        let st = &mut self.stages[self.cur];
-        if changed || (edge && idle) {
-            st.reset();
+        let desired = s.effect.min(self.len - 1);
+        if self.exchange.desired.swap(desired, Release) != desired {
+            self.worker.wake();
         }
-        if (changed || edge) && s.on {
-            st.engage();
+        let mut installed = false;
+        self.pending = self.stage.as_ref().is_none_or(|p| p.index != desired);
+        if self.pending {
+            if let Ok(mut h) = self.exchange.handoff.try_lock() {
+                if h.retired.is_none() && h.ready.as_ref().is_some_and(|p| p.index == desired) {
+                    h.retired = self.stage.take();
+                    self.stage = h.ready.take();
+                    self.exchange.active.store(desired, Release);
+                    self.pending = false;
+                    installed = true;
+                    self.worker.wake();
+                }
+            }
+        }
+        let idle = self.idle();
+        let (changed, edge) = (installed || s.effect != self.s.effect, s.on && !self.s.on);
+        if !self.pending {
+            let st = &mut self.stage.as_mut().unwrap().stage;
+            if changed || (edge && idle) {
+                st.reset();
+            }
+            if (changed || edge) && s.on {
+                st.engage();
+            }
         }
         if edge {
             self.quiet = 0;
@@ -156,8 +208,8 @@ impl Unit {
 
     /// Drop everything and idle at once (the unit's controls moved to a stem part: [`Unit::apply`] must not touch it).
     fn silence(&mut self) {
-        if let Some(st) = self.stages.get_mut(self.cur) {
-            st.reset();
+        if let Some(st) = &mut self.stage {
+            st.stage.reset();
         }
         self.s.on = false;
         self.g = 0.0;
@@ -166,9 +218,13 @@ impl Unit {
 
     /// One frame through the current effect (the voice's stem-part path calls it per frame).
     pub fn process(&mut self, x: Frame) -> Frame {
-        let Some(st) = self.stages.get_mut(self.cur) else {
+        if self.pending {
+            return x;
+        }
+        let Some(selected) = &mut self.stage else {
             return x;
         };
+        let st = &mut selected.stage;
         let s = self.s;
         let want = if s.on { 1.0 } else { 0.0 };
         self.g = ramp(self.g, want, self.ramp);
@@ -228,6 +284,97 @@ impl Unit {
                     }
                 }
             }
+        }
+    }
+}
+
+impl Drop for Unit {
+    fn drop(&mut self) {
+        self.worker.retire(&self.exchange, self.stage.take());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
+    #[test]
+    fn shutdown_destroys_the_current_stage_on_the_worker() {
+        let mut u = Unit::new(48_000);
+        let (tx, rx) = mpsc::channel();
+        u.stage = Some(Prepared {
+            index: 0,
+            stage: Box::new(Probe(tx)),
+        });
+        drop(u);
+        let destroyed_on = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_ne!(destroyed_on, thread::current().id());
+    }
+
+    struct Probe(mpsc::Sender<thread::ThreadId>);
+
+    impl Stage for Probe {
+        fn tick(&mut self, _: Frame, _: &Ctx) -> Frame {
+            panic!("a pending selection ran the previous stage");
+        }
+        fn reset(&mut self) {}
+    }
+
+    impl Drop for Probe {
+        fn drop(&mut self) {
+            self.0.send(thread::current().id()).unwrap();
+        }
+    }
+
+    #[test]
+    fn rapid_selection_and_pending_on_off_use_only_the_latest_stage() {
+        for final_on in [false, true] {
+            let mut u = Unit::new(48_000);
+            let (tx, rx) = mpsc::channel();
+            u.stage = Some(Prepared {
+                index: 0,
+                stage: Box::new(Probe(tx)),
+            });
+            let exchange = u.exchange.clone();
+            let handoff = exchange.handoff.lock().unwrap();
+            let mut s = Settings {
+                effect: Effect::Lpf.index(),
+                beats: 0.25,
+                level: 1.0,
+                knob: 0.5,
+                on: true,
+                bpm: 120.0,
+            };
+            u.set(s);
+            assert_eq!(u.process([0.4, -0.3]), [0.4, -0.3]);
+            s.effect = Effect::Trans.index();
+            s.on = false;
+            u.set(s);
+            s.on = final_on;
+            u.set(s);
+            assert_eq!(u.process([0.4, -0.3]), [0.4, -0.3]);
+            drop(handoff);
+            u.prepare(s.effect);
+            u.set(s);
+            let out: Vec<_> = (0..6000).map(|_| u.process([0.4, -0.3])).collect();
+            if final_on {
+                assert!(out[1000][0] > 0.39, "the latest gate opens");
+                assert!(out[4500][0].abs() < 0.01, "the latest gate closes");
+            } else {
+                assert!(
+                    out.iter().all(|&x| x == [0.4, -0.3]),
+                    "pending OFF never activates"
+                );
+            }
+            let destroyed_on = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert_ne!(
+                destroyed_on,
+                thread::current().id(),
+                "retired stages are destroyed by the worker"
+            );
         }
     }
 }

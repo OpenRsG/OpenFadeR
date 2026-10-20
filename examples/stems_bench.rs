@@ -46,10 +46,9 @@ fn main() {
     let pcm = std::sync::Arc::new(audio::Track16::from(pcm)); // the deck's own form: 16-bit, shared with the job
     let job = Job::start(path, pcm.clone(), quality, true);
     job.focus(play, &[]);
-    let stems = job.stems().clone();
     let mut usable = None;
     let result = loop {
-        if usable.is_none() && stems.ready(play) {
+        if usable.is_none() && job.stems().is_some_and(|s| s.ready(play)) {
             usable = Some(t0.elapsed());
         }
         if let Some(r) = job.poll() {
@@ -59,6 +58,7 @@ fn main() {
     };
     let total = t0.elapsed();
     result.expect("separation");
+    let stems = job.stems().expect("allocated stems");
     println!(
         "{:?} {:.1} min: stems usable at the play position after {:.1} s, whole track after {:.1} s = {:.1} s per audio minute",
         quality,
@@ -81,7 +81,7 @@ fn main() {
             |i| {
                 Mixed {
                     pcm: &pcm,
-                    stems: &stems,
+                    stems,
                     gain: only,
                 }
                 .frame_at(i as f64)
@@ -95,7 +95,7 @@ fn main() {
             |i| {
                 Mixed {
                     pcm: &pcm,
-                    stems: &stems,
+                    stems,
                     gain: muted,
                 }
                 .frame_at(i as f64)

@@ -27,6 +27,13 @@ pub(super) fn resolve(track: Option<&Track>, pcm: &Pcm) -> (f32, f32) {
     (analysed, stored.adjust_db)
 }
 
+pub(super) fn stored(track: Option<&Track>) -> (f32, f32) {
+    let gain = track
+        .and_then(|t| store::global().gain(&store::key(t)).ok().flatten())
+        .unwrap_or_default();
+    (gain.analysed_db.unwrap_or(0.0), gain.adjust_db)
+}
+
 impl Deck {
     /// AUTO GAIN hook for the mixer: the gain in dB that evens out this deck's track, analysed + adjustment within +-12 dB
     /// (0 when nothing is loaded).

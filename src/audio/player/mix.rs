@@ -585,6 +585,7 @@ mod tests {
     /// Counts the allocations of the thread that reads it, so a test can prove a stretch of code makes none.
     struct Counting;
     thread_local!(static ALLOCS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
+    thread_local!(static DEALLOCS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
     // SAFETY: forwards every call unchanged to `System`; the counter is a plain thread-local `Cell`.
     unsafe impl std::alloc::GlobalAlloc for Counting {
         unsafe fn alloc(&self, l: std::alloc::Layout) -> *mut u8 {
@@ -592,6 +593,7 @@ mod tests {
             unsafe { std::alloc::System.alloc(l) }
         }
         unsafe fn dealloc(&self, p: *mut u8, l: std::alloc::Layout) {
+            DEALLOCS.with(|c| c.set(c.get() + 1));
             unsafe { std::alloc::System.dealloc(p, l) }
         }
         unsafe fn realloc(&self, p: *mut u8, l: std::alloc::Layout, n: usize) -> *mut u8 {
@@ -645,6 +647,48 @@ mod tests {
         }
         assert_eq!(ALLOCS.with(|c| c.get()) - before, 0);
         assert!(out.iter().any(|&s| s != 0.0), "the decks are audible");
+    }
+
+    #[test]
+    fn effect_selection_and_activation_allocate_and_destroy_nothing_in_the_callback() {
+        let plugins = crate::plugin::effect::fake_effects();
+        let mut units: [fx::Unit; 10] = std::array::from_fn(|_| fx::Unit::with(48_000, &plugins));
+        let controls: [fx::Controls; 10] = std::array::from_fn(|_| fx::Controls::default());
+        let mut buf = vec![vec![([0.4; 2], [0.7; 2]); 6000]; 4];
+        for c in &controls {
+            c.set_assign(fx::Assign::A);
+            c.set_beat(2);
+            c.set_level(1.0);
+        }
+        for effect in [
+            fx::Effect::Reverb,
+            fx::Effect::Delay,
+            fx::Effect::Plugin(0),
+            fx::Effect::Trans,
+        ] {
+            for c in &controls {
+                c.set_effect(effect);
+                c.set_on(true);
+            }
+            for _ in 0..30 {
+                buf[0].fill(([0.4; 2], [0.7; 2]));
+                let before = (ALLOCS.with(|c| c.get()), DEALLOCS.with(|c| c.get()));
+                for (u, c) in units.iter_mut().zip(&controls) {
+                    u.apply(c, &mut buf, 6000);
+                }
+                let after = (ALLOCS.with(|c| c.get()), DEALLOCS.with(|c| c.get()));
+                assert_eq!(
+                    after, before,
+                    "{effect:?} selection/activation touched the allocator"
+                );
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+        assert!(
+            buf[0].iter().any(|f| f.0[0].abs() < 0.01),
+            "the selected gates became audible"
+        );
+        assert!(buf.iter().flatten().all(|f| f.1 == [0.7; 2]));
     }
 
     #[test]

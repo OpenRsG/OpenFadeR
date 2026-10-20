@@ -149,12 +149,13 @@ export global DeviceState {
 export component PickList inherits Rectangle {
     in property <[PickRow]> rows;
     callback toggled(int);
+    min-height: Theme.layout-profile == 1 ? 4 * Theme.target-size(Theme.h-row) : 0px;
     background: Theme.bg-deep;
     border-color: Theme.line-strong;
     border-width: 1px;
     ListView {
         for row[i] in root.rows: Rectangle {
-            height: Theme.h-row;
+            height: Theme.target-size(Theme.h-row);
             background: area.has-hover ? Theme.hover-row : transparent;
             HorizontalLayout {
                 padding-left: Theme.space-md + row.depth * 16px;

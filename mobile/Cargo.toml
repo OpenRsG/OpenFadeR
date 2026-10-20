@@ -1,0 +1,34 @@
+[package]
+name = "openfader-mobile"
+version = "0.2.1"
+edition = "2024"
+publish = false
+
+[features]
+preview = []
+
+[lib]
+name = "openfader_mobile"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "openfader-mobile"
+path = "src/main.rs"
+
+required-features = ["preview"]
+[dependencies]
+openfader = { path = "..", default-features = false }
+slint = { version = "=1.18.1", default-features = false, features = ["std", "compat-1-18", "renderer-software", "accessibility"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+slint = { version = "=1.18.1", default-features = false, features = ["backend-android-activity-06"] }
+jni = "0.21"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+slint = { version = "=1.18.1", default-features = false, features = ["backend-winit-x11"] }
+
+[build-dependencies]
+slint-build = "=1.18.1"
+
+[profile.release]
+strip = "symbols"

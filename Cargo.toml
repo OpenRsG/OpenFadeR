@@ -5,7 +5,8 @@ edition = "2024"
 
 [features]
 default = ["app"]
-app = ["dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend"]
+app = ["stems", "dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend"]
+stems = ["dep:ort"]
 
 [[bin]]
 name = "openfader"
@@ -21,7 +22,7 @@ parking_lot = "0.12"
 # winit access: files dropped on the window (X11 / Windows / macOS) and the Wayland display for our own drag-and-drop (src/app/drop/).
 slint = { version = "1.17", optional = true, features = ["unstable-winit-030", "raw-window-handle-06"] }
 midir = { version = "0.11.1", optional = true }
-ort = { version = "2.0.0-rc.14", default-features = false, features = ["std", "download-binaries", "tls-native", "copy-dylibs", "api-31", "webgpu"] }
+ort = { version = "2.0.0-rc.14", optional = true, default-features = false, features = ["std", "download-binaries", "tls-native", "copy-dylibs", "api-31", "webgpu"] }
 ureq = "3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -38,6 +39,13 @@ openfader-ui = { path = "ui", optional = true } # the Slint UI, built as its own
 alsa = "0.9"
 wayland-client = { version = "0.31", optional = true }
 wayland-backend = { version = "0.3", optional = true, features = ["client_system"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+cpal = { version = "0.15", features = ["oboe-shared-stdcxx"] }
+
+[[example]]
+name = "stems_bench"
+required-features = ["stems"]
 
 # Free space of a mount (statvfs), the macOS volume list (getfsstat) and the background priority of the analysis threads.
 [target.'cfg(unix)'.dependencies]

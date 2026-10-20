@@ -1,0 +1,160 @@
+import { CheckBox, ComboBox, LineEdit, ListView, ScrollView } from "std-widgets.slint";
+import { Theme, DeckState, DeckView, LibraryState, MixerState } from "state.slint";
+import { DJButton, Control, Meter, Icon } from "widgets.slint";
+
+export component LibraryPanel inherits Rectangle {
+    background: Theme.bg-deep;
+    VerticalLayout {
+        padding: 12px; spacing: 8px;
+        HorizontalLayout {
+            height: 44px; spacing: 6px;
+            Text { min-width: 0px; text: "Library · " + LibraryState.tracks.length; color: Theme.text-bright; font-size: 18px; font-weight: 700; overflow: elide; }
+            DJButton {
+                width: root.width < 480px ? 100px : 168px; icon: Icon.folder; text: LibraryState.busy ? "Busy…" : root.width < 480px ? "Import" : "Import music…"; label: "Import music";
+                enabled: !LibraryState.busy; clicked => { LibraryState.import-music(); }
+            }
+        }
+        LineEdit { height: 44px; placeholder-text: "Search title or artist"; text <=> LibraryState.query; edited(v) => { LibraryState.search(v); } }
+        if LibraryState.tracks.length == 0: Text {
+            text: LibraryState.busy ? "Copying the selected files into your library…" : LibraryState.query == "" ? "Import audio files from this device, then load deck A or B. Your originals stay unchanged." : "No tracks match this search.";
+            color: Theme.text; font-size: 16px; wrap: word-wrap; vertical-alignment: center;
+        }
+        ListView {
+            for track in LibraryState.tracks: Rectangle {
+                height: 68px; background: mod(track.index, 2) == 0 ? Theme.bg-deep : Theme.row-alt;
+                HorizontalLayout {
+                    padding: 6px; spacing: 8px;
+                    VerticalLayout {
+                        min-width: 0px; alignment: center; spacing: 3px;
+                        Text { text: track.title; color: Theme.text-bright; font-size: 16px; font-weight: 600; overflow: elide; }
+                        Text { text: track.artist; color: Theme.text; font-size: 14px; overflow: elide; }
+                    }
+                    DJButton {
+                        width: root.width < 480px ? 44px : 76px; text: root.width < 480px ? "A" : "Load A"; tone: Theme.deck1;
+                        enabled: !DeckState.decks[0].playing && !DeckState.decks[0].loading;
+                        label: "Load " + track.title + " to deck A";
+                        clicked => { LibraryState.load(0, track.index); }
+                    }
+                    DJButton {
+                        width: root.width < 480px ? 44px : 76px; text: root.width < 480px ? "B" : "Load B"; tone: Theme.deck2;
+                        enabled: !DeckState.decks[1].playing && !DeckState.decks[1].loading;
+                        label: "Load " + track.title + " to deck B";
+                        clicked => { LibraryState.load(1, track.index); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component MixerPanel inherits ScrollView {
+    VerticalLayout {
+        padding: 16px; spacing: 12px; alignment: start;
+        Text { text: "Mixer & output"; color: Theme.text-bright; font-size: 20px; font-weight: 700; }
+        HorizontalLayout {
+            spacing: 16px;
+            for deck[i] in DeckState.decks: Rectangle {
+                height: 72px; background: Theme.bg-deep;
+                VerticalLayout {
+                    padding: 8px; spacing: 4px;
+                    Text { text: (i == 0 ? "A · " : "B · ") + deck.title; color: i == 0 ? Theme.deck1 : Theme.deck2; font-size: 16px; font-weight: 600; overflow: elide; }
+                    Text { text: deck.playing ? "Playing · " + deck.bpm + " BPM" : "Paused"; color: Theme.text; font-size: 14px; }
+                    Meter { height: 6px; level: deck.level; segments: 20; }
+                }
+            }
+        }
+        Control { label: "Crossfader · A to B"; value: MixerState.crossfade; moved(v) => { MixerState.change-crossfade(v); } }
+        HorizontalLayout {
+            DJButton { width: 170px; text: "Center crossfader"; clicked => { MixerState.change-crossfade(0.5); } }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        Control { label: "Master level · " + round(MixerState.master * 100) + "%"; value: MixerState.master; moved(v) => { MixerState.change-master(v); } }
+        CheckBox { height: 44px; text: "Split output for cue headphones"; checked: MixerState.split; toggled => { MixerState.change-split(self.checked); } }
+        Text { text: "DJ splitter cable: mono cue on the left, mono master on the right. Turn split off for normal stereo playback. Android manages the output device and system volume."; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 16px;
+            CheckBox { height: 44px; text: "Cue A"; accessible-label: "Headphone cue deck A"; checked: MixerState.headphones[0]; toggled => { MixerState.change-headphones(0, self.checked); } }
+            CheckBox { height: 44px; text: "Cue B"; accessible-label: "Headphone cue deck B"; checked: MixerState.headphones[1]; toggled => { MixerState.change-headphones(1, self.checked); } }
+        }
+    }
+}
+
+component DeckTools inherits ScrollView {
+    in property <int> index;
+    property <DeckView> deck: DeckState.decks[root.index];
+    VerticalLayout {
+        padding: 12px; spacing: 8px; alignment: start;
+        Text { text: (root.index == 0 ? "Deck A · " : "Deck B · ") + root.deck.title; color: root.index == 0 ? Theme.deck1 : Theme.deck2; font-size: 18px; font-weight: 700; overflow: elide; }
+        Text { text: "Transport & beat controls"; color: Theme.text-bright; font-size: 16px; font-weight: 600; }
+        HorizontalLayout {
+            height: 44px; spacing: 4px;
+            DJButton { text: "SYNC"; enabled: root.deck.ready; clicked => { DeckState.sync(root.index); } }
+            ComboBox {
+                height: 44px; min-width: 64px; model: ["1 beat", "2 beats", "4 beats", "8 beats", "16 beats"];
+                current-index: root.deck.loop-index; accessible-label: "Loop length in beats";
+                selected(v) => { DeckState.loop-size(root.index, self.current-index); }
+            }
+            DJButton {
+                width: 44px; icon: Icon.loop; active: root.deck.looping; enabled: root.deck.ready;
+                label: root.deck.looping ? "Exit beat loop" : "Enable beat loop";
+                clicked => { DeckState.loop(root.index, root.deck.loop-index); }
+            }
+        }
+        Control { label: "Tempo · " + round(root.deck.tempo * 10) / 10 + "%"; minimum: -16; maximum: 16; value: root.deck.tempo; moved(v) => { DeckState.tempo(root.index, v); } }
+        Control { label: "Channel level · " + round(root.deck.gain * 100) + "%"; value: root.deck.gain; moved(v) => { DeckState.mix(root.index, 0, v); } }
+        Control { label: "Low EQ · " + round(root.deck.low * 10) / 10 + " dB"; minimum: -26; maximum: 6; value: root.deck.low; moved(v) => { DeckState.mix(root.index, 1, v); } }
+        Control { label: "Mid EQ · " + round(root.deck.mid * 10) / 10 + " dB"; minimum: -26; maximum: 6; value: root.deck.mid; moved(v) => { DeckState.mix(root.index, 2, v); } }
+        Control { label: "High EQ · " + round(root.deck.high * 10) / 10 + " dB"; minimum: -26; maximum: 6; value: root.deck.high; moved(v) => { DeckState.mix(root.index, 3, v); } }
+        Text { text: "Color FX"; color: Theme.text-bright; font-size: 16px; font-weight: 600; }
+        ComboBox {
+            height: 44px; model: ["Filter", "Space", "Dub echo", "Sweep", "Noise", "Crush"];
+            current-index: root.deck.effect; accessible-label: "Color effect deck " + (root.index == 0 ? "A" : "B");
+            selected(v) => { DeckState.effect(root.index, self.current-index); }
+        }
+        Control { label: "Effect amount · " + round(root.deck.amount * 100) + "% · center is off"; minimum: -1; maximum: 1; value: root.deck.amount; moved(v) => { DeckState.mix(root.index, 4, v); } }
+        DJButton { text: "Reset EQ & effect"; clicked => { DeckState.mix(root.index, 5, 0); } }
+        DJButton { text: root.deck.key-lock ? "Key lock on" : "Key lock off"; icon: Icon.lock; active: root.deck.key-lock; enabled: root.deck.ready; clicked => { DeckState.key-lock(root.index); } }
+        Text { text: "Hot cue pad action"; color: Theme.text-bright; font-size: 16px; font-weight: 600; }
+        ComboBox {
+            height: 44px; model: ["Jump / set empty", "Set / overwrite", "Clear saved cue"];
+            current-index: root.deck.cue-mode; accessible-label: "Hot cue action deck " + (root.index == 0 ? "A" : "B");
+            selected(v) => { DeckState.cue-mode(root.index, self.current-index); }
+        }
+        Text { text: "Use the Pads bank between the decks. Set overwrites a pad; Clear removes its saved cue."; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+    }
+}
+
+export component EffectsPanel inherits Rectangle {
+    property <int> selected-deck;
+    if root.width >= 640px: HorizontalLayout {
+        spacing: 2px;
+        DeckTools { index: 0; }
+        Rectangle { width: 1px; background: Theme.line; }
+        DeckTools { index: 1; }
+    }
+    if root.width < 640px: VerticalLayout {
+        spacing: 2px;
+        HorizontalLayout {
+            height: 44px; spacing: 2px;
+            DJButton { text: "Deck A"; active: root.selected-deck == 0; tone: Theme.deck1; clicked => { root.selected-deck = 0; } }
+            DJButton { text: "Deck B"; active: root.selected-deck == 1; tone: Theme.deck2; clicked => { root.selected-deck = 1; } }
+        }
+        DeckTools { index: root.selected-deck; }
+    }
+}
+
+export component HelpPanel inherits ScrollView {
+    VerticalLayout {
+        padding: 16px; spacing: 12px; alignment: start;
+        Text { text: "Controls & help"; color: Theme.text-bright; font-size: 20px; font-weight: 700; }
+        Text { text: "Load & perform"; color: Theme.text-bright; font-size: 16px; font-weight: 600; }
+        Text { text: "Library imports files from Android's document picker into private storage. Load A and B, then return to Decks. Pause a deck before replacing its track. Tap its play button to start or pause. CUE jumps to the memory cue; SET CUE saves the current point."; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+        Text { text: "Seek, tempo & loops"; color: Theme.text-bright; font-size: 16px; font-weight: 600; }
+        Text { text: "Tap or drag a waveform to seek. Drag a platter horizontally for relative jog seeking; this is not scratching. Seeking exits an active loop. The pitch fader spans ±16%: up slows down, down speeds up. Key lock keeps pitch steady. Choose a beat length and tap the loop button to enter or exit."; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+        Text { text: "Sync & hot cues"; color: Theme.text-bright; font-size: 16px; font-weight: 600; }
+        Text { text: "SYNC matches the other loaded deck's tempo and beat phase once; it is not a continuously engaged sync mode. It needs detected grids and a tempo inside ±16%. Mixer / Pads switches the center bank. Empty pads save a cue; saved pads jump to it. More → Deck controls & FX also offers explicit Set and Clear pad actions. On short displays, the same More view keeps sync, beat loops and key lock reachable while both platters remain visible."; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+        Text { text: "Output & interruptions"; color: Theme.text-bright; font-size: 16px; font-weight: 600; }
+        Text { text: "The center mixer controls channel levels, headphone cues and the crossfader. More → Mixer, output & headphones has master level and split output for a DJ splitter cable: left is mono cue, right is mono master. Use normal stereo without a splitter. Wired output avoids Bluetooth's extra latency."; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+        Text { text: "Switching away, losing audio focus or disconnecting headphones pauses playback. Returning never resumes it automatically. Keep this app in the foreground. Imported files, analysis and cues survive restart, but uninstalling deletes them. Back up before uninstalling or changing signing keys."; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+    }
+}

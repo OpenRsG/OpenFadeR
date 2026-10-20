@@ -44,7 +44,7 @@ use std::{
     path::PathBuf,
     rc::{Rc, Weak},
     sync::Arc,
-    sync::mpsc::{Receiver, TryRecvError},
+    sync::mpsc::TryRecvError,
 };
 
 /// Beat counts of a deck capture and the one selected at start.
@@ -104,7 +104,7 @@ impl Default for Cfg {
 struct Pending {
     slot: usize,
     bpm: f32,
-    rx: Receiver<Result<Pcm, String>>,
+    rx: audio::DecodeJob,
 }
 /// Slots to fill from a sample pack ([`load_bank`]): (slot, file, BPM), decoded one after the other.
 type Bank = VecDeque<(usize, PathBuf, f32)>;

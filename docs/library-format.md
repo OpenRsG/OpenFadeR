@@ -5,7 +5,7 @@ Two things are documented here, so other tools can read and write a collection w
 1. the **open export** (File > Export Collection): a JSON file, a CSV table and an M3U8 playlist;
 2. the **library database** `store.db`, the SQLite file that holds the Collection itself.
 
-The export is the stable interface. The database is documented as it is today (schema version 14); it can only grow:
+The export is the stable interface. The database is documented as it is today (schema version 16); it can only grow:
 migrations append columns and tables, they never rename or reuse one.
 
 ## 1. Open export
@@ -85,6 +85,7 @@ copy as `store.db`). Edit it only with the app closed.
 Every track of the Collection is a row of `collection`, and its key is **`t<id>`** (`collection.id`). Tables that say
 "key" below hold that string. Edits made before a track had an id (and tracks of a device that are not in the Collection)
 use a legacy key: `<file name>|<size>` or `meta|<title>|<artist>`.
+Descriptive edits require an id or file: changing the title or artist of a `meta|title|artist` track would change its key.
 
 ### Collection
 
@@ -109,7 +110,11 @@ Also: `removed(id)` (tracks of a source the user removed), `relocated(orig, path
 
 ### Edits by track key (table `track` and children)
 
-`track(key, rating, comment, color, cues_set, grid, grid_orig)`: a null column means no edit, the source's value stands.
+`track(key, rating, comment, color, cues_set, grid, grid_orig, title, artist, album, genre, label)`: a null column means no
+edit, the source's value stands. An empty text value explicitly clears that field. The title, artist, album, genre, label
+and comment overrides are saved together as one atomic edit and one undo step; they do not alter the `collection` row or file tags.
+The library overlay applies these fields along with rating and comment, so exports use the edited values. Source libraries
+are unchanged unless an existing two-way connection writes back the edits.
 `rating` 0..=5. `color` 1..=8 (1 Pink, 2 Red, 3 Orange, 4 Yellow, 5 Green, 6 Aqua, 7 Blue, 8 Purple). `cues_set` is 1 when
 the `cue` rows are the track's complete cue list (it may be empty). `grid` and `grid_orig` (the grid before the first edit)
 are blobs of 8 bytes per beat, little-endian: `time_ms u32, bpm_x100 u16, bar_pos u16`.

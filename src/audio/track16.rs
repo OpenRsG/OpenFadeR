@@ -26,6 +26,12 @@ fn deq(v: i16) -> f32 {
 impl From<Pcm> for Track16 {
     /// Quantises `pcm` (dropped on return; NaN becomes silence, overs past ±2.0 clip).
     fn from(pcm: Pcm) -> Self {
+        Self::from(&pcm)
+    }
+}
+
+impl From<&Pcm> for Track16 {
+    fn from(pcm: &Pcm) -> Self {
         let samples = pcm
             .samples
             .iter()

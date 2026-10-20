@@ -129,7 +129,7 @@ impl Midi {
         self.layer34_noted.set(false);
         self.snap_at.set(None);
 
-        let ports = port::connect(self.filter.as_deref());
+        let ports = port::connect(self.filter.as_deref(), super::wire::wake_input);
         state.set_ports(match &ports {
             Ok(p) if p.names.is_empty() => "no MIDI input ports".into(),
             Ok(p) => p.names.join(", ").into(),

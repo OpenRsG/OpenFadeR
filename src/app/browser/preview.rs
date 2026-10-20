@@ -5,21 +5,18 @@
 
 use super::{View, strip};
 use crate::app::{App, BrowserState};
-use openfader::audio::{self, Pcm};
+use openfader::audio;
 use slint::{ComponentHandle, Timer, TimerMode};
 use std::{
     cell::RefCell,
     path::PathBuf,
     rc::Rc,
-    sync::{
-        Arc,
-        mpsc::{Receiver, TryRecvError},
-    },
+    sync::{Arc, mpsc::TryRecvError},
     time::Duration,
 };
 
 /// A decode in flight and the position (ms) the preview starts at once it is done.
-type Pending = (Receiver<Result<Pcm, String>>, u32);
+type Pending = (audio::DecodeJob, u32);
 
 /// Decodes `file`; the preview starts at `from_ms` when the audio is there.
 fn start(app: &App, pending: &RefCell<Option<Pending>>, file: PathBuf, from_ms: u32) {

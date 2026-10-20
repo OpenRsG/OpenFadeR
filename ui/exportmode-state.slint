@@ -1,3 +1,5 @@
+import { Theme } from "theme.slint";
+
 /// One phrase of the loaded track on the overview: start and end as fractions of the track, and whether it is the selected one.
 export struct PhraseSeg { x0: float, x1: float, selected: bool }
 
@@ -51,9 +53,9 @@ export global ExportModeState {
     in-out property <int> layout;
     in property <[string]> layout-names: ["1 PLAYER", "2 PLAYER", "DUAL PLAYER", "SIMPLE PLAYER", "FULL BROWSER"];
     /// Height of the player area under the global bar (the browser fills the rest); 0 for FULL BROWSER.
-    out property <length> panel-h: [261px, 400px, 400px, 69px, 0px][root.layout];
+    out property <length> panel-h: Theme.layout-profile == 1 ? [520px, 760px, 760px, 100px, 0px][root.layout] : [261px, 400px, 400px, 69px, 0px][root.layout];
     /// The tree column's bottom slot (the device dock).
-    out property <length> dock-h: 196px;
+    out property <length> dock-h: Theme.layout-profile == 1 ? 250px : 196px;
     /// The recording panel (global-bar REC button in EXPORT mode).
     in-out property <bool> rec-open;
     /// Decks A and B.

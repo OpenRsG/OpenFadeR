@@ -1,5 +1,5 @@
 import { ListView } from "std-widgets.slint";
-import { Chip, TextField } from "widgets.slint";
+import { Chip, TextField, Icon, IconButton } from "widgets.slint";
 import { Theme } from "theme.slint";
 
 /// One performance pad (hot cues A-H, or the pad of another mode). `time` is the hot cue's position ("1:02.4"), empty
@@ -51,17 +51,17 @@ export component PadGrid inherits Rectangle {
     property <bool> grid: Theme.pad-style == 1;
     property <int> cols: root.grid ? 4 : 2;
     property <length> cw: (root.width - (root.cols - 1) * Theme.gap) / root.cols;
-    property <length> ch: root.grid ? (root.height - Theme.gap) / 2 : 22px;
+    property <length> ch: root.grid ? (root.height - Theme.gap) / 2 : Theme.layout-profile == 1 ? Theme.touch-target : 22px;
     /// S.SCRATCH, SAMPLER and SEQ. CALL pads work on an empty deck.
     property <bool> live: root.enabled || root.mode == 6 || root.mode == 9 || root.mode == 10;
     /// HOT CUE and the plugin modes draw the hot cue pads (letter badge, time).
     property <bool> cues: root.mode == 0 || root.mode >= 12;
-    min-height: 4 * 24px - 2px;
+    min-height: Theme.layout-profile == 1 && !root.grid ? 4 * Theme.touch-target + 3 * Theme.gap : 4 * 24px - 2px;
     for p[i] in root.pads: Rectangle {
         /// The pad's colour: its own, but the PAD FX pads wear the VIEW > PAD FX COLOR.
         property <color> tone: root.mode == 4 ? [Theme.accent, Theme.play, Theme.deck2, Theme.danger, Theme.sampler][root.fx-color] : p.color;
         x: root.grid ? Math.mod(i, 4) * (root.cw + Theme.gap) : Math.floor(i / 4) * (root.cw + Theme.gap);
-        y: root.grid ? Math.floor(i / 4) * (root.ch + Theme.gap) : Math.mod(i, 4) * 24px;
+        y: root.grid ? Math.floor(i / 4) * (root.ch + Theme.gap) : Math.mod(i, 4) * (root.ch + Theme.gap);
         width: root.cw;
         height: root.ch;
         opacity: root.live ? 1 : 0.4;
@@ -148,6 +148,8 @@ export component CueList inherits Rectangle {
     callback cue-comment(int, string);
     /// Colours the popup offers (Rust fills it from `analysis::picker()`, 63 entries; the 64th grid cell is "default").
     in property <[color]> palette;
+    property <length> palette-w: Theme.layout-profile == 1 ? clamp((root.width - 8px) / 8, 28px, Theme.touch-target) : 22px;
+    property <length> palette-h: Theme.layout-profile == 1 ? root.palette-w : 18px;
     background: Theme.bg-deep;
     border-radius: Theme.radius;
     opacity: root.enabled ? 1 : 0.5;
@@ -168,12 +170,12 @@ export component CueList inherits Rectangle {
         }
         ListView {
             for c[i] in root.cues: Rectangle {
-                height: 18px;
+                height: Theme.layout-profile == 1 ? Theme.touch-target : 18px;
                 background: touch.has-hover && root.enabled ? Theme.hover-row : transparent;
                 HorizontalLayout {
                     spacing: 5px;
                     padding-left: 2px;
-                    padding-right: 4px;
+                    padding-right: Theme.layout-profile == 1 ? Theme.touch-target + 4px : 4px;
                     Rectangle { width: 5px; height: 12px; y: 3px; background: c.color; }
                     Text { text: c.tag; color: Theme.text; font-size: Theme.font-size; font-weight: Theme.weight-bold; width: 14px; vertical-alignment: center; }
                     Text { text: c.time; color: Theme.text; font-size: Theme.font-size; width: 44px; vertical-alignment: center; }
@@ -182,18 +184,26 @@ export component CueList inherits Rectangle {
                 }
                 touch := TouchArea {
                     enabled: root.enabled;
+                    width: Theme.layout-profile == 1 ? parent.width - Theme.touch-target : parent.width;
                     clicked => { root.jump(i); }
                     pointer-event(e) => {
                         if (e.button == PointerEventButton.right && e.kind == PointerEventKind.up) { pop.show(); }
                     }
                 }
+                if Theme.layout-profile == 1: IconButton {
+                    x: parent.width - self.width;
+                    icon: Icon.more;
+                    tooltip: "Cue color and comment";
+                    enabled: root.enabled;
+                    clicked => { pop.show(); }
+                }
                 // Right-click: the full colour grid (the last cell = default colour) and the cue's comment.
                 pop := PopupWindow {
                     x: 0px;
                     y: parent.height;
-                    width: 184px;
+                    width: Theme.layout-profile == 1 ? 8 * root.palette-w + 8px : 184px;
                     close-policy: close-on-click-outside; // the comment field must be clickable
-                    height: 182px;
+                    height: Theme.layout-profile == 1 ? 8 * root.palette-h + Theme.h-ctl + 12px : 182px;
                     Rectangle {
                         background: Theme.panel-raised;
                         border-color: Theme.line-strong;
@@ -203,21 +213,21 @@ export component CueList inherits Rectangle {
                             padding: 4px;
                             spacing: 4px;
                             Rectangle {
-                                height: 142px;
+                                height: Theme.layout-profile == 1 ? 8 * root.palette-h : 142px;
                                 for p[k] in root.palette: Rectangle {
-                                    x: Math.mod(k, 8) * 22px;
-                                    y: Math.floor(k / 8) * 18px;
-                                    width: 20px;
-                                    height: 16px;
+                                    x: Math.mod(k, 8) * root.palette-w;
+                                    y: Math.floor(k / 8) * root.palette-h;
+                                    width: root.palette-w - 2px;
+                                    height: root.palette-h - 2px;
                                     background: p;
                                     border-radius: Theme.radius;
                                     TouchArea { clicked => { root.cue-color(i, k); pop.close(); } }
                                 }
                                 Rectangle {
-                                    x: 7 * 22px;
-                                    y: 7 * 18px;
-                                    width: 20px;
-                                    height: 16px;
+                                    x: 7 * root.palette-w;
+                                    y: 7 * root.palette-h;
+                                    width: root.palette-w - 2px;
+                                    height: root.palette-h - 2px;
                                     background: Theme.panel-high;
                                     border-radius: Theme.radius;
                                     Text { text: "×"; color: Theme.text; font-size: Theme.font-size; }

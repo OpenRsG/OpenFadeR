@@ -99,6 +99,8 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
     prefs::on_change(move |p| {
         for deck in &d {
             deck.refresh_key();
+            let grid = super::grid_bpm(&deck.loaded.borrow().analysis.beats);
+            deck.show(|v| v.bpm_text = super::bpm_text(grid, deck.rate.get()));
             deck.rewave();
         }
         if let Some(app) = weak.upgrade() {

@@ -112,7 +112,7 @@ export component TrackTable inherits Rectangle {
     property <length> menu-y;
     property <bool> list-view: BrowserState.tag-view || BrowserState.user-view;
     /// Rows of the right-click menu (the library entries come last).
-    property <int> menu-rows: (root.list-view ? 8 : 5) + 7 + (BrowserState.palette-enabled ? 3 : 0);
+    property <int> menu-rows: (root.list-view ? 8 : 5) + 8 + (BrowserState.palette-enabled ? 3 : 0);
     function place-menu(x: length, y: length) {
         root.menu-x = min(x, root.width - 190px);
         root.menu-y = min(y, max(0px, root.height - root.menu-rows * Theme.h-row - 4px));
@@ -162,6 +162,10 @@ export component TrackTable inherits Rectangle {
                     height: Theme.h-row;
                     property <bool> current: i == BrowserState.current-row;
                     property <string> hints: cells[9].text;
+                    property <int> preview-generation: BrowserState.preview-generation;
+                    property <bool> preview-enabled: root.w-preview > 0px;
+                    changed preview-generation => { if (self.preview-enabled) { BrowserState.preview-wanted(i); } }
+                    changed preview-enabled => { if (self.preview-enabled) { BrowserState.preview-wanted(i); } }
                     /// The track is the one a deck has loaded (its row wears `row-loaded`).
                     property <bool> on-deck: cells[0].text != "" && (DeckState.decks[0].title == cells[0].text || DeckState.decks[1].title == cells[0].text || DeckState.decks[2].title == cells[0].text || DeckState.decks[3].title == cells[0].text);
                     background: current ? Theme.select : (row-ta.has-hover ? Theme.hover-row : (Math.mod(i, 2) == 0 ? Theme.bg-deep : Theme.row-alt));
@@ -239,6 +243,7 @@ export component TrackTable inherits Rectangle {
             VerticalLayout {
                 padding: 1px;
                 MenuItem { text: "Load to deck"; activated => { BrowserState.track-pressed(BrowserState.current-row); BrowserState.track-pressed(BrowserState.current-row); menu.close(); } }
+                MenuItem { text: "Edit track details…"; activated => { LibraryState.action("track-edit"); menu.close(); } }
                 MenuItem { text: "Add to Tag List (T)"; activated => { BrowserState.tag-add(); menu.close(); } }
                 MenuItem { text: "Add to playlist…"; activated => { BrowserState.panel-request(0); menu.close(); } }
                 if BrowserState.palette-enabled: MenuItem { text: "Add to palette 1"; activated => { BrowserState.palette-add-chosen(1); menu.close(); } }

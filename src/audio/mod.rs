@@ -42,7 +42,7 @@ mod transport;
 pub(crate) mod wavout;
 
 pub use bus::{Bus, CHANNELS, FX_SLOTS, FX_UNITS, Headphones, MAX_LEVEL, equal_power};
-pub use decode::{decode, decode_async, probe_rate};
+pub use decode::{DecodeJob, decode, decode_async, decode_cancellable, probe_rate};
 pub use dsp::{EQ_KILL_DB, EQ_MAX_DB};
 pub use player::{
     Player, Status, configure, controller, live_bus, release_controller, set_output, status,

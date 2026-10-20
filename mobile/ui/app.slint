@@ -1,0 +1,139 @@
+import { Palette, ScrollView } from "std-widgets.slint";
+import { Theme, DeckState, DeckView, LibraryState, TrackRow, MixerState, MobileState } from "state.slint";
+import { DJButton, Icon } from "widgets.slint";
+import { DeckPanel } from "deck.slint";
+import { PerformanceMixer, CompactMixer } from "mixer.slint";
+import { LibraryPanel, MixerPanel, EffectsPanel, HelpPanel } from "panels.slint";
+export { DeckState, DeckView, LibraryState, TrackRow, MixerState, MobileState, Theme, Palette }
+
+component MenuItem inherits DJButton {
+    in property <int> destination;
+    active: MobileState.view == root.destination;
+    clicked => { MobileState.view = root.destination; MobileState.menu-open = false; }
+}
+
+export component App inherits Window {
+    title: "OpenFadeR"; preferred-width: 1000px; preferred-height: 540px;
+    min-width: 320px; min-height: 320px;
+    background: Theme.bg; default-font-family: Theme.font; default-font-size: 14px;
+    property <length> mixer-width: clamp(root.width * 0.18, 128px, 210px);
+    property <bool> landscape-only: MobileState.landscape-only;
+    property <bool> compact: true;
+    property <bool> stacked;
+    property <bool> tight-decks;
+    function update-layout() {
+        root.compact = !root.landscape-only && root.width - root.safe-area-insets.left - root.safe-area-insets.right < 760px;
+        root.stacked = !root.landscape-only && root.height - root.safe-area-insets.top - root.safe-area-insets.bottom >= 660px;
+        root.tight-decks = root.landscape-only && (root.height - root.safe-area-insets.top - root.safe-area-insets.bottom < 356px
+            || (root.width - root.safe-area-insets.left - root.safe-area-insets.right - root.mixer-width - 4px) / 2 < 232px);
+    }
+    changed width => { root.update-layout(); }
+    changed height => { root.update-layout(); }
+    changed landscape-only => { root.update-layout(); }
+    init => { root.update-layout(); }
+    property <int> focused-deck;
+    property <string> section: MobileState.view == 0 ? "Performance" : MobileState.view == 1 ? "Library"
+        : MobileState.view == 2 ? "Mixer & output" : MobileState.view == 3 ? "Deck controls & FX" : MobileState.view == 5 ? "Hot cue pads" : "Controls & help";
+    property <bool> menu-visible: MobileState.menu-open;
+    changed section => { keys.focus(); }
+    changed menu-visible => { keys.focus(); }
+    keys := FocusScope {
+        width: parent.width; height: parent.height;
+        init => { self.focus(); }
+    shell := VerticalLayout {
+        padding-top: root.safe-area-insets.top; padding-bottom: root.safe-area-insets.bottom;
+        padding-left: root.safe-area-insets.left; padding-right: root.safe-area-insets.right;
+        spacing: 0px;
+        Rectangle {
+            height: 44px; background: Theme.panel;
+            HorizontalLayout {
+                padding-left: 12px; padding-right: 6px; spacing: 6px;
+                Text { text: "OpenFadeR"; color: Theme.text-bright; font-size: 18px; font-weight: 700; horizontal-stretch: 0; vertical-alignment: center; }
+                if !root.compact: Text { text: root.section; color: Theme.text-dim; font-size: 13px; overflow: elide; vertical-alignment: center; }
+                Rectangle { horizontal-stretch: 1; }
+                DJButton { width: root.compact ? 44px : 82px; text: root.compact ? "" : "Decks"; label: "Performance decks"; icon: Icon.layout-dual; active: MobileState.view == 0; clicked => { MobileState.view = 0; MobileState.menu-open = false; } }
+                DJButton { width: root.compact ? 44px : 92px; text: root.compact ? "" : "Library"; label: "Music library"; icon: Icon.folder; active: MobileState.view == 1; clicked => { MobileState.view = 1; MobileState.menu-open = false; } }
+                DJButton { width: root.compact ? 44px : 82px; text: root.compact ? "" : "More"; label: "More controls"; icon: Icon.more; active: MobileState.menu-open; clicked => { MobileState.menu-open = !MobileState.menu-open; } }
+            }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            if MobileState.view == 0 && !root.compact: HorizontalLayout {
+                spacing: 2px;
+                DeckPanel { index: 0; tight: root.tight-decks; preferred-width: 0px; horizontal-stretch: 1; }
+                PerformanceMixer { width: root.mixer-width; horizontal-stretch: 0; }
+                DeckPanel { index: 1; tight: root.tight-decks; preferred-width: 0px; horizontal-stretch: 1; }
+            }
+            if MobileState.view == 0 && root.compact: VerticalLayout {
+                spacing: 2px;
+                if root.stacked: VerticalLayout {
+                    spacing: 2px;
+                    DeckPanel { index: 0; compact: true; }
+                    DeckPanel { index: 1; compact: true; }
+                }
+                if !root.stacked: VerticalLayout {
+                    spacing: 2px;
+                    HorizontalLayout {
+                        height: 44px; spacing: 2px;
+                        DJButton { text: "Deck A"; active: root.focused-deck == 0; tone: Theme.deck1; clicked => { root.focused-deck = 0; } }
+                        DJButton { text: "Deck B"; active: root.focused-deck == 1; tone: Theme.deck2; clicked => { root.focused-deck = 1; } }
+                    }
+                    ScrollView {
+                        VerticalLayout {
+                            DeckPanel { index: root.focused-deck; compact: true; min-height: 240px; }
+                        }
+                    }
+                }
+            }
+            if MobileState.view == 1: LibraryPanel {}
+            if MobileState.view == 2: MixerPanel {}
+            if MobileState.view == 3: EffectsPanel {}
+            if MobileState.view == 4: HelpPanel {}
+            if MobileState.view == 5: PerformanceMixer { pads: true; }
+        }
+        if root.compact: CompactMixer { height: 98px; }
+        Rectangle {
+            height: 20px; background: Theme.bg-deep;
+            Text { x: 10px; width: parent.width - 20px; text: MobileState.status; color: Theme.text; font-size: 12px; overflow: elide; vertical-alignment: center; }
+        }
+    }
+    if MobileState.menu-open: Rectangle {
+        x: root.safe-area-insets.left; y: root.safe-area-insets.top + 44px;
+        width: parent.width - root.safe-area-insets.left - root.safe-area-insets.right;
+        height: parent.height - self.y - root.safe-area-insets.bottom;
+        background: Theme.scrim;
+        TouchArea { clicked => { MobileState.menu-open = false; } }
+        Rectangle {
+            x: max(0px, parent.width - self.width);
+            width: min(330px, parent.width); height: parent.height;
+            background: Theme.panel;
+            ScrollView {
+                VerticalLayout {
+                    padding: 10px; spacing: 6px; alignment: start;
+                    HorizontalLayout {
+                        height: 44px;
+                        Text { text: "More"; color: Theme.text-bright; font-size: 20px; font-weight: 700; }
+                        DJButton { width: 44px; icon: Icon.close; label: "Close More menu"; clicked => { MobileState.menu-open = false; } }
+                    }
+                    MenuItem { destination: 0; text: "Performance decks"; icon: Icon.layout-dual; }
+                    MenuItem { destination: 1; text: "Library & import"; icon: Icon.folder; }
+                    MenuItem { destination: 2; text: "Mixer, output & headphones"; icon: Icon.mixer; }
+                    MenuItem { destination: 3; text: "Deck controls & FX"; icon: Icon.fx; }
+                    MenuItem { destination: 4; text: "Controls & help"; icon: Icon.info; }
+                    MenuItem { destination: 5; text: "Hot cue pads"; icon: Icon.layout-dual; }
+                    Rectangle { height: 1px; background: Theme.line; }
+                    Text { text: MobileState.status; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+                }
+            }
+        }
+    }
+        key-pressed(e) => {
+            if e.text == Key.Escape || e.text == Key.Back {
+                if MobileState.menu-open { MobileState.menu-open = false; return accept; }
+                if MobileState.view != 0 { MobileState.view = 0; return accept; }
+                if e.text == Key.Back && MobileState.landscape-only { MobileState.background(); return accept; }
+            }
+            reject
+        }
+    }
+}

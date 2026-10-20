@@ -3,6 +3,8 @@
 //! (`$XDG_CACHE_HOME/openfader/models/htdemucs.onnx`, see `stems::model`). `OPENFADER_STEMS_TRACK` (default 0) picks the
 //! track, `OPENFADER_STEMS_SECS` (default 30; 0 = the whole track) how much of it, cut from the middle.
 
+#![cfg(feature = "stems")]
+
 mod common;
 
 use openfader::audio::{STEM_NAMES, Stems, Track16, decode};
@@ -77,7 +79,7 @@ fn separates_a_usb_track_into_stems_that_add_up() {
     );
     wait(&job).unwrap();
     let took = t.elapsed();
-    let stems = job.stems().clone();
+    let stems = job.stems().expect("allocated stems").clone();
     assert_eq!(stems.frames(), want);
     assert!(stems.is_complete() && (0..want).step_by(4999).all(|i| stems.ready(i)));
 
@@ -136,7 +138,7 @@ fn separates_a_usb_track_into_stems_that_add_up() {
     eprintln!("stems: cache hit in {:.2} s", t.elapsed().as_secs_f64());
     assert!(t.elapsed() < Duration::from_secs(10) && took > t.elapsed());
     assert!(
-        (0..4).all(|k| dump(job2.stems(), k) == dump(&stems, k)),
+        (0..4).all(|k| dump(job2.stems().expect("cached stems"), k) == dump(&stems, k)),
         "cached stems equal the separated ones"
     );
     std::fs::remove_dir_all(cache).unwrap();

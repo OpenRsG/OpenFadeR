@@ -20,13 +20,13 @@ mod dialog;
 pub mod dupes;
 mod export;
 mod import;
-mod missing;
+pub(super) mod missing;
 mod playlist;
 pub mod settings;
 mod track;
 mod undo;
 
-use super::{analyze, deck::Decks, plural, prefs, toast, App, BrowserState, LibraryState};
+use super::{App, BrowserState, LibraryState, analyze, deck::Decks, plural, prefs, toast};
 use openfader::{
     library::{Library, Track},
     store::{self, Store},
@@ -40,7 +40,7 @@ use std::{
     sync::Arc,
 };
 
-pub use dialog::{browse, chooser, open_external, show_in_folder, Ask, Confirm, Pick};
+pub use dialog::{Ask, Confirm, Pick, browse, chooser, open_external, show_in_folder};
 pub use missing::is_missing;
 
 #[derive(Default)]

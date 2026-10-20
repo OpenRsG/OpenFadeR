@@ -6,6 +6,7 @@ use std::rc::Rc;
 slint::slint! {
     import { JogWheel } from "../../../ui/deck-controls.slint";
     export { DeckState, DeckView } from "../../../ui/deck-state.slint";
+    export { Theme } from "../../../ui/theme.slint";
     export component TempoReadoutTest inherits Window {
         preferred-width: 240px;
         preferred-height: 120px;
@@ -17,7 +18,7 @@ slint::slint! {
 }
 
 #[test]
-fn tempo_readout_carries_hundredths_without_losing_neighbouring_values() {
+fn tempo_readout_rounds_both_precisions_without_losing_neighbouring_values() {
     headless::init();
     let app = TempoReadoutTest::new().unwrap();
     let decks = Rc::new(VecModel::from(vec![DeckView::default(); 2]));
@@ -26,7 +27,8 @@ fn tempo_readout_carries_hundredths_without_losing_neighbouring_values() {
     let window = headless::last_window();
 
     // The same component serves normal decks and the compact C/D decks (which hide the decimals).
-    for size in [120usize, 72] {
+    for (digits, size) in [(2, 120usize), (2, 72), (1, 120), (1, 72)] {
+        app.global::<Theme>().set_tempo_decimals(digits);
         window.set_size(slint::PhysicalSize::new((2 * size) as u32, size as u32));
         let mut pixels = vec![Rgb8Pixel::default(); 2 * size * size];
         let mut same_readout = |actual: f32, expected: f32| {
@@ -53,6 +55,23 @@ fn tempo_readout_carries_hundredths_without_losing_neighbouring_values() {
                 "{actual:?} must display as {expected:.2} BPM in a {size}px jog"
             );
         };
+
+        if digits == 1 {
+            check(126.96, 127.0);
+            check(127.04, 127.0);
+            check(126.94, 126.9);
+            assert!(
+                !same_readout(126.94, 127.0),
+                "tenths must carry into the integer"
+            );
+            if size >= 80 {
+                assert!(
+                    !same_readout(127.04, 127.06),
+                    "neighbouring tenths must remain distinguishable"
+                );
+            }
+            continue;
+        }
 
         // Reported failure: 126.99 -> 126.100 -> 127.01. Values below 127 must carry as well.
         check(126.999, 127.0);

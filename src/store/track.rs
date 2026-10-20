@@ -1,10 +1,11 @@
-//! Per-track edits: rating, comment, colour, the cue list (hot / memory cues and loops) and the beat
+//! Per-track edits: descriptive metadata, rating, comment, colour, the cue list (hot / memory cues and loops) and the beat
 //! grid. `None` = never edited, the library's value stands; `Some` = the store's value wins (a stored
 //! cue list replaces the library's as a whole, so a deleted library cue stays deleted).
 
-use super::{cue_at, exec, exists, query_all, query_opt, rgb, scalar, Sql, Store, R};
+use super::{R, Sql, Store, cue_at, exec, exists, query_all, query_opt, rgb, scalar};
 use crate::analysis::{Beat, Cue, Phrases};
-use rusqlite::{params, Connection, ToSql};
+use crate::library::Track;
+use rusqlite::{Connection, ToSql, params};
 use std::collections::HashMap;
 
 /// Track colours by colour id − 1: name and RGB.
@@ -25,6 +26,11 @@ pub struct Edits {
     /// Stars 0..=5.
     pub rating: Option<u8>,
     pub comment: Option<String>,
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub genre: Option<String>,
+    pub label: Option<String>,
     /// Track colour: colour id 1..=8 (pink, red, orange, yellow, green, aqua, blue, purple).
     pub color: Option<u8>,
     pub cues: Option<Vec<Cue>>,
@@ -33,11 +39,38 @@ pub struct Edits {
     pub phrases: Option<Phrases>,
 }
 
+impl Edits {
+    /// Applies stored text and rating overrides, leaving unedited fields and track identity alone.
+    /// Tracks without an id or file use title / artist as their key and must not have descriptive edits.
+    pub fn apply_metadata(&self, track: &mut Track) {
+        if let Some(rating) = self.rating {
+            track.rating = rating;
+        }
+        for (field, edit) in [
+            (&mut track.title, &self.title),
+            (&mut track.artist, &self.artist),
+            (&mut track.album, &self.album),
+            (&mut track.genre, &self.genre),
+            (&mut track.label, &self.label),
+            (&mut track.comment, &self.comment),
+        ] {
+            if let Some(value) = edit {
+                field.clone_from(value);
+            }
+        }
+    }
+}
+
 /// The cheap fields of one track ([`Store::track_fields`]): what a track list needs, without cues and grids.
 #[derive(Debug)]
 pub(super) struct Fields {
     pub rating: Option<u8>,
     pub comment: Option<String>,
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub genre: Option<String>,
+    pub label: Option<String>,
 }
 
 /// Bytes per beat in the grid blob.
@@ -125,6 +158,25 @@ impl Store {
         self.set_field("comment", key, comment)
     }
 
+    /// Stores all descriptive fields and comment in one atomic edit; empty strings explicitly clear fields.
+    /// Only use for tracks with a stable id or file, not a `meta|title|artist` identity.
+    pub fn set_metadata(
+        &self,
+        key: &str,
+        title: &str,
+        artist: &str,
+        album: &str,
+        genre: &str,
+        label: &str,
+        comment: &str,
+    ) -> R<()> {
+        self.run(
+            "INSERT INTO track(key, title, artist, album, genre, label, comment) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(key) DO UPDATE SET title = ?2, artist = ?3, album = ?4, genre = ?5, label = ?6, comment = ?7",
+            params![key, title, artist, album, genre, label, comment],
+        )
+    }
+
     /// `color`: colour id 1..=8, `None` = no colour override (values above 8 are ignored).
     pub fn set_color(&self, key: &str, color: Option<u8>) -> R<()> {
         self.set_field("color", key, color.filter(|c| (1..=8).contains(c)))
@@ -183,7 +235,7 @@ impl Store {
             let db = self.db();
             let row = query_opt(
                 &db,
-                "SELECT rating, comment, color, cues_set, grid FROM track WHERE key = ?1",
+                "SELECT rating, comment, color, cues_set, grid, title, artist, album, genre, label FROM track WHERE key = ?1",
                 [key],
                 |r| {
                     Ok((
@@ -192,14 +244,24 @@ impl Store {
                         r.get(2)?,
                         r.get::<_, bool>(3)?,
                         r.get::<_, Option<Vec<u8>>>(4)?,
+                        r.get(5)?,
+                        r.get(6)?,
+                        r.get(7)?,
+                        r.get(8)?,
+                        r.get(9)?,
                     ))
                 },
             )?;
             match row {
                 None => Edits::default(),
-                Some((rating, comment, color, cues_set, grid)) => Edits {
+                Some((rating, comment, color, cues_set, grid, title, artist, album, genre, label)) => Edits {
                     rating,
                     comment,
+                    title,
+                    artist,
+                    album,
+                    genre,
+                    label,
                     color,
                     cues: cues_set
                         .then(|| {
@@ -220,11 +282,13 @@ impl Store {
         Ok(edits)
     }
 
-    /// Rating and comment of every track that has either, by [`super::key`].
+    /// Text and rating overrides of every edited track, by [`super::key`], without loading analysis.
     pub(super) fn track_fields(&self) -> R<HashMap<String, Fields>> {
         query_all(
             &self.db(),
-            "SELECT key, rating, comment FROM track WHERE rating IS NOT NULL OR comment IS NOT NULL",
+            "SELECT key, rating, comment, title, artist, album, genre, label FROM track
+             WHERE rating IS NOT NULL OR comment IS NOT NULL OR title IS NOT NULL OR artist IS NOT NULL
+                OR album IS NOT NULL OR genre IS NOT NULL OR label IS NOT NULL",
             [],
             |r| {
                 Ok((
@@ -232,6 +296,11 @@ impl Store {
                     Fields {
                         rating: r.get(1)?,
                         comment: r.get(2)?,
+                        title: r.get(3)?,
+                        artist: r.get(4)?,
+                        album: r.get(5)?,
+                        genre: r.get(6)?,
+                        label: r.get(7)?,
                     },
                 ))
             },

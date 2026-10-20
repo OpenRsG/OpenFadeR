@@ -19,6 +19,7 @@ fn on(effect: Effect, beats: f32, level: f32) -> Settings {
 
 /// `u.set(s)`, then `n` frames of `input(i)`; an idle unit passes frames through like [`Unit::apply`].
 fn run(u: &mut Unit, s: Settings, n: usize, input: impl Fn(usize) -> Frame) -> Vec<Frame> {
+    u.prepare(s.effect);
     u.set(s);
     (0..n)
         .map(|i| {
@@ -108,6 +109,7 @@ fn off_is_bit_exact_for_every_effect() {
     for e in Effect::ALL {
         let mut u = Unit::new(RATE);
         assert!(u.idle(), "{e:?}");
+        u.prepare(e.index());
         u.set(Settings {
             on: false,
             ..on(e, 1.0, 1.0)
@@ -298,6 +300,7 @@ fn apply_edits_only_the_assigned_master_path() {
     for (assign, hit) in [(Assign::A, 0usize), (Assign::B, 1)] {
         c.set_assign(assign);
         let mut u = Unit::new(RATE);
+        u.prepare(c.settings().effect);
         let mut buf = vec![vec![([1.0; 2], [0.7; 2]); QUARTER]; 2];
         u.apply(&c, &mut buf, QUARTER);
         assert!(
@@ -316,6 +319,7 @@ fn apply_edits_only_the_assigned_master_path() {
     // Master: the sum of both channels goes through the gate.
     c.set_assign(Assign::Master);
     let mut u = Unit::new(RATE);
+    u.prepare(c.settings().effect);
     let mut buf = vec![vec![([0.5; 2], [0.7; 2]); QUARTER]; 2];
     u.apply(&c, &mut buf, QUARTER);
     let sum = |i: usize| buf[0][i].0[0] + buf[1][i].0[0];
@@ -336,6 +340,7 @@ fn a_unit_aimed_at_a_stem_part_is_skipped_by_apply_and_left_idle() {
     c.set_on(true);
     c.set_assign(Assign::A);
     let mut u = Unit::new(RATE);
+    u.prepare(c.settings().effect);
     let mut buf = vec![vec![([1.0; 2], [0.7; 2]); QUARTER]; 2];
     u.apply(&c, &mut buf, QUARTER); // whole channel: gated, the unit is busy
     assert!(!u.idle());

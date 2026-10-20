@@ -10,8 +10,9 @@
 //! * Phase: the grids' fractional beat numbers are compared (`k` beats of the follower per master
 //!   beat). Drift above 10 ms is pulled in with a tiny `Player::nudge`, never a seek; a
 //!   bigger error (a hot-cue jump, SYNC pressed while playing) re-seeks once to the aligned spot
-//!   ([`correct`]). No correction while scratching, bending, looping or reversing.
-//! * PLAY on a paused synced deck waits for the master's next beat, then starts there.
+//!   ([`correct`]). No correction while scratching, bending, looping or reversing, or when the master's loop
+//!   cannot preserve the follower's beat phase. Tempo following continues through those loops.
+//! * PLAY on a paused synced deck waits for the master's next beat, unless its loop cannot preserve that phase.
 //!
 //! Base: [`Link`] and [`State`] (the master and each deck's SYNC state), the nudge plumbing. Children:
 //! [`phase`] (tempo and phase maths, pure), [`master`] (hand-over rules, SYNC / MASTER buttons), [`follow`] (the
@@ -27,9 +28,9 @@ mod phase;
 
 use super::{DECKS, Deck, grid_bpm};
 use crate::app::prefs::controller::{Controller, SyncType};
+use openfader::analysis::Beat;
 pub use phase::target;
 use phase::{Fix, align, correct, error_ms, start_ms, wait_phase};
-use openfader::analysis::Beat;
 use std::{
     cell::{Cell, OnceCell},
     rc::{Rc, Weak},

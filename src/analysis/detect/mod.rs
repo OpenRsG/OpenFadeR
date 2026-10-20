@@ -16,6 +16,7 @@ mod grid;
 mod vocal;
 
 pub use grid::{GridOptions, Mode, beat_grid, beat_grid_with};
+pub(crate) use vocal::vocal_regions_cancellable;
 pub use vocal::{VocalRegion, vocal_regions};
 
 use super::{DETAIL_ENTRIES_PER_SEC, PREVIEW_ENTRIES};
@@ -105,17 +106,32 @@ pub fn peaks(samples: &[f32], rate: u32) -> Vec<[f32; 3]> {
 
 /// [`peaks`] of `n` stereo frames read one by one (a mix computed on the fly needs no full-length buffer).
 pub fn peaks_of(frames: impl Iterator<Item = [f32; 2]>, n: usize, rate: u32) -> Vec<[f32; 3]> {
+    peaks_of_cancellable(frames, n, rate, &|| false).expect("uncancelled waveform peaks")
+}
+
+fn peaks_of_cancellable(
+    frames: impl Iterator<Item = [f32; 2]>,
+    n: usize,
+    rate: u32,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Vec<[f32; 3]>> {
+    if cancelled() {
+        return None;
+    }
     let cols = (n * DETAIL_ENTRIES_PER_SEC as usize).div_ceil(rate as usize);
     let mut peak = vec![[0f32; 3]; cols];
     let mut s = Split::new(rate);
     for (i, f) in frames.take(n).enumerate() {
+        if i & 4095 == 0 && cancelled() {
+            return None;
+        }
         let b = s.push((f[0] + f[1]) * 0.5);
         let c = &mut peak[(i as u64 * DETAIL_ENTRIES_PER_SEC as u64 / rate as u64) as usize];
         for k in 0..3 {
             c[k] = c[k].max(b[k].abs());
         }
     }
-    peak
+    (!cancelled()).then_some(peak)
 }
 
 /// The loudest band peak of `peaks`: the usual `top` of [`quantise`].
@@ -152,8 +168,69 @@ pub fn quantise(peak: &[[f32; 3]], top: f32) -> (Vec<[u8; 3]>, Vec<[u8; 3]>) {
 
 /// `(detail, preview)` of the audio, the loudest peak being 127 ([`peaks`], [`quantise`]).
 pub fn waveform(samples: &[f32], rate: u32) -> (Vec<[u8; 3]>, Vec<[u8; 3]>) {
-    let p = peaks(samples, rate);
-    quantise(&p, loudest(&p))
+    let (detail, preview, _) = waveform_and_grid(samples, rate, None);
+    (detail, preview)
+}
+
+/// One band split supplies waveform peaks and, when requested, grid hop energies.
+pub(crate) fn waveform_and_grid(
+    samples: &[f32],
+    rate: u32,
+    opt: Option<&GridOptions>,
+) -> (Vec<[u8; 3]>, Vec<[u8; 3]>, Vec<super::Beat>) {
+    waveform_and_grid_cancellable(samples, rate, opt, &|| false)
+        .expect("uncancelled waveform and grid analysis")
+}
+
+pub(crate) fn waveform_and_grid_cancellable(
+    samples: &[f32],
+    rate: u32,
+    opt: Option<&GridOptions>,
+    cancelled: &(dyn Fn() -> bool + Sync),
+) -> Option<(Vec<[u8; 3]>, Vec<[u8; 3]>, Vec<super::Beat>)> {
+    if cancelled() {
+        return None;
+    }
+    let Some(opt) = opt else {
+        let peak = peaks_of_cancellable(
+            samples.chunks_exact(2).map(|f| [f[0], f[1]]),
+            samples.len() / 2,
+            rate,
+            cancelled,
+        )?;
+        let (detail, preview) = quantise(&peak, loudest(&peak));
+        return (!cancelled()).then_some((detail, preview, Vec::new()));
+    };
+    let frames = samples.len() / 2;
+    let cols = (frames * DETAIL_ENTRIES_PER_SEC as usize).div_ceil(rate as usize);
+    let mut peak = vec![[0f32; 3]; cols];
+    let h = (rate / opt.flux_hz()).max(1) as usize;
+    let mut energy = std::array::from_fn(|_| Vec::with_capacity(frames / h));
+    let (mut acc, mut n) = ([0f32; 3], 0);
+    for (i, b) in bands(samples, rate).enumerate() {
+        if i & 4095 == 0 && cancelled() {
+            return None;
+        }
+        let c = &mut peak[(i as u64 * DETAIL_ENTRIES_PER_SEC as u64 / rate as u64) as usize];
+        for k in 0..3 {
+            c[k] = c[k].max(b[k].abs());
+            acc[k] += b[k] * b[k];
+        }
+        n += 1;
+        if n == h {
+            for k in 0..3 {
+                energy[k].push(acc[k] / h as f32);
+            }
+            (acc, n) = ([0.0; 3], 0);
+        }
+    }
+    if cancelled() {
+        return None;
+    }
+    let (detail, preview) = quantise(&peak, loudest(&peak));
+    let beats =
+        grid::from_hops_cancellable(energy, rate as f64 / h as f64, frames, rate, opt, cancelled)?;
+    (!cancelled()).then_some((detail, preview, beats))
 }
 
 #[cfg(test)]
@@ -191,5 +268,110 @@ mod tests {
             mid > 100 && high < 60 && low < 20,
             "1 kHz: low {low} mid {mid} high {high}"
         );
+    }
+
+    #[test]
+    fn fused_waveform_grid_matches_independent_passes() {
+        for rate in [8000, 44100, 48000] {
+            let frames = rate as usize * 12 + 37;
+            let mut samples: Vec<f32> = (0..frames)
+                .flat_map(|i| {
+                    let t = i as f32 / rate as f32;
+                    let click = if i % (rate as usize / 2) < 20 {
+                        0.8
+                    } else {
+                        0.0
+                    };
+                    let tone = (std::f32::consts::TAU * 713.0 * t).sin() * 0.07;
+                    [tone + click, tone * 0.6 + click]
+                })
+                .collect();
+            samples.push(0.9);
+            let expected = waveform(&samples, rate);
+            for mode in [Mode::Normal, Mode::Dynamic, Mode::Auto] {
+                for precision in [false, true] {
+                    let opt = GridOptions {
+                        mode,
+                        precision,
+                        ..Default::default()
+                    };
+                    let (detail, preview, beats) = waveform_and_grid(&samples, rate, Some(&opt));
+                    assert_eq!((&detail, &preview), (&expected.0, &expected.1));
+                    let fields = |beats: Vec<super::super::Beat>| {
+                        beats
+                            .into_iter()
+                            .map(|b| (b.time_ms, b.bpm_x100, b.bar_pos))
+                            .collect::<Vec<_>>()
+                    };
+                    assert_eq!(fields(beats), fields(beat_grid_with(&samples, rate, &opt)));
+                }
+            }
+            let (detail, preview, beats) = waveform_and_grid(&samples, rate, None);
+            assert_eq!((detail, preview), expected);
+            assert!(beats.is_empty());
+        }
+        for samples in [vec![], vec![0.5], vec![0.0; 91]] {
+            let (detail, preview, beats) =
+                waveform_and_grid(&samples, RATE, Some(&GridOptions::default()));
+            assert_eq!((detail, preview), waveform(&samples, RATE));
+            assert!(beats.is_empty());
+        }
+    }
+
+    #[test]
+    fn fused_band_scan_cancels_with_or_without_grid() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let samples = vec![0.0; 40_000];
+        let opt = GridOptions::default();
+        for grid in [None, Some(&opt)] {
+            let polls = AtomicUsize::new(0);
+            let cancelled = || polls.fetch_add(1, Ordering::Relaxed) >= 3;
+            assert!(waveform_and_grid_cancellable(&samples, 8000, grid, &cancelled).is_none());
+            assert!(polls.load(Ordering::Relaxed) > 1);
+            assert!(waveform_and_grid_cancellable(&samples, 8000, grid, &|| true).is_none());
+        }
+    }
+
+    #[test]
+    #[ignore = "scaling benchmark; run optimized with --ignored --nocapture"]
+    fn benchmark_fused_band_pass_scaling() {
+        use std::{hint::black_box, time::Instant};
+        for secs in [15, 60, 240] {
+            let samples: Vec<f32> = (0..RATE as usize * secs)
+                .flat_map(|i| {
+                    let phase = i % (RATE as usize / 2);
+                    let click = if phase < 90 {
+                        (std::f32::consts::TAU * 1000.0 * phase as f32 / RATE as f32).sin()
+                    } else {
+                        0.0
+                    };
+                    [click, click]
+                })
+                .collect();
+            for precision in [false, true] {
+                let opt = GridOptions {
+                    precision,
+                    ..Default::default()
+                };
+                let start = Instant::now();
+                let waveform = waveform(black_box(&samples), RATE);
+                let beats = beat_grid_with(black_box(&samples), RATE, &opt);
+                let independent_time = start.elapsed();
+                let start = Instant::now();
+                let fused = waveform_and_grid(black_box(&samples), RATE, Some(&opt));
+                let fused_time = start.elapsed();
+                assert_eq!((&fused.0, &fused.1), (&waveform.0, &waveform.1));
+                let fields = |beats: Vec<super::super::Beat>| {
+                    beats
+                        .into_iter()
+                        .map(|b| (b.time_ms, b.bpm_x100, b.bar_pos))
+                        .collect::<Vec<_>>()
+                };
+                assert_eq!(fields(fused.2), fields(beats));
+                eprintln!(
+                    "band-pass secs={secs} precision={precision} independent={independent_time:?} fused={fused_time:?}"
+                );
+            }
+        }
     }
 }

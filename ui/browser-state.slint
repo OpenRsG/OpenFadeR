@@ -99,6 +99,8 @@ export global BrowserState {
     /// (`preview-wanted`). A click on a strip starts the preview from that point (`x` = 0..1 of the strip; with Display Cue
     /// Markers on Preview a click near a cue starts from the cue).
     in property <[image]> previews;
+    /// Changes when the visible row mapping or strip inputs change, including when delegates are reused.
+    in property <int> preview-generation;
     callback preview-wanted(int);
     callback preview-seek(int, float);
     /// Playlist Palette (src/app/browser/palette/): Preferences > View > Layout > Browser panel > Playlist Palette shows the

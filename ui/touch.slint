@@ -1,0 +1,178 @@
+import { Chip, Dropdown, Icon, IconButton } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState, DeckDetail } from "deck.slint";
+import { DeckOverview } from "deck-wave.slint";
+import { TouchDeck } from "deck-touch.slint";
+import { TouchMixer, TouchTransport } from "mixer-touch.slint";
+import { Browser, BrowserState } from "browser.slint";
+import { FxPanel, FxState } from "fx.slint";
+import { SamplerPanel, SamplerState } from "sampler.slint";
+import { MixPointPanel } from "mixpoint.slint";
+import { MixPointState } from "mixpoint-state.slint";
+import { GroovePanel, GrooveState } from "groove.slint";
+import { ExportModeState, ExportPlayers, ExportDock } from "exportmode.slint";
+import { EditView, EditState } from "edit.slint";
+import { LightingView, LightingState } from "lighting.slint";
+import { VideoView, VideoState } from "video.slint";
+import { PrefsState } from "prefs.slint";
+import { MidiState } from "midi.slint";
+import { DeviceState } from "device.slint";
+import { KeysState } from "help.slint";
+import { TouchActions } from "touch-actions.slint";
+import { TrackInfoEditor, TrackInfoState } from "trackinfo.slint";
+
+/// A theme-selected presentation of the full Linux app. No separate session or reduced feature set.
+export component TouchWorkspace inherits Rectangle {
+    callback fullscreen-toggled();
+    callback zoom-all(int);
+    property <int> section;
+    property <int> deck;
+    property <int> deck-count: DeckState.count;
+    changed deck-count => { root.deck = min(root.deck, root.deck-count - 1); }
+    property <int> mode: ExportModeState.visible ? 0 : EditState.visible ? 2 : LightingState.visible ? 3 : VideoState.visible ? 4 : 1;
+    property <int> export-layout: ExportModeState.layout;
+    changed export-layout => { if root.mode == 0 && root.export-layout == 4 { root.section = 1; } }
+    property <bool> dual: root.width >= Theme.touch-breakpoint;
+    property <bool> compact-header: root.width >= 14 * Theme.touch-target;
+    property <bool> deck-page: root.section == 0 && root.mode == 1;
+    property <bool> inline-deck: root.deck-page && root.width >= 12 * Theme.touch-target;
+    property <length> header-h: (root.compact-header ? 1 : 2) * (Theme.touch-target + 4px) + (root.deck-page && !root.inline-deck ? Theme.touch-target + 4px : 0px);
+    out property <length> required-height: root.header-h + transport.height + Theme.h-status + Theme.touch-target;
+    // ponytail: dense legacy editors pan at 1000px; reflow those panels if side-scrolling becomes impractical.
+    property <length> panel-width: root.section == 3 || root.section == 4 || root.section == 5 || root.section == 6 ? max(root.width, 1000px) : root.section == 0 && root.mode != 1 ? max(root.width, 1000px) : root.width;
+    out property <int> browser-rows: max(6, floor((viewport.height - browser.required-height + 4 * Theme.h-row) / Theme.h-row));
+    out property <bool> mix-active: root.visible && root.section == 5 && MixPointState.enabled;
+    changed visible => { if root.visible { keys.focus(); } }
+    changed section => {
+        viewport.content-x = 0px; viewport.content-y = 0px;
+        if root.visible {
+            FxState.open = root.section == 3;
+            SamplerState.open = root.section == 4;
+            MixPointState.open = root.section == 5;
+            GrooveState.open = root.section == 6;
+            keys.focus();
+        }
+    }
+    changed mode => { root.section = root.mode == 0 && root.export-layout == 4 ? 1 : 0; viewport.content-x = 0px; viewport.content-y = 0px; }
+    function set-mode(n: int) { ExportModeState.visible = n == 0; EditState.visible = n == 2; LightingState.visible = n == 3; VideoState.visible = n == 4; }
+    public function focus-search() { root.section = 1; browser.focus-search(); }
+    public function browse(d: int) { browser.select-delta(d); }
+    public function browse-back() { root.section = 1; browser.browse-back(); }
+    public function browse-push() -> bool { root.section = 1; return browser.browse-push(); }
+    public function sort-by(col: int) { browser.sort-by(col); }
+    public function browse-view() { root.section = root.mode == 0 && root.export-layout == 4 ? 1 : root.section == 1 ? 0 : 1; }
+    public function browse-area() { root.section = 1; browser.cycle-area(); }
+    background: Theme.bg;
+    keys := FocusScope {
+        width: root.width; height: root.height;
+        key-pressed(e) => {
+            if (e.text == Key.Escape || e.text == Key.Back) && root.section != 0 { root.section = 0; return accept; }
+            if !e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control) { return accept; }
+            return reject;
+        }
+        key-released(e) => { if KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control) { return accept; } return reject; }
+        VerticalLayout {
+            x: 4px; y: 4px; width: root.width - 8px; height: root.header-h - 4px; spacing: 4px;
+            HorizontalLayout {
+                height: Theme.touch-target; spacing: 4px;
+                Dropdown {
+                    preferred-width: 3 * Theme.touch-target; horizontal-stretch: root.compact-header ? 0 : 1;
+                    options: LightingState.enabled && VideoState.enabled ? ["Export", "Performance", "Edit", "Lighting", "Video"] : LightingState.enabled ? ["Export", "Performance", "Edit", "Lighting"] : VideoState.enabled ? ["Export", "Performance", "Edit", "Video"] : ["Export", "Performance", "Edit"];
+                    current: root.mode == 4 && !LightingState.enabled ? 3 : root.mode;
+                    chose(n) => { root.set-mode(n == 3 && !LightingState.enabled ? 4 : n); }
+                }
+                if root.compact-header: Dropdown { options: [root.mode == 1 ? "Decks" : root.mode == 0 ? "Export players" : root.mode == 2 ? "Edit" : root.mode == 3 ? "Lighting" : "Video", "Library", "Mixer & output", "Effects", "Sampler", "Mix point link", "Beat Lab", "All commands"]; current: root.section; chose(n) => { root.section = n; } }
+                if root.inline-deck: Dropdown {
+                    width: root.compact-header ? 2 * Theme.touch-target : 100px; horizontal-stretch: 0;
+                    options: DeckState.count == 4 ? ["Deck A", "Deck B", "Deck C", "Deck D"] : ["Deck A", "Deck B"];
+                    current: root.deck; chose(n) => { root.deck = n; }
+                }
+                if root.compact-header && root.mode == 1: Dropdown { width: 2 * Theme.touch-target; horizontal-stretch: 0; options: ["2 decks", "4 decks"]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose("decks", n); } }
+                if root.compact-header && root.mode == 0: Dropdown { width: 3 * Theme.touch-target; horizontal-stretch: 0; options: ExportModeState.layout-names; current: ExportModeState.layout; chose(n) => { PrefsState.chose("export_layout", n); } }
+                IconButton { icon: Icon.usb; tooltip: "Devices"; clicked => { DeviceState.visible = true; DeviceState.opened(); } }
+                IconButton { icon: Icon.gear; tooltip: "Preferences, themes and extensions"; clicked => { PrefsState.visible = true; } }
+                IconButton { icon: Icon.more; tooltip: "All commands"; active: root.section == 7; clicked => { root.section = root.section == 7 ? 0 : 7; } }
+            }
+            if !root.compact-header: HorizontalLayout {
+                height: Theme.touch-target; spacing: 4px;
+                Dropdown { options: [root.mode == 1 ? "Decks" : root.mode == 0 ? "Export players" : root.mode == 2 ? "Edit" : root.mode == 3 ? "Lighting" : "Video", "Library", "Mixer & output", "Effects", "Sampler", "Mix point link", "Beat Lab", "All commands"]; current: root.section; chose(n) => { root.section = n; } }
+                if root.mode == 1: Dropdown { width: 100px; horizontal-stretch: 0; options: ["2 decks", "4 decks"]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose("decks", n); } }
+                if root.mode == 0: Dropdown { width: 130px; horizontal-stretch: 0; options: ExportModeState.layout-names; current: ExportModeState.layout; chose(n) => { PrefsState.chose("export_layout", n); } }
+            }
+            if root.deck-page && !root.inline-deck: HorizontalLayout {
+                height: Theme.touch-target; spacing: 4px;
+                for i in DeckState.count: Chip { text: (root.width < 480px ? "" : "Deck ") + ["A", "B", "C", "D"][i]; tooltip: "Select deck " + ["A", "B", "C", "D"][i]; active: root.dual ? floor(root.deck / 2) == floor(i / 2) : root.deck == i; clicked => { root.deck = i; } }
+                IconButton { icon: Icon.zoom-out; tooltip: "Zoom out"; clicked => { DeckState.zoom(root.deck, -1); } }
+                IconButton { icon: Icon.zoom-reset; tooltip: "Reset waveform zoom"; clicked => { DeckState.zoom(root.deck, 0); } }
+                IconButton { icon: Icon.zoom-in; tooltip: "Zoom in"; clicked => { DeckState.zoom(root.deck, 1); } }
+            }
+        }
+        viewport := Flickable {
+            x: 0; y: root.header-h; width: root.width;
+            height: max(0px, root.height - root.header-h - transport.height - Theme.h-status);
+            content-width: root.panel-width;
+            content-height: root.deck-page ? deck-stage.height : root.section == 1 ? max(self.height, browser.required-height) : root.section == 2 ? touch-mixer.height : root.section == 3 ? max(self.height, FxState.panel-h) : root.section == 4 ? max(self.height, SamplerState.panel-h) : root.section == 5 ? max(self.height, mix-stage.height) : root.section == 6 ? max(self.height, GrooveState.panel-h) : root.section == 7 ? actions.height : root.mode == 0 ? max(self.height, ExportModeState.panel-h) : max(self.height, root.mode == 3 || root.mode == 4 ? 680px : 520px);
+            deck-stage := Rectangle {
+                visible: root.deck-page;
+                width: viewport.content-width;
+                height: root.dual ? max(left.height, right.height) : left.height;
+                left := VerticalLayout {
+                    x: 0; y: 0; width: root.dual ? (parent.width - 4px) / 2 : parent.width;
+                    height: self.preferred-height; spacing: 4px; alignment: start;
+                    if root.visible && root.deck-page: DeckDetail { index: root.dual ? floor(min(root.deck, DeckState.count - 1) / 2) * 2 : min(root.deck, DeckState.count - 1); height: 88px; }
+                    if root.visible && root.deck-page: TouchDeck { index: root.dual ? floor(min(root.deck, DeckState.count - 1) / 2) * 2 : min(root.deck, DeckState.count - 1); }
+                }
+                right := VerticalLayout {
+                    visible: root.dual;
+                    x: (parent.width + 4px) / 2; y: 0; width: (parent.width - 4px) / 2;
+                    height: self.preferred-height; spacing: 4px; alignment: start;
+                    if root.visible && root.deck-page && root.dual: DeckDetail { index: min(floor(root.deck / 2) * 2 + 1, DeckState.count - 1); height: 88px; }
+                    if root.visible && root.deck-page && root.dual: TouchDeck { index: min(floor(root.deck / 2) * 2 + 1, DeckState.count - 1); }
+                }
+            }
+            browser := Browser {
+                visible: root.section == 1;
+                width: viewport.content-width; height: viewport.content-height;
+                dock: root.mode == 0;
+                dock-height: root.mode == 0 ? ExportModeState.dock-h : 0px;
+                if root.mode == 0: ExportDock { vertical-stretch: 0; min-height: ExportModeState.dock-h; max-height: ExportModeState.dock-h; }
+            }
+            touch-mixer := TouchMixer { visible: root.section == 2; width: viewport.content-width; }
+            if root.visible && root.section == 3: FxPanel { width: viewport.content-width; height: viewport.content-height; }
+            if root.visible && root.section == 4: SamplerPanel { width: viewport.content-width; height: viewport.content-height; }
+            mix-stage := VerticalLayout {
+                visible: root.section == 5;
+                width: viewport.content-width; height: self.preferred-height; spacing: 4px; alignment: start;
+                if root.visible && root.section == 5: MixPointPanel {
+                    height: max(Theme.h-mixpoint, 2 * Theme.target-size(Theme.h-ctl) + 2 * Theme.target-size(Theme.h-ctl-sm) + 3 * Theme.gap + 2 * Theme.space-sm);
+                }
+                if root.visible && root.section == 5 && MixPointState.enabled: HorizontalLayout {
+                    height: Theme.touch-target; spacing: 4px;
+                    for i in DeckState.count: Chip {
+                        text: "Deck " + ["A", "B", "C", "D"][i]; height: Theme.touch-target; min-width: max(Theme.touch-target, self.fit-width);
+                        active: root.deck == i; tooltip: "Select deck waveform for MIX POINT / SILENT editing";
+                        clicked => { root.deck = i; }
+                    }
+                    IconButton { icon: Icon.zoom-out; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Deck waveform zoom out"; clicked => { DeckState.zoom(root.deck, -1); } }
+                    IconButton { icon: Icon.zoom-reset; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Reset deck waveform zoom"; clicked => { DeckState.zoom(root.deck, 0); } }
+                    IconButton { icon: Icon.zoom-in; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Deck waveform zoom in"; clicked => { DeckState.zoom(root.deck, 1); } }
+                    Text { text: "Mix point lane zoom"; color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; horizontal-alignment: TextHorizontalAlignment.right; horizontal-stretch: 1; }
+                    IconButton { icon: Icon.minus; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Mix point lanes zoom out"; clicked => { MixPointState.zoom(-1); } }
+                    IconButton { icon: Icon.plus; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Mix point lanes zoom in"; clicked => { MixPointState.zoom(1); } }
+                }
+                if root.visible && root.section == 5 && MixPointState.enabled: DeckDetail { index: root.deck; height: max(88px, 2 * Theme.touch-target); }
+                if root.visible && root.section == 5 && MixPointState.enabled: DeckOverview { index: root.deck; height: Theme.target-size(Theme.h-overview); }
+            }
+            if root.visible && root.section == 6: GroovePanel { width: viewport.content-width; height: viewport.content-height; }
+            actions := TouchActions { visible: root.section == 7; width: viewport.content-width; fullscreen-toggled => { root.fullscreen-toggled(); } zoom-all(dir) => { root.zoom-all(dir); } }
+            if root.visible && root.section == 0 && root.mode == 0: ExportPlayers { width: viewport.content-width; height: viewport.content-height; }
+            if root.visible && root.section == 0 && root.mode == 2: EditView { width: viewport.content-width; height: viewport.content-height; }
+            if root.visible && root.section == 0 && root.mode == 3: LightingView { width: viewport.content-width; height: viewport.content-height; }
+            if root.visible && root.section == 0 && root.mode == 4: VideoView { width: viewport.content-width; height: viewport.content-height; }
+        }
+        transport := TouchTransport { x: 0; y: root.height - self.height - Theme.h-status; width: root.width; }
+        Text { x: 8px; y: root.height - Theme.h-status; width: root.width - 16px; height: Theme.h-status; text: BrowserState.status; color: Theme.text; font-size: Theme.font-sm; vertical-alignment: center; overflow: elide; }
+    }
+    // The browser can be hidden or taller than its viewport; the editor uses the whole workspace.
+    if root.visible && TrackInfoState.editor-open: TrackInfoEditor {}
+}

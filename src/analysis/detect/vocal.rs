@@ -9,7 +9,7 @@
 //! (vibrato, glides and syllables do; a held synth chord does not) ([`regions`]). Gaps under 1 s are closed,
 //! regions under 2 s dropped.
 
-use crate::analysis::{Stft, mono_decimate};
+use crate::analysis::{Stft, mono_decimate_cancellable};
 
 const N: usize = 4096;
 const HOP: usize = N / 2;
@@ -80,11 +80,17 @@ fn frame_pitch(mag: &[f32], bin_hz: f32) -> Option<f32> {
 }
 
 /// Per frame pitch of the voiced frames of mono `x` at `rate`.
-fn pitches(x: &[f32], rate: f32) -> Vec<Option<f32>> {
+fn pitches(x: &[f32], rate: f32, cancelled: &dyn Fn() -> bool) -> Option<Vec<Option<f32>>> {
     let mut stft = Stft::new(N);
     x.windows(N)
         .step_by(HOP)
-        .map(|frame| frame_pitch(stft.magnitudes(frame), rate / N as f32))
+        .map(|frame| {
+            if cancelled() {
+                None
+            } else {
+                Some(frame_pitch(stft.magnitudes(frame), rate / N as f32))
+            }
+        })
         .collect()
 }
 
@@ -131,10 +137,23 @@ fn regions(p: &[Option<f32>], frame_ms: f64) -> Vec<VocalRegion> {
 
 /// Vocal regions of interleaved stereo f32 PCM (`rate` Hz). CPU light (a few hundred ms for a long track).
 pub fn vocal_regions(samples: &[f32], rate: u32) -> Vec<VocalRegion> {
+    vocal_regions_cancellable(samples, rate, &|| false).expect("uncancelled vocal analysis")
+}
+
+pub(crate) fn vocal_regions_cancellable(
+    samples: &[f32],
+    rate: u32,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Vec<VocalRegion>> {
     let d = ((rate + TARGET_RATE / 2) / TARGET_RATE).max(1) as usize;
-    let x = mono_decimate(samples, d);
+    let x = mono_decimate_cancellable(samples, d, cancelled)?;
     let r = rate as f32 / d as f32;
-    regions(&pitches(&x, r), HOP as f64 / r as f64 * 1000.0)
+    let pitches = pitches(&x, r, cancelled)?;
+    if cancelled() {
+        return None;
+    }
+    let regions = regions(&pitches, HOP as f64 / r as f64 * 1000.0);
+    (!cancelled()).then_some(regions)
 }
 
 #[cfg(test)]
@@ -237,5 +256,23 @@ mod tests {
             regions(&steady, 100.0).is_empty(),
             "a pitch that never moves is not a voice"
         );
+    }
+
+    #[test]
+    fn vocal_analysis_cancels_between_spectral_frames() {
+        use std::cell::Cell;
+        let x = vec![0.0; N + 8 * HOP];
+        let polls = Cell::new(0);
+        let cancelled = || {
+            polls.set(polls.get() + 1);
+            polls.get() >= 3
+        };
+        assert!(pitches(&x, TARGET_RATE as f32, &cancelled).is_none());
+        assert_eq!(polls.get(), 3);
+        assert_eq!(
+            pitches(&x, TARGET_RATE as f32, &|| false),
+            Some(vec![None; 9])
+        );
+        assert!(vocal_regions_cancellable(&[], RATE, &|| true).is_none());
     }
 }

@@ -1,9 +1,9 @@
 //! STEMS: separating a loaded track into VOCAL / INST / BASS / DRUMS (a 4-stem set) in the background, while it is
 //! played.
 //!
-//! Base: [`Job`], the background job a deck starts per loaded track: its [`Stems`] exist at once and fill segment by segment
-//! (the deck hands them to the player straight away; frames not separated yet play as the original track), from the cache if
-//! the track was separated before, else by the GPU and the CPU side by side, then cached. [`Progress`] is what it reports and
+//! Base: [`Job`], the background job a deck starts per loaded track: its [`Stems`] are allocated on the worker and fill
+//! segment by segment (frames not separated yet play as the original track), from the cache if the track was separated
+//! before, else by the GPU and CPU side by side, then cached. [`Progress`] is what it reports and
 //! [`Quality`] (STEMS Analysis Process: sound quality or speed) what it separates at. Children: [`model`] (the open
 //! Demucs v4 `htdemucs` ONNX model, its download, the GPU and CPU [`Engine`](model::Engine)s), [`schedule`] (the order of the
 //! segments), [`separate`] (one engine's loop over segments), [`cache`] (on-disk results keyed like the analysis cache, one
@@ -20,9 +20,9 @@ use crate::audio::{Stems, Track16};
 use parking_lot::Mutex;
 use schedule::Schedule;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicUsize, Ordering::Relaxed};
 use std::sync::mpsc::{Receiver, channel};
+use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 /// STEMS Analysis Process (PREFS: "Prioritize sound quality" / "Prioritize speed"):
@@ -97,7 +97,7 @@ impl Progress {
 /// A separation in the background. Dropping it cancels (between segments); the stems it filled stay with whoever holds them.
 pub struct Job {
     pub progress: Arc<Progress>,
-    stems: Arc<Stems>,
+    stems: Arc<OnceLock<Arc<Stems>>>,
     ctl: Arc<Control>,
     rx: Receiver<Result<(), String>>,
 }
@@ -142,17 +142,30 @@ impl Job {
             permille: AtomicU32::new(0),
         });
         let (frames, grid) = (pcm.frames(), separate::grid(pcm.rate, quality));
-        let stems = Arc::new(Stems::new(frames, grid));
+        let stems = Arc::new(OnceLock::new());
         let ctl = Arc::new(Control {
-            sched: Mutex::new(Schedule::new(grid, stems.segments(), quality.sequential())),
+            sched: Mutex::new(Schedule::new(
+                grid,
+                grid.count(frames),
+                quality.sequential(),
+            )),
             cancel: AtomicBool::new(false),
         });
         let (tx, rx) = channel();
         let (p, s, c) = (progress.clone(), stems.clone(), ctl.clone());
         std::thread::spawn(move || {
-            let result = work(&audio, &pcm, quality, multithread, &s, &c, &p).map(|fresh| {
+            if c.cancel.load(Relaxed) {
+                return;
+            }
+            let allocated = Arc::new(Stems::new(frames, grid));
+            if c.cancel.load(Relaxed) {
+                return;
+            }
+            let _ = s.set(allocated);
+            let s = s.get().unwrap();
+            let result = work(&audio, &pcm, quality, multithread, s, &c, &p).map(|fresh| {
                 // Stored before the outcome is announced: whoever starts the same track next finds it.
-                if fresh && let Err(e) = cache::store(&audio, pcm.rate, &s, quality) {
+                if fresh && let Err(e) = cache::store(&audio, pcm.rate, s, quality) {
                     eprintln!("stems cache: {e}");
                 }
             });
@@ -167,9 +180,9 @@ impl Job {
         }
     }
 
-    /// The stems being filled (hand them to the player at once).
-    pub fn stems(&self) -> &Arc<Stems> {
-        &self.stems
+    /// The stems once the worker has allocated them; attach them while separation continues.
+    pub fn stems(&self) -> Option<&Arc<Stems>> {
+        self.stems.get()
     }
 
     /// Where the listener is (`play`) and the HOT CUEs, in frames: SPEED separates those first ([`Schedule::focus`]).
@@ -194,10 +207,16 @@ fn work(
     ctl: &Control,
     p: &Progress,
 ) -> Result<bool, String> {
+    if ctl.cancel.load(Relaxed) {
+        return Err("cancelled".into());
+    }
     match cache::load(audio, pcm.rate, stems, quality) {
         Ok(true) => return Ok(false),
         Ok(false) => {}
         Err(e) => eprintln!("stems cache: {e} (recomputing)"),
+    }
+    if ctl.cancel.load(Relaxed) {
+        return Err("cancelled".into());
     }
     if !model::usable() {
         p.set(Phase::Download, 0.0);
@@ -215,20 +234,19 @@ fn work(
         for (i, &engine) in engines.iter().enumerate() {
             let (finished, per_engine, errors) = (&finished, &per_engine, &errors);
             sc.spawn(move || {
-                // A GPU that will not open is logged by `open`; the other engine carries on.
-                let result = engine.open().and_then(|()| {
-                    let done = |_: usize| {
-                        per_engine[i].fetch_add(1, Relaxed);
-                        p.set(
-                            Phase::Separate,
-                            (finished.fetch_add(1, Relaxed) + 1) as f32 / n as f32,
-                        );
-                    };
+                let done = |_: usize| {
+                    per_engine[i].fetch_add(1, Relaxed);
+                    p.set(
+                        Phase::Separate,
+                        (finished.fetch_add(1, Relaxed) + 1) as f32 / n as f32,
+                    );
+                };
+                let result = engine.open_cancellable(&ctl.cancel).and_then(|()| {
                     separate::work(
                         pcm,
                         stems,
                         &ctl.sched,
-                        &mut |mix| engine.run(mix),
+                        &mut |mix, consume| engine.run(mix, &ctl.cancel, consume),
                         &ctl.cancel,
                         &done,
                     )

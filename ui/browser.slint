@@ -1,10 +1,11 @@
-import { Chip, Icon, IconButton, Splitter, TextField } from "widgets.slint";
+import { Chip, Dropdown, Icon, IconButton, Splitter, TextField } from "widgets.slint";
 import { PaneState } from "panes.slint";
 import { Theme } from "theme.slint";
+import { DeckState } from "deck-state.slint";
 import { AutomixState, BrowserState } from "browser-state.slint";
 import { DeviceState } from "device-state.slint";
 import { LibraryState } from "library.slint";
-import { TrackInfo } from "trackinfo.slint";
+import { TrackInfo, TrackInfoEditor, TrackInfoState } from "trackinfo.slint";
 import { TrackTable } from "browser-table.slint";
 import { PickerPanel, SmartEditor, TreeView } from "browser-tree.slint";
 import { Palette } from "browser-palette.slint";
@@ -36,9 +37,17 @@ component Tab inherits Rectangle {
 /// Media browser : icon strip, playlist tree with the track info under it, tabs / toolbar / filter /
 /// table in the middle, action strip on the right. Fills the size it is given; the status line belongs to the window.
 export component Browser inherits Rectangle {
-    public function focus-search() { search.focus-field(); }
+    property <bool> touch: Theme.layout-profile == 1;
+    property <int> touch-pane;
+    property <int> preview-row: BrowserState.current-row;
+    changed preview-row => { if root.touch && root.touch-pane == 3 && root.preview-row >= 0 { BrowserState.preview-wanted(root.preview-row); } }
+    changed touch-pane => { if root.touch && root.touch-pane == 3 && root.preview-row >= 0 { BrowserState.preview-wanted(root.preview-row); } }
+    property <length> touch-header: root.touch ? Theme.touch-target + 4px : 0px;
+    out property <length> required-height: max(root.touch-header + Theme.h-tab + Theme.h-toolbar + 4 * Theme.h-row + ((root.filter-open ? 1 : 0) + (BrowserState.name-open ? 1 : 0) + (BrowserState.suggest ? 1 : 0)) * (Theme.h-ctl + Theme.space-sm) + (BrowserState.palette-enabled && BrowserState.palette-open ? 6 * Theme.touch-target : 0px), root.touch && root.touch-pane == 1 ? root.touch-header + 3 * Theme.target-size(Theme.h-row) + Theme.h-ctl + 2 * Theme.gap + root.dock-height : 0px);
+    public function focus-search() { root.touch-pane = 0; search.focus-field(); }
     /// EXPORT mode: the tree column carries the device dock (a child of this component) instead of the track info.
     in property <bool> dock;
+    in property <length> dock-height: 0px;
     /// The browser of the split-screen window: the main window's layout switch (browse view) is not its to flip.
     in property <bool> detached;
     /// Moves the track selection by `d` rows, clamped (current-row is -1 when none).
@@ -47,10 +56,10 @@ export component Browser inherits Rectangle {
         else { table.set-current-row(BrowserState.current-row + d); }
     }
     /// MIDI BACK: the browse encoder walks the playlist tree.
-    public function browse-back() { root.tree-focus = true; tree.focus(); }
+    public function browse-back() { root.touch-pane = 1; root.tree-focus = true; tree.focus(); }
     /// MIDI browse push: from the tree, go to the tracks (false); on the tracks the caller loads the chosen one (true).
     public function browse-push() -> bool {
-        if (root.tree-focus) { root.tree-focus = false; table.focus(); return false; }
+        if (root.tree-focus) { root.touch-pane = 0; root.tree-focus = false; table.focus(); return false; }
         return true;
     }
     /// MIDI Area (Back+Shift) / Shift+W: the focus walks tree → Tag List → track list → related → tree. Tag List and
@@ -83,6 +92,7 @@ export component Browser inherits Rectangle {
     property <bool> filter-open;
     /// Related off, the sidebar on `row`, the table focused.
     function show-list(row: int) {
+        root.touch-pane = 0;
         root.tree-focus = false;
         if (BrowserState.related) { BrowserState.related-toggled(false); }
         if (BrowserState.suggest) { BrowserState.suggest-toggled(false); }
@@ -117,11 +127,15 @@ export component Browser inherits Rectangle {
     background: Theme.bg;
 
     HorizontalLayout {
+        x: 0; y: root.touch-header;
+        width: root.width;
+        height: root.height - root.touch-header;
         spacing: Theme.gap;
         // Left icon strip: the fixed sidebar rows (All tracks, Tag List, Session history, Duplicates), Related, then one USB icon
         // per connected device that opens the DEVICES window on it.
         Rectangle {
-            width: 28px;
+            width: root.touch ? (root.touch-pane == 1 ? Theme.touch-target : 0px) : 28px;
+            visible: !root.touch || root.touch-pane == 1;
             background: Theme.panel;
             VerticalLayout {
                 padding: 2px;
@@ -149,7 +163,8 @@ export component Browser inherits Rectangle {
         }
         // Tree + management buttons + track info.
         VerticalLayout {
-            width: root.tree-w;
+            width: root.touch ? (root.touch-pane == 1 ? root.width - Theme.touch-target - Theme.gap : 0px) : root.tree-w;
+            visible: !root.touch || root.touch-pane == 1;
             spacing: Theme.gap;
             tree := TreeView {
                 current-item <=> BrowserState.tree-row;
@@ -157,6 +172,7 @@ export component Browser inherits Rectangle {
                 item-changed(i) => {
                     if (i != BrowserState.tag-row) { root.list-row = i; }
                     BrowserState.playlist-selected(i);
+                    if root.touch { root.touch-pane = 0; }
                 }
                 focused => { root.tree-focus = true; }
             }
@@ -172,17 +188,24 @@ export component Browser inherits Rectangle {
                 Chip { text: "MORE"; font-size: Theme.font-xs; tooltip: "Edit smart playlist, move; Cue Bank: add cues, load onto a deck"; enabled: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || BrowserState.side-kind == 14; clicked => { BrowserState.panel-request(4); } }
             }
             // Shrinks (clipped) with the browser instead of forcing it taller than the window allows.
-            if !root.dock: TrackInfo { min-height: 0px; preferred-height: root.info-h; max-height: root.info-h; clip: true; vertical-stretch: 0; }
+            if !root.dock && !root.touch: TrackInfo { min-height: 0px; preferred-height: root.info-h; max-height: root.info-h; clip: true; vertical-stretch: 0; }
             // EXPORT mode: the device dock (exportmode.slint) takes the track info's place under the tree.
             @children
         }
         // Tabs, toolbar, filter row, name bar, table.
         VerticalLayout {
+            visible: !root.touch || root.touch-pane == 0;
+            min-width: 0px;
+            max-width: root.touch && root.touch-pane != 0 ? 0px : 100000px;
             spacing: 0;
             Rectangle {
                 height: Theme.h-tab;
                 background: Theme.panel;
+                Flickable {
+                    content-width: root.touch ? max(self.width, 650px) : self.width;
+                    content-height: self.height;
                 HorizontalLayout {
+                    width: parent.content-width; height: parent.height;
                     padding-right: Theme.space-md;
                     spacing: Theme.space-sm;
                     Tab { text: "TRACKS"; active: (root.area == 2 || root.area == 0) && !BrowserState.suggest; clicked => { root.show-list(root.list-row); } }
@@ -197,6 +220,7 @@ export component Browser inherits Rectangle {
                     }
                     Chip { text: "SKIP"; width: 44px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; enabled: AutomixState.running; clicked => { AutomixState.skip(); } }
                     Chip { text: "EXPORT"; width: 64px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; clicked => { BrowserState.export-collection(); } }
+                }
                 }
             }
             if BrowserState.suggest: SuggestBar { }
@@ -230,7 +254,11 @@ export component Browser inherits Rectangle {
             if root.filter-open: Rectangle {
                 height: Theme.h-ctl + Theme.space-sm;
                 background: Theme.panel;
+                Flickable {
+                    content-width: root.touch ? max(self.width, 760px) : self.width;
+                    content-height: self.height;
                 HorizontalLayout {
+                    width: parent.content-width; height: parent.height;
                     padding-left: Theme.space-lg;
                     padding-right: Theme.space-md;
                     padding-bottom: Theme.space-sm;
@@ -252,6 +280,7 @@ export component Browser inherits Rectangle {
                         clicked => { BrowserState.panel-request(2); }
                     }
                     Rectangle { }
+                }
                 }
             }
             if BrowserState.name-open: Rectangle {
@@ -275,13 +304,17 @@ export component Browser inherits Rectangle {
             Rectangle {
                 vertical-stretch: 1;
                 min-height: 0px;
-                table := TrackTable {
-                    width: parent.width;
-                    height: parent.height;
-                    sorted-col: root.sorted-col;
-                    sorted-asc: root.sorted-asc;
-                    sort-clicked(c) => { root.sort-by(c); }
-                    focused => { root.tree-focus = false; }
+                Flickable {
+                    content-width: root.touch ? max(self.width, 540px) : self.width;
+                    content-height: self.height;
+                    table := TrackTable {
+                        width: parent.content-width;
+                        height: parent.height;
+                        sorted-col: root.sorted-col;
+                        sorted-asc: root.sorted-asc;
+                        sort-clicked(c) => { root.sort-by(c); }
+                        focused => { root.tree-focus = false; }
+                    }
                 }
                 if BrowserState.panel-open: PickerPanel {
                     x: parent.width - self.width;
@@ -291,20 +324,41 @@ export component Browser inherits Rectangle {
                 if BrowserState.editor-open: SmartEditor { width: parent.width; height: parent.height; }
             }
             // Playlist Palette: the TAG LIST and three playlists under the track list.
-            if BrowserState.palette-enabled && BrowserState.palette-open: Palette { height: root.palette-h; vertical-stretch: 0; }
+            if BrowserState.palette-enabled && BrowserState.palette-open: Flickable {
+                height: root.touch ? 6 * Theme.touch-target : root.palette-h; vertical-stretch: 0;
+                content-width: root.touch ? max(self.width, 760px) : self.width; content-height: self.height;
+                Palette { width: parent.content-width; height: parent.height; }
+            }
         }
         // Right strip: list actions on the chosen track, plus the browse view.
         Rectangle {
-            width: 28px;
+            width: root.touch ? (root.touch-pane == 3 ? root.width : 0px) : 28px;
+            visible: !root.touch || root.touch-pane == 3;
             background: Theme.panel;
-            VerticalLayout {
+            Flickable {
+                content-width: self.width;
+                content-height: browser-actions.preferred-height;
+            browser-actions := VerticalLayout {
+                width: parent.width;
                 padding: 2px;
                 spacing: 2px;
                 alignment: start;
+                if root.touch: HorizontalLayout {
+                    spacing: 4px;
+                    Dropdown { options: ["Sort: Title", "Sort: Artist", "Sort: Genre", "Sort: Key", "Sort: BPM", "Sort: Time", "Sort: Rating", "Sort: Comment"]; current: root.sorted-col; chose(n) => { root.sort-by(n); } }
+                    Chip { text: root.sorted-asc ? "Ascending" : "Descending"; width: 120px; horizontal-stretch: 0; clicked => { root.sort-by(max(0, root.sorted-col)); } }
+                }
                 IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Add to playlist"; active: BrowserState.panel-open && BrowserState.panel-title == "ADD TO PLAYLIST"; clicked => { BrowserState.panel-request(0); } }
                 IconButton { icon: Icon.tag; icon-size: 16px; tooltip: "Tags of the chosen track"; active: BrowserState.panel-open && BrowserState.panel-title == "TAGS OF THE CHOSEN TRACK"; clicked => { BrowserState.panel-request(1); } }
                 IconButton { icon: Icon.check; icon-size: 16px; tooltip: "Add to the Tag List (T)"; clicked => { BrowserState.tag-add(); } }
                 IconButton { icon: BrowserState.preview-playing ? Icon.stop : Icon.headphones; icon-size: 16px; tooltip: "Preview the chosen track on the headphones"; active: BrowserState.preview-playing; clicked => { BrowserState.preview-toggled(); } }
+                if root.touch: Text { text: "Headphone preview: tap the waveform to seek"; color: Theme.text-dim; font-size: Theme.font-sm; wrap: word-wrap; }
+                if root.touch: Rectangle {
+                    height: Theme.touch-target;
+                    background: Theme.bg-deep;
+                    Image { source: BrowserState.previews[root.preview-row]; width: parent.width; height: parent.height; image-fit: fill; }
+                    TouchArea { enabled: root.preview-row >= 0; clicked => { BrowserState.preview-seek(root.preview-row, self.mouse-x / self.width); } }
+                }
                 if BrowserState.palette-enabled: IconButton { icon: Icon.layout-4h; icon-size: 16px; tooltip: "Playlist Palette"; active: BrowserState.palette-open; clicked => { BrowserState.palette-open = !BrowserState.palette-open; } }
                 IconButton { icon: Icon.chevron-up; icon-size: 16px; tooltip: "Move up"; enabled: root.list-edit; clicked => { BrowserState.list-move(-1); } }
                 IconButton { icon: Icon.chevron-down; icon-size: 16px; tooltip: "Move down"; enabled: root.list-edit; clicked => { BrowserState.list-move(1); } }
@@ -319,10 +373,11 @@ export component Browser inherits Rectangle {
                 if BrowserState.history-view: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: "Save as M3U8"; clicked => { BrowserState.history-save(); } }
                 if !root.detached: IconButton { icon: Icon.expand; icon-size: 16px; tooltip: "Browse view (W)"; active: BrowserState.browse-max; clicked => { BrowserState.browse-max = !BrowserState.browse-max; } }
             }
+            }
         }
     }
     // Drag handles on the borders: tree / list, tree / track info, list / palette (double-click = the default size).
-    Splitter {
+    if !root.touch: Splitter {
         x: 28px + Theme.gap + root.tree-w + Theme.gap / 2 - 3px;
         y: 0px;
         width: 6px;
@@ -331,7 +386,7 @@ export component Browser inherits Rectangle {
         lo: PaneState.tree-lo();
         hi: PaneState.tree-hi(root.width);
     }
-    if !root.dock: Splitter {
+    if !root.dock && !root.touch: Splitter {
         horizontal: true;
         invert: true;
         x: 28px + Theme.gap;
@@ -342,7 +397,7 @@ export component Browser inherits Rectangle {
         lo: PaneState.info-lo();
         hi: PaneState.info-hi(root.height);
     }
-    if BrowserState.palette-enabled && BrowserState.palette-open: Splitter {
+    if BrowserState.palette-enabled && BrowserState.palette-open && !root.touch: Splitter {
         horizontal: true;
         invert: true;
         x: 28px + 2 * Theme.gap + root.tree-w;
@@ -353,4 +408,22 @@ export component Browser inherits Rectangle {
         lo: PaneState.palette-lo();
         hi: PaneState.palette-hi(root.height);
     }
+    if root.touch && root.touch-pane == 2: TrackInfo {
+        x: 0; y: root.touch-header; width: root.width; height: root.height - self.y;
+    }
+    if root.touch: HorizontalLayout {
+        x: 4px; y: 0; width: root.width - 8px; height: Theme.touch-target; spacing: 4px;
+        Dropdown {
+            options: ["Tracks", "Sources", "Info", "Actions"];
+            current: root.touch-pane;
+            chose(n) => { root.touch-pane = n; }
+        }
+        for i in DeckState.count: Chip {
+            width: root.width < 480px ? Theme.touch-target : 80px; horizontal-stretch: 0;
+            text: (root.width < 480px ? "→ " : "Load ") + ["A", "B", "C", "D"][i];
+            tooltip: "Load the selected track to deck " + ["A", "B", "C", "D"][i];
+            clicked => { DeckState.load(i); }
+        }
+    }
+    if TrackInfoState.editor-open && (!root.touch || root.detached): TrackInfoEditor {}
 }

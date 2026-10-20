@@ -39,6 +39,20 @@ fn wrap(x: f64) -> f64 {
     (x + 0.5).rem_euclid(1.0) - 0.5
 }
 
+/// A loop can drive beat phase only if wrapping preserves the follower's fractional beat.
+pub(super) fn loop_preserves_phase(master: &[Beat], loop_: Option<(u32, u32)>, k: f64) -> bool {
+    let Some((s, e)) = loop_ else { return true };
+    let Some(start) = beat_at(master, s as f64) else {
+        return false;
+    };
+    let Some(end) = beat_at(master, e as f64) else {
+        return false;
+    };
+    let beats = ((end - start) * k).round();
+    // Loop endpoints are rounded to integer milliseconds; allow their combined rounding error.
+    beats >= 1.0 && ms_at(master, start + beats / k).is_some_and(|at| (at - e as f64).abs() <= 1.0)
+}
+
 /// Beat-phase error of the follower at `own_pos` against the master at `master_pos` (ms, track time)
 /// in the follower's beats (positive = ahead), and the position (ms) where it would be aligned.
 pub fn align(
@@ -188,6 +202,25 @@ mod tests {
         // k = ½: master beat 3 wants own phase .5
         let (err, _) = align(&own, 0.5 * 500.0, &master, 3.0 * 500.0, 0.5).unwrap();
         assert!(err.abs() < 1e-9);
+    }
+
+    #[test]
+    fn loop_phase_requires_whole_follower_beats() {
+        let master = grid(0, 120, 64);
+        for end in [16, 31, 63, 125, 250, 625, 750] {
+            assert!(!loop_preserves_phase(&master, Some((0, end)), 1.0));
+        }
+        for end in [500, 1000, 2000, 4000] {
+            assert!(loop_preserves_phase(&master, Some((0, end)), 1.0));
+        }
+        assert!(loop_preserves_phase(&master, None, 1.0));
+        assert!(loop_preserves_phase(&master, Some((0, 250)), 2.0));
+        assert!(!loop_preserves_phase(&master, Some((0, 125)), 2.0));
+        assert!(!loop_preserves_phase(&master, Some((0, 500)), 0.5));
+        assert!(loop_preserves_phase(&master, Some((0, 1000)), 0.5));
+        assert!(loop_preserves_phase(&master, Some((0, 501)), 1.0));
+        assert!(!loop_preserves_phase(&master, Some((0, 502)), 1.0));
+        assert!(!loop_preserves_phase(&[], Some((0, 500)), 1.0));
     }
 
     #[test]

@@ -1,0 +1,95 @@
+import { Theme } from "state.slint";
+import { Fader, Meter } from "../../ui/gauges.slint";
+import { Glyph, Icon } from "../../ui/icons.slint";
+export { Meter, Glyph, Icon }
+
+export component DJButton inherits Rectangle {
+    in property <string> text;
+    in property <string> label;
+    in property <bool> active;
+    in property <bool> enabled: true;
+    in property <color> tone: Theme.accent-hi;
+    in property <Icon> icon;
+    in property <bool> round-face;
+    callback clicked;
+    min-width: 44px; height: 44px;
+    accessible-role: button;
+    accessible-label: root.label == "" ? root.text : root.label;
+    face := Rectangle {
+        border-radius: root.round-face ? root.height / 2 : 5px;
+        border-width: 1px;
+        border-color: focus.has-focus ? Theme.text-bright : root.active ? root.tone : Theme.line;
+        background: !root.enabled ? Theme.panel : touch.pressed ? Theme.bg-deep
+            : root.active ? root.tone.darker(3) : touch.has-hover ? Theme.panel-high : Theme.panel-raised;
+    }
+    HorizontalLayout {
+        padding-left: 6px; padding-right: 6px; spacing: 5px; alignment: center;
+        if root.icon != Icon.none: Rectangle {
+            width: 18px;
+            Glyph {
+                width: 18px; height: 18px; y: (parent.height - self.height) / 2;
+                tint: !root.enabled ? Theme.text-disabled : root.active ? root.tone : Theme.text-bright;
+                icon: root.icon;
+            }
+        }
+        if root.text != "": Text {
+            text: root.text; color: !root.enabled ? Theme.text-disabled : root.active ? root.tone : Theme.text-bright;
+            font-size: 13px; font-weight: 600; overflow: elide;
+            horizontal-alignment: center; vertical-alignment: center;
+        }
+    }
+    focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " { root.clicked(); return accept; }
+            reject
+        }
+    }
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { focus.focus(); root.clicked(); }
+    }
+}
+
+export component TouchFader inherits Rectangle {
+    in property <float> value;
+    in property <bool> vertical;
+    in property <bool> detent;
+    in property <bool> enabled: true;
+    in property <color> tone: Theme.accent-hi;
+    in property <string> label;
+    callback edited(float);
+    min-width: 44px; min-height: 44px;
+    accessible-role: slider;
+    accessible-label: root.label;
+    accessible-value: "" + round(root.value * 100);
+    FocusScope {
+        enabled: root.enabled;
+        Fader {
+            width: parent.width; height: parent.height;
+            value: root.value; vertical: root.vertical; detent: root.detent; fill-color: root.tone;
+            edited(v) => { if root.enabled { root.edited(v); } }
+        }
+        key-pressed(e) => {
+            if e.text == Key.RightArrow || e.text == Key.UpArrow { root.edited(min(1, root.value + 0.01)); return accept; }
+            if e.text == Key.LeftArrow || e.text == Key.DownArrow { root.edited(max(0, root.value - 0.01)); return accept; }
+            reject
+        }
+    }
+}
+
+export component Control inherits VerticalLayout {
+    in property <string> label;
+    in property <float> value;
+    in property <float> minimum;
+    in property <float> maximum: 1;
+    callback moved(float);
+    spacing: 0px;
+    Text { text: root.label; color: Theme.text; font-size: 14px; }
+    TouchFader {
+        height: 44px; label: root.label;
+        value: (root.value - root.minimum) / (root.maximum - root.minimum);
+        detent: root.minimum == -root.maximum;
+        edited(v) => { root.moved(root.minimum + v * (root.maximum - root.minimum)); }
+    }
+}

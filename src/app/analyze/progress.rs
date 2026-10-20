@@ -24,6 +24,17 @@ impl Progress {
         }
     }
 
+    pub fn include(&mut self, other: &Self) {
+        self.total += other.total;
+        self.done += other.done;
+        self.failed += other.failed;
+        self.cached += other.cached;
+        self.recomputed += other.recomputed;
+        self.cues += other.cues;
+        self.tags += other.tags;
+        self.tag_failed += other.tag_failed;
+    }
+
     pub fn text(&self) -> String {
         if self.done < self.total {
             return format!("analyzing {}/{}", self.done, self.total);
@@ -97,5 +108,30 @@ mod tests {
         q.record(&out(Some(Ok(true))));
         q.record(&out(Some(Ok(false))));
         assert_eq!((q.cached, q.cues, q.tags, q.tag_failed), (2, 2, 1, 0));
+    }
+
+    #[test]
+    fn overlapping_runs_keep_all_request_progress_until_completion() {
+        let first = Progress {
+            total: 3,
+            done: 3,
+            cached: 2,
+            ..Default::default()
+        };
+        let mut second = Progress {
+            total: 2,
+            done: 1,
+            ..Default::default()
+        };
+        let mut total = Progress::default();
+        total.include(&first);
+        total.include(&second);
+        assert_eq!(total.text(), "analyzing 4/5");
+        second.done = 2;
+        second.failed = 1;
+        let mut total = Progress::default();
+        total.include(&first);
+        total.include(&second);
+        assert_eq!(total.text(), "analyzed 4 · 2 from cache · 1 failed");
     }
 }

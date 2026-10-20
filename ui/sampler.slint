@@ -12,6 +12,7 @@ export struct SlotView { loaded: bool, playing: bool, looped: bool, band: int, m
 export global SamplerState {
     /// Panel shown (in place of the Beat FX row), toggled by `SamplerTab` and the keyboard.
     in-out property <bool> open;
+    out property <length> panel-h: Theme.layout-profile == 1 ? max(Theme.h-sampler, 7 * Theme.touch-target) : Theme.h-sampler;
     /// 16 entries; the pads show the current bank of eight.
     in-out property <[SlotView]> slots;
     /// 0 = slots 1-8, 1 = slots 9-16.
@@ -133,9 +134,9 @@ component Slot inherits Rectangle {
 /// 2 rows x 4 slots (`first` .. `first + 7`).
 component SlotGrid inherits VerticalLayout {
     in property <int> first;
-    spacing: 2px;
+    spacing: Theme.layout-profile == 1 ? 4px : 2px;
     for r in SamplerState.slot-count - root.first > 4 ? 2 : 1: HorizontalLayout {
-        spacing: 2px;
+        spacing: Theme.layout-profile == 1 ? 4px : 2px;
         for c in 4: Slot { slot: root.first + r * 4 + c; }
     }
 }
@@ -143,28 +144,29 @@ component SlotGrid inherits VerticalLayout {
 /// SEQUENCER (src/app/sampler/seq.rs): REC / PLAY, 1 2 4 bars; MUTE / ERASE (then a slot pad), SAVE; ◀ n ▶ over the 8 saved sequences (lit = saved,
 /// red dot = the pattern is recorded and unsaved) and × to delete; the thin bar is the pattern clock.
 component SeqBlock inherits VerticalLayout {
-    spacing: 2px;
+    property <bool> touch: Theme.layout-profile == 1;
+    spacing: root.touch ? 4px : 2px;
     HorizontalLayout {
-        height: 20px;
-        spacing: 2px;
-        Chip { text: SamplerState.seq-mode == 2 ? "REC…" : "REC"; font-size: Theme.font-xs; min-width: 40px; active: SamplerState.seq-mode >= 2; active-color: Theme.rec; tooltip: "Record: the first pad hit starts it, REC again stops recording"; clicked => { SamplerState.seq-rec(); } }
-        Chip { text: SamplerState.seq-mode == 1 || SamplerState.seq-mode == 3 ? "STOP" : "PLAY"; font-size: Theme.font-xs; min-width: 40px; active: SamplerState.seq-mode == 1 || SamplerState.seq-mode == 3; active-color: Theme.play; clicked => { SamplerState.seq-play(); } }
-        for b in [1, 2, 4]: Chip { text: b + (b == 1 ? " BAR" : ""); font-size: Theme.font-xs; min-width: b == 1 ? 40px : 22px; active: SamplerState.seq-bars == b; clicked => { SamplerState.seq-bars-selected(b); } }
+        height: root.touch ? Theme.touch-target : 20px;
+        spacing: root.touch ? 4px : 2px;
+        Chip { text: SamplerState.seq-mode == 2 ? "REC…" : "REC"; font-size: Theme.font-xs; min-width: root.touch ? 64px : 40px; active: SamplerState.seq-mode >= 2; active-color: Theme.rec; tooltip: "Record: the first pad hit starts it, REC again stops recording"; clicked => { SamplerState.seq-rec(); } }
+        Chip { text: SamplerState.seq-mode == 1 || SamplerState.seq-mode == 3 ? "STOP" : "PLAY"; font-size: Theme.font-xs; min-width: root.touch ? 64px : 40px; active: SamplerState.seq-mode == 1 || SamplerState.seq-mode == 3; active-color: Theme.play; clicked => { SamplerState.seq-play(); } }
+        for b in [1, 2, 4]: Chip { text: b + (b == 1 ? " BAR" : ""); font-size: Theme.font-xs; min-width: root.touch ? (b == 1 ? 64px : Theme.touch-target) : (b == 1 ? 40px : 22px); active: SamplerState.seq-bars == b; clicked => { SamplerState.seq-bars-selected(b); } }
     }
     HorizontalLayout {
-        height: 20px;
-        spacing: 2px;
+        height: root.touch ? Theme.touch-target : 20px;
+        spacing: root.touch ? 4px : 2px;
         Chip { text: "MUTE"; font-size: Theme.font-xs; min-width: 40px; active: SamplerState.seq-mute; tooltip: "Then press a slot: its sequence is muted / unmuted"; clicked => { SamplerState.seq-mute-toggled(); } }
         Chip { text: "ERASE"; font-size: Theme.font-xs; min-width: 40px; active: SamplerState.seq-erase; active-color: Theme.danger; tooltip: "Then press a slot: its events are erased"; clicked => { SamplerState.seq-erase-toggled(); } }
         Chip { text: SamplerState.seq-unsaved ? "SAVE ●" : "SAVE"; font-size: Theme.font-xs; min-width: 52px; tooltip: "Save the sequence in the slot in view"; clicked => { SamplerState.seq-save(); } }
     }
     HorizontalLayout {
-        height: 20px;
-        spacing: 2px;
-        Chip { text: "◀"; font-size: Theme.font-xs; min-width: 20px; max-width: 20px; horizontal-stretch: 0; clicked => { SamplerState.seq-pick(-1); } }
+        height: root.touch ? Theme.touch-target : 20px;
+        spacing: root.touch ? 4px : 2px;
+        Chip { text: "◀"; font-size: Theme.font-xs; min-width: root.touch ? Theme.touch-target : 20px; max-width: root.touch ? Theme.touch-target : 20px; horizontal-stretch: 0; clicked => { SamplerState.seq-pick(-1); } }
         Text { text: "SEQ " + (SamplerState.seq-slot + 1) + (SamplerState.seq-saved[SamplerState.seq-slot] ? " ✓" : ""); color: SamplerState.seq-saved[SamplerState.seq-slot] ? Theme.text-bright : Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; horizontal-stretch: 1; }
-        Chip { text: "▶"; font-size: Theme.font-xs; min-width: 20px; max-width: 20px; horizontal-stretch: 0; clicked => { SamplerState.seq-pick(1); } }
-        Chip { text: "×"; font-size: Theme.font-xs; min-width: 22px; max-width: 22px; horizontal-stretch: 0; tooltip: "Delete the saved sequence in view"; enabled: SamplerState.seq-saved[SamplerState.seq-slot]; clicked => { SamplerState.seq-delete(); } }
+        Chip { text: "▶"; font-size: Theme.font-xs; min-width: root.touch ? Theme.touch-target : 20px; max-width: root.touch ? Theme.touch-target : 20px; horizontal-stretch: 0; clicked => { SamplerState.seq-pick(1); } }
+        Chip { text: "×"; font-size: Theme.font-xs; min-width: root.touch ? Theme.touch-target : 22px; max-width: root.touch ? Theme.touch-target : 22px; horizontal-stretch: 0; tooltip: "Delete the saved sequence in view"; enabled: SamplerState.seq-saved[SamplerState.seq-slot]; clicked => { SamplerState.seq-delete(); } }
     }
     Rectangle {
         height: 3px;
@@ -176,30 +178,31 @@ component SeqBlock inherits VerticalLayout {
 /// Sampler deck (src/app/sampler/): the slots in use (`slot-count`: 4, 8 or 16) as groups of 2 x 4 around the GAIN knob; under them BANK (16 slots only), the
 /// selected slot's SHOT/LOOP, GATE, SYNC and volume, where LOAD takes the slice from, and the status line.
 export component SamplerPanel inherits Rectangle {
+    property <bool> touch: Theme.layout-profile == 1;
     background: Theme.panel;
     VerticalLayout {
         padding: 0px;
-        spacing: 2px;
+        spacing: root.touch ? 6px : 2px;
         HorizontalLayout {
-            height: 68px;
-            spacing: 2px;
+            height: root.touch ? 3 * Theme.touch-target + 16px : 68px;
+            spacing: root.touch ? 6px : 2px;
             SlotGrid { first: 0; }
             VerticalLayout {
-                width: 56px;
+                width: root.touch ? 64px : 56px;
                 horizontal-stretch: 0;
                 spacing: 2px;
                 alignment: center;
                 Text { text: "GAIN"; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; horizontal-alignment: center; }
                 HorizontalLayout {
                     alignment: center;
-                    Knob { width: 30px; height: 30px; detent: true; value: SamplerState.master; edited(v) => { SamplerState.master-edited(v); } }
+                    Knob { width: root.touch ? Theme.touch-target : 30px; height: root.touch ? Theme.touch-target : 30px; detent: true; value: SamplerState.master; edited(v) => { SamplerState.master-edited(v); } }
                 }
-                Chip { text: "CUE"; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: SamplerState.cue; tooltip: "Sampler to headphones"; clicked => { SamplerState.cue-toggled(); } }
+                Chip { text: "CUE"; font-size: Theme.font-xs; height: root.touch ? Theme.touch-target : 18px; min-width: 0px; active: SamplerState.cue; tooltip: "Sampler to headphones"; clicked => { SamplerState.cue-toggled(); } }
             }
             if SamplerState.slot-count > 8: SlotGrid { first: 8; }
-            SeqBlock { width: 176px; horizontal-stretch: 0; }
+            SeqBlock { width: root.touch ? 300px : 176px; horizontal-stretch: 0; }
         }
-        HorizontalLayout {
+        if !root.touch: HorizontalLayout {
             height: 26px;
             padding: 2px;
             spacing: 3px;
@@ -228,6 +231,41 @@ export component SamplerPanel inherits Rectangle {
             Chip { text: "×"; font-size: Theme.font-xs; min-width: 22px; horizontal-stretch: 0; tooltip: "Clear slot"; enabled: SamplerState.slots[SamplerState.selected].loaded; clicked => { SamplerState.clear-clicked(); } }
             Chip { text: "WAV"; font-size: Theme.font-xs; min-width: 32px; horizontal-stretch: 0; tooltip: "Export the FROM deck's loop (else this slot) as a WAV file"; clicked => { SamplerState.export-loop(SamplerState.source < 4 ? SamplerState.source : -1); } }
             Text { text: SamplerState.status; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; vertical-alignment: center; horizontal-stretch: 1; min-width: 0px; }
+        }
+        if root.touch: VerticalLayout {
+            spacing: 6px;
+            HorizontalLayout {
+                height: Theme.touch-target;
+                spacing: 6px;
+                alignment: start;
+                if SamplerState.slot-count > 8: Text { text: "BANK"; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+                for b in SamplerState.slot-count > 8 ? 2 : 0: Chip { text: "" + (b + 1); width: Theme.touch-target; horizontal-stretch: 0; active: SamplerState.bank == b; clicked => { if (SamplerState.bank != b) { SamplerState.bank-toggled(); } } }
+                Chip { text: SamplerState.slots[SamplerState.selected].looped ? "LOOP" : "SHOT"; width: 64px; horizontal-stretch: 0; active: SamplerState.slots[SamplerState.selected].looped; clicked => { SamplerState.loop-toggled(); } }
+                Chip { text: "GATE"; width: 64px; horizontal-stretch: 0; active: SamplerState.gate; clicked => { SamplerState.gate-toggled(); } }
+                Chip { text: "SYNC"; width: 64px; horizontal-stretch: 0; active: SamplerState.sync; active-color: Theme.bpm-sync; tooltip: "BPM SYNC"; clicked => { SamplerState.sync-toggled(); } }
+                Fader { width: 150px; height: Theme.touch-target; horizontal-stretch: 0; detent: true; value: SamplerState.volume; edited(v) => { SamplerState.volume-edited(v); } }
+            }
+            HorizontalLayout {
+                height: Theme.touch-target;
+                spacing: 6px;
+                alignment: start;
+                Text { text: "FROM"; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+                for name[i] in DeckState.count == 4 ? ["1", "2", "3", "4", "TRK"] : ["1", "2", "TRK"]: Chip {
+                    property <int> src: name == "TRK" ? 4 : i;
+                    text: name;
+                    width: Theme.touch-target;
+                    horizontal-stretch: 0;
+                    active: SamplerState.source == self.src;
+                    clicked => { SamplerState.source-selected(self.src); }
+                }
+                Chip { text: "◀"; width: Theme.touch-target; horizontal-stretch: 0; enabled: SamplerState.source < 4; clicked => { SamplerState.beats-step(-1); } }
+                Text { text: SamplerState.source < 4 ? SamplerState.beats-text : "30s"; width: 44px; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; horizontal-stretch: 0; }
+                Chip { text: "▶"; width: Theme.touch-target; horizontal-stretch: 0; enabled: SamplerState.source < 4; clicked => { SamplerState.beats-step(1); } }
+                Chip { text: "LOAD"; width: 64px; horizontal-stretch: 0; clicked => { SamplerState.load-clicked(); } }
+                Chip { text: "×"; width: Theme.touch-target; horizontal-stretch: 0; tooltip: "Clear slot"; enabled: SamplerState.slots[SamplerState.selected].loaded; clicked => { SamplerState.clear-clicked(); } }
+                Chip { text: "WAV"; width: 64px; horizontal-stretch: 0; tooltip: "Export the FROM deck's loop (else this slot) as a WAV file"; clicked => { SamplerState.export-loop(SamplerState.source < 4 ? SamplerState.source : -1); } }
+            }
+            Text { text: SamplerState.status; height: 24px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; }
         }
     }
 }

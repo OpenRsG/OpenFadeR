@@ -72,8 +72,8 @@ struct Palette {
     choice_ids: RefCell<Vec<Option<i64>>>,
     /// What each palette lists now, in row order; the rows of a drag or click are looked up here.
     shown: RefCell<Vec<Vec<Track>>>,
-    /// What `shown` was made from: the palette names and the track keys of each palette.
-    seen: RefCell<(Vec<String>, Vec<Vec<String>>)>,
+    /// Palette names, track keys, store generation and BPM display precision used for `shown`.
+    seen: RefCell<(Vec<String>, Vec<Vec<String>>, (u64, usize))>,
     on_track: Rc<dyn Fn(&Track)>,
     _timer: Timer,
 }
@@ -253,7 +253,14 @@ impl Palette {
             }
             (names, keys)
         };
-        if self.seen.borrow().0 == names && self.seen.borrow().1 == keys {
+        let revision = (
+            store.generation(),
+            prefs::with(|p| p.view.tempo_decimals.digits()),
+        );
+        if self.seen.borrow().0 == names
+            && self.seen.borrow().1 == keys
+            && self.seen.borrow().2 == revision
+        {
             return;
         }
         let mut lists = vec![v.tags.clone()];
@@ -271,7 +278,7 @@ impl Palette {
                 .collect::<Vec<_>>(),
         );
         *self.shown.borrow_mut() = lists;
-        *self.seen.borrow_mut() = (names, keys);
+        *self.seen.borrow_mut() = (names, keys, revision);
     }
 }
 

@@ -1,14 +1,10 @@
-//! LOAD: the analysis is read at once (waveforms show immediately), the audio decodes on a worker
-//! thread and is picked up by [`Deck::poll_decode`] from the deck tick. Tracks the library has no
-//! beat grid or 3-band waveform for are analysed on that same worker ([`analysis::analyze`]) and
-//! those parts are filled in on arrival (session only, never written back).
-//! A new LOAD replaces the whole [`Loaded`], dropping the old receiver: a stale decode is never
-//! delivered. While decoding, the controls stay disabled (`DeckView.loaded` is false).
-//! With STEMS and the STEM waveform on, [`stemwave`](super::stemwave) swaps in the waves of the mix heard once the stems are ready.
+//! LOAD publishes decoded audio before optional analysis. The worker also prepares loudness,
+//! auto cue and the audio-only waveform; the UI merges late results without replacing edits.
+//! Replacing the loaded track cancels its worker at decode packet and analysis stage boundaries.
 
 use super::{
-    at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm, render, tempo_text, Deck, Decoded,
-    Loaded, Pending,
+    Deck, Loaded, Pending, at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm, render,
+    tempo_text,
 };
 use crate::app::prefs::{self, analysis::GridSource};
 use openfader::{
@@ -21,22 +17,87 @@ use serde_json::json;
 use slint::{ModelRc, VecModel};
 use std::{
     cell::{Cell, RefCell},
-    sync::mpsc::{channel, Receiver, TryRecvError},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{Receiver, TryRecvError, channel},
+    },
 };
 
-/// Decode the file of `t`; when `need` (no grid, no 3-band waveform) is set, also analyse the audio before
-/// sending, so the PCM is never cloned. A Collection track that has no fingerprint yet gets one from the audio.
-fn decode_and_analyze(t: Track, need: bool) -> Receiver<Result<Decoded, String>> {
+pub(super) enum Decoded {
+    Playable {
+        pcm: Arc<audio::Track16>,
+        stems: Option<Arc<audio::Stems>>,
+        gain: Option<f32>,
+        cue: Option<u32>,
+    },
+    Detail(Option<render::Wave>),
+    Analyzed(analysis::Analysis),
+    Finished,
+}
+
+fn decode_and_analyze(
+    t: Track,
+    need: bool,
+    pcm: Option<audio::Pcm>,
+    library: bool,
+    auto_cue: Option<f32>,
+    fallback: bool,
+    cancelled: Arc<AtomicBool>,
+) -> Receiver<Result<Decoded, String>> {
     let (tx, rx) = channel();
     std::thread::spawn(move || {
-        let Some(file) = t.file.as_deref() else {
-            return;
+        let stop = || cancelled.load(Ordering::Relaxed);
+        let pcm = match pcm.map(Ok).unwrap_or_else(|| {
+            t.file
+                .as_deref()
+                .ok_or_else(|| "no file path".into())
+                .and_then(|file| audio::decode_cancellable(file, &stop))
+        }) {
+            Ok(pcm) => pcm,
+            Err(e) => {
+                let _ = tx.send(Err(e));
+                return;
+            }
         };
-        let _ = tx.send(audio::decode(file).map(|pcm| {
+        if stop() {
+            return;
+        }
+        let gain = gain::resolve(library.then_some(&t), &pcm).0;
+        if stop() {
+            return;
+        }
+        let cue = auto_cue.and_then(|db| autocue::first_sound(&pcm, db));
+        if stop()
+            || tx
+                .send(Ok(Decoded::Playable {
+                    pcm: Arc::new(audio::Track16::from(&pcm)),
+                    stems: None,
+                    gain: Some(gain),
+                    cue,
+                }))
+                .is_err()
+        {
+            return;
+        }
+        let detail = fallback.then(|| render::detail::audio_wave(&pcm)).flatten();
+        if stop() || tx.send(Ok(Decoded::Detail(detail))).is_err() {
+            return;
+        }
+        if library {
             analysis::cache::remember_fingerprint(&t, &pcm);
-            let a = need.then(|| analysis::cache::analyze_cached(&t, &pcm.samples, pcm.rate).0);
-            (pcm, a)
-        }));
+        }
+        if need && !stop() {
+            let Some((a, _)) =
+                analysis::cache::analyze_cached_cancellable(&t, &pcm.samples, pcm.rate, &stop)
+            else {
+                return;
+            };
+            if stop() || tx.send(Ok(Decoded::Analyzed(a))).is_err() {
+                return;
+            }
+        }
+        let _ = tx.send(Ok(Decoded::Finished));
     });
     rx
 }
@@ -59,6 +120,27 @@ pub fn set_next_track(f: impl Fn(&Track) -> Option<Track> + 'static) {
 }
 
 impl Deck {
+    /// Updates metadata without touching audio, analysis, transport or the load serial.
+    pub(in crate::app) fn refresh_metadata(&self, edited: &Track) {
+        let key = store::key(edited);
+        let mut loaded = self.loaded.borrow_mut();
+        if let Some(t) = loaded.track.as_mut().filter(|t| store::key(t) == key) {
+            crate::app::trackinfo::copy_metadata(t, edited);
+            self.show(|v| {
+                v.title = t.title.as_str().into();
+                v.artist = t.artist.as_str().into();
+            });
+            if let Some(pending) = loaded.pending.as_mut() {
+                pending.title.clone_from(&edited.title);
+            }
+        }
+        if let Some(d) = self.download.borrow_mut().as_mut()
+            && store::key(&d.track) == key
+        {
+            crate::app::trackinfo::copy_metadata(&mut d.track, edited);
+        }
+    }
+
     pub fn load(&self, t: &Track, lib: &dyn Library) {
         if self.eject_locked() {
             return;
@@ -149,16 +231,38 @@ impl Deck {
     pub(super) fn install(
         &self,
         t: &Track,
+        a: analysis::Analysis,
+        notes: Vec<String>,
+        pcm: Option<audio::Pcm>,
+    ) {
+        self.install_audio(t, a, notes, pcm, None);
+    }
+
+    pub(super) fn install_shared(
+        &self,
+        t: &Track,
+        a: analysis::Analysis,
+        notes: Vec<String>,
+        pcm: Arc<audio::Track16>,
+        stems: Arc<audio::Stems>,
+    ) {
+        self.install_audio(t, a, notes, None, Some((pcm, stems)));
+    }
+
+    fn install_audio(
+        &self,
+        t: &Track,
         mut a: analysis::Analysis,
         notes: Vec<String>,
         pcm: Option<audio::Pcm>,
+        shared: Option<(Arc<audio::Track16>, Arc<audio::Stems>)>,
     ) {
         // LOAD SETTING: the track's own cue nearest the start wins over the others (before the automatic cues are added).
         let nearest = prefs::with(|p| p.controller.load_nearest_cue)
             .then(|| autocue::nearest(&a.cues))
             .flatten();
         analysis::auto::fill(&mut a); // phrases from the grid + 3-band waveform when the library has none
-                                      // session-only automatic cues (none without a grid or when the track has cues)
+        // session-only automatic cues (none without a grid or when the track has cues)
         let auto_cues = a.cues.is_empty() && {
             let auto = analysis::auto::cues(&a);
             a.cues.extend(auto);
@@ -177,11 +281,17 @@ impl Deck {
         });
         let grid = grid_bpm(&a.beats);
         let mut notes = notes;
-        if self.player.is_some() && t.file.is_none() && t.remote.is_none() && pcm.is_none() {
+        if self.player.is_some()
+            && t.file.is_none()
+            && t.remote.is_none()
+            && pcm.is_none()
+            && shared.is_none()
+        {
             notes.push("no file path".into());
         }
-        let mut status = summary(&t.title, &a, grid, auto_cues, &notes);
+        let status = summary(&t.title, &a, grid, auto_cues, &notes);
         let library = pcm.is_none(); // a sampler slice is no library track: not exported, not in the history
+        let reused = shared.is_some();
         let downloading = library && t.file.is_none() && t.remote.is_some();
         self.rate.set(1.0);
         self.key_st.set(0);
@@ -193,35 +303,53 @@ impl Deck {
         self.jog_cue.set(false);
         self.stems_clear();
         let mut pending = None;
+        let detail = render::detail::wave(&a, None);
         if let Some(player) = &self.player {
             let mut player = player.borrow_mut();
             player.load(audio::Pcm::default());
             player.set_rate(1.0);
             player.set_key_shift(0.0);
             player.seek(cue_ms);
-            // Analyse only what is missing; analyze() fills both parts, poll_decode keeps whichever the library had.
-            let need = a.beats.is_empty() || a.three_band_detail.is_empty();
-            if need && t.file.is_some() && pcm.is_none() {
-                status += " · analyzing…";
-            }
-            let rx = match pcm {
-                Some(pcm) => {
+            let need = library && (a.beats.is_empty() || a.three_band_detail.is_empty());
+            let cancelled = Arc::new(AtomicBool::new(false));
+            let auto_cue = prefs::with(|p| {
+                (library && nearest.is_none() && p.controller.auto_cue)
+                    .then(|| p.controller.auto_cue_db())
+            });
+            let rx = match shared {
+                Some((pcm, stems)) => {
                     let (tx, rx) = channel();
-                    let _ = tx.send(Ok((pcm, None)));
+                    let _ = tx.send(Ok(Decoded::Playable {
+                        pcm,
+                        stems: Some(stems),
+                        gain: None,
+                        cue: None,
+                    }));
+                    let _ = tx.send(Ok(Decoded::Finished));
                     Some(rx)
                 }
-                None => t
-                    .file
-                    .is_some()
-                    .then(|| decode_and_analyze(t.clone(), need)),
+                None => (pcm.is_some() || t.file.is_some()).then(|| {
+                    decode_and_analyze(
+                        t.clone(),
+                        need,
+                        pcm,
+                        library,
+                        auto_cue,
+                        detail.is_none(),
+                        cancelled.clone(),
+                    )
+                }),
             };
             pending = rx.map(|rx| Pending {
                 rx,
+                cancelled,
                 title: t.title.clone(),
                 notes,
+                playable: false,
+                initial_cue: cue_ms,
             });
         }
-        if pending.is_some() {
+        if pending.is_some() && !reused {
             self.stems_warm(t.file.as_deref());
         }
         let loading = pending.is_some() || downloading;
@@ -229,10 +357,11 @@ impl Deck {
         self.load_serial.set(self.load_serial.get().wrapping_add(1));
         let slip = self.with_player(|p| p.slip()).unwrap_or(false); // slip mode persists across loads
         let base_bpm = grid.unwrap_or(t.bpm_x100 as f64 / 100.0);
+        let (gain_analysed, gain_adjust) = gain::stored(library.then_some(t));
         *self.loaded.borrow_mut() = Loaded {
             ready: true,
             pending,
-            detail: render::detail::wave(&a, None),
+            detail,
             overview: render::overview::wave(&a, duration),
             lib_beats: a.beats.clone(),
             analysis: a,
@@ -244,6 +373,8 @@ impl Deck {
             lib_bpm: t.bpm_x100 as f64 / 100.0,
             track: library.then(|| t.clone()),
             auto_cues: Cell::new(auto_cues),
+            gain_analysed,
+            gain_adjust,
             ..Default::default()
         };
         let pad_views = self.pad_views(&self.loaded.borrow());
@@ -317,87 +448,120 @@ impl Deck {
             .map(|t| (t, l.analysis.beats.clone(), l.analysis.cues.clone()))
     }
 
-    /// Picks up a finished decode: hands the audio to the player, falls back to audio peaks for
-    /// the detail waveform when the analysis has none, and enables the controls.
+    /// Installs audio as soon as it is decoded; optional results leave transport and edits intact.
     pub(super) fn poll_decode(&self) {
         self.poll_download();
         let mut l = self.loaded.borrow_mut();
-        let Some(p) = &l.pending else { return };
-        let res = match p.rx.try_recv() {
-            Err(TryRecvError::Empty) => return,
-            Ok(r) => r,
-            Err(TryRecvError::Disconnected) => Err("decoder stopped".into()),
+        let Some(mut pending) = l.pending.take() else {
+            return;
         };
-        let (title, mut notes) = l
-            .pending
-            .take()
-            .map_or_else(Default::default, |p| (p.title, p.notes));
+        let result = match pending.rx.try_recv() {
+            Err(TryRecvError::Empty) => {
+                l.pending = Some(pending);
+                return;
+            }
+            Ok(result) => result,
+            Err(TryRecvError::Disconnected) => Err(if pending.playable {
+                "analysis stopped"
+            } else {
+                "decoder stopped"
+            }
+            .into()),
+        };
+        let mut finished = false;
+        let mut playable = false;
+        let mut completed_stems = None;
         let mut added_cues = false;
-        let mut stem_src = None;
-        match res {
-            Ok((pcm, analysed)) => {
-                // Fill only what the library lacked; keep its beats / waveform otherwise.
-                if let Some(an) = analysed {
-                    notes.retain(|n| n != "not analysed");
-                    l.analysis.key = an.key.clone();
-                    if l.analysis.beats.is_empty() && !an.beats.is_empty() {
-                        l.lib_beats = an.beats.clone();
-                        l.analysis.beats = an.beats;
-                        notes.push("grid: analysed".into());
-                    }
-                    if l.analysis.three_band_detail.is_empty() && !an.three_band_detail.is_empty() {
-                        l.analysis.three_band_detail = an.three_band_detail;
-                        l.analysis.three_band_preview = an.three_band_preview;
-                        l.detail = render::detail::wave(&l.analysis, Some(&pcm));
-                        notes.push("waveform: analysed".into());
-                    }
+        let mut detail_update = None;
+        match result {
+            Ok(Decoded::Playable {
+                pcm,
+                stems,
+                gain,
+                cue,
+            }) => {
+                completed_stems = stems;
+                if let Some(gain) = gain {
+                    l.gain_analysed = gain;
                 }
-                // The analysis may have just given this track a grid and waveform: phrases and automatic cues follow.
-                analysis::auto::fill(&mut l.analysis);
-                if l.analysis.cues.is_empty() {
-                    let auto = analysis::auto::cues(&l.analysis);
-                    added_cues = !auto.is_empty();
-                    l.auto_cues.set(added_cues);
-                    l.analysis.cues.extend(auto);
-                }
-                if l.detail.is_none() {
-                    l.detail = render::detail::wave(&l.analysis, Some(&pcm));
-                    notes.push("detail: from audio".into());
-                }
-                // AUTO GAIN comes from the store (measured and saved on the track's first load, [`gain::resolve`]); AUTO CUE
-                // puts the cue point (and the playhead) on the first sound unless LOAD SETTING chose a cue. A sampler slice is no track to cue.
-                (l.gain_analysed, l.gain_adjust) = gain::resolve(l.track.as_ref(), &pcm);
-                let (auto_cue, db) =
-                    prefs::with(|p| (p.controller.auto_cue, p.controller.auto_cue_db()));
-                if auto_cue && !l.cue_locked && l.track.is_some() {
-                    if let Some(ms) = autocue::first_sound(&pcm, db) {
+                if !l.cue_locked && l.cue_ms == pending.initial_cue {
+                    if let Some(ms) = cue {
                         l.cue_ms = ms;
                     }
                 }
-                // STEMS start after the player has the audio.
-                stem_src = l
-                    .track
-                    .as_ref()
-                    .and_then(|t| t.file.clone())
-                    .filter(|_| prefs::with(|p| p.stems));
                 if let Some(player) = &self.player {
                     let mut player = player.borrow_mut();
-                    player.load(pcm);
+                    player.load_shared(pcm);
                     player.seek(l.cue_ms);
                     l.duration_ms = player.duration_ms();
                 }
-                l.overview = render::overview::wave(&l.analysis, l.duration_ms);
+                pending.playable = true;
+                playable = true;
             }
-            Err(e) => notes.push(format!("audio: {e}")),
+            Ok(Decoded::Detail(detail)) => {
+                let missing = self
+                    .stemwave
+                    .borrow()
+                    .orig
+                    .as_ref()
+                    .map_or(l.detail.is_none(), |(detail, _)| detail.is_none());
+                if missing {
+                    detail_update = detail;
+                }
+            }
+            Ok(Decoded::Analyzed(an)) => {
+                pending.notes.retain(|n| n != "not analysed");
+                let edits = l
+                    .track
+                    .as_ref()
+                    .and_then(|t| store::global().edits(&store::key(t)).ok())
+                    .unwrap_or_default();
+                merge_analysis(&mut l, an, &edits, &mut pending.notes);
+                detail_update = render::detail::wave(&l.analysis, None);
+                analysis::auto::fill(&mut l.analysis);
+                let edited_cues = edits.cues.is_some();
+                if l.analysis.cues.is_empty() && !edited_cues {
+                    let cues = analysis::auto::cues(&l.analysis);
+                    added_cues = !cues.is_empty();
+                    l.auto_cues.set(added_cues);
+                    l.analysis.cues.extend(cues);
+                }
+            }
+            Ok(Decoded::Finished) => finished = true,
+            Err(e) => {
+                pending.notes.push(format!("audio: {e}"));
+                finished = true;
+            }
+        }
+        let overview = render::overview::wave(&l.analysis, l.duration_ms);
+        {
+            let mut sw = self.stemwave.borrow_mut();
+            let (detail, over) = match sw.orig.as_mut() {
+                Some((detail, overview)) => (detail, overview),
+                None => {
+                    let l = &mut *l;
+                    (&mut l.detail, &mut l.overview)
+                }
+            };
+            if let Some(update) = detail_update {
+                *detail = Some(update);
+            }
+            *over = overview;
         }
         l.invalidate();
         let grid = grid_bpm(&l.analysis.beats);
-        let status = summary(&title, &l.analysis, grid, l.auto_cues.get(), &notes);
+        let status = summary(
+            &pending.title,
+            &l.analysis,
+            grid,
+            l.auto_cues.get(),
+            &pending.notes,
+        );
         if let Some(g) = grid {
             l.base_bpm = g;
         }
         if l.key.is_empty() {
-            l.key = l.analysis.key.clone().unwrap_or_default(); // library key wins, else the detected one
+            l.key = l.analysis.key.clone().unwrap_or_default();
         }
         let (base, rate) = (l.base_bpm, self.rate.get());
         let (cue_views, pad_views) = if added_cues {
@@ -405,10 +569,17 @@ impl Deck {
         } else {
             (None, None)
         };
+        let ready = pending.playable || finished;
+        let stem_src = playable
+            .then(|| l.track.as_ref().and_then(|t| t.file.clone()))
+            .flatten();
+        if !finished {
+            l.pending = Some(pending);
+        }
         drop(l);
         self.show(|v| {
-            v.loaded = true;
-            v.loading = false;
+            v.loaded = ready;
+            v.loading = !ready;
             v.status = status.into();
             v.has_grid = grid.is_some();
             if let (Some(c), Some(p)) = (cue_views, pad_views) {
@@ -419,13 +590,18 @@ impl Deck {
             v.bpm = (base * rate) as f32;
         });
         self.refresh_key();
-        self.push_beats(); // the player's metronome clicks on the final grid (Player::load cleared it)
-        if self.autoplay.take() {
+        self.push_beats();
+        if playable && self.autoplay.take() {
             self.with_player(|p| p.play());
         }
-        // The player's track itself, shared: no copy of the audio for the separation.
         if let Some((file, pcm)) = stem_src.zip(self.with_player(|p| p.pcm())) {
-            self.stems_start(file, pcm);
+            if completed_stems
+                .is_some_and(|stems| self.stems_attach_completed(file.clone(), pcm.clone(), stems))
+            {
+                self.finish_double();
+            } else {
+                self.stems_start(file, pcm);
+            }
         }
     }
 
@@ -461,6 +637,27 @@ impl Deck {
     }
 }
 
+fn merge_analysis(
+    l: &mut Loaded,
+    an: analysis::Analysis,
+    edits: &store::Edits,
+    notes: &mut Vec<String>,
+) {
+    if l.analysis.key.is_none() {
+        l.analysis.key = an.key;
+    }
+    if l.analysis.beats.is_empty() && edits.grid.is_none() && !an.beats.is_empty() {
+        l.lib_beats = an.beats.clone();
+        l.analysis.beats = an.beats;
+        notes.push("grid: analysed".into());
+    }
+    if l.analysis.three_band_detail.is_empty() && !an.three_band_detail.is_empty() {
+        l.analysis.three_band_detail = an.three_band_detail;
+        l.analysis.three_band_preview = an.three_band_preview;
+        notes.push("waveform: analysed".into());
+    }
+}
+
 /// The deck status line: `<title> — N beats @ BPM, N cues · notes…` (`N automatic cues` for this session's own),
 /// rebuilt when the analysis arrives.
 fn summary(
@@ -480,4 +677,138 @@ fn summary(
     .chain(notes.iter().cloned())
     .collect::<Vec<_>>()
     .join(" · ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn beat(time_ms: u32) -> analysis::Beat {
+        analysis::Beat {
+            time_ms,
+            bpm_x100: 12000,
+            bar_pos: 1,
+        }
+    }
+
+    #[test]
+    fn decoded_audio_is_readable_before_optional_analysis_and_keeps_initial_cue_gain() {
+        let mut samples = vec![0.0; 800];
+        samples.extend((0..7200).map(|i| (i as f32 * 0.17).sin() * 0.4));
+        let pcm = audio::Pcm {
+            rate: 4000,
+            samples,
+        };
+        let expected = audio::Track16::from(&pcm);
+        let expected_gain = audio::loudness::auto_gain_db(&pcm);
+        let expected_cue = autocue::first_sound(&pcm, -36.0);
+        let expected_detail = render::detail::audio_wave(&pcm).unwrap();
+        let rx = decode_and_analyze(
+            Track::default(),
+            true,
+            Some(pcm),
+            false,
+            Some(-36.0),
+            true,
+            Arc::new(AtomicBool::new(false)),
+        );
+        let Decoded::Playable { pcm, gain, cue, .. } = rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("audio must arrive before optional results")
+        };
+        let mut energy = 0.0;
+        for frame in 0..pcm.frames() {
+            let actual = pcm.frame_at(frame as f64).unwrap();
+            assert_eq!(Some(actual), expected.frame_at(frame as f64));
+            energy += actual[0] * actual[0];
+        }
+        assert!(
+            energy > 100.0,
+            "published audio is audible before analysis arrives"
+        );
+        assert_eq!(gain, Some(expected_gain));
+        assert_eq!(cue, expected_cue);
+        assert_eq!(cue, Some(100));
+        let Decoded::Detail(Some(detail)) = rx.recv().unwrap().unwrap() else {
+            panic!("audio-only waveform follows playable audio")
+        };
+        assert_eq!(detail.layers, expected_detail.layers);
+        assert_eq!(detail.per_ms, expected_detail.per_ms);
+        let Decoded::Analyzed(a) = rx
+            .recv_timeout(std::time::Duration::from_secs(30))
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("optional analysis follows playable audio")
+        };
+        assert!(!a.three_band_detail.is_empty());
+        assert!(matches!(rx.recv().unwrap().unwrap(), Decoded::Finished));
+    }
+
+    #[test]
+    fn late_analysis_fills_missing_waveform_without_replacing_library_or_edited_grid() {
+        let detected = analysis::Analysis {
+            beats: vec![beat(500)],
+            three_band_detail: vec![[7, 8, 9]],
+            three_band_preview: vec![[4, 5, 6]],
+            key: Some("8A".into()),
+            ..Default::default()
+        };
+        for original in [vec![beat(100)], vec![beat(200)]] {
+            let mut loaded = Loaded {
+                analysis: analysis::Analysis {
+                    beats: original.clone(),
+                    cues: vec![analysis::Cue {
+                        time_ms: 300,
+                        hot_cue: 0,
+                        loop_end_ms: None,
+                        color: None,
+                        comment: None,
+                    }],
+                    key: Some("7A".into()),
+                    ..Default::default()
+                },
+                lib_beats: vec![beat(50)],
+                cue_ms: 300,
+                gain_adjust: 2.5,
+                ..Default::default()
+            };
+            merge_analysis(
+                &mut loaded,
+                detected.clone(),
+                &store::Edits::default(),
+                &mut Vec::new(),
+            );
+            assert_eq!(loaded.analysis.beats, original);
+            assert_eq!(loaded.lib_beats, vec![beat(50)]);
+            assert_eq!(loaded.analysis.cues[0].time_ms, 300);
+            assert_eq!(loaded.analysis.key.as_deref(), Some("7A"));
+            assert_eq!(
+                loaded.analysis.three_band_detail,
+                detected.three_band_detail
+            );
+            assert_eq!((loaded.cue_ms, loaded.gain_adjust), (300, 2.5));
+        }
+        let mut absent = Loaded::default();
+        merge_analysis(
+            &mut absent,
+            detected.clone(),
+            &store::Edits::default(),
+            &mut Vec::new(),
+        );
+        assert_eq!(absent.analysis.beats, detected.beats);
+        let mut deleted = Loaded::default();
+        let edits = store::Edits {
+            grid: Some(Vec::new()),
+            ..Default::default()
+        };
+        merge_analysis(&mut deleted, detected, &edits, &mut Vec::new());
+        assert!(
+            deleted.analysis.beats.is_empty(),
+            "an explicit grid deletion stays deleted"
+        );
+    }
 }

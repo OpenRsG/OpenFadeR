@@ -1,4 +1,4 @@
-import { Chip, IconButton, Icon, SegmentedChips } from "widgets.slint";
+import { Chip, Dropdown, IconButton, Icon, SegmentedChips } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DialogFrame } from "dialog.slint";
 import { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow } from "device-state.slint";
@@ -21,7 +21,7 @@ export component DeviceChip inherits Chip {
 /// Small enough for the status bar; the dialog shows the same.
 export component DeviceProgress inherits Rectangle {
     min-width: 220px;
-    height: 16px;
+    height: Theme.target-size(16px);
     background: Theme.panel-raised;
     border-radius: Theme.radius;
     visible: DeviceState.busy;
@@ -61,11 +61,23 @@ component DeviceWindow inherits DialogFrame {
     card-width: 900px;
     card-height: 780px;
     closed => { DeviceState.visible = false; }
-    SegmentedChips {
+    if Theme.layout-profile == 0: SegmentedChips {
         options: ["DEVICES", "EXPORT", "SYNC MANAGER", "BACKUPS"];
         current: DeviceState.tab;
         vertical-stretch: 0;
         alignment: start;
+        chose(i) => {
+            DeviceState.tab = i;
+            DeviceState.opened();
+        }
+    }
+    if Theme.layout-profile == 1: Dropdown {
+        options: ["DEVICES", "EXPORT", "SYNC MANAGER", "BACKUPS"];
+        current: DeviceState.tab;
+        width: 240px;
+        list-width: 240px;
+        horizontal-stretch: 0;
+        vertical-stretch: 0;
         chose(i) => {
             DeviceState.tab = i;
             DeviceState.opened();
@@ -90,7 +102,7 @@ component DeviceWindow inherits DialogFrame {
 component DeviceConfirm inherits DialogFrame {
     visible: DeviceState.confirm-open;
     title: "CONFIRM";
-    card-width: 460px;
+    card-width: Theme.layout-profile == 1 ? min(460px, root.width - 16px) : 460px;
     closed => { DeviceState.confirmed(false); }
     Text {
         text: DeviceState.confirm-text;

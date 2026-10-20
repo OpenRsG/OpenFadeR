@@ -14,6 +14,7 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
         return c.say("choose a track first");
     };
     match id {
+        "track-edit" => crate::app::trackinfo::open_editor(&c.app(), &t),
         "track-import" => import(c, t),
         "track-analyze" => {
             if c.store.analysis_locked(&store::key(&t)).unwrap_or(false) {

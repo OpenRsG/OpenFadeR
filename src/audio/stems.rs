@@ -224,10 +224,22 @@ impl Stems {
     /// blended with the weights of the [`Grid`]: the head and tail overlaps are added to what the neighbour left there, in
     /// any order, from any thread. A frame is only [`ready`](Stems::ready) once both sides are in.
     pub fn deposit(&self, s: usize, parts: [&[f32]; COUNT]) {
+        self.deposit_frames(s, parts[0].len() / 2, |i| {
+            std::array::from_fn(|k| [parts[k][2 * i], parts[k][2 * i + 1]])
+        });
+    }
+
+    /// Deposits segment frames without an interleaved intermediate buffer.
+    pub fn deposit_frames(
+        &self,
+        s: usize,
+        frames: usize,
+        frame: impl Fn(usize) -> [[f32; 2]; COUNT],
+    ) {
         let g = self.grid;
         let (first, last) = (s == 0, s + 1 == self.done.len());
         let start = g.start(s);
-        let valid = (parts[0].len() / 2).min(self.frames - start);
+        let valid = frames.min(self.frames - start);
         let (head, tail) = (
             if first { 0 } else { g.overlap.min(valid) },
             if last { valid } else { g.stride().min(valid) },
@@ -235,11 +247,11 @@ impl Stems {
         let put = |range: std::ops::Range<usize>, add: bool| {
             for i in range {
                 let w = weight(i, g, first, last) * 32768.0;
+                let parts = frame(i);
                 for k in 0..COUNT {
                     for c in 0..2 {
                         let cell = &self.data[k][2 * (start + i) + c];
-                        let v = parts[k][2 * i + c] * w
-                            + if add { cell.load(Relaxed) as f32 } else { 0.0 };
+                        let v = parts[k][c] * w + if add { cell.load(Relaxed) as f32 } else { 0.0 };
                         cell.store(to_i16(v), Relaxed);
                     }
                 }
@@ -351,6 +363,33 @@ mod tests {
         });
         let q = |v: f32| vec![(v * 32768.0) as i16; 8];
         (pcm, Stems::complete([q(0.1), q(0.2), q(0.3), q(0.4)]))
+    }
+
+    #[test]
+    fn shared_stems_play_the_same_samples_with_independent_deck_gains() {
+        use std::sync::Arc;
+        let (pcm, stems) = fixture(0.9);
+        let (pcm, stems) = (Arc::new(pcm), Arc::new(stems));
+        let (other_pcm, other_stems) = (pcm.clone(), stems.clone());
+        let mut left = Mixed {
+            pcm: &pcm,
+            stems: &stems,
+            gain: [0.0, 1.0, 1.0, 1.0],
+        };
+        let right = Mixed {
+            pcm: &other_pcm,
+            stems: &other_stems,
+            gain: [0.0, 0.0, 0.0, 1.0],
+        };
+        for at in [0.0, 0.5, 1.25, 3.0] {
+            assert!((left.frame_at(at).unwrap()[0] - 0.825).abs() < 1e-4);
+            assert!((right.frame_at(at).unwrap()[0] - 0.375).abs() < 1e-4);
+            let unchanged = right.frame_at(at);
+            left.gain = [1.0; COUNT];
+            assert_eq!(left.frame_at(at), pcm.frame_at(at));
+            assert_eq!(right.frame_at(at), unchanged);
+            left.gain = [0.0, 1.0, 1.0, 1.0];
+        }
     }
 
     #[test]

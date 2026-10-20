@@ -393,3 +393,200 @@ fn downbeat_is_the_beat_with_the_most_low_end() {
 fn silence_has_no_grid() {
     assert!(beat_grid(&vec![0.0; RATE as usize * 20], RATE).is_empty());
 }
+
+fn reference_score(onsets: &[(f64, f64)], q: f64, bins: &mut Vec<f64>) -> f64 {
+    fold(onsets, q, bins);
+    let top = (0..bins.len()).map(|j| win3(bins, j)).fold(0.0, f64::max);
+    top * top * q
+}
+
+#[test]
+fn bounded_scores_preserve_exhaustive_decisions_and_rounding() {
+    let mut state = 17u64;
+    for len in [0, 3, 511, 512, 2048] {
+        let on: Vec<_> = (0..len)
+            .map(|i| {
+                state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let jitter = (state >> 32) as f64 / u32::MAX as f64;
+                let w = 2.0f64.powi((state % 90) as i32 - 45);
+                (i as f64 * 137.13 + jitter, w)
+            })
+            .collect();
+        let bound = ScoreBound::new(&on);
+        for q in [0.75, 1.0, 2.0, 2.00001, 137.0, 200.5, 499.999] {
+            let exact = reference_score(&on, q, &mut Vec::new());
+            assert_eq!(score(&on, q, &mut Vec::new()).to_bits(), exact.to_bits());
+            for best in [0.0, exact.next_down(), exact, exact.next_up(), exact * 4.0] {
+                match bound.score(&on, q, &mut Vec::new(), best) {
+                    Some(got) => assert_eq!(got.to_bits(), exact.to_bits(), "len={len}, q={q}"),
+                    None => assert!(exact <= best, "rejected winner: len={len}, q={q}"),
+                }
+            }
+        }
+    }
+}
+
+fn flux_fixture(secs: usize, fr: f64, bpm: f64, ambiguous: bool) -> Vec<f32> {
+    let mut f = vec![0.0f32; (secs as f64 * fr) as usize];
+    let mut t = 0.173 * fr;
+    let p = 60.0 * fr / bpm;
+    let mut k = 0;
+    while t + p < f.len() as f64 {
+        let at = t.round() as usize;
+        f[at] = if ambiguous && k % 2 != 0 { 0.7 } else { 1.0 };
+        f[at - 1] = 0.13;
+        f[at + 1] = 0.21;
+        if ambiguous {
+            let off = (t + p * 0.5).round() as usize;
+            f[off] = 0.69;
+            f[off + 1] = 0.17;
+        }
+        t += p;
+        k += 1;
+    }
+    f
+}
+
+#[test]
+fn exact_tempo_search_matches_reference_at_both_precisions_and_octaves() {
+    for precision in [false, true] {
+        let opt = opts(Mode::Normal, precision);
+        let fr = RATE as f64 / (RATE / opt.flux_hz()) as f64;
+        for (bpm, ambiguous) in [(120.0, false), (140.25, true), (174.0, true)] {
+            let f = flux_fixture(24, fr, bpm, ambiguous);
+            let on = onsets(&f, precision);
+            for range in [(85, 175), (70, 140), (110, 220)] {
+                let opt = GridOptions {
+                    bpm_range: range,
+                    ..opt
+                };
+                let reference = tempo_search(&f, fr, &opt, &|| false, |q, bins, _| {
+                    Some(reference_score(&on, q, bins))
+                });
+                assert_eq!(
+                    tempo(&f, &on, fr, &opt, &|| false),
+                    reference,
+                    "{bpm}, {opt:?}"
+                );
+            }
+        }
+    }
+    let f = flux_fixture(330, 400.0, 120.0, false);
+    let on = onsets(&f, false);
+    assert!(on.len() >= 512);
+    let opt = GridOptions::default();
+    let reference = tempo_search(&f, 400.0, &opt, &|| false, |q, bins, _| {
+        Some(reference_score(&on, q, bins))
+    });
+    assert_eq!(tempo(&f, &on, 400.0, &opt, &|| false), reference);
+    let bound = ScoreBound::new(&on);
+    let incumbent = reference_score(&on, 200.0, &mut Vec::new());
+    assert!(
+        bound
+            .score(&on, 190.0, &mut Vec::new(), incumbent)
+            .is_none()
+    );
+}
+
+#[test]
+fn tempo_search_cancels_inside_autocorrelation_and_fine_search() {
+    use std::cell::Cell;
+    let f = flux_fixture(120, 400.0, 120.0, false);
+    let opt = GridOptions::default();
+    let polls = Cell::new(0);
+    let evaluated = Cell::new(0);
+    let cancelled = || {
+        polls.set(polls.get() + 1);
+        polls.get() >= 3
+    };
+    let result = tempo_search(&f, 400.0, &opt, &cancelled, |_, _, _| {
+        evaluated.set(evaluated.get() + 1);
+        Some(1.0)
+    });
+    assert_eq!(result, None);
+    assert_eq!(evaluated.get(), 0);
+    assert!(polls.get() >= 3);
+
+    let on = onsets(&f, false);
+    let cancelled = || evaluated.get() >= 3;
+    let result = tempo_search(&f, 400.0, &opt, &cancelled, |q, bins, _| {
+        evaluated.set(evaluated.get() + 1);
+        Some(reference_score(&on, q, bins))
+    });
+    assert_eq!(result, None);
+    assert_eq!(evaluated.get(), 3);
+}
+
+#[test]
+#[ignore = "scaling benchmark; run optimized with --ignored --nocapture"]
+fn benchmark_exact_fine_search_scaling() {
+    use std::{hint::black_box, time::Instant};
+    for fr in [400.0, 1000.0] {
+        for secs in [30, 120, 480, 1800] {
+            let n = (secs as f64 * fr) as usize;
+            let f = flux_fixture(secs, fr, 120.0, true);
+            let on = onsets(&f, true);
+            let original = on;
+            for no_prune in [false, true] {
+                let mut on = original.clone();
+                let mut thresholds = Vec::new();
+                if no_prune {
+                    // A dominant transient keeps every candidate concentrated. Incumbents just
+                    // below exact scores force the bound check to do work without rejecting.
+                    on[0].1 = on.len() as f64 * 4.0;
+                    let (mut r, mut bins) = (-0.006, Vec::new());
+                    while r <= 0.006 {
+                        let q = 60.0 * fr / (120.0 * (1.0 + r));
+                        thresholds.push(reference_score(&on, q, &mut bins) * 0.99);
+                        r += 1.5 / n as f64;
+                    }
+                }
+                let bound = ScoreBound::new(&on);
+                let run = |bounded: bool| {
+                    let (mut best, mut bins, mut r) = ((0.0f64, 0.0f64), Vec::new(), -0.006);
+                    let (mut candidates, mut pruned) = (0, 0);
+                    while r <= 0.006 {
+                        let q = 60.0 * fr / (120.0 * (1.0 + r));
+                        let incumbent = if no_prune {
+                            thresholds[candidates]
+                        } else {
+                            best.0
+                        };
+                        let s = if bounded {
+                            bound.score(black_box(&on), q, &mut bins, incumbent)
+                        } else {
+                            Some(reference_score(black_box(&on), q, &mut bins))
+                        };
+                        if let Some(s) = s {
+                            if s > best.0 {
+                                best = (s, q);
+                            }
+                        } else {
+                            pruned += 1;
+                        }
+                        candidates += 1;
+                        r += 1.5 / n as f64;
+                    }
+                    (best, candidates, pruned)
+                };
+                let start = Instant::now();
+                let reference = run(false);
+                let reference_time = start.elapsed();
+                let start = Instant::now();
+                let optimized = run(true);
+                let optimized_time = start.elapsed();
+                assert_eq!(reference.0, optimized.0);
+                assert_eq!(reference.1, optimized.1);
+                if no_prune {
+                    assert_eq!(optimized.2, 0);
+                }
+                eprintln!(
+                    "fine-search fr={fr} secs={secs} no-prune={no_prune} onsets={} candidates={} pruned={} reference={reference_time:?} optimized={optimized_time:?}",
+                    on.len(),
+                    optimized.1,
+                    optimized.2
+                );
+            }
+        }
+    }
+}

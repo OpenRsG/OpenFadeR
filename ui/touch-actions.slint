@@ -1,0 +1,82 @@
+import { Chip } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { LibraryState } from "library.slint";
+import { BrowserState, AutomixState } from "browser.slint";
+import { DeviceState } from "device.slint";
+import { PrefsState } from "prefs.slint";
+import { MidiState } from "midi.slint";
+import { PluginState } from "plugins.slint";
+import { KeysState } from "help.slint";
+import { AboutState } from "about.slint";
+import { WelcomeState } from "welcome.slint";
+import { LayoutState } from "split.slint";
+
+component Action inherits Chip {
+    in property <string> action;
+    clicked => { LibraryState.action(root.action); }
+}
+
+/// The desktop commands remain available without a mouse or keyboard-sized menu bar.
+export component TouchActions inherits Rectangle {
+    callback fullscreen-toggled();
+    callback zoom-all(int);
+    height: items.preferred-height + 16px;
+    items := VerticalLayout {
+        x: 8px; y: 8px; width: parent.width - 16px; spacing: 8px; alignment: start;
+        Text { text: "Application"; color: Theme.text-bright; font-size: Theme.font-lg; }
+        Chip { text: "Preferences / themes / extensions"; clicked => { PrefsState.visible = true; } }
+        Chip { text: "MIDI and controllers"; clicked => { MidiState.captured = ""; MidiState.visible = true; } }
+        Chip { text: "Devices and export"; clicked => { DeviceState.visible = true; DeviceState.opened(); } }
+        Chip { text: "Full screen"; clicked => { root.fullscreen-toggled(); } }
+        Chip { text: LayoutState.split-open ? "Close split screen" : "Split screen"; clicked => { LayoutState.split-toggle(); } }
+        Chip { text: "Switch split-screen window"; enabled: LayoutState.split-open; clicked => { LayoutState.split-switch(); } }
+        HorizontalLayout {
+            Chip { text: "Zoom −"; clicked => { root.zoom-all(-1); } }
+            Chip { text: "Reset zoom"; clicked => { root.zoom-all(0); } }
+            Chip { text: "Zoom +"; clicked => { root.zoom-all(1); } }
+        }
+        Text { text: "Import & collection"; color: Theme.text-bright; font-size: Theme.font-lg; }
+        Action { text: "Import track"; action: "import-track"; }
+        Action { text: "Import folder"; action: "import-folder"; }
+        Action { text: "Import playlist"; action: "import-playlist"; }
+        for label[i] in LibraryState.import-readers: Action { text: "Import " + label; action: "import-collection:" + i; }
+        for label[i] in LibraryState.export-writers: Action { text: "Export " + label; action: "export-collection:" + i; }
+        Action { text: "Find missing files"; action: "missing"; }
+        Action { text: "Find duplicates"; action: "dupes"; }
+        Action { text: "Back up library"; action: "backup"; }
+        Action { text: "Restore library"; action: "restore"; }
+        Chip { text: "Manage device backups"; clicked => { DeviceState.manage-backups(); } }
+        Action { text: LibraryState.undo-label == "" ? "Undo" : "Undo " + LibraryState.undo-label; enabled: LibraryState.undo-label != ""; action: "undo"; }
+        Action { text: LibraryState.redo-label == "" ? "Redo" : "Redo " + LibraryState.redo-label; enabled: LibraryState.redo-label != ""; action: "redo"; }
+        Text { text: "Selected track"; color: Theme.text-bright; font-size: Theme.font-lg; }
+        Action { text: "Edit track details"; action: "track-edit"; }
+        Action { text: "Import to collection"; action: "track-import"; }
+        Action { text: "Analyze track"; action: "track-analyze"; }
+        Action { text: "Analysis lock"; action: "track-lock"; }
+        Action { text: "Reload tags"; action: "track-reload-tag"; }
+        Action { text: "Show in file manager"; action: "track-show"; }
+        Action { text: "Relocate track"; action: "track-relocate"; }
+        Action { text: "Auto relocate"; action: "track-auto-relocate"; }
+        Action { text: "Remove from collection"; action: "track-remove"; }
+        Chip { text: "Add to tag list"; clicked => { BrowserState.tag-add(); } }
+        Chip { text: "Add to playlist"; clicked => { BrowserState.panel-request(0); } }
+        Chip { text: "Track tags"; clicked => { BrowserState.panel-request(1); } }
+        Text { text: "Playlists & mixing"; color: Theme.text-bright; font-size: Theme.font-lg; }
+        Action { text: "New playlist"; action: "playlist-new"; }
+        Action { text: "New intelligent playlist"; action: "playlist-new-smart"; }
+        Action { text: "New folder"; action: "playlist-new-folder"; }
+        Action { text: "Delete playlist"; action: "playlist-delete"; }
+        for label[i] in ["Title", "Artist", "Genre", "BPM", "Key", "Time", "Rating", "Comments"]: Action { text: "Sort playlist by " + label; action: "playlist-sort-" + ["title", "artist", "genre", "bpm", "key", "time", "rating", "comment"][i]; }
+        Action { text: "Renumber playlist"; action: "playlist-renumber"; }
+        for label[i] in ["M3U8", "PLS", "Text"]: Action { text: "Export playlist as " + label; action: "playlist-export-" + ["m3u8", "pls", "text"][i]; }
+        Action { text: "Export playlist to device"; action: "playlist-export-device"; }
+        Action { text: "Import playlist"; action: "playlist-import"; }
+        Chip { text: "Automix"; active: AutomixState.running; clicked => { AutomixState.toggled(); } }
+        Chip { text: "Related tracks"; active: BrowserState.related; clicked => { BrowserState.related-toggled(!BrowserState.related); } }
+        for label[i] in PluginState.actions: Chip { text: label; clicked => { PluginState.run(i); } }
+        Chip { text: "Keyboard shortcuts"; clicked => { KeysState.help-visible = true; } }
+        Chip { text: "Welcome / suggested extensions"; clicked => { WelcomeState.show(); } }
+        Chip { text: "About / updates"; clicked => { AboutState.visible = true; } }
+        Action { text: "Exit OpenFadeR"; action: "exit"; }
+    }
+}

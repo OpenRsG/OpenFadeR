@@ -10,8 +10,8 @@
 //! With the STEM waveform on (PREFS) and a part muted, the 3-band wave of the stems heard ([`wave_3band`]) replaces these.
 
 use super::{
-    cue_letter, hot_cue_rgb, mono_layers, mono_rgbh, phrase::phrase_band, single, sources,
-    three_band, Axis, Canvas, Layers, Src, Wave,
+    Axis, Canvas, Layers, Src, Wave, cue_letter, hot_cue_rgb, mono_layers, mono_rgbh,
+    phrase::phrase_band, single, sources, three_band,
 };
 use crate::app::prefs::{
     self,
@@ -26,6 +26,7 @@ const PER_MS: f64 = DETAIL_ENTRIES_PER_SEC as f64 / 1000.0;
 
 /// The counter right of the playhead (VIEW > Beat Count Display): `Position` = bars.beats from the first
 /// beat to the playhead; `NextBars` / `NextBeats` = distance to the next memory cue (None without one ahead).
+/// Beat timestamps are ordered, as for the deck's beat-grid lookup; only the two range boundaries need searching.
 pub fn beat_count_text(
     mode: BeatCount,
     beats: &[Beat],
@@ -33,10 +34,9 @@ pub fn beat_count_text(
     pos_ms: f64,
 ) -> Option<String> {
     let between = |from: f64, to: f64| {
-        beats
-            .iter()
-            .filter(|b| b.time_ms as f64 > from && b.time_ms as f64 <= to)
-            .count()
+        let start = beats.partition_point(|b| b.time_ms as f64 <= from);
+        let end = beats.partition_point(|b| b.time_ms as f64 <= to);
+        end.saturating_sub(start)
     };
     let next = || {
         cues.iter()
@@ -85,6 +85,14 @@ pub fn wave(a: &Analysis, pcm: Option<&Pcm>) -> Option<Wave> {
 pub fn wave_3band(detail: &[[u8; 3]]) -> Option<Wave> {
     (!detail.is_empty()).then(|| Wave {
         layers: three_band(detail),
+        per_ms: PER_MS,
+    })
+}
+
+/// Audio-only fallback, prepared off the UI thread without reading UI preferences.
+pub(in crate::app) fn audio_wave(pcm: &Pcm) -> Option<Wave> {
+    (!pcm.samples.is_empty() && pcm.rate > 0).then(|| Wave {
+        layers: peaks(pcm),
         per_ms: PER_MS,
     })
 }
@@ -202,6 +210,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn beat_counts_at_beat_and_memory_cue_boundaries() {
+        let beats: Vec<_> = [0, 500, 1000, 1000, 1500, 2000, 2500]
+            .into_iter()
+            .map(|time_ms| Beat {
+                time_ms,
+                bar_pos: 1,
+                bpm_x100: 12000,
+            })
+            .collect();
+        let cues = [(2500, 0), (500, 1), (1500, 0)].map(|(time_ms, hot_cue)| Cue {
+            time_ms,
+            hot_cue,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        });
+        for (pos, position, bars, count) in [
+            (-1.0, "0.0BARS", Some("1.0BARS"), Some("4BEATS")),
+            (0.0, "0.1BARS", Some("0.3BARS"), Some("3BEATS")),
+            (499.9, "0.1BARS", Some("0.3BARS"), Some("3BEATS")),
+            (500.0, "0.2BARS", Some("0.2BARS"), Some("2BEATS")),
+            (1000.0, "1.0BARS", Some("0.0BARS"), Some("0BEATS")),
+            (1499.5, "1.0BARS", Some("0.0BARS"), Some("0BEATS")),
+            (1500.0, "1.1BARS", Some("0.1BARS"), Some("1BEATS")),
+            (2499.9, "1.2BARS", Some("0.0BARS"), Some("0BEATS")),
+            (2500.0, "1.3BARS", None, None),
+            (3000.0, "1.3BARS", None, None),
+        ] {
+            for (mode, expected) in [
+                (BeatCount::Position, Some(position)),
+                (BeatCount::NextBars, bars),
+                (BeatCount::NextBeats, count),
+            ] {
+                assert_eq!(
+                    beat_count_text(mode, &beats, &cues, pos).as_deref(),
+                    expected,
+                    "position {pos}"
+                );
+            }
+        }
+        for (mode, expected) in [
+            (BeatCount::Position, Some("0.0BARS")),
+            (BeatCount::NextBars, Some("0.0BARS")),
+            (BeatCount::NextBeats, Some("0BEATS")),
+        ] {
+            assert_eq!(beat_count_text(mode, &[], &cues, 0.0).as_deref(), expected);
+        }
+        for mode in [BeatCount::NextBars, BeatCount::NextBeats] {
+            assert_eq!(beat_count_text(mode, &beats, &[], 0.0), None);
+        }
+    }
+
+    #[test]
     fn bold_grid_stays_visible_over_audio_and_marks_downbeats_by_width() {
         let a = Analysis {
             beats: vec![
@@ -272,7 +333,7 @@ mod tests {
 #[cfg(test)]
 mod mode_tests {
     use super::*;
-    use crate::app::prefs::{set_for_test, WaveColors};
+    use crate::app::prefs::{WaveColors, set_for_test};
 
     #[test]
     fn waveform_mode_picks_the_stored_family_and_falls_back() {

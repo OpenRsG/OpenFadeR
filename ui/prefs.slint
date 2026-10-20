@@ -1,5 +1,6 @@
 import { Theme } from "theme.slint";
 import { DialogFrame, Note } from "dialog.slint";
+import { Dropdown } from "widgets.slint";
 import { PrefRowData, PrefRows, PrefsState } from "prefs-state.slint";
 import { PrefsView } from "prefs-view.slint";
 import { PrefsAudio } from "prefs-audio.slint";
@@ -37,17 +38,28 @@ export component PrefsOverlay inherits DialogFrame {
     visible: PrefsState.visible;
     title: "PREFERENCES";
     // The card follows the window (DialogFrame keeps 8 px of scrim around it): 80 % of the width (at least 860 px, at most 1400 px), 92 % of the height.
-    card-width: min(1400px, max(860px, root.width * 0.8));
+    card-width: Theme.layout-profile == 1 ? root.width - 16px : min(1400px, max(860px, root.width * 0.8));
     card-height: root.height * 0.92;
     body-padding: 0px;
     closed => { PrefsState.visible = false; }
     changed visible => {
         if self.visible { PrefsState.category-chosen(PrefsState.category); }
     }
+    if Theme.layout-profile == 1: Dropdown {
+        options: ["VIEW", "THEMES", "AUDIO", "ANALYSIS", "CONTROLLER", "KEYBOARD", "EXTENSIONS", "DJ SYSTEM", "ADVANCED", "LIBRARIES"];
+        current: PrefsState.category == 9 ? 9 : PrefsState.category == 8 ? 1 : PrefsState.category > 0 ? PrefsState.category + 1 : 0;
+        chose(n) => {
+            PrefsState.category = n == 9 ? 9 : n == 1 ? 8 : n > 1 ? n - 1 : n;
+            flick.content-y = 0;
+            flick.content-x = 0;
+            PrefsState.category-chosen(PrefsState.category);
+        }
+    }
     HorizontalLayout {
         spacing: 0px;
         Rectangle {
-            width: 160px;
+            width: Theme.layout-profile == 1 ? 0px : 160px;
+            visible: Theme.layout-profile != 1;
             background: Theme.bg;
             VerticalLayout {
                 padding-top: Theme.space-sm;
@@ -70,10 +82,10 @@ export component PrefsOverlay inherits DialogFrame {
             spacing: Theme.space-lg;
             flick := Flickable {
                 // Rows wider than the page (a long device name) are cut or elided, never scrolled sideways: the labels stay where they are.
-                content-width: self.width;
+                content-width: Theme.layout-profile == 1 ? max(self.width, page.preferred-width) : self.width;
                 content-height: page.preferred-height;
                 page := VerticalLayout {
-                    width: flick.width;
+                    width: flick.content-width;
                     alignment: start;
                     if PrefsState.category == 0: PrefsView {}
                     if PrefsState.category == 1: PrefsAudio {}

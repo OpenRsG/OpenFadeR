@@ -1,0 +1,103 @@
+import { ScrollView } from "std-widgets.slint";
+import { Theme, DeckState, MixerState } from "state.slint";
+import { DJButton, TouchFader, Meter, Icon } from "widgets.slint";
+
+export component PerformanceMixer inherits Rectangle {
+    in-out property <bool> pads;
+    background: Theme.bg-deep;
+    VerticalLayout {
+        padding: 4px; spacing: 2px;
+        HorizontalLayout {
+            height: 44px; spacing: 2px;
+            DJButton { text: "Mixer"; active: !root.pads; clicked => { root.pads = false; } }
+            DJButton { text: "Pads"; active: root.pads; clicked => { root.pads = true; } }
+        }
+        if !root.pads: HorizontalLayout {
+            vertical-stretch: 1; spacing: 6px;
+            for deck[i] in DeckState.decks: VerticalLayout {
+                spacing: 2px;
+                Text { height: 18px; text: i == 0 ? "A" : "B"; color: i == 0 ? Theme.deck1 : Theme.deck2; font-size: 14px; font-weight: 700; horizontal-alignment: center; }
+                HorizontalLayout {
+                    vertical-stretch: 1; spacing: 4px;
+                    Rectangle {
+                        width: 8px; min-height: 44px; vertical-stretch: 1;
+                        Meter { width: parent.width; height: parent.height; vertical: true; level: deck.level; segments: 14; }
+                    }
+                    TouchFader {
+                        vertical: true; value: deck.gain; tone: i == 0 ? Theme.deck1 : Theme.deck2;
+                        label: "Channel level deck " + (i == 0 ? "A" : "B");
+                        edited(v) => { DeckState.mix(i, 0, v); }
+                    }
+                }
+                DJButton {
+                    height: 44px; icon: Icon.headphones; active: MixerState.headphones[i];
+                    tone: i == 0 ? Theme.deck1 : Theme.deck2;
+                    label: "Headphone cue deck " + (i == 0 ? "A" : "B");
+                    clicked => { MixerState.change-headphones(i, !MixerState.headphones[i]); }
+                }
+            }
+        }
+        if root.pads: ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 0px; alignment: center;
+                for slot in 4: HorizontalLayout {
+                    height: 44px; spacing: 2px;
+                    for deck[i] in DeckState.decks: DJButton {
+                        preferred-width: 0px; horizontal-stretch: 1;
+                        text: (deck.cue-mode == 2 ? "CLR " : deck.cue-mode == 1 ? "SET " : "") + (i == 0 ? "A" : "B") + (slot + 1);
+                        icon: deck.cue-mode == 0 && !deck.cues[slot] ? Icon.plus : Icon.none;
+                        active: deck.cues[slot]; enabled: deck.ready && (deck.cue-mode != 2 || deck.cues[slot]);
+                        tone: deck.cue-mode == 2 ? Theme.danger : i == 0 ? Theme.deck1 : Theme.deck2;
+                        label: (deck.cue-mode == 2 ? "Clear " : deck.cue-mode == 1 ? "Set " : "Jump or set ") + "hot cue " + (i == 0 ? "A" : "B") + (slot + 1) + (deck.cues[slot] ? " saved" : " empty");
+                        clicked => { DeckState.hot-cue(i, slot, deck.cue-mode); }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            height: 14px;
+            Text { text: "A"; color: Theme.deck1; font-size: 11px; }
+            Text { text: "Crossfader"; color: Theme.text-dim; font-size: 11px; horizontal-alignment: center; }
+            Text { text: "B"; color: Theme.deck2; font-size: 11px; horizontal-alignment: right; }
+        }
+        TouchFader { height: 44px; detent: true; value: MixerState.crossfade; label: "Crossfader A to B"; edited(v) => { MixerState.change-crossfade(v); } }
+    }
+}
+
+export component CompactMixer inherits Rectangle {
+    background: Theme.bg-deep;
+    VerticalLayout {
+        padding: 4px; spacing: 2px;
+        HorizontalLayout {
+            height: 44px; spacing: 4px;
+            for deck[i] in DeckState.decks: HorizontalLayout {
+                spacing: 2px;
+                DJButton {
+                    width: 54px; text: i == 0 ? "A" : "B"; icon: deck.playing ? Icon.pause : Icon.play;
+                    tone: i == 0 ? Theme.deck1 : Theme.deck2; active: deck.playing; enabled: deck.ready;
+                    label: (deck.playing ? "Pause deck " : "Play deck ") + (i == 0 ? "A" : "B");
+                    clicked => { DeckState.play(i); }
+                }
+                TouchFader {
+                    value: deck.gain; tone: i == 0 ? Theme.deck1 : Theme.deck2;
+                    label: "Channel level deck " + (i == 0 ? "A" : "B");
+                    edited(v) => { DeckState.mix(i, 0, v); }
+                }
+                DJButton {
+                    width: 44px; icon: Icon.headphones; active: MixerState.headphones[i];
+                    tone: i == 0 ? Theme.deck1 : Theme.deck2;
+                    label: "Headphone cue deck " + (i == 0 ? "A" : "B");
+                    clicked => { MixerState.change-headphones(i, !MixerState.headphones[i]); }
+                }
+            }
+        }
+        HorizontalLayout {
+            height: 44px; spacing: 4px;
+            Text { text: "A"; color: Theme.deck1; horizontal-stretch: 0; }
+            TouchFader { detent: true; value: MixerState.crossfade; label: "Crossfader A to B"; edited(v) => { MixerState.change-crossfade(v); } }
+            Text { text: "B"; color: Theme.deck2; horizontal-stretch: 0; }
+            DJButton { width: 60px; text: "Mid"; label: "Center crossfader"; clicked => { MixerState.change-crossfade(0.5); } }
+        }
+    }
+}

@@ -6,6 +6,11 @@ once, in the main window and in the split-screen window, and the choice is kept 
 the next start falls back to Catppuccin Mocha (a line on stderr says so). "Skin" and "theme" are the same thing: the settings key, the folder and
 the code say `skin`.
 
+PREFERENCES > VIEW > DISPLAY TYPE > TEMPO DECIMAL PLACES switches BPM readouts between 1 and 2 decimals (default: 2).
+It applies immediately to deck headers and jogs, browser tables, track info and BEAT FX, and is saved independently of the theme.
+Regular and Pocket layouts share this preference. Compact jogs still hide the fractional part; playback, SYNC, stored BPM and the
+editable grid-tempo field keep their original precision.
+
 ## Themes that come with the app
 
 | Theme | Base | What it is |
@@ -21,6 +26,7 @@ the code say `skin`.
 | Tokyo Night | dark | deep indigo with neon blue, magenta and orange |
 | So Pro | dark | near-black greys, a bright blue accent, a white platter, eight coloured pads in a 4 × 2 grid, the vertical 2-deck layout |
 | Ocean, High Contrast | dark | small examples that list only a few tokens |
+| Pocket | dark | the full Linux app with a touch workspace, focused/paired decks, persistent transport and mixer controls, and all desktop modes and commands |
 
 Except the two built-ins, they are the files of the [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) repository:
 copy them into `~/.config/openfader/extension/skin/`, or point `OPENFADER_SKINS` at a checkout of it.
@@ -122,6 +128,28 @@ ignored.
 | `show_mixer` | `true`, `false` (the mixer column and strip; hidden, the vertical waveform columns sit together and grow) |
 
 Sizes of the regions (deck height, waveform heights, the jog, the mixer channel) are tokens, not hints, and apply with the theme.
+
+### Structural presentation
+
+Themes can select a different presentation, not just recolor the desktop. The `layout-profile` token is `0` for the desktop workspace and `1` for the touch workspace. These use the same Linux application, engine, Collection, plugins and callbacks; `mobile/` is the separate Android frontend and is not the Linux phone application.
+
+Pocket (`extension/skin/pocket.json`) selects the touch presentation. Its workspace selector exposes decks/export players, Library, mixer/output, effects, sampler, Mix Point Link, Beat Lab and all commands. EDIT, LIGHTING and VIDEO use the same mode selector as desktop; optional features retain their normal preference/extension switches. Two or four decks are available. Below `touch-breakpoint`, select a deck; wider windows show a pair. All eight pads and all desktop pad modes, cue/loop editing and grid tools remain available.
+
+Play/pause, transport CUE, channel levels, headphone cues and the crossfader remain available while navigating. The Library separates tracks, sources/playlists, track info and actions, with explicit deck-load buttons. Preferences uses a category selector and stacked form labels. Wide editors and dense effect/sample panels retain their complete controls in a scrollable workspace; narrow tables can scroll their columns.
+
+Library → Actions includes every browser sort column, direction and a headphone-preview waveform that seeks without loading a deck. Mix Point Link keeps a selected deck's editable waveform in the same workspace as MIX IN/OUT and SILENT, with separate touch buttons for deck and linked-lane zoom.
+
+`touch-target` sizes primary touch controls; `icon-size` sizes their centered glyphs independently. Shared Slint controls use `Theme.target-size(base)` to retain their desktop size in profile `0` and enforce the touch target in profile `1`. The existing font, spacing and region tokens still apply. Switching to a desktop theme restores the desktop presentation without changing or copying library data. These tokens are editable and saved by the existing theme editor.
+
+For the full Linux app's viewport check (Xvfb, Openbox, xdotool and ImageMagick required):
+
+```sh
+xvfb-run -a -s '-screen 0 1440x1400x24' sh -c \
+  'openbox & python3 ui/check-touch.py target/release/openfader'
+```
+
+This runs the actual binary with disposable settings and checks compact portrait/landscape window sizes, saving screenshots and logs. It is not proof of physical audio output, controllers or device export.
+
 
 ### Value forms
 
@@ -291,6 +319,10 @@ and brightness of the key column's colours, whose hue is the key's.
 
 | Token | Type | Default |
 |---|---|---|
+| `layout-profile` | int | `0` (desktop), `1` selects touch |
+| `touch-breakpoint` | length | `760px` |
+| `touch-target` | length | `44px` |
+| `icon-size` | length | `14px` |
 | `gap` | length | `2px` |
 | `space-xs` | length | `2px` |
 | `space-sm` | length | `4px` |

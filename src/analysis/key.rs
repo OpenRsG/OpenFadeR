@@ -35,7 +35,11 @@ const MINOR_PRIOR: f32 = 0.1;
 const SILENCE: f32 = 2.0;
 
 /// Spectral peaks as `(frame, fractional MIDI note, magnitude)`; silent frames have none.
-fn spectral_peaks(x: &[f32], rate: f32) -> Vec<(u32, f32, f32)> {
+fn spectral_peaks(
+    x: &[f32],
+    rate: f32,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Vec<(u32, f32, f32)>> {
     let mut stft = Stft::new(N);
     let mut peaks = Vec::new();
     let bin_hz = rate / N as f32;
@@ -44,6 +48,9 @@ fn spectral_peaks(x: &[f32], rate: f32) -> Vec<(u32, f32, f32)> {
         ((F_MAX / bin_hz) as usize).min(N / 2 - 2),
     );
     for (fi, frame) in x.windows(N).step_by(HOP).enumerate() {
+        if cancelled() {
+            return None;
+        }
         let mag = stft.magnitudes(frame);
         let top = mag[lo..=hi].iter().cloned().fold(0.0, f32::max);
         if top < SILENCE {
@@ -60,37 +67,64 @@ fn spectral_peaks(x: &[f32], rate: f32) -> Vec<(u32, f32, f32)> {
             }
         }
     }
-    peaks
+    Some(peaks)
 }
 
 /// Twelve-bin pitch-class profile (C = 0) summed over the track, tuning-corrected, every peak also voting for the
 /// pitch classes of the fundamentals it could be a harmonic of. All zero for silence.
 pub fn chroma(samples: &[f32], rate: u32) -> [f32; 12] {
+    chroma_cancellable(samples, rate, &|| false).unwrap()
+}
+
+fn chroma_cancellable(
+    samples: &[f32],
+    rate: u32,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<[f32; 12]> {
     let d = (rate / LOW_RATE).max(1) as usize;
-    let peaks = spectral_peaks(&super::mono_decimate(samples, d), rate as f32 / d as f32);
+    let mono = super::mono_decimate_cancellable(samples, d, cancelled)?;
+    let peaks = spectral_peaks(&mono, rate as f32 / d as f32, cancelled)?;
+    drop(mono);
     // Per-frame normalised weights, so loud and quiet passages count alike.
     let mut sums = vec![0f32; peaks.last().map_or(0, |p| p.0 as usize + 1)];
-    for p in &peaks {
+    for (i, p) in peaks.iter().enumerate() {
+        if i % 4096 == 0 && cancelled() {
+            return None;
+        }
         sums[p.0 as usize] += p.2;
     }
     let peaks: Vec<(f32, f32)> = peaks
         .iter()
-        .map(|p| (p.1, p.2 / sums[p.0 as usize]))
-        .collect();
+        .enumerate()
+        .map(|(i, p)| {
+            if i % 4096 == 0 && cancelled() {
+                return None;
+            }
+            Some((p.1, p.2 / sums[p.0 as usize]))
+        })
+        .collect::<Option<_>>()?;
     // Tuning: circular mean of each peak's offset from the semitone grid (period 1 semitone).
-    let (s, c) = peaks.iter().fold((0f32, 0f32), |(s, c), &(m, w)| {
+    let mut s = 0f32;
+    let mut c = 0f32;
+    for (i, &(m, w)) in peaks.iter().enumerate() {
+        if i % 4096 == 0 && cancelled() {
+            return None;
+        }
         let a = std::f32::consts::TAU * m;
-        (s + w * a.sin(), c + w * a.cos())
-    });
+        (s, c) = (s + w * a.sin(), c + w * a.cos());
+    }
     let tuning = s.atan2(c) / std::f32::consts::TAU; // semitones, in (-0.5, 0.5]
     let mut out = [0f32; 12];
-    for &(m, w) in &peaks {
+    for (i, &(m, w)) in peaks.iter().enumerate() {
+        if i % 4096 == 0 && cancelled() {
+            return None;
+        }
         for h in 1..=HARMONICS {
             out[((m - 12.0 * (h as f32).log2() - tuning).round() as i32).rem_euclid(12)
                 as usize] += w;
         }
     }
-    out
+    (!cancelled()).then_some(out)
 }
 
 /// Camelot name of a key: major tonic pitch class `t` is `(8 + 7t) mod 12`, minor shares its relative major's number.
@@ -137,6 +171,14 @@ pub fn from_chroma(c: &[f32; 12]) -> Option<String> {
 /// Key of interleaved stereo f32 PCM; `None` for silence or audio shorter than one analysis window (~0.75 s).
 pub fn detect(samples: &[f32], rate: u32) -> Option<String> {
     from_chroma(&chroma(samples, rate))
+}
+
+pub(crate) fn detect_cancellable(
+    samples: &[f32],
+    rate: u32,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Option<String>> {
+    Some(from_chroma(&chroma_cancellable(samples, rate, cancelled)?))
 }
 
 /// A key as `(Camelot number 1..=12, major)`: "A" = minor = `false`, "B" = major = `true`.
@@ -271,6 +313,25 @@ mod tests {
     fn silence_and_too_short_have_no_key() {
         assert_eq!(detect(&vec![0.0; RATE as usize * 20], RATE), None);
         assert_eq!(detect(&[0.1; 2000], RATE), None);
+    }
+
+    #[test]
+    fn key_cancellation_discards_work_during_decimation_and_stft() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let samples = song(9, true, 0.0);
+        for stop in [0, 2, 16, 64] {
+            let calls = AtomicUsize::new(0);
+            let cancelled = || calls.fetch_add(1, Ordering::Relaxed) >= stop;
+            assert_eq!(detect_cancellable(&samples, RATE, &cancelled), None);
+        }
+        assert_eq!(
+            detect_cancellable(&samples, RATE, &|| false),
+            Some(Some("8A".into()))
+        );
+        assert_eq!(
+            detect_cancellable(&[0.0; 2000], RATE, &|| false),
+            Some(None)
+        );
     }
 
     #[test]

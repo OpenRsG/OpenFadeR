@@ -90,6 +90,66 @@ fn a_sdk_table_runs_through_the_host_stage_and_is_destroyed_on_drop() {
 }
 
 #[test]
+fn a_unit_constructs_only_selected_plugins_and_recreates_them_after_switching() {
+    use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+    static CREATED: AtomicUsize = AtomicUsize::new(0);
+    static DESTROYED: AtomicUsize = AtomicUsize::new(0);
+    struct Counted;
+    impl sdk::Effect for Counted {
+        const NAME: &'static CStr = c"COUNTED";
+        fn new(_: u32) -> Self {
+            CREATED.fetch_add(1, SeqCst);
+            Self
+        }
+        fn tick(&mut self, x: Frame, c: &Ctx) -> Frame {
+            c.mix(x, [2.0 * x[0], 2.0 * x[1]])
+        }
+        fn reset(&mut self) {}
+    }
+    impl Drop for Counted {
+        fn drop(&mut self) {
+            DESTROYED.fetch_add(1, SeqCst);
+        }
+    }
+    let plugin = unsafe { from_vtable("selected-only", &sdk::vtable::<Counted>()) }.unwrap();
+    let created = CREATED.load(SeqCst);
+    let destroyed = DESTROYED.load(SeqCst);
+    let mut u = Unit::with(48_000, &[plugin]);
+    assert_eq!(
+        CREATED.load(SeqCst),
+        created,
+        "unselected plugins are not instantiated"
+    );
+    let s = Settings {
+        effect: Selected::Plugin(0).index(),
+        beats: 1.0,
+        level: 1.0,
+        knob: 0.5,
+        on: true,
+        bpm: 120.0,
+    };
+    for selected in 1..=2 {
+        u.prepare(s.effect);
+        u.set(s);
+        let y = (0..500).map(|_| u.process([0.25, -0.5])).last().unwrap();
+        assert_eq!(y, [0.5, -1.0]);
+        assert_eq!(CREATED.load(SeqCst), created + selected);
+        u.prepare(Selected::Trans.index());
+        u.set(Settings {
+            effect: Selected::Trans.index(),
+            ..s
+        });
+    }
+    drop(u);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while DESTROYED.load(SeqCst) < destroyed + 2 {
+        assert!(std::time::Instant::now() < deadline, "retirement timed out");
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    assert_eq!(DESTROYED.load(SeqCst), destroyed + 2);
+}
+
+#[test]
 fn a_panicking_effect_passes_the_signal_through_in_a_unit() {
     let fx = fake_effects();
     let mut u = Unit::with(48_000, &fx);
@@ -101,11 +161,13 @@ fn a_panicking_effect_passes_the_signal_through_in_a_unit() {
         on: true,
         bpm: 120.0,
     };
+    u.prepare(Selected::Plugin(1).index());
     u.set(set(Selected::Plugin(1)));
     for _ in 0..500 {
         u.process([0.0; 2]); // engage ramp done
     }
     assert_eq!(u.process([0.5, -0.5]), [0.5, -0.5]);
+    u.prepare(Selected::Plugin(0).index());
     u.set(set(Selected::Plugin(0)));
     let y = (0..500).map(|_| u.process([0.5, -0.5])).last().unwrap();
     assert_eq!(y, [1.0, -1.0], "the next effect still works");
@@ -122,6 +184,7 @@ fn a_unit_without_the_plugin_falls_back_instead_of_indexing_out_of_range() {
         bpm: 120.0,
     };
     let mut u = Unit::with(48_000, &[]);
+    u.prepare(Selected::Plugin(3).index());
     u.set(on(Selected::Plugin(3).index()));
     assert!(u.process([0.1; 2])[0].is_finite());
     let mut rack = Unit::rack_with(48_000, &[]);

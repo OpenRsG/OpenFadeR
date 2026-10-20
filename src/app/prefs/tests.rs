@@ -31,6 +31,7 @@ fn round_trips_every_field_and_keeps_unknown_keys() {
     p.set_extra("skin", "light");
     p.view.wave_order = 4321;
     p.view.draw_rate = view::DrawRate::Fps30;
+    p.view.tempo_decimals = view::TempoDecimals::One;
     let (back, notes) = Prefs::parse(&p.to_text());
     assert_eq!(back, p);
     assert!(notes.is_empty(), "{notes:?}");

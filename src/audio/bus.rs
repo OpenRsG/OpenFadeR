@@ -361,10 +361,10 @@ mod tests {
     }
 
     fn run(units: &mut [Unit], controls: &[Controls], buf: &mut Chans) {
-        units
-            .iter_mut()
-            .zip(controls)
-            .for_each(|(u, c)| u.apply(c, buf, N));
+        units.iter_mut().zip(controls).for_each(|(u, c)| {
+            u.prepare(c.settings().effect);
+            u.apply(c, buf, N);
+        });
     }
 
     fn cue_untouched(buf: &Chans) -> bool {
@@ -462,6 +462,7 @@ mod tests {
             let (mut u, c) = (Unit::new(48_000), Controls::default());
             gate(&c, a);
             let mut buf = chans(CHANNELS);
+            u.prepare(c.settings().effect);
             u.apply(&c, &mut buf, N);
             assert!(gated(&buf[ch]), "CH{} is gated", ch + 1);
             assert!(
@@ -474,6 +475,7 @@ mod tests {
         let (mut u, c) = (Unit::new(48_000), Controls::default());
         gate(&c, Assign::Master);
         let mut buf = chans(CHANNELS);
+        u.prepare(c.settings().effect);
         u.apply(&c, &mut buf, N);
         let sum = |i: usize| (0..CHANNELS).map(|k| buf[k][i].0[0]).sum::<f32>();
         assert!(

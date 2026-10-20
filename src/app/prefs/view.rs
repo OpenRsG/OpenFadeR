@@ -2,7 +2,7 @@
 //! our choice). Typed section [`View`] plus the page rows. Consumers read `prefs::with(|p| p.view.*)` (the owners are named
 //! per field); [`super::look`] pushes the look (skin, tooltips, browse font and line space) into the Slint `Theme` global.
 
-use super::{choice, section, Prefs, Row, Section};
+use super::{Prefs, Row, Section, choice, section};
 use crate::app::skin;
 
 /// The chosen skin's name (a built-in one ([`skin::BUILTIN`], the first is the default) or a skin file's `name`; the old names
@@ -19,6 +19,20 @@ choice!(
     /// database / tag.
     KeyNotation { #[default] Camelot = "camelot", Classic = "classic", OpenKey = "openkey", Database = "database" }
 );
+choice!(
+    /// BPM readout precision; display only, never the stored tempo or playback rate.
+    TempoDecimals { One = "1", #[default] Two = "2" }
+);
+
+impl TempoDecimals {
+    pub fn digits(self) -> usize {
+        match self {
+            Self::One => 1,
+            Self::Two => 2,
+        }
+    }
+}
+
 choice!(
     /// Which stored waveform the decks draw ([`crate::app::render`]): 3-band, colour, or
     /// the classic blue mono one. A mode the track has no data for falls back to the next one.
@@ -47,7 +61,8 @@ choice!(
     OverviewSize { #[default] Full = "full", Half = "half" }
 );
 choice!(
-    /// Bold grid lines sit above the waveform; downbeats are wider than other beats.
+    /// Bold grid lines sit above the enlarged waveform; downbeats are wider than other beats.
+    /// The overview keeps thin bar lines behind the audio.
     BeatGrid { #[default] Normal = "normal", Bold = "bold" }
 );
 choice!(
@@ -99,6 +114,8 @@ section!(
     View {
         /// Tooltips: hover texts of the buttons.
         tooltips: bool = true;
+        /// Decimal places in BPM readouts, including the jog; two preserves the original display.
+        tempo_decimals: TempoDecimals = TempoDecimals::Two;
         /// Browse > FontSize / bold, Line Space; read by the browser lists via `Theme`.
         browse_font: FontSize = FontSize::Normal;
         browse_bold: bool = false;
@@ -230,6 +247,12 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         Row::header("DISPLAY TYPE"),
         Row::info("LANGUAGE", "English (the only language so far)"),
         Row::check("tooltips", "Tooltips", v.tooltips),
+        Row::chips(
+            "tempo_decimals",
+            "TEMPO DECIMAL PLACES",
+            &["1", "2"],
+            v.tempo_decimals as usize,
+        ),
         Row::header("BROWSE"),
         Row::of("browse_font", "FONT SIZE", v.browse_font),
         Row::check("browse_bold", "Bold characters", v.browse_bold),

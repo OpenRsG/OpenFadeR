@@ -221,7 +221,7 @@ impl Canvas {
             }
         }
     }
-    /// Bold grid above the waveform: a contrasting outline and wider downbeats, not colour alone.
+    /// Enlarged waveform's bold grid: a contrasting outline and wider downbeats, not colour alone.
     pub fn bold_grid(&mut self, x: i64, downbeat: bool) {
         let p = palette();
         let (left, right, rgb) = if downbeat {

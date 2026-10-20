@@ -66,7 +66,7 @@ mod transport;
 mod wire;
 pub use wire::wire;
 
-use super::{prefs, render, App, DeckScroll, DeckState, DeckView};
+use super::{App, DeckScroll, DeckState, DeckView, prefs, render};
 use openfader::{
     analysis::{self, Beat},
     audio,
@@ -92,16 +92,21 @@ pub fn active() -> usize {
     prefs::with(|p| p.decks.clamp(2, DECKS))
 }
 
-/// A decoded track plus, when the library gave no grid / 3-band waveform, [`analysis::analyze`]'s result.
-type Decoded = (audio::Pcm, Option<analysis::Analysis>);
-
-/// Audio still decoding (and analysing): the receiver (dropping it cancels the result) and the
-/// track title and status notes to rebuild the status line from when it arrives.
+/// The worker stays cancellable after playback starts, until optional analysis finishes.
 struct Pending {
-    rx: Receiver<Result<Decoded, String>>,
+    rx: Receiver<Result<load::Decoded, String>>,
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
     title: String,
-    /// Status notes after the summary; the summary itself is rebuilt from the finished analysis.
     notes: Vec<String>,
+    playable: bool,
+    initial_cue: u32,
+}
+
+impl Drop for Pending {
+    fn drop(&mut self) {
+        self.cancelled
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 #[derive(Default)]
@@ -194,7 +199,7 @@ pub struct Deck {
     /// The STEM waveform: copies of the audio and stems, the parked original waves ([`stemwave`]).
     stemwave: RefCell<stemwave::State>,
     /// Part of a pending STEM INSTANT DOUBLES: waits for this deck's stems ([`stemdouble`]).
-    double: Cell<Option<usize>>,
+    double: RefCell<Option<stemdouble::Pending>>,
     /// Quantize NEXT BEAT: the hot cue / loop waiting for its boundary (ms) ([`quantize`]).
     pending: Cell<Option<(f64, quantize::Call)>>,
     /// HOT CUE gate: the cue a held pad returns to when released ([`pads`]).
@@ -224,7 +229,10 @@ pub(in crate::app) fn fmt_ms(ms: u32) -> String {
 }
 
 fn bpm_text(grid_bpm: Option<f64>, rate: f64) -> slint::SharedString {
-    grid_bpm.map_or("— BPM".into(), |g| format!("{:.2} BPM", g * rate).into())
+    let digits = prefs::with(|p| p.view.tempo_decimals.digits());
+    grid_bpm.map_or("— BPM".into(), |g| {
+        format!("{:.*} BPM", digits, g * rate).into()
+    })
 }
 
 fn tempo_text(rate: f64) -> slint::SharedString {
@@ -313,7 +321,7 @@ impl Deck {
             cue_state: Cell::default(),
             stems: RefCell::default(),
             stemwave: RefCell::default(),
-            double: Cell::new(None),
+            double: RefCell::new(None),
             pending: Cell::new(None),
             gate: Cell::new(None),
             plugin_held: Cell::new(None),

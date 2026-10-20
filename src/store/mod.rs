@@ -40,26 +40,26 @@ mod sequence;
 mod tag;
 mod track;
 
-pub use backup::{Backup, Restored, MUSIC_DIR};
-pub use bank::{collect_banks, BankSlot, HotCueBank};
+pub use backup::{Backup, MUSIC_DIR, Restored};
+pub use bank::{BankSlot, HotCueBank, collect_banks};
 pub use device::{DeviceBackup, NewBackup};
-pub use gain::{effective_db, TrackGain};
+pub use gain::{TrackGain, effective_db};
 pub use node::{Node, NodeKind};
-pub use overlay::{apply, overlay, Overlay};
-pub use sequence::{Sequence, MAX_SEQUENCES};
+pub use overlay::{Overlay, apply, overlay};
+pub use sequence::{MAX_SEQUENCES, Sequence};
 pub use tag::{Tag, TagGroup};
-pub use track::{Edits, AUTO_CUES, TRACK_COLORS};
+pub use track::{AUTO_CUES, Edits, TRACK_COLORS};
 
 use crate::{analysis::Cue, library::Track, paths};
 use parking_lot::{Mutex, MutexGuard};
-use rusqlite::{types::FromSql, Connection, OptionalExtension, Params, Row};
+use rusqlite::{Connection, OptionalExtension, Params, Row, types::FromSql};
 use std::{
     borrow::Cow,
     collections::HashMap,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc, LazyLock, OnceLock,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -172,6 +172,12 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE collection_hwm (n INTEGER NOT NULL);
      INSERT INTO collection_hwm SELECT COALESCE(MAX(id), 0) FROM collection;
      CREATE TRIGGER collection_hwm_d AFTER DELETE ON collection BEGIN UPDATE collection_hwm SET n = MAX(n, OLD.id); END;",
+    // v16: descriptive text overrides; NULL keeps the source's value, an empty string clears it.
+    "ALTER TABLE track ADD COLUMN title TEXT;
+     ALTER TABLE track ADD COLUMN artist TEXT;
+     ALTER TABLE track ADD COLUMN album TEXT;
+     ALTER TABLE track ADD COLUMN genre TEXT;
+     ALTER TABLE track ADD COLUMN label TEXT;",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as

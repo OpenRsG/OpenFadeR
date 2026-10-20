@@ -28,6 +28,7 @@ pub fn fold(mut p: f32, max: f32) -> f32 {
 pub struct Line {
     buf: Vec<Frame>,
     head: usize,
+    valid: usize,
 }
 
 impl Line {
@@ -35,6 +36,7 @@ impl Line {
         Line {
             buf: vec![[0.0; 2]; ((rate as f32 * seconds) as usize).max(4)],
             head: 0,
+            valid: 0,
         }
     }
 
@@ -46,6 +48,7 @@ impl Line {
     pub fn push(&mut self, x: Frame) {
         self.buf[self.head] = x;
         self.head = (self.head + 1) % self.buf.len();
+        self.valid = (self.valid + 1).min(self.buf.len());
     }
 
     /// The frame pushed `d` frames ago (1 = the last push), clamped to `1..=max`.
@@ -54,14 +57,22 @@ impl Line {
         let (i, f) = (d as usize, d.fract());
         let n = self.buf.len();
         let (a, b) = (
-            self.buf[(self.head + n - i) % n],
-            self.buf[(self.head + n - i - 1) % n],
+            if i <= self.valid {
+                self.buf[(self.head + n - i) % n]
+            } else {
+                [0.0; 2]
+            },
+            if i < self.valid {
+                self.buf[(self.head + n - i - 1) % n]
+            } else {
+                [0.0; 2]
+            },
         );
         [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]
     }
 
     pub fn clear(&mut self) {
-        self.buf.fill([0.0; 2]);
+        self.valid = 0;
     }
 }
 
@@ -340,5 +351,66 @@ impl Reverb {
         for a in self.allpasses.iter_mut().flatten() {
             a.clear();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Line;
+
+    #[test]
+    fn line_clear_matches_zeroed_history_at_every_interpolated_tap() {
+        let mut line = Line::new(8, 1.0);
+        let mut zeroed = vec![[0.0; 2]; 8];
+        let mut head = 0;
+        for cycle in 0..5 {
+            for i in 0..13 {
+                let x = [i as f32 + 1.0, -(cycle as f32 + i as f32)];
+                line.push(x);
+                zeroed[head] = x;
+                head = (head + 1) % zeroed.len();
+            }
+            line.clear();
+            zeroed.fill([0.0; 2]);
+            for pushed in 0..=16 {
+                for quarter in 0..=32 {
+                    let d = (quarter as f32 * 0.25).clamp(1.0, 6.0);
+                    let (i, f) = (d as usize, d.fract());
+                    let a = zeroed[(head + 8 - i) % 8];
+                    let b = zeroed[(head + 8 - i - 1) % 8];
+                    let expected = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+                    assert_eq!(line.read(quarter as f32 * 0.25), expected);
+                }
+                let x = [pushed as f32 + 0.5, -(pushed as f32)];
+                line.push(x);
+                zeroed[head] = x;
+                head = (head + 1) % zeroed.len();
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "timing comparison; run with --ignored --nocapture"]
+    fn benchmark_four_second_line_clear() {
+        use std::hint::black_box;
+        use std::time::Instant;
+        const RESETS: usize = 2000;
+        let mut line = Line::new(48_000, 4.0);
+        let mut filled = vec![[0.0f32; 2]; 48_000 * 4];
+        let at = Instant::now();
+        for _ in 0..RESETS {
+            black_box(&mut line).clear();
+        }
+        let logical = at.elapsed();
+        let at = Instant::now();
+        for _ in 0..RESETS {
+            black_box(&mut filled).fill([0.0; 2]);
+        }
+        let physical = at.elapsed();
+        eprintln!(
+            "{RESETS} resets, 48kHz / four seconds: logical={logical:?}, full_fill={physical:?}"
+        );
+        assert_eq!(black_box(line.read(1.5)), [0.0; 2]);
+        assert!(black_box(filled).iter().all(|&x| x == [0.0; 2]));
     }
 }

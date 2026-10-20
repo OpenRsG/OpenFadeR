@@ -1,0 +1,23 @@
+plugins { id 'com.android.application' version '8.9.2' }
+
+android {
+    namespace 'org.openfader.mobile'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'org.openfader.mobile'
+        minSdk 26
+        targetSdk 35
+        versionCode 201
+        versionName '0.2.1'
+        ndk { abiFilters.addAll((project.findProperty('openfaderAbis') ?: 'arm64-v8a').tokenize()) }
+    }
+    sourceSets.main.res.srcDir(layout.buildDirectory.dir('generated/openfader-res'))
+    packaging { jniLibs { useLegacyPackaging = false } }
+}
+
+tasks.register('appIcon', Copy) {
+    from('../../../assets/icon.png')
+    into(layout.buildDirectory.dir('generated/openfader-res/drawable'))
+    rename { 'openfader.png' }
+}
+tasks.named('preBuild').configure { dependsOn('appIcon') }

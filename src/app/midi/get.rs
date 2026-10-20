@@ -102,6 +102,13 @@ pub(super) fn register(midi: &Rc<Midi>) {
     MIDI.with_borrow_mut(|m| *m = Rc::downgrade(midi));
 }
 
+/// A coalesced input notification, delivered on the UI thread; a closed session is a no-op.
+pub(super) fn input_ready() {
+    if let Some(midi) = MIDI.with_borrow(Weak::upgrade) {
+        midi.read_input();
+    }
+}
+
 /// When an input port matching `e` is connected, opens the session again (the mapping is read from the folders, so the controller
 /// is loaded with the file just installed, lights and all, as after a plug). UI thread only.
 pub fn reload_if_connected(e: &Entry) {

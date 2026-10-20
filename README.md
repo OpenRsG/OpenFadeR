@@ -43,13 +43,22 @@ The first run clones the plugins, themes and mappings next to the code, builds e
 
 To install it for your user on Linux instead (the `openfader` command and an application menu entry, with the plugins, themes and mappings bundled): `./install.sh`. It also sets the default plugin, theme and mapping repositories of PREFERENCES (GET PLUGINS / GET THEMES / GET MAPPINGS), which the app uses anyway until you edit the list. Run it again to update; `./install.sh --uninstall` removes it.
 
+### Android
+
+The standalone phone/tablet app lives in [`mobile/`](mobile/): two decks, local music import, waveforms, cues, loops, sync, EQ and effects, using the shared Rust engine with a touch-first Slint UI. It excludes video, lighting and Beat Lab. See [Android build and usage](docs/android.md) for APK packaging, supported features and lifecycle behavior.
+
+
 ## A tour
 
 ### Analysis that is ready when you load
 
 BPM, beat grid, downbeat, key, a three-band waveform, phrases (intro, up, chorus, down) and automatic cues are computed in the background and cached. The pictures above show them: coloured phrase bars over the enlarged waveforms, hot cues A to H under each deck, and a key colour in the track list. Decks sync tempo and beats, key sync follows the key, and key lock keeps the pitch while you push the tempo.
 
-For clearer waveforms, open PREFERENCES > VIEW > WAVEFORM. Set BEAT GRID to BOLD for outlined lines drawn over the audio, with wider downbeats that do not rely on colour alone. Set HOT CUE MARKERS to LARGE for double-size flags and letters on the decks and browser previews (when preview cue markers are enabled). Both settings apply immediately and are saved; NORMAL keeps the original sizes.
+Loading publishes playable audio after decoding and preparing its initial gain and auto-cue position. Missing waveform, grid and key analysis can finish during playback without replacing cue or grid edits made meanwhile. Bulk analysis requests share a worker budget; replacing a deck load or preview cancels obsolete work.
+
+SYNC follows tempo while a master deck loops. Beat-phase correction pauses when the loop does not span a whole number of follower beats, so short loops do not make other decks repeat. Phase correction resumes when the loop ends or returns to a whole-beat length.
+
+For clearer waveforms, open PREFERENCES > VIEW > WAVEFORM. Set BEAT GRID to BOLD for outlined lines over the enlarged waveform, with wider downbeats that do not rely on colour alone. The whole-track overview keeps thin bar lines behind the audio in either setting, so track dynamics and phrases stay readable. Set HOT CUE MARKERS to LARGE for double-size flags and letters on the decks and browser previews (when preview cue markers are enabled). Both settings apply immediately and are saved; NORMAL keeps the original sizes.
 
 ### Two decks or four
 
@@ -63,6 +72,8 @@ Press `D` to switch layouts. All four decks get their own pads, loops, slip, syn
 
 Beat FX has several units with three slots each, tempo taken from the deck or tapped. COLOR FX (filter, space, dub echo, sweep, noise, crush, cross-pass) sits on every channel and MERGE FX works on the whole mix. More effects arrive through effect plugins.
 
+Effect replacements are prepared outside the audio callback. While a replacement is pending, that unit passes dry audio. Turning the selected effect off keeps its tail.
+
 ### Sampler
 
 <p align="center"><img src="docs/media/sampler.png" alt="Sampler strip with sixteen slots, banks and a sequencer" width="100%"></p>
@@ -75,6 +86,8 @@ Sixteen slots in two banks, loaded from a deck or from a file. Slots play as a s
 
 Enable STEMS in PREFERENCES > EXTENSIONS and each loaded track is separated into vocal, instrument, bass and drums (a 3-stem mode exists too) by an ONNX model that runs on the CPU or the GPU. Switching STEMS on downloads that model once (316 MB), with a progress card at the bottom right. A deck's stem button is filled while its stem plays at full level; a click turns that stem off, another brings it back. The pads and a controller can mute or solo, and the mixer's knobs can act on stems. The waveform follows what you hear.
 
+Stem buffers allocate on a worker while the original track remains playable. STEM INSTANT DOUBLES shares completed audio and stems between decks, with independent transport and stem gains.
+
 ### BEAT LAB
 
 <p align="center"><img src="docs/media/beatlab.png" alt="BEAT LAB strip with drum loops captured from two decks" width="100%"></p>
@@ -85,7 +98,16 @@ BEAT LAB captures a few beats of a deck's drum stem into a slot. Fill the slots 
 
 <p align="center"><img src="docs/media/suggest.png" alt="Track browser showing suggestions for the loaded track, ranked by match" width="100%"></p>
 
-The browser reads folders (subfolders become playlists) or library plugins, and has search, sortable columns, a track filter (BPM range, key match, rating), related tracks, a Tag List, smart playlists, history, a duplicate finder and a missing-file manager. The SUGGEST tab ranks the rest of your collection against the loaded track and shows a score for each, with filters for BPM and key. Your own edits (cues, loops, grid, rating, comment, colour) live in `store.db`; a library source is never written to.
+The browser reads folders (subfolders become playlists) or library plugins, and has search, sortable columns, a track filter (BPM range, key match, rating), related tracks, a Tag List, smart playlists, history, a duplicate finder and a missing-file manager. The SUGGEST tab ranks the rest of your collection against the loaded track and shows a score for each, with filters for BPM and key. Your own edits (track fields, cues, loops, grid, rating, comment, colour) live in `store.db`.
+
+Right-click a browser track and choose Edit track details, or use Track > Edit Track Details (touch themes: Actions > Selected track).
+Edit the title, artist, album, genre, label and comment while working on a playlist. Save fields and comment or Enter saves the text,
+including empty values. Rating and colour save immediately. Close discards unsaved text. Saved edits appear in Collection, playlists
+and loaded decks without restarting playback, and survive restarting the app.
+
+Descriptive fields require a local-file track; remote-only tracks still support comments, rating and colour. BPM/key use the
+grid/analysis controls; file paths and technical properties are read-only. OpenFadeR stores overrides in `store.db` and leaves
+audio-file tags unchanged. Explicitly enabled two-way library connections retain their existing write-back behavior.
 
 ### Edit mode
 
