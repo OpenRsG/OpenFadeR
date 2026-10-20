@@ -1,9 +1,9 @@
 //! What analysis does, set from Preferences > Analysis: which parts run (Track Analysis Setting), how
 //! the beat grid is detected ([`GridOptions`]) and how CUE Analysis places cues ([`CueOptions`]).
 //!
-//! The options are process-wide: the app copies the settings here ([`set`]) whenever they change and every analysis
-//! entry point ([`super::analyze`], the cache, the deck's session cues) reads them with [`get`], so a worker thread
-//! needs no settings of its own. Tests use the `*_with` functions and never touch the global.
+//! The app copies preferences here with [`set`]. Interactive entry points read [`get`]; bulk runs capture their own
+//! options so later preference changes cannot alter queued work. Tests use the `*_with` functions without changing
+//! the global.
 
 use super::{Analysis, auto::CueOptions, detect::GridOptions, detect::Mode};
 use std::sync::RwLock;

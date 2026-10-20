@@ -67,7 +67,7 @@ const LOOP_LAG_S: f64 = 0.5;
 pub(super) struct Voice {
     fx: Fx,
     cfx: Cfx,
-    /// FADER plugin curves, one stage per effect ([`Shared::fader`] selects).
+    /// Selected FADER plugin curve ([`Shared::fader`] selects).
     fader: Unit,
     scr: Scratch,
     spin: Spin,

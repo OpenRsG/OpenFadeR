@@ -3,13 +3,13 @@
 use super::{
     DOUBLE_CLICK, Home, View, editor,
     filter::Filter,
-    history, palette, tagging,
+    history, palette,
     playlists::{self, Panel},
     preview, session,
     sidebar::{Entry, TAG_ROW},
     strip, suggest,
-    table::{Look, Reference},
-    track_at,
+    table::Reference,
+    tagging, track_at,
 };
 use crate::app::{
     App, AutomixState, BrowserState, DeckState, analyze::detected, automix, deck::Decks,
@@ -63,13 +63,13 @@ pub fn wire(
     let sidebar = Rc::new(VecModel::default());
     state.set_playlists(sidebar.clone().into());
     state.set_tag_row(TAG_ROW as i32);
-    let rows = Rc::new(VecModel::default());
-    state.set_tracks(rows.clone().into());
     let panel_rows = Rc::new(VecModel::default());
     state.set_panel_rows(panel_rows.clone().into());
     let automix = automix::wire(app, decks.clone(), lib.clone());
     let store = store::global();
     let played = super::played::load(&store);
+    let rows = Rc::new(super::table::Rows::new(played));
+    state.set_tracks(rows.clone().into());
     tagging::ensure_defaults(&store);
     let view = Rc::new(RefCell::new(View {
         lib,
@@ -77,7 +77,7 @@ pub fn wire(
         rows,
         sidebar,
         panel_rows,
-        list: Vec::new(),
+        list: Rc::default(),
         shown: Vec::new(),
         query: String::new(),
         filter: Filter::default(),
@@ -89,7 +89,6 @@ pub fn wire(
         history: Vec::new(),
         selected: None,
         reference: Reference::default(),
-        look: Look::now(),
         detected_ver: detected().version(),
         entries: Vec::new(),
         entry: Entry::All,
@@ -108,7 +107,6 @@ pub fn wire(
         editing: None,
         confirm: None,
         sources: Vec::new(),
-        played,
         strips: strip::Strips::new(app),
         _timer: Timer::default(),
         _preview: Timer::default(),
@@ -138,7 +136,14 @@ pub fn wire(
 /// The settings that change what the rows or the tree show: key names, the traffic light, the played colour, the
 /// playlist-tree panels (All Tracks, CUE Analysis), and where a chosen row scrolls to.
 fn wire_prefs(app: &App, view: &Rc<RefCell<View>>) {
-    let shape = |p: &prefs::Prefs| (p.key_notation, p.view.traffic_light, p.view.played_color);
+    let shape = |p: &prefs::Prefs| {
+        (
+            p.key_notation,
+            p.view.traffic_light,
+            p.view.played_color,
+            p.view.tempo_decimals,
+        )
+    };
     let panels = |p: &prefs::Prefs| {
         (
             p.view.panel_all_tracks,
@@ -345,16 +350,21 @@ fn wire_selection(
         let v = view.clone();
         move |t| v.borrow().next_after(t)
     });
-    let (v, weak) = (view.clone(), app.as_weak());
+    let (v, weak, on_reloaded) = (view.clone(), app.as_weak(), on_track.clone());
     state.on_reload(move |select| {
         let (app, mut v) = (weak.unwrap(), v.borrow_mut());
         v.cache = None;
+        v.reread_metadata();
         v.lib_playlists = v.lib.playlists().unwrap_or_default();
         if select >= 0 {
             v.entry = Entry::User(i64::from(select));
         }
         v.rebuild(&app);
         v.show(&app);
+        if let Some(t) = &v.selected {
+            trackinfo::show(&app, t);
+            on_reloaded(t);
+        }
     });
     let (v, weak, on_found) = (view.clone(), app.as_weak(), on_track.clone());
     state.on_select_file(move |file| {
@@ -374,10 +384,13 @@ fn wire_selection(
         }
     });
     editor::wire(app, view);
-    let (v, weak) = (view.clone(), app.as_weak());
+    let (v, weak, on_edited) = (view.clone(), app.as_weak(), on_track.clone());
     trackinfo::on_edit(move |t| {
         if let Some(app) = weak.upgrade() {
             v.borrow_mut().track_edited(&app, t);
+            if let Some(selected) = &v.borrow().selected {
+                on_edited(selected);
+            }
         }
     });
     // Two left presses on one row within DOUBLE_CLICK select it and load it into the first deck that is not playing.

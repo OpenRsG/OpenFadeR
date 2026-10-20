@@ -11,7 +11,7 @@ component ModeCard inherits Rectangle {
     in property <bool> active;
     in property <bool> enabled: true;
     callback clicked;
-    height: 62px;
+    height: Theme.layout-profile == 1 ? 104px : 62px;
     border-radius: Theme.radius-lg;
     border-width: 1px;
     border-color: root.active ? Theme.accent : Theme.line-strong;
@@ -87,12 +87,24 @@ component FormatRow inherits Rectangle {
 }
 
 /// A row of buttons with a dim caption in front.
-component ActionRow inherits HorizontalLayout {
+component ActionRow inherits Rectangle {
     in property <string> label;
-    spacing: Theme.space-md;
+    height: Theme.h-ctl;
     vertical-stretch: 0;
-    Text { text: root.label; width: 128px; vertical-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
-    @children
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        Text { text: root.label; width: 128px; vertical-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+        viewport := Flickable {
+            content-width: Theme.layout-profile == 1 ? max(self.width, controls.preferred-width) : self.width;
+            content-height: self.height;
+            controls := HorizontalLayout {
+                width: viewport.content-width;
+                height: viewport.height;
+                spacing: Theme.space-md;
+                @children
+            }
+        }
+    }
 }
 
 /// DEVICES tab: the mounted USB drives and SD cards a library plugin handles on the left; on the right the chosen one: what it
@@ -130,7 +142,7 @@ export component DevicesPage inherits HorizontalLayout {
             }
             ListView {
                 for d[i] in DeviceState.devices: Rectangle {
-                    height: d.warning != "" ? 78px : 62px;
+                    height: Theme.layout-profile == 1 ? (d.warning != "" ? 112px : 92px) : (d.warning != "" ? 78px : 62px);
                     background: i == DeviceState.current ? Theme.select : area.has-hover ? Theme.hover-row : transparent;
                     HorizontalLayout {
                         padding: Theme.space-md;
@@ -197,6 +209,7 @@ export component DevicesPage inherits HorizontalLayout {
         Caption { text: "FORMATS"; }
         // A Flickable over a layout, not a ListView: rows of wrapped text get their height for the width they are shown at.
         formats := Flickable {
+            min-height: Theme.layout-profile == 1 ? 240px : 0px;
             content-width: self.width;
             content-height: rows.preferred-height;
             rows := VerticalLayout {
@@ -209,22 +222,22 @@ export component DevicesPage inherits HorizontalLayout {
         Note { text: "Ticked formats are written by EXPORT, SYNC and the cue sync. Formats share one copy of each track, so ticking more costs little space."; vertical-stretch: 0; }
         ActionRow {
             label: "PUT MUSIC ON IT";
-            Chip { text: "EXPORT…"; enabled: root.writable && root.can-export; tooltip: "Create or extend the libraries on this device"; clicked => { DeviceState.tab = 1; DeviceState.opened(); } }
-            Chip { text: "SYNC MANAGER"; enabled: root.writable && root.can-export; tooltip: "Keep chosen playlists up to date on this device"; clicked => { DeviceState.tab = 2; DeviceState.opened(); } }
+            Chip { text: "EXPORT…"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.writable && root.can-export; tooltip: "Create or extend the libraries on this device"; clicked => { DeviceState.tab = 1; DeviceState.opened(); } }
+            Chip { text: "SYNC MANAGER"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.writable && root.can-export; tooltip: "Keep chosen playlists up to date on this device"; clicked => { DeviceState.tab = 2; DeviceState.opened(); } }
         }
         ActionRow {
             label: "BRING BACK";
-            Chip { text: "UPDATE COLLECTION"; enabled: root.has-library && root.can-update && !DeviceState.busy; tooltip: "Import cues, grids, ratings, colours and comments edited on the player"; clicked => { DeviceState.update-collection(); } }
-            Chip { text: "IMPORT HISTORIES"; enabled: root.has-library && root.can-histories && !DeviceState.busy; tooltip: "Import what the players played"; clicked => { DeviceState.import-histories(); } }
+            Chip { text: "UPDATE COLLECTION"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.has-library && root.can-update && !DeviceState.busy; tooltip: "Import cues, grids, ratings, colours and comments edited on the player"; clicked => { DeviceState.update-collection(); } }
+            Chip { text: "IMPORT HISTORIES"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.has-library && root.can-histories && !DeviceState.busy; tooltip: "Import what the players played"; clicked => { DeviceState.import-histories(); } }
         }
         ActionRow {
             label: "KEEP IT SAFE";
-            Chip { text: "BACKUPS"; enabled: root.can-backup; tooltip: "Back up or restore this device's library"; clicked => { DeviceState.tab = 3; DeviceState.opened(); } }
-            Chip { text: "SETTINGS"; enabled: root.can-settings; tooltip: "The player settings this device carries (Preferences > DJ SYSTEM)"; clicked => { DeviceState.edit-settings(); } }
+            Chip { text: "BACKUPS"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.can-backup; tooltip: "Back up or restore this device's library"; clicked => { DeviceState.tab = 3; DeviceState.opened(); } }
+            Chip { text: "SETTINGS"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.can-settings; tooltip: "The player settings this device carries (Preferences > DJ SYSTEM)"; clicked => { DeviceState.edit-settings(); } }
         }
         if DeviceState.actions.length > 0: ActionRow {
             label: "MORE";
-            for a in DeviceState.actions: Chip { text: a.label; enabled: a.enabled && (!a.writes || root.writable) && !DeviceState.busy; tooltip: a.help; clicked => { DeviceState.run-action(a.id); } }
+            for a in DeviceState.actions: Chip { text: a.label; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: a.enabled && (!a.writes || root.writable) && !DeviceState.busy; tooltip: a.help; clicked => { DeviceState.run-action(a.id); } }
         }
     }
 }

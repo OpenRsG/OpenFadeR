@@ -885,6 +885,9 @@ fn trans_on(level: f32) -> Settings {
 /// Like `run_buffers`, handing the voice the stem FX target before every buffer as the engine does.
 fn run_part(sh: &Shared, v: &mut Voice, t: Option<(u8, Settings)>, buffers: usize) -> Vec<f32> {
     let mut out = vec![];
+    if let Some(t) = t {
+        v.part_fx.prepare(t.1.effect);
+    }
     for _ in 0..buffers {
         v.set_part_fx(t);
         render(sh, v, 44100, 512, |_, m, _| out.push(m[0]));
@@ -1154,6 +1157,7 @@ fn drum_release_fx_gates_the_stem_drums_when_held_and_in_multi_mode() {
     sh.groove.release.set_level(1.0);
     sh.groove.release.set_on(true);
     let mut out = vec![];
+    v.part_fx.prepare(fx::Effect::Trans.index());
     for _ in 0..103 {
         v.set_part_fx(sh.groove.release_target(0));
         render(&sh, &mut v, 44100, 512, |_, m, _| out.push(m[0]));

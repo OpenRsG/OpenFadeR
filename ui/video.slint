@@ -136,7 +136,7 @@ component DeckStrip inherits Rectangle {
         padding: 6px;
         spacing: 8px;
         Rectangle {
-            width: 160px;
+            width: Theme.layout-profile == 1 ? 72px : 160px;
             background: Theme.bg-deep;
             horizontal-stretch: 0;
             Image { source: root.v.thumb; width: 100%; height: 100%; image-fit: contain; }
@@ -154,14 +154,14 @@ component DeckStrip inherits Rectangle {
                     active: DeckState.decks[root.index].playing;
                     enabled: DeckState.decks[root.index].loaded;
                     width: 64px;
-                    height: 22px;
+                    height: Theme.layout-profile == 1 ? Theme.touch-target : 22px;
                     horizontal-stretch: 0;
                     clicked => { DeckState.play-pause(root.index); }
                 }
                 Text { text: DeckState.decks[root.index].time-text; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; }
             }
             Rectangle {
-                height: 10px;
+                height: Theme.layout-profile == 1 ? Theme.touch-target : 10px;
                 background: Theme.line;
                 border-radius: 2px;
                 Rectangle { width: parent.width * root.v.pos; background: Theme.play; border-radius: 2px; }
@@ -195,7 +195,7 @@ export component VideoView inherits Rectangle {
         x: 8px;
         y: 8px;
         width: parent.width - 16px;
-        height: 24px;
+        height: Theme.layout-profile == 1 ? Theme.touch-target : 24px;
         spacing: 6px;
         Text { text: "VIDEO"; color: Theme.text-bright; font-size: Theme.font-xl; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
         Chip { text: "OUTPUT WINDOW"; active: VideoState.window-open; width: 120px; horizontal-stretch: 0; clicked => { VideoState.window-toggled(); } }
@@ -204,9 +204,9 @@ export component VideoView inherits Rectangle {
     }
     VerticalLayout {
         x: 0;
-        y: 38px;
+        y: Theme.layout-profile == 1 ? Theme.touch-target + 14px : 38px;
         width: parent.width;
-        height: parent.height - 38px;
+        height: parent.height - self.y;
         padding: 8px;
         padding-top: 0;
         spacing: 6px;
@@ -223,11 +223,12 @@ export component VideoView inherits Rectangle {
                     overlay-image: VideoState.overlay-image;
                     alpha: VideoState.opacity;
                     size: VideoState.size;
+                    min-height: Theme.layout-profile == 1 ? 120px : 0px;
                     vertical-stretch: 1;
                 }
                 HorizontalLayout {
                     spacing: 6px;
-                    height: 26px;
+                    height: Theme.layout-profile == 1 ? Theme.touch-target : 26px;
                     vertical-stretch: 0;
                     Chip { text: "TEXT"; active: VideoState.overlay-mode == 0; width: 56px; horizontal-stretch: 0; clicked => { VideoState.overlay-mode = 0; } }
                     Chip { text: "IMAGE"; active: VideoState.overlay-mode == 1; width: 56px; horizontal-stretch: 0; clicked => { VideoState.overlay-mode = 1; } }
@@ -242,7 +243,7 @@ export component VideoView inherits Rectangle {
                 }
                 HorizontalLayout {
                     spacing: 6px;
-                    height: 22px;
+                    height: Theme.layout-profile == 1 ? Theme.touch-target : 22px;
                     vertical-stretch: 0;
                     Text { text: "OPACITY"; color: Theme.text-dim; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 0; }
                     Fader { value: VideoState.opacity; edited(v) => { VideoState.opacity = v; } }
@@ -253,7 +254,7 @@ export component VideoView inherits Rectangle {
             VerticalLayout {
                 spacing: 4px;
                 horizontal-stretch: 1;
-                min-width: 280px;
+                min-width: Theme.layout-profile == 1 ? 320px : 280px;
                 Text { text: "ALL VIDEOS"; color: Theme.accent; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-stretch: 0; }
                 Rectangle {
                     background: Theme.bg-deep;
@@ -261,7 +262,7 @@ export component VideoView inherits Rectangle {
                     border-width: 1px;
                     ListView {
                         for item[row] in VideoState.list: HorizontalLayout {
-                            height: 28px;
+                            height: Theme.layout-profile == 1 ? Theme.touch-target + 4px : 28px;
                             padding: 2px;
                             spacing: 4px;
                             VerticalLayout {
@@ -270,8 +271,8 @@ export component VideoView inherits Rectangle {
                             }
                             for d[di] in VideoState.decks: Chip {
                                 text: ["A", "B", "C", "D"][di];
-                                width: 26px;
-                                height: 22px;
+                                width: Theme.layout-profile == 1 ? Theme.touch-target : 26px;
+                                height: Theme.layout-profile == 1 ? Theme.touch-target : 22px;
                                 horizontal-stretch: 0;
                                 clicked => { VideoState.load(row, di); }
                             }
@@ -283,13 +284,13 @@ export component VideoView inherits Rectangle {
         }
         HorizontalLayout {
             spacing: 8px;
-            height: 112px;
+            height: Theme.layout-profile == 1 ? 190px : 112px;
             vertical-stretch: 0;
             for v[i] in VideoState.decks: DeckStrip { index: i; v: v; }
         }
         HorizontalLayout {
             spacing: 6px;
-            height: 26px;
+            height: Theme.layout-profile == 1 ? Theme.touch-target : 26px;
             vertical-stretch: 0;
             Text { text: "A"; color: Theme.accent; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
             Fader {
@@ -302,6 +303,6 @@ export component VideoView inherits Rectangle {
             Chip { text: "CUT"; active: VideoState.transition == 1; width: 60px; horizontal-stretch: 0; clicked => { VideoState.transition = 1; } }
             Chip { text: "CH FADER DIMS"; active: VideoState.follow-fader; width: 110px; horizontal-stretch: 0; clicked => { VideoState.follow-fader = !VideoState.follow-fader; } }
         }
-        Text { text: VideoState.status; color: Theme.text-dim; font-size: Theme.font-sm; height: 14px; vertical-stretch: 0; overflow: elide; }
+        Text { text: VideoState.status; color: Theme.text-dim; font-size: Theme.font-sm; height: Theme.layout-profile == 1 ? 18px : 14px; vertical-stretch: 0; overflow: elide; }
     }
 }

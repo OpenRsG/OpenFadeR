@@ -26,21 +26,16 @@ pub(super) fn load(store: &Store) -> HashSet<String> {
 }
 
 impl View {
-    /// Whether the table dims `t` (the setting is on and the track played).
-    pub(super) fn is_played(&self, t: &Track) -> bool {
-        !self.played.is_empty() && self.look.played && self.played.contains(&store::key(t))
-    }
-
     pub(super) fn mark_played(&mut self, t: &Track) {
         let key = store::key(t);
-        if self.played.insert(key.clone()) {
+        if self.rows.mark_played(&key) {
             let _ = self.store.set_device_setting(SCOPE, &key, "1");
         }
     }
 
     /// RESET NOW.
     pub(super) fn reset_played(&mut self, app: &App) {
-        self.played.clear();
+        self.rows.reset_played();
         let msg = match self.store.reset_device_settings(SCOPE, "") {
             Ok(()) => "the colour of played tracks was reset".to_owned(),
             Err(e) => format!("store: {e}"),

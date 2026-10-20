@@ -7,10 +7,7 @@
 //! Features come from a background index ([`openfader::analysis::similar::index`]): the list ranks with what is ready and
 //! re-ranks as more arrives; tracks the index has no analysis for are counted in the status, not guessed.
 
-use super::super::{
-    View,
-    table::{Facts, row},
-};
+use super::super::View;
 use super::{Conditions, Item, Links, Mode, max_list, rank};
 use crate::app::{App, BrowserState, DeckState, deck, plural, prefs};
 use openfader::{
@@ -18,7 +15,7 @@ use openfader::{
     library::Track,
     store::{self, NodeKind},
 };
-use slint::{ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
+use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use std::{cell::RefCell, rc::Rc, sync::Arc, time::Duration};
 
 /// How often the follow timer looks for a new anchor or new index results.
@@ -58,7 +55,7 @@ pub struct State {
     /// The LIST anchor.
     pinned: Option<Track>,
     /// Table note per row of `View.list` while it is ranked; empty otherwise.
-    notes: Vec<String>,
+    pub(in crate::app::browser) notes: Vec<String>,
     status: String,
     /// What the list was last ranked for (anchor id, index version): the timer re-ranks when either moves.
     seen: (String, u64),
@@ -207,7 +204,7 @@ impl View {
         let ix = index();
         let version = ix.version();
         let Some(anchor) = self.suggest_anchor(app) else {
-            self.list.clear();
+            self.list = Rc::default();
             self.suggest.seen = (String::new(), version);
             self.suggest.status = match self.suggest.anchor {
                 Anchor::List => "Track Suggestion: click a track, then press LIST".to_owned(),
@@ -275,31 +272,12 @@ impl View {
         }
         self.suggest.status = status;
         self.suggest.notes = out.picks.iter().map(|p| p.note.clone()).collect();
-        self.list = out.picks.iter().map(|p| self.list[p.at].clone()).collect();
+        self.list = Rc::new(out.picks.iter().map(|p| self.list[p.at].clone()).collect());
     }
 
     /// The status line of the ranked list (`None` when the tab is off).
     pub(in crate::app::browser) fn suggest_status(&self) -> Option<&str> {
         (self.suggest.on && self.related.is_none()).then_some(self.suggest.status.as_str())
-    }
-
-    /// Table row of `self.list[i]` (its [`Facts`] are `f`): while ranked, the comment cell says why the track ranks there (the table's own row number is the rank).
-    pub(in crate::app::browser) fn table_row(
-        &self,
-        i: usize,
-        f: &Facts,
-    ) -> ModelRc<slint::StandardListViewItem> {
-        let t = &self.list[i];
-        let r = row(t, f, &self.reference, self.is_played(t), &self.look);
-        if let Some(note) = self
-            .suggest
-            .notes
-            .get(i)
-            .filter(|_| self.suggest.notes.len() == self.list.len())
-        {
-            r.set_row_data(7, note.as_str().into());
-        }
-        r
     }
 
     /// A row of the ranked list was chosen: say why it ranks there.

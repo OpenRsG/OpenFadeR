@@ -1,9 +1,13 @@
 //! MIDI ports (midir, ALSA sequencer on Linux). Each connected input port's callback runs on
-//! midir's own thread and only forwards the raw 3-byte message into a channel; the UI thread polls it.
+//! midir's own thread, queues the raw 3-byte message and wakes the UI once for a pending batch.
 //! The LED output is one connection to the output port of the mapped controller, written by a [`Sink`] thread.
 
 use midir::{MidiInput, MidiInputConnection, MidiOutput, MidiOutputConnection};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    mpsc::{channel, Receiver, Sender},
+    Arc,
+};
 use std::{thread::JoinHandle, time::Duration};
 
 /// Gap between two LED messages in ms when the mapping file has no `<outInterval>`: 2 is the commonest value
@@ -21,11 +25,40 @@ pub struct Ports {
     _conns: Vec<MidiInputConnection<()>>,
     pub rx: Receiver<[u8; 3]>,
     pub names: Vec<String>,
+    wake: Arc<Wake>,
+}
+
+/// One event-loop wake per pending batch, not per MIDI message.
+struct Wake {
+    pending: AtomicBool,
+    notify: fn() -> Result<(), slint::EventLoopError>,
+}
+
+impl Wake {
+    fn request(&self) {
+        if !self.pending.swap(true, Ordering::AcqRel) && (self.notify)().is_err() {
+            self.pending.store(false, Ordering::Release);
+        }
+    }
+}
+
+impl Ports {
+    /// Rearm before draining: input arriving during dispatch must schedule another turn.
+    pub fn begin_input(&self) {
+        self.wake.pending.store(false, Ordering::Release);
+    }
+
+    pub fn wake_input(&self) {
+        self.wake.request();
+    }
 }
 
 /// Connects every input port whose name contains `filter` (all when `None`). Only channel
 /// messages (3 bytes) are forwarded; sysex, clock and sensing are dropped by midir's default filter.
-pub fn connect(filter: Option<&str>) -> Result<Ports, String> {
+pub fn connect(
+    filter: Option<&str>,
+    notify: fn() -> Result<(), slint::EventLoopError>,
+) -> Result<Ports, String> {
     // One listing: re-listing per index raced with ports coming and going (hotplug, other clients).
     let lister = MidiInput::new("openfader").map_err(|e| e.to_string())?;
     let ports: Vec<_> = lister
@@ -34,6 +67,10 @@ pub fn connect(filter: Option<&str>) -> Result<Ports, String> {
         .filter_map(|p| Some((lister.port_name(&p).ok()?, p)))
         .collect();
     let (tx, rx) = channel();
+    let wake = Arc::new(Wake {
+        pending: AtomicBool::new(false),
+        notify,
+    });
     let (mut conns, mut names) = (Vec::new(), Vec::new());
     for (name, port) in ports {
         if is_own(&name) || filter.is_some_and(|f| !name.contains(f)) {
@@ -41,9 +78,12 @@ pub fn connect(filter: Option<&str>) -> Result<Ports, String> {
         }
         let input = MidiInput::new("openfader").map_err(|e| e.to_string())?;
         let tx = tx.clone();
+        let wake = wake.clone();
         let on_msg = move |_: u64, m: &[u8], _: &mut ()| {
             if let &[a, b, c] = m {
-                let _ = tx.send([a, b, c]);
+                if tx.send([a, b, c]).is_ok() {
+                    wake.request();
+                }
             }
         };
         match input.connect(&port, "openfader-in", on_msg, ()) {
@@ -58,6 +98,7 @@ pub fn connect(filter: Option<&str>) -> Result<Ports, String> {
         _conns: conns,
         rx,
         names,
+        wake,
     })
 }
 
@@ -166,7 +207,7 @@ mod tests {
         let Ok(mut out) = out else {
             return eprintln!("skip: no ALSA seq");
         };
-        let ports = connect(Some("rk-virtual-controller")).unwrap();
+        let ports = connect(Some("rk-virtual-controller"), || Ok(())).unwrap();
         assert_eq!(ports.names.len(), 1);
         out.send(&[0xB0, 7, 100]).unwrap();
         out.send(&[0x90, 36, 0]).unwrap();
@@ -211,5 +252,48 @@ mod tests {
         drop(sink); // waits for the queue
         std::thread::sleep(Duration::from_millis(300));
         assert_eq!(got.load(SeqCst), 258);
+    }
+}
+
+#[cfg(test)]
+mod wake_tests {
+    use super::*;
+    use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn input_wakes_coalesce_and_rearm_before_dispatch() {
+        static CALLS: AtomicUsize = AtomicUsize::new(0);
+        let wake = Wake {
+            pending: AtomicBool::new(false),
+            notify: || {
+                CALLS.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            },
+        };
+        for _ in 0..1000 {
+            wake.request();
+        }
+        assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+        wake.pending.store(false, Ordering::Release);
+        // A message arriving while the UI dispatches this batch needs its own wake.
+        wake.request();
+        wake.request();
+        assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn failed_input_wake_can_be_retried() {
+        static CALLS: AtomicUsize = AtomicUsize::new(0);
+        let wake = Wake {
+            pending: AtomicBool::new(false),
+            notify: || {
+                CALLS.fetch_add(1, Ordering::SeqCst);
+                Err(slint::EventLoopError::EventLoopTerminated)
+            },
+        };
+        wake.request();
+        wake.request();
+        assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+        assert!(!wake.pending.load(Ordering::Acquire));
     }
 }

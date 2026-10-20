@@ -48,28 +48,37 @@ export component DialogFrame inherits Rectangle {
                 clicked => { root.closed(); }
             }
         }
-        body := VerticalLayout {
+        viewport := Flickable {
             x: 0;
             y: Theme.h-bar;
             width: parent.width;
             height: parent.height - Theme.h-bar;
-            padding: root.body-padding;
-            spacing: Theme.space-lg;
-            @children
+            content-width: Theme.layout-profile == 1 ? max(self.width, root.card-width) : self.width;
+            content-height: Theme.layout-profile == 1 ? max(self.height, body.preferred-height) : self.height;
+            body := VerticalLayout {
+                width: viewport.content-width;
+                height: viewport.content-height;
+                padding: root.body-padding;
+                spacing: Theme.space-lg;
+                @children
+            }
         }
     }
 }
 
-/// One labelled settings row: a 224 px dim label column (wide enough for "CONTROL DEVICE INFORMATION"; it never shrinks, a long label is
-/// elided), then the controls (`@children`), then an optional hint right after them (a unit or a short note; elided at the row's end).
-export component FormRow inherits HorizontalLayout {
+/// A settings label beside its controls on desktop, above a scrollable control row in touch themes.
+export component FormRow inherits Rectangle {
     in property <string> label;
     in property <string> hint;
-    spacing: Theme.space-sm;
-    height: Theme.h-ctl + Theme.space-xs;
+    property <bool> stacked: Theme.layout-profile == 1;
+    height: Theme.h-ctl + Theme.space-xs + (root.stacked ? 24px : 0px);
+    horizontal-stretch: 1;
     Text {
+        x: 0px;
+        y: 0px;
         text: root.label;
-        width: 224px;
+        width: root.stacked ? parent.width : 224px;
+        height: root.stacked ? 24px : parent.height;
         vertical-alignment: center;
         color: Theme.text-dim;
         font-family: Theme.font;
@@ -77,16 +86,30 @@ export component FormRow inherits HorizontalLayout {
         font-weight: Theme.weight-bold;
         overflow: elide;
     }
-    @children
-    Text {
-        text: root.hint;
-        min-width: 0px;
-        horizontal-stretch: 1;
-        vertical-alignment: center;
-        color: Theme.text-faint;
-        font-family: Theme.font;
-        font-size: Theme.font-sm;
-        overflow: elide;
+    viewport := Flickable {
+        x: root.stacked ? 0px : 224px + Theme.space-sm;
+        y: root.stacked ? 24px : 0px;
+        width: max(0px, root.width - self.x);
+        height: Theme.h-ctl + Theme.space-xs;
+        content-width: root.stacked ? max(self.width, controls.preferred-width) : self.width;
+        content-height: self.height;
+        controls := HorizontalLayout {
+            width: viewport.content-width;
+            height: viewport.height;
+            spacing: Theme.space-sm;
+            @children
+            Text {
+                text: root.hint;
+                min-width: 0px;
+                preferred-width: 0px;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+                color: Theme.text-faint;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+                overflow: elide;
+            }
+        }
     }
 }
 

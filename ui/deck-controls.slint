@@ -3,7 +3,7 @@ import { Theme } from "theme.slint";
 import { DeckState, DeckView } from "deck-state.slint";
 
 /// The jog ring: `panel-high` ring with a `danger` arc at the playhead's place on a 33⅓ rpm platter while the deck
-/// plays, `bg-deep` disc inside showing the BPM (integer 22 px bold, two decimals 12 px), the tempo offset (double-click = 0 %)
+/// plays, `bg-deep` disc inside showing the BPM (integer 22 px bold, one or two decimals 12 px), the tempo offset (double-click = 0 %)
 /// and the green range (click cycles ±6 / ±10 / ±16 / WIDE). VIEW > Switch JOG Display: CURRENT CUE / SLIP adds a dot at the cue
 /// point and a red inner ring while SLIP is on; HOT CUE COUNTDOWN shows the distance to the next hot cue within
 /// 5 laps instead. Display only: scratching is the drag on the enlarged waveform. Under 80 px (decks C, D) only the integer
@@ -17,9 +17,10 @@ export component JogWheel inherits Rectangle {
     property <length> t: root.width * 0.054;
     /// Share of the current lap (0..1) left before the next hot cue.
     property <float> left: root.v.jog-laps - (Math.ceil(root.v.jog-laps) - 1);
-    property <int> bpm-hundredths: Math.round(root.v.bpm * 100);
-    property <int> bpm-int: Math.floor(root.bpm-hundredths / 100);
-    property <int> bpm-dec: Math.mod(root.bpm-hundredths, 100);
+    property <int> bpm-scale: Theme.tempo-decimals == 1 ? 10 : 100;
+    property <int> bpm-rounded: Math.round(root.v.bpm * root.bpm-scale);
+    property <int> bpm-int: Math.floor(root.bpm-rounded / root.bpm-scale);
+    property <int> bpm-dec: Math.mod(root.bpm-rounded, root.bpm-scale);
     width: Theme.jog;
     height: self.width;
     border-radius: self.width / 2;
@@ -87,7 +88,7 @@ export component JogWheel inherits Rectangle {
                 vertical-alignment: bottom;
             }
             if !root.small && root.v.bpm > 0: Text {
-                text: "." + (root.bpm-dec < 10 ? "0" : "") + root.bpm-dec;
+                text: "." + (Theme.tempo-decimals == 2 && root.bpm-dec < 10 ? "0" : "") + root.bpm-dec;
                 color: root.v.synced ? Theme.accent-hi : Theme.jog-bpm;
                 font-size: Theme.font-md;
                 vertical-alignment: bottom;
@@ -144,7 +145,7 @@ export component RingColumn inherits VerticalLayout {
 /// SLIP (red when on) / Q (quantize) / MT (master tempo = key lock), stacked.
 export component SideButtons inherits VerticalLayout {
     in property <int> index;
-    in property <length> h: 18px;
+    in property <length> h: Theme.layout-profile == 1 ? Theme.touch-target : 18px;
     property <DeckView> v: DeckState.decks[root.index];
     alignment: center;
     spacing: root.h > 16px ? 4px : 2px;
@@ -165,7 +166,7 @@ export component TempoColumn inherits VerticalLayout {
         value: root.v.tempo;
         edited(p) => { DeckState.tempo(root.index, p); }
     }
-    Chip { height: 18px; font-size: Theme.font-xs; text: root.v.tempo-range; tooltip: "Tempo range"; vertical-stretch: 0; clicked => { DeckState.tempo-range(root.index); } }
+    Chip { height: Theme.layout-profile == 1 ? Theme.touch-target : 18px; font-size: Theme.font-xs; text: root.v.tempo-range; tooltip: "Tempo range"; vertical-stretch: 0; clicked => { DeckState.tempo-range(root.index); } }
 }
 
 /// Loop block (64 px): AU = number box starts / leaves an auto loop of the shown beats, `<` `>` halve / double (or
@@ -182,7 +183,7 @@ export component LoopBlock inherits VerticalLayout {
     spacing: 4px;
     alignment: center;
     if !root.manual: Rectangle {
-        height: 30px;
+        height: Theme.layout-profile == 1 ? Theme.touch-target : 30px;
         background: Theme.bg-deep;
         border-radius: Theme.radius;
         border-width: 1px;

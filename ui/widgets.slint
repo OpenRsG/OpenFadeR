@@ -74,6 +74,9 @@ export component Chip inherits Rectangle {
     callback pressed;
     callback released;
     height: Theme.h-ctl;
+    accessible-role: button;
+    accessible-label: root.tooltip != "" ? root.tooltip : root.text;
+    accessible-action-default => { if root.enabled { root.pressed(); root.released(); root.clicked(); } }
     min-width: 28px;
     horizontal-stretch: 1;
     // The face is a child, not the root's own background: Slint inlines every use of a component whose root property is
@@ -88,6 +91,8 @@ export component Chip inherits Rectangle {
     property <bool> iconic: root.icon != Icon.none && label.preferred-width > root.width - 4px;
     label := Text {
         visible: !root.iconic;
+        x: 2px;
+        height: parent.height;
         width: parent.width - 4px;
         text: root.text;
         horizontal-alignment: center;
@@ -99,7 +104,9 @@ export component Chip inherits Rectangle {
         font-weight: Theme.weight-bold;
     }
     if root.iconic: Glyph {
-        width: min(14px, root.height - 4px);
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(Theme.icon-size, root.height - 4px);
         height: self.width;
         icon: root.icon;
         tint: !root.enabled ? Theme.text-disabled : root.active ? Theme.text-bright : Theme.text;
@@ -125,13 +132,16 @@ export component IconButton inherits Rectangle {
     in property <bool> enabled: true;
     in property <bool> solid;
     in property <color> active-color: Theme.accent;
-    in property <length> icon-size: 14px;
+    in property <length> icon-size: Theme.icon-size;
     in property <string> tooltip;
     callback clicked;
     callback pressed;
     callback released;
     width: Theme.h-ctl;
     height: Theme.h-ctl;
+    accessible-role: button;
+    accessible-label: root.tooltip;
+    accessible-action-default => { if root.enabled { root.pressed(); root.released(); root.clicked(); } }
     face := Rectangle {
         border-radius: Theme.radius;
         background: !root.enabled ? (root.solid ? Theme.panel : transparent)
@@ -140,6 +150,8 @@ export component IconButton inherits Rectangle {
         animate background { duration: Theme.t-fast; }
     }
     Glyph {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
         width: root.icon-size;
         height: root.icon-size;
         icon: root.icon;
@@ -193,6 +205,9 @@ export component RingButton inherits Rectangle {
     callback released;
     width: Theme.ring;
     height: Theme.ring;
+    accessible-role: button;
+    accessible-label: root.text != "" ? root.text : root.icon == Icon.play ? "Play" : root.icon == Icon.pause ? "Pause" : "Transport";
+    accessible-action-default => { if root.enabled { root.pressed(); root.released(); root.clicked(); } }
     face := Rectangle {
         border-radius: root.width / 2;
         border-width: 1.5px;
@@ -214,8 +229,10 @@ export component RingButton inherits Rectangle {
         font-weight: Theme.weight-bold;
     }
     Glyph {
-        width: 14px;
-        height: 14px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: Theme.icon-size;
+        height: Theme.icon-size;
         icon: root.icon;
         tint: !root.enabled ? Theme.text-faint : Theme.text-bright;
     }
@@ -365,16 +382,19 @@ export component Dropdown inherits Rectangle {
         x: 0;
         y: root.height + 1px;
         width: max(root.list-width > 0px ? root.list-width : root.width, 100px);
-        height: root.options.length * Theme.h-row + 2px;
+        height: min(root.options.length * (Theme.layout-profile == 1 ? max(Theme.h-row, Theme.touch-target) : Theme.h-row) + 2px, 320px);
         Rectangle {
             background: Theme.panel-raised;
             border-width: 1px;
             border-color: Theme.line-strong;
             border-radius: Theme.radius;
-            VerticalLayout {
+            Flickable {
+                content-width: self.width;
+                content-height: popup-items.preferred-height;
+            popup-items := VerticalLayout {
                 padding: 1px;
                 for o[i] in root.options: Rectangle {
-                    height: Theme.h-row;
+                    height: Theme.layout-profile == 1 ? max(Theme.h-row, Theme.touch-target) : Theme.h-row;
                     background: row.has-hover ? Theme.select : (i == root.current ? Theme.panel-high : transparent);
                     HorizontalLayout {
                         padding-left: Theme.space-md;
@@ -395,6 +415,7 @@ export component Dropdown inherits Rectangle {
                         }
                     }
                 }
+            }
             }
         }
     }

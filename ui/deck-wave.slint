@@ -30,6 +30,7 @@ export component WaveStrip inherits Rectangle {
     init => { self.resized(self.width, self.height); }
     changed width => { self.resized(self.width, self.height); }
     changed height => { self.resized(self.width, self.height); }
+    changed index => { self.resized(self.width, self.height); }
     Image {
         x: root.s.strip-x;
         y: 0;
@@ -228,6 +229,7 @@ export component DeckOverview inherits Rectangle {
     background: Theme.wave-bg;
     // `init` and the first layout pass run before Rust connects the callback, so report again once a track loads.
     changed loaded => { DeckState.overview-resized(root.index, self.width, self.height); }
+    changed index => { DeckState.overview-resized(root.index, self.width, self.height); }
     WaveView {
         source: DeckState.decks[root.index].overview;
         resized(w, h) => { DeckState.overview-resized(root.index, w, h); }

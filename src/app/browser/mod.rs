@@ -47,7 +47,7 @@ mod wire;
 pub use sources::SourceType;
 pub use wire::wire;
 
-use super::{deck::Decks, App, BrowserState};
+use super::{App, BrowserState, deck::Decks};
 use filter::Filter;
 use openfader::{
     library::{Library, Playlist, Track},
@@ -55,9 +55,9 @@ use openfader::{
 };
 use playlists::{Ask, Panel};
 use sidebar::Entry;
-use slint::{ComponentHandle, ModelRc, StandardListViewItem, Timer, VecModel};
+use slint::{ComponentHandle, StandardListViewItem, Timer, VecModel};
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Duration};
-use table::{Look, Reference};
+use table::Reference;
 
 /// Two presses on one row closer than this load it.
 const DOUBLE_CLICK: Duration = Duration::from_millis(400);
@@ -80,6 +80,11 @@ thread_local! {
 /// The browser, once wired (UI thread).
 fn view() -> Option<Rc<RefCell<View>>> {
     VIEW.with(|v| v.borrow().as_ref().and_then(std::rc::Weak::upgrade))
+}
+
+/// Current metadata from the Collection or an opened source, including removed overrides after undo.
+pub fn fresh_track(t: &Track) -> Option<Track> {
+    view()?.borrow_mut().fresh_track(t)
 }
 
 /// The browser's selection now (empty before the browser is wired).
@@ -163,10 +168,10 @@ struct Cache {
 struct View {
     lib: Rc<dyn Library>,
     store: Arc<Store>,
-    rows: Rc<VecModel<ModelRc<StandardListViewItem>>>,
+    rows: Rc<table::Rows>,
     sidebar: Rc<VecModel<StandardListViewItem>>,
     panel_rows: Rc<VecModel<StandardListViewItem>>,
-    list: Vec<Track>,
+    list: Rc<Vec<Track>>,
     /// Visible row → index into `list`.
     shown: Vec<usize>,
     query: String,
@@ -185,8 +190,6 @@ struct View {
     /// The track chosen in the table last.
     selected: Option<Track>,
     reference: Reference,
-    /// The settings the cells were last built with; refreshed by every [`View::refresh`].
-    look: Look,
     /// `detected().version()` the rows were last built for.
     detected_ver: u64,
     /// Sidebar row → what it is; `entry` is the chosen one.
@@ -213,8 +216,6 @@ struct View {
     confirm: Option<Entry>,
     /// The mounted devices and the iTunes / xml / Explorer sources (see [`sources`]).
     sources: Vec<sources::Source>,
-    /// Tracks the table dims, by store key; see [`played`].
-    played: std::collections::HashSet<String>,
     _timer: Timer,
     _preview: Timer,
     /// The SUGGEST tab: the list ranked for a track ([`suggest`]).

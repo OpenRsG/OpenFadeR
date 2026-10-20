@@ -8,7 +8,7 @@ import { DeckDropTarget } from "dnd.slint";
 import { CueList, PadGrid, PadOptions } from "pads.slint";
 
 /// GRID edit block (replaces the pads while GRID is on): shift by n ms, beat 1 at the playhead, BPM ×2 / ÷2, TAP, reset, METRO.
-component GridEdit inherits GridLayout {
+export component GridEdit inherits GridLayout {
     in property <int> index;
     property <bool> en: DeckState.decks[root.index].loaded;
     spacing: 2px;
@@ -83,7 +83,7 @@ export component DeckPanel inherits Rectangle {
             Rectangle {
                 x: ctl.x-pads;
                 width: ctl.pw;
-                if root.v.grid-edit: GridEdit { index: root.index; height: 4 * 22px + 3 * 2px; y: 0; }
+                if root.v.grid-edit: GridEdit { index: root.index; height: 4 * Theme.h-ctl + 3 * 2px; y: 0; }
                 if !root.v.grid-edit && root.show-cues: CueList {
                     height: parent.height;
                     cues: root.v.cues;

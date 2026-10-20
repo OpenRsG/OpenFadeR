@@ -109,6 +109,7 @@ fn knob_moved(mute: &mut [bool; STEM_COUNT], old: [f32; 3], new: [f32; 3], four:
 
 pub(super) struct State {
     job: Option<Job>,
+    attached: Option<std::sync::Arc<openfader::audio::Stems>>,
     /// Stems are attached to the player and the buttons work (the separation may still be running).
     ready: bool,
     /// The separation finished: every frame has its stems (the stem waveform and INSTANT DOUBLES wait for it).
@@ -129,6 +130,7 @@ impl Default for State {
     fn default() -> Self {
         State {
             job: None,
+            attached: None,
             ready: false,
             complete: false,
             mute: [false; STEM_COUNT],
@@ -188,11 +190,6 @@ impl Deck {
         self.stems.borrow().ready.then(|| self.stem_gains_for(four))
     }
 
-    /// The separation is finished: every frame has its stems (INSTANT DOUBLES start from it).
-    pub(super) fn stems_complete(&self) -> bool {
-        self.stems.borrow().complete
-    }
-
     /// The mute state (true = silent) of VOCAL, INST, BASS, DRUMS.
     pub(super) fn stem_mutes(&self) -> [bool; STEM_COUNT] {
         self.stems.borrow().mute
@@ -206,10 +203,11 @@ impl Deck {
 
     /// A new track replaces the old: drops its separation and, unless PREFS says KEEP, the mute state.
     pub(super) fn stems_clear(&self) {
-        self.double.set(None); // a pending INSTANT DOUBLES belongs to the track that is going
+        self.double.borrow_mut().take(); // a pending INSTANT DOUBLES belongs to the track that is going
         {
             let mut s = self.stems.borrow_mut();
             s.job = None;
+            s.attached = None;
             (s.ready, s.complete, s.focus) = (false, false, None);
             s.text.clear();
             if prefs::with(|p| p.stems_reset) {

@@ -1,0 +1,65 @@
+import { Theme, DeckState, DeckView } from "state.slint";
+
+export component Platter inherits Rectangle {
+    in property <int> index;
+    in property <DeckView> deck: DeckState.decks[root.index];
+    in property <color> tone: root.index == 0 ? Theme.deck1 : Theme.deck2;
+    property <length> size: min(root.width, root.height);
+    property <angle> spin: mod(root.deck.position * root.deck.duration / 1800, 1) * 360deg;
+    property <float> start;
+    property <length> start-x;
+    min-width: 96px; min-height: 96px;
+    accessible-role: slider;
+    accessible-label: "Jog seek deck " + (root.index == 0 ? "A" : "B") + "; drag horizontally to seek";
+    accessible-value: root.deck.time;
+    disc := Rectangle {
+        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        width: root.size; height: self.width;
+        border-radius: self.width / 2;
+        background: Theme.jog-ring;
+        border-width: 1px; border-color: root.deck.ready ? root.tone : Theme.line-strong;
+        Rectangle {
+            x: 5px; y: 5px; width: parent.width - 10px; height: self.width;
+            border-radius: self.width / 2; background: Theme.jog-face;
+        }
+        for ring in 7: Rectangle {
+            property <length> inset: 10px + ring * root.size * 0.027;
+            x: self.inset; y: self.inset;
+            width: parent.width - 2 * self.inset; height: self.width;
+            border-radius: self.width / 2; border-width: 1px; border-color: Theme.line;
+        }
+        Rectangle {
+            x: (parent.width - self.width) / 2 + sin(root.spin) * (root.size / 2 - 10px);
+            y: (parent.height - self.height) / 2 - cos(root.spin) * (root.size / 2 - 10px);
+            width: 5px; height: 5px; border-radius: 2.5px;
+            background: root.deck.ready ? root.tone : Theme.text-disabled;
+        }
+        Rectangle {
+            width: parent.width * 0.49; height: self.width;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            border-radius: self.width / 2;
+            border-width: 1px; border-color: root.tone.darker(0.35);
+            background: root.tone.darker(4);
+            VerticalLayout {
+                alignment: center; spacing: 2px;
+                Text { text: root.index == 0 ? "A" : "B"; color: root.tone; font-weight: 700; font-size: min(28px, root.size * 0.16); horizontal-alignment: center; }
+                Text { text: root.deck.ready ? root.deck.bpm : "—"; color: Theme.text-bright; font-size: min(22px, root.size * 0.115); font-weight: 600; horizontal-alignment: center; }
+                Text { text: "BPM"; color: Theme.text-dim; font-size: 11px; horizontal-alignment: center; }
+            }
+        }
+        TouchArea {
+            enabled: root.deck.ready;
+            pointer-event(e) => {
+                if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                    root.start = root.deck.position;
+                    root.start-x = self.mouse-x;
+                }
+            }
+            moved => {
+                if self.pressed && root.deck.duration > 0 {
+                    DeckState.seek(root.index, clamp(root.start + (self.mouse-x - root.start-x) / self.width * 8000 / root.deck.duration, 0, 1));
+                }
+            }
+        }
+    }
+}

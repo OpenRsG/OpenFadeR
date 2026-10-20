@@ -52,6 +52,7 @@ tests/
   (e.g. `animate background`), and every use given children, `clip` or layout padding. For widgets used many times, put such
   bindings on a child element (`face := Rectangle { … animate background … }`), never on the root: each inlined use is a full
   copy in the generated code.
+- Large views and overlay groups use permanent `if true` item trees to create separate heap-allocation boundaries. Named Slint components alone remain embedded by value. Keep both individual constructors and nested initialization within the 1 MiB stack budget exercised by `.github/smoke.sh` on Linux; dialog visibility and state retain their existing lifetimes.
 - Each Slint section talks to Rust only through its `<Section>State` global. Rust sets it via `app.global::<…State>()`. Do not add root `App` properties for a section.
 - Multi-instance sections (decks) use ONE global holding an indexed model plus index-taking callbacks. Never write per-instance A/B copies.
 
@@ -60,6 +61,7 @@ tests/
 - Duplicate logic in two children (SQL open/key, playlist-tree build, byte readers, colour mixing, ms↔pixel mapping) → move it to the base on the second occurrence.
 - Constants (sample rates, entries/s, sizes) are defined once, in the module that owns the concept, and are imported elsewhere.
 - Hot paths (audio callback, per-frame render, timers, per-row browser code) never clone `Prefs` or `Track`: use `prefs::with` and `Deck::serial()`/`with_track`. The audio callback allocates nothing (`player/mix.rs` test).
+- Moving deck readouts update in the rendering notifier when available; the deck timer retains paused updates and renderer fallback. Beat-count lookups binary-search the ordered beat grid rather than scanning it per frame.
 - Tests share fixtures through `tests/common/` or `examples/make_fixture.rs`, not through copied helpers.
 
 ## Boundaries & evidence
@@ -67,3 +69,21 @@ tests/
 - Machine-local paths, keys and user data are never in tracked files. USB tests read `OPENFADER_USB` and skip when it is unset. Keys come from env vars or the git-ignored `.local/` files.
 - Format claims are labelled inferred or ours in the doc comment of the child that implements them. The core names no third-party software; only plugins and mapping files may.
 - Repositories: core (`OpenFadeR`), `OpenFadeR-Plugins` (`extension/plugin/`), `OpenFadeR-Map` (`mappings/`), `OpenFadeR-Themes` (`extension/skin/`).
+
+## Performance contracts
+
+- Delay-line reset invalidates history in constant time. Interpolated reads must treat both unwritten taps as silence; resetting an effect must not clear its full buffer inside the callback.
+- `audio/fx/prepare.rs` owns replacement construction and retirement. Each unit keeps its selected stage and bounded handoff slots. Initialize the handoff mutex during construction because Darwin allocates its native mutex on first lock. Initial stages are built during stream setup; callbacks only try a handoff when selection changes. Pending selections pass dry audio, and the latest selection wins.
+- Deck loading sends playable `Arc<Track16>` after worker-side gain and auto-cue preparation, before optional analysis. Late results merge into the current load without overwriting edits or disturbing transport.
+- Bulk runs share `app/analyze/job.rs`'s process-wide budget. Compatible queued or running requests share computation; cue guides, tag writes and progress remain subscriber-specific. Bulk detectors run sequentially per track rather than nesting detector threads inside track workers.
+- Cancellation is checked between decode packets, during detector scans and after acquiring inference locks. An active ORT inference cannot be interrupted. Video decode cancellation kills and reaps its ffmpeg child; dropping a result receiver alone is insufficient.
+- Stem jobs allocate off the UI thread. Engine availability is established before claiming a segment. Completed instant doubles share validated audio/stem Arcs instead of decoding or reading the stem cache again.
+- Separation consumes the borrowed ORT output and deposits resampled frames directly. Preserve interpolation, overlap weighting and quantization; compare against an independent scalar reference.
+- Waveform peaks and grid hop energies share one band-filter traversal. Stem-wave normalization is cached per loaded PCM; cancelled waveform workers retain their slot until they exit, and stale results cannot install.
+- Tempo search retains every fine candidate, resolution and strict tie order. Conservative bounds may reject losing candidates; worst-case search remains quadratic. Tests retain exhaustive scoring as the reference.
+- Browser facts are cached and cell models are constructed on demand. Invalidate metadata, detected analysis, missing-file markers and display preferences explicitly. Preview generations refresh reused delegates after sorting or filtering.
+
+Run optimized timing checks with `cargo test --release --lib benchmark_ -- --ignored --nocapture --test-threads=1`.
+Browser and stem-wave comparisons use the binary filters `benchmark_lazy_browser_search_sort` and `bench_cached_stemwave_normalization`.
+`examples/stems_bench.rs` reports first-usable stems, whole-track time and Linux peak RSS; use a fresh cache for cold runs and compare identical profiles and inputs.
+Allocated buffer payload, anonymous resident memory and total RSS are different measurements. Kernel timings do not establish controller-to-audio latency.

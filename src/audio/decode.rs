@@ -2,7 +2,11 @@
 
 use super::Pcm;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{Receiver, channel};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+    mpsc::{Receiver, channel},
+};
 use symphonia::core::audio::SampleBuffer;
 use symphonia::core::codecs::DecoderOptions;
 use symphonia::core::errors::Error as SymErr;
@@ -11,13 +15,35 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
-/// [`decode`] on a worker thread; the receiver gets exactly one result.
-pub fn decode_async(path: PathBuf) -> Receiver<Result<Pcm, String>> {
+/// Dropping a decode job stops its worker at the next packet boundary.
+pub struct DecodeJob {
+    rx: Receiver<Result<Pcm, String>>,
+    cancelled: Arc<AtomicBool>,
+}
+
+impl std::ops::Deref for DecodeJob {
+    type Target = Receiver<Result<Pcm, String>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.rx
+    }
+}
+
+impl Drop for DecodeJob {
+    fn drop(&mut self) {
+        self.cancelled.store(true, Ordering::Relaxed);
+    }
+}
+
+pub fn decode_async(path: PathBuf) -> DecodeJob {
     let (tx, rx) = channel();
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let stop = cancelled.clone();
     std::thread::spawn(move || {
-        let _ = tx.send(decode(&path)); // receiver dropped = load cancelled
+        let result = decode_cancellable(&path, &|| stop.load(Ordering::Relaxed));
+        let _ = tx.send(result);
     });
-    rx
+    DecodeJob { rx, cancelled }
 }
 
 /// Probes `path` for its container (the part of decoding that is cheap).
@@ -56,18 +82,37 @@ fn audio_track(fmt: &dyn FormatReader) -> Option<&Track> {
 
 /// Decode a whole file (mp3/aac-m4a/flac/wav/aiff) to stereo: mono duplicated, >2 channels keep the first two. A video
 /// file whose audio symphonia cannot decode (AC-3, Opus …) goes through `ffmpeg` instead ([`crate::video::audio`]).
-/// ponytail: whole-file decode costs ~10 MB/min of RAM; upgrade path is a streaming decoder thread feeding a ring buffer.
+/// ponytail: stereo f32 PCM needs 21.2 MB/min at 44.1 kHz; streaming decode is the upgrade path for longer tracks.
 pub fn decode(path: &Path) -> Result<Pcm, String> {
-    decode_native(path).or_else(|e| {
+    decode_cancellable(path, &|| false)
+}
+
+/// Checks cancellation before opening the file and between native decoder packets.
+pub fn decode_cancellable(path: &Path, cancelled: &dyn Fn() -> bool) -> Result<Pcm, String> {
+    if cancelled() {
+        return Err("decode cancelled".into());
+    }
+    decode_native(path, cancelled).or_else(|e| {
+        if cancelled() {
+            return Err("decode cancelled".into());
+        }
         if crate::video::is_video(path) {
-            crate::video::audio::extract(path).map_err(|f| format!("{e}; {f}"))
+            crate::video::audio::extract(path, cancelled)
+                .map_err(|f| format!("{e}; {f}"))
+                .and_then(|pcm| {
+                    if cancelled() {
+                        Err("decode cancelled".into())
+                    } else {
+                        Ok(pcm)
+                    }
+                })
         } else {
             Err(e)
         }
     })
 }
 
-fn decode_native(path: &Path) -> Result<Pcm, String> {
+fn decode_native(path: &Path, cancelled: &dyn Fn() -> bool) -> Result<Pcm, String> {
     let mut fmt = open_format(path)?;
     let track = audio_track(&*fmt).ok_or("no audio track")?;
     let id = track.id;
@@ -78,6 +123,9 @@ fn decode_native(path: &Path) -> Result<Pcm, String> {
     let mut samples = Vec::new();
     let mut buf: Option<SampleBuffer<f32>> = None;
     loop {
+        if cancelled() {
+            return Err("decode cancelled".into());
+        }
         let pkt = match fmt.next_packet() {
             Ok(p) => p,
             Err(SymErr::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
@@ -159,5 +207,57 @@ mod tests {
         std::fs::remove_file(&p).ok();
         assert_eq!((got.rate, got.samples.len()), (22050, 2 * 22050));
         assert!(decode_async(p).recv().unwrap().is_err()); // file is gone now
+    }
+
+    #[test]
+    fn cancellation_stops_between_packets_without_returning_partial_audio() {
+        let path =
+            std::env::temp_dir().join(format!("openfader_cancel_{}.wav", std::process::id()));
+        write_wav(&path, 22050, 22050 * 10);
+        let checks = std::cell::Cell::new(0);
+        let result = decode_cancellable(&path, &|| {
+            checks.set(checks.get() + 1);
+            checks.get() >= 4
+        });
+        assert_eq!(result.err().as_deref(), Some("decode cancelled"));
+        let expected = decode(&path).unwrap();
+        let actual = decode_cancellable(&path, &|| false).unwrap();
+        assert_eq!(actual.rate, expected.rate);
+        assert_eq!(actual.samples, expected.samples);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn dropping_a_preview_decode_job_cancels_its_worker() {
+        let (tx, rx) = channel();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let job = DecodeJob {
+            rx,
+            cancelled: cancelled.clone(),
+        };
+        let (ready_tx, ready_rx) = channel();
+        let (resume_tx, resume_rx) = channel();
+        let (result_tx, result_rx) = channel();
+        let worker = std::thread::spawn(move || {
+            let result = decode_cancellable(Path::new("/nonexistent"), &|| {
+                ready_tx.send(()).unwrap();
+                resume_rx.recv().unwrap();
+                cancelled.load(Ordering::Relaxed)
+            });
+            let error = result.as_ref().err().cloned();
+            let _ = tx.send(result);
+            result_tx.send(error).unwrap();
+        });
+        ready_rx.recv().unwrap();
+        drop(job);
+        resume_tx.send(()).unwrap();
+        assert_eq!(
+            result_rx
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap()
+                .as_deref(),
+            Some("decode cancelled")
+        );
+        worker.join().unwrap();
     }
 }

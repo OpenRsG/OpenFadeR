@@ -122,6 +122,11 @@ impl Voice {
         }
     }
 
+    #[cfg(test)]
+    pub(super) fn prepare_fx(&mut self, c: &Controls) {
+        self.fx.prepare(c.release.settings().effect);
+    }
+
     /// The buffer of `n` frames at `dev_rate`: takes hand-overs, presses and stops, applies the link state, sets the gains and the loops' FX.
     pub(crate) fn begin(&mut self, c: &Controls, link: Link, n: usize, dev_rate: u32) {
         (self.n, self.rate) = (n.max(1), dev_rate);

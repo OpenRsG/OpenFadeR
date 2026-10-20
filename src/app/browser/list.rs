@@ -2,12 +2,11 @@
 //! sort pass, and the cheaper row updates (a new reference, an edited track).
 
 use super::{
-    filter,
-    table::{self, Facts, Look, Reference},
-    App, BrowserState, Home, View,
+    App, BrowserState, Home, View, filter,
+    table::{Look, Reference},
 };
 use openfader::{library::Track, store};
-use slint::{ComponentHandle, Model};
+use slint::ComponentHandle;
 
 impl View {
     /// Rebuilds `list` from the current source and refreshes the rows.
@@ -52,8 +51,10 @@ impl View {
         state.set_remote_search(self.search_entry().is_some());
         match list {
             Ok(list) => {
-                self.list = list;
+                self.list = std::rc::Rc::new(list);
                 self.rank_list(app);
+                self.rows
+                    .replace(self.list.clone(), self.suggest.notes.clone());
                 self.refresh(app);
             }
             Err(e) => state.set_status(format!("query failed: {e}").into()),
@@ -62,36 +63,35 @@ impl View {
 
     /// Search box, filter bar, tag filter and header sort over `list`, then the rows and the status line.
     ///
-    /// BPM and key are resolved once per track ([`Facts`]) and the search compares without lowercasing each field
+    /// BPM and key are cached per track ([`super::table::Facts`]) and the search compares without lowercasing each field
     /// ([`filter::shown`], [`filter::sort`]).
     pub(super) fn refresh(&mut self, app: &App) {
-        self.look = Look::now();
-        let look = self.look;
+        let look = Look::now();
         let q = if self.search_entry().is_some() {
             String::new() // the box searches online there: it does not filter the results
         } else {
             self.query.to_lowercase()
         };
-        let facts: Vec<Facts> = self.list.iter().map(Facts::of).collect();
-        self.shown = filter::shown(
-            &self.list,
-            &facts,
-            &q,
-            &self.filter,
-            &self.reference,
-            &look,
-            |t| super::tagging::passes(&self.tag_map, &self.tag_filter, t),
-        );
-        if let Some((col, asc)) = self.sort.filter(|_| !self.ordered()) {
-            filter::sort(&mut self.shown, &self.list, &facts, col, asc, &look);
+        let shown = {
+            let facts = self.rows.facts();
+            let mut shown = filter::shown(
+                &self.list,
+                &facts,
+                &q,
+                &self.filter,
+                &self.reference,
+                &look,
+                |t| super::tagging::passes(&self.tag_map, &self.tag_filter, t),
+            );
+            if let Some((col, asc)) = self.sort.filter(|_| !self.ordered()) {
+                filter::sort(&mut shown, &self.list, &facts, col, asc, &look);
+            }
+            shown
+        };
+        self.shown = shown;
+        if self.rows.update(&self.shown, look, self.reference.clone()) {
+            self.strips.reset(app, self.shown.len());
         }
-        let rows: Vec<_> = self
-            .shown
-            .iter()
-            .map(|&i| self.table_row(i, &facts[i]))
-            .collect();
-        self.rows.set_vec(rows);
-        self.strips.reset(self.shown.len());
         let state = app.global::<BrowserState>();
         // The selection follows the track, not the row index.
         let at = self.selected.as_ref().and_then(|s| self.row_of(s));
@@ -124,28 +124,97 @@ impl View {
 
     /// Re-marks the visible rows for a new reference: only each row's hint cell changes, in place (the selection stays).
     pub(super) fn remark(&mut self, r: Reference) {
+        self.rows.remark(r.clone());
         self.reference = r;
-        for (n, &i) in self.shown.iter().enumerate() {
-            if let Some(row) = self.rows.row_data(n) {
-                table::remark(&row, &self.list[i], &self.reference, &self.look);
+    }
+
+    // ponytail: source snapshots are scanned per refreshed track; index them if large source playlists make undo lag.
+    pub(super) fn fresh_track(&mut self, t: &Track) -> Option<Track> {
+        let key = store::key(t);
+        let collection = self
+            .cache()
+            .ok()
+            .and_then(|c| c.by_key.get(&key).map(|&i| c.tracks[i].clone()));
+        if t.id.is_some() && collection.is_some() {
+            return collection;
+        }
+        let find = |lib: &dyn openfader::library::Library| {
+            lib.tracks_all()
+                .ok()?
+                .iter()
+                .find(|fresh| fresh.file == t.file && store::key(fresh) == key)
+                .cloned()
+        };
+        if let Home::Source(i, _) = self.home
+            && let Some(fresh) = self
+                .sources
+                .get(i)
+                .and_then(|s| s.lib.as_ref())
+                .and_then(|lib| find(&**lib))
+        {
+            return Some(fresh);
+        }
+        self.sources
+            .iter()
+            .filter_map(|s| s.lib.as_ref())
+            .find_map(|lib| find(&**lib))
+            .or(collection)
+    }
+
+    /// Undo/redo can remove an override, so restore fresh inherited values rather than overlaying old copies.
+    pub(super) fn reread_metadata(&mut self) {
+        let mut lists = [
+            std::mem::take(&mut self.tags),
+            std::mem::take(&mut self.history),
+        ];
+        for t in lists.iter_mut().flatten() {
+            if let Some(fresh) = self.fresh_track(t) {
+                crate::app::trackinfo::copy_metadata(t, &fresh);
+            }
+        }
+        let [tags, history] = lists;
+        (self.tags, self.history) = (tags, history);
+        let mut chosen = [self.selected.take(), self.related.take()];
+        for t in chosen.iter_mut().flatten() {
+            if let Some(fresh) = self.fresh_track(t) {
+                crate::app::trackinfo::copy_metadata(t, &fresh);
+            }
+        }
+        let [selected, related] = chosen;
+        (self.selected, self.related) = (selected, related);
+        for i in 0..self.decks.len() {
+            if let Some(t) = self.decks[i].with_track(Clone::clone)
+                && let Some(fresh) = self.fresh_track(&t)
+            {
+                self.decks[i].refresh_metadata(&fresh);
             }
         }
     }
 
-    /// The track panel edited a rating / comment: every copy of that track here shows the new values.
+    /// The track editor changed metadata: every copy here uses the same durable overrides.
     pub(super) fn track_edited(&mut self, app: &App, edited: &Track) {
         let key = store::key(edited);
         let put = |t: &mut Track| {
             if store::key(t) == key {
-                (t.rating, t.comment) = (edited.rating, edited.comment.clone());
+                crate::app::trackinfo::copy_metadata(t, edited);
             }
         };
-        [&mut self.list, &mut self.tags, &mut self.history]
-            .into_iter()
-            .flatten()
-            .for_each(put);
+        [
+            std::rc::Rc::make_mut(&mut self.list),
+            &mut self.tags,
+            &mut self.history,
+        ]
+        .into_iter()
+        .flatten()
+        .for_each(put);
         self.selected.iter_mut().for_each(put);
+        self.related.iter_mut().for_each(put);
+        for deck in &self.decks {
+            deck.refresh_metadata(edited);
+        }
         self.cache = None;
+        self.rows
+            .replace(self.list.clone(), self.suggest.notes.clone());
         if matches!(self.home, Home::Smart(_)) && self.related.is_none() {
             self.load(app);
         } else {

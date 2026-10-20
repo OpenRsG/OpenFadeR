@@ -1,6 +1,6 @@
 //! The deck's tick: picks up a finished decode, runs SYNC ([`Deck::follow`]), and redraws the time, the overview and the play
 //! state only when something they show changed; the enlarged waveform, platter and phase meter go through [`Deck::scroll`]
-//! ([`super::frame`], which also moves them on every frame while a deck plays). Its period is VIEW > Waveform Drawing Rate
+//! ([`super::frame`], which owns their updates while a deck plays if the renderer supports it). Its period is VIEW > Waveform Drawing Rate
 //! ([`period`]; the timer is created in `Deck::new` and re-timed by [`wire_view`]). Also the deck's VIEW consumers: the jog
 //! display, SYNC RATE, click-on-waveform / PAD FX colour / PAD Mode Auto (pushed to `DeckState` by [`wire_view`]).
 
@@ -166,7 +166,7 @@ impl Deck {
             (self.overview_size.get().0 * scale).round() as usize,
             (self.overview_size.get().1 * scale).round() as usize,
         );
-        let mut dirty = self.scroll(&app, &mut l, pos);
+        let mut dirty = frame::tick_scroll(playing) && self.scroll(&app, &mut l, pos);
         let mut v = self.view.borrow_mut();
         if v.playing != playing {
             let track = l.track.as_ref().map(openfader::plugin::source::track_json);

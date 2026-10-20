@@ -50,11 +50,12 @@ export component FxDivider inherits Rectangle {
 }
 
 /// SEND FX / LEVER FX / MIC FX in the FX panel's slot of the two Beat FX units (`FxState.view` 3, 4, 5; `rack` = view - 3).
-/// One row of 20 px controls, centred, so every group lines up.
+/// Centred control groups use the same native controls at the current input profile's target size.
 export component FxRack inherits Rectangle {
     in property <int> rack;
     property <RackView> r: FxRackState.racks[root.rack];
-    property <length> ctl-h: 20px;
+    property <bool> touch: Theme.layout-profile == 1;
+    property <length> ctl-h: root.touch ? Theme.touch-target : 20px;
     background: Theme.panel;
     VerticalLayout {
         alignment: center;
@@ -72,7 +73,8 @@ export component FxRack inherits Rectangle {
                     current: r.effect;
                     enabled: r.has;
                     font-size: Theme.font-xs;
-                    min-width: 140px;
+                    min-width: root.touch ? 4 * root.ctl-h : 140px;
+                    list-width: root.touch ? 6 * root.ctl-h : 0px;
                     horizontal-stretch: 0;
                     height: root.ctl-h;
                     chose(i) => { FxRackState.effect-selected(root.rack, i); }
@@ -80,8 +82,8 @@ export component FxRack inherits Rectangle {
                 if root.rack != 1: Chip {
                     text: "ON";
                     font-size: Theme.font-xs;
-                    min-width: 34px;
-                    max-width: 34px;
+                    min-width: root.touch ? root.ctl-h : 34px;
+                    max-width: root.touch ? root.ctl-h : 34px;
                     horizontal-stretch: 0;
                     height: root.ctl-h;
                     enabled: r.has;
@@ -116,7 +118,7 @@ export component FxRack inherits Rectangle {
                 horizontal-stretch: 0;
                 FxLabel { text: "LEVER"; }
                 Fader {
-                    width: 160px;
+                    width: root.touch ? 6 * root.ctl-h : 160px;
                     height: root.ctl-h;
                     value: FxRackState.lever;
                     opacity: r.has ? 1 : 0.4;

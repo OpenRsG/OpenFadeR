@@ -68,6 +68,9 @@ export component EditView inherits Rectangle {
     visible: EditState.visible;
     background: Theme.bg;
     property <bool> shown: EditState.visible;
+    property <bool> touch: Theme.layout-profile == 1;
+    property <length> toolbar-height: root.touch ? max(Theme.h-ctl, Theme.touch-target) : 26px;
+    property <length> status-height: root.touch ? max(24px, Theme.font-md + 8px) : 18px;
     changed shown => {
         if self.shown {
             EditState.opened();
@@ -104,7 +107,7 @@ export component EditView inherits Rectangle {
             spacing: 4px;
             HorizontalLayout {
                 spacing: 8px;
-                height: 26px;
+                height: root.toolbar-height;
                 vertical-stretch: 0;
                 Text { text: "EDIT"; color: Theme.text-bright; font-size: Theme.font-xl; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
                 Text { text: EditState.title; color: Theme.text; font-size: Theme.font-md; vertical-alignment: center; overflow: elide; }
@@ -112,10 +115,10 @@ export component EditView inherits Rectangle {
             }
             HorizontalLayout {
                 spacing: 4px;
-                height: 26px;
+                height: root.toolbar-height;
                 vertical-stretch: 0;
                 Chip { text: EditState.playing ? "STOP" : "PLAY"; width: 66px; horizontal-stretch: 0; enabled: EditState.loaded; active: EditState.playing; clicked => { EditState.play-toggle(); } }
-                Chip { text: "|◀"; width: 38px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.rewind(); } }
+                Chip { text: "|◀"; width: root.touch ? max(38px, Theme.touch-target) : 38px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.rewind(); } }
                 Rectangle { width: 10px; horizontal-stretch: 0; }
                 Label { text: "SNAP"; }
                 Chip { text: "OFF"; width: 44px; horizontal-stretch: 0; active: EditState.snap == 0; clicked => { EditState.set-snap(0); } }
@@ -123,17 +126,26 @@ export component EditView inherits Rectangle {
                 Chip { text: "BAR"; width: 44px; horizontal-stretch: 0; active: EditState.snap == 2; clicked => { EditState.set-snap(2); } }
                 Rectangle { width: 10px; horizontal-stretch: 0; }
                 Label { text: "ZOOM"; }
-                Chip { text: "−"; width: 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(-1); } }
-                Chip { text: "+"; width: 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(1); } }
-                Chip { text: "FIT"; width: 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(0); } }
+                Chip { text: "−"; width: root.touch ? max(34px, Theme.touch-target) : 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(-1); } }
+                Chip { text: "+"; width: root.touch ? max(34px, Theme.touch-target) : 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(1); } }
+                Chip { text: "FIT"; width: root.touch ? max(40px, Theme.touch-target) : 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(0); } }
                 Rectangle { }
+                if !root.touch: Chip { text: "RENDER WAV"; width: 100px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.render(); } }
+                if !root.touch: Label { text: "LOAD ON"; }
+                for d in (root.touch ? 0 : EditState.deck-count): Chip { text: "DECK " + (d + 1); width: 64px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.to-deck(d); } }
+            }
+            if root.touch: HorizontalLayout {
+                spacing: 4px;
+                height: root.toolbar-height;
+                vertical-stretch: 0;
+                alignment: start;
                 Chip { text: "RENDER WAV"; width: 100px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.render(); } }
                 Label { text: "LOAD ON"; }
                 for d in EditState.deck-count: Chip { text: "DECK " + (d + 1); width: 64px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.to-deck(d); } }
             }
             HorizontalLayout {
                 spacing: 4px;
-                height: 26px;
+                height: root.toolbar-height;
                 vertical-stretch: 0;
                 alignment: start;
                 Chip { text: "COPY"; width: 54px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.copy(); } }
@@ -144,12 +156,13 @@ export component EditView inherits Rectangle {
                 Chip { text: "MUTE"; width: 50px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.clear(); } }
                 Chip { text: "+ SILENCE"; width: 82px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.silence(); } }
                 Chip { text: "DUPLICATE"; width: 82px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.duplicate(); } }
-                Chip { text: "ALL"; width: 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.select-all(); } }
+                Chip { text: "ALL"; width: root.touch ? max(40px, Theme.touch-target) : 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.select-all(); } }
                 Rectangle { width: 10px; horizontal-stretch: 0; }
                 Chip { text: "UNDO"; width: 54px; horizontal-stretch: 0; enabled: EditState.can-undo; clicked => { EditState.undo(); } }
                 Chip { text: "REDO"; width: 54px; horizontal-stretch: 0; enabled: EditState.can-redo; clicked => { EditState.redo(); } }
             }
             Rectangle {
+                min-height: root.touch ? 180px : 0px;
                 background: Theme.bg-deep;
                 border-color: Theme.line;
                 border-width: 1px;
@@ -180,19 +193,20 @@ export component EditView inherits Rectangle {
             }
             HorizontalLayout {
                 spacing: 16px;
-                height: 18px;
+                height: root.status-height;
                 vertical-stretch: 0;
                 Text { text: EditState.pos-text; color: Theme.accent; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; min-width: 230px; }
                 Text { text: EditState.sel-text; color: Theme.text; font-size: Theme.font-md; vertical-alignment: center; overflow: elide; }
             }
             HorizontalLayout {
                 spacing: 16px;
-                height: 18px;
+                height: root.status-height;
                 vertical-stretch: 0;
                 Text { text: EditState.len-text; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; horizontal-stretch: 0; min-width: 440px; }
                 Text { text: EditState.status; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; }
             }
             Text {
+                min-height: root.touch ? 24px : 0px;
                 text: "click: playhead · drag: select (snapped) · wheel: scroll · Ctrl+wheel: zoom · Space play · Ctrl+C/X/V copy/cut/paste · Ctrl+I insert · Del delete · M mute · S silence · Ctrl+D duplicate · Ctrl+Z/Y undo/redo · B snap · 0 fit";
                 color: Theme.text-faint;
                 font-size: Theme.font-sm;

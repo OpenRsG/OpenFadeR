@@ -15,8 +15,8 @@ use ort::{environment::Environment, ep, logging::LogLevel, session::Session, val
 use parking_lot::Mutex;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
 use std::time::{Duration, Instant};
 
 pub const URL: &str = "https://huggingface.co/StemSplitio/htdemucs-onnx/resolve/main/htdemucs.onnx";
@@ -279,8 +279,12 @@ impl Model {
         model
     }
 
-    /// One segment: `mix` is `[L; SEGMENT]` then `[R; SEGMENT]`; returns `[model stem][channel][SEGMENT]` flattened.
-    fn run(&mut self, mix: Vec<f32>) -> Result<Vec<f32>, String> {
+    /// Consumes `[model stem][channel][SEGMENT]` while the ORT output is alive.
+    fn run(
+        &mut self,
+        mix: Vec<f32>,
+        consume: &mut dyn FnMut(&[f32]) -> Result<(), String>,
+    ) -> Result<(), String> {
         let input = Tensor::from_array(([1usize, 2, SEGMENT], mix)).map_err(|e| e.to_string())?;
         let out = self
             .0
@@ -292,7 +296,7 @@ impl Model {
         if shape.iter().copied().ne([1, 4, 2, SEGMENT as i64]) {
             return Err(format!("unexpected model output shape {shape:?}"));
         }
-        Ok(data.to_vec())
+        consume(data)
     }
 }
 
@@ -372,14 +376,20 @@ fn gpu_allowed() -> Result<(), &'static str> {
     }
 }
 
-fn gpu_session() -> Result<(), String> {
-    GPU.lock()
-        .ensure(
-            gpu_allowed(),
-            || Model::open(1, true),
-            |why| eprintln!("stems: GPU unavailable ({why}); separating on the CPU"),
-        )
-        .map(|_| ())
+fn gpu_session(slot: &mut Slot<Model>) -> Result<&mut Model, String> {
+    slot.ensure(
+        gpu_allowed(),
+        || Model::open(1, true),
+        |why| eprintln!("stems: GPU unavailable ({why}); separating on the CPU"),
+    )
+}
+
+fn cpu_session(slot: &mut Option<(usize, Model)>, threads: usize) -> Result<&mut Model, String> {
+    if slot.as_ref().is_none_or(|(t, _)| *t != threads) {
+        *slot = None; // release the old weights before allocating a replacement
+        *slot = Some((threads, Model::open(threads, false)?));
+    }
+    Ok(&mut slot.as_mut().unwrap().1)
 }
 
 /// Closes both sessions before the process exits: Dawn's teardown inside `exit()` can crash with a session still open.
@@ -412,48 +422,71 @@ impl Engine {
     /// Opens the engine's session now if it is not open (the GPU: the first time per process). `Err` = this engine is out,
     /// for the GPU with the reason logged once.
     pub fn open(self) -> Result<(), String> {
+        self.open_cancellable(&std::sync::atomic::AtomicBool::new(false))
+    }
+
+    /// Preflights an engine before it reserves any segments, checking cancellation under its session lock.
+    pub fn open_cancellable(self, cancel: &std::sync::atomic::AtomicBool) -> Result<(), String> {
         if !usable() {
             return Err(missing_hint()); // not the engine's fault: nothing is remembered
         }
         match self {
-            Engine::Gpu => gpu_session(),
+            Engine::Gpu => with_active(&GPU, cancel, |g| gpu_session(g).map(|_| ())),
             Engine::Cpu(threads) => {
-                let mut c = CPU.lock();
-                if c.as_ref().is_none_or(|(t, _)| *t != threads) {
-                    *c = None; // the old session goes first: two copies of the weights are 600 MB
-                    *c = Some((threads, Model::open(threads, false)?));
-                }
-                Ok(())
+                with_active(&CPU, cancel, |c| cpu_session(c, threads).map(|_| ()))
             }
         }
     }
 
-    /// One segment ([`Model::run`]'s layout) on this engine, opening it first if needed.
-    pub fn run(self, mix: Vec<f32>) -> Result<Vec<f32>, String> {
-        self.open()?;
+    /// Consumes one segment under the session lock; a cancelled queued job runs no inference.
+    pub fn run(
+        self,
+        mix: Vec<f32>,
+        cancel: &std::sync::atomic::AtomicBool,
+        consume: &mut dyn FnMut(&[f32]) -> Result<(), String>,
+    ) -> Result<(), String> {
+        if !usable() {
+            return Err(missing_hint());
+        }
         match self {
-            Engine::Gpu => {
-                let mut g = GPU.lock();
-                let Slot::Ready(m) = &mut *g else {
-                    return Err("GPU unavailable".into());
-                };
-                let t = Instant::now();
-                let out = m.run(mix);
-                if let Some(why) = gpu_verdict(&out, t.elapsed()) {
+            Engine::Gpu => with_active(&GPU, cancel, |g| {
+                let m = gpu_session(g)?;
+                if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                    return Err("cancelled".into());
+                }
+                let started = Instant::now();
+                let mut took = Duration::ZERO;
+                let out = m.run(mix, &mut |data| {
+                    took = started.elapsed();
+                    consume(data)
+                });
+                if let Some(why) = gpu_verdict(&out, took) {
                     eprintln!("stems: GPU unusable ({why}); separating on the CPU");
                     *g = Slot::Unusable(why);
                 }
                 out
-            }
-            Engine::Cpu(threads) => {
-                let mut c = CPU.lock();
-                match &mut *c {
-                    Some((t, m)) if *t == threads => m.run(mix),
-                    _ => Err("CPU session replaced".into()),
+            }),
+            Engine::Cpu(threads) => with_active(&CPU, cancel, |c| {
+                let m = cpu_session(c, threads)?;
+                if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                    return Err("cancelled".into());
                 }
-            }
+                m.run(mix, consume)
+            }),
         }
     }
+}
+
+fn with_active<T>(
+    slot: &Mutex<T>,
+    cancel: &std::sync::atomic::AtomicBool,
+    run: impl FnOnce(&mut T) -> Result<(), String>,
+) -> Result<(), String> {
+    let mut slot = slot.lock();
+    if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err("cancelled".into());
+    }
+    run(&mut slot)
 }
 
 /// Opens the sessions in the background, so the first track loaded after STEMS is switched on does not wait for them.
@@ -461,7 +494,11 @@ pub fn warm(engines: &[Engine]) {
     for &e in engines {
         std::thread::spawn(move || {
             if e.open().is_ok() {
-                let _ = e.run(vec![0.0; 2 * SEGMENT]); // shaders, thread pool, allocator
+                let _ = e.run(
+                    vec![0.0; 2 * SEGMENT],
+                    &std::sync::atomic::AtomicBool::new(false),
+                    &mut |_| Ok(()),
+                ); // shaders, thread pool, allocator
             }
         });
     }
@@ -475,6 +512,67 @@ pub fn engines(multithread: bool) -> [Engine; 2] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancellation_while_waiting_for_session_skips_the_run() {
+        use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+        let (slot, cancel) = (Mutex::new(0usize), AtomicBool::new(false));
+        let guard = slot.lock();
+        std::thread::scope(|scope| {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let (slot, cancel) = (&slot, &cancel);
+            let queued = scope.spawn(move || {
+                tx.send(()).unwrap();
+                with_active(slot, cancel, |runs| {
+                    *runs += 1;
+                    Ok(())
+                })
+            });
+            rx.recv().unwrap();
+            cancel.store(true, Relaxed);
+            drop(guard);
+            assert_eq!(queued.join().unwrap(), Err("cancelled".into()));
+        });
+        assert_eq!(*slot.lock(), 0);
+        with_active(&slot, &AtomicBool::new(false), |runs| {
+            *runs += 1;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(*slot.lock(), 1);
+    }
+
+    #[test]
+    fn cancelled_session_waiter_does_not_initialize_the_engine() {
+        use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+        let (slot, cancel) = (Mutex::new(Slot::<usize>::Untried), AtomicBool::new(false));
+        let guard = slot.lock();
+        std::thread::scope(|scope| {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let (slot, cancel) = (&slot, &cancel);
+            let queued = scope.spawn(move || {
+                tx.send(()).unwrap();
+                with_active(slot, cancel, |slot| {
+                    slot.ensure(
+                        Ok(()),
+                        || panic!("cancelled preflight opened an engine"),
+                        |_| {},
+                    )
+                    .map(|_| ())
+                })
+            });
+            rx.recv().unwrap();
+            cancel.store(true, Relaxed);
+            drop(guard);
+            assert_eq!(queued.join().unwrap(), Err("cancelled".into()));
+        });
+        assert!(matches!(*slot.lock(), Slot::Untried));
+        with_active(&slot, &AtomicBool::new(false), |slot| {
+            slot.ensure(Ok(()), || Ok(7), |_| {}).map(|_| ())
+        })
+        .unwrap();
+        assert!(matches!(*slot.lock(), Slot::Ready(7)));
+    }
 
     #[test]
     fn meminfo_parse() {
@@ -545,9 +643,11 @@ mod tests {
             None,
             "shader compile on the first run"
         );
-        assert!(gpu_verdict(&Ok(()), Duration::from_secs(30))
-            .unwrap()
-            .contains("software"));
+        assert!(
+            gpu_verdict(&Ok(()), Duration::from_secs(30))
+                .unwrap()
+                .contains("software")
+        );
         assert_eq!(
             gpu_verdict::<()>(&Err("device lost".into()), Duration::ZERO).as_deref(),
             Some("device lost")

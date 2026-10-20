@@ -1,7 +1,7 @@
 //! Selected-track details panel (`TrackInfoState` in ui/trackinfo.slint): cover, tags, rating, comment, phrase mood,
 //! our detected BPM/key where it differs from the library's, and the bulk-analysis progress ([`super::analyze`]).
 
-use super::{analyze, camelot::display, prefs, App, TrackInfoState};
+use super::{App, TrackInfoState, analyze, camelot::display, prefs};
 use openfader::{
     library::{Library, Track},
     store,
@@ -19,6 +19,8 @@ const BPM_TOLERANCE: f64 = 0.1;
 thread_local! {
     /// The track the panel shows, so a finished analysis or a notation change can refresh it.
     static SHOWN: RefCell<Option<Track>> = const { RefCell::new(None) };
+    /// A browser editor pins its target even if a controller changes the selection behind it.
+    static EDITING: RefCell<Option<Track>> = const { RefCell::new(None) };
     static WIRED: Cell<bool> = const { Cell::new(false) };
     static LISTENER: RefCell<Option<Box<dyn Fn(&Track)>>> = const { RefCell::new(None) };
     /// The library the panel reads the selected track's phrases from.
@@ -35,31 +37,52 @@ fn shown() -> Option<Track> {
     SHOWN.with_borrow(|t| t.clone())
 }
 
+fn target() -> Option<Track> {
+    EDITING.with_borrow(|t| t.clone()).or_else(shown)
+}
+
+/// Opens the existing details editor for the browser action's track, not a loaded deck.
+pub fn open_editor(app: &App, t: &Track) {
+    show(app, t);
+    EDITING.with_borrow_mut(|e| *e = Some(t.clone()));
+    display_track(app, t);
+    let s = app.global::<TrackInfoState>();
+    let (t, _) = edited(t);
+    s.set_metadata_writable(t.file.is_some());
+    s.set_edit_title(t.title.into());
+    s.set_edit_artist(t.artist.into());
+    s.set_edit_album(t.album.into());
+    s.set_edit_genre(t.genre.into());
+    s.set_edit_label(t.label.into());
+    s.set_edit_status("".into());
+    s.set_editor_open(true);
+}
+
 /// Re-shows the shown track as the library lists it now (after an undo or redo changed its row or its edits).
 pub fn reshow(app: &App) {
     let Some(t) = shown() else {
         return;
     };
-    let fresh = t.id.and_then(|id| {
-        LIBRARY.with_borrow(|l| {
-            l.as_ref()?
-                .tracks_all()
-                .ok()?
-                .iter()
-                .find(|x| x.id == Some(id))
-                .cloned()
-        })
-    });
-    show(app, &fresh.unwrap_or(t));
+    show(app, &super::browser::fresh_track(&t).unwrap_or(t));
 }
 
-/// `t` with the store's rating and comment, and every edit of it.
+/// `t` with the store's metadata overrides, and every edit of it.
 fn edited(t: &Track) -> (Track, store::Edits) {
     let edits = store::global().edits(&store::key(t)).unwrap_or_default();
     let mut t = t.clone();
-    t.rating = edits.rating.unwrap_or(t.rating);
-    t.comment = edits.comment.clone().unwrap_or(t.comment);
+    edits.apply_metadata(&mut t);
     (t, edits)
+}
+
+/// Copies only editable fields; origin, identity, technical data and analysis references stay put.
+pub(in crate::app) fn copy_metadata(to: &mut Track, from: &Track) {
+    to.title.clone_from(&from.title);
+    to.artist.clone_from(&from.artist);
+    to.album.clone_from(&from.album);
+    to.genre.clone_from(&from.genre);
+    to.label.clone_from(&from.label);
+    to.comment.clone_from(&from.comment);
+    to.rating = from.rating;
 }
 
 /// Re-shows the selected track when it is `path` (its analysis just arrived).
@@ -82,10 +105,13 @@ fn found(t: &Track) -> Option<analyze::Found> {
 fn detected_text(t: &Track, (bpm, key): &analyze::Found, notation: prefs::KeyNotation) -> String {
     let mut parts = Vec::new();
     if t.bpm_x100 > 0 && *bpm > 0 && (bpm - t.bpm_x100).abs() as f64 / 100.0 > BPM_TOLERANCE {
+        let digits = prefs::with(|p| p.view.tempo_decimals.digits());
         parts.push(format!(
-            "detected {:.2} BPM (library {})",
+            "detected {:.*} BPM (library {:.*})",
+            digits,
             *bpm as f64 / 100.0,
-            t.bpm_text()
+            digits,
+            t.bpm_x100 as f64 / 100.0
         ));
     }
     if !t.key.is_empty() && !key.is_empty() && analyze::keys_differ(&t.key, key) {
@@ -103,17 +129,34 @@ pub fn on_edit(f: impl Fn(&Track) + 'static) {
     LISTENER.with_borrow_mut(|l| *l = Some(Box::new(f)));
 }
 
-/// Saves one edit of the shown track to the store and re-shows it (`show` reads what the store holds). A store
-/// failure is said in the panel.
+/// Persists the same edits from the details panel and browser editor. A failure leaves the draft intact.
 fn edit(app: &App, save: impl FnOnce(&store::Store, &str) -> Result<(), String>) {
-    let Some(t) = shown() else {
+    let Some(t) = target() else {
         return;
     };
+    let s = app.global::<TrackInfoState>();
+    let draft = s.get_comment();
+    let old_comment = edited(&t).0.comment;
     if let Err(e) = save(&store::global(), &store::key(&t)) {
-        return set_progress(app, &format!("not saved: {e}"));
+        let message = format!("not saved: {e}");
+        s.set_edit_status(message.clone().into());
+        return set_progress(app, &message);
     }
-    show(app, &t);
+    display_track(app, &t);
     let (t, _) = edited(&t);
+    // Rating and colour edits must not discard a comment still being typed.
+    if t.comment == old_comment {
+        s.set_comment(draft);
+    }
+    SHOWN.with_borrow_mut(|shown| {
+        if shown
+            .as_ref()
+            .is_some_and(|s| store::key(s) == store::key(&t))
+        {
+            *shown = Some(t.clone());
+        }
+    });
+    s.set_edit_status("Saved in OpenFadeR".into());
     LISTENER.with_borrow(|l| l.iter().for_each(|f| f(&t)));
 }
 
@@ -127,8 +170,15 @@ fn wire(app: &App) {
     });
     let s = app.global::<TrackInfoState>();
     let weak = app.as_weak();
+    s.on_editor_closed(move || {
+        let app = weak.unwrap();
+        EDITING.with_borrow_mut(|e| *e = None);
+        app.global::<TrackInfoState>().set_editor_open(false);
+        reshow(&app);
+    });
+    let weak = app.as_weak();
     s.on_rating_set(move |n| {
-        let Some(cur) = shown().map(|t| edited(&t).0.rating) else {
+        let Some(cur) = target().map(|t| edited(&t).0.rating) else {
             return;
         };
         let n = if i32::from(cur) == n {
@@ -142,6 +192,27 @@ fn wire(app: &App) {
     s.on_comment_edited(move |text| {
         let text = text.trim().to_owned();
         edit(&weak.unwrap(), |s, k| s.set_comment(k, Some(&text)));
+    });
+    let weak = app.as_weak();
+    s.on_metadata_edited(move |title, artist, album, genre, label| {
+        let app = weak.unwrap();
+        if target().is_none_or(|t| t.file.is_none()) {
+            app.global::<TrackInfoState>()
+                .set_edit_status("Import a local file before editing descriptive fields".into());
+            return;
+        }
+        let comment = app.global::<TrackInfoState>().get_comment();
+        edit(&app, |s, k| {
+            s.set_metadata(
+                k,
+                title.as_str(),
+                artist.as_str(),
+                album.as_str(),
+                genre.as_str(),
+                label.as_str(),
+                comment.trim(),
+            )
+        });
     });
     let weak = app.as_weak();
     s.on_color_set(move |c| {
@@ -165,6 +236,12 @@ pub fn show(app: &App, t: &Track) {
     }
     // The browser's list may predate an edit made here: what the store holds wins.
     SHOWN.with_borrow_mut(|s| *s = Some(t.clone()));
+    if EDITING.with_borrow(Option::is_none) {
+        display_track(app, t);
+    }
+}
+
+fn display_track(app: &App, t: &Track) {
     let (t, edits) = edited(t);
     let t = &t;
     let s = app.global::<TrackInfoState>();
@@ -187,7 +264,8 @@ pub fn show(app: &App, t: &Track) {
     let key = if t.key.is_empty() { &ours.1 } else { &t.key };
     s.set_key(display(key, notation).into());
     let bpm = if t.bpm_x100 > 0 { t.bpm_x100 } else { ours.0 };
-    s.set_bpm(format!("{:.2}", bpm as f64 / 100.0).into());
+    let digits = prefs::with(|p| p.view.tempo_decimals.digits());
+    s.set_bpm(format!("{:.*}", digits, bpm as f64 / 100.0).into());
     s.set_length(t.length_text().into());
     let details = [
         (t.bitrate > 0).then(|| format!("{} kbps", t.bitrate)),

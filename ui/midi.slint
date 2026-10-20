@@ -41,6 +41,8 @@ export component MidiOverlay inherits Rectangle {
     Rectangle {
         width: min(parent.width - 16px, 520px);
         height: min(parent.height - 16px, 560px);
+        x: floor((parent.width - self.width) / 2px) * 1px;
+        y: floor((parent.height - self.height) / 2px) * 1px;
         background: Theme.overlay-bg;
         border-color: Theme.overlay-border;
         border-width: 1px;
@@ -51,7 +53,7 @@ export component MidiOverlay inherits Rectangle {
             HorizontalLayout {
                 Text { text: "MIDI learn"; color: Theme.overlay-title; font-size: Theme.font-xl; font-weight: Theme.weight-bold; }
                 Rectangle {}
-                Chip { text: "DONE"; width: 60px; height: 22px; horizontal-stretch: 0; clicked => { MidiState.visible = false; } }
+                Chip { text: "DONE"; width: 60px; height: Theme.layout-profile == 1 ? Theme.touch-target : 22px; horizontal-stretch: 0; clicked => { MidiState.visible = false; } }
             }
             Text { text: "Inputs: " + MidiState.ports + "  ·  " + MidiState.mapped + " mapped"; color: Theme.overlay-dim; font-size: Theme.font-size; wrap: word-wrap; }
             Text { text: MidiState.controller; color: Theme.overlay-ok; font-size: Theme.font-size; wrap: word-wrap; }
@@ -66,12 +68,12 @@ export component MidiOverlay inherits Rectangle {
             if MidiState.last != "": Text { text: "Bound " + MidiState.last; color: Theme.overlay-bound; font-size: Theme.font-size; wrap: word-wrap; }
             ListView {
                 for name[i] in MidiState.actions: HorizontalLayout {
-                    height: 24px;
+                    height: Theme.layout-profile == 1 ? Theme.touch-target : 24px;
                     spacing: 4px;
-                    Text { text: name; color: MidiState.captured == "" ? Theme.overlay-faint : Theme.overlay-soft; font-size: Theme.font-md; vertical-alignment: center; }
+                    Text { text: name; min-width: 0px; overflow: elide; color: MidiState.captured == "" ? Theme.overlay-faint : Theme.overlay-soft; font-size: Theme.font-md; vertical-alignment: center; }
                     Rectangle {}
-                    Chip { text: "A"; width: 30px; height: 20px; horizontal-stretch: 0; enabled: MidiState.captured != ""; clicked => { MidiState.assign(i, 0); } }
-                    Chip { text: "B"; width: 30px; height: 20px; horizontal-stretch: 0; enabled: MidiState.captured != ""; clicked => { MidiState.assign(i, 1); } }
+                    Chip { text: "A"; width: Theme.layout-profile == 1 ? Theme.touch-target : 30px; height: Theme.layout-profile == 1 ? Theme.touch-target : 20px; horizontal-stretch: 0; enabled: MidiState.captured != ""; clicked => { MidiState.assign(i, 0); } }
+                    Chip { text: "B"; width: Theme.layout-profile == 1 ? Theme.touch-target : 30px; height: Theme.layout-profile == 1 ? Theme.touch-target : 20px; horizontal-stretch: 0; enabled: MidiState.captured != ""; clicked => { MidiState.assign(i, 1); } }
                 }
             }
         }

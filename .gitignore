@@ -2,6 +2,11 @@
 /sdk/target/
 /sdk/Cargo.lock
 /sdk/examples/*/*.so
+/mobile/target/
+/mobile/android/.gradle/
+/mobile/android/app/build/
+/mobile/android/app/src/main/jniLibs/
+/mobile/android/local.properties
 /.local
 
 # The companion repositories, cloned in place by start.sh: OpenFadeR-Plugins, OpenFadeR-Themes, OpenFadeR-Map.

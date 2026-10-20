@@ -5,8 +5,8 @@
 //!
 //! [`wire`] hooks the window's rendering: right before each frame every deck works out the position heard *now* and
 //! places the strip ([`Deck::scroll`]), so the steps between frames are even whatever the timers do; while a deck plays
-//! the next frame is asked for straight away, no sooner than VIEW > Waveform Drawing Rate allows. Between frames (paused,
-//! a seek, a zoom) the deck tick does the same.
+//! the next frame is asked for straight away, no sooner than VIEW > Waveform Drawing Rate allows. While paused (or when
+//! the renderer has no frame notifier), the deck tick does the same.
 
 use super::{Deck, Decks, Loaded, active, render, tick::jog_angle};
 use crate::app::{App, DeckScroll, prefs};
@@ -134,11 +134,18 @@ impl Deck {
 thread_local! {
     /// Shortest time between two frames asked for while a deck plays (VIEW > Waveform Drawing Rate, with room for jitter).
     static MIN_FRAME: Cell<Duration> = const { Cell::new(Duration::from_millis(14)) };
+    /// A registered rendering notifier updates moving decks; their timer need not do the same work between frames.
+    static FRAME_DRIVEN: Cell<bool> = const { Cell::new(false) };
 }
 
 /// VIEW > Waveform Drawing Rate as the frame pacing.
 pub(super) fn set_rate(period: Duration) {
     MIN_FRAME.set(period.mul_f32(0.9));
+}
+
+/// The timer places paused decks, and moving decks only when the rendering notifier is unavailable.
+pub(super) fn tick_scroll(playing: bool) -> bool {
+    !playing || !FRAME_DRIVEN.get()
 }
 
 /// Hooks the decks to the window's frames (see the module doc).
@@ -172,6 +179,7 @@ pub(super) fn wire(app: &App, decks: &Decks) {
             }
             _ => {}
         });
+    FRAME_DRIVEN.set(set.is_ok());
     if let Err(e) = set {
         eprintln!("waveform frames: {e:?} (the deck tick draws them instead)");
     }
@@ -180,6 +188,17 @@ pub(super) fn wire(app: &App, decks: &Decks) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_tick_only_leaves_playback_scrolling_to_a_registered_frame_notifier() {
+        FRAME_DRIVEN.set(false);
+        assert!(tick_scroll(false));
+        assert!(tick_scroll(true));
+        FRAME_DRIVEN.set(true);
+        assert!(tick_scroll(false));
+        assert!(!tick_scroll(true));
+        FRAME_DRIVEN.set(false);
+    }
 
     #[test]
     fn the_strip_is_drawn_again_only_near_its_edges_or_when_what_it_shows_changes() {

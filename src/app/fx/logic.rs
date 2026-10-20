@@ -47,7 +47,8 @@ pub(super) fn toggle_part(cur: i32, part: i32, four: bool) -> i32 {
 }
 
 pub(super) fn bpm_text(bpm: f32) -> slint::SharedString {
-    format!("{bpm:.2} BPM").into()
+    let digits = crate::app::prefs::with(|p| p.view.tempo_decimals.digits());
+    format!("{bpm:.*} BPM", digits).into()
 }
 
 /// Runs `f` on slot `i` of `u` (out of range: nothing).

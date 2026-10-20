@@ -88,7 +88,7 @@ impl GridOptions {
         )
     }
 
-    fn flux_hz(&self) -> u32 {
+    pub(super) fn flux_hz(&self) -> u32 {
         if self.precision {
             PRECISE_FLUX_HZ
         } else {
@@ -177,19 +177,105 @@ fn win3(bins: &[f64], j: usize) -> f64 {
     bins[(j + nb - 1) % nb] + bins[j] + bins[(j + 1) % nb]
 }
 
+fn top3(bins: &[f64]) -> f64 {
+    if bins.len() < 3 {
+        return (0..bins.len()).map(|j| win3(bins, j)).fold(0.0, f64::max);
+    }
+    let n = bins.len();
+    let edge = win3(bins, 0).max(win3(bins, n - 1));
+    bins.windows(3)
+        .map(|w| w[0] + w[1] + w[2])
+        .fold(edge, f64::max)
+}
+
 /// Grid score of `onsets` at period `q` frames: best 3-bin window sum squared times `q` = (share of
 /// all onset weight on the grid) x (mean weight per beat), so a half-tempo grid that hits only every
 /// other onset scores half.
 fn score(onsets: &[(f64, f64)], q: f64, bins: &mut Vec<f64>) -> f64 {
     fold(onsets, q, bins);
-    let top = (0..bins.len()).map(|j| win3(bins, j)).fold(0.0, f64::max);
+    let top = top3(bins);
     top * top * q
+}
+
+struct ScoreBound {
+    remaining: Vec<f64>,
+    divisor: f64,
+}
+
+impl ScoreBound {
+    fn new(onsets: &[(f64, f64)]) -> Self {
+        if onsets.len() < 512 {
+            return Self {
+                remaining: Vec::new(),
+                divisor: 0.0,
+            };
+        }
+        let mut remaining = vec![0.0; onsets.len() + 1];
+        for (i, &(_, w)) in onsets.iter().enumerate().rev() {
+            remaining[i] = (remaining[i + 1] + w).next_up();
+        }
+        // Nonnegative bin sums: this covers all accumulation and window-sum rounding,
+        // including a partial window rounded down. Unbounded inputs disable pruning.
+        let error = (onsets.len() as f64 + 4.0) * f64::EPSILON;
+        let divisor = if error < 0.0625 {
+            1.0 - 4.0 * error
+        } else {
+            0.0
+        };
+        Self { remaining, divisor }
+    }
+
+    fn score(&self, onsets: &[(f64, f64)], q: f64, bins: &mut Vec<f64>, best: f64) -> Option<f64> {
+        let needed = (best / q).sqrt();
+        if onsets.len() < 512
+            || q <= 2.0
+            || needed < self.remaining[0] * 0.25
+            || self.divisor == 0.0
+        {
+            return Some(score(onsets, q, bins));
+        }
+        // Check once, after most of the incumbent's required weight is no longer
+        // in the unvisited suffix. This changes work only, never the candidate set.
+        let at = self.remaining.partition_point(|&w| w > needed * 0.75);
+        fold(&onsets[..at], q, bins);
+        let top = top3(bins);
+        let upper = ((top + self.remaining[at]).next_up() / self.divisor).next_up();
+        let upper_score = ((upper * upper).next_up() * q).next_up();
+        if upper_score <= best {
+            return None;
+        }
+        let (inv, last) = (1.0 / q, bins.len() - 1);
+        for &(t, w) in &onsets[at..] {
+            bins[((t - (t * inv).floor() * q) as usize).min(last)] += w;
+        }
+        let top = top3(bins);
+        Some(top * top * q)
+    }
 }
 
 /// Period in frames of the strongest tempo in `f` (onset flux; `onsets` are its peaks above the mean,
 /// as `(frame, weight)`). Autocorrelation proposes candidates, [`score`] of a fine fold decides.
 /// `None` when `f` is shorter than 4 beats of the slowest tempo.
-fn tempo(f: &[f32], onsets: &[(f64, f64)], fr: f64, opt: &GridOptions) -> Option<f64> {
+fn tempo(
+    f: &[f32],
+    onsets: &[(f64, f64)],
+    fr: f64,
+    opt: &GridOptions,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<f64> {
+    let bound = ScoreBound::new(onsets);
+    tempo_search(f, fr, opt, cancelled, |q, bins, best| {
+        bound.score(onsets, q, bins, best)
+    })
+}
+
+fn tempo_search(
+    f: &[f32],
+    fr: f64,
+    opt: &GridOptions,
+    cancelled: &dyn Fn() -> bool,
+    mut evaluate: impl FnMut(f64, &mut Vec<f64>, f64) -> Option<f64>,
+) -> Option<f64> {
     let n = f.len();
     let (search, range) = (
         opt.search(),
@@ -204,9 +290,23 @@ fn tempo(f: &[f32], onsets: &[(f64, f64)], fr: f64, opt: &GridOptions) -> Option
     }
     let mean = f.iter().map(|&v| v as f64).sum::<f64>() / n as f64;
     let fm: Vec<f64> = f.iter().map(|&v| v as f64 - mean).collect();
-    let ac: Vec<f64> = (lag_lo - 1..=lag_hi + 1)
-        .map(|l| fm.iter().zip(&fm[l..]).map(|(a, b)| a * b).sum::<f64>() / (n - l) as f64)
-        .collect();
+    let mut ac = Vec::with_capacity(lag_hi - lag_lo + 3);
+    for l in lag_lo - 1..=lag_hi + 1 {
+        if cancelled() {
+            return None;
+        }
+        let sum = fm
+            .iter()
+            .zip(&fm[l..])
+            .enumerate()
+            .take_while(|(i, _)| i & 16383 != 0 || !cancelled())
+            .map(|(_, (a, b))| a * b)
+            .sum::<f64>();
+        if cancelled() {
+            return None;
+        }
+        ac.push(sum / (n - l) as f64);
+    }
     let mut peaks: Vec<usize> = (1..ac.len() - 1)
         .filter(|&j| ac[j] > ac[j - 1] && ac[j] >= ac[j + 1])
         .collect();
@@ -225,10 +325,14 @@ fn tempo(f: &[f32], onsets: &[(f64, f64)], fr: f64, opt: &GridOptions) -> Option
         let step = 1.5 / n as f64;
         let mut r = -0.006;
         while r <= 0.006 {
+            if cancelled() {
+                return None;
+            }
             let p = 60.0 * fr / (bpm0 * (1.0 + r));
-            let s = score(onsets, p, &mut bins);
-            if s > best.0 {
-                best = (s, p);
+            if let Some(s) = evaluate(p, &mut bins, best.0) {
+                if s > best.0 {
+                    best = (s, p);
+                }
             }
             r += step;
         }
@@ -365,34 +469,71 @@ pub fn beat_grid(samples: &[f32], rate: u32) -> Vec<Beat> {
 /// Empty when no tempo can be found (silence, too short).
 pub fn beat_grid_with(samples: &[f32], rate: u32, opt: &GridOptions) -> Vec<Beat> {
     let (e, fr) = hops(samples, rate, opt.flux_hz());
+    from_hops(e, fr, samples.len() / 2, rate, opt)
+}
+
+pub(super) fn from_hops(
+    e: [Vec<f32>; 3],
+    fr: f64,
+    frames: usize,
+    rate: u32,
+    opt: &GridOptions,
+) -> Vec<Beat> {
+    from_hops_cancellable(e, fr, frames, rate, opt, &|| false).expect("uncancelled grid analysis")
+}
+
+pub(super) fn from_hops_cancellable(
+    e: [Vec<f32>; 3],
+    fr: f64,
+    frames: usize,
+    rate: u32,
+    opt: &GridOptions,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Vec<Beat>> {
+    if cancelled() {
+        return None;
+    }
     let f = flux(&e, fr);
     let n = f.len();
     let onsets = onsets(&f, opt.precision);
-    if onsets.len() < 8 {
-        return Vec::new();
+    if cancelled() {
+        return None;
     }
-    let Some(p0) = tempo(&f, &onsets, fr, opt) else {
-        return Vec::new();
+    if onsets.len() < 8 {
+        return Some(Vec::new());
+    }
+    let period = tempo(&f, &onsets, fr, opt, cancelled);
+    if cancelled() {
+        return None;
+    }
+    let Some(p0) = period else {
+        return Some(Vec::new());
     };
     let [low, mid, _] = e.map(|b| b.iter().map(|v| v.sqrt()).collect::<Vec<f32>>());
     let grid: Vec<f64> = (0..(n as f64 / p0) as usize)
         .map(|k| k as f64 * p0)
         .collect();
     let (p, phi) = fit(&onsets, kick_offset(&mid, &grid, fr) * p0, p0, fr);
+    if cancelled() {
+        return None;
+    }
 
     if opt.effective_mode() != Mode::Normal {
         if let Some((times, bpm)) =
             dynamic::tracked(&f, &mid, &onsets, p, fr, |drifts| opt.tracks(drifts))
         {
-            return beats(&times, &low, fr, |k| bpm[k]);
+            return (!cancelled()).then(|| beats(&times, &low, fr, |k| bpm[k]));
         }
+    }
+    if cancelled() {
+        return None;
     }
 
     // Beats from the first at/after 0 (+0.5 frame: an onset is seen in the frame it starts in).
     let k0 = (-(phi + 0.5) / p).ceil() as i64;
-    let frames = (samples.len() / 2) as f64 / rate as f64 * fr;
+    let frames = frames as f64 / rate as f64 * fr;
     let k_end = ((frames - phi - 0.5) / p).floor() as i64;
     let times: Vec<f64> = (k0..=k_end).map(|k| phi + 0.5 + k as f64 * p).collect();
     let bpm = (6000.0 * fr / p).round() as u16;
-    beats(&times, &low, fr, |_| bpm)
+    Some(beats(&times, &low, fr, |_| bpm))
 }

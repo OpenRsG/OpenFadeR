@@ -87,13 +87,13 @@ component Stage inherits Rectangle {
 component PatchRow inherits Rectangle {
     in property <FixtureView> f;
     in property <int> index;
-    height: 28px;
+    height: Theme.layout-profile == 1 ? Theme.touch-target + 8px : 28px;
     background: root.index.mod(2) == 0 ? Theme.panel : Theme.row-alt;
     HorizontalLayout {
         padding-left: 6px;
         padding-right: 4px;
         spacing: 4px;
-        Rectangle { width: 10px; height: 10px; border-radius: 5px; background: root.f.colour; border-width: 1px; border-color: Theme.text-faint; y: 9px; }
+        Rectangle { width: 10px; height: 10px; border-radius: 5px; background: root.f.colour; border-width: 1px; border-color: Theme.text-faint; y: (root.height - self.height) / 2; }
         Text { text: root.f.name; color: root.f.conflict ? Theme.danger : Theme.text; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
         Text { text: "U"; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
         TextField {
@@ -109,7 +109,7 @@ component PatchRow inherits Rectangle {
             input-type: number;
             accepted(t) => { LightingState.set-address(root.index, root.f.universe, Math.round(t.to-float())); }
         }
-        Chip { text: "✕"; width: 24px; height: 20px; y: 4px; horizontal-stretch: 0; clicked => { LightingState.remove-fixture(root.index); } }
+        Chip { text: "✕"; width: Theme.layout-profile == 1 ? Theme.touch-target : 24px; height: Theme.layout-profile == 1 ? Theme.touch-target : 20px; y: 4px; horizontal-stretch: 0; clicked => { LightingState.remove-fixture(root.index); } }
     }
 }
 
@@ -133,17 +133,17 @@ export component LightingView inherits Rectangle {
             vertical-stretch: 0;
             // Scene: palette, override, strobe, master.
             VerticalLayout {
-                width: 380px;
+                width: Theme.layout-profile == 1 ? 360px : 380px;
                 spacing: 4px;
                 alignment: start;
                 Heading { text: "PALETTE"; }
                 HorizontalLayout {
                     spacing: 4px;
-                    for name[i] in ["COOL", "NATURAL", "HOT", "SUBTLE"]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.palette == i; clicked => { LightingState.set-palette(i); } }
+                    for name[i] in ["COOL", "NATURAL", "HOT", "SUBTLE"]: Chip { text: name; width: Theme.layout-profile == 1 ? 84px : 88px; horizontal-stretch: 0; active: LightingState.palette == i; clicked => { LightingState.set-palette(i); } }
                 }
                 HorizontalLayout {
                     spacing: 4px;
-                    for name[i] in ["WARM", "VIVID", "CLUB 1", "CLUB 2"]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.palette == i + 4; clicked => { LightingState.set-palette(i + 4); } }
+                    for name[i] in ["WARM", "VIVID", "CLUB 1", "CLUB 2"]: Chip { text: name; width: Theme.layout-profile == 1 ? 84px : 88px; horizontal-stretch: 0; active: LightingState.palette == i + 4; clicked => { LightingState.set-palette(i + 4); } }
                 }
                 Heading { text: "SCENE"; }
                 HorizontalLayout {
@@ -166,13 +166,13 @@ export component LightingView inherits Rectangle {
             }
             // Output.
             VerticalLayout {
-                width: 300px;
+                width: Theme.layout-profile == 1 ? 260px : 300px;
                 spacing: 4px;
                 alignment: start;
                 Heading { text: "DMX OUTPUT"; }
                 HorizontalLayout {
                     spacing: 4px;
-                    for name[i] in ["OFF", "ART-NET", "SACN", "BOTH"]: Chip { text: name; width: 70px; horizontal-stretch: 0; active: LightingState.protocol == i; clicked => { LightingState.set-protocol(i); } }
+                    for name[i] in ["OFF", "ART-NET", "SACN", "BOTH"]: Chip { text: name; width: Theme.layout-profile == 1 ? 62px : 70px; horizontal-stretch: 0; active: LightingState.protocol == i; clicked => { LightingState.set-protocol(i); } }
                 }
                 HorizontalLayout {
                     spacing: 4px;
@@ -189,15 +189,15 @@ export component LightingView inherits Rectangle {
                 horizontal-stretch: 1;
                 Heading { text: "PATCH  (universe · DMX address)"; }
                 ListView {
-                    height: 190px;
+                    height: Theme.layout-profile == 1 ? 220px : 190px;
                     for f[i] in LightingState.fixtures: PatchRow { f: f; index: i; }
                 }
                 HorizontalLayout {
                     spacing: 4px;
-                    height: 26px;
-                    Chip { text: "◀"; width: 28px; horizontal-stretch: 0; clicked => { LightingState.step-profile(-1); } }
+                    height: Theme.layout-profile == 1 ? Theme.touch-target : 26px;
+                    Chip { text: "◀"; width: Theme.layout-profile == 1 ? Theme.touch-target : 28px; horizontal-stretch: 0; clicked => { LightingState.step-profile(-1); } }
                     Chip { text: LightingState.profile; horizontal-stretch: 1; }
-                    Chip { text: "▶"; width: 28px; horizontal-stretch: 0; clicked => { LightingState.step-profile(1); } }
+                    Chip { text: "▶"; width: Theme.layout-profile == 1 ? Theme.touch-target : 28px; horizontal-stretch: 0; clicked => { LightingState.step-profile(1); } }
                     Chip { text: "ADD FIXTURE"; width: 100px; horizontal-stretch: 0; clicked => { LightingState.add-fixture(); } }
                 }
             }

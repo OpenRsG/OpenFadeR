@@ -13,6 +13,7 @@ const MIRRORED: [(&str, bool); 7] = [
 ];
 
 fn main() {
+    println!("cargo:rerun-if-changed=.");
     slint_build::compile("app.slint").unwrap();
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     fs::write(out.join("mirror.rs"), mirror()).unwrap();

@@ -12,7 +12,7 @@ component FormatChips inherits FormRow {
         spacing: Theme.space-xs;
         for f[i] in DeviceState.formats: Chip {
             text: f.held != "" ? f.title + " •" : f.title;
-            min-width: self.fit-width;
+            min-width: Theme.target-size(self.fit-width);
             horizontal-stretch: 0;
             active: f.on;
             enabled: !DeviceState.busy;

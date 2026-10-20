@@ -71,7 +71,7 @@ export global PrefsState {
 export component PrefRowView inherits Rectangle {
     in property <PrefRowData> r;
     callback chose(int);
-    height: root.r.kind == 3 ? 30px : Theme.h-ctl + Theme.space-xs;
+    height: root.r.kind == 3 ? 30px : Theme.h-ctl + Theme.space-xs + (Theme.layout-profile == 1 && root.r.kind != 2 ? 24px : 0px);
     opacity: root.r.enabled ? 1 : 0.45;
     if root.r.kind == 3: Text {
         y: 8px;
@@ -98,7 +98,7 @@ export component PrefRowView inherits Rectangle {
         label: root.r.label;
         hint: root.r.hint;
         Dropdown {
-            width: 220px;
+            width: Theme.layout-profile == 1 ? min(220px, root.width) : 220px;
             horizontal-stretch: 0;
             enabled: root.r.enabled;
             options: root.r.options;
@@ -130,7 +130,7 @@ export component PrefRowView inherits Rectangle {
     if root.r.kind == 5: FormRow {
         label: root.r.label;
         TextField {
-            width: 340px;
+            width: Theme.layout-profile == 1 ? root.width : 340px;
             horizontal-stretch: 0;
             text: root.r.hint;
             placeholder-text: root.r.options.length > 0 ? root.r.options[0] : "";

@@ -7,12 +7,12 @@
 //! With the STEM waveform on (PREFS) and a part muted, the 3-band wave of the stems heard ([`wave_3band`]) replaces these.
 
 use super::{
-    cue_letter, hot_cue_rgb, mono_layers, phrase::phrase_band, playhead, slip_ghost, sources,
-    three_band, Axis, Canvas, Col, Layers, Src, Wave,
+    Axis, Canvas, Col, Layers, Src, Wave, cue_letter, hot_cue_rgb, mono_layers,
+    phrase::phrase_band, playhead, slip_ghost, sources, three_band,
 };
 use crate::app::prefs::{
     self,
-    view::{BeatGrid, CueMarkers, OverviewSize},
+    view::{CueMarkers, OverviewSize},
 };
 use openfader::analysis::Analysis;
 
@@ -88,19 +88,13 @@ pub fn render(wave: Option<&Wave>, a: &Analysis, duration_ms: u32, w: usize, h: 
         return c.extended(strip);
     }
     let axis = axis(w, duration_ms);
-    if view.beat_grid == BeatGrid::Normal {
-        for b in a.beats.iter().filter(|b| b.bar_pos == 1) {
-            c.vline(axis.col(b.time_ms as f64), 0..hw, [48, 48, 48]);
-        }
+    // Whole-track bars can be closer than a bold marker's width; keep them thin and behind the audio.
+    for b in a.beats.iter().filter(|b| b.bar_pos == 1) {
+        c.vline(axis.col(b.time_ms as f64), 0..hw, [48, 48, 48]);
     }
     if let Some(wave) = wave {
         // VIEW > Full / Half waveform: Full is symmetric around the middle row, Half grows from the bottom.
         wave.draw(&mut c, &axis, view.overview == OverviewSize::Full);
-    }
-    if view.beat_grid == BeatGrid::Bold {
-        for b in a.beats.iter().filter(|b| b.bar_pos == 1) {
-            c.bold_grid(axis.col(b.time_ms as f64), true);
-        }
     }
     if view.vocal_full {
         for r in &a.vocal {
@@ -169,6 +163,56 @@ pub fn with_playhead(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::prefs::view::BeatGrid;
+    use openfader::analysis::Beat;
+
+    #[test]
+    fn bold_preference_preserves_overview_dynamics_at_narrow_and_full_widths() {
+        let a = Analysis {
+            beats: (0..1200)
+                .map(|i| Beat {
+                    time_ms: i * 500,
+                    bar_pos: (i % 4 + 1) as u16,
+                    bpm_x100: 12000,
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let wave = Wave {
+            layers: (0..1200)
+                .map(|i| super::super::single([80, 90, 100], if i < 600 { 0.25 } else { 0.85 }))
+                .collect(),
+            per_ms: 1200.0 / 600_000.0,
+        };
+        let old = prefs::with(|p| p.view.clone());
+        for overview in [OverviewSize::Full, OverviewSize::Half] {
+            for w in [96, 1200] {
+                prefs::set_for_test(|p| {
+                    p.view.overview = overview;
+                    p.view.beat_grid = BeatGrid::Normal;
+                });
+                let normal = render(Some(&wave), &a, 600_000, w, 50);
+                prefs::set_for_test(|p| p.view.beat_grid = BeatGrid::Bold);
+                let bold = render(Some(&wave), &a, 600_000, w, 50);
+                assert_eq!(normal.buf.as_bytes(), bold.buf.as_bytes(), "width {w}");
+                let pixel = |x: usize| {
+                    let p = bold.buf.as_slice()[9 * w + x];
+                    [p.r, p.g, p.b]
+                };
+                assert_eq!(
+                    pixel(w / 4),
+                    [48; 3],
+                    "quiet section keeps a subdued bar line"
+                );
+                assert_eq!(
+                    pixel(w * 3 / 4),
+                    [80, 90, 100],
+                    "loud section stays visible"
+                );
+            }
+        }
+        prefs::set_for_test(|p| p.view = old);
+    }
 
     #[test]
     fn falls_back_three_band_then_colour_then_mono() {

@@ -20,7 +20,7 @@ use openfader::{
     library::{Library, Track},
     store::{self, Edits},
 };
-use slint::{ComponentHandle, Image, Model, VecModel};
+use slint::{ComponentHandle, Image, Model, ModelNotify, ModelTracker};
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
@@ -49,13 +49,13 @@ struct Drawn {
 /// The strips shown now, one image per visible row (`BrowserState.previews`), and the strips drawn lately by track file,
 /// strip scale and the cue-markers setting, so a sort, filter or scroll does not read the analysis again.
 pub(super) struct Strips {
-    model: Rc<VecModel<Image>>,
+    model: Rc<StripRows>,
     cache: RefCell<HashMap<(PathBuf, usize, bool, bool), Drawn>>,
 }
 
 impl Strips {
     pub fn new(app: &App) -> Self {
-        let model = Rc::new(VecModel::default());
+        let model = Rc::new(StripRows::default());
         app.global::<BrowserState>()
             .set_previews(model.clone().into());
         Self {
@@ -65,8 +65,10 @@ impl Strips {
     }
 
     /// The rows changed (new list, sort, filter): every strip is blank until its row asks for it again.
-    pub fn reset(&self, rows: usize) {
-        self.model.set_vec(vec![Image::default(); rows]);
+    pub fn reset(&self, app: &App, rows: usize) {
+        let generation = self.model.reset(rows);
+        app.global::<BrowserState>()
+            .set_preview_generation(generation);
     }
 
     /// `t`'s strip: the cached drawing while the store's edits of the track and the detected analysis are the ones it was
@@ -102,6 +104,49 @@ impl Strips {
             },
         );
         image
+    }
+}
+
+#[derive(Default)]
+struct StripRows {
+    count: Cell<usize>,
+    images: RefCell<HashMap<usize, Image>>,
+    generation: Cell<i32>,
+    notify: ModelNotify,
+}
+
+impl StripRows {
+    fn reset(&self, rows: usize) -> i32 {
+        self.images.borrow_mut().clear();
+        self.count.set(rows);
+        let generation = self.generation.get().wrapping_add(1);
+        self.generation.set(generation);
+        self.notify.reset();
+        generation
+    }
+}
+
+impl Model for StripRows {
+    type Data = Image;
+
+    fn row_count(&self) -> usize {
+        self.count.get()
+    }
+
+    fn row_data(&self, row: usize) -> Option<Image> {
+        (row < self.count.get())
+            .then(|| self.images.borrow().get(&row).cloned().unwrap_or_default())
+    }
+
+    fn set_row_data(&self, row: usize, image: Image) {
+        if row < self.count.get() {
+            self.images.borrow_mut().insert(row, image);
+            self.notify.row_changed(row);
+        }
+    }
+
+    fn model_tracker(&self) -> &dyn ModelTracker {
+        &self.notify
     }
 }
 
@@ -187,18 +232,21 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
         let scale = app.window().scale_factor().round().max(1.0) as usize;
         let image = v.strips.image(&*v.lib, t, scale);
         if v.strips.model.row_count() != v.shown.len() {
-            v.strips.reset(v.shown.len());
+            v.strips.reset(&app, v.shown.len());
         }
         v.strips.model.set_row_data(row, image);
     });
     // The setting changed: the rows are made again, so every visible strip asks for its drawing again.
     let (v, weak) = (view.clone(), app.as_weak());
-    let cues = Cell::new(prefs::with(|p| (p.view.panel_preview_cues, p.view.cue_markers)));
+    let cues = Cell::new(prefs::with(|p| {
+        (p.view.panel_preview_cues, p.view.cue_markers)
+    }));
     prefs::on_change(move |p| {
         let next = (p.view.panel_preview_cues, p.view.cue_markers);
         if cues.replace(next) != next
             && let (Ok(mut v), Some(app)) = (v.try_borrow_mut(), weak.upgrade())
         {
+            v.rows.invalidate();
             v.refresh(&app);
         }
     });
@@ -210,6 +258,61 @@ mod tests {
 
     /// 100 s track on a 110 px strip: 1 px = 0.909 s.
     const LEN: u32 = 100_000;
+
+    #[test]
+    fn preview_rows_are_sparse_and_reset_with_the_display_order() {
+        let strips = Strips {
+            model: Rc::new(StripRows::default()),
+            cache: RefCell::default(),
+        };
+        strips.model.reset(50_000);
+        assert_eq!(strips.model.row_count(), 50_000);
+        assert_eq!(strips.model.row_data(49_999).unwrap().size().width, 0);
+        assert!(strips.model.row_data(50_000).is_none());
+        let image = draw(&Analysis::default(), LEN, false, 1);
+        strips.model.set_row_data(17, image);
+        assert_eq!(strips.model.row_data(17).unwrap().size().width, W as u32);
+        assert_eq!(strips.model.row_data(18).unwrap().size().width, 0);
+        assert_eq!(strips.model.images.borrow().len(), 1);
+        strips.model.reset(3);
+        assert_eq!(strips.model.row_count(), 3);
+        assert_eq!(strips.model.row_data(0).unwrap().size().width, 0);
+        assert!(strips.model.row_data(17).is_none());
+        assert!(strips.model.images.borrow().is_empty());
+    }
+
+    #[test]
+    fn preview_sort_and_filter_reset_stale_images_before_visible_rows_request_again() {
+        let model = StripRows::default();
+        let image = |rgb| {
+            let mut c = Canvas::new(1, 1);
+            c.vline(0, 0..1, rgb);
+            c.image()
+        };
+        let color = |row| {
+            let image = model.row_data(row).unwrap().to_rgba8().unwrap();
+            let p = image.as_slice()[0];
+            [p.r, p.g, p.b]
+        };
+        let generation = model.reset(2);
+        model.set_row_data(0, image([255, 0, 0]));
+        model.set_row_data(1, image([0, 0, 255]));
+        assert_eq!(color(0), [255, 0, 0]);
+        assert_eq!(color(1), [0, 0, 255]);
+        assert_ne!(model.reset(2), generation);
+        assert_eq!(model.row_data(0).unwrap().size().width, 0);
+        assert_eq!(model.row_data(1).unwrap().size().width, 0);
+        model.set_row_data(0, image([0, 0, 255]));
+        model.set_row_data(1, image([255, 0, 0]));
+        assert_eq!(color(0), [0, 0, 255]);
+        assert_eq!(color(1), [255, 0, 0]);
+        let generation = model.generation.get();
+        assert_ne!(model.reset(1), generation);
+        assert_eq!(model.row_data(0).unwrap().size().width, 0);
+        assert!(model.row_data(1).is_none());
+        model.set_row_data(0, image([255, 0, 0]));
+        assert_eq!(color(0), [255, 0, 0]);
+    }
 
     #[test]
     fn a_click_near_a_cue_starts_from_the_cue() {

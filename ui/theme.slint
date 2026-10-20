@@ -9,6 +9,8 @@ export global Theme {
     in property <bool> light: false;
     /// Hover tooltips on / off (VIEW > Tooltips).
     in property <bool> tooltips: true;
+    /// Decimal places in BPM readouts (VIEW > TEMPO DECIMAL PLACES), independent of the skin.
+    in property <int> tempo-decimals: 2;
 
     // @group Surfaces
     // Surfaces
@@ -205,6 +207,14 @@ export global Theme {
     in-out property <int> weight-semi: 600;
 
     // @group Sizes
+    /// Presentation profile: 0 desktop workspace, 1 touch workspace with the same application features.
+    in-out property <int> layout-profile: 0;
+    /// Width below which the touch workspace presents one selected deck instead of two columns.
+    in-out property <length> touch-breakpoint: 760px;
+    /// Minimum primary control size in the touch presentation.
+    in-out property <length> touch-target: 44px;
+    /// Glyph size inside shared buttons, independent of the control's hit area.
+    in-out property <length> icon-size: 14px;
     // Spacing and radii
     /// Gap between panels.
     in-out property <length> gap: 2px;
@@ -271,6 +281,10 @@ export global Theme {
     in-out property <length> jog: 112px;
     /// Diameter of the CUE and PLAY buttons.
     in-out property <length> ring: 36px;
+
+    public pure function target-size(size: length) -> length {
+        return root.layout-profile == 1 ? max(size, root.touch-target) : size;
+    }
 
     // @group Motion
     // Motion

@@ -1,5 +1,6 @@
 //! The per-tick follower: tempo, the armed quantized start and phase correction.
 
+use super::phase::loop_preserves_phase;
 use super::{Fix, align, correct, error_ms, start_ms, wait_phase};
 use crate::app::deck::Deck;
 
@@ -16,6 +17,7 @@ impl Deck {
         let (their_pos, their_playing) = peer.clock(&theirs);
         let phase = self
             .tempo_target(&own.analysis.beats, &theirs.analysis.beats, peer.rate.get())
+            .filter(|(_, _, k)| loop_preserves_phase(&theirs.analysis.beats, theirs.loop_, *k))
             .and_then(|(_, _, k)| wait_phase(&theirs.analysis.beats, their_pos, k));
         drop((own, theirs));
         match phase.filter(|_| their_playing) {
@@ -52,13 +54,15 @@ impl Deck {
         let Some((g, rate, k)) = self.tempo_target(ob, tb, peer.rate.get()) else {
             return;
         };
-        let free = !self.sync.scratching.get()
+        let master_phase = loop_preserves_phase(tb, theirs.loop_, k);
+        let free = master_phase
+            && !self.sync.scratching.get()
             && self.sync.bend.get() == 0.0
             && own.loop_.is_none()
             && !self.view.borrow().reverse;
         // Only the figures this tick's branch uses: each is a binary search per grid.
         let waiting = self.sync.waiting.get();
-        let (start, phase) = if waiting.is_some() {
+        let (start, phase) = if waiting.is_some() && master_phase {
             (
                 start_ms(ob, own_pos, tb, their_pos, k),
                 wait_phase(tb, their_pos, k),

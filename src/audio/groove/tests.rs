@@ -357,6 +357,7 @@ fn drum_release_fx_acts_on_the_loop_only_in_single_mode() {
         r.c.release.set_beat(2); // 1/4
         r.c.release.set_level(1.0);
         r.c.release.set_on(on);
+        r.v.prepare_fx(&r.c);
         r.c.press(0);
         let x = r.run(2 * BEAT, 1.0);
         x[BEAT + 1000..]

@@ -12,7 +12,6 @@
 //! Undo / redo replay the rows inside one transaction with foreign keys deferred and append marker rows (action 0) so
 //! [`Store::changed_since`] reports what they touched.
 
-
 mod record;
 mod replay;
 #[cfg(test)]
@@ -20,13 +19,13 @@ mod tests;
 
 pub(in crate::store) use record::install;
 
-use super::{exec, in_tx, query_all, query_opt, scalar, Sql, Store, R};
-use rusqlite::{functions::FunctionFlags, params_from_iter, types::Value, Connection};
+use super::{R, Sql, Store, exec, in_tx, query_all, query_opt, scalar};
+use rusqlite::{Connection, functions::FunctionFlags, params_from_iter, types::Value};
 use std::{
     cell::RefCell,
     sync::{
-        atomic::{AtomicI64, AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicI64, AtomicU64, Ordering},
     },
 };
 
@@ -128,7 +127,6 @@ fn columns(db: &Connection, table: &str) -> R<Vec<Col>> {
     })
 }
 
-
 /// What one journal row says about the user's change, in words ("rating", "cues", ...).
 fn noun(table: &str, op: i64, old: Option<&str>, new: Option<&str>) -> &'static str {
     match table {
@@ -146,6 +144,12 @@ fn noun(table: &str, op: i64, old: Option<&str>, new: Option<&str>) -> &'static 
                 })
                 .unwrap_or_default();
             let has = |c: &str| set.iter().any(|x| x == c);
+            if ["title", "artist", "album", "genre", "label"]
+                .iter()
+                .any(|c| has(c))
+            {
+                return "metadata";
+            }
             if has("rating") {
                 "rating"
             } else if has("comment") {

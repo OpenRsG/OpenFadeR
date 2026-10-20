@@ -1,6 +1,6 @@
 //! Separation of a track by segments: [`grid`] cuts it, [`segment`] feeds the fixed-length model one overlapping piece and
-//! returns the stems at the track's own rate, [`work`] is one engine's loop (take the next segment from the
-//! [`Schedule`](super::schedule::Schedule), run it, [`deposit`](crate::audio::Stems::deposit) it). Any number of engines run
+//! deposits the stems at the track's own rate, [`work`] is one engine's loop (take the next segment from the
+//! [`Schedule`](super::schedule::Schedule), run it, deposit it). Any number of engines run
 //! `work` side by side on the same [`Stems`]; the cross-fades live with the stems, which is why the order of segments
 //! does not matter and playback can start on the first one ([`crate::audio::Stems::ready`]).
 //!
@@ -29,14 +29,17 @@ pub fn grid(rate: u32, quality: Quality) -> Grid {
     }
 }
 
-/// Segment `s` of `pcm` through `run` (a model engine: [`model::Engine::run`]'s layout): stem `k` as interleaved stereo f32,
-/// `min(grid.len, frames left)` frames, ready for [`Stems::deposit`].
+/// Runs a model segment and deposits its borrowed output directly at the track's rate.
 pub fn segment(
     pcm: &Track16,
-    g: Grid,
+    stems: &Stems,
     s: usize,
-    run: &mut dyn FnMut(Vec<f32>) -> Result<Vec<f32>, String>,
-) -> Result<[Vec<f32>; STEM_COUNT], String> {
+    run: &mut dyn FnMut(
+        Vec<f32>,
+        &mut dyn FnMut(&[f32]) -> Result<(), String>,
+    ) -> Result<(), String>,
+) -> Result<(), String> {
+    let g = stems.grid();
     let (start, step) = (g.start(s), ratio(pcm.rate));
     let valid = g.len.min(pcm.frames().saturating_sub(start));
     let mut x = vec![0f32; 2 * SEGMENT];
@@ -46,27 +49,29 @@ pub fn segment(
             None => break,
         }
     }
-    let y = run(x)?;
-    if y.len() != STEM_COUNT * 2 * SEGMENT {
-        return Err(format!(
-            "model returned {} values, wanted {}",
-            y.len(),
-            STEM_COUNT * 2 * SEGMENT
-        ));
-    }
-    let mut parts: [Vec<f32>; STEM_COUNT] = std::array::from_fn(|_| vec![0f32; 2 * valid]);
-    for t in 0..valid {
-        let at = t as f64 / step; // model sample of track frame `t`
-        let (i, f) = (at as usize, (at - at.floor()) as f32);
-        let (i, j) = (i.min(SEGMENT - 1), (i + 1).min(SEGMENT - 1));
-        for (m, &stem) in model::ORDER.iter().enumerate() {
-            for c in 0..2 {
-                let ch = &y[(2 * m + c) * SEGMENT..(2 * m + c + 1) * SEGMENT];
-                parts[stem][2 * t + c] = ch[i] + (ch[j] - ch[i]) * f;
-            }
+    run(x, &mut |y| {
+        if y.len() != STEM_COUNT * 2 * SEGMENT {
+            return Err(format!(
+                "model returned {} values, wanted {}",
+                y.len(),
+                STEM_COUNT * 2 * SEGMENT
+            ));
         }
-    }
-    Ok(parts)
+        stems.deposit_frames(s, valid, |t| {
+            let at = t as f64 / step;
+            let (i, f) = (at as usize, (at - at.floor()) as f32);
+            let (i, j) = (i.min(SEGMENT - 1), (i + 1).min(SEGMENT - 1));
+            let mut parts = [[0.0; 2]; STEM_COUNT];
+            for (m, &stem) in model::ORDER.iter().enumerate() {
+                for c in 0..2 {
+                    let ch = &y[(2 * m + c) * SEGMENT..(2 * m + c + 1) * SEGMENT];
+                    parts[stem][c] = ch[i] + (ch[j] - ch[i]) * f;
+                }
+            }
+            parts
+        });
+        Ok(())
+    })
 }
 
 /// One engine's loop: segments from `sched` through `run` into `stems` until none are left, `cancel` is set (checked between
@@ -75,7 +80,10 @@ pub fn work(
     pcm: &Track16,
     stems: &Stems,
     sched: &Mutex<Schedule>,
-    run: &mut dyn FnMut(Vec<f32>) -> Result<Vec<f32>, String>,
+    run: &mut dyn FnMut(
+        Vec<f32>,
+        &mut dyn FnMut(&[f32]) -> Result<(), String>,
+    ) -> Result<(), String>,
     cancel: &AtomicBool,
     done: &dyn Fn(usize),
 ) -> Result<(), String> {
@@ -83,12 +91,9 @@ pub fn work(
         let Some(s) = sched.lock().next() else {
             return Ok(());
         };
-        match segment(pcm, stems.grid(), s, run) {
-            Ok(parts) => stems.deposit(s, [&parts[0], &parts[1], &parts[2], &parts[3]]),
-            Err(e) => {
-                sched.lock().release(s); // another engine takes it
-                return Err(e);
-            }
+        if let Err(e) = segment(pcm, stems, s, run) {
+            sched.lock().release(s); // another engine takes it
+            return Err(e);
         }
         done(s);
     }
@@ -102,13 +107,16 @@ mod tests {
     use std::sync::atomic::AtomicUsize;
 
     /// A stand-in for the model: vocals = 0.4·mix, inst = 0.3, bass = 0.2, drums = 0.1 (sums to the mix).
-    fn fake(mix: Vec<f32>) -> Result<Vec<f32>, String> {
+    fn fake(
+        mix: Vec<f32>,
+        consume: &mut dyn FnMut(&[f32]) -> Result<(), String>,
+    ) -> Result<(), String> {
         let mut y = Vec::with_capacity(4 * mix.len());
         for share in [0.1, 0.2, 0.3, 0.4] {
             // the model's order: drums, bass, other, vocals
             y.extend(mix.iter().map(|v| v * share));
         }
-        Ok(y)
+        consume(&y)
     }
 
     fn tone(rate: u32, frames: usize) -> Track16 {
@@ -120,6 +128,95 @@ mod tests {
             rate,
             samples: s.collect(),
         })
+    }
+
+    #[test]
+    fn direct_deposit_is_bit_exact_to_interleaved_segments_at_all_rates_and_qualities() {
+        let y: Vec<f32> = (0..STEM_COUNT * 2 * SEGMENT)
+            .map(|i| (i as f32 * 0.013).sin() * 1.3)
+            .collect();
+        for rate in [22_050, 44_100, 48_000, 96_000] {
+            for quality in [Quality::Quality, Quality::Speed] {
+                let g = grid(rate, quality);
+                let pcm = tone(rate, g.len + g.stride() + 17);
+                for reverse in [false, true] {
+                    let direct = Stems::new(pcm.frames(), g);
+                    let mut reference: [Vec<i16>; STEM_COUNT] =
+                        std::array::from_fn(|_| vec![0; pcm.frames() * 2]);
+                    let count = direct.segments();
+                    let mut deposited = vec![false; count];
+                    for n in 0..count {
+                        let s = if reverse { count - 1 - n } else { n };
+                        segment(&pcm, &direct, s, &mut |_, consume| consume(&y)).unwrap();
+                        let valid = g.len.min(pcm.frames() - g.start(s));
+                        let mut parts: [Vec<f32>; STEM_COUNT] =
+                            std::array::from_fn(|_| vec![0.0; valid * 2]);
+                        for t in 0..valid {
+                            let at = t as f64 / ratio(rate);
+                            let (i, f) = (at as usize, (at - at.floor()) as f32);
+                            let (i, j) = (i.min(SEGMENT - 1), (i + 1).min(SEGMENT - 1));
+                            for (m, &stem) in model::ORDER.iter().enumerate() {
+                                for c in 0..2 {
+                                    let ch = &y[(2 * m + c) * SEGMENT..(2 * m + c + 1) * SEGMENT];
+                                    parts[stem][2 * t + c] = ch[i] + (ch[j] - ch[i]) * f;
+                                }
+                            }
+                        }
+                        // Independent scalar reference: each overlap rounds once per segment contribution.
+                        let (first, last) = (s == 0, s + 1 == count);
+                        for t in 0..valid {
+                            let ramp = (g.overlap + 1) as f32;
+                            let up = if first || t >= g.overlap {
+                                1.0
+                            } else {
+                                (t + 1) as f32 / ramp
+                            };
+                            let down = if last || t < g.stride() {
+                                1.0
+                            } else {
+                                (g.len - t) as f32 / ramp
+                            };
+                            let weight = up * down * 32768.0;
+                            let add = if !first && t < g.overlap {
+                                deposited[s - 1]
+                            } else if !last && t >= g.stride() {
+                                deposited[s + 1]
+                            } else {
+                                false
+                            };
+                            for k in 0..STEM_COUNT {
+                                for c in 0..2 {
+                                    let cell = &mut reference[k][2 * (g.start(s) + t) + c];
+                                    let value = parts[k][2 * t + c] * weight
+                                        + if add { *cell as f32 } else { 0.0 };
+                                    *cell = value.round().clamp(-32768.0, 32767.0) as i16;
+                                }
+                            }
+                        }
+                        deposited[s] = true;
+                    }
+                    assert!(direct.is_complete());
+                    for k in 0..STEM_COUNT {
+                        let mut got = vec![0; pcm.frames() * 2];
+                        direct.read(k, 0, &mut got);
+                        assert_eq!(
+                            got, reference[k],
+                            "rate={rate} quality={quality:?} reverse={reverse} stem={k}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn malformed_output_never_marks_a_segment_ready() {
+        let pcm = tone(44_100, 100);
+        let stems = Stems::new(pcm.frames(), grid(pcm.rate, Quality::Speed));
+        let error = segment(&pcm, &stems, 0, &mut |_, consume| consume(&[0.0])).unwrap_err();
+        assert!(error.contains("model returned 1 values"));
+        assert_eq!(stems.segments_done(), 0);
+        assert!(!stems.ready(0));
     }
 
     #[test]
@@ -223,7 +320,7 @@ mod tests {
             &pcm,
             &stems,
             &sched,
-            &mut |_| Err("no GPU".into()),
+            &mut |_, _| Err("no GPU".into()),
             &AtomicBool::new(false),
             &|_| {},
         )
@@ -248,7 +345,7 @@ mod tests {
             &pcm,
             &stems,
             &sched,
-            &mut |_| Err("device lost".into()),
+            &mut |_, _| Err("device lost".into()),
             &cancel,
             &|_| {},
         );

@@ -14,9 +14,9 @@
 //! [`migrate`] moves those of the Collection's tracks here once.
 
 use super::{
+    Analysis, Beat,
     detect::VocalRegion,
     options::{self, Options, Profile},
-    Analysis, Beat,
 };
 use crate::{library::Track, paths::at, store};
 use std::path::{Path, PathBuf};
@@ -257,6 +257,7 @@ pub fn load_for(t: &Track, o: &Options) -> Result<Option<Analysis>, String> {
     Ok(load_from(&data_dir()?, t)?
         .filter(|x| x.1.covers(o.profile()))
         .map(|mut x| {
+            x.0.phrases = super::phrases_for(o, &x.0.beats, &x.0.three_band_detail);
             o.restrict(&mut x.0);
             x.0
         }))
@@ -279,16 +280,86 @@ pub enum Source {
 /// Stored analysis under the current [`options`], else [`super::analyze`] of the decoded `samples` + [`store`].
 /// ponytail: a failed cache write is dropped silently; the result is still returned.
 pub fn analyze_cached(t: &Track, samples: &[f32], rate: u32) -> (Analysis, Source) {
+    analyze_cached_cancellable(t, samples, rate, &|| false).unwrap()
+}
+
+/// Like [`analyze_cached`], but abandoned loads cannot publish partial or stale results.
+pub fn analyze_cached_cancellable(
+    t: &Track,
+    samples: &[f32],
+    rate: u32,
+    cancelled: &(dyn Fn() -> bool + Sync),
+) -> Option<(Analysis, Source)> {
     let o = options::get();
-    let ignored = match load_for(t, &o) {
-        Ok(Some(a)) => return (a, Source::Cache),
-        Ok(None) => None,
-        Err(e) => Some(e),
-    };
-    (
-        analyze_fresh(t, samples, rate, &o),
-        Source::Computed { ignored },
+    analyze_pcm(
+        t,
+        samples,
+        rate,
+        &o,
+        false,
+        super::Execution::Interactive,
+        cancelled,
     )
+}
+
+fn analyze_pcm(
+    t: &Track,
+    samples: &[f32],
+    rate: u32,
+    o: &Options,
+    explicit: bool,
+    execution: super::Execution,
+    cancelled: &(dyn Fn() -> bool + Sync),
+) -> Option<(Analysis, Source)> {
+    if cancelled() {
+        return None;
+    }
+    let ignored = if explicit {
+        None
+    } else {
+        match load_for(t, o) {
+            Ok(Some(a)) => return (!cancelled()).then_some((a, Source::Cache)),
+            Ok(None) => None,
+            Err(e) => Some(e),
+        }
+    };
+    let a = super::analyze_cancellable(samples, rate, o, execution, cancelled)?;
+    if cancelled() {
+        return None;
+    }
+    let _ = store(t, &a, o.profile());
+    Some((a, Source::Computed { ignored }))
+}
+
+/// Bulk work uses its captured options and worker, never nested detector threads.
+pub fn get_or_analyze_with(
+    t: &Track,
+    o: &Options,
+    explicit: bool,
+    cancelled: &(dyn Fn() -> bool + Sync),
+) -> Result<Option<(Analysis, Source)>, String> {
+    if cancelled() {
+        return Ok(None);
+    }
+    if !explicit {
+        if let Ok(Some(a)) = load_for(t, o) {
+            return Ok((!cancelled()).then_some((a, Source::Cache)));
+        }
+    }
+    let pcm = crate::audio::decode_cancellable(audio_of(t)?, cancelled)?;
+    if cancelled() {
+        return Ok(None);
+    }
+    remember_fingerprint(t, &pcm);
+    Ok(analyze_pcm(
+        t,
+        &pcm.samples,
+        pcm.rate,
+        o,
+        explicit,
+        super::Execution::Bulk,
+        cancelled,
+    ))
 }
 
 /// [`super::analyze_with`] `o`, stored for `t` whatever the cache held.
@@ -563,6 +634,24 @@ mod tests {
             "a request without the key part gets no key"
         );
         std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn cancelled_analysis_never_requires_an_audio_file_or_returns_a_fallback() {
+        let track = Track::default();
+        assert!(analyze_cached_cancellable(&track, &[0.0; 64], 8000, &|| true).is_none());
+        assert!(
+            analyze_pcm(
+                &track,
+                &[0.0; 64],
+                8000,
+                &Options::default(),
+                true,
+                super::super::Execution::Bulk,
+                &|| true,
+            )
+            .is_none()
+        );
     }
 
     #[test]

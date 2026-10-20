@@ -5,12 +5,12 @@
 //!
 //! A scan stats every track's file on a thread (a USB stick is slow); [`is_missing`] answers from the last scan.
 
-use super::{settings, Ask, Confirm, Ctx};
-use crate::app::{plural, LibraryState, MissingRow};
-use openfader::library::{relocate, Track};
+use super::{Ask, Confirm, Ctx, settings};
+use crate::app::{LibraryState, MissingRow, plural};
+use openfader::library::{Track, relocate};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::HashSet,
     path::{Path, PathBuf},
     rc::Rc,
@@ -25,11 +25,25 @@ pub struct State {
 thread_local! {
     /// Files the last scan did not find.
     static MARKS: RefCell<HashSet<PathBuf>> = RefCell::default();
+    static VERSION: Cell<u64> = const { Cell::new(0) };
 }
 
 /// Whether the last scan found no file at `path` (always false before the first scan finishes).
 pub fn is_missing(path: &Path) -> bool {
     MARKS.with(|m| m.borrow().contains(path))
+}
+
+pub(in crate::app) fn version() -> u64 {
+    VERSION.with(Cell::get)
+}
+
+pub(in crate::app) fn update_marks(marks: HashSet<PathBuf>) {
+    MARKS.with(|m| {
+        if *m.borrow() != marks {
+            *m.borrow_mut() = marks;
+            VERSION.with(|v| v.set(v.get().wrapping_add(1)));
+        }
+    });
 }
 
 fn show(c: &Ctx) {
@@ -78,7 +92,7 @@ fn scan(c: &Rc<Ctx>) {
                 .collect::<Vec<Track>>()
         },
         |c, gone| {
-            MARKS.with(|m| *m.borrow_mut() = gone.iter().filter_map(|t| t.file.clone()).collect());
+            update_marks(gone.iter().filter_map(|t| t.file.clone()).collect());
             let msg = if gone.is_empty() {
                 "File is not missing: every track has its file".to_owned()
             } else {

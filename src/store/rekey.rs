@@ -6,16 +6,19 @@
 //! a place in a list, so it goes to one row only.
 
 use super::{
-    date_secs, exec, exec_count, exists, file_name, file_stamp, id_key, in_tx, legacy_key,
-    query_all, Store, R,
+    R, Store, date_secs, exec, exec_count, exists, file_name, file_stamp, id_key, in_tx,
+    legacy_key, query_all,
 };
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// Per-track tables: `(table, columns after the key)`; every row keyed by a track's key. `cue` follows `track` (foreign key).
 const COPY: &[(&str, &str)] = &[
-    ("track", "rating, comment, color, cues_set, grid, grid_orig"),
+    (
+        "track",
+        "rating, comment, color, cues_set, grid, grid_orig, title, artist, album, genre, label",
+    ),
     ("cue", "pos, hot, time_ms, loop_end_ms, color, comment"),
     ("track_mytag", "tag"),
     ("analysis_lock", ""),

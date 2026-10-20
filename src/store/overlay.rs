@@ -1,4 +1,4 @@
-//! The store laid over a [`Library`]: tracks carry the store's rating and comment, and a track's
+//! The store laid over a [`Library`]: tracks carry the store's text and rating overrides, and a track's
 //! analysis carries the store's cue list and beat grid. The store wins; what it has no edit for stays
 //! the library's. Playlists are the library's own (user playlists are read from the store by the browser).
 
@@ -15,7 +15,7 @@ pub fn overlay(inner: Box<dyn Library>) -> Box<dyn Library> {
     Box::new(Overlay::new(inner, global()))
 }
 
-/// Rating / comment edits by track: a Collection track's by its id (no key string built per track on a 100k listing), the
+/// Text / rating edits by track: a Collection track's by its id (no key string built per track on a 100k listing), the
 /// rest by [`key`].
 #[derive(Default)]
 struct Edited {
@@ -52,15 +52,24 @@ impl Edited {
 }
 
 impl Edited {
-    /// Puts the edited rating and comment on the tracks they belong to.
+    /// Puts the edited text and rating on the tracks they belong to.
     fn apply(&self, tracks: &mut [Track]) {
         for t in tracks {
             let Some(f) = self.get(t) else { continue };
             if let Some(r) = f.rating {
                 t.rating = r;
             }
-            if let Some(c) = &f.comment {
-                t.comment.clone_from(c);
+            for (field, edit) in [
+                (&mut t.title, &f.title),
+                (&mut t.artist, &f.artist),
+                (&mut t.album, &f.album),
+                (&mut t.genre, &f.genre),
+                (&mut t.label, &f.label),
+                (&mut t.comment, &f.comment),
+            ] {
+                if let Some(value) = edit {
+                    field.clone_from(value);
+                }
             }
         }
     }
@@ -77,7 +86,7 @@ fn id_of_key(k: &str) -> Option<i64> {
 pub struct Overlay {
     inner: Box<dyn Library>,
     store: Arc<Store>,
-    /// The store's rating / comment edits as of the [`Store::generation`] in `.0`.
+    /// The store's text / rating edits as of the [`Store::generation`] in `.0`.
     fields: Mutex<Option<(u64, Arc<Edited>)>>,
     /// [`Library::tracks_all`] of `inner` with those edits on: valid while both `Arc`s are the ones it was made from.
     merged: Mutex<Option<Merged>>,
@@ -93,7 +102,7 @@ impl Overlay {
         }
     }
 
-    /// The store's rating / comment edits, read again only when the store changed since the last call.
+    /// The store's text / rating edits, read again only when the store changed since the last call.
     fn fields(&self) -> Arc<Edited> {
         let generation = self.store.generation();
         let mut c = self.fields.lock();

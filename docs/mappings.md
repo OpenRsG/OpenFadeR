@@ -7,6 +7,8 @@ message lights which light. The format is documented at the top of `src/app/midi
 the executable; a file in an earlier folder replaces one of the same name in a later one. When a controller connects, the file whose
 `<port>` is the longest one found inside a MIDI input port name (case-insensitive) is loaded.
 
+Input callbacks queue messages in order and wake the UI event loop once per pending batch. Each UI turn dispatches at most 256 messages, then yields without dropping or merging controls. The 5 ms timer remains for jog decay and session housekeeping, not as the normal input-delivery clock. Audio buffers and the output device add separate control-to-sound latency.
+
 ## Install from a repository
 
 PREFERENCES > CONTROLLER > **GET MAPPINGS** lists the mapping files of your GitHub repositories, with the same repository list as GET

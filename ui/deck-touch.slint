@@ -1,0 +1,108 @@
+import { Chip, Dropdown, Fader, Icon, IconButton, RingButton } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DeckState, DeckView } from "deck-state.slint";
+import { DeckOverview } from "deck-wave.slint";
+import { DeckTitle, DeckTimes, StemRow } from "deck-header.slint";
+import { JogWheel, LoopBlock, SideButtons, TempoColumn } from "deck-controls.slint";
+import { GridEdit } from "deck-panel.slint";
+import { CueList, PadGrid, PadOptions } from "pads.slint";
+import { DeckDropTarget } from "dnd.slint";
+
+/// Touch presentation of the desktop deck. All actions use the desktop session and pad modes.
+export component TouchDeck inherits Rectangle {
+    in property <int> index;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <int> page;
+    property <bool> grid-mode: root.v.grid-edit;
+    init => { if root.grid-mode { root.page = 2; } }
+    changed grid-mode => { if root.grid-mode { root.page = 2; } else if root.page == 2 { root.page = 0; } }
+    height: column.preferred-height + 16px;
+    background: Theme.deck-bg;
+    column := VerticalLayout {
+        x: 8px; y: 8px; width: parent.width - 16px;
+        spacing: 8px;
+        alignment: start;
+        HorizontalLayout {
+            height: 48px; spacing: 8px;
+            Chip { width: 48px; horizontal-stretch: 0; text: ["A", "B", "C", "D"][root.index]; tooltip: "Load the selected library track"; clicked => { DeckState.load(root.index); } }
+            DeckTitle { index: root.index; min-width: 0px; }
+            DeckTimes { index: root.index; width: 64px; size: Theme.font-md; }
+        }
+        DeckOverview { index: root.index; height: Theme.h-overview + Theme.h-phrase; }
+        HorizontalLayout {
+            spacing: 4px;
+            Chip { text: "KEY SYNC"; enabled: root.v.loaded; clicked => { DeckState.key-sync(root.index); } }
+            Chip { text: "SYNC"; enabled: root.v.loaded; active: root.v.synced; clicked => { DeckState.sync(root.index); } }
+            Chip { text: "MASTER"; enabled: root.v.loaded; active: root.v.master; clicked => { DeckState.master-toggle(root.index); } }
+        }
+        HorizontalLayout {
+            spacing: 4px;
+            Chip { text: "Key −"; enabled: root.v.loaded; clicked => { DeckState.key-step(root.index, -1); } }
+            Chip { text: root.v.key-eff == "" ? "Reset key" : root.v.key-eff; enabled: root.v.loaded; clicked => { DeckState.key-reset(root.index); } }
+            Chip { text: "Key +"; enabled: root.v.loaded; clicked => { DeckState.key-step(root.index, 1); } }
+        }
+        if root.v.stems && root.v.stem-buttons: StemRow { index: root.index; h: Theme.touch-target; }
+        HorizontalLayout {
+            spacing: 4px;
+            for label[i] in ["Transport", "Pads", "Grid", "Cues"]: Chip {
+                text: label; active: root.page == i;
+                clicked => {
+                    root.page = i;
+                    if ((i == 2) != root.v.grid-edit) { DeckState.grid-toggle(root.index); }
+                }
+            }
+        }
+        if root.page == 0: HorizontalLayout {
+            height: 190px; spacing: 8px;
+            VerticalLayout {
+                width: 56px; horizontal-stretch: 0; alignment: center; spacing: 8px;
+                RingButton { width: 56px; height: 56px; text: "CUE"; tone: Theme.cue; enabled: root.v.loaded; lit: root.v.at-cue; pressed => { DeckState.cue(root.index); } released => { DeckState.cue-released(root.index); } }
+                RingButton { width: 56px; height: 56px; icon: root.v.playing ? Icon.pause : Icon.play; tone: Theme.play; enabled: root.v.loaded; lit: root.v.playing; clicked => { DeckState.play-pause(root.index); } }
+            }
+            LoopBlock { index: root.index; min-width: 96px; }
+            if root.width >= 480px: JogWheel { index: root.index; width: 100px; horizontal-stretch: 0; }
+            TempoColumn { index: root.index; width: 64px; horizontal-stretch: 0; }
+        }
+        if root.page == 0: HorizontalLayout {
+            spacing: 4px;
+            Chip { text: "SLIP"; active: root.v.slip; enabled: root.v.loaded; clicked => { DeckState.slip(root.index); } }
+            Chip { text: "Quantize"; active: root.v.quantize; clicked => { DeckState.quantize(root.index); } }
+            Chip { text: "Key lock"; active: root.v.key-lock; clicked => { DeckState.key-lock(root.index); } }
+        }
+        if root.page == 0: HorizontalLayout {
+            spacing: 4px;
+            Chip { text: "Reverse"; active: root.v.reverse; enabled: root.v.loaded; clicked => { DeckState.reverse(root.index); } }
+            Chip { text: "Brake"; enabled: root.v.loaded; clicked => { DeckState.brake(root.index); } }
+            Chip { text: "Reset tempo"; enabled: root.v.loaded; clicked => { DeckState.tempo(root.index, 0.5); } }
+        }
+        if root.page == 1: Dropdown {
+            options: root.v.stems ? DeckState.pad-mode-names-stems : DeckState.pad-mode-names;
+            current: !root.v.stems && root.v.pad-mode > 11 ? root.v.pad-mode - 1 : root.v.pad-mode;
+            chose(m) => { DeckState.pad-mode(root.index, !root.v.stems && m >= 11 ? m + 1 : m); }
+        }
+        if root.page == 1: PadGrid {
+            height: Theme.touch-target * 4 + Theme.gap * 3;
+            pads: root.v.pads; mode: root.v.pad-mode; enabled: root.v.loaded;
+            delete-mode: root.v.delete-mode; fx-color: DeckState.pad-fx-color;
+            pad(p) => { DeckState.pad(root.index, p); }
+            pad-released => { DeckState.pad-released(root.index); }
+        }
+        if root.page == 1: PadOptions { index: root.index; }
+        if root.page == 1: HorizontalLayout {
+            spacing: 4px;
+            Chip { text: "Delete cue"; active: root.v.delete-mode; active-color: Theme.danger; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.cue-delete(root.index); } }
+            Chip { text: "Memory cue"; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.memory-cue(root.index); } }
+        }
+        if root.page == 2: GridEdit { index: root.index; height: 4 * Theme.touch-target + 6px; }
+        if root.page == 3: CueList {
+            height: 280px; cues: root.v.cues; enabled: root.v.loaded; loop-active: root.v.loop-active;
+            palette: DeckState.cue-palette;
+            jump(row) => { DeckState.cue-jump(root.index, row); }
+            save-loop => { DeckState.save-loop(root.index); }
+            cue-color(row, c) => { DeckState.cue-color(root.index, row, c); }
+            cue-comment(row, t) => { DeckState.cue-comment(root.index, row, t); }
+        }
+        Text { text: root.v.status; color: Theme.text; font-size: Theme.font-size; wrap: word-wrap; }
+    }
+    DeckDropTarget { index: root.index; }
+}

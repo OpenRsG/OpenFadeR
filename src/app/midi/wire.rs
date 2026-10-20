@@ -1,10 +1,9 @@
-//! Set-up: the shared [`Midi`] state, the first connection, the PREFS listener and the 5 ms input timer.
+//! Set-up: the shared [`Midi`] state, connections, event-driven input and the jog/housekeeping timer.
 
 use super::jog::Jog;
 use super::led::Leds;
-use super::Ev;
-use super::{decode, hotplug, layer, learn, lights, prefs_audio, usermap, Guard, Midi};
-use crate::app::deck::{Decks, DECKS};
+use super::{Guard, Midi, decode, hotplug, layer, learn, lights, prefs_audio, usermap};
+use crate::app::deck::{DECKS, Decks};
 use crate::app::{App, MidiState};
 use slint::{ComponentHandle, Timer, TimerMode};
 use std::{
@@ -13,14 +12,34 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Bounds each UI turn, including unsupported messages, without discarding or reordering input.
+const INPUT_BATCH: usize = 256;
+
+pub(super) fn wake_input() -> Result<(), slint::EventLoopError> {
+    slint::invoke_from_event_loop(super::get::input_ready)
+}
+
 impl Midi {
-    /// The next decodable message from the input ports, without collecting the channel into a list first.
-    fn next_event(&self) -> Option<Ev> {
-        loop {
-            let raw = self.ports.borrow().as_ref()?.rx.try_recv().ok()?;
+    pub(super) fn read_input(&self) {
+        self.start_dump();
+        {
+            let ports = self.ports.borrow();
+            let Some(p) = ports.as_ref() else { return };
+            p.begin_input();
+        }
+        for _ in 0..INPUT_BATCH {
+            let raw = self
+                .ports
+                .borrow()
+                .as_ref()
+                .and_then(|p| p.rx.try_recv().ok());
+            let Some(raw) = raw else { return };
             if let Some(ev) = decode(raw) {
-                return Some(ev);
+                self.handle(ev);
             }
+        }
+        if let Some(p) = self.ports.borrow().as_ref() {
+            p.wake_input();
         }
     }
 }
@@ -96,15 +115,12 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         }
     });
 
-    // 5 ms while MIDI input ports are open (jog and controls feel immediate); 100 ms without, which still sees a controller
-    // arrive (the hot-plug thread reads the port list once a second) without waking the app 200 times a second for nothing.
+    // Input wakes the event loop directly; this timer retains jog decay and session housekeeping.
+    // Without input ports, 100 ms still picks up the hot-plug worker's once-a-second port snapshots.
     let (m, input) = (midi.clone(), Rc::new(Timer::default()));
     let weak_input = Rc::downgrade(&input);
     input.start(TimerMode::Repeated, Duration::from_millis(5), move || {
-        m.start_dump();
-        while let Some(ev) = m.next_event() {
-            m.handle(ev);
-        }
+        m.read_input(); // fallback if an event-loop wake could not be queued
         m.tick();
         m.dump_tick();
         m.poll_ports();

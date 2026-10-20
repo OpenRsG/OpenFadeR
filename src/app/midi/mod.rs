@@ -1,6 +1,6 @@
 //! MIDI controllers ↔ ui/midi.slint (global `MidiState`). Input ports are opened by [`port`] (all of
 //! them, or those whose name contains `OPENFADER_MIDI_PORT`, which also picks the LED output); midir's thread only pushes raw
-//! messages into a channel, a UI-thread timer drains it, so no Slint call happens off-thread.
+//! messages into a FIFO and coalesces event-loop wakes; bounded UI-thread batches dispatch them, so Slint state stays on the UI thread.
 //!
 //! Bindings come from two places, the user's winning: [`usermap`] (`midi.map`, written by MIDI LEARN)
 //! and [`mapfile`] (the mapping file of the connected controller). The actions are the table in [`actions`]. Status is the note-on
@@ -37,7 +37,7 @@
 //!
 //! Children of this base: [`input`] (one decoded message: LEARN capture, state dump, dispatch to the binding's action), [`wheel`]
 //! (jog and platter state), [`learn`] (binding a captured control), [`lights`] (the light timer and signals), [`wire`] (set-up and the
-//! 5 ms input timer). They add methods to [`Midi`]; the types they share live here. [`get`] is the way in for the repository catalog
+//! input wakes and jog/housekeeping timer). They add methods to [`Midi`]; the types they share live here. [`get`] is the way in for the repository catalog
 //! (`app/catalog`): mapping files read, installed into the config folder, and the session opened again with one.
 
 mod actions;

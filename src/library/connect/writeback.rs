@@ -4,9 +4,9 @@
 //! run (what would change, what the format cannot keep); [`apply`] copies the source file to the backups folder first and
 //! never writes when that copy fails; the new file is written beside the old one and renamed over it.
 
-use super::{foreign_id, stamp, Connection, Mode};
-use crate::library::{snapshot::Snapshot, Library};
-use crate::store::{self, Store, R};
+use super::{Connection, Mode, foreign_id, stamp};
+use crate::library::{Library, snapshot::Snapshot};
+use crate::store::{self, R, Store};
 use openfader_plugin::library as wire;
 use std::path::{Path, PathBuf};
 
@@ -69,10 +69,11 @@ pub fn plan(store: &Store, conn: &Connection) -> R<Option<Plan>> {
         let Some(&(id, _)) = foreign_id(t).and_then(|f| map.get(&f)) else {
             continue;
         };
-        let Some(ours) = store.collection_track(id)? else {
+        let Some(mut ours) = store.collection_track(id)? else {
             continue;
         };
         let e = store.edits(&store::id_key(id))?;
+        e.apply_metadata(&mut ours);
         let was = (t.clone(), a.clone().map(|a| (a.cues, a.beats)));
         *t = wire::Track {
             id: None,
@@ -80,8 +81,6 @@ pub fn plan(store: &Store, conn: &Connection) -> R<Option<Plan>> {
             analysis_ref: t.analysis_ref.clone(),
             artwork: t.artwork.clone(),
             remote: t.remote.clone(),
-            rating: e.rating.unwrap_or(ours.rating),
-            comment: e.comment.unwrap_or(ours.comment.clone()),
             ..ours
         };
         let mut an = a.take().unwrap_or_default();

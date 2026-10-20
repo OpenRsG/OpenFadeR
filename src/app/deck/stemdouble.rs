@@ -1,17 +1,25 @@
 //! STEM INSTANT DOUBLES (the controller rows `VocalPartInstDoubles` … `DrumsPartInstDoubles`, STEMS pads 5 to 8 on screen).
 //!
-//! The press loads a track from the other deck to the one pressed on; during playback the position is matched, the pressed deck
-//! outputs only the selected stem and that stem on the other deck is muted. So with part `k`: this deck loads the other deck's track (its session analysis included), and once the stems of that
-//! track are ready (a cache hit: the other deck already separated it) it jumps to the other deck's position, takes its
-//! tempo, key lock and key shift, plays when it plays, solos `k` here and mutes `k` there ([`doubled`]). "The other
-//! deck" is the neighbour on the mixer, A↔B, C↔D, or the one deck
-//! PREFS > Extensions > STEM Instant Doubles names ([`source`]).
-//! The position is read when the stems land, not at the press, so a load that took seconds still lines up.
+//! The destination shares the source's completed audio and stems. When they attach, transport and
+//! the selected part follow the source only if it still has the same load and audio identity.
 
 use super::{DECK_NAMES, Deck};
 use crate::app::prefs;
-use openfader::audio::{BASS, STEM_COUNT, STEM_NAMES};
-use std::rc::Rc;
+use openfader::audio::{BASS, STEM_COUNT, STEM_NAMES, Track16};
+use std::{rc::Rc, sync::Arc};
+
+pub(super) struct Pending {
+    part: usize,
+    source: usize,
+    serial: u32,
+    pcm: Arc<Track16>,
+}
+
+impl Pending {
+    fn matches(&self, serial: u32, source: &Arc<Track16>, target: &Arc<Track16>) -> bool {
+        serial == self.serial && Arc::ptr_eq(source, &self.pcm) && Arc::ptr_eq(target, &self.pcm)
+    }
+}
 
 /// Mute states `(this deck, the other deck)` after INSTANT DOUBLES of part `k`, the other deck having `other` now:
 /// here every part but `k` is muted, there `k` is muted on top of what was.
@@ -42,6 +50,9 @@ impl Deck {
 
     /// INSTANT DOUBLES of part `k` (0 VOCAL, 1 INST, 2 BASS, 3 DRUMS) from the other deck. Says why when it cannot.
     pub fn stem_double(&self, k: usize) {
+        if self.eject_locked() {
+            return;
+        }
         let (stems, four) = prefs::with(|p| (p.stems, p.stems_four));
         if !stems {
             return self.say("STEMS is off: turn it on in PREFS");
@@ -59,27 +70,46 @@ impl Deck {
         let Some((track, analysis)) = src else {
             return self.say("instant doubles: the other deck has no library track");
         };
-        if !from.stems_complete() {
+        let Some(stems) = from.completed_stems() else {
             return self.say("instant doubles: the other deck's stems are not finished yet");
-        }
-        self.install(
+        };
+        let Some(pcm) = from.with_player(|p| p.pcm()) else {
+            return;
+        };
+        let serial = from.load_serial.get();
+        self.install_shared(
             &track,
             analysis,
             vec![format!("instant double {}", STEM_NAMES[k])],
-            None,
+            pcm.clone(),
+            stems,
         );
-        self.double.set(Some(k)); // after `install`: loading clears a pending double
+        *self.double.borrow_mut() = Some(Pending {
+            part: k,
+            source: from.index,
+            serial,
+            pcm,
+        });
     }
 
     /// The stems of a doubled track landed: line up with the other deck and swap the part (see the module doc).
     pub(super) fn finish_double(&self) {
-        let Some(k) = self.double.take() else { return };
-        let Some(from) = self.partner() else { return };
-        let same = from.loaded.borrow().track.as_ref().map(|t| &t.file)
-            == self.loaded.borrow().track.as_ref().map(|t| &t.file);
+        let Some(pending) = self.double.borrow_mut().take() else {
+            return;
+        };
+        let Some(from) = self.deck_at(pending.source) else {
+            return;
+        };
+        let same = from
+            .with_player(|p| p.pcm())
+            .zip(self.with_player(|p| p.pcm()))
+            .is_some_and(|(source, target)| {
+                pending.matches(from.load_serial.get(), &source, &target)
+            });
         if !same {
             return self.say("instant doubles: the other deck changed track");
         }
+        let k = pending.part;
         let (pos, playing, key_lock) = from
             .with_player(|p| (p.position_ms(), p.is_playing(), p.key_lock()))
             .unwrap_or_default();
@@ -150,5 +180,36 @@ mod tests {
             (0.0, 0.0),
             "3 stems: bass leaves with INST"
         );
+    }
+
+    #[test]
+    fn a_late_double_never_mutes_a_reloaded_source_or_replaced_destination() {
+        use super::super::stems::gains;
+        let audio = || {
+            Arc::new(Track16::from(openfader::audio::Pcm {
+                rate: 44100,
+                samples: vec![0.25; 64],
+            }))
+        };
+        let shared = audio();
+        let pending = Pending {
+            part: VOCAL,
+            source: 0,
+            serial: 3,
+            pcm: shared.clone(),
+        };
+        for (serial, source, target, expected) in [
+            (3, shared.clone(), shared.clone(), [0.0, 1.0, 1.0, 1.0]),
+            (4, shared.clone(), shared.clone(), [1.0; STEM_COUNT]),
+            (3, audio(), shared.clone(), [1.0; STEM_COUNT]),
+            (3, shared.clone(), audio(), [1.0; STEM_COUNT]),
+        ] {
+            let mutes = if pending.matches(serial, &source, &target) {
+                doubled(pending.part, [false; STEM_COUNT]).1
+            } else {
+                [false; STEM_COUNT]
+            };
+            assert_eq!(gains(mutes, [1.0; 3], true), expected);
+        }
     }
 }
