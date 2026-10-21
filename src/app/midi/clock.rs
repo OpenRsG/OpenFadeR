@@ -1,0 +1,220 @@
+//! MIDI clock output on its own port and thread (`OPENFADER_MIDI_CLOCK`).
+//!
+//! Set `OPENFADER_MIDI_CLOCK` to a substring of an output port name (the way
+//! [`super::port::connect_out`] does for the LED port, and `OPENFADER_MIDI_PORT`
+//! for the inputs) and every time the app plays it sends a MIDI realtime clock: 24
+//! pulses per quarter note at the master deck's effective tempo, START (0xFA)
+//! when a deck starts and STOP (0xFC) when the last one stops. That lets external
+//! gear follow the mix: a eurorack sequencer, a drum machine, a hardware daisy
+//! chain. The master deck is the tempo reference ([`crate::app::deck::sync`]); when
+//! no deck is master, the first playing deck's tempo is used.
+//!
+//! The clock lives on its own `MidiOutputConnection` and thread rather than the
+//! controller's LED [`super::port::Sink`] for two reasons: the sink paces one
+//! message every `<outInterval>` ms (that gap would turn a 20.8 ms pulse train at
+//! 120 BPM into a jittery mess), and the sink is shared by all LED output. Realtime
+//! clock needs a clean, dedicated pipe.
+//!
+//! The UI thread only writes two atomics from its tick (tempo in BPM as f64 bits,
+//! and whether the master deck is playing); the clock thread reads them on every
+//! pulse and sleeps until the next one, so a busy UI thread never delays a pulse.
+//! Tempo changes are picked up on the next pulse; the phase is kept by advancing a
+//! deadline by the pulse interval, never by sleeping a fresh duration each time
+//! (that would accumulate slew).
+
+use super::port;
+use midir::MidiOutputConnection;
+use std::sync::{
+    atomic::{AtomicBool, AtomicU64, Ordering},
+    mpsc::{channel, Receiver},
+    Arc,
+};
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
+
+/// MIDI realtime messages (1 byte, no channel).
+const CLOCK: u8 = 0xF8;
+const START: u8 = 0xFA;
+// CONTINUE (0xFB) is deliberately not used: MIDI clock treats a pause as a STOP.
+const STOP: u8 = 0xFC;
+/// Pulses per quarter note (the MIDI clock resolution).
+const PPQN: u64 = 24;
+
+/// The tempo and transport the clock thread reads (written on the UI thread).
+struct Snap {
+    /// Effective master tempo in BPM, as f64 bits; 0 = none / not playing.
+    bpm: AtomicU64,
+    /// The master (or fallback) deck is playing.
+    running: AtomicBool,
+    /// Drop-set: make the pulse loop return so we can join.
+    quit: AtomicBool,
+}
+
+impl Default for Snap {
+    fn default() -> Self {
+        Self {
+            bpm: AtomicU64::new(0),
+            running: AtomicBool::new(false),
+            quit: AtomicBool::new(false),
+        }
+    }
+}
+
+/// A dedicated MIDI clock output: its own connection and pulse thread.
+pub struct Clock {
+    /// The thread's last words, once, if the connection died.
+    lost: Receiver<String>,
+    thread: Option<JoinHandle<()>>,
+    snap: Arc<Snap>,
+}
+
+impl Clock {
+    /// Opens the first output port whose name contains `name` and starts the pulse
+    /// thread there. `Err` when no such port exists or midir cannot open it.
+    pub fn start(name: &str) -> Result<Clock, String> {
+        let (conn, _pname) = port::connect_out(name)?;
+        Ok(Clock::from_connection(conn))
+    }
+
+    /// Builds a clock on an already-open output connection (used by the tests).
+    fn from_connection(conn: MidiOutputConnection) -> Clock {
+        let snap = Arc::new(Snap::default());
+        let (lost_tx, lost) = channel();
+        let snap_t = snap.clone();
+        let thread = std::thread::spawn(move || pulse(conn, snap_t, lost_tx));
+        Clock {
+            lost,
+            thread: Some(thread),
+            snap,
+        }
+    }
+
+    /// The UI tick's snapshot of the master deck: tempo in BPM and whether it plays.
+    /// 0 BPM / stopped sends no pulses and (on a running→stopped edge) a STOP.
+    pub fn set(&self, bpm: f64, running: bool) {
+        self.snap.bpm.store(bpm.to_bits(), Ordering::Relaxed);
+        self.snap.running.store(running, Ordering::Relaxed);
+    }
+
+    /// Why the output stopped, once, if the midir connection failed mid-run.
+    pub fn lost(&self) -> Option<String> {
+        self.lost.try_recv().ok()
+    }
+}
+
+/// The UI tick's `clock_tick`: resolve the master deck (fallback: the first playing
+/// deck) and push its tempo + transport to every clock. Runs on the UI thread.
+impl super::Midi {
+    pub(super) fn clock_tick(&self) {
+        let guard = self.clock.borrow();
+        let clock = match guard.as_ref() {
+            Some(c) => c,
+            None => return,
+        };
+        if clock.lost().is_some() {
+            return;
+        }
+        let master = self
+            .decks
+            .iter()
+            .find(|d| d.is_master())
+            .or_else(|| self.decks.iter().find(|d| d.playing()));
+        let (bpm, running) = match master {
+            Some(d) => (d.effective_bpm(), d.playing()),
+            None => (0.0, false),
+        };
+        clock.set(bpm, running);
+    }
+}
+
+impl Drop for Clock {
+    fn drop(&mut self) {
+        self.snap.quit.store(true, Ordering::Relaxed);
+        if let Some(t) = self.thread.take() {
+            let _ = t.join();
+        }
+    }
+}
+
+/// The pulse loop. Owns the connection, so a midir failure that drops it also ends
+/// the loop via [`Snap::quit`] on [`Drop`].
+fn pulse(
+    mut conn: MidiOutputConnection,
+    snap: Arc<Snap>,
+    lost_tx: std::sync::mpsc::Sender<String>,
+) {
+    let mut running = false;
+    // The phase: the next CLOCK is exactly one pulse period after the previous one,
+    // so tempo nudges never accumulate into slew across long sets.
+    let mut next = Instant::now();
+    loop {
+        if snap.quit.load(Ordering::Relaxed) {
+            return;
+        }
+        let bpm = f64::from_bits(snap.bpm.load(Ordering::Relaxed));
+        let want = snap.running.load(Ordering::Relaxed);
+        if want != running {
+            running = want;
+            let status = match want {
+                // A pause in MIDI clock is a STOP; nothing tricky about CONTINUE.
+                true => START,
+                false => STOP,
+            };
+            if let Err(e) = conn.send(&[status]) {
+                let _ = lost_tx.send(e.to_string());
+                return;
+            }
+            next = Instant::now();
+        }
+        if !running {
+            // No pulses while stopped; poll the value change without spinning.
+            std::thread::sleep(Duration::from_millis(20));
+            continue;
+        }
+        let period = Duration::from_micros(safe_micros(bpm));
+        let wait = next.saturating_duration_since(Instant::now());
+        if !wait.is_zero() {
+            std::thread::sleep(wait); // wakes a little early; see below
+        }
+        if conn.send(&[CLOCK]).is_err() {
+            let _ = lost_tx.send("clock output failed".into());
+            return;
+        }
+        next += period;
+        // The OS timer wakes a bit late; schedule the next pulse from the instant *
+        // the deadline would have been, tolerating the small overshoot.
+        if next < Instant::now() {
+            next = Instant::now();
+        }
+    }
+}
+
+/// Microseconds between two clock pulses at `bpm` (24 PPQN), clamped to sane bounds:
+/// a BPM of 0 or less than ~10 would otherwise ask for an absurd (or infinite) wait.
+fn safe_micros(bpm: f64) -> u64 {
+    if !bpm.is_finite() || bpm < 10.0 {
+        return Duration::from_millis(20).as_micros() as u64; // idle-ish
+    }
+    let us = 60_000_000.0 / (bpm * PPQN as f64);
+    (us as u64).clamp(100, 5_000_000)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pulse_period_matches_midi_clock_resolution() {
+        // 120 BPM -> one CLOCK every 20.833 ms (24 PPQN).
+        assert_eq!(safe_micros(120.0), 20_833);
+        // 140 BPM -> every 17.857 ms.
+        assert_eq!(safe_micros(140.0), 17_857);
+    }
+
+    #[test]
+    fn missing_or_absurd_bpm_idles_instead_of_spinning() {
+        assert_eq!(safe_micros(0.0), 20_000);
+        assert_eq!(safe_micros(f64::NAN), 20_000);
+        assert!(safe_micros(1.0) >= 20_000, "clamped to a sane idle");
+    }
+}

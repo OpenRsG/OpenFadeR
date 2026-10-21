@@ -41,6 +41,7 @@
 //! (`app/catalog`): mapping files read, installed into the config folder, and the session opened again with one.
 
 mod actions;
+mod clock;
 mod dump;
 pub mod get;
 mod hotplug;
@@ -307,6 +308,8 @@ struct Midi {
     layer34_noted: Cell<bool>,
     out: RefCell<Option<Sink>>,
     leds: RefCell<Leds>,
+    /// The dedicated MIDI clock output (`OPENFADER_MIDI_CLOCK`), if one is set up.
+    clock: RefCell<Option<clock::Clock>>,
     /// What the lights show: the whole Slint state every [`lights::STATE_EVERY`], the jog ring's playheads on every light tick.
     snap: RefCell<led::Snap>,
     snap_at: Cell<Option<Instant>>,

@@ -2,7 +2,9 @@
 
 use super::jog::Jog;
 use super::led::Leds;
-use super::{Guard, Midi, decode, hotplug, layer, learn, lights, prefs_audio, usermap};
+use super::{
+    clock, decode, hotplug, layer, learn, lights, prefs_audio, usermap, Guard, Midi,
+};
 use crate::app::deck::{DECKS, Decks};
 use crate::app::{App, MidiState};
 use slint::{ComponentHandle, Timer, TimerMode};
@@ -73,6 +75,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         layer34_noted: Cell::new(false),
         out: RefCell::new(None),
         leds: RefCell::new(Leds::new(Vec::new())),
+        clock: RefCell::new(None),
         snap: RefCell::default(),
         snap_at: Cell::new(None),
         filter: filter.clone(),
@@ -99,6 +102,17 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
     midi.reconnect(app, names.clone());
     *midi.watcher.borrow_mut() = Some(hotplug::Watcher::start(filter, names));
 
+    // MIDI clock output: `OPENFADER_MIDI_CLOCK` = substring of an output port name.
+    let clock_name = std::env::var("OPENFADER_MIDI_CLOCK")
+        .ok()
+        .filter(|s| !s.is_empty());
+    if let Some(name) = clock_name {
+        match clock::Clock::start(&name) {
+            Ok(clock) => *midi.clock.borrow_mut() = Some(clock),
+            Err(e) => eprintln!("MIDI clock: can't open a port containing \"{name}\": {e}"),
+        }
+    }
+
     // PREFS: the jog speed, and "Use controller audio when connected" switched while a controller is connected.
     let (weak_midi, weak_app, was) = (
         Rc::downgrade(&midi),
@@ -122,6 +136,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
     input.start(TimerMode::Repeated, Duration::from_millis(5), move || {
         m.read_input(); // fallback if an event-loop wake could not be queued
         m.tick();
+        m.clock_tick();
         m.dump_tick();
         m.poll_ports();
         m.flush_toasts();
