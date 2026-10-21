@@ -22,6 +22,7 @@ jobs:
           - { name: windows, os: windows-latest, arch: x86_64 }
           - { name: macos, os: macos-latest, arch: arm64 }
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
     defaults:
       run:
         shell: bash
@@ -122,10 +123,6 @@ jobs:
             ;;
           esac
           ls -l out
-      - uses: actions/upload-artifact@v4
-        with:
-          name: package-${{ matrix.name }}
-          path: out/*
       # The packaged files, unpacked somewhere else, must start and show their window (the smoke test of ci.yml).
       - name: Unpack the archive
         run: |
@@ -146,6 +143,13 @@ jobs:
       - name: Smoke test of the packaged app (macOS)
         if: matrix.name == 'macos'
         run: bash .github/smoke.sh unpacked/OpenFadeR.app/Contents/MacOS/openfader smoke
+      # Only publish distributable archives after the packaged app passes its smoke test.
+      - name: Upload validated package
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.name }}
+          path: out/*
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
