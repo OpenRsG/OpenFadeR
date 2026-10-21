@@ -2,9 +2,7 @@
 
 use super::jog::Jog;
 use super::led::Leds;
-use super::{
-    clock, decode, hotplug, layer, learn, lights, prefs_audio, usermap, Guard, Midi,
-};
+use super::{Guard, Midi, decode, hotplug, layer, learn, lights, prefs_audio, usermap};
 use crate::app::deck::{DECKS, Decks};
 use crate::app::{App, MidiState};
 use slint::{ComponentHandle, Timer, TimerMode};
@@ -76,6 +74,8 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         out: RefCell::new(None),
         leds: RefCell::new(Leds::new(Vec::new())),
         clock: RefCell::new(None),
+        clock_target: RefCell::new(None),
+        clock_next_try: Cell::new(None),
         snap: RefCell::default(),
         snap_at: Cell::new(None),
         filter: filter.clone(),
@@ -103,14 +103,13 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
     *midi.watcher.borrow_mut() = Some(hotplug::Watcher::start(filter, names));
 
     // MIDI clock output: `OPENFADER_MIDI_CLOCK` = substring of an output port name.
-    let clock_name = std::env::var("OPENFADER_MIDI_CLOCK")
+    // `clock_tick` (from the 5 ms timer below) opens the port on its first run and
+    // reopens it later if it is unplugged and comes back, so this is the single open path.
+    if let Some(name) = std::env::var("OPENFADER_MIDI_CLOCK")
         .ok()
-        .filter(|s| !s.is_empty());
-    if let Some(name) = clock_name {
-        match clock::Clock::start(&name) {
-            Ok(clock) => *midi.clock.borrow_mut() = Some(clock),
-            Err(e) => eprintln!("MIDI clock: can't open a port containing \"{name}\": {e}"),
-        }
+        .filter(|s| !s.is_empty())
+    {
+        *midi.clock_target.borrow_mut() = Some(name);
     }
 
     // PREFS: the jog speed, and "Use controller audio when connected" switched while a controller is connected.

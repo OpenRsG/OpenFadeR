@@ -310,6 +310,11 @@ struct Midi {
     leds: RefCell<Leds>,
     /// The dedicated MIDI clock output (`OPENFADER_MIDI_CLOCK`), if one is set up.
     clock: RefCell<Option<clock::Clock>>,
+    /// The `OPENFADER_MIDI_CLOCK` port-name substring, kept for the hot-plug reopen.
+    clock_target: RefCell<Option<String>>,
+    /// When the last reopen attempt was made, so a missing port is polled at most
+    /// once a second instead of hammering midir from the 5 ms tick.
+    clock_next_try: Cell<Option<Instant>>,
     /// What the lights show: the whole Slint state every [`lights::STATE_EVERY`], the jog ring's playheads on every light tick.
     snap: RefCell<led::Snap>,
     snap_at: Cell<Option<Instant>>,
