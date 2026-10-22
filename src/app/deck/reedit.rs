@@ -31,7 +31,7 @@ impl Deck {
             .or_else(|| lib.analysis(&t).map(|a| a.beats));
         let beats = target_grid(edits.grid, base);
         if let Some(beats) = beats.filter(|b| *b != self.loaded.borrow().analysis.beats) {
-            self.apply_grid(beats, "grid restored".into());
+            self.apply_grid(beats, tr!("grid restored").into());
         }
         let phrases = match edits.phrases {
             Some(p) => Some(p),
@@ -66,7 +66,7 @@ impl Deck {
         self.show(|v| {
             v.pads = ModelRc::new(VecModel::from(pads));
             v.cues = ModelRc::new(VecModel::from(views));
-            v.status = "cues restored".into();
+            v.status = tr!("cues restored").into();
         });
     }
 }

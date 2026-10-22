@@ -57,23 +57,23 @@ pub fn more_rows(nodes: &[store::Node], id: i64) -> Vec<(String, Act)> {
     let siblings = nodes.iter().filter(|n| n.parent == me.parent).count() as i64;
     let mut rows = Vec::new();
     if me.kind == NodeKind::Smart {
-        rows.push(("Edit conditions…".to_owned(), Act::Edit));
+        rows.push((tr!("Edit conditions…").to_owned(), Act::Edit));
     }
     if me.pos > 0 {
-        rows.push(("▲ Move up".to_owned(), Act::Up));
+        rows.push((tr!("▲ Move up").to_owned(), Act::Up));
     }
     if me.pos + 1 < siblings {
-        rows.push(("▼ Move down".to_owned(), Act::Down));
+        rows.push((tr!("▼ Move down").to_owned(), Act::Down));
     }
     if me.parent.is_some() {
-        rows.push(("Move to the top level".to_owned(), Act::Into(None)));
+        rows.push((tr!("Move to the top level").to_owned(), Act::Into(None)));
     }
     let folders = nodes.iter().filter(|f| {
         f.kind == NodeKind::Folder && Some(f.id) != me.parent && !inside(nodes, f.id, id)
     });
     rows.extend(folders.map(|f| {
         (
-            format!("Move into ▸ {}", path_of(nodes, f.id)),
+            tr!("Move into ▸ {}", path_of(nodes, f.id)),
             Act::Into(Some(f.id)),
         )
     }));
@@ -132,23 +132,35 @@ impl View {
     pub(in crate::app::browser) fn entry_hint(&self) -> &'static str {
         match self.entry {
             Entry::UserRoot => {
-                "My Playlists: + NEW makes a playlist, folder or smart playlist; ADD TO PLAYLIST puts the chosen track in a playlist"
+                tr!(
+                    "My Playlists: + NEW makes a playlist, folder or smart playlist; ADD TO PLAYLIST puts the chosen track in a playlist"
+                )
             }
-            Entry::HistoryRoot => "History: tracks that stayed on air for 60 s, one list per day",
+            Entry::HistoryRoot => {
+                tr!("History: tracks that stayed on air for 60 s, one list per day")
+            }
             Entry::BankRoot => {
-                "Cue Bank: + NEW makes a list of up to 8 cues (A–H) of different tracks; the device export carries the lists"
+                tr!(
+                    "Cue Bank: + NEW makes a list of up to 8 cues (A–H) of different tracks; the device export carries the lists"
+                )
             }
             Entry::TagsRoot => {
-                "Tags: + NEW adds a category; choose a category and + NEW adds a tag to it"
+                tr!("Tags: + NEW adds a category; choose a category and + NEW adds a tag to it")
             }
             Entry::LibRoot => {
-                "Library: read-only; DUPLICATE TO MY PLAYLISTS copies a playlist you can edit"
+                tr!("Library: read-only; DUPLICATE TO MY PLAYLISTS copies a playlist you can edit")
             }
             Entry::Lib(_) => {
-                "Folder of the library (read-only): DUPLICATE TO MY PLAYLISTS copies it with its playlists"
+                tr!(
+                    "Folder of the library (read-only): DUPLICATE TO MY PLAYLISTS copies it with its playlists"
+                )
             }
-            Entry::User(_) => "Folder: + NEW makes a playlist, folder or smart playlist inside it",
-            Entry::Category(_) => "Category: + NEW adds a tag; choose a tag to list its tracks",
+            Entry::User(_) => {
+                tr!("Folder: + NEW makes a playlist, folder or smart playlist inside it")
+            }
+            Entry::Category(_) => {
+                tr!("Category: + NEW adds a tag; choose a tag to list its tracks")
+            }
             _ => self.source_hint(&self.entry).unwrap_or(""),
         }
     }

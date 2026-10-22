@@ -17,9 +17,9 @@ fn kind(p: &Plugin) -> &'static str {
     match (m.command.is_empty(), m.script.as_deref()) {
         (true, Some(s)) if s.ends_with(".lua") => "LUA",
         (true, Some(s)) if s.ends_with(".py") => "PYTHON",
-        (true, None) if m.library.is_some() => "NATIVE",
+        (true, None) if m.library.is_some() => tr!("NATIVE"),
         (true, None) => "JSON",
-        _ => "PROGRAM",
+        _ => tr!("PROGRAM"),
     }
 }
 
@@ -28,31 +28,50 @@ fn provides(p: &Plugin) -> String {
     let m = &p.manifest;
     let name = &m.name;
     let mut parts: Vec<String> = Vec::new();
-    let mut count = |n: usize, what: &str| {
+    let mut count = |n: usize, text: String| {
         if n > 0 {
-            parts.push(format!("{n} {what}{}", crate::app::plural(n)));
+            parts.push(text);
         }
     };
-    count(usize::from(m.library.is_some()), "track library");
-    count(m.sources.len(), "source");
-    count(m.actions.len(), "action");
-    count(m.events.len(), "event hook");
-    count(m.knob_modes.len(), "knob mode");
-    count(m.pad_modes.len(), "pad mode");
-    count(m.settings.len(), "setting");
+    let lib = usize::from(m.library.is_some());
+    count(lib, tr_n!("{n} track library", "{n} track libraries", lib));
+    count(
+        m.sources.len(),
+        tr_n!("{n} source", "{n} sources", m.sources.len()),
+    );
+    count(
+        m.actions.len(),
+        tr_n!("{n} action", "{n} actions", m.actions.len()),
+    );
+    count(
+        m.events.len(),
+        tr_n!("{n} event hook", "{n} event hooks", m.events.len()),
+    );
+    count(
+        m.knob_modes.len(),
+        tr_n!("{n} knob mode", "{n} knob modes", m.knob_modes.len()),
+    );
+    count(
+        m.pad_modes.len(),
+        tr_n!("{n} pad mode", "{n} pad modes", m.pad_modes.len()),
+    );
+    count(
+        m.settings.len(),
+        tr_n!("{n} setting", "{n} settings", m.settings.len()),
+    );
     let mut slots: Vec<(String, usize)> = Vec::new();
     for e in registry().effects.iter().filter(|e| &e.plugin == name) {
-        let slot = format!("{} effect", e.slot.name().to_lowercase());
+        let slot = e.slot.name().to_lowercase();
         match slots.iter_mut().find(|(s, _)| *s == slot) {
             Some((_, n)) => *n += 1,
             None => slots.push((slot, 1)),
         }
     }
     for (slot, n) in slots {
-        count(n, &slot);
+        count(n, tr_n!("{n} {0} effect", "{n} {0} effects", n, slot));
     }
     if parts.is_empty() {
-        "nothing yet".into()
+        tr!("nothing yet").into()
     } else {
         parts.join(" · ")
     }
@@ -152,7 +171,7 @@ pub(super) fn refresh(app: &App) {
     s.set_restart_text(if restart.is_empty() {
         SharedString::default()
     } else {
-        format!("Restart to finish: {}", restart.join(", ")).into()
+        tr!("Restart to finish: {}", restart.join(", ")).into()
     });
     s.set_folder(
         install::user_dir()
@@ -180,12 +199,13 @@ pub fn install(app: &App, path: &Path) -> Result<String, String> {
 pub fn installed(app: &App, names: &[String]) -> String {
     reloaded(app);
     let restart = current().restart_needed();
-    let text = format!(
-        "plugin{} {} installed{}",
-        if names.len() > 1 { "s" } else { "" },
+    let text = tr_n!(
+        "plugin {} installed{}",
+        "plugins {} installed{}",
+        if names.len() > 1 { 2 } else { 1 },
         names.join(", "),
         if names.iter().any(|n| restart.contains(n)) {
-            "; restart to load its effects or sources"
+            tr!("; restart to load its effects or sources")
         } else {
             ""
         }
@@ -239,7 +259,7 @@ fn set(app: &App, i: i32, k: i32, value: impl FnOnce(&plugin::SettingDecl) -> Op
     };
     match value(s) {
         Some(v) => changed(app, config::update(|c| c.set(&p.manifest.name, &s.id, v))),
-        None => say(app, &format!("{}: not a number", s.label)),
+        None => say(app, &tr!("{}: not a number", s.label)),
     }
 }
 
@@ -262,7 +282,7 @@ pub(super) fn wire(app: &App) {
         };
         let r = install::uninstall(&p);
         let text = match &r {
-            Ok(()) => format!("plugin {} uninstalled", p.manifest.name),
+            Ok(()) => tr!("plugin {} uninstalled", p.manifest.name),
             Err(e) => e.clone(),
         };
         changed(&app, r);
@@ -336,7 +356,7 @@ pub(super) fn wire(app: &App) {
     s.on_reload(move || {
         if let Some(app) = w.upgrade() {
             reloaded(&app);
-            say(&app, "plugin folders read again");
+            say(&app, tr!("plugin folders read again"));
         }
     });
     s.on_restart(crate::app::restart);

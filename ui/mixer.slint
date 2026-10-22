@@ -107,7 +107,7 @@ component Channel inherits Rectangle {
             spacing: 3px;
             VerticalLayout {
                 horizontal-stretch: 1;
-                for label[p] in ["TRIM", "HIGH", "MID", "LOW", "CFX"]: VerticalLayout {
+                for label[p] in [@tr("TRIM"), @tr("HIGH"), @tr("MID"), @tr("LOW"), @tr("CFX")]: VerticalLayout {
                     height: root.row-h;
                     spacing: 1px;
                     alignment: start;
@@ -127,7 +127,7 @@ component Channel inherits Rectangle {
                     }
                     Text {
                         // STEM mode: the HIGH / MID / LOW knobs become INST / VOCAL / DRUMS (top to bottom).
-                        text: is-iso ? ["", "INST", "VOCAL", "DRUMS"][p] : p == 4 ? MixerState.cfx-names[MixerState.cfx-type] : label;
+                        text: is-iso ? ["", @tr("INST"), @tr("VOCAL"), @tr("DRUMS")][p] : p == 4 ? MixerState.cfx-names[MixerState.cfx-type] : label;
                         color: is-iso ? [Theme.text, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums][p] : Theme.text-dim;
                         font-family: Theme.font;
                         font-size: Theme.font-xs;
@@ -145,12 +145,12 @@ component Channel inherits Rectangle {
         if root.wide: HorizontalLayout {
             height: 18px;
             spacing: 2px;
-            Chip { text: "CUE"; icon: Icon.headphones; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.cue; tooltip: "Headphone CUE"; clicked => { MixerState.cue-toggled(root.index); } }
-            if root.stems: Chip { text: "STEM"; icon: Icon.stems; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.iso; tooltip: "STEM mode: INST / VOCAL / DRUMS levels"; clicked => { MixerState.iso-toggled(root.index); } }
+            Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.cue; tooltip: @tr("Headphone CUE"); clicked => { MixerState.cue-toggled(root.index); } }
+            if root.stems: Chip { text: @tr("STEM"); icon: Icon.stems; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.iso; tooltip: @tr("STEM mode: INST / VOCAL / DRUMS levels"); clicked => { MixerState.iso-toggled(root.index); } }
         }
-        if !root.wide: Chip { text: "CUE"; icon: Icon.headphones; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.cue; tooltip: "Headphone CUE"; clicked => { MixerState.cue-toggled(root.index); } }
+        if !root.wide: Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.cue; tooltip: @tr("Headphone CUE"); clicked => { MixerState.cue-toggled(root.index); } }
         if !root.wide && root.stems: Rectangle { height: 2px; }
-        if !root.wide && root.stems: Chip { text: "STEM"; icon: Icon.stems; font-size: Theme.font-xs; height: 16px; min-width: 0px; active: root.ch.iso; tooltip: "STEM mode: INST / VOCAL / DRUMS levels"; clicked => { MixerState.iso-toggled(root.index); } }
+        if !root.wide && root.stems: Chip { text: @tr("STEM"); icon: Icon.stems; font-size: Theme.font-xs; height: 16px; min-width: 0px; active: root.ch.iso; tooltip: @tr("STEM mode: INST / VOCAL / DRUMS levels"); clicked => { MixerState.iso-toggled(root.index); } }
         Rectangle { height: 6px; }
         // Takes what the rows above leave.
         holder := Rectangle {
@@ -207,7 +207,7 @@ component XfGrid inherits VerticalLayout {
             width: 26px;
             height: 16px;
             active: MixerState.channels[n].xf == side;
-            tooltip: "Crossfader assign";
+            tooltip: @tr("Crossfader assign");
             clicked => { MixerState.xf-assigned(n, side); }
         }
     }
@@ -223,13 +223,13 @@ export component MixerBar inherits Rectangle {
         padding-top: 3px;
         padding-bottom: 3px;
         spacing: Theme.space-md;
-        for label[p] in ["MASTER", "HP MIX", "HP LEVEL"]: KnobLabel {
+        for label[p] in [@tr("MASTER"), @tr("HP MIX"), @tr("HP LEVEL")]: KnobLabel {
             text: label;
             value: MixerState.bus.knobs[p];
             reset: p == 1 ? 0.0 : 0.5;
             edited(v) => { MixerState.bus-knob(p, v); }
         }
-        Chip { text: "SPLIT"; font-size: Theme.font-xs; min-width: 40px; horizontal-stretch: 0; active: MixerState.bus.split; tooltip: "Mono HP left / master right"; clicked => { MixerState.split-toggled(); } }
+        Chip { text: @tr("SPLIT"); font-size: Theme.font-xs; min-width: 40px; horizontal-stretch: 0; active: MixerState.bus.split; tooltip: @tr("Mono HP left / master right"); clicked => { MixerState.split-toggled(); } }
         Rectangle { horizontal-stretch: 1; }
         // Only while there is something to say (a headphone-device or recording message); wraps rather than elides.
         if MixerState.bus.status != "": Text {
@@ -244,13 +244,13 @@ export component MixerBar inherits Rectangle {
         }
         VerticalLayout { width: 90px; horizontal-stretch: 0; alignment: center; Meter { level: MixerState.bus.level; peak: MixerState.bus.peak; } }
         Chip {
-            text: MixerState.bus.rec-armed ? "● ARMED" : MixerState.bus.rec ? "● " + MixerState.bus.rec-text : "● REC";
+            text: MixerState.bus.rec-armed ? @tr("● ARMED") : MixerState.bus.rec ? "● " + MixerState.bus.rec-text : @tr("● REC");
             font-size: Theme.font-xs;
             min-width: 62px;
             horizontal-stretch: 0;
             active: MixerState.bus.rec;
             active-color: Theme.rec;
-            tooltip: MixerState.bus.rec-armed ? "Waiting for audio, click to cancel" : "Record master";
+            tooltip: MixerState.bus.rec-armed ? @tr("Waiting for audio, click to cancel") : @tr("Record master");
             clicked => { MixerState.rec-toggled(); }
         }
     }
@@ -274,11 +274,11 @@ export component MixerBar inherits Rectangle {
     Chip {
         x: centre.x + centre.width + Theme.space-md;
         y: (root.height - self.height) / 2;
-        text: ["SMOOTH", "SHARP", "CONST"][MixerState.curve];
+        text: [@tr("SMOOTH"), @tr("SHARP"), @tr("CONST")][MixerState.curve];
         font-size: Theme.font-xs;
         width: 52px;
         height: 16px;
-        tooltip: "Crossfader curve";
+        tooltip: @tr("Crossfader curve");
         clicked => { MixerState.curve-cycled(); }
     }
 }

@@ -67,9 +67,9 @@ export component FxRack inherits Rectangle {
             HorizontalLayout {
                 spacing: 6px;
                 horizontal-stretch: 0;
-                FxLabel { text: "EFFECT"; }
+                FxLabel { text: @tr("EFFECT"); }
                 Dropdown {
-                    options: r.has ? r.names : ["no plugin"];
+                    options: r.has ? r.names : [@tr("no plugin")];
                     current: r.effect;
                     enabled: r.has;
                     font-size: Theme.font-xs;
@@ -80,7 +80,7 @@ export component FxRack inherits Rectangle {
                     chose(i) => { FxRackState.effect-selected(root.rack, i); }
                 }
                 if root.rack != 1: Chip {
-                    text: "ON";
+                    text: @tr("ON");
                     font-size: Theme.font-xs;
                     min-width: root.touch ? root.ctl-h : 34px;
                     max-width: root.touch ? root.ctl-h : 34px;
@@ -96,17 +96,17 @@ export component FxRack inherits Rectangle {
             if root.rack != 1: HorizontalLayout {
                 spacing: 4px;
                 horizontal-stretch: 0;
-                FxLabel { text: root.rack == 0 ? "RETURN" : "LEVEL"; }
+                FxLabel { text: root.rack == 0 ? @tr("RETURN") : @tr("LEVEL"); }
                 Knob { width: root.ctl-h; height: root.ctl-h; value: r.level; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.level-edited(root.rack, v); } } }
                 Rectangle { width: 6px; }
-                FxLabel { text: "PARAM"; }
+                FxLabel { text: @tr("PARAM"); }
                 Knob { width: root.ctl-h; height: root.ctl-h; value: r.param; detent: root.rack == 2; opacity: r.has ? 1 : 0.4; edited(v) => { if r.has { FxRackState.param-edited(root.rack, v); } } }
             }
             if root.rack == 0: FxDivider { }
             if root.rack == 0: HorizontalLayout {
                 spacing: 4px;
                 horizontal-stretch: 0;
-                FxLabel { text: "SEND"; }
+                FxLabel { text: @tr("SEND"); }
                 for n in DeckState.count: HorizontalLayout {
                     spacing: 2px;
                     FxLabel { text: "" + (n + 1); }
@@ -116,7 +116,7 @@ export component FxRack inherits Rectangle {
             if root.rack == 1: HorizontalLayout {
                 spacing: 6px;
                 horizontal-stretch: 0;
-                FxLabel { text: "LEVER"; }
+                FxLabel { text: @tr("LEVER"); }
                 Fader {
                     width: root.touch ? 6 * root.ctl-h : 160px;
                     height: root.ctl-h;
@@ -130,7 +130,7 @@ export component FxRack inherits Rectangle {
             if root.rack == 1: HorizontalLayout {
                 spacing: 3px;
                 horizontal-stretch: 0;
-                FxLabel { text: "BEAT"; }
+                FxLabel { text: @tr("BEAT"); }
                 Rectangle { width: 3px; }
                 Chip { text: "◀"; font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; clicked => { FxRackState.beat-step(root.rack, -1); } }
                 Text { text: r.beat-text; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; min-width: 30px; }

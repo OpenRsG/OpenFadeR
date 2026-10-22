@@ -19,7 +19,7 @@ export global KeysState {
 /// Dialog listing every shortcut; the scrim or the close button closes it.
 export component HelpOverlay inherits DialogFrame {
     visible: KeysState.help-visible;
-    title: "KEYBOARD SHORTCUTS";
+    title: @tr("KEYBOARD SHORTCUTS");
     card-width: 940px;
     closed => { KeysState.help-visible = false; }
     HorizontalLayout {
@@ -34,5 +34,5 @@ export component HelpOverlay inherits DialogFrame {
             }
         }
     }
-    Note { text: "Up / Down move the track selection (when the search box is not focused).  Beat jump with a loop active moves the loop.  Hold CUE to preview, release returns; PLAY while held keeps playing.  SYNC latches: the deck follows the master's tempo and beats.  Drag a waveform to scratch.  The keys are the current KEYBOARD preset plus your changes (PREFERENCES > KEYBOARD).  ? or click to close."; }
+    Note { text: @tr("Up / Down move the track selection (when the search box is not focused).  Beat jump with a loop active moves the loop.  Hold CUE to preview, release returns; PLAY while held keeps playing.  SYNC latches: the deck follows the master's tempo and beats.  Drag a waveform to scratch.  The keys are the current KEYBOARD preset plus your changes (PREFERENCES > KEYBOARD).  ? or click to close."); }
 }

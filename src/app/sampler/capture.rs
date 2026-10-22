@@ -28,7 +28,7 @@ pub(super) fn save(pcm: &Pcm, prefix: &str) -> Result<PathBuf, String> {
             p.advanced.loop_hz(),
         )
     });
-    let dir = dir.ok_or(format!("set a capture location, {DIR_ENV} or HOME"))?;
+    let dir = dir.ok_or(tr!("set a capture location, {} or HOME", DIR_ENV))?;
     let path = paths::at(paths::timestamped(&dir, prefix, "wav"), &dir)?;
     paths::at(audio::write_wav(&path, pcm, hz), &path)?;
     Ok(path)

@@ -85,7 +85,7 @@ impl Slot {
             Err(TryRecvError::Empty) => return,
             Ok(Ok(info)) => Source::Ready(Stream::open(path.clone(), info), info),
             Ok(Err(e)) => Source::Failed(e),
-            Err(TryRecvError::Disconnected) => Source::Failed("ffprobe stopped".into()),
+            Err(TryRecvError::Disconnected) => Source::Failed(tr!("ffprobe stopped").into()),
         };
         self.src = next;
     }
@@ -108,13 +108,16 @@ impl Slot {
 
     pub fn info(&self) -> String {
         match &self.src {
-            Source::None => "audio only — no picture".into(),
-            Source::Probing(..) => "reading the video…".into(),
-            Source::Ready(_, i) => format!(
-                "{:.2} fps · {}:{:02}",
-                i.fps,
-                i.duration_ms / 60_000,
-                i.duration_ms / 1000 % 60
+            Source::None => tr!("audio only — no picture").into(),
+            Source::Probing(..) => tr!("reading the video…").into(),
+            Source::Ready(_, i) => tr!(
+                "{} fps · {}",
+                format!("{:.2}", i.fps),
+                format!(
+                    "{}:{:02}",
+                    i.duration_ms / 60_000,
+                    i.duration_ms / 1000 % 60
+                )
             ),
             Source::Failed(e) => e.clone(),
         }

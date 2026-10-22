@@ -32,8 +32,9 @@ impl Mix {
             (s.mode, s.selected(), self.opts.get().auto_switch)
         };
         let Some(d) = sel else {
-            return self
-                .say("MIX POINT SELECT: pick a deck first (its button, or click its waveform)");
+            return self.say(tr!(
+                "MIX POINT SELECT: pick a deck first (its button, or click its waveform)"
+            ));
         };
         let ms = {
             let l = self.decks[d].loaded.borrow();
@@ -49,7 +50,7 @@ impl Mix {
             Some(i) => s.silent[i] = !s.silent[i],
             None => {
                 drop(s);
-                return self.say("SILENT: pick the MIX IN deck first");
+                return self.say(tr!("SILENT: pick the MIX IN deck first"));
             }
         }
         drop(s);
@@ -66,8 +67,9 @@ impl Mix {
     /// LINK: arms the pair; a MIX IN deck that is already running is put back in step with the MIX OUT deck.
     pub(super) fn link(&self) {
         let Some((o, i)) = self.s.borrow_mut().press_link() else {
-            return self
-                .say("MIX POINT LINK: set a MIX POINT on the MIX OUT deck and on the MIX IN deck");
+            return self.say(tr!(
+                "MIX POINT LINK: set a MIX POINT on the MIX OUT deck and on the MIX IN deck"
+            ));
         };
         let (po, pi) = (probe(&self.decks[o]), probe(&self.decks[i]));
         let (out_ms, in_ms) = {

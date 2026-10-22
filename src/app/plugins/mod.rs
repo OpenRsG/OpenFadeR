@@ -126,7 +126,7 @@ impl Ctx {
         let deck = |n: usize| {
             let d = self.decks.iter().take(active()).nth(n - 1);
             if d.is_none() {
-                say(app, &format!("{plugin}: no deck {n}"));
+                say(app, &tr!("{}: no deck {}", plugin, n));
             }
             d
         };
@@ -134,15 +134,13 @@ impl Ctx {
             Command::Toast(text) => say(app, &text),
             Command::Load { deck: n, file } => match deck(n) {
                 None => {}
-                Some(_) if !file.is_file() => {
-                    say(app, &format!("{}: no such file", file.display()))
-                }
+                Some(_) if !file.is_file() => say(app, &tr!("{}: no such file", file.display())),
                 Some(d) => d.load(&read_track(&file), &*self.lib),
             },
             Command::Import(files) => library::import_files(files),
             Command::Key(id) => {
                 if !keys::run(app, &id) {
-                    say(app, &format!("no shortcut {id}"));
+                    say(app, &tr!("no shortcut {}", id));
                 }
             }
             Command::Play { deck: n, on } => {
@@ -162,12 +160,12 @@ impl Ctx {
             }
             Command::Open(url) => {
                 if let Err(e) = library::open_external(&url) {
-                    say(app, &format!("{plugin}: {e}"));
+                    say(app, &tr!("{}: {}", plugin, e));
                 }
             }
             Command::Setting { id, value } => {
                 if let Err(e) = config::update(|c| c.set(plugin, &id, value)) {
-                    say(app, &format!("{plugin}: {e}"));
+                    say(app, &tr!("{}: {}", plugin, e));
                 }
                 manager::refresh(app);
             }
@@ -255,7 +253,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) {
         };
         let text = s.get_prompt_text().trim().to_owned();
         if text.is_empty() {
-            say(&k.app(), "nothing was typed");
+            say(&k.app(), tr!("nothing was typed"));
         } else {
             k.run(i, Some(text));
         }

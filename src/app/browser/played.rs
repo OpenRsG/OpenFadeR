@@ -37,8 +37,8 @@ impl View {
     pub(super) fn reset_played(&mut self, app: &App) {
         self.rows.reset_played();
         let msg = match self.store.reset_device_settings(SCOPE, "") {
-            Ok(()) => "the colour of played tracks was reset".to_owned(),
-            Err(e) => format!("store: {e}"),
+            Ok(()) => tr!("the colour of played tracks was reset").to_owned(),
+            Err(e) => tr!("store: {}", e),
         };
         self.refresh(app);
         app.global::<BrowserState>().set_status(msg.into());

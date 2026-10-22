@@ -46,9 +46,13 @@ impl Row {
         }
     }
 
-    /// A row for a [`Choice`] value: chips for up to 4 options, else a drop-down; names are shown upper-case.
+    /// A row for a [`Choice`] value: chips for up to 4 options, else a drop-down; names are shown upper-case, translated
+    /// (ui/translations/extract.py collects the names from `choice!`).
     pub fn of<T: super::Choice>(key: &str, label: &str, current: T) -> Row {
-        let names: Vec<String> = T::ALL.iter().map(|c| c.name().to_uppercase()).collect();
+        let names: Vec<String> = T::ALL
+            .iter()
+            .map(|c| crate::app::i18n::tr_dyn(&c.name().to_uppercase()).to_owned())
+            .collect();
         let at = T::ALL.iter().position(|&c| c == current).unwrap_or(0);
         let kind = if names.len() <= 4 {
             Kind::Chips

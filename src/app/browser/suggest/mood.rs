@@ -15,9 +15,9 @@ fn level(m: Mood) -> i32 {
 
 pub(super) fn word(m: Mood) -> &'static str {
     match m {
-        Mood::High => "high",
-        Mood::Mid => "mid",
-        Mood::Low => "low",
+        Mood::High => tr!("high"),
+        Mood::Mid => tr!("mid"),
+        Mood::Low => tr!("low"),
     }
 }
 
@@ -40,12 +40,16 @@ pub(super) fn score(a: &Item, c: &Item) -> Verdict {
     }
     Verdict::Score(
         score,
-        format!(
-            "{:.0}% · {} mood{}{}",
-            score * 100.0,
+        tr!(
+            "{}% · {} mood{}{}",
+            format!("{:.0}", score * 100.0),
             word(fc.mood()),
-            if steps == 0 { "" } else { " (one step off)" },
-            if genre { " · same genre" } else { "" }
+            if steps == 0 {
+                ""
+            } else {
+                tr!(" (one step off)")
+            },
+            if genre { tr!(" · same genre") } else { "" }
         ),
     )
 }

@@ -137,9 +137,9 @@ component DrumSlot inherits Rectangle {
         width: parent.width - 8px;
         height: Theme.touch-target;
         spacing: 4px;
-        Chip { text: "−"; width: Theme.touch-target; horizontal-stretch: 0; tooltip: "Decrease slot gain"; clicked => { GrooveState.slot-gain(root.deck, root.idx, -1.0); } }
-        Label { text: "GAIN"; horizontal-alignment: center; horizontal-stretch: 1; }
-        Chip { text: "+"; width: Theme.touch-target; horizontal-stretch: 0; tooltip: "Increase slot gain"; clicked => { GrooveState.slot-gain(root.deck, root.idx, 1.0); } }
+        Chip { text: "−"; width: Theme.touch-target; horizontal-stretch: 0; tooltip: @tr("Decrease slot gain"); clicked => { GrooveState.slot-gain(root.deck, root.idx, -1.0); } }
+        Label { text: @tr("GAIN"); horizontal-alignment: center; horizontal-stretch: 1; }
+        Chip { text: "+"; width: Theme.touch-target; horizontal-stretch: 0; tooltip: @tr("Increase slot gain"); clicked => { GrooveState.slot-gain(root.deck, root.idx, 1.0); } }
     }
 }
 
@@ -161,15 +161,15 @@ component DeckRow inherits HorizontalLayout {
         font-weight: Theme.weight-bold;
         vertical-alignment: center;
     }
-    for b in 2: Chip { text: b == 0 ? "A" : "B"; min-width: 22px; max-width: 22px; horizontal-stretch: 0; height: 26px; active: root.d.bank == b; tooltip: "DRUM LOOP BANK"; clicked => { GrooveState.bank-selected(root.deck, b); } }
+    for b in 2: Chip { text: b == 0 ? "A" : "B"; min-width: 22px; max-width: 22px; horizontal-stretch: 0; height: 26px; active: root.d.bank == b; tooltip: @tr("DRUM LOOP BANK"); clicked => { GrooveState.bank-selected(root.deck, b); } }
     for n in 4: DrumSlot { deck: root.deck; slot: n; }
-    Chip { text: "SINGLE"; font-size: Theme.font-xs; min-width: 42px; horizontal-stretch: 0; height: 26px; active: !root.d.multi; tooltip: "DRUM SWAP SINGLE MODE: replaces the drums"; clicked => { GrooveState.multi-selected(root.deck, false); } }
-    Chip { text: "MULTI"; font-size: Theme.font-xs; min-width: 38px; horizontal-stretch: 0; height: 26px; active: root.d.multi; tooltip: "DRUM SWAP MULTI MODE: adds to the drums"; clicked => { GrooveState.multi-selected(root.deck, true); } }
+    Chip { text: @tr("SINGLE"); font-size: Theme.font-xs; min-width: 42px; horizontal-stretch: 0; height: 26px; active: !root.d.multi; tooltip: @tr("DRUM SWAP SINGLE MODE: replaces the drums"); clicked => { GrooveState.multi-selected(root.deck, false); } }
+    Chip { text: @tr("MULTI"); font-size: Theme.font-xs; min-width: 38px; horizontal-stretch: 0; height: 26px; active: root.d.multi; tooltip: @tr("DRUM SWAP MULTI MODE: adds to the drums"); clicked => { GrooveState.multi-selected(root.deck, true); } }
     Knob { width: 26px; height: 26px; horizontal-stretch: 0; detent: true; value: root.d.master; edited(v) => { GrooveState.master-edited(root.deck, v); } }
-    Dropdown { label: "PRESET"; width: 60px; horizontal-stretch: 0; height: 26px; font-size: Theme.font-xs; list-width: 190px; options: GrooveState.presets; current: -1; chose(i) => { GrooveState.preset-chosen(root.deck, i); } }
-    Chip { text: "CAPTURE"; font-size: Theme.font-xs; min-width: 52px; horizontal-stretch: 0; height: 26px; active: root.d.capture-on; active-color: Theme.text-bright.with-alpha(0.35); tooltip: "DRUM CAPTURE: pick a slot to put the drums of the range in"; clicked => { GrooveState.capture-clicked(root.deck); } }
-    if root.d.capture-on: Chip { text: root.d.capture-beats; font-size: Theme.font-xs; min-width: 24px; max-width: 24px; horizontal-stretch: 0; height: 26px; tooltip: "Range in beats: 4, 8, 16, 32"; clicked => { GrooveState.range-clicked(root.deck); } }
-    Chip { text: "◀"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; tooltip: "DRUM RELEASE FX"; clicked => { GrooveState.fx-step(root.deck, -1); } }
+    Dropdown { label: @tr("PRESET"); width: 60px; horizontal-stretch: 0; height: 26px; font-size: Theme.font-xs; list-width: 190px; options: GrooveState.presets; current: -1; chose(i) => { GrooveState.preset-chosen(root.deck, i); } }
+    Chip { text: @tr("CAPTURE"); font-size: Theme.font-xs; min-width: 52px; horizontal-stretch: 0; height: 26px; active: root.d.capture-on; active-color: Theme.text-bright.with-alpha(0.35); tooltip: @tr("DRUM CAPTURE: pick a slot to put the drums of the range in"); clicked => { GrooveState.capture-clicked(root.deck); } }
+    if root.d.capture-on: Chip { text: root.d.capture-beats; font-size: Theme.font-xs; min-width: 24px; max-width: 24px; horizontal-stretch: 0; height: 26px; tooltip: @tr("Range in beats: 4, 8, 16, 32"); clicked => { GrooveState.range-clicked(root.deck); } }
+    Chip { text: "◀"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; tooltip: @tr("DRUM RELEASE FX"); clicked => { GrooveState.fx-step(root.deck, -1); } }
     Chip {
         text: root.d.release-fx;
         font-size: Theme.font-xs;
@@ -178,14 +178,14 @@ component DeckRow inherits HorizontalLayout {
         height: 26px;
         active: root.d.release-on;
         active-color: Theme.stem-drums;
-        tooltip: "DRUM RELEASE FX: hold to apply to the drums";
+        tooltip: @tr("DRUM RELEASE FX: hold to apply to the drums");
         pressed => { GrooveState.fx-held(root.deck, 0, 0, true); }
         released => { GrooveState.fx-held(root.deck, 0, 0, false); }
     }
     Chip { text: "▶"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; clicked => { GrooveState.fx-step(root.deck, 1); } }
     Chip { text: "−"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; clicked => { GrooveState.beat-step(root.deck, -1); } }
     Text { text: root.d.release-beat; width: 24px; horizontal-stretch: 0; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
-    Chip { text: "+"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; tooltip: "Beats of the DRUM RELEASE FX"; clicked => { GrooveState.beat-step(root.deck, 1); } }
+    Chip { text: "+"; font-size: Theme.font-xs; min-width: 16px; max-width: 16px; horizontal-stretch: 0; height: 26px; tooltip: @tr("Beats of the DRUM RELEASE FX"); clicked => { GrooveState.beat-step(root.deck, 1); } }
 }
 
 component TouchDeckRow inherits VerticalLayout {
@@ -203,7 +203,7 @@ component TouchDeckRow inherits VerticalLayout {
             spacing: 6px;
             alignment: start;
             Label { text: "" + (root.deck + 1); height: 24px; horizontal-alignment: center; color: [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][root.deck]; font-size: Theme.font-md; }
-            for b in 2: Chip { text: b == 0 ? "A" : "B"; width: Theme.touch-target; height: Theme.touch-target; active: root.d.bank == b; tooltip: "DRUM LOOP BANK"; clicked => { GrooveState.bank-selected(root.deck, b); } }
+            for b in 2: Chip { text: b == 0 ? "A" : "B"; width: Theme.touch-target; height: Theme.touch-target; active: root.d.bank == b; tooltip: @tr("DRUM LOOP BANK"); clicked => { GrooveState.bank-selected(root.deck, b); } }
         }
         for n in 4: DrumSlot { deck: root.deck; slot: n; }
     }
@@ -211,28 +211,28 @@ component TouchDeckRow inherits VerticalLayout {
         height: Theme.touch-target;
         spacing: 6px;
         alignment: start;
-        Chip { text: "SINGLE"; width: 64px; horizontal-stretch: 0; active: !root.d.multi; tooltip: "DRUM SWAP SINGLE MODE: replaces the drums"; clicked => { GrooveState.multi-selected(root.deck, false); } }
-        Chip { text: "MULTI"; width: 64px; horizontal-stretch: 0; active: root.d.multi; tooltip: "DRUM SWAP MULTI MODE: adds to the drums"; clicked => { GrooveState.multi-selected(root.deck, true); } }
-        Label { text: "GAIN"; }
+        Chip { text: @tr("SINGLE"); width: 64px; horizontal-stretch: 0; active: !root.d.multi; tooltip: @tr("DRUM SWAP SINGLE MODE: replaces the drums"); clicked => { GrooveState.multi-selected(root.deck, false); } }
+        Chip { text: @tr("MULTI"); width: 64px; horizontal-stretch: 0; active: root.d.multi; tooltip: @tr("DRUM SWAP MULTI MODE: adds to the drums"); clicked => { GrooveState.multi-selected(root.deck, true); } }
+        Label { text: @tr("GAIN"); }
         Knob { width: Theme.touch-target; height: Theme.touch-target; horizontal-stretch: 0; detent: true; value: root.d.master; edited(v) => { GrooveState.master-edited(root.deck, v); } }
-        Dropdown { label: "PRESET"; width: 100px; horizontal-stretch: 0; list-width: 240px; options: GrooveState.presets; current: -1; chose(i) => { GrooveState.preset-chosen(root.deck, i); } }
-        Chip { text: "CAPTURE"; width: 80px; horizontal-stretch: 0; active: root.d.capture-on; active-color: Theme.text-bright.with-alpha(0.35); tooltip: "DRUM CAPTURE: pick a slot to put the drums of the range in"; clicked => { GrooveState.capture-clicked(root.deck); } }
-        if root.d.capture-on: Chip { text: root.d.capture-beats; width: Theme.touch-target; horizontal-stretch: 0; tooltip: "Range in beats: 4, 8, 16, 32"; clicked => { GrooveState.range-clicked(root.deck); } }
-        Chip { text: "◀"; width: Theme.touch-target; horizontal-stretch: 0; tooltip: "DRUM RELEASE FX"; clicked => { GrooveState.fx-step(root.deck, -1); } }
+        Dropdown { label: @tr("PRESET"); width: 100px; horizontal-stretch: 0; list-width: 240px; options: GrooveState.presets; current: -1; chose(i) => { GrooveState.preset-chosen(root.deck, i); } }
+        Chip { text: @tr("CAPTURE"); width: 80px; horizontal-stretch: 0; active: root.d.capture-on; active-color: Theme.text-bright.with-alpha(0.35); tooltip: @tr("DRUM CAPTURE: pick a slot to put the drums of the range in"); clicked => { GrooveState.capture-clicked(root.deck); } }
+        if root.d.capture-on: Chip { text: root.d.capture-beats; width: Theme.touch-target; horizontal-stretch: 0; tooltip: @tr("Range in beats: 4, 8, 16, 32"); clicked => { GrooveState.range-clicked(root.deck); } }
+        Chip { text: "◀"; width: Theme.touch-target; horizontal-stretch: 0; tooltip: @tr("DRUM RELEASE FX"); clicked => { GrooveState.fx-step(root.deck, -1); } }
         Chip {
             text: root.d.release-fx;
             min-width: 80px;
             horizontal-stretch: 0;
             active: root.d.release-on;
             active-color: Theme.stem-drums;
-            tooltip: "DRUM RELEASE FX: hold to apply to the drums";
+            tooltip: @tr("DRUM RELEASE FX: hold to apply to the drums");
             pressed => { GrooveState.fx-held(root.deck, 0, 0, true); }
             released => { GrooveState.fx-held(root.deck, 0, 0, false); }
         }
         Chip { text: "▶"; width: Theme.touch-target; horizontal-stretch: 0; clicked => { GrooveState.fx-step(root.deck, 1); } }
         Chip { text: "−"; width: Theme.touch-target; horizontal-stretch: 0; clicked => { GrooveState.beat-step(root.deck, -1); } }
         Label { text: root.d.release-beat; width: 40px; color: Theme.text-bright; font-size: Theme.font-sm; horizontal-alignment: center; }
-        Chip { text: "+"; width: Theme.touch-target; horizontal-stretch: 0; tooltip: "Beats of the DRUM RELEASE FX"; clicked => { GrooveState.beat-step(root.deck, 1); } }
+        Chip { text: "+"; width: Theme.touch-target; horizontal-stretch: 0; tooltip: @tr("Beats of the DRUM RELEASE FX"); clicked => { GrooveState.beat-step(root.deck, 1); } }
     }
 }
 
@@ -247,21 +247,21 @@ export component GroovePanel inherits Rectangle {
             padding-left: Theme.space-md;
             padding-right: Theme.space-md;
             spacing: Theme.space-md;
-            Label { text: "BEAT LAB"; color: Theme.stem-drums.brighter(0.4); }
+            Label { text: @tr("BEAT LAB"); color: Theme.stem-drums.brighter(0.4); }
             if GrooveState.saving < 0: Text { text: GrooveState.status; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
             if GrooveState.saving >= 0: HorizontalLayout {
                 spacing: Theme.space-md;
                 horizontal-stretch: 1;
-                Label { text: "PRESET NAME"; }
+                Label { text: @tr("PRESET NAME"); }
                 name := TextField {
                     height: root.touch ? Theme.touch-target : 16px;
                     horizontal-stretch: 1;
-                    placeholder-text: "Drum Preset name";
+                    placeholder-text: @tr("Drum Preset name");
                     accepted(t) => { GrooveState.preset-saved(GrooveState.saving, t); }
                     init => { self.focus-field(); }
                 }
-                Chip { text: "OK"; height: root.touch ? Theme.touch-target : 16px; min-width: root.touch ? Theme.touch-target : 30px; horizontal-stretch: 0; clicked => { GrooveState.preset-saved(GrooveState.saving, name.text); } }
-                Chip { text: "CANCEL"; height: root.touch ? Theme.touch-target : 16px; min-width: root.touch ? 80px : 50px; horizontal-stretch: 0; clicked => { GrooveState.saving = -1; } }
+                Chip { text: @tr("OK"); height: root.touch ? Theme.touch-target : 16px; min-width: root.touch ? Theme.touch-target : 30px; horizontal-stretch: 0; clicked => { GrooveState.preset-saved(GrooveState.saving, name.text); } }
+                Chip { text: @tr("CANCEL"); height: root.touch ? Theme.touch-target : 16px; min-width: root.touch ? 80px : 50px; horizontal-stretch: 0; clicked => { GrooveState.saving = -1; } }
             }
         }
         if !root.touch: VerticalLayout {

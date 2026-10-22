@@ -51,7 +51,7 @@ export global ExportModeState {
     in-out property <bool> visible;
     /// 0 1 PLAYER, 1 2 PLAYER, 2 DUAL PLAYER, 3 SIMPLE PLAYER, 4 FULL BROWSER.
     in-out property <int> layout;
-    in property <[string]> layout-names: ["1 PLAYER", "2 PLAYER", "DUAL PLAYER", "SIMPLE PLAYER", "FULL BROWSER"];
+    in property <[string]> layout-names: [@tr("1 PLAYER"), @tr("2 PLAYER"), @tr("DUAL PLAYER"), @tr("SIMPLE PLAYER"), @tr("FULL BROWSER")];
     /// Height of the player area under the global bar (the browser fills the rest); 0 for FULL BROWSER.
     out property <length> panel-h: Theme.layout-profile == 1 ? [520px, 760px, 760px, 100px, 0px][root.layout] : [261px, 400px, 400px, 69px, 0px][root.layout];
     /// The tree column's bottom slot (the device dock).

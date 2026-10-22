@@ -210,12 +210,14 @@ impl Mix {
     fn eligible(&self, mode: Mode, deck: usize) -> Result<(), &'static str> {
         let p = probe(&self.decks[deck]);
         if !p.ready {
-            return Err("MIX POINT LINK: load a track on that deck first");
+            return Err(tr!("MIX POINT LINK: load a track on that deck first"));
         }
         let started_by_link = self.s.borrow().link.contains(&Some(deck));
         match mode {
-            Mode::Out if !p.playing && !started_by_link => Err("MIX OUT: pick the playing deck"),
-            Mode::In if p.playing => Err("MIX IN: pick a stopped deck"),
+            Mode::Out if !p.playing && !started_by_link => {
+                Err(tr!("MIX OUT: pick the playing deck"))
+            }
+            Mode::In if p.playing => Err(tr!("MIX IN: pick a stopped deck")),
             _ => Ok(()),
         }
     }

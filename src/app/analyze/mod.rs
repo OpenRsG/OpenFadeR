@@ -231,7 +231,7 @@ fn run_pending() {
     let tracks = match lib.tracks_all() {
         Ok(t) => t,
         Err(e) => {
-            return trackinfo::set_progress(&app, &format!("analysis: library query failed: {e}"));
+            return trackinfo::set_progress(&app, &tr!("analysis: library query failed: {}", e));
         }
     };
     let todo = detected::pending(&tracks, &detected(), &options::get().parts);
@@ -265,7 +265,9 @@ pub fn library_grid_notice(t: &Track) -> &'static str {
 
 fn notice_for(source: GridSource, library_beats: bool, edited: bool) -> &'static str {
     if source == GridSource::Library && library_beats && !edited {
-        " · library grid in use: PREFS > ANALYSIS > BEAT GRID FROM > OPENFADER ANALYSIS shows ours"
+        tr!(
+            " · library grid in use: PREFS > ANALYSIS > BEAT GRID FROM > OPENFADER ANALYSIS shows ours"
+        )
     } else {
         ""
     }

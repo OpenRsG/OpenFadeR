@@ -13,7 +13,7 @@ use super::{
 };
 use crate::app::{
     App, AutomixState, BrowserState, DeckState, analyze::detected, automix, deck::Decks,
-    library::settings, plural, prefs, trackinfo,
+    library::settings, prefs, trackinfo,
 };
 use openfader::{
     library::{Library, Track},
@@ -46,7 +46,7 @@ pub(super) fn load_to_deck(app: &App, on_track: &dyn Fn(&Track), t: &Track) {
         Some(d) => decks.invoke_load(d as i32),
         None => app
             .global::<BrowserState>()
-            .set_status("every deck is playing; pause one to load".into()),
+            .set_status(tr!("every deck is playing; pause one to load").into()),
     }
 }
 
@@ -202,8 +202,13 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
     let (v, weak) = (view.clone(), app.as_weak());
     state.on_history_save(move || {
         let msg = match history::save(&v.borrow().list) {
-            Ok((path, n)) => format!("saved {n} track{} to {}", plural(n), path.display()),
-            Err(e) => format!("save failed: {e}"),
+            Ok((path, n)) => tr_n!(
+                "saved {n} track to {}",
+                "saved {n} tracks to {}",
+                n,
+                path.display()
+            ),
+            Err(e) => tr!("save failed: {}", e),
         };
         weak.unwrap()
             .global::<BrowserState>()
@@ -254,7 +259,7 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
         v.related = if on { v.selected.clone() } else { None };
         if on && v.related.is_none() {
             app.global::<BrowserState>()
-                .set_status("select a track to see what relates to it".into());
+                .set_status(tr!("select a track to see what relates to it").into());
         }
         v.load(&app);
     });
@@ -262,10 +267,10 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
     state.on_tag_add(move || {
         let (app, mut v) = (weak.unwrap(), v.borrow_mut());
         let msg = match v.selected.clone() {
-            None => "select a track to tag".to_owned(),
-            Some(t) if v.tags.contains(&t) => format!("“{}” is already in the Tag List", t.title),
+            None => tr!("select a track to tag").to_owned(),
+            Some(t) if v.tags.contains(&t) => tr!("“{}” is already in the Tag List", t.title),
             Some(t) => {
-                let msg = format!(
+                let msg = tr!(
                     "tagged “{}” ({} in the Tag List)",
                     t.title,
                     v.tags.len() + 1
@@ -305,7 +310,7 @@ fn wire_selection(
     let v = view.clone();
     app.global::<AutomixState>().on_toggled(move || {
         if automix.running() {
-            automix.stop("AUTOMIX stopped");
+            automix.stop(tr!("AUTOMIX stopped"));
         } else {
             automix.start(v.borrow().queue());
         }

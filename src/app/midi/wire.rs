@@ -94,7 +94,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
 
     // The first connection is the same as every later one; then the port list is watched.
     let names = hotplug::snapshot(filter.as_deref()).unwrap_or_else(|e| {
-        state.set_ports(format!("MIDI unavailable: {e}").into());
+        state.set_ports(tr!("MIDI unavailable: {}", e).into());
         Vec::new()
     });
     midi.reconnect(app, names.clone());

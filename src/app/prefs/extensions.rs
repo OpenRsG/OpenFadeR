@@ -82,94 +82,94 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     let e = &p.extensions;
     let custom = e.stems_layout == StemsLayout::Custom;
     vec![
-        Row::header("STEMS"),
+        Row::header(tr!("STEMS")),
         Row::chips(
             "stems",
-            "ENABLE THE STEMS FUNCTION",
-            &["OFF", "ON"],
+            tr!("ENABLE THE STEMS FUNCTION"),
+            &[tr!("OFF"), tr!("ON")],
             p.stems as usize,
         )
-        .hint("ON downloads a 316 MB model once"),
+        .hint(tr!("ON downloads a 316 MB model once")),
         Row::chips(
             "stems_mode",
-            "STEMS MODE",
-            &["3 STEMS", "4 STEMS"],
+            tr!("STEMS MODE"),
+            &[tr!("3 STEMS"), tr!("4 STEMS")],
             p.stems_four as usize,
         ),
         Row::chips(
             "stems_analysis",
-            "STEMS ANALYSIS PROCESS",
-            &["QUALITY", "SPEED"],
+            tr!("STEMS ANALYSIS PROCESS"),
+            &[tr!("QUALITY"), tr!("SPEED")],
             p.stems_fast as usize,
         )
-        .hint("next track"),
-        Row::of("stems_layout", "STEMS LAYOUT", e.stems_layout),
+        .hint(tr!("next track")),
+        Row::of("stems_layout", tr!("STEMS LAYOUT"), e.stems_layout),
         Row::check(
             "layout_active",
-            "Custom layout: ACTIVE STEM buttons",
+            tr!("Custom layout: ACTIVE STEM buttons"),
             e.layout_active,
         )
         .enabled(custom),
-        Row::check("layout_iso", "Custom layout: STEM ISO knobs", e.layout_iso).enabled(custom),
-        Row::check("layout_fx", "Custom layout: STEM FX", e.layout_fx).enabled(custom),
+        Row::check("layout_iso", tr!("Custom layout: STEM ISO knobs"), e.layout_iso).enabled(custom),
+        Row::check("layout_fx", tr!("Custom layout: STEM FX"), e.layout_fx).enabled(custom),
         Row::chips(
             "stem_waveform",
-            "STEM WAVEFORM DISPLAY",
-            &["ORIGINAL", "STEM"],
+            tr!("STEM WAVEFORM DISPLAY"),
+            &[tr!("ORIGINAL"), tr!("STEM")],
             p.stem_wave as usize,
         ),
         Row::chips(
             "active_part",
-            "ACTIVE STEM SETTING",
-            &["MUTE", "SOLO"],
+            tr!("ACTIVE STEM SETTING"),
+            &[tr!("MUTE"), tr!("SOLO")],
             p.active_part_solo as usize,
         )
-        .hint("pads and controller"),
+        .hint(tr!("pads and controller")),
         Row::chips(
             "stems_reset",
-            "MUTE/SOLO ON LOAD",
-            &["RESET", "KEEP"],
+            tr!("MUTE/SOLO ON LOAD"),
+            &[tr!("RESET"), tr!("KEEP")],
             !p.stems_reset as usize,
         ),
-        Row::of("doubles_from", "STEM INSTANT DOUBLES", e.doubles_from).hint("source deck"),
+        Row::of("doubles_from", tr!("STEM INSTANT DOUBLES"), e.doubles_from).hint(tr!("source deck")),
         Row::check(
             "stems_multithread",
-            "Apply multi-thread to the analysis process",
+            tr!("Apply multi-thread to the analysis process"),
             e.stems_multithread,
         )
-        .hint("next track"),
-        Row::header("BEAT LAB"),
-        Row::check("groove", "Enable the BEAT LAB Function", e.groove).hint(if p.stems {
+        .hint(tr!("next track")),
+        Row::header(tr!("BEAT LAB")),
+        Row::check("groove", tr!("Enable the BEAT LAB Function"), e.groove).hint(if p.stems {
             ""
         } else {
-            "needs STEMS"
+            tr!("needs STEMS")
         }),
         Row::text(
             "drum_pack",
-            "FACTORY SAMPLES PACK (sample pack)",
+            tr!("FACTORY SAMPLES PACK (sample pack)"),
             &e.drum_pack,
         ),
-        Row::header("DRUM SWAP"),
+        Row::header(tr!("DRUM SWAP")),
         Row::chips(
             "drum_lock",
-            "EJECT/LOAD LOCK",
-            &["UNLOCK", "LOCK"],
+            tr!("EJECT/LOAD LOCK"),
+            &[tr!("UNLOCK"), tr!("LOCK")],
             e.drum_lock as usize,
         )
-        .hint("no load into a playing slot"),
+        .hint(tr!("no load into a playing slot")),
         Row::check(
             "drum_titles",
-            "Display track titles on DRUM SWAP SLOT",
+            tr!("Display track titles on DRUM SWAP SLOT"),
             e.drum_titles,
         ),
-        Row::header("DRUM CAPTURE"),
-        Row::of("drum_source", "EXTRACT", e.drum_source),
-        Row::text("drum_dir", "LOCATION OF FILES", &e.drum_dir),
-        Row::info("", "empty = ~/Music/OpenFadeR/Drums"),
-        Row::header("VIDEO (BETA)"),
-        Row::check("video", "Enable Video Function", e.video),
-        Row::header("LIGHTING (BETA)"),
-        Row::check("lighting", "Enable Lighting Function", e.lighting),
+        Row::header(tr!("DRUM CAPTURE")),
+        Row::of("drum_source", tr!("EXTRACT"), e.drum_source),
+        Row::text("drum_dir", tr!("LOCATION OF FILES"), &e.drum_dir),
+        Row::info("", tr!("empty = ~/Music/OpenFadeR/Drums")),
+        Row::header(tr!("VIDEO (BETA)")),
+        Row::check("video", tr!("Enable Video Function"), e.video),
+        Row::header(tr!("LIGHTING (BETA)")),
+        Row::check("lighting", tr!("Enable Lighting Function"), e.lighting),
     ]
 }
 

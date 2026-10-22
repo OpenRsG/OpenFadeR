@@ -38,7 +38,7 @@ impl View {
                 .sources
                 .get(*s)
                 .and_then(|s| s.lib.clone())
-                .ok_or_else(|| "the source is not open".to_owned())
+                .ok_or_else(|| tr!("the source is not open").to_owned())
                 .and_then(|l| l.tracks(id.as_deref())),
         };
         let state = app.global::<BrowserState>();
@@ -57,7 +57,7 @@ impl View {
                     .replace(self.list.clone(), self.suggest.notes.clone());
                 self.refresh(app);
             }
-            Err(e) => state.set_status(format!("query failed: {e}").into()),
+            Err(e) => state.set_status(tr!("query failed: {}", e).into()),
         }
     }
 
@@ -97,26 +97,26 @@ impl View {
         let at = self.selected.as_ref().and_then(|s| self.row_of(s));
         state.set_current_row(at.map_or(-1, |n| n as i32));
         let mut status = match (&self.related, &self.home, self.suggest_status()) {
-            (Some(a), ..) => format!(
+            (Some(a), ..) => tr!(
                 "{} tracks relate to “{}” (registered partners, then compatible key, BPM ±6%)",
                 self.shown.len(),
                 a.title
             ),
             (None, Home::Nothing, _) => self.entry_hint().to_owned(),
             (None, _, Some(s)) => s.to_owned(),
-            (None, Home::Bank(_), _) => format!(
+            (None, Home::Bank(_), _) => tr!(
                 "{} of 8 banks, A first · MORE adds a cue from a deck or the chosen track, loads the list onto a deck",
                 self.list.len()
             ),
-            (None, Home::Dupes, _) => format!(
+            (None, Home::Dupes, _) => tr!(
                 "{} tracks share title, artist and length (±1 s) with another one, in {} groups",
                 self.list.len(),
                 self.dupe_groups
             ),
-            (None, ..) => format!("{} of {} tracks", self.shown.len(), self.list.len()),
+            (None, ..) => tr!("{} of {} tracks", self.shown.len(), self.list.len()),
         };
         if self.filter.ignored(&self.reference) {
-            status += " · BPM ±6% / KEY MATCH wait for a loaded deck";
+            status += tr!(" · BPM ±6% / KEY MATCH wait for a loaded deck");
         }
         state.set_status(status.into());
         state.set_tag_filter_count(self.tag_filter.len() as i32);

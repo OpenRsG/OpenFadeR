@@ -37,9 +37,7 @@ impl Deck {
             slots,
         });
         self.set_pad_mode(0);
-        self.say(format!(
-            "Cue Bank “{name}” on the pads ({n} banks)"
-        ));
+        self.say(tr!("Cue Bank “{}” on the pads ({} banks)", name, n));
     }
 
     /// The pads go back to the loaded track's own hot cues.
@@ -81,7 +79,7 @@ impl Deck {
             Some(b) => b.slots.get(pad).cloned().flatten(),
         };
         let Some((track, cue)) = slot else {
-            self.say(format!("bank {} is empty", pad_label(pad)));
+            self.say(tr!("bank {} is empty", pad_label(pad)));
             return true;
         };
         let here = self.ready()

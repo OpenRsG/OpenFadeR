@@ -99,35 +99,35 @@ component ListEditor inherits HorizontalLayout {
         IconButton {
             solid: true;
             icon: Icon.chevron-right;
-            tooltip: "Add to Active";
+            tooltip: @tr("Add to Active");
             enabled: root.sel >= 0 && !root.sel-active;
             clicked => { DjSystemState.list-action(root.data.key, "activate", root.sel); root.sel-active = true; }
         }
         IconButton {
             solid: true;
             icon: Icon.chevron-left;
-            tooltip: "Remove from Active";
+            tooltip: @tr("Remove from Active");
             enabled: root.sel >= 0 && root.sel-active;
             clicked => { DjSystemState.list-action(root.data.key, "deactivate", root.sel); root.sel-active = false; }
         }
         IconButton {
             solid: true;
             icon: Icon.chevron-up;
-            tooltip: "Shift selected item upward";
+            tooltip: @tr("Shift selected item upward");
             enabled: root.sel >= 0 && root.sel-active;
             clicked => { DjSystemState.list-action(root.data.key, "up", root.sel); }
         }
         IconButton {
             solid: true;
             icon: Icon.chevron-down;
-            tooltip: "Shift selected item downward";
+            tooltip: @tr("Shift selected item downward");
             enabled: root.sel >= 0 && root.sel-active;
             clicked => { DjSystemState.list-action(root.data.key, "down", root.sel); }
         }
         IconButton {
             solid: true;
             icon: Icon.trash;
-            tooltip: "Reset to defaults";
+            tooltip: @tr("Reset to defaults");
             clicked => { DjSystemState.list-action(root.data.key, "reset", 0); root.sel = -1; }
         }
     }
@@ -155,10 +155,10 @@ export component PrefsDjSystem inherits VerticalLayout {
             overflow: elide;
         }
         if DjSystemState.device: Chip {
-            text: "DEFAULTS";
+            text: @tr("DEFAULTS");
             width: 80px;
             horizontal-stretch: 0;
-            tooltip: "Edit the defaults of every device";
+            tooltip: @tr("Edit the defaults of every device");
             clicked => { DjSystemState.defaults(); }
         }
     }

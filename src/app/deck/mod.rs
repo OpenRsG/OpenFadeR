@@ -267,9 +267,9 @@ impl Deck {
         let (player, status) = match audio::Player::new() {
             Ok(p) => (
                 Some(RefCell::new(p)),
-                "Select a track, then LOAD".to_owned(),
+                tr!("Select a track, then LOAD").to_owned(),
             ),
-            Err(e) => (None, format!("audio disabled: {e}")),
+            Err(e) => (None, tr!("audio disabled: {}", e)),
         };
         // Start-up defaults from the settings.
         let (range, key_lock_default, quantize, auto_beats) = prefs::with(|p| {
@@ -290,7 +290,7 @@ impl Deck {
             tempo: 0.5,
             bpm_text: bpm_text(None, 1.0),
             tempo_text: tempo_text(1.0),
-            tempo_range: transport::RANGES[range].1.into(),
+            tempo_range: crate::app::i18n::tr_dyn(transport::RANGES[range].1).into(),
             zoom_text: transport::span_text(span_ms).into(),
             quantize,
             auto_beats,

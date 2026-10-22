@@ -53,7 +53,7 @@ pub(super) fn wire(cx: &Rc<Ctx>, app: &App) {
 fn run_action(cx: &Rc<Ctx>, d: &Device, id: &str, confirmed: bool) {
     let Some(a) = d.info.actions.iter().find(|a| a.id == id) else {
         return cx.say(
-            &format!("{}: that action is not offered any more", d.label),
+            &tr!("{}: that action is not offered any more", d.label),
             true,
         );
     };
@@ -61,7 +61,7 @@ fn run_action(cx: &Rc<Ctx>, d: &Device, id: &str, confirmed: bool) {
         return;
     }
     let Some(provider) = d.provider() else {
-        return cx.say(&format!("{}: its plugin is not available", d.label), true);
+        return cx.say(&tr!("{}: its plugin is not available", d.label), true);
     };
     let config = device_settings::config(&cx.store, &d.id);
     let (dev, id) = (d.clone(), id.to_owned());
@@ -92,19 +92,19 @@ fn run_action(cx: &Rc<Ctx>, d: &Device, id: &str, confirmed: bool) {
 
 fn update_collection(cx: &Rc<Ctx>, d: &Device) {
     if !d.has_library() {
-        return cx.say(&format!("{} has no library", d.label), true);
+        return cx.say(&tr!("{} has no library", d.label), true);
     }
     let Some(provider) = cx.provider_for(d, Feature::Update) else {
         return;
     };
     let Some(snap) = cx.collection() else { return };
     let (store, d) = (cx.store.clone(), d.clone());
-    cx.start(Some(d.id.clone()), "Updating the collection", move |ctl| {
+    cx.start(Some(d.id.clone()), tr!("Updating the collection"), move |ctl| {
         let u = update::update_collection(&provider, &d.mount, &d.id, &snap, &store, &ctl)?;
-        let unmatched = if u.unmatched > 0 { format!("; {} track(s) of the device are not in the collection and were not updated", u.unmatched) } else { String::new() };
-        Ok(format!(
-            "Update Collection: {} of {} track(s) changed ({} ratings, {} comments, {} colours, {} cue lists, {} grids){unmatched}",
-            u.changed, u.matched, u.ratings, u.comments, u.colors, u.cues, u.grids
+        let unmatched = if u.unmatched > 0 { tr!("; {} track(s) of the device are not in the collection and were not updated", u.unmatched) } else { String::new() };
+        Ok(tr!(
+            "Update Collection: {} of {} track(s) changed ({} ratings, {} comments, {} colours, {} cue lists, {} grids){}",
+            u.changed, u.matched, u.ratings, u.comments, u.colors, u.cues, u.grids, unmatched
         ))
     });
 }
@@ -122,16 +122,16 @@ fn import_histories_of(cx: &Rc<Ctx>, d: &Device, which: Option<String>, auto: bo
     let (store, d, provider) = (cx.store.clone(), d.clone(), d.provider());
     let config = device_settings::config(&cx.store, &d.id);
     let delete_after = Behaviour::load(&cx.store).delete_history_after_import;
-    cx.start(Some(d.id.clone()), "Importing histories", move |ctl| {
+    cx.start(Some(d.id.clone()), tr!("Importing histories"), move |ctl| {
         let lib = device::open_library(&d)?;
         let keys: HashSet<String> = snap.tracks().iter().map(|(t, _)| store::key(t)).collect();
         let which = which.map(|w| vec![w]);
         let r = history::import(&d.info, &d.id, &*lib, &keys, &store, which.as_deref())?;
-        let mut text = format!("Imported {} history(ies) of {}: {} plays, {} of unknown tracks skipped, {} imported before", r.histories, d.label, r.plays, r.skipped, r.already);
+        let mut text = tr!("Imported {} history(ies) of {}: {} plays, {} of unknown tracks skipped, {} imported before", r.histories, d.label, r.plays, r.skipped, r.already);
         if delete_after && !r.done.is_empty() {
-            match provider.ok_or("its plugin is not available".to_owned()).and_then(|p| history::delete(&p, &d.mount, &r.done, &config, &ctl)) {
-                Ok(n) => text.push_str(&format!("; deleted {n} from the device")),
-                Err(e) => text.push_str(&format!("; not deleted from the device: {e}")),
+            match provider.ok_or(tr!("its plugin is not available").to_owned()).and_then(|p| history::delete(&p, &d.mount, &r.done, &config, &ctl)) {
+                Ok(n) => text.push_str(&tr!("; deleted {} from the device", n)),
+                Err(e) => text.push_str(&tr!("; not deleted from the device: {}", e)),
             }
         }
         if auto && r.histories == 0 && r.already == 0 && r.skipped == 0 {
@@ -187,11 +187,11 @@ fn import_playlist(cx: &Rc<Ctx>, dev: &str, id: &str) {
         let at = pls
             .iter()
             .position(|p| p.id == id)
-            .ok_or("that playlist is not on the device any more")?;
+            .ok_or(tr!("that playlist is not on the device any more"))?;
         let mut known: HashSet<String> = cx.lib.tracks(None)?.iter().map(store::key).collect();
         let mut stats = (0, 0);
         import_node(&cx.store, &*lib, &pls, at, None, &mut known, &mut stats)?;
-        Ok(format!(
+        Ok(tr!(
             "Imported {} into My Playlists: {} track(s), {} added to the collection",
             pls[at].name, stats.0, stats.1
         ))
@@ -228,39 +228,43 @@ fn delete_playlist(cx: &Rc<Ctx>, dev: &str, id: &str) {
         device::playlist_path(&pls, id),
         pls.iter().find(|p| p.id == id).map(|p| p.name.clone()),
     ) else {
-        return cx.say("That playlist is not on the device any more", true);
+        return cx.say(&tr!("That playlist is not on the device any more"), true);
     };
     let delete_tracks = Behaviour::load(&cx.store).delete_tracks;
     let text = if log {
-        format!("Delete the history {name} from {}?", d.label)
+        tr!("Delete the history {} from {}?", name, d.label)
     } else if delete_tracks {
-        format!(
-            "Delete {name} from {}? Tracks that no other playlist lists are deleted too.",
+        tr!(
+            "Delete {} from {}? Tracks that no other playlist lists are deleted too.",
+            name,
             d.label
         )
     } else {
-        format!(
-            "Delete {name} from {}? Its tracks stay on the device.",
+        tr!(
+            "Delete {} from {}? Its tracks stay on the device.",
+            name,
             d.label
         )
     };
-    cx.confirm(&text, "DELETE", move |c| {
+    cx.confirm(&text, tr!("DELETE"), move |c| {
         let config = device_settings::config(&c.store, &d.id);
-        c.start(Some(d.id.clone()), "Deleting", move |ctl| {
+        c.start(Some(d.id.clone()), tr!("Deleting"), move |ctl| {
             if log {
                 history::delete(&provider, &d.mount, &[name.clone()], &config, &ctl)?;
-                return Ok(format!("Deleted the history {name} from {}", d.label));
+                return Ok(tr!("Deleted the history {} from {}", name, d.label));
             }
             let target = RemoveTarget::Playlist { path };
             let r = provider.remove(&d.mount, &target, delete_tracks, &config, &ctl)?;
-            Ok(format!(
-                "Deleted {name} ({} list(s), {} track(s)) from {}{}",
+            Ok(tr!(
+                "Deleted {} ({} list(s), {} track(s)) from {}{}",
+                name,
                 r.playlists,
                 r.tracks,
                 d.label,
-                r.warnings.first().map_or(String::new(), |w| format!(
-                    " — {} file(s) could not be deleted, first: {w}",
-                    r.warnings.len()
+                r.warnings.first().map_or(String::new(), |w| tr!(
+                    " — {} file(s) could not be deleted, first: {}",
+                    r.warnings.len(),
+                    w
                 ))
             ))
         });
@@ -283,14 +287,15 @@ fn delete_track(cx: &Rc<Ctx>, dev: &str, file: &str) {
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     cx.confirm(
-        &format!(
-            "Delete {name} from {}? The file and its analysis are removed.",
+        &tr!(
+            "Delete {} from {}? The file and its analysis are removed.",
+            name,
             d.label
         ),
-        "DELETE",
+        tr!("DELETE"),
         move |c| {
             let config = device_settings::config(&c.store, &d.id);
-            c.start(Some(d.id.clone()), "Deleting", move |ctl| {
+            c.start(Some(d.id.clone()), tr!("Deleting"), move |ctl| {
                 let r = provider.remove(
                     &d.mount,
                     &RemoveTarget::Track { file },
@@ -298,7 +303,7 @@ fn delete_track(cx: &Rc<Ctx>, dev: &str, file: &str) {
                     &config,
                     &ctl,
                 )?;
-                Ok(format!("Deleted {} track(s) from {}", r.tracks, d.label))
+                Ok(tr!("Deleted {} track(s) from {}", r.tracks, d.label))
             });
         },
     );

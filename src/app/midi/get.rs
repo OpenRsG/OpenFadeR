@@ -70,7 +70,7 @@ pub fn best<'a>(ports: &[String], entries: &'a [Entry]) -> Option<&'a Entry> {
 fn user_dir() -> Result<PathBuf, String> {
     openfader::paths::config_dir()
         .map(|d| d.join("mappings"))
-        .ok_or_else(|| "no config folder (set HOME)".into())
+        .ok_or_else(|| tr!("no config folder (set HOME)").into())
 }
 
 /// Writes `e` into the user's mapping folder (through a `.part` file), after checking that it is a plain `*.xml` file name and that
@@ -84,7 +84,10 @@ fn install_in(dir: &Path, e: &Entry) -> Result<(), String> {
         .file_name()
         .is_some_and(|n| n == e.name.as_str());
     if !plain || !e.name.ends_with(".xml") {
-        return Err(format!("{:?} is not a mapping file name", e.name));
+        return Err(tr!(
+            "{} is not a mapping file name",
+            format!("{:?}", e.name)
+        ));
     }
     mapfile::parse(&e.text).map_err(|why| format!("{}: {why}", e.name))?;
     openfader::paths::at(std::fs::create_dir_all(dir), dir)?;

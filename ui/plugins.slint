@@ -98,7 +98,7 @@ component Badge inherits Rectangle {
 component CardMenu inherits IconButton {
     in property <int> index;
     icon: Icon.more;
-    tooltip: "More";
+    tooltip: @tr("More");
     clicked => { pop.show(); }
     pop := PopupWindow {
         x: root.width - self.width;
@@ -112,8 +112,8 @@ component CardMenu inherits IconButton {
             border-radius: Theme.radius;
             VerticalLayout {
                 padding: 1px;
-                MenuItem { text: "Open folder"; activated => { PluginState.open-folder(root.index); pop.close(); } }
-                MenuItem { text: "Uninstall"; activated => { PluginState.remove(root.index); pop.close(); } }
+                MenuItem { text: @tr("Open folder"); activated => { PluginState.open-folder(root.index); pop.close(); } }
+                MenuItem { text: @tr("Uninstall"); activated => { PluginState.remove(root.index); pop.close(); } }
             }
         }
     }
@@ -151,8 +151,8 @@ component Card inherits Rectangle {
                     }
                     if root.v.version != "": Text { text: root.v.version; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
                     Badge { text: root.v.kind; tone: root.v.kind == "LUA" ? Theme.accent-hi : root.v.kind == "PYTHON" ? Theme.cue : root.v.kind == "JSON" ? Theme.play : Theme.text-dim; y: 2px; }
-                    if !root.v.removable: Badge { text: "BUNDLED"; tone: Theme.text-dim; y: 2px; }
-                    if root.v.restart: Badge { text: "RESTART"; tone: Theme.cue; y: 2px; }
+                    if !root.v.removable: Badge { text: @tr("BUNDLED"); tone: Theme.text-dim; y: 2px; }
+                    if root.v.restart: Badge { text: @tr("RESTART"); tone: Theme.cue; y: 2px; }
                 }
                 Text {
                     text: root.v.description;
@@ -164,7 +164,7 @@ component Card inherits Rectangle {
                 Text { text: root.v.provides; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; }
             }
             Chip {
-                text: root.v.open ? "LESS" : root.v.settings.length > 0 ? "SETTINGS" : "MORE";
+                text: root.v.open ? @tr("LESS") : root.v.settings.length > 0 ? @tr("SETTINGS") : @tr("MORE");
                 width: 72px;
                 horizontal-stretch: 0;
                 font-size: Theme.font-xs;
@@ -175,7 +175,7 @@ component Card inherits Rectangle {
         if root.v.open: VerticalLayout {
             spacing: Theme.space-sm;
             padding-left: 26px;
-            if root.v.author != "": Text { text: "by " + root.v.author; color: Theme.text-dim; font-size: Theme.font-sm; }
+            if root.v.author != "": Text { text: @tr("by {}", root.v.author); color: Theme.text-dim; font-size: Theme.font-sm; }
             Text { text: root.v.folder; color: Theme.text-faint; font-size: Theme.font-xs; overflow: elide; }
             for s[k] in root.v.settings: VerticalLayout {
                 spacing: 2px;
@@ -195,8 +195,8 @@ component Card inherits Rectangle {
             HorizontalLayout {
                 spacing: Theme.space-md;
                 alignment: start;
-                Chip { text: "OPEN FOLDER"; width: 100px; font-size: Theme.font-xs; clicked => { PluginState.open-folder(root.index); } }
-                if root.v.homepage != "": Chip { text: "WEB PAGE"; width: 90px; font-size: Theme.font-xs; clicked => { PluginState.homepage(root.index); } }
+                Chip { text: @tr("OPEN FOLDER"); width: 100px; font-size: Theme.font-xs; clicked => { PluginState.open-folder(root.index); } }
+                if root.v.homepage != "": Chip { text: @tr("WEB PAGE"); width: 90px; font-size: Theme.font-xs; clicked => { PluginState.homepage(root.index); } }
             }
         }
     }
@@ -208,12 +208,12 @@ export component PluginManager inherits VerticalLayout {
     spacing: Theme.space-md;
     HorizontalLayout {
         spacing: Theme.space-md;
-        Text { text: "PLUGINS"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; }
+        Text { text: @tr("PLUGINS"); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; }
         Rectangle { horizontal-stretch: 1; }
-        Chip { text: "INSTALL FILE…"; width: 110px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: "A plugin .zip or its plugin.json"; clicked => { PluginState.install(false); } }
-        Chip { text: "INSTALL FOLDER…"; width: 120px; horizontal-stretch: 0; font-size: Theme.font-xs; clicked => { PluginState.install(true); } }
-        Chip { text: "OPEN PLUGINS FOLDER"; width: 150px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: PluginState.folder; clicked => { PluginState.open-folder(-1); } }
-        Chip { text: "RELOAD"; width: 70px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: "Read the plugin folders again"; clicked => { PluginState.reload(); } }
+        Chip { text: @tr("INSTALL FILE…"); width: 110px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: @tr("A plugin .zip or its plugin.json"); clicked => { PluginState.install(false); } }
+        Chip { text: @tr("INSTALL FOLDER…"); width: 120px; horizontal-stretch: 0; font-size: Theme.font-xs; clicked => { PluginState.install(true); } }
+        Chip { text: @tr("OPEN PLUGINS FOLDER"); width: 150px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: PluginState.folder; clicked => { PluginState.open-folder(-1); } }
+        Chip { text: @tr("RELOAD"); width: 70px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: @tr("Read the plugin folders again"); clicked => { PluginState.reload(); } }
     }
     Rectangle {
         height: 34px;
@@ -222,7 +222,7 @@ export component PluginManager inherits VerticalLayout {
         border-color: Theme.line-strong;
         background: Theme.bg;
         Text {
-            text: PluginState.message != "" ? PluginState.message : "Drop a plugin folder, .zip or plugin.json (or a theme .json, or audio files) anywhere on the window to install it.";
+            text: PluginState.message != "" ? PluginState.message : @tr("Drop a plugin folder, .zip or plugin.json (or a theme .json, or audio files) anywhere on the window to install it.");
             color: PluginState.message != "" ? Theme.text : Theme.text-dim;
             font-family: Theme.font;
             font-size: Theme.font-sm;
@@ -241,11 +241,11 @@ export component PluginManager inherits VerticalLayout {
             padding-right: Theme.space-sm;
             spacing: Theme.space-md;
             Text { text: PluginState.restart-text; color: Theme.text-bright; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
-            Chip { text: "RESTART NOW"; width: 110px; horizontal-stretch: 0; y: 4px; height: 24px; active: true; active-color: Theme.cue; clicked => { PluginState.restart(); } }
+            Chip { text: @tr("RESTART NOW"); width: 110px; horizontal-stretch: 0; y: 4px; height: 24px; active: true; active-color: Theme.cue; clicked => { PluginState.restart(); } }
         }
     }
     for v[i] in PluginState.plugins: Card { v: v; index: i; }
-    if PluginState.plugins.length == 0: Note { text: "No plugin found. Install one, or put plugin folders in " + PluginState.folder + "."; }
+    if PluginState.plugins.length == 0: Note { text: @tr("No plugin found. Install one, or put plugin folders in {}.", PluginState.folder); }
     for e in PluginState.errors: Text { text: "⚠ " + e; color: Theme.danger; font-family: Theme.font; font-size: Theme.font-sm; wrap: word-wrap; }
 }
 
@@ -269,8 +269,8 @@ component GetRow inherits Rectangle {
                 spacing: Theme.space-md;
                 alignment: start;
                 Text { text: root.v.name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
-                if root.v.version != "": Text { text: root.v.action == 1 ? root.v.installed + " → " + root.v.version : root.v.version; color: Theme.text-faint; font-size: Theme.font-xs; vertical-alignment: center; }
-                if root.v.native: Badge { text: "NATIVE"; tone: Theme.text-dim; }
+                if root.v.version != "": Text { text: root.v.action == 1 ? @tr("{} → {}", root.v.installed, root.v.version) : root.v.version; color: Theme.text-faint; font-size: Theme.font-xs; vertical-alignment: center; }
+                if root.v.native: Badge { text: @tr("NATIVE"); tone: Theme.text-dim; }
                 Text { text: root.v.repo; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; vertical-alignment: center; }
             }
             Text { text: root.v.description; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; overflow: elide; }
@@ -280,11 +280,11 @@ component GetRow inherits Rectangle {
             horizontal-stretch: 0;
             alignment: center;
             Chip {
-                text: root.v.action == 0 ? "INSTALL" : root.v.action == 1 ? "UPDATE" : "INSTALLED";
+                text: root.v.action == 0 ? @tr("INSTALL") : root.v.action == 1 ? @tr("UPDATE") : @tr("INSTALLED");
                 active: root.v.action != 2;
                 enabled: root.v.action != 2 && !CatalogState.busy;
                 font-size: Theme.font-xs;
-                tooltip: root.v.native ? "Downloads the prebuilt library for this computer when the repository has one" : root.v.description;
+                tooltip: root.v.native ? @tr("Downloads the prebuilt library for this computer when the repository has one") : root.v.description;
                 clicked => { CatalogState.install-plugin(root.index); }
             }
         }
@@ -295,14 +295,14 @@ component GetRow inherits Rectangle {
 export component GetPlugins inherits VerticalLayout {
     spacing: Theme.space-md;
     init => { CatalogState.opened(); }
-    Text { text: "GET PLUGINS"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
-    Note { text: "Plugins and themes come from GitHub repositories. Add a repository (owner/repo), then install what it holds with one click."; }
+    Text { text: @tr("GET PLUGINS"); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+    Note { text: @tr("Plugins and themes come from GitHub repositories. Add a repository (owner/repo), then install what it holds with one click."); }
     RepoBar { }
     HorizontalLayout {
         spacing: Theme.space-md;
         height: Theme.h-ctl;
         Text {
-            text: CatalogState.plugins.length == 1 ? "1 plugin in your repositories" : CatalogState.plugins.length + " plugins in your repositories";
+            text: CatalogState.plugins.length == 1 ? @tr("1 plugin in your repositories") : @tr("{} plugins in your repositories", CatalogState.plugins.length);
             vertical-alignment: center;
             color: Theme.text-dim;
             font-family: Theme.font;
@@ -310,12 +310,12 @@ export component GetPlugins inherits VerticalLayout {
         }
         Rectangle { horizontal-stretch: 1; }
         Chip {
-            text: "INSTALL ALL";
+            text: @tr("INSTALL ALL");
             width: 110px;
             horizontal-stretch: 0;
             active: CatalogState.plugins-todo > 0;
             enabled: CatalogState.plugins-todo > 0 && !CatalogState.busy;
-            tooltip: "Install or update every plugin below";
+            tooltip: @tr("Install or update every plugin below");
             clicked => { CatalogState.install-all-plugins(); }
         }
     }
@@ -352,8 +352,8 @@ export component PluginOverlays inherits Rectangle {
             spacing: Theme.space-md;
             vertical-stretch: 0;
             alignment: end;
-            Chip { text: "OK"; width: 80px; horizontal-stretch: 0; active: true; clicked => { PluginState.prompt-done(true); } }
-            Chip { text: "CANCEL"; width: 80px; horizontal-stretch: 0; clicked => { PluginState.prompt-done(false); } }
+            Chip { text: @tr("OK"); width: 80px; horizontal-stretch: 0; active: true; clicked => { PluginState.prompt-done(true); } }
+            Chip { text: @tr("CANCEL"); width: 80px; horizontal-stretch: 0; clicked => { PluginState.prompt-done(false); } }
         }
     }
 }

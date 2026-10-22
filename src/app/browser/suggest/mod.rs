@@ -161,9 +161,9 @@ impl Links {
 pub fn rank(mode: Mode, anchor: &Item, pool: &[Item], cond: &Conditions, links: &Links) -> Outcome {
     let blocked = match mode {
         Mode::Radar | Mode::Mood if anchor.features().is_none() => {
-            Some("the track has no analysis data yet (ANALYZE TRACK)")
+            Some(tr!("the track has no analysis data yet (ANALYZE TRACK)"))
         }
-        Mode::Era if anchor.year().is_none() => Some("the track has no year tag"),
+        Mode::Era if anchor.year().is_none() => Some(tr!("the track has no year tag")),
         _ => None,
     };
     let mut out = Outcome {

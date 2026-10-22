@@ -22,11 +22,11 @@ impl View {
         };
         let state = app.global::<BrowserState>();
         if text.trim().is_empty() {
-            return state.set_status("type what to search for, then press Enter".into());
+            return state.set_status(tr!("type what to search for, then press Enter").into());
         }
         if self.lib.search(&id, text) {
             self.load(app); // the old results go while the plugin works
-            state.set_status(format!("searching “{}”…", text.trim()).into());
+            state.set_status(tr!("searching “{}”…", text.trim()).into());
         }
     }
 }

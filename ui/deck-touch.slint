@@ -24,27 +24,27 @@ export component TouchDeck inherits Rectangle {
         alignment: start;
         HorizontalLayout {
             height: 48px; spacing: 8px;
-            Chip { width: 48px; horizontal-stretch: 0; text: ["A", "B", "C", "D"][root.index]; tooltip: "Load the selected library track"; clicked => { DeckState.load(root.index); } }
+            Chip { width: 48px; horizontal-stretch: 0; text: ["A", "B", "C", "D"][root.index]; tooltip: @tr("Load the selected library track"); clicked => { DeckState.load(root.index); } }
             DeckTitle { index: root.index; min-width: 0px; }
             DeckTimes { index: root.index; width: 64px; size: Theme.font-md; }
         }
         DeckOverview { index: root.index; height: Theme.h-overview + Theme.h-phrase; }
         HorizontalLayout {
             spacing: 4px;
-            Chip { text: "KEY SYNC"; enabled: root.v.loaded; clicked => { DeckState.key-sync(root.index); } }
-            Chip { text: "SYNC"; enabled: root.v.loaded; active: root.v.synced; clicked => { DeckState.sync(root.index); } }
-            Chip { text: "MASTER"; enabled: root.v.loaded; active: root.v.master; clicked => { DeckState.master-toggle(root.index); } }
+            Chip { text: @tr("KEY SYNC"); enabled: root.v.loaded; clicked => { DeckState.key-sync(root.index); } }
+            Chip { text: @tr("SYNC"); enabled: root.v.loaded; active: root.v.synced; clicked => { DeckState.sync(root.index); } }
+            Chip { text: @tr("MASTER"); enabled: root.v.loaded; active: root.v.master; clicked => { DeckState.master-toggle(root.index); } }
         }
         HorizontalLayout {
             spacing: 4px;
-            Chip { text: "Key −"; enabled: root.v.loaded; clicked => { DeckState.key-step(root.index, -1); } }
-            Chip { text: root.v.key-eff == "" ? "Reset key" : root.v.key-eff; enabled: root.v.loaded; clicked => { DeckState.key-reset(root.index); } }
-            Chip { text: "Key +"; enabled: root.v.loaded; clicked => { DeckState.key-step(root.index, 1); } }
+            Chip { text: @tr("Key −"); enabled: root.v.loaded; clicked => { DeckState.key-step(root.index, -1); } }
+            Chip { text: root.v.key-eff == "" ? @tr("Reset key") : root.v.key-eff; enabled: root.v.loaded; clicked => { DeckState.key-reset(root.index); } }
+            Chip { text: @tr("Key +"); enabled: root.v.loaded; clicked => { DeckState.key-step(root.index, 1); } }
         }
         if root.v.stems && root.v.stem-buttons: StemRow { index: root.index; h: Theme.touch-target; }
         HorizontalLayout {
             spacing: 4px;
-            for label[i] in ["Transport", "Pads", "Grid", "Cues"]: Chip {
+            for label[i] in [@tr("Transport"), @tr("Pads"), @tr("Grid"), @tr("Cues")]: Chip {
                 text: label; active: root.page == i;
                 clicked => {
                     root.page = i;
@@ -56,7 +56,7 @@ export component TouchDeck inherits Rectangle {
             height: 190px; spacing: 8px;
             VerticalLayout {
                 width: 56px; horizontal-stretch: 0; alignment: center; spacing: 8px;
-                RingButton { width: 56px; height: 56px; text: "CUE"; tone: Theme.cue; enabled: root.v.loaded; lit: root.v.at-cue; pressed => { DeckState.cue(root.index); } released => { DeckState.cue-released(root.index); } }
+                RingButton { width: 56px; height: 56px; text: @tr("CUE"); tone: Theme.cue; enabled: root.v.loaded; lit: root.v.at-cue; pressed => { DeckState.cue(root.index); } released => { DeckState.cue-released(root.index); } }
                 RingButton { width: 56px; height: 56px; icon: root.v.playing ? Icon.pause : Icon.play; tone: Theme.play; enabled: root.v.loaded; lit: root.v.playing; clicked => { DeckState.play-pause(root.index); } }
             }
             LoopBlock { index: root.index; min-width: 96px; }
@@ -65,15 +65,15 @@ export component TouchDeck inherits Rectangle {
         }
         if root.page == 0: HorizontalLayout {
             spacing: 4px;
-            Chip { text: "SLIP"; active: root.v.slip; enabled: root.v.loaded; clicked => { DeckState.slip(root.index); } }
-            Chip { text: "Quantize"; active: root.v.quantize; clicked => { DeckState.quantize(root.index); } }
-            Chip { text: "Key lock"; active: root.v.key-lock; clicked => { DeckState.key-lock(root.index); } }
+            Chip { text: @tr("SLIP"); active: root.v.slip; enabled: root.v.loaded; clicked => { DeckState.slip(root.index); } }
+            Chip { text: @tr("Quantize"); active: root.v.quantize; clicked => { DeckState.quantize(root.index); } }
+            Chip { text: @tr("Key lock"); active: root.v.key-lock; clicked => { DeckState.key-lock(root.index); } }
         }
         if root.page == 0: HorizontalLayout {
             spacing: 4px;
-            Chip { text: "Reverse"; active: root.v.reverse; enabled: root.v.loaded; clicked => { DeckState.reverse(root.index); } }
-            Chip { text: "Brake"; enabled: root.v.loaded; clicked => { DeckState.brake(root.index); } }
-            Chip { text: "Reset tempo"; enabled: root.v.loaded; clicked => { DeckState.tempo(root.index, 0.5); } }
+            Chip { text: @tr("Reverse"); active: root.v.reverse; enabled: root.v.loaded; clicked => { DeckState.reverse(root.index); } }
+            Chip { text: @tr("Brake"); enabled: root.v.loaded; clicked => { DeckState.brake(root.index); } }
+            Chip { text: @tr("Reset tempo"); enabled: root.v.loaded; clicked => { DeckState.tempo(root.index, 0.5); } }
         }
         if root.page == 1: Dropdown {
             options: root.v.stems ? DeckState.pad-mode-names-stems : DeckState.pad-mode-names;
@@ -90,8 +90,8 @@ export component TouchDeck inherits Rectangle {
         if root.page == 1: PadOptions { index: root.index; }
         if root.page == 1: HorizontalLayout {
             spacing: 4px;
-            Chip { text: "Delete cue"; active: root.v.delete-mode; active-color: Theme.danger; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.cue-delete(root.index); } }
-            Chip { text: "Memory cue"; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.memory-cue(root.index); } }
+            Chip { text: @tr("Delete cue"); active: root.v.delete-mode; active-color: Theme.danger; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.cue-delete(root.index); } }
+            Chip { text: @tr("Memory cue"); enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.memory-cue(root.index); } }
         }
         if root.page == 2: GridEdit { index: root.index; height: 4 * Theme.touch-target + 6px; }
         if root.page == 3: CueList {

@@ -13,9 +13,9 @@ pub(super) fn capture_span(
 ) -> Result<(f64, f64), String> {
     let end = beat_at(beats, start_ms)
         .and_then(|b| ms_at(beats, b + n as f64))
-        .ok_or("the track has no beat grid")?;
+        .ok_or(tr!("the track has no beat grid"))?;
     if end > duration_ms as f64 + 0.5 {
-        return Err(format!("{n} beats run past the end of the track"));
+        return Err(tr!("{} beats run past the end of the track", n));
     }
     Ok((start_ms, end))
 }
@@ -25,7 +25,7 @@ impl Deck {
     /// beat.
     pub(in crate::app) fn capture_range(&self, n: u32) -> Result<(f64, f64), String> {
         if !self.ready() {
-            return Err("load a track first".into());
+            return Err(tr!("load a track first").into());
         }
         let l = self.loaded.borrow();
         let (pos, _) = self.clock(&l);

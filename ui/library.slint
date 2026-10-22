@@ -43,7 +43,7 @@ export global LibraryState {
     in-out property <bool> confirm-open;
     in property <string> confirm-title;
     in property <string> confirm-text;
-    in property <string> confirm-yes: "YES";
+    in property <string> confirm-yes: @tr("YES");
     in property <string> confirm-no;
     callback confirm-done(int);
     /// Missing File Manager.
@@ -149,14 +149,14 @@ export component LibraryOverlays inherits Rectangle {
                 accepted => { LibraryState.path-done(true); }
                 init => { self.focus-field(); }
             }
-            if LibraryState.path-browse: Chip { text: "BROWSE…"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.path-browse-clicked(); } }
+            if LibraryState.path-browse: Chip { text: @tr("BROWSE…"); width: 80px; horizontal-stretch: 0; clicked => { LibraryState.path-browse-clicked(); } }
         }
         HorizontalLayout {
             spacing: Theme.space-md;
             vertical-stretch: 0;
             alignment: end;
-            Chip { text: "OK"; width: 80px; horizontal-stretch: 0; active: true; clicked => { LibraryState.path-done(true); } }
-            Chip { text: "CANCEL"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.path-done(false); } }
+            Chip { text: @tr("OK"); width: 80px; horizontal-stretch: 0; active: true; clicked => { LibraryState.path-done(true); } }
+            Chip { text: @tr("CANCEL"); width: 80px; horizontal-stretch: 0; clicked => { LibraryState.path-done(false); } }
         }
     }
 
@@ -173,18 +173,18 @@ export component LibraryOverlays inherits Rectangle {
             alignment: end;
             Chip { text: LibraryState.confirm-yes; width: 100px; horizontal-stretch: 0; active: true; clicked => { LibraryState.confirm-done(1); } }
             if LibraryState.confirm-no != "": Chip { text: LibraryState.confirm-no; width: 100px; horizontal-stretch: 0; clicked => { LibraryState.confirm-done(2); } }
-            Chip { text: "CANCEL"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.confirm-done(0); } }
+            Chip { text: @tr("CANCEL"); width: 80px; horizontal-stretch: 0; clicked => { LibraryState.confirm-done(0); } }
         }
     }
 
     // Missing File Manager.
     DialogFrame {
         visible: LibraryState.missing-open;
-        title: "MISSING FILE MANAGER";
+        title: @tr("MISSING FILE MANAGER");
         card-width: 820px;
         card-height: 520px;
         closed => { LibraryState.missing-open = false; }
-        Note { text: "Tracks whose audio file cannot be found. Tick tracks, then RELOCATE (choose the new file of the first one; the others are looked for in its folder), AUTO RELOCATE (search the Auto Relocate Search Folders from Preferences > Advanced > Database) or DELETE (remove from the Collection; files are never deleted). None ticked = all."; vertical-stretch: 0; }
+        Note { text: @tr("Tracks whose audio file cannot be found. Tick tracks, then RELOCATE (choose the new file of the first one; the others are looked for in its folder), AUTO RELOCATE (search the Auto Relocate Search Folders from Preferences > Advanced > Database) or DELETE (remove from the Collection; files are never deleted). None ticked = all."); vertical-stretch: 0; }
         Rectangle {
             background: Theme.bg-deep;
             border-color: Theme.line-strong;
@@ -193,7 +193,7 @@ export component LibraryOverlays inherits Rectangle {
                 for row[i] in LibraryState.missing-rows: MissingLine { item: row; toggled => { LibraryState.missing-toggle(i); } }
             }
             if LibraryState.missing-rows.length == 0: Text {
-                text: LibraryState.busy ? "Searching…" : "No missing files";
+                text: LibraryState.busy ? @tr("Searching…") : @tr("No missing files");
                 horizontal-alignment: center;
                 vertical-alignment: center;
                 color: Theme.text-faint;
@@ -205,24 +205,24 @@ export component LibraryOverlays inherits Rectangle {
         HorizontalLayout {
             spacing: Theme.space-md;
             vertical-stretch: 0;
-            Chip { text: "SELECT ALL"; width: 100px; horizontal-stretch: 0; clicked => { LibraryState.missing-all(); } }
-            Chip { text: "RESCAN"; width: 80px; horizontal-stretch: 0; enabled: !LibraryState.busy; clicked => { LibraryState.missing-rescan(); } }
+            Chip { text: @tr("SELECT ALL"); width: 100px; horizontal-stretch: 0; clicked => { LibraryState.missing-all(); } }
+            Chip { text: @tr("RESCAN"); width: 80px; horizontal-stretch: 0; enabled: !LibraryState.busy; clicked => { LibraryState.missing-rescan(); } }
             Rectangle { horizontal-stretch: 1; }
-            Chip { text: "RELOCATE"; width: 100px; horizontal-stretch: 0; enabled: !LibraryState.busy && LibraryState.missing-rows.length > 0; clicked => { LibraryState.missing-relocate(); } }
-            Chip { text: "AUTO RELOCATE"; width: 120px; horizontal-stretch: 0; enabled: !LibraryState.busy && LibraryState.missing-rows.length > 0; clicked => { LibraryState.missing-auto(); } }
-            Chip { text: "DELETE"; width: 80px; horizontal-stretch: 0; enabled: !LibraryState.busy && LibraryState.missing-rows.length > 0; clicked => { LibraryState.missing-delete(); } }
-            Chip { text: "CLOSE"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.missing-open = false; } }
+            Chip { text: @tr("RELOCATE"); width: 100px; horizontal-stretch: 0; enabled: !LibraryState.busy && LibraryState.missing-rows.length > 0; clicked => { LibraryState.missing-relocate(); } }
+            Chip { text: @tr("AUTO RELOCATE"); width: 120px; horizontal-stretch: 0; enabled: !LibraryState.busy && LibraryState.missing-rows.length > 0; clicked => { LibraryState.missing-auto(); } }
+            Chip { text: @tr("DELETE"); width: 80px; horizontal-stretch: 0; enabled: !LibraryState.busy && LibraryState.missing-rows.length > 0; clicked => { LibraryState.missing-delete(); } }
+            Chip { text: @tr("CLOSE"); width: 80px; horizontal-stretch: 0; clicked => { LibraryState.missing-open = false; } }
         }
     }
 
     // Duplicated File Manager.
     DialogFrame {
         visible: LibraryState.dupes-open;
-        title: "DUPLICATED FILE MANAGER";
+        title: @tr("DUPLICATED FILE MANAGER");
         card-width: 820px;
         card-height: 520px;
         closed => { LibraryState.dupes-open = false; }
-        Note { text: "Tracks with the same title and artist (length within 1 s). The filled circle is the representative file. MERGE keeps it, adds the cues, playlist places, tags and plays of the others to it and removes the others from the Collection; DELETE removes the ticked tracks from the Collection. Files are never deleted."; vertical-stretch: 0; }
+        Note { text: @tr("Tracks with the same title and artist (length within 1 s). The filled circle is the representative file. MERGE keeps it, adds the cues, playlist places, tags and plays of the others to it and removes the others from the Collection; DELETE removes the ticked tracks from the Collection. Files are never deleted."); vertical-stretch: 0; }
         Rectangle {
             background: Theme.bg-deep;
             border-color: Theme.line-strong;
@@ -231,7 +231,7 @@ export component LibraryOverlays inherits Rectangle {
                 for row[i] in LibraryState.dupes-rows: DupeLine { item: row; toggled => { LibraryState.dupes-toggle(i); } kept => { LibraryState.dupes-keep(i); } }
             }
             if LibraryState.dupes-rows.length == 0: Text {
-                text: "No duplicate track found";
+                text: @tr("No duplicate track found");
                 horizontal-alignment: center;
                 vertical-alignment: center;
                 color: Theme.text-faint;
@@ -244,10 +244,10 @@ export component LibraryOverlays inherits Rectangle {
             spacing: Theme.space-md;
             vertical-stretch: 0;
             alignment: end;
-            Chip { text: "MERGE"; width: 90px; horizontal-stretch: 0; enabled: LibraryState.dupes-rows.length > 0; active: true; clicked => { LibraryState.dupes-merge(); } }
-            Chip { text: "DELETE"; width: 90px; horizontal-stretch: 0; enabled: LibraryState.dupes-rows.length > 0; clicked => { LibraryState.dupes-delete(); } }
-            Chip { text: "RESCAN"; width: 90px; horizontal-stretch: 0; clicked => { LibraryState.dupes-rescan(); } }
-            Chip { text: "CLOSE"; width: 80px; horizontal-stretch: 0; clicked => { LibraryState.dupes-open = false; } }
+            Chip { text: @tr("MERGE"); width: 90px; horizontal-stretch: 0; enabled: LibraryState.dupes-rows.length > 0; active: true; clicked => { LibraryState.dupes-merge(); } }
+            Chip { text: @tr("DELETE"); width: 90px; horizontal-stretch: 0; enabled: LibraryState.dupes-rows.length > 0; clicked => { LibraryState.dupes-delete(); } }
+            Chip { text: @tr("RESCAN"); width: 90px; horizontal-stretch: 0; clicked => { LibraryState.dupes-rescan(); } }
+            Chip { text: @tr("CLOSE"); width: 80px; horizontal-stretch: 0; clicked => { LibraryState.dupes-open = false; } }
         }
     }
 }

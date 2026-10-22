@@ -69,7 +69,10 @@ pub(super) fn install(i: i32) {
     match get::install(&skin) {
         Ok(name) => say(
             &s,
-            &format!("{name} installed: it is in the gallery above, APPLY to use it"),
+            &tr!(
+                "{} installed: it is in the gallery above, APPLY to use it",
+                name
+            ),
             false,
         ),
         Err(e) => say(&s, &e, true),

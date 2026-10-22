@@ -171,116 +171,116 @@ export component App inherits Window {
 
     if !root.touch: MenuBar {
         Menu {
-            title: "File";
+            title: @tr("File");
             Menu {
-                title: "Import";
-                MenuItem { title: "Import Track…"; activated => { LibraryState.action("import-track"); } }
-                MenuItem { title: "Import Folder…"; activated => { LibraryState.action("import-folder"); } }
-                MenuItem { title: "Import Playlist…"; activated => { LibraryState.action("import-playlist"); } }
+                title: @tr("Import");
+                MenuItem { title: @tr("Import Track…"); activated => { LibraryState.action("import-track"); } }
+                MenuItem { title: @tr("Import Folder…"); activated => { LibraryState.action("import-folder"); } }
+                MenuItem { title: @tr("Import Playlist…"); activated => { LibraryState.action("import-playlist"); } }
                 for label[i] in LibraryState.import-readers: MenuItem { title: label; activated => { LibraryState.action("import-collection:" + i); } }
             }
             MenuSeparator {}
-            MenuItem { title: "Display All Missing Files"; activated => { LibraryState.action("missing"); } }
-            MenuItem { title: "Display All Duplicated Files"; activated => { LibraryState.action("dupes"); } }
+            MenuItem { title: @tr("Display All Missing Files"); activated => { LibraryState.action("missing"); } }
+            MenuItem { title: @tr("Display All Duplicated Files"); activated => { LibraryState.action("dupes"); } }
             Menu {
-                title: "Library";
-                MenuItem { title: "Backup Library…"; activated => { LibraryState.action("backup"); } }
-                MenuItem { title: "Restore Library…"; activated => { LibraryState.action("restore"); } }
-                MenuItem { title: "Backed up device library management…"; activated => { DeviceState.manage-backups(); } }
+                title: @tr("Library");
+                MenuItem { title: @tr("Backup Library…"); activated => { LibraryState.action("backup"); } }
+                MenuItem { title: @tr("Restore Library…"); activated => { LibraryState.action("restore"); } }
+                MenuItem { title: @tr("Backed up device library management…"); activated => { DeviceState.manage-backups(); } }
             }
             Menu {
-                title: "Export Collection";
+                title: @tr("Export Collection");
                 for label[i] in LibraryState.export-writers: MenuItem { title: label; activated => { LibraryState.action("export-collection:" + i); } }
             }
             MenuSeparator {}
-            MenuItem { title: "Preferences…"; activated => { PrefsState.visible = true; } }
-            MenuItem { title: "Exit"; activated => { LibraryState.action("exit"); } }
+            MenuItem { title: @tr("Preferences…"); activated => { PrefsState.visible = true; } }
+            MenuItem { title: @tr("Exit"); activated => { LibraryState.action("exit"); } }
         }
         Menu {
-            title: "Edit";
-            MenuItem { title: LibraryState.undo-label == "" ? "Undo (Ctrl+Z)" : "Undo " + LibraryState.undo-label + " (Ctrl+Z)"; enabled: LibraryState.undo-label != ""; activated => { LibraryState.action("undo"); } }
-            MenuItem { title: LibraryState.redo-label == "" ? "Redo (Ctrl+Shift+Z)" : "Redo " + LibraryState.redo-label + " (Ctrl+Shift+Z)"; enabled: LibraryState.redo-label != ""; activated => { LibraryState.action("redo"); } }
+            title: @tr("Edit");
+            MenuItem { title: LibraryState.undo-label == "" ? @tr("Undo (Ctrl+Z)") : @tr("Undo {} (Ctrl+Z)", LibraryState.undo-label); enabled: LibraryState.undo-label != ""; activated => { LibraryState.action("undo"); } }
+            MenuItem { title: LibraryState.redo-label == "" ? @tr("Redo (Ctrl+Shift+Z)") : @tr("Redo {} (Ctrl+Shift+Z)", LibraryState.redo-label); enabled: LibraryState.redo-label != ""; activated => { LibraryState.action("redo"); } }
         }
         Menu {
-            title: "Track";
-            MenuItem { title: "Edit Track Details…"; activated => { LibraryState.action("track-edit"); } }
-            MenuItem { title: "Import To Collection"; activated => { LibraryState.action("track-import"); } }
-            MenuItem { title: "Analyze Track"; activated => { LibraryState.action("track-analyze"); } }
-            MenuItem { title: "Analysis Lock"; activated => { LibraryState.action("track-lock"); } }
-            MenuItem { title: "Reload Tag"; activated => { LibraryState.action("track-reload-tag"); } }
-            MenuItem { title: "Show in File Manager"; activated => { LibraryState.action("track-show"); } }
+            title: @tr("Track");
+            MenuItem { title: @tr("Edit Track Details…"); activated => { LibraryState.action("track-edit"); } }
+            MenuItem { title: @tr("Import To Collection"); activated => { LibraryState.action("track-import"); } }
+            MenuItem { title: @tr("Analyze Track"); activated => { LibraryState.action("track-analyze"); } }
+            MenuItem { title: @tr("Analysis Lock"); activated => { LibraryState.action("track-lock"); } }
+            MenuItem { title: @tr("Reload Tag"); activated => { LibraryState.action("track-reload-tag"); } }
+            MenuItem { title: @tr("Show in File Manager"); activated => { LibraryState.action("track-show"); } }
             MenuSeparator {}
-            MenuItem { title: "Relocate…"; activated => { LibraryState.action("track-relocate"); } }
-            MenuItem { title: "Auto Relocate"; activated => { LibraryState.action("track-auto-relocate"); } }
-            MenuItem { title: "Remove from Collection"; activated => { LibraryState.action("track-remove"); } }
+            MenuItem { title: @tr("Relocate…"); activated => { LibraryState.action("track-relocate"); } }
+            MenuItem { title: @tr("Auto Relocate"); activated => { LibraryState.action("track-auto-relocate"); } }
+            MenuItem { title: @tr("Remove from Collection"); activated => { LibraryState.action("track-remove"); } }
             MenuSeparator {}
-            MenuItem { title: "Add to Tag List"; activated => { BrowserState.tag-add(); } }
-            MenuItem { title: "Add to Playlist…"; activated => { BrowserState.panel-request(0); } }
-            MenuItem { title: "Tags…"; activated => { BrowserState.panel-request(1); } }
+            MenuItem { title: @tr("Add to Tag List"); activated => { BrowserState.tag-add(); } }
+            MenuItem { title: @tr("Add to Playlist…"); activated => { BrowserState.panel-request(0); } }
+            MenuItem { title: @tr("Tags…"); activated => { BrowserState.panel-request(1); } }
         }
         Menu {
-            title: "Playlist";
-            MenuItem { title: "Create New Playlist"; activated => { LibraryState.action("playlist-new"); } }
-            MenuItem { title: "Create New Intelligent Playlist"; activated => { LibraryState.action("playlist-new-smart"); } }
-            MenuItem { title: "Create New Folder"; activated => { LibraryState.action("playlist-new-folder"); } }
-            MenuItem { title: "Delete Playlist"; activated => { LibraryState.action("playlist-delete"); } }
+            title: @tr("Playlist");
+            MenuItem { title: @tr("Create New Playlist"); activated => { LibraryState.action("playlist-new"); } }
+            MenuItem { title: @tr("Create New Intelligent Playlist"); activated => { LibraryState.action("playlist-new-smart"); } }
+            MenuItem { title: @tr("Create New Folder"); activated => { LibraryState.action("playlist-new-folder"); } }
+            MenuItem { title: @tr("Delete Playlist"); activated => { LibraryState.action("playlist-delete"); } }
             MenuSeparator {}
             Menu {
-                title: "Sort Items";
-                MenuItem { title: "Track Title"; activated => { LibraryState.action("playlist-sort-title"); } }
-                MenuItem { title: "Artist"; activated => { LibraryState.action("playlist-sort-artist"); } }
-                MenuItem { title: "Genre"; activated => { LibraryState.action("playlist-sort-genre"); } }
+                title: @tr("Sort Items");
+                MenuItem { title: @tr("Track Title"); activated => { LibraryState.action("playlist-sort-title"); } }
+                MenuItem { title: @tr("Artist"); activated => { LibraryState.action("playlist-sort-artist"); } }
+                MenuItem { title: @tr("Genre"); activated => { LibraryState.action("playlist-sort-genre"); } }
                 MenuItem { title: "BPM"; activated => { LibraryState.action("playlist-sort-bpm"); } }
-                MenuItem { title: "Key"; activated => { LibraryState.action("playlist-sort-key"); } }
-                MenuItem { title: "Time"; activated => { LibraryState.action("playlist-sort-time"); } }
-                MenuItem { title: "Rating"; activated => { LibraryState.action("playlist-sort-rating"); } }
-                MenuItem { title: "Comments"; activated => { LibraryState.action("playlist-sort-comment"); } }
+                MenuItem { title: @tr("Key"); activated => { LibraryState.action("playlist-sort-key"); } }
+                MenuItem { title: @tr("Time"); activated => { LibraryState.action("playlist-sort-time"); } }
+                MenuItem { title: @tr("Rating"); activated => { LibraryState.action("playlist-sort-rating"); } }
+                MenuItem { title: @tr("Comments"); activated => { LibraryState.action("playlist-sort-comment"); } }
             }
-            MenuItem { title: "Renumber Track Order"; activated => { LibraryState.action("playlist-renumber"); } }
+            MenuItem { title: @tr("Renumber Track Order"); activated => { LibraryState.action("playlist-renumber"); } }
             MenuSeparator {}
             Menu {
-                title: "Export a playlist to a file";
+                title: @tr("Export a playlist to a file");
                 MenuItem { title: "M3U8"; activated => { LibraryState.action("playlist-export-m3u8"); } }
                 MenuItem { title: "PLS"; activated => { LibraryState.action("playlist-export-pls"); } }
-                MenuItem { title: "Text"; activated => { LibraryState.action("playlist-export-text"); } }
+                MenuItem { title: @tr("Text"); activated => { LibraryState.action("playlist-export-text"); } }
             }
-            MenuItem { title: "Export Playlist (to a device)…"; activated => { LibraryState.action("playlist-export-device"); } }
-            MenuItem { title: "Import Playlist…"; activated => { LibraryState.action("playlist-import"); } }
+            MenuItem { title: @tr("Export Playlist (to a device)…"); activated => { LibraryState.action("playlist-export-device"); } }
+            MenuItem { title: @tr("Import Playlist…"); activated => { LibraryState.action("playlist-import"); } }
         }
         Menu {
-            title: "View";
-            MenuItem { title: "Full Screen"; activated => { root.full-screen = !root.full-screen; } }
+            title: @tr("View");
+            MenuItem { title: @tr("Full Screen"); activated => { root.full-screen = !root.full-screen; } }
             MenuSeparator {}
-            if root.stage: MenuItem { title: "2Deck Horizontal"; activated => { root.set-layout(0); } }
-            if root.stage: MenuItem { title: "2Deck Vertical"; activated => { root.set-layout(1); } }
-            if root.stage: MenuItem { title: "4Deck Horizontal"; activated => { root.set-layout(2); } }
-            if root.stage: MenuItem { title: "4Deck Vertical"; activated => { root.set-layout(3); } }
-            if root.stage: MenuItem { title: "Browse"; activated => { root.set-layout(4); } }
-            if !root.stage: MenuItem { title: "1 PLAYER"; activated => { root.set-export-layout(0); } }
-            if !root.stage: MenuItem { title: "2 PLAYER"; activated => { root.set-export-layout(1); } }
-            if !root.stage: MenuItem { title: "DUAL PLAYER"; activated => { root.set-export-layout(2); } }
-            if !root.stage: MenuItem { title: "SIMPLE PLAYER"; activated => { root.set-export-layout(3); } }
-            if !root.stage: MenuItem { title: "FULL BROWSER"; activated => { root.set-export-layout(4); } }
-            MenuItem { title: LayoutState.split-open ? "Close Split Screen" : "Split Screen"; activated => { LayoutState.split-toggle(); } }
+            if root.stage: MenuItem { title: @tr("2Deck Horizontal"); activated => { root.set-layout(0); } }
+            if root.stage: MenuItem { title: @tr("2Deck Vertical"); activated => { root.set-layout(1); } }
+            if root.stage: MenuItem { title: @tr("4Deck Horizontal"); activated => { root.set-layout(2); } }
+            if root.stage: MenuItem { title: @tr("4Deck Vertical"); activated => { root.set-layout(3); } }
+            if root.stage: MenuItem { title: @tr("Browse"); activated => { root.set-layout(4); } }
+            if !root.stage: MenuItem { title: @tr("1 PLAYER"); activated => { root.set-export-layout(0); } }
+            if !root.stage: MenuItem { title: @tr("2 PLAYER"); activated => { root.set-export-layout(1); } }
+            if !root.stage: MenuItem { title: @tr("DUAL PLAYER"); activated => { root.set-export-layout(2); } }
+            if !root.stage: MenuItem { title: @tr("SIMPLE PLAYER"); activated => { root.set-export-layout(3); } }
+            if !root.stage: MenuItem { title: @tr("FULL BROWSER"); activated => { root.set-export-layout(4); } }
+            MenuItem { title: LayoutState.split-open ? @tr("Close Split Screen") : @tr("Split Screen"); activated => { LayoutState.split-toggle(); } }
             MenuSeparator {}
-            MenuItem { title: "Mixer"; activated => { PrefsState.chose("show_mixer", root.show-mixer ? 0 : 1); } }
-            MenuItem { title: "Effect Panel"; activated => { FxState.open = !FxState.open; } }
-            MenuItem { title: "Sampler"; activated => { SamplerState.open = !SamplerState.open; } }
-            MenuItem { title: "BEAT LAB"; enabled: GrooveState.enabled; activated => { GrooveState.open = !GrooveState.open; } }
+            MenuItem { title: @tr("Mixer"); activated => { PrefsState.chose("show_mixer", root.show-mixer ? 0 : 1); } }
+            MenuItem { title: @tr("Effect Panel"); activated => { FxState.open = !FxState.open; } }
+            MenuItem { title: @tr("Sampler"); activated => { SamplerState.open = !SamplerState.open; } }
+            MenuItem { title: @tr("BEAT LAB"); enabled: GrooveState.enabled; activated => { GrooveState.open = !GrooveState.open; } }
             MenuSeparator {}
-            MenuItem { title: "Related Tracks"; activated => { BrowserState.related-toggled(!BrowserState.related); } }
-            MenuItem { title: "Tags"; activated => { BrowserState.panel-request(1); } }
-            MenuItem { title: "Automix"; activated => { AutomixState.toggled(); } }
+            MenuItem { title: @tr("Related Tracks"); activated => { BrowserState.related-toggled(!BrowserState.related); } }
+            MenuItem { title: @tr("Tags"); activated => { BrowserState.panel-request(1); } }
+            MenuItem { title: @tr("Automix"); activated => { AutomixState.toggled(); } }
         }
         if PluginState.actions.length > 0: Menu {
-            title: "Plugins";
+            title: @tr("Plugins");
             for action[i] in PluginState.actions: MenuItem { title: action; activated => { PluginState.run(i); } }
         }
         Menu {
-            title: "Help";
-            MenuItem { title: "Keyboard Shortcuts"; activated => { KeysState.help-visible = !KeysState.help-visible; } }
-            MenuItem { title: "Welcome"; activated => { WelcomeState.show(); } }
-            MenuItem { title: "About OpenFadeR"; activated => { AboutState.visible = true; } }
+            title: @tr("Help");
+            MenuItem { title: @tr("Keyboard Shortcuts"); activated => { KeysState.help-visible = !KeysState.help-visible; } }
+            MenuItem { title: @tr("Welcome"); activated => { WelcomeState.show(); } }
+            MenuItem { title: @tr("About OpenFadeR"); activated => { AboutState.visible = true; } }
         }
     }
 
@@ -400,8 +400,8 @@ export component App inherits Window {
         prog := Text { x: parent.width - self.width - 52px - Theme.space-lg; height: parent.height; text: TrackInfoState.progress; vertical-alignment: center; color: Theme.accent; font-size: Theme.font-size; }
         DeviceProgress { x: parent.width - self.width - prog.width - 100px; y: (parent.height - self.height) / 2; }
         // Split screen (bottom right): the browser in a second window, and the switch to the other window.
-        IconButton { x: parent.width - 50px; y: 2px; width: 22px; height: 18px; icon: Icon.layout-dual; active: LayoutState.split-open; tooltip: "Split screen: the browser in a window of its own"; clicked => { LayoutState.split-toggle(); } }
-        IconButton { x: parent.width - 26px; y: 2px; width: 22px; height: 18px; icon: Icon.browse; enabled: LayoutState.split-open; tooltip: "Switch the active window"; clicked => { LayoutState.split-switch(); } }
+        IconButton { x: parent.width - 50px; y: 2px; width: 22px; height: 18px; icon: Icon.layout-dual; active: LayoutState.split-open; tooltip: @tr("Split screen: the browser in a window of its own"); clicked => { LayoutState.split-toggle(); } }
+        IconButton { x: parent.width - 26px; y: 2px; width: 22px; height: 18px; icon: Icon.browse; enabled: LayoutState.split-open; tooltip: @tr("Switch the active window"); clicked => { LayoutState.split-switch(); } }
     }
 
     // The full-window views start under the global bar.
@@ -429,10 +429,10 @@ export component App inherits Window {
                 width: 120px;
                 horizontal-stretch: 0;
                 list-width: 150px;
-                options: LightingState.enabled && VideoState.enabled ? ["EXPORT", "PERFORMANCE", "EDIT", "LIGHTING (BETA)", "VIDEO (BETA)"]
-                    : LightingState.enabled ? ["EXPORT", "PERFORMANCE", "EDIT", "LIGHTING (BETA)"]
-                    : VideoState.enabled ? ["EXPORT", "PERFORMANCE", "EDIT", "VIDEO (BETA)"]
-                    : ["EXPORT", "PERFORMANCE", "EDIT"];
+                options: LightingState.enabled && VideoState.enabled ? [@tr("EXPORT"), @tr("PERFORMANCE"), @tr("EDIT"), @tr("LIGHTING (BETA)"), @tr("VIDEO (BETA)")]
+                    : LightingState.enabled ? [@tr("EXPORT"), @tr("PERFORMANCE"), @tr("EDIT"), @tr("LIGHTING (BETA)")]
+                    : VideoState.enabled ? [@tr("EXPORT"), @tr("PERFORMANCE"), @tr("EDIT"), @tr("VIDEO (BETA)")]
+                    : [@tr("EXPORT"), @tr("PERFORMANCE"), @tr("EDIT")];
                 current: root.mode == 4 && !LightingState.enabled ? 3 : root.mode;
                 chose(n) => { root.set-mode(n == 3 && !LightingState.enabled ? 4 : n); }
             }
@@ -441,7 +441,7 @@ export component App inherits Window {
                 horizontal-stretch: 0;
                 compact: true;
                 list-width: 170px;
-                options: ["2Deck Horizontal", "2Deck Vertical", "4Deck Horizontal", "4Deck Vertical", "Browse"];
+                options: [@tr("2Deck Horizontal"), @tr("2Deck Vertical"), @tr("4Deck Horizontal"), @tr("4Deck Vertical"), @tr("Browse")];
                 icons: [Icon.layout-2h, Icon.layout-2v, Icon.layout-4h, Icon.layout-4v, Icon.browse];
                 current: root.layout;
                 chose(n) => { root.set-layout(n); }
@@ -459,27 +459,27 @@ export component App inherits Window {
             HorizontalLayout {
                 spacing: Theme.gap;
                 horizontal-stretch: 0;
-                if root.mode == 1: IconButton { icon: Icon.fx; active: root.show-fx; tooltip: "FX"; clicked => { FxState.open = !FxState.open; } }
-                if root.mode == 1 && GrooveState.enabled && !root.browse-on: IconButton { icon: Icon.shuffle; active: GrooveState.open; tooltip: "BEAT LAB"; clicked => { GrooveState.open = !GrooveState.open; } }
-                if root.mode == 1 && MixPointState.enabled && !root.browse-on: IconButton { icon: Icon.mix-point; active: MixPointState.open; tooltip: "MIX POINT LINK"; clicked => { MixPointState.open = !MixPointState.open; } }
-                if root.mode == 1: IconButton { icon: Icon.grid; active: SamplerState.open; tooltip: "SAMPLER"; clicked => { SamplerState.open = !SamplerState.open; } }
-                if root.mode == 1: IconButton { icon: Icon.mixer; active: root.show-mixer; tooltip: "MIXER"; clicked => { PrefsState.chose("show_mixer", root.show-mixer ? 0 : 1); } }
+                if root.mode == 1: IconButton { icon: Icon.fx; active: root.show-fx; tooltip: @tr("FX"); clicked => { FxState.open = !FxState.open; } }
+                if root.mode == 1 && GrooveState.enabled && !root.browse-on: IconButton { icon: Icon.shuffle; active: GrooveState.open; tooltip: @tr("BEAT LAB"); clicked => { GrooveState.open = !GrooveState.open; } }
+                if root.mode == 1 && MixPointState.enabled && !root.browse-on: IconButton { icon: Icon.mix-point; active: MixPointState.open; tooltip: @tr("MIX POINT LINK"); clicked => { MixPointState.open = !MixPointState.open; } }
+                if root.mode == 1: IconButton { icon: Icon.grid; active: SamplerState.open; tooltip: @tr("SAMPLER"); clicked => { SamplerState.open = !SamplerState.open; } }
+                if root.mode == 1: IconButton { icon: Icon.mixer; active: root.show-mixer; tooltip: @tr("MIXER"); clicked => { PrefsState.chose("show_mixer", root.show-mixer ? 0 : 1); } }
                 IconButton {
                     icon: Icon.rec;
                     active: root.mode == 0 ? ExportModeState.rec-open : MixerState.bus.rec;
                     active-color: Theme.rec;
-                    tooltip: root.mode == 0 ? "REC panel" : "REC (master out)";
+                    tooltip: root.mode == 0 ? @tr("REC panel") : @tr("REC (master out)");
                     clicked => { if (root.mode == 0) { ExportModeState.rec-open = !ExportModeState.rec-open; } else { MixerState.rec-toggled(); } }
                 }
-                if VideoState.enabled: IconButton { icon: Icon.video; active: root.mode == 4; tooltip: "VIDEO (BETA)"; clicked => { root.set-mode(root.mode == 4 ? 1 : 4); } }
-                if LightingState.enabled: IconButton { icon: Icon.light; active: root.mode == 3; tooltip: "LIGHTING (BETA)"; clicked => { root.set-mode(root.mode == 3 ? 1 : 3); } }
+                if VideoState.enabled: IconButton { icon: Icon.video; active: root.mode == 4; tooltip: @tr("VIDEO (BETA)"); clicked => { root.set-mode(root.mode == 4 ? 1 : 4); } }
+                if LightingState.enabled: IconButton { icon: Icon.light; active: root.mode == 3; tooltip: @tr("LIGHTING (BETA)"); clicked => { root.set-mode(root.mode == 3 ? 1 : 3); } }
             }
             if MixerState.bus.rec: Text { text: MixerState.bus.rec-text; vertical-alignment: center; horizontal-stretch: 0; color: Theme.rec.brighter(0.4); font-size: Theme.font-md; font-weight: Theme.weight-bold; }
             Rectangle { horizontal-stretch: 1; }
             MidiChip { width: 44px; height: Theme.h-ctl; horizontal-stretch: 0; }
             DeviceChip { width: 70px; horizontal-stretch: 0; }
-            IconButton { icon: Icon.info; active: KeysState.help-visible; tooltip: "SHORTCUTS (?)"; clicked => { KeysState.help-visible = !KeysState.help-visible; } }
-            Chip { text: "PREFS"; width: 54px; horizontal-stretch: 0; clicked => { PrefsState.visible = true; } }
+            IconButton { icon: Icon.info; active: KeysState.help-visible; tooltip: @tr("SHORTCUTS (?)"); clicked => { KeysState.help-visible = !KeysState.help-visible; } }
+            Chip { text: @tr("PREFS"); width: 54px; horizontal-stretch: 0; clicked => { PrefsState.visible = true; } }
             Rectangle {
                 width: 70px;
                 horizontal-stretch: 0;
@@ -492,9 +492,9 @@ export component App inherits Window {
             width: self.preferred-width;
             padding: 3px;
             spacing: Theme.gap;
-            IconButton { icon: Icon.zoom-out; tooltip: "Zoom out the waveforms"; clicked => { root.zoom-all(-1); } }
-            IconButton { icon: Icon.zoom-reset; tooltip: "Default waveform zoom"; clicked => { root.zoom-all(0); } }
-            IconButton { icon: Icon.zoom-in; tooltip: "Zoom in the waveforms"; clicked => { root.zoom-all(1); } }
+            IconButton { icon: Icon.zoom-out; tooltip: @tr("Zoom out the waveforms"); clicked => { root.zoom-all(-1); } }
+            IconButton { icon: Icon.zoom-reset; tooltip: @tr("Default waveform zoom"); clicked => { root.zoom-all(0); } }
+            IconButton { icon: Icon.zoom-in; tooltip: @tr("Zoom in the waveforms"); clicked => { root.zoom-all(1); } }
         }
     }
     }

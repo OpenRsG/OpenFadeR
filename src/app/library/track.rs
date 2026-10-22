@@ -11,16 +11,16 @@ use std::rc::Rc;
 
 pub fn act(c: &Rc<Ctx>, id: &str) {
     let Some(t) = browser::context().track else {
-        return c.say("choose a track first");
+        return c.say(tr!("choose a track first"));
     };
     match id {
         "track-edit" => crate::app::trackinfo::open_editor(&c.app(), &t),
         "track-import" => import(c, t),
         "track-analyze" => {
             if c.store.analysis_locked(&store::key(&t)).unwrap_or(false) {
-                return c.say("this track has an Analysis Lock: unlock it first");
+                return c.say(tr!("this track has an Analysis Lock: unlock it first"));
             }
-            c.say(&format!(
+            c.say(&tr!(
                 "analysing “{}”…{}",
                 t.title,
                 analyze::library_grid_notice(&t)
@@ -31,44 +31,44 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
         "track-reload-tag" => reload_tag(c, &t),
         "track-show" => match &t.file {
             Some(f) => show_in_folder(f),
-            None => c.say("this track has no file"),
+            None => c.say(tr!("this track has no file")),
         },
         "track-relocate" => c.ask_path(Ask::Relocate(vec![t]), None),
         "track-auto-relocate" => missing::auto(c, vec![t]),
         "track-remove" => {
-            if !c.protected("remove tracks") {
-                let text = format!(
+            if !c.protected(tr!("remove tracks")) {
+                let text = tr!(
                     "Remove “{}” from the Collection? Its playlist places and edits are dropped; the file is not deleted.",
                     t.title
                 );
                 c.confirm(
                     Confirm::Remove(vec![t]),
-                    "REMOVE FROM COLLECTION",
+                    tr!("REMOVE FROM COLLECTION"),
                     &text,
-                    "OK",
+                    tr!("OK"),
                     "",
                 );
             }
         }
-        _ => c.say(&format!("unknown track action {id}")),
+        _ => c.say(&tr!("unknown track action {}", id)),
     }
 }
 
 /// Import To Collection: a track of a device or another library joins ours.
 fn import(c: &Rc<Ctx>, t: Track) {
     let Some(file) = t.file.clone() else {
-        return c.say("this track has no file");
+        return c.say(tr!("this track has no file"));
     };
     if c.known().contains(&file) {
-        return c.say("already in the Collection");
+        return c.say(tr!("already in the Collection"));
     }
     match c.store.collection_put(std::slice::from_ref(&t), false) {
         Ok(_) => {
-            c.say(&format!("“{}” imported to the Collection", t.title));
+            c.say(&tr!("“{}” imported to the Collection", t.title));
             c.reload(None);
             c.analyze(vec![t], false);
         }
-        Err(e) => c.say(&format!("store: {e}")),
+        Err(e) => c.say(&tr!("store: {}", e)),
     }
 }
 
@@ -76,12 +76,12 @@ fn lock(c: &Rc<Ctx>, t: &Track) {
     let key = store::key(t);
     let on = !c.store.analysis_locked(&key).unwrap_or(false);
     match c.store.set_analysis_lock(&key, on) {
-        Ok(()) => c.say(&format!(
-            "Analysis Lock {} for “{}”",
-            if on { "on" } else { "off" },
-            t.title
-        )),
-        Err(e) => c.say(&format!("store: {e}")),
+        Ok(()) => c.say(&if on {
+            tr!("Analysis Lock on for “{}”", t.title)
+        } else {
+            tr!("Analysis Lock off for “{}”", t.title)
+        }),
+        Err(e) => c.say(&tr!("store: {}", e)),
     }
 }
 
@@ -112,15 +112,15 @@ fn retagged(t: &Track, fresh: Track) -> Track {
 /// Reload Tag: the file's tags replace what the track shows (a Collection row shadows the source's, which stays untouched).
 fn reload_tag(c: &Rc<Ctx>, t: &Track) {
     let Some(file) = t.file.as_deref().filter(|f| f.is_file()) else {
-        return c.say("the file is missing: relocate it first");
+        return c.say(tr!("the file is missing: relocate it first"));
     };
     let merged = retagged(t, folder::read_track(file));
     match c.store.collection_put(&[merged], true) {
         Ok(_) => {
-            c.say(&format!("tags of “{}” reloaded", t.title));
+            c.say(&tr!("tags of “{}” reloaded", t.title));
             c.reload(None);
         }
-        Err(e) => c.say(&format!("store: {e}")),
+        Err(e) => c.say(&tr!("store: {}", e)),
     }
 }
 

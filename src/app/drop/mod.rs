@@ -44,7 +44,7 @@ pub fn dropped(app: &App, paths: Vec<PathBuf>) {
             said.push(plugins::install(app, &p).unwrap_or_else(|e| e));
         } else if is_theme(&p) {
             said.push(match skin::install_and_choose(&p) {
-                Ok(name) => format!("theme {name} installed and applied"),
+                Ok(name) => tr!("theme {} installed and applied", name),
                 Err(e) => e,
             });
         } else {
@@ -52,10 +52,10 @@ pub fn dropped(app: &App, paths: Vec<PathBuf>) {
         }
     }
     if !music.is_empty() {
-        said.push(format!(
-            "importing {} item{}…",
-            music.len(),
-            super::plural(music.len())
+        said.push(tr_n!(
+            "importing {n} item…",
+            "importing {n} items…",
+            music.len()
         ));
         library::import_files(music);
     }

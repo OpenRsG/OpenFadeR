@@ -4,9 +4,9 @@
 //! available" with an INSTALL button ([`install_offer`]). Installing writes the file into `<config>/mappings/` on a worker thread
 //! ([`get::install`]), then the controller session opens again with it ([`get::reload_if_connected`]).
 
-use super::{app, plural, report, start, CatalogState, State, STATE};
-use crate::app::{midi::get, toast, App, GetMapping};
-use openfader::catalog::{self, list, Repo};
+use super::{CatalogState, STATE, State, app, report, start};
+use crate::app::{App, GetMapping, midi::get, toast};
+use openfader::catalog::{self, Repo, list};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -63,22 +63,23 @@ pub(super) fn show(s: &CatalogState, st: &State) {
         .collect();
     s.set_mappings(ModelRc::new(VecModel::from(rows)));
     let note = if found.len() > SHOWN {
-        format!(
-            "Showing {SHOWN} of {}: type to narrow the list",
+        tr!(
+            "Showing {} of {}: type to narrow the list",
+            SHOWN,
             found.len()
         )
     } else if all.is_empty() {
-        "No mapping in your repositories".to_owned()
+        tr!("No mapping in your repositories").to_owned()
     } else if found.is_empty() {
-        "No mapping fits the search".to_owned()
+        tr!("No mapping fits the search").to_owned()
     } else {
-        plural(found.len(), "mapping", "mappings")
+        tr_n!("{n} mapping", "{n} mappings", found.len())
     };
     s.set_mappings_note(note.into());
     s.set_offer(
         st.offer
             .as_ref()
-            .map(|e| format!("Mapping for {} available", e.controller))
+            .map(|e| tr!("Mapping for {} available", e.controller))
             .unwrap_or_default()
             .into(),
     );
@@ -125,7 +126,7 @@ fn run(e: get::Entry) {
     if s.get_busy() {
         return;
     }
-    start(&s, &format!("Installing the mapping for {}…", e.controller));
+    start(&s, &tr!("Installing the mapping for {}…", e.controller));
     let weak = app.as_weak();
     std::thread::spawn(move || {
         let done = get::install(&e).map(|()| get::installed());
@@ -137,7 +138,7 @@ fn run(e: get::Entry) {
                         st.offer = None;
                     }
                 });
-                let text = format!("mapping for {} installed", e.controller);
+                let text = tr!("mapping for {} installed", e.controller);
                 report(&app, &text, false);
                 toast::show(&app, &text);
                 get::reload_if_connected(&e);
@@ -183,11 +184,11 @@ pub fn unmapped(mut ports: Vec<String>) {
 /// A mapping fits a connected controller: show the banner (and say so once).
 fn offered(app: &App, e: get::Entry) {
     let same = STATE.with_borrow(|st| st.offer.as_ref().is_some_and(|o| o.name == e.name));
-    let text = format!("Mapping for {} available", e.controller);
+    let text = tr!("Mapping for {} available", e.controller);
     STATE.with_borrow_mut(|st| st.offer = Some(e));
     app.global::<CatalogState>().set_offer(text.as_str().into());
     if !same {
-        toast::show(app, &format!("{text}: INSTALL it (top right)"));
+        toast::show(app, &tr!("{}: INSTALL it (top right)", text));
     }
 }
 

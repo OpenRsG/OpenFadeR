@@ -81,7 +81,7 @@ component MuteButton inherits Rectangle {
     Tooltip {
         width: root.width;
         height: root.height;
-        text: !root.enabled ? "This device has no mute switch" : root.muted ? "Unmute" : "Mute";
+        text: !root.enabled ? @tr("This device has no mute switch") : root.muted ? @tr("Unmute") : @tr("Mute");
         hovered: ta.has-hover && !ta.pressed;
     }
 }
@@ -109,7 +109,7 @@ component SelectCheck inherits Rectangle {
     Tooltip {
         width: root.width;
         height: root.height;
-        text: root.selected ? "OpenFadeR plays on this device" : "Use this device for OpenFadeR";
+        text: root.selected ? @tr("OpenFadeR plays on this device") : @tr("Use this device for OpenFadeR");
         hovered: ta.has-hover && !ta.pressed;
     }
 }
@@ -235,7 +235,7 @@ component AudioCardView inherits Rectangle {
             spacing: Theme.space-md;
             Text {
                 width: 36px;
-                text: "Port:";
+                text: @tr("Port:");
                 vertical-alignment: center;
                 color: Theme.text-dim;
                 font-family: Theme.font;
@@ -280,7 +280,7 @@ component AudioCardView inherits Rectangle {
                 spacing: Theme.space-md;
                 Rectangle { width: 28px; horizontal-stretch: 0; }
                 Text {
-                    text: "Silence";
+                    text: @tr("Silence");
                     color: Theme.text-faint;
                     font-family: Theme.font;
                     font-size: Theme.font-sm;
@@ -315,7 +315,7 @@ component AudioCardView inherits Rectangle {
                     tint: Theme.text-dim;
                 }
                 Text {
-                    text: "Advanced";
+                    text: @tr("Advanced");
                     vertical-alignment: center;
                     color: Theme.text-dim;
                     font-family: Theme.font;
@@ -348,14 +348,14 @@ component AudioCardView inherits Rectangle {
 export component AudioCardList inherits VerticalLayout {
     spacing: Theme.space-md;
     Text {
-        text: "OUTPUT DEVICE";
+        text: @tr("OUTPUT DEVICE");
         x: Theme.space-lg;
         color: Theme.accent-hi;
         font-family: Theme.font;
         font-size: Theme.font-md;
         font-weight: Theme.weight-bold;
     }
-    Note { text: "The green check is where OpenFadeR plays. Choosing a card or port reopens the output on it."; }
+    Note { text: @tr("The green check is where OpenFadeR plays. Choosing a card or port reopens the output on it."); }
     Rectangle {
         height: fl.height;
         fl := Flickable {
@@ -383,7 +383,7 @@ export component AudioCardList inherits VerticalLayout {
     HorizontalLayout {
         padding-left: Theme.space-lg;
         Toggle {
-            text: "Show all ALSA devices (plugins, converters and raw names)";
+            text: @tr("Show all ALSA devices (plugins, converters and raw names)");
             checked: PrefsState.audio-all;
             toggled(on) => { PrefsState.chose("output_show_all", on ? 1 : 0); }
         }

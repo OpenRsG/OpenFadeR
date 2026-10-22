@@ -14,7 +14,11 @@ const MIRRORED: [(&str, bool); 7] = [
 
 fn main() {
     println!("cargo:rerun-if-changed=.");
-    slint_build::compile("app.slint").unwrap();
+    // @tr strings without a context: one msgid per English text, shared with the app's `tr!` (src/app/i18n.rs).
+    let config = slint_build::CompilerConfiguration::new()
+        .with_bundled_translations("translations")
+        .with_default_translation_context(slint_build::DefaultTranslationContext::None);
+    slint_build::compile_with_config("app.slint", config).unwrap();
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     fs::write(out.join("mirror.rs"), mirror()).unwrap();
     fs::write(out.join("skin_tokens.rs"), skin_tokens()).unwrap();

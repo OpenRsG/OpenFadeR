@@ -23,9 +23,9 @@ impl Sampler {
             .app
             .upgrade()
             .and_then(|a| a.global::<DeckState>().get_decks().row_data(d))
-            .ok_or("no deck")?;
+            .ok_or(tr!("no deck"))?;
         if !row.loaded {
-            return Err(format!("deck {name} has no track"));
+            return Err(tr!("deck {} has no track", name));
         }
         let (pcm, bpm) = self.decks[d]
             .with_player(|p| {
@@ -37,14 +37,14 @@ impl Sampler {
                 };
                 span(p, native).map(|(from, secs)| (p.capture(from, secs), native as f32))
             })
-            .ok_or(format!("deck {name} has no audio"))??;
+            .ok_or(tr!("deck {} has no audio", name))??;
         let saved = (!pcm.samples.is_empty()).then(|| capture::save(&pcm, "sampler"));
         self.give(i, pcm, bpm)?;
         if let Some(saved) = saved {
             let info = self.cfg.borrow()[i].info.clone();
             self.say(match saved {
-                Ok(p) => format!("{info} · saved {}", p.display()),
-                Err(e) => format!("{info} · WAV not saved: {e}"),
+                Ok(p) => tr!("{} · saved {}", info, p.display()),
+                Err(e) => tr!("{} · WAV not saved: {}", info, e),
             });
         }
         Ok(())
@@ -55,7 +55,7 @@ impl Sampler {
         let (name, beats) = (DECK_NAMES[d], BEATS[self.beats.get()] as f64);
         self.from_deck_span(d, i, |p, native| {
             if native <= 0.0 {
-                return Err(format!("deck {name} has no tempo to count beats with"));
+                return Err(tr!("deck {} has no tempo to count beats with", name));
             }
             Ok((p.position_ms(), (beats * 60.0 / native).min(MAX_SECS)))
         })
@@ -67,7 +67,7 @@ impl Sampler {
         self.from_deck_span(d, i, |p, _| {
             p.looping()
                 .map(|lp| capture::loop_region(lp, MAX_SECS))
-                .ok_or(format!("deck {name} has no loop"))
+                .ok_or(tr!("deck {} has no loop", name))
         })
     }
 
@@ -78,8 +78,8 @@ impl Sampler {
             .track
             .borrow()
             .clone()
-            .ok_or("select a track in the browser first")?;
-        let file = t.file.ok_or("that track has no audio file")?;
+            .ok_or(tr!("select a track in the browser first"))?;
+        let file = t.file.ok_or(tr!("that track has no audio file"))?;
         self.decode(i, file, t.bpm_x100 as f32 / 100.0);
         Ok(())
     }
@@ -148,19 +148,19 @@ impl Sampler {
                 let (from, secs) = capture::loop_region(lp, f64::INFINITY);
                 let pcm = self.decks[d]
                     .with_player(|p| p.capture(from, secs))
-                    .ok_or(format!("deck {} has no audio", DECK_NAMES[d]))?;
+                    .ok_or(tr!("deck {} has no audio", DECK_NAMES[d]))?;
                 return capture::save(&pcm, "loop");
             }
-            let (_, i) = self.state().ok_or("no panel")?;
+            let (_, i) = self.state().ok_or(tr!("no panel"))?;
             let slice = self
                 .bus
                 .as_ref()
                 .and_then(|b| b.sampler.slice(i))
-                .ok_or(format!("no loop on that deck and slot {} is empty", i + 1))?;
+                .ok_or(tr!("no loop on that deck and slot {} is empty", i + 1))?;
             capture::save(&slice, "loop")
         };
         self.say(match r() {
-            Ok(p) => format!("exported {}", p.display()),
+            Ok(p) => tr!("exported {}", p.display()),
             Err(e) => e,
         });
     }

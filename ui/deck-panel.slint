@@ -19,16 +19,16 @@ export component GridEdit inherits GridLayout {
     }
     Row {
         Chip { text: "+10"; enabled: root.en; clicked => { DeckState.grid-shift(root.index, 10); } }
-        Chip { text: "BEAT 1"; enabled: root.en; clicked => { DeckState.grid-beat1(root.index); } }
-        Chip { text: "TAP"; enabled: root.en; clicked => { DeckState.grid-tap(root.index); } }
+        Chip { text: @tr("BEAT 1"); enabled: root.en; clicked => { DeckState.grid-beat1(root.index); } }
+        Chip { text: @tr("TAP"); enabled: root.en; clicked => { DeckState.grid-tap(root.index); } }
     }
     Row {
         Chip { text: "×2"; enabled: root.en; clicked => { DeckState.grid-double(root.index); } }
         Chip { text: "÷2"; enabled: root.en; clicked => { DeckState.grid-halve(root.index); } }
-        Chip { text: "RESET"; enabled: root.en; clicked => { DeckState.grid-reset(root.index); } }
+        Chip { text: @tr("RESET"); enabled: root.en; clicked => { DeckState.grid-reset(root.index); } }
     }
     Row {
-        Chip { text: "METRO"; tooltip: "Metronome: click on every beat of the grid"; active: DeckState.decks[root.index].metronome; enabled: root.en; colspan: 3; clicked => { DeckState.metronome(root.index); } }
+        Chip { text: @tr("METRO"); tooltip: @tr("Metronome: click on every beat of the grid"); active: DeckState.decks[root.index].metronome; enabled: root.en; colspan: 3; clicked => { DeckState.metronome(root.index); } }
     }
 }
 
@@ -111,8 +111,8 @@ export component DeckPanel inherits Rectangle {
                     y: 96px;
                     height: Theme.h-ctl;
                     spacing: 2px;
-                    Chip { text: "×"; width: 30px; horizontal-stretch: 0; tooltip: "Delete a hot cue: press its pad"; active: root.v.delete-mode; active-color: Theme.danger; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.cue-delete(root.index); } }
-                    Chip { text: "MEMORY"; tooltip: "Store a memory cue at the playhead"; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.memory-cue(root.index); } }
+                    Chip { text: "×"; width: 30px; horizontal-stretch: 0; tooltip: @tr("Delete a hot cue: press its pad"); active: root.v.delete-mode; active-color: Theme.danger; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.cue-delete(root.index); } }
+                    Chip { text: @tr("MEMORY"); tooltip: @tr("Store a memory cue at the playhead"); enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.memory-cue(root.index); } }
                 }
             }
             LoopBlock { index: root.index; x: ctl.x-loop; width: ctl.wl; height: ctl.height; }
@@ -143,10 +143,10 @@ export component DeckPanel inherits Rectangle {
                 horizontal-stretch: 1;
                 min-width: 0px;
             }
-            Chip { text: "REV"; width: 32px; horizontal-stretch: 0; tooltip: "Reverse playback"; active: root.v.reverse; enabled: root.v.loaded; clicked => { DeckState.reverse(root.index); } }
-            Chip { text: "BRAKE"; width: 44px; horizontal-stretch: 0; tooltip: "Vinyl stop"; enabled: root.v.loaded; clicked => { DeckState.brake(root.index); } }
-            Chip { text: "GRID"; width: 40px; horizontal-stretch: 0; tooltip: "Beat grid editing"; enabled: root.v.loaded; active: root.v.grid-edit; clicked => { DeckState.grid-toggle(root.index); } }
-            Chip { text: "CUES"; width: 40px; horizontal-stretch: 0; tooltip: "Cue / loop list"; active: root.show-cues; clicked => { root.show-cues = !root.show-cues; } }
+            Chip { text: @tr("REV"); width: 32px; horizontal-stretch: 0; tooltip: @tr("Reverse playback"); active: root.v.reverse; enabled: root.v.loaded; clicked => { DeckState.reverse(root.index); } }
+            Chip { text: @tr("BRAKE"); width: 44px; horizontal-stretch: 0; tooltip: @tr("Vinyl stop"); enabled: root.v.loaded; clicked => { DeckState.brake(root.index); } }
+            Chip { text: @tr("GRID"); width: 40px; horizontal-stretch: 0; tooltip: @tr("Beat grid editing"); enabled: root.v.loaded; active: root.v.grid-edit; clicked => { DeckState.grid-toggle(root.index); } }
+            Chip { text: @tr("CUES"); width: 40px; horizontal-stretch: 0; tooltip: @tr("Cue / loop list"); active: root.show-cues; clicked => { root.show-cues = !root.show-cues; } }
         }
     }
     Rectangle { border-width: Theme.deck-frame-w; border-color: Theme.deck-frame; }

@@ -58,7 +58,7 @@ impl Deck {
         let mut l = self.loaded.borrow_mut();
         if self.view.borrow().delete_mode {
             if delete_hot(&mut l.analysis.cues, pad) {
-                self.cues_changed(l, format!("hot cue {} deleted", pad_label(pad)));
+                self.cues_changed(l, tr!("hot cue {} deleted", pad_label(pad)));
             }
         } else if let Some(ms) = hot(&l.analysis, pad).map(|c| c.time_ms) {
             drop(l);
@@ -70,10 +70,7 @@ impl Deck {
         } else {
             let ms = self.mark(&l);
             set_hot(&mut l.analysis.cues, pad, ms);
-            self.cues_changed(
-                l,
-                format!("hot cue {} set at {}", pad_label(pad), fmt_ms(ms)),
-            );
+            self.cues_changed(l, tr!("hot cue {} set at {}", pad_label(pad), fmt_ms(ms)));
         }
     }
 
@@ -84,7 +81,7 @@ impl Deck {
         let mut l = self.loaded.borrow_mut();
         let ms = self.mark(&l);
         if add_memory(&mut l.analysis.cues, ms) {
-            self.cues_changed(l, format!("memory cue set at {}", fmt_ms(ms)));
+            self.cues_changed(l, tr!("memory cue set at {}", fmt_ms(ms)));
         }
     }
 
@@ -96,10 +93,10 @@ impl Deck {
         let mut l = self.loaded.borrow_mut();
         let (pos, _) = self.clock(&l);
         if cuelist::delete_memory(&mut l.analysis.cues, pos) {
-            self.cues_changed(l, "memory cue deleted".into());
+            self.cues_changed(l, tr!("memory cue deleted").into());
         } else {
             drop(l);
-            self.say("no memory cue at the playhead");
+            self.say(tr!("no memory cue at the playhead"));
         }
     }
 
@@ -115,14 +112,14 @@ impl Deck {
         }
         let mut l = self.loaded.borrow_mut();
         if delete_hot(&mut l.analysis.cues, pad) {
-            self.cues_changed(l, format!("hot cue {} deleted", pad_label(pad)));
+            self.cues_changed(l, tr!("hot cue {} deleted", pad_label(pad)));
         }
     }
 
     /// Cues changed: refresh the pads, redraw both waveforms, say what happened.
     pub(in crate::app::deck) fn cues_changed(&self, mut l: RefMut<Loaded>, mut status: String) {
         if let Err(e) = self.persist_cues(&l) {
-            status += &format!(" · NOT saved: {e}");
+            status += &tr!(" · NOT saved: {}", e);
         }
         l.invalidate();
         let (pads, cues) = (self.pad_views(&l), cuelist::views(&l.analysis));

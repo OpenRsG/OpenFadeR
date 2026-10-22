@@ -47,7 +47,7 @@ component FormatRow inherits Rectangle {
             }
             Text { text: root.f.title; horizontal-stretch: 1; vertical-alignment: center; color: root.f.on ? Theme.text-bright : Theme.text; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
             Text {
-                text: root.f.held != "" ? "ON THE DEVICE: " + root.f.held : root.f.on ? "WRITTEN BY THE NEXT EXPORT" : "OFF";
+                text: root.f.held != "" ? @tr("ON THE DEVICE: {}", root.f.held) : root.f.on ? @tr("WRITTEN BY THE NEXT EXPORT") : @tr("OFF");
                 horizontal-alignment: right;
                 vertical-alignment: center;
                 color: root.f.held != "" ? Theme.accent-hi : Theme.text-faint;
@@ -124,7 +124,7 @@ export component DevicesPage inherits HorizontalLayout {
     VerticalLayout {
         width: 236px;
         spacing: Theme.space-sm;
-        Caption { text: "CONNECTED"; }
+        Caption { text: @tr("CONNECTED"); }
         Rectangle {
             background: Theme.bg-deep;
             border-color: Theme.line-strong;
@@ -133,7 +133,7 @@ export component DevicesPage inherits HorizontalLayout {
                 x: Theme.space-xl;
                 width: parent.width - 2 * Theme.space-xl;
                 height: parent.height;
-                text: !DeviceState.has-plugin ? "No device plugin is on. Switch one on in PREFERENCES > EXTENSIONS, then restart." : "No USB drive or SD card is mounted. Insert one: it shows up here, and as a USB icon on the left of the browser, as soon as it is mounted.";
+                text: !DeviceState.has-plugin ? @tr("No device plugin is on. Switch one on in PREFERENCES > EXTENSIONS, then restart.") : @tr("No USB drive or SD card is mounted. Insert one: it shows up here, and as a USB icon on the left of the browser, as soon as it is mounted.");
                 wrap: word-wrap;
                 vertical-alignment: center;
                 color: Theme.text-faint;
@@ -167,7 +167,7 @@ export component DevicesPage inherits HorizontalLayout {
         }
     }
     if !root.picked && DeviceState.devices.length > 0: Text {
-        text: "Choose a device on the left.";
+        text: @tr("Choose a device on the left.");
         vertical-alignment: center;
         horizontal-alignment: center;
         color: Theme.text-faint;
@@ -185,28 +185,28 @@ export component DevicesPage inherits HorizontalLayout {
                 Text { text: DeviceState.devices[DeviceState.current].name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-lg; font-weight: Theme.weight-bold; overflow: elide; }
                 Text { text: DeviceState.devices[DeviceState.current].summary; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; }
             }
-            Chip { text: "EJECT"; width: 72px; horizontal-stretch: 0; enabled: !DeviceState.busy; tooltip: "Unmount it safely (a backup first, when Preferences ask for one)"; clicked => { DeviceState.eject(); } }
+            Chip { text: @tr("EJECT"); width: 72px; horizontal-stretch: 0; enabled: !DeviceState.busy; tooltip: @tr("Unmount it safely (a backup first, when Preferences ask for one)"); clicked => { DeviceState.eject(); } }
         }
-        Caption { text: "WHAT IS THIS DEVICE FOR?"; }
+        Caption { text: @tr("WHAT IS THIS DEVICE FOR?"); }
         HorizontalLayout {
             spacing: Theme.space-md;
             vertical-stretch: 0;
             ModeCard {
-                title: "UNIVERSAL";
-                text: "Every format below on one device: it works in each app and on each player they list. The music is stored once.";
+                title: @tr("UNIVERSAL");
+                text: @tr("Every format below on one device: it works in each app and on each player they list. The music is stored once.");
                 active: DeviceState.universal;
                 enabled: root.formats-enabled;
                 clicked => { DeviceState.format-universal(true); }
             }
             ModeCard {
-                title: "DEDICATED";
-                text: "Only the formats you tick below: for one app or one family of players. Exports are quicker.";
+                title: @tr("DEDICATED");
+                text: @tr("Only the formats you tick below: for one app or one family of players. Exports are quicker.");
                 active: !DeviceState.universal;
                 enabled: root.formats-enabled;
                 clicked => { DeviceState.format-universal(false); }
             }
         }
-        Caption { text: "FORMATS"; }
+        Caption { text: @tr("FORMATS"); }
         // A Flickable over a layout, not a ListView: rows of wrapped text get their height for the width they are shown at.
         formats := Flickable {
             min-height: Theme.layout-profile == 1 ? 240px : 0px;
@@ -219,24 +219,24 @@ export component DevicesPage inherits HorizontalLayout {
                 for f[i] in DeviceState.formats: FormatRow { f: f; index: i; enabled: root.formats-enabled; }
             }
         }
-        Note { text: "Ticked formats are written by EXPORT, SYNC and the cue sync. Formats share one copy of each track, so ticking more costs little space."; vertical-stretch: 0; }
+        Note { text: @tr("Ticked formats are written by EXPORT, SYNC and the cue sync. Formats share one copy of each track, so ticking more costs little space."); vertical-stretch: 0; }
         ActionRow {
-            label: "PUT MUSIC ON IT";
-            Chip { text: "EXPORT…"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.writable && root.can-export; tooltip: "Create or extend the libraries on this device"; clicked => { DeviceState.tab = 1; DeviceState.opened(); } }
-            Chip { text: "SYNC MANAGER"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.writable && root.can-export; tooltip: "Keep chosen playlists up to date on this device"; clicked => { DeviceState.tab = 2; DeviceState.opened(); } }
+            label: @tr("PUT MUSIC ON IT");
+            Chip { text: @tr("EXPORT…"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.writable && root.can-export; tooltip: @tr("Create or extend the libraries on this device"); clicked => { DeviceState.tab = 1; DeviceState.opened(); } }
+            Chip { text: @tr("SYNC MANAGER"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.writable && root.can-export; tooltip: @tr("Keep chosen playlists up to date on this device"); clicked => { DeviceState.tab = 2; DeviceState.opened(); } }
         }
         ActionRow {
-            label: "BRING BACK";
-            Chip { text: "UPDATE COLLECTION"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.has-library && root.can-update && !DeviceState.busy; tooltip: "Import cues, grids, ratings, colours and comments edited on the player"; clicked => { DeviceState.update-collection(); } }
-            Chip { text: "IMPORT HISTORIES"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.has-library && root.can-histories && !DeviceState.busy; tooltip: "Import what the players played"; clicked => { DeviceState.import-histories(); } }
+            label: @tr("BRING BACK");
+            Chip { text: @tr("UPDATE COLLECTION"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.has-library && root.can-update && !DeviceState.busy; tooltip: @tr("Import cues, grids, ratings, colours and comments edited on the player"); clicked => { DeviceState.update-collection(); } }
+            Chip { text: @tr("IMPORT HISTORIES"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.has-library && root.can-histories && !DeviceState.busy; tooltip: @tr("Import what the players played"); clicked => { DeviceState.import-histories(); } }
         }
         ActionRow {
-            label: "KEEP IT SAFE";
-            Chip { text: "BACKUPS"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.can-backup; tooltip: "Back up or restore this device's library"; clicked => { DeviceState.tab = 3; DeviceState.opened(); } }
-            Chip { text: "SETTINGS"; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.can-settings; tooltip: "The player settings this device carries (Preferences > DJ SYSTEM)"; clicked => { DeviceState.edit-settings(); } }
+            label: @tr("KEEP IT SAFE");
+            Chip { text: @tr("BACKUPS"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.can-backup; tooltip: @tr("Back up or restore this device's library"); clicked => { DeviceState.tab = 3; DeviceState.opened(); } }
+            Chip { text: @tr("SETTINGS"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.can-settings; tooltip: @tr("The player settings this device carries (Preferences > DJ SYSTEM)"); clicked => { DeviceState.edit-settings(); } }
         }
         if DeviceState.actions.length > 0: ActionRow {
-            label: "MORE";
+            label: @tr("MORE");
             for a in DeviceState.actions: Chip { text: a.label; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: a.enabled && (!a.writes || root.writable) && !DeviceState.busy; tooltip: a.help; clicked => { DeviceState.run-action(a.id); } }
         }
     }

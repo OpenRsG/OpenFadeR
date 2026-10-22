@@ -49,14 +49,14 @@ pub fn act(c: &mut Ctx, tab: &Tab, key: &str, action: &str, id: i32) -> Done {
     let (f, _, items) = fields(c, tab)
         .into_iter()
         .find(|(f, ..)| f.key == key)
-        .ok_or("no such list on this tab")?;
+        .ok_or(tr!("no such list on this tab"))?;
     if action == "reset" {
-        return c.reset([f]).map(|()| "reset to defaults".into());
+        return c.reset([f]).map(|()| tr!("reset to defaults").into());
     }
     let value = usize::try_from(id)
         .ok()
         .and_then(|i| items.get(i))
-        .ok_or("no item selected")?
+        .ok_or(tr!("no item selected"))?
         .value
         .clone();
     let mut active = c.list(f);

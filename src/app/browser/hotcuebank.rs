@@ -38,7 +38,7 @@ fn letter(i: usize) -> char {
 /// "1:23.4", or "loop 1:23.4–1:30.0" for a loop.
 fn span(c: &Cue) -> String {
     match c.loop_end_ms.filter(|&e| e > c.time_ms) {
-        Some(e) => format!("loop {}–{}", fmt_ms(c.time_ms), fmt_ms(e)),
+        Some(e) => tr!("loop {}–{}", fmt_ms(c.time_ms), fmt_ms(e)),
         None => fmt_ms(c.time_ms),
     }
 }
@@ -70,19 +70,19 @@ fn adds(
             comment: None,
         };
         let what = if looped.is_some() {
-            "active"
+            tr!("active")
         } else {
-            "playhead"
+            tr!("playhead")
         };
         rows.push((
-            format!("Add {who} · {what} {}", span(&cue)),
+            tr!("Add {} · {} {}", who, what, span(&cue)),
             Act::Add(slot(cue)),
         ));
     }
     for c in cues.iter().filter(|c| (1..=8).contains(&c.hot_cue)) {
         let pad = letter(c.hot_cue as usize - 1);
         rows.push((
-            format!("Add {who} · hot cue {pad} {}", span(c)),
+            tr!("Add {} · hot cue {} {}", who, pad, span(c)),
             Act::Add(slot(c.clone())),
         ));
     }
@@ -118,17 +118,13 @@ impl View {
             return false;
         };
         let r = self.store.bank_remove_cue(id, at);
-        self.bank_changed(app, r, format!("cleared bank {}", letter(at)))
+        self.bank_changed(app, r, tr!("cleared bank {}", letter(at)))
     }
 
     /// ▲ ▼: the banks at list positions `a` and `b` swap letters.
     pub(super) fn bank_swap(&mut self, app: &App, id: i64, a: usize, b: usize) {
         let r = self.store.bank_swap(id, a, b);
-        self.bank_changed(
-            app,
-            r,
-            format!("banks {} and {} swapped", letter(a), letter(b)),
-        );
+        self.bank_changed(app, r, tr!("banks {} and {} swapped", letter(a), letter(b)));
     }
 
     /// MORE pressed on a Cue Bank.
@@ -154,21 +150,19 @@ impl View {
             .enumerate()
             .map(|(i, s)| {
                 (
-                    format!("✕ Clear {} · {} · {}", letter(i), title(s), span(&s.cue)),
+                    tr!("✕ Clear {} · {} · {}", letter(i), title(s), span(&s.cue)),
                     Act::Clear(i),
                 )
             })
             .collect();
         let decks = active().min(self.decks.len());
         if !bank.slots.is_empty() {
-            rows.extend(
-                (0..decks).map(|d| (format!("Load onto Deck {} pads", d + 1), Act::Load(d))),
-            );
+            rows.extend((0..decks).map(|d| (tr!("Load onto Deck {} pads", d + 1), Act::Load(d))));
         }
         rows.extend((0..decks).filter_map(|d| {
             let name = self.decks[d].bank_name()?;
             Some((
-                format!("Release Deck {} pads (“{name}”)", d + 1),
+                tr!("Release Deck {} pads (“{}”)", d + 1, name),
                 Act::Unload(d),
             ))
         }));
@@ -176,7 +170,7 @@ impl View {
             for d in 0..decks {
                 if let Some(s) = self.decks[d].bank_source() {
                     rows.extend(adds(
-                        &format!("Deck {}", d + 1),
+                        &tr!("Deck {}", d + 1),
                         &s.track,
                         &s.cues,
                         Some((s.playhead, s.looped)),
@@ -205,7 +199,7 @@ impl View {
                 // The bank takes its letter's number and, unless the cue has its own, its pad colour.
                 slot.cue.hot_cue = pos as u16 + 1;
                 slot.cue.color = slot.cue.color.or(Some(COLORFUL[pos.min(7)]));
-                let msg = format!(
+                let msg = tr!(
                     "added {} as bank {} of “{}”",
                     span(&slot.cue),
                     letter(pos),
@@ -216,12 +210,12 @@ impl View {
             }
             Act::Clear(i) => {
                 let r = self.store.bank_remove_cue(id, i);
-                self.bank_changed(app, r, format!("cleared bank {}", letter(i)));
+                self.bank_changed(app, r, tr!("cleared bank {}", letter(i)));
             }
             Act::Load(d) => {
                 let cache = match self.cache() {
                     Ok(c) => c,
-                    Err(e) => return self.say(app, format!("library: {e}")),
+                    Err(e) => return self.say(app, tr!("library: {}", e)),
                 };
                 let slots: Vec<_> = bank
                     .slots
@@ -240,7 +234,7 @@ impl View {
                     deck.unload_bank();
                     self.say(
                         app,
-                        format!("Deck {} pads show the track's own hot cues", d + 1),
+                        tr!("Deck {} pads show the track's own hot cues", d + 1),
                     );
                 }
             }

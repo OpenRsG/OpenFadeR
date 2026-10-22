@@ -189,14 +189,14 @@ fn file_name(name: &str) -> Option<String> {
 /// Saves the slots as the user preset `name` (replacing one of that name).
 pub fn save(name: &str, slots: Vec<Option<Entry>>) -> Result<Preset, String> {
     save_in(
-        &dir().ok_or("no settings folder: set HOME or XDG_CONFIG_HOME")?,
+        &dir().ok_or(tr!("no settings folder: set HOME or XDG_CONFIG_HOME"))?,
         name,
         slots,
     )
 }
 
 fn save_in(dir: &Path, name: &str, slots: Vec<Option<Entry>>) -> Result<Preset, String> {
-    let file = file_name(name).ok_or("give the Drum Preset a name")?;
+    let file = file_name(name).ok_or(tr!("give the Drum Preset a name"))?;
     let p = Preset {
         name: file.clone(),
         slots,

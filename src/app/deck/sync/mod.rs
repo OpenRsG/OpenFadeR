@@ -205,7 +205,7 @@ impl Deck {
     pub(super) fn cancel_start(&self) -> bool {
         let armed = self.sync.waiting.take().is_some();
         if armed {
-            self.say("synced start cancelled");
+            self.say(tr!("synced start cancelled"));
         }
         armed
     }

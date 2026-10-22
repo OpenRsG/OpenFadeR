@@ -46,7 +46,7 @@ impl Sampler {
     pub(super) fn seq_init(&self) {
         match store::global().sequences() {
             Ok(s) => *self.seq.saved.borrow_mut() = s,
-            Err(e) => self.say(format!("saved sequences: {e}")),
+            Err(e) => self.say(tr!("saved sequences: {}", e)),
         }
         self.seq_show();
     }
@@ -87,7 +87,9 @@ impl Sampler {
     fn seq_tempo(&self) -> bool {
         let ok = self.seq.bpm.get() > 0.0;
         if !ok {
-            self.say("the sequencer follows the master deck's BPM: no deck has a tempo yet");
+            self.say(tr!(
+                "the sequencer follows the master deck's BPM: no deck has a tempo yet"
+            ));
         }
         ok
     }
@@ -100,11 +102,13 @@ impl Sampler {
                     return;
                 }
                 bus.sampler.seq_set(bus.sampler.seq_bars(), &[]);
-                self.say("sequence REC: standby, the first hit of a SHOT slot starts it");
+                self.say(tr!(
+                    "sequence REC: standby, the first hit of a SHOT slot starts it"
+                ));
                 Mode::Standby
             }
             Mode::Play => {
-                self.say("sequence REC: overdub");
+                self.say(tr!("sequence REC: overdub"));
                 Mode::Rec
             }
             Mode::Standby => Mode::Stop,
@@ -120,7 +124,7 @@ impl Sampler {
         let next = match bus.sampler.seq_mode() {
             Mode::Stop => {
                 if bus.sampler.seq_events().is_empty() {
-                    return self.say("nothing recorded: REC, then play the slots");
+                    return self.say(tr!("nothing recorded: REC, then play the slots"));
                 }
                 if !self.seq_tempo() {
                     return;
@@ -166,14 +170,14 @@ impl Sampler {
         };
         if self.seq.mute.get() {
             let muted = bus.sampler.seq_toggle_mute(slot);
-            self.say(format!(
-                "slot {} {} in the sequence",
-                slot + 1,
-                if muted { "muted" } else { "unmuted" }
-            ));
+            self.say(if muted {
+                tr!("slot {} muted in the sequence", slot + 1)
+            } else {
+                tr!("slot {} unmuted in the sequence", slot + 1)
+            });
         } else if self.seq.erase.get() {
             bus.sampler.seq_erase(slot);
-            self.say(format!("slot {} erased from the sequence", slot + 1));
+            self.say(tr!("slot {} erased from the sequence", slot + 1));
         } else {
             return false;
         }
@@ -185,7 +189,7 @@ impl Sampler {
         let Some(bus) = &self.bus else { return };
         let events = bus.sampler.seq_events();
         if events.is_empty() {
-            return self.say("nothing to save: record a sequence first");
+            return self.say(tr!("nothing to save: record a sequence first"));
         }
         let (n, bank) = (
             self.seq.sel.get(),
@@ -200,11 +204,11 @@ impl Sampler {
         };
         match store::global().save_sequence(n, &s) {
             Ok(()) => {
-                self.say(format!("sequence saved in slot {}", n + 1));
+                self.say(tr!("sequence saved in slot {}", n + 1));
                 self.seq.saved.borrow_mut()[n] = Some(s);
                 self.seq.unsaved.set(false);
             }
-            Err(e) => self.say(format!("sequence NOT saved: {e}")),
+            Err(e) => self.say(tr!("sequence NOT saved: {}", e)),
         }
         self.seq_show();
     }
@@ -237,9 +241,9 @@ impl Sampler {
         let n = (self.seq.sel.get() as i32 + dir).rem_euclid(MAX_SEQUENCES as i32) as usize;
         self.seq.sel.set(n);
         if self.seq_load(n) {
-            self.say(format!("sequence {} loaded", n + 1));
+            self.say(tr!("sequence {} loaded", n + 1));
         } else {
-            self.say(format!("sequence slot {} is empty: SAVE writes it", n + 1));
+            self.say(tr!("sequence slot {} is empty: SAVE writes it", n + 1));
         }
         self.seq_show();
     }
@@ -247,14 +251,14 @@ impl Sampler {
     pub(super) fn seq_delete(&self) {
         let n = self.seq.sel.get();
         if self.seq.saved.borrow()[n].is_none() {
-            return self.say(format!("sequence slot {} is empty", n + 1));
+            return self.say(tr!("sequence slot {} is empty", n + 1));
         }
         match store::global().delete_sequence(n) {
             Ok(()) => {
                 self.seq.saved.borrow_mut()[n] = None;
-                self.say(format!("sequence {} deleted", n + 1));
+                self.say(tr!("sequence {} deleted", n + 1));
             }
-            Err(e) => self.say(format!("sequence NOT deleted: {e}")),
+            Err(e) => self.say(tr!("sequence NOT deleted: {}", e)),
         }
         self.seq_show();
     }
@@ -284,7 +288,7 @@ pub fn call(n: usize) {
     };
     let Some(bus) = &s.bus else { return };
     if !s.seq_load(n) {
-        return s.say(format!("no saved sequence in slot {}", n + 1));
+        return s.say(tr!("no saved sequence in slot {}", n + 1));
     }
     if s.seq_tempo() {
         bus.sampler.set_seq_mode(Mode::Play);

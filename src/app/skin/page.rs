@@ -230,8 +230,9 @@ pub(super) fn choose(name: &str) {
         true => say(&s, "", false),
         false => say(
             &s,
-            format!(
-                "{name}: these layout settings are not valid and were left as they are: {}",
+            tr!(
+                "{}: these layout settings are not valid and were left as they are: {}",
+                name,
                 bad.join(", ")
             ),
             true,
@@ -290,11 +291,7 @@ fn save(s: &ThemeState, name: &str) {
             // the layout is already what the user has: choosing the saved theme must not set its hints again
             prefs::update(|p| p.set_extra("skin", &skin.name));
             rescan();
-            say(
-                s,
-                format!("Saved {} to {}", skin.name, path.display()),
-                false,
-            );
+            say(s, tr!("Saved {} to {}", skin.name, path.display()), false);
         }
     }
 }
@@ -303,7 +300,7 @@ fn duplicate(s: &ThemeState) {
     let (skins, name) = (found(), chosen());
     let copy = store::copy_name(&name, &names());
     let made = copy_of(&skins, &name, &copy)
-        .ok_or_else(|| format!("{name:?} cannot be copied now"))
+        .ok_or_else(|| tr!("{} cannot be copied now", format!("{name:?}")))
         .and_then(|c| {
             Ok((
                 store::write_into(&store::ensure_user_dir()?, &skins, &c)?,
@@ -315,7 +312,7 @@ fn duplicate(s: &ThemeState) {
         Ok((path, c)) => {
             rescan();
             choose(&c.name);
-            say(s, format!("Made {} in {}", c.name, path.display()), false);
+            say(s, tr!("Made {} in {}", c.name, path.display()), false);
         }
     }
 }
@@ -329,7 +326,7 @@ fn remove(s: &ThemeState) {
             close_editor(s);
             prefs::update(|p| p.set_extra("skin", BUILTIN[0]));
             rescan();
-            say(s, format!("Deleted {name}; back to {}", BUILTIN[0]), false);
+            say(s, tr!("Deleted {}; back to {}", name, BUILTIN[0]), false);
         }
     }
 }
@@ -339,7 +336,9 @@ fn import_file(s: &ThemeState) {
     if chooser().is_none() {
         say(
             s,
-            "IMPORT needs zenity or kdialog; without one, put the theme file in the themes folder (OPEN FOLDER).",
+            tr!(
+                "IMPORT needs zenity or kdialog; without one, put the theme file in the themes folder (OPEN FOLDER)."
+            ),
             true,
         );
         return;
@@ -365,7 +364,7 @@ pub fn install_and_choose(path: &Path) -> Result<String, String> {
         Ok(name) => {
             choose(name);
             if let Some(app) = app() {
-                say(&app.global::<ThemeState>(), format!("Added {name}"), false);
+                say(&app.global::<ThemeState>(), tr!("Added {}", name), false);
             }
         }
         Err(e) => {
@@ -422,7 +421,7 @@ pub fn wire(window: &App) -> Timer {
         if let Some(app) = app() {
             say(
                 &app.global::<ThemeState>(),
-                "Theme folders read again",
+                tr!("Theme folders read again"),
                 false,
             );
         }

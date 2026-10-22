@@ -139,7 +139,7 @@ impl Deck {
             return;
         }
         if prefs::with(|p| p.controller.memory_cue_lock) && self.playing() {
-            return self.say("memory cue lock: no memory cue call while playing");
+            return self.say(tr!("memory cue lock: no memory cue call while playing"));
         }
         let (pos, _) = self.clock(&self.loaded.borrow());
         let target = neighbour(&self.loaded.borrow().analysis, pos, dir);
@@ -147,7 +147,7 @@ impl Deck {
             Some(ms) => {
                 self.with_player(|p| p.seek(ms));
             }
-            None => self.say("no memory cue that way"),
+            None => self.say(tr!("no memory cue that way")),
         }
     }
 
@@ -158,12 +158,12 @@ impl Deck {
         }
         let mut l = self.loaded.borrow_mut();
         let Some(lp) = l.loop_ else {
-            return self.say("no active loop to save");
+            return self.say(tr!("no active loop to save"));
         };
         if add_loop(&mut l.analysis.cues, lp) {
             self.cues_changed(
                 l,
-                format!(
+                tr!(
                     "loop {} – {} saved to the list",
                     super::fmt_ms(lp.0),
                     super::fmt_ms(lp.1)
@@ -171,7 +171,7 @@ impl Deck {
             );
         } else {
             drop(l);
-            self.say("that loop is already in the list");
+            self.say(tr!("that loop is already in the list"));
         }
     }
 
@@ -188,13 +188,15 @@ impl Deck {
 
     /// Cue list row `row`: colour `palette` = index into [`picker`], anything else = back to the default.
     pub fn cue_color(&self, row: usize, palette: usize) {
-        self.edit_cue(row, "cue colour set", |c| c.color = picker().nth(palette));
+        self.edit_cue(row, tr!("cue colour set"), |c| {
+            c.color = picker().nth(palette)
+        });
     }
 
     /// Cue list row `row`: comment (blank = none).
     pub fn cue_comment(&self, row: usize, text: String) {
         let text = text.trim().to_owned();
-        self.edit_cue(row, "cue comment saved", |c| {
+        self.edit_cue(row, tr!("cue comment saved"), |c| {
             c.comment = Some(text).filter(|t| !t.is_empty())
         });
     }
@@ -218,7 +220,7 @@ impl Deck {
         let mut l = self.loaded.borrow_mut();
         if let Some(i) = nth_index(&l.analysis.cues, row) {
             l.analysis.cues.remove(i);
-            self.cues_changed(l, "cue deleted".into());
+            self.cues_changed(l, tr!("cue deleted").into());
         }
     }
 }

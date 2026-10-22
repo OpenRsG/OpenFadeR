@@ -58,12 +58,13 @@ fn deck_source(source: i32) -> Option<usize> {
 /// May slot `i` be loaded now: it is one of the `slots` in use, and not a filled slot while "do not overwrite" is on.
 fn usable(i: usize, slots: usize, keep_loaded: bool, loaded: bool) -> Result<(), String> {
     if i >= slots {
-        Err(format!(
-            "slot {} is not in use ({slots} slots: PREFS > Controller > Sampler)",
-            i + 1
+        Err(tr!(
+            "slot {} is not in use ({} slots: PREFS > Controller > Sampler)",
+            i + 1,
+            slots
         ))
     } else if keep_loaded && loaded {
-        Err(format!("slot {} is loaded", i + 1))
+        Err(tr!("slot {} is loaded", i + 1))
     } else {
         Ok(())
     }
@@ -233,7 +234,7 @@ impl Sampler {
         s.set_status(if c.loaded {
             c.info.as_str().into()
         } else {
-            format!("slot {} is empty: pick A–D / TRK, then LOAD", i + 1).into()
+            tr!("slot {} is empty: pick A–D / TRK, then LOAD", i + 1).into()
         });
     }
 
@@ -248,19 +249,24 @@ impl Sampler {
 
     /// Puts `pcm` (tempo `bpm`, 0 = unknown) into slot `i`.
     fn give(&self, i: usize, pcm: Pcm, bpm: f32) -> Result<(), String> {
-        let bus = self.bus.as_ref().ok_or("audio disabled")?;
+        let bus = self.bus.as_ref().ok_or(tr!("audio disabled"))?;
         if pcm.samples.is_empty() {
-            return Err("nothing to capture here (playhead at the end?)".into());
+            return Err(tr!("nothing to capture here (playhead at the end?)").into());
         }
         let secs = pcm.samples.len() as f64 / 2.0 / pcm.rate as f64;
         let info = if bpm > 0.0 {
-            format!(
-                "slot {}: {:.1} beats · {bpm:.1} BPM",
+            tr!(
+                "slot {}: {} beats · {} BPM",
                 i + 1,
-                secs * bpm as f64 / 60.0
+                format!("{:.1}", secs * bpm as f64 / 60.0),
+                format!("{bpm:.1}")
             )
         } else {
-            format!("slot {}: {secs:.1} s · no tempo, SYNC does nothing", i + 1)
+            tr!(
+                "slot {}: {} s · no tempo, SYNC does nothing",
+                i + 1,
+                format!("{secs:.1}")
+            )
         };
         let band = capture::band(&pcm);
         bus.sampler.load(i, pcm, bpm);
@@ -280,7 +286,7 @@ impl Sampler {
             bpm,
             rx: audio::decode_async(file),
         });
-        self.say(format!("slot {}: decoding…", slot + 1));
+        self.say(tr!("slot {}: decoding…", slot + 1));
     }
 
     /// The 50 ms timer: the finished decode, the next pack file, the pads, the sequencer and the master tempo.
@@ -291,7 +297,7 @@ impl Sampler {
             Some(r) => {
                 let p = self.pending.borrow_mut().take().unwrap();
                 let r = r
-                    .map_err(|_| "decoder stopped".to_owned())
+                    .map_err(|_| tr!("decoder stopped").to_owned())
                     .and_then(|r| r)
                     .and_then(|mut pcm| {
                         self.check(p.slot)?; // the slot may have been filled / dropped from use while the track decoded

@@ -23,7 +23,7 @@ impl Deck {
         match phase.filter(|_| their_playing) {
             Some(p) => {
                 self.sync.waiting.set(Some(p));
-                self.say("synced: starting on the master's next beat…");
+                self.say(tr!("synced: starting on the master's next beat…"));
                 true
             }
             None => false,

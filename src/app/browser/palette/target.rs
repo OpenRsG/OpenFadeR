@@ -51,7 +51,7 @@ impl Palette {
             return self
                 .view
                 .borrow()
-                .say(app, "drop a track on a deck to load it");
+                .say(app, tr!("drop a track on a deck to load it"));
         };
         self.view.borrow_mut().selected = Some(t.clone());
         trackinfo::show(app, &t);
@@ -66,14 +66,20 @@ impl Palette {
         };
         let mut v = self.view.borrow_mut();
         let Some(t) = self.track_of(&v, &drag) else {
-            return v.say(app, "drop a track on a playlist, the Tag List or a tag");
+            return v.say(
+                app,
+                tr!("drop a track on a playlist, the Tag List or a tag"),
+            );
         };
         match v.entries.get(row).cloned() {
             Some(Entry::Tags) => self.add_track(app, &mut v, 0, &t),
             Some(Entry::Tag(id)) => v.tag_track(app, &t, id),
             Some(e) => match Self::playlist_of(&v, &e) {
                 Some(id) => v.add_track_to(app, id, &t),
-                None => v.say(app, "drop a track on a playlist, the Tag List or a tag"),
+                None => v.say(
+                    app,
+                    tr!("drop a track on a playlist, the Tag List or a tag"),
+                ),
             },
             None => {}
         }

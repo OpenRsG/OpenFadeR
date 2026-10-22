@@ -113,7 +113,7 @@ pub fn connect_out(name: &str) -> Result<(MidiOutputConnection, String), String>
             out.port_name(p)
                 .is_ok_and(|n| n.to_lowercase().contains(&name))
         })
-        .ok_or_else(|| format!("no MIDI output port matching {name:?}"))?;
+        .ok_or_else(|| tr!("no MIDI output port matching {}", format!("{name:?}")))?;
     let pname = out.port_name(&port).unwrap_or_default();
     out.connect(&port, "openfader-out")
         .map(|c| (c, pname))

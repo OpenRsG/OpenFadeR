@@ -159,7 +159,7 @@ component ThemeCardView inherits Rectangle {
         x: 8px;
         y: 96px;
         width: parent.width - 16px;
-        text: root.card.author != "" ? "by " + root.card.author : root.card.user ? "yours" : "built in";
+        text: root.card.author != "" ? @tr("by {}", root.card.author) : root.card.user ? @tr("yours") : @tr("built in");
         overflow: elide;
         color: Theme.text-faint;
         font-family: Theme.font;
@@ -252,7 +252,7 @@ component Picker inherits Rectangle {
         y: Theme.space-md;
         width: min(parent.width - 100px - Theme.space-lg, 420px);
         spacing: 4px;
-        for s[n] in ["Hue", "Saturation", "Value", "Alpha"]: HorizontalLayout {
+        for s[n] in [@tr("Hue"), @tr("Saturation"), @tr("Value"), @tr("Alpha")]: HorizontalLayout {
             spacing: Theme.space-md;
             Text { width: 70px; text: s; vertical-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; }
             GradSlider {
@@ -328,14 +328,14 @@ component TokenRowView inherits VerticalLayout {
             }
             if root.r.kind == 1: HorizontalLayout {
                 spacing: 2px;
-                Chip { text: "−"; width: 22px; horizontal-stretch: 0; clicked => { ThemeState.step(root.r.index, -1); } }
+                Chip { text: @tr("−"); width: 22px; horizontal-stretch: 0; clicked => { ThemeState.step(root.r.index, -1); } }
                 ValueField {
                     width: 84px;
                     horizontal-stretch: 0;
                     value: root.r.text;
                     accepted(t) => { ThemeState.edit(root.r.index, t); }
                 }
-                Chip { text: "+"; width: 22px; horizontal-stretch: 0; clicked => { ThemeState.step(root.r.index, 1); } }
+                Chip { text: @tr("+"); width: 22px; horizontal-stretch: 0; clicked => { ThemeState.step(root.r.index, 1); } }
             }
             if root.r.kind >= 2: HorizontalLayout {
                 spacing: 2px;
@@ -348,7 +348,7 @@ component TokenRowView inherits VerticalLayout {
                 if root.r.kind == 3: Dropdown {
                     width: 116px;
                     horizontal-stretch: 0;
-                    label: "FONTS";
+                    label: @tr("FONTS");
                     options: root.fonts;
                     current: -1;
                     chose(n) => { ThemeState.edit(root.r.index, root.fonts[n]); }
@@ -366,7 +366,7 @@ component TokenRowView inherits VerticalLayout {
         Chip {
             width: 46px;
             horizontal-stretch: 0;
-            text: "RESET";
+            text: @tr("RESET");
             font-size: Theme.font-xs;
             visible: root.r.changed;
             clicked => { ThemeState.reset(root.r.index); }
@@ -384,25 +384,25 @@ component Editor inherits Rectangle {
     VerticalLayout {
         padding: Theme.space-lg;
         spacing: Theme.space-md;
-        Text { text: "CUSTOMIZE"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
-        Note { text: "Every change shows in the whole app at once. Give the theme a name and SAVE AS to keep it (a file in your themes folder); DISCARD goes back to the applied theme."; }
+        Text { text: @tr("CUSTOMIZE"); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+        Note { text: @tr("Every change shows in the whole app at once. Give the theme a name and SAVE AS to keep it (a file in your themes folder); DISCARD goes back to the applied theme."); }
         HorizontalLayout {
             spacing: Theme.space-md;
             height: Theme.h-ctl;
             TextField {
                 width: 220px;
                 horizontal-stretch: 0;
-                placeholder-text: "Theme name";
+                placeholder-text: @tr("Theme name");
                 text <=> ThemeState.draft-name;
                 accepted(t) => { ThemeState.save(t); }
             }
-            Chip { text: "SAVE AS"; width: 84px; horizontal-stretch: 0; active: true; clicked => { ThemeState.save(ThemeState.draft-name); } }
-            Chip { text: "DISCARD"; width: 84px; horizontal-stretch: 0; clicked => { ThemeState.discard(); } }
-            Chip { text: "RESET ALL"; width: 84px; horizontal-stretch: 0; tooltip: "Every token back to how it was when the editor opened"; clicked => { ThemeState.reset-all(); } }
+            Chip { text: @tr("SAVE AS"); width: 84px; horizontal-stretch: 0; active: true; clicked => { ThemeState.save(ThemeState.draft-name); } }
+            Chip { text: @tr("DISCARD"); width: 84px; horizontal-stretch: 0; clicked => { ThemeState.discard(); } }
+            Chip { text: @tr("RESET ALL"); width: 84px; horizontal-stretch: 0; tooltip: @tr("Every token back to how it was when the editor opened"); clicked => { ThemeState.reset-all(); } }
             Rectangle { width: Theme.space-lg; }
-            Text { text: "BASE"; vertical-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
-            Chip { text: "DARK"; width: 60px; horizontal-stretch: 0; active: !ThemeState.draft-light; tooltip: "The values the tokens you do not change keep (and the menu bar's colours)"; clicked => { ThemeState.set-base(false); } }
-            Chip { text: "LIGHT"; width: 60px; horizontal-stretch: 0; active: ThemeState.draft-light; clicked => { ThemeState.set-base(true); } }
+            Text { text: @tr("BASE"); vertical-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+            Chip { text: @tr("DARK"); width: 60px; horizontal-stretch: 0; active: !ThemeState.draft-light; tooltip: @tr("The values the tokens you do not change keep (and the menu bar's colours)"); clicked => { ThemeState.set-base(false); } }
+            Chip { text: @tr("LIGHT"); width: 60px; horizontal-stretch: 0; active: ThemeState.draft-light; clicked => { ThemeState.set-base(true); } }
             Rectangle { horizontal-stretch: 1; }
         }
         HorizontalLayout {
@@ -448,17 +448,17 @@ component GetThemeCard inherits Rectangle {
         height: Theme.h-ctl;
         spacing: Theme.space-sm;
         Chip {
-            text: root.t.action == 0 ? "INSTALL" : root.t.action == 1 ? "UPDATE" : "INSTALLED";
+            text: root.t.action == 0 ? @tr("INSTALL") : root.t.action == 1 ? @tr("UPDATE") : @tr("INSTALLED");
             active: root.t.action != 2;
             enabled: root.t.action != 2 && !CatalogState.busy;
             font-size: Theme.font-xs;
             clicked => { CatalogState.install-theme(root.index); }
         }
         if root.t.action != 0: Chip {
-            text: root.t.active ? "APPLIED" : "APPLY";
+            text: root.t.active ? @tr("APPLIED") : @tr("APPLY");
             enabled: !root.t.active;
             font-size: Theme.font-xs;
-            tooltip: "Use this theme";
+            tooltip: @tr("Use this theme");
             clicked => { CatalogState.apply-theme(root.index); }
         }
     }
@@ -472,8 +472,8 @@ component GetThemes inherits VerticalLayout {
     property <length> gap: Theme.space-lg;
     property <int> cols: Math.max(1, Math.floor((root.width + root.gap) / (root.cw + root.gap)));
     init => { CatalogState.opened(); }
-    Text { text: "GET THEMES"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
-    Note { text: "Themes from your GitHub repositories (the same list as GET PLUGINS): INSTALL puts one in your themes folder and in the gallery above, APPLY uses it."; }
+    Text { text: @tr("GET THEMES"); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+    Note { text: @tr("Themes from your GitHub repositories (the same list as GET PLUGINS): INSTALL puts one in your themes folder and in the gallery above, APPLY uses it."); }
     RepoBar { }
     Rectangle {
         height: Math.ceil(CatalogState.themes.length / root.cols) * (root.ch + root.gap);
@@ -486,7 +486,7 @@ component GetThemes inherits VerticalLayout {
             index: i;
         }
     }
-    if CatalogState.themes.length == 0: Note { text: "No theme in your repositories yet."; }
+    if CatalogState.themes.length == 0: Note { text: @tr("No theme in your repositories yet."); }
 }
 
 /// PREFS > THEMES: the gallery (click a theme to apply it), the theme actions and, under CUSTOMIZE, the editor. Opening the page
@@ -496,23 +496,23 @@ export component ThemesPage inherits VerticalLayout {
     alignment: start;
     init => { ThemeState.opened(); }
     Text {
-        text: "THEMES";
+        text: @tr("THEMES");
         color: Theme.accent-hi;
         font-family: Theme.font;
         font-size: Theme.font-md;
         font-weight: Theme.weight-bold;
     }
-    Note { text: "Click a theme to apply it: colours, fonts, sizes and the layout it asks for change at once. Drop a theme file on the window, or IMPORT one; folders are re-read while the app runs."; }
+    Note { text: @tr("Click a theme to apply it: colours, fonts, sizes and the layout it asks for change at once. Drop a theme file on the window, or IMPORT one; folders are re-read while the app runs."); }
     Gallery { }
     HorizontalLayout {
         spacing: Theme.space-md;
         height: Theme.h-ctl;
-        Chip { text: "CUSTOMIZE"; width: 100px; horizontal-stretch: 0; active: ThemeState.editing; tooltip: "Edit every colour, font and size of the applied theme, live"; clicked => { ThemeState.customize(); } }
-        Chip { text: "DUPLICATE"; width: 100px; horizontal-stretch: 0; tooltip: "A copy of the applied theme in your themes folder"; clicked => { ThemeState.duplicate(); } }
-        Chip { text: "DELETE"; width: 80px; horizontal-stretch: 0; enabled: ThemeState.current-user; active-color: Theme.danger; tooltip: "Delete the applied theme (only your own can be)"; clicked => { ThemeState.remove(); } }
-        Chip { text: "IMPORT…"; width: 90px; horizontal-stretch: 0; tooltip: "Choose a theme file to add"; clicked => { ThemeState.import-file(); } }
-        Chip { text: "OPEN FOLDER"; width: 110px; horizontal-stretch: 0; tooltip: "Your themes folder"; clicked => { ThemeState.open-folder(); } }
-        Chip { text: "RESCAN"; width: 80px; horizontal-stretch: 0; tooltip: "Read the theme folders again"; clicked => { ThemeState.rescan(); } }
+        Chip { text: @tr("CUSTOMIZE"); width: 100px; horizontal-stretch: 0; active: ThemeState.editing; tooltip: @tr("Edit every colour, font and size of the applied theme, live"); clicked => { ThemeState.customize(); } }
+        Chip { text: @tr("DUPLICATE"); width: 100px; horizontal-stretch: 0; tooltip: @tr("A copy of the applied theme in your themes folder"); clicked => { ThemeState.duplicate(); } }
+        Chip { text: @tr("DELETE"); width: 80px; horizontal-stretch: 0; enabled: ThemeState.current-user; active-color: Theme.danger; tooltip: @tr("Delete the applied theme (only your own can be)"); clicked => { ThemeState.remove(); } }
+        Chip { text: @tr("IMPORT…"); width: 90px; horizontal-stretch: 0; tooltip: @tr("Choose a theme file to add"); clicked => { ThemeState.import-file(); } }
+        Chip { text: @tr("OPEN FOLDER"); width: 110px; horizontal-stretch: 0; tooltip: @tr("Your themes folder"); clicked => { ThemeState.open-folder(); } }
+        Chip { text: @tr("RESCAN"); width: 80px; horizontal-stretch: 0; tooltip: @tr("Read the theme folders again"); clicked => { ThemeState.rescan(); } }
         Rectangle { horizontal-stretch: 1; }
     }
     Text {

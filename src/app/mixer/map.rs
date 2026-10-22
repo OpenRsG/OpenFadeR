@@ -117,7 +117,7 @@ pub fn readout(kind: Kind, eq: EqType, knob: usize, k: f32) -> String {
     match knob {
         TRIM => db_text(trim_db(k)),
         CFX => match cfx(k) {
-            x if x == 0.0 => "OFF".into(),
+            x if x == 0.0 => tr!("OFF").into(),
             x => {
                 let (left, right) = if kind == Kind::Filter {
                     ("LP", "HP")
@@ -132,7 +132,7 @@ pub fn readout(kind: Kind, eq: EqType, knob: usize, k: f32) -> String {
             }
         },
         _ => match eq_db(k, eq) {
-            db if db <= EQ_KILL_DB => "KILL".into(),
+            db if db <= EQ_KILL_DB => tr!("KILL").into(),
             db => db_text(db),
         },
     }
@@ -141,9 +141,9 @@ pub fn readout(kind: Kind, eq: EqType, knob: usize, k: f32) -> String {
 /// Text under a master / headphone knob.
 pub fn bus_readout(knob: usize, k: f32) -> String {
     match knob {
-        HP_MIX if k <= 0.0 => "CUE".into(),
-        HP_MIX if k >= 1.0 => "MASTER".into(),
-        HP_MIX => format!("{:.0}% MST", k * 100.0),
+        HP_MIX if k <= 0.0 => tr!("CUE").into(),
+        HP_MIX if k >= 1.0 => tr!("MASTER").into(),
+        HP_MIX => tr!("{}% MST", format!("{:.0}", k * 100.0)),
         _ => db_text(bus_db(k)),
     }
 }
@@ -151,7 +151,7 @@ pub fn bus_readout(knob: usize, k: f32) -> String {
 /// Text under a STEM ISO knob (position = gain 0..1).
 pub fn iso_readout(k: f32) -> String {
     if k <= 0.0 {
-        "MUTE".into()
+        tr!("MUTE").into()
     } else {
         format!("{:.0}%", k * 100.0)
     }

@@ -21,7 +21,7 @@ fn choices(c: &Ctx, tab: &Tab, f: &Field) -> Vec<Choice> {
     };
     let none = Choice {
         value: String::new(),
-        label: none.clone().unwrap_or_else(|| "NONE".into()),
+        label: none.clone().unwrap_or_else(|| tr!("NONE").into()),
     };
     let Some(list) = all_fields(tab).find(|l| l.key == *list) else {
         return vec![none];
@@ -77,7 +77,7 @@ pub fn choose(c: &mut Ctx, tab: &Tab, f: &Field, i: usize) -> Done {
             choices(c, tab, f)
                 .into_iter()
                 .nth(i)
-                .ok_or("no such choice")?
+                .ok_or(tr!("no such choice"))?
                 .value
         }
         FieldKind::Bool => i.min(1).to_string(),

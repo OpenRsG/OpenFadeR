@@ -246,9 +246,10 @@ fn combine14(msb: u8, lsb: u8) -> f32 {
 
 /// "CC 7 ch 1" / "Note 36 ch 2" for a control key.
 fn describe((status, d1): (u8, u8)) -> String {
-    format!(
-        "{} {d1} ch {}",
+    tr!(
+        "{} {} ch {}",
         if status & 0xF0 == 0xB0 { "CC" } else { "Note" },
+        d1,
         (status & 0x0F) + 1
     )
 }

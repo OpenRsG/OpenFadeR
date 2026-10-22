@@ -124,7 +124,7 @@ export component LightingView inherits Rectangle {
         HorizontalLayout {
             height: 20px;
             spacing: 12px;
-            Text { text: "LIGHTING"; color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+            Text { text: @tr("LIGHTING"); color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
             Text { text: LightingState.scene; color: Theme.text; font-size: Theme.font-md; vertical-alignment: center; overflow: elide; }
         }
         Stage { vertical-stretch: 1; min-height: 180px; }
@@ -136,32 +136,32 @@ export component LightingView inherits Rectangle {
                 width: Theme.layout-profile == 1 ? 360px : 380px;
                 spacing: 4px;
                 alignment: start;
-                Heading { text: "PALETTE"; }
+                Heading { text: @tr("PALETTE"); }
                 HorizontalLayout {
                     spacing: 4px;
-                    for name[i] in ["COOL", "NATURAL", "HOT", "SUBTLE"]: Chip { text: name; width: Theme.layout-profile == 1 ? 84px : 88px; horizontal-stretch: 0; active: LightingState.palette == i; clicked => { LightingState.set-palette(i); } }
+                    for name[i] in [@tr("COOL"), @tr("NATURAL"), @tr("HOT"), @tr("SUBTLE")]: Chip { text: name; width: Theme.layout-profile == 1 ? 84px : 88px; horizontal-stretch: 0; active: LightingState.palette == i; clicked => { LightingState.set-palette(i); } }
                 }
                 HorizontalLayout {
                     spacing: 4px;
-                    for name[i] in ["WARM", "VIVID", "CLUB 1", "CLUB 2"]: Chip { text: name; width: Theme.layout-profile == 1 ? 84px : 88px; horizontal-stretch: 0; active: LightingState.palette == i + 4; clicked => { LightingState.set-palette(i + 4); } }
+                    for name[i] in [@tr("WARM"), @tr("VIVID"), @tr("CLUB 1"), @tr("CLUB 2")]: Chip { text: name; width: Theme.layout-profile == 1 ? 84px : 88px; horizontal-stretch: 0; active: LightingState.palette == i + 4; clicked => { LightingState.set-palette(i + 4); } }
                 }
-                Heading { text: "SCENE"; }
+                Heading { text: @tr("SCENE"); }
                 HorizontalLayout {
                     spacing: 4px;
-                    for name[i] in ["AUTO", "AMBIENT"]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.mode == i; clicked => { LightingState.set-mode(i); } }
-                    for name[i] in ["RED", "GREEN", "BLUE"]: Chip { text: name; width: 52px; horizontal-stretch: 0; active: LightingState.mode == i + 2; clicked => { LightingState.set-mode(i + 2); } }
+                    for name[i] in [@tr("AUTO"), @tr("AMBIENT")]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.mode == i; clicked => { LightingState.set-mode(i); } }
+                    for name[i] in [@tr("RED"), @tr("GREEN"), @tr("BLUE")]: Chip { text: name; width: 52px; horizontal-stretch: 0; active: LightingState.mode == i + 2; clicked => { LightingState.set-mode(i + 2); } }
                 }
                 HorizontalLayout {
                     spacing: 4px;
-                    Chip { text: "WHITE"; width: 88px; horizontal-stretch: 0; active: LightingState.mode == 5; clicked => { LightingState.set-mode(5); } }
-                    Chip { text: "BLACK OUT"; width: 88px; horizontal-stretch: 0; active: LightingState.mode == 6; clicked => { LightingState.set-mode(6); } }
+                    Chip { text: @tr("WHITE"); width: 88px; horizontal-stretch: 0; active: LightingState.mode == 5; clicked => { LightingState.set-mode(5); } }
+                    Chip { text: @tr("BLACK OUT"); width: 88px; horizontal-stretch: 0; active: LightingState.mode == 6; clicked => { LightingState.set-mode(6); } }
                 }
-                Heading { text: "STROBE"; }
+                Heading { text: @tr("STROBE"); }
                 HorizontalLayout {
                     spacing: 4px;
-                    for name[i] in ["OFF", "SLOW", "FAST"]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.strobe == i; clicked => { LightingState.set-strobe(i); } }
+                    for name[i] in [@tr("OFF"), @tr("SLOW"), @tr("FAST")]: Chip { text: name; width: 88px; horizontal-stretch: 0; active: LightingState.strobe == i; clicked => { LightingState.set-strobe(i); } }
                 }
-                Heading { text: "MASTER"; }
+                Heading { text: @tr("MASTER"); }
                 Fader { width: 270px; value: LightingState.master; edited(v) => { LightingState.set-master(v); } }
             }
             // Output.
@@ -169,25 +169,25 @@ export component LightingView inherits Rectangle {
                 width: Theme.layout-profile == 1 ? 260px : 300px;
                 spacing: 4px;
                 alignment: start;
-                Heading { text: "DMX OUTPUT"; }
+                Heading { text: @tr("DMX OUTPUT"); }
                 HorizontalLayout {
                     spacing: 4px;
-                    for name[i] in ["OFF", "ART-NET", "SACN", "BOTH"]: Chip { text: name; width: Theme.layout-profile == 1 ? 62px : 70px; horizontal-stretch: 0; active: LightingState.protocol == i; clicked => { LightingState.set-protocol(i); } }
+                    for name[i] in [@tr("OFF"), "ART-NET", "SACN", @tr("BOTH")]: Chip { text: name; width: Theme.layout-profile == 1 ? 62px : 70px; horizontal-stretch: 0; active: LightingState.protocol == i; clicked => { LightingState.set-protocol(i); } }
                 }
                 HorizontalLayout {
                     spacing: 4px;
-                    Text { text: "TO IP"; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; width: 40px; }
+                    Text { text: @tr("TO IP"); color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; width: 40px; }
                     TextField { text: LightingState.ip; accepted(t) => { LightingState.set-ip(t); } }
                 }
-                Text { text: "Art-Net UDP 6454 · sACN E1.31 UDP 5568"; color: Theme.text-faint; font-size: Theme.font-sm; }
+                Text { text: @tr("Art-Net UDP 6454 · sACN E1.31 UDP 5568"); color: Theme.text-faint; font-size: Theme.font-sm; }
                 Text { text: LightingState.status; color: Theme.text; font-size: Theme.font-size; wrap: word-wrap; }
-                Text { text: "User fixtures: " + LightingState.fixtures-dir + "/*.json"; color: Theme.text-faint; font-size: Theme.font-sm; wrap: word-wrap; }
+                Text { text: @tr("User fixtures: {}/*.json", LightingState.fixtures-dir); color: Theme.text-faint; font-size: Theme.font-sm; wrap: word-wrap; }
             }
             // Patch.
             VerticalLayout {
                 spacing: 4px;
                 horizontal-stretch: 1;
-                Heading { text: "PATCH  (universe · DMX address)"; }
+                Heading { text: @tr("PATCH  (universe · DMX address)"); }
                 ListView {
                     height: Theme.layout-profile == 1 ? 220px : 190px;
                     for f[i] in LightingState.fixtures: PatchRow { f: f; index: i; }
@@ -198,7 +198,7 @@ export component LightingView inherits Rectangle {
                     Chip { text: "◀"; width: Theme.layout-profile == 1 ? Theme.touch-target : 28px; horizontal-stretch: 0; clicked => { LightingState.step-profile(-1); } }
                     Chip { text: LightingState.profile; horizontal-stretch: 1; }
                     Chip { text: "▶"; width: Theme.layout-profile == 1 ? Theme.touch-target : 28px; horizontal-stretch: 0; clicked => { LightingState.step-profile(1); } }
-                    Chip { text: "ADD FIXTURE"; width: 100px; horizontal-stretch: 0; clicked => { LightingState.add-fixture(); } }
+                    Chip { text: @tr("ADD FIXTURE"); width: 100px; horizontal-stretch: 0; clicked => { LightingState.add-fixture(); } }
                 }
             }
         }

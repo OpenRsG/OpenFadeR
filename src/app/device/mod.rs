@@ -55,7 +55,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const BUSY: &str = "Another job is running: wait for it or cancel it (X)";
+const BUSY: &str = n_!("Another job is running: wait for it or cancel it (X)");
 
 /// What runs when a job ends, with the worker's result.
 type Then = Box<dyn FnOnce(&Rc<Ctx>, &Result<String, String>)>;
@@ -133,11 +133,17 @@ fn report_text(r: &ExportReport, name: &str) -> String {
         format!(" ({})", r.notes.join("; "))
     };
     let warn = r.warnings.first().map_or_else(String::new, |w| {
-        format!(" — {} warning(s), first: {w}", r.warnings.len())
+        tr!(" — {} warning(s), first: {}", r.warnings.len(), w)
     });
-    format!(
-        "exported {} tracks ({} new, {} updated) and {} playlists to {name}{notes}{warn}",
-        r.tracks, r.added, r.updated, r.playlists
+    tr!(
+        "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}",
+        r.tracks,
+        r.added,
+        r.updated,
+        r.playlists,
+        name,
+        notes,
+        warn
     )
 }
 
@@ -148,7 +154,7 @@ fn record_export(store: &Store, id: &str, r: &ExportReport, text: &mut String) {
         let _ = device_settings::record_fingerprint(store, id, fp);
     }
     if let Err(e) = store.set_device_sigs(id, &r.baselines) {
-        text.push_str(&format!(" — Update Collection baseline not recorded: {e}"));
+        text.push_str(&tr!(" — Update Collection baseline not recorded: {}", e));
     }
 }
 
@@ -173,7 +179,7 @@ fn record_all(
         .map(|(plugin, r)| {
             let mut text = match r {
                 Ok(r) => report_text(r, name),
-                Err(e) => format!("failed: {e}"),
+                Err(e) => tr!("failed: {}", e),
             };
             if let (Ok(r), Some(d)) = (r, dev) {
                 record_export(store, &d.id, r, &mut text);
@@ -227,7 +233,7 @@ impl Ctx {
     fn device_or_say(&self, id: &str) -> Option<Device> {
         let d = self.device(id);
         if d.is_none() {
-            self.say("That device is not mounted any more", true);
+            self.say(tr!("That device is not mounted any more"), true);
         }
         d
     }
@@ -236,7 +242,7 @@ impl Ctx {
     fn on_current(self: &Rc<Self>, f: impl FnOnce(&Rc<Self>, &Device)) {
         match self.current() {
             Some(d) => f(self, &d),
-            None => self.say("Choose a device first", true),
+            None => self.say(tr!("Choose a device first"), true),
         }
     }
 
@@ -248,7 +254,7 @@ impl Ctx {
                 &format!(
                     "{}: {}",
                     d.label,
-                    d.support.message().unwrap_or("mounted read-only")
+                    d.support.message().unwrap_or(tr!("mounted read-only"))
                 ),
                 true,
             );
@@ -257,7 +263,7 @@ impl Ctx {
     }
 
     fn read_collection(&self, f: impl FnOnce() -> Result<Snapshot, String>) -> Option<Snapshot> {
-        f().map_err(|e| self.say(&format!("cannot read the collection: {e}"), true))
+        f().map_err(|e| self.say(&tr!("cannot read the collection: {}", e), true))
             .ok()
     }
 
@@ -295,10 +301,7 @@ impl Ctx {
     fn provider_for(&self, d: &Device, f: Feature) -> Option<Provider> {
         let p = d.provider().filter(|_| d.can(f));
         if p.is_none() {
-            self.say(
-                &format!("{}: its plugin does not offer that", d.label),
-                true,
-            );
+            self.say(&tr!("{}: its plugin does not offer that", d.label), true);
         }
         p
     }
@@ -420,7 +423,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     s.on_cancel(move || {
         if let Some(j) = c.job.borrow().as_ref() {
             j.ctl.cancel();
-            c.say("Cancelling…", false);
+            c.say(tr!("Cancelling…"), false);
         }
     });
     let c = cx.clone();

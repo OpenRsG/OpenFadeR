@@ -94,7 +94,7 @@ export component DeckDetailV inherits Rectangle {
         x: 0;
         y: root.top + root.wl * MixPointState.decks[root.index].out-x - 1px;
         width: root.wt;
-        label: "OUT";
+        label: @tr("OUT");
         flag-above: true;
         tone: MixPointState.decks[root.index].linked ? Theme.accent-hi : Theme.cue;
     }
@@ -102,14 +102,14 @@ export component DeckDetailV inherits Rectangle {
         x: 0;
         y: root.top + root.wl * MixPointState.decks[root.index].in-x - 1px;
         width: root.wt;
-        label: "IN";
+        label: @tr("IN");
         tone: MixPointState.decks[root.index].linked ? Theme.accent-hi : Theme.cue;
     }
     if MixPointState.active && MixPointState.decks[root.index].silent-set && MixPointState.decks[root.index].silent-x >= 0 && MixPointState.decks[root.index].silent-x <= 1: MixMarkerV {
         x: 0;
         y: root.top + root.wl * MixPointState.decks[root.index].silent-x - 1px;
         width: root.wt;
-        label: "SILENT";
+        label: @tr("SILENT");
         flag-above: true;
         tone: Theme.danger;
     }
@@ -162,9 +162,9 @@ export component DeckDetailV inherits Rectangle {
         VerticalLayout {
             padding: 1px;
             spacing: 2px;
-            IconButton { icon: Icon.plus; height: 18px; solid: true; tooltip: "Zoom in"; clicked => { DeckState.zoom(root.index, 1); } }
+            IconButton { icon: Icon.plus; height: 18px; solid: true; tooltip: @tr("Zoom in"); clicked => { DeckState.zoom(root.index, 1); } }
             Text { text: DeckState.decks[root.index].zoom-text; color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; horizontal-alignment: center; vertical-stretch: 1; }
-            IconButton { icon: Icon.minus; height: 18px; solid: true; tooltip: "Zoom out"; clicked => { DeckState.zoom(root.index, -1); } }
+            IconButton { icon: Icon.minus; height: 18px; solid: true; tooltip: @tr("Zoom out"); clicked => { DeckState.zoom(root.index, -1); } }
         }
     }
     // Bottom gutter: the expander.

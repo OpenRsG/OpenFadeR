@@ -34,10 +34,9 @@ impl View {
 
     /// Every library track that passes the smart playlist's conditions (library order).
     pub(in crate::app::browser) fn smart_list(&mut self, id: i64) -> Result<Vec<Track>, String> {
-        let text = self
-            .store
-            .smart(id)?
-            .ok_or("this smart playlist has no conditions yet: EDIT adds some")?;
+        let text = self.store.smart(id)?.ok_or(tr!(
+            "this smart playlist has no conditions yet: EDIT adds some"
+        ))?;
         let smart = Smart::parse(&text)?;
         let cache = self.cache()?;
         let hit = |t: &Track, k: &String| {
@@ -97,9 +96,12 @@ impl View {
     /// places of tracks the library no longer has.
     pub(super) fn reorder(&mut self, app: &App, op: &str) {
         let Home::User(id) = self.home.clone() else {
-            return self.say(app, "choose one of your playlists first (My Playlists)");
+            return self.say(
+                app,
+                tr!("choose one of your playlists first (My Playlists)"),
+            );
         };
-        if self.protected(app, "reorder a playlist") {
+        if self.protected(app, tr!("reorder a playlist")) {
             return;
         }
         let r = self.user_list(id);
@@ -121,18 +123,18 @@ impl View {
         if self.try_store(app, r).is_some() {
             self.load(app);
             let did = if op == "renumber" {
-                "renumbered"
+                tr!("renumbered")
             } else {
-                "sorted"
+                tr!("sorted")
             };
-            self.say(app, format!("{} tracks {did}", keys.len()));
+            self.say(app, tr!("{} tracks {}", keys.len(), did));
         }
     }
 
     /// Takes list entry `pos` out of the Tag List / user playlist on screen; false when neither is.
     pub(in crate::app::browser) fn remove_at(&mut self, app: &App, pos: usize) -> bool {
         if matches!(self.home, Home::User(_))
-            && self.protected(app, "remove tracks from a playlist")
+            && self.protected(app, tr!("remove tracks from a playlist"))
         {
             return false;
         }

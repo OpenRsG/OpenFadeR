@@ -20,14 +20,22 @@ pub(super) fn run(c: &Rc<Ctx>, redo: bool) {
             }
             crate::app::trackinfo::reshow(&c.app());
             labels(c);
-            c.say(&format!("{} {label}", if redo { "redid" } else { "undid" }));
+            c.say(&if redo {
+                tr!("redid {}", label)
+            } else {
+                tr!("undid {}", label)
+            });
         }
         Ok(None) => c.say(if redo {
-            "nothing to redo"
+            tr!("nothing to redo")
         } else {
-            "nothing to undo"
+            tr!("nothing to undo")
         }),
-        Err(e) => c.say(&format!("{}: {e}", if redo { "redo" } else { "undo" })),
+        Err(e) => c.say(&if redo {
+            tr!("redo: {}", e)
+        } else {
+            tr!("undo: {}", e)
+        }),
     }
 }
 

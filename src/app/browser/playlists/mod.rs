@@ -75,7 +75,7 @@ impl View {
 
     /// A store result: on error the message goes to the status line and `None` comes back.
     pub(super) fn try_store<T, E: Display>(&self, app: &App, r: Result<T, E>) -> Option<T> {
-        r.map_err(|e| self.say(app, format!("store: {e}"))).ok()
+        r.map_err(|e| self.say(app, tr!("store: {}", e))).ok()
     }
 
     /// A store result: on error the message goes to the status line and `fallback` stands in.
@@ -89,8 +89,9 @@ impl View {
         if on {
             self.say(
                 app,
-                format!(
-                    "Library Protection is on: cannot {what} (Preferences > Advanced > Browse)"
+                tr!(
+                    "Library Protection is on: cannot {} (Preferences > Advanced > Browse)",
+                    what
                 ),
             );
         }

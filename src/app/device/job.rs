@@ -28,7 +28,7 @@ impl Ctx {
         then: impl FnOnce(&Rc<Ctx>, &Result<String, String>) + 'static,
     ) {
         if self.busy() {
-            return self.say(BUSY, true);
+            return self.say(crate::app::i18n::tr_dyn(BUSY), true);
         }
         let ctl = Arc::new(Control::default());
         let (worker, (tx, rx)) = (ctl.clone(), mpsc::channel());
@@ -59,7 +59,7 @@ impl Ctx {
             let Some(job) = slot.as_ref() else { return };
             match job.rx.try_recv() {
                 Err(mpsc::TryRecvError::Empty) => return self.show_progress(&job.ctl),
-                Err(mpsc::TryRecvError::Disconnected) => Err("the worker stopped".to_owned()),
+                Err(mpsc::TryRecvError::Disconnected) => Err(tr!("the worker stopped").to_owned()),
                 Ok(r) => r,
             }
         };
@@ -75,7 +75,9 @@ impl Ctx {
         let text = match &outcome {
             Ok(m) if m.is_empty() || m.starts_with('\u{1}') => None,
             Ok(m) => Some((m.as_str(), false)),
-            Err(e) if e == "cancelled" => Some(("Cancelled: the device was left as it was", true)),
+            Err(e) if e == "cancelled" => {
+                Some((tr!("Cancelled: the device was left as it was"), true))
+            }
             Err(e) => Some((e.as_str(), true)),
         };
         if let Some((text, failed)) = text {

@@ -88,7 +88,7 @@ impl Deck {
     pub(super) fn slicer_text(&self) -> (String, String) {
         let b = self.slicer_bars();
         (
-            format!("{b} BAR{}", if b > 1 { "S" } else { "" }),
+            tr_n!("{n} BAR", "{n} BARS", b),
             format!("1/{}", self.slicer_roll()),
         )
     }
@@ -146,7 +146,7 @@ impl Deck {
                 }
                 None => {
                     drop(l);
-                    return self.say("the slicer needs a track with a beat grid");
+                    return self.say(tr!("the slicer needs a track with a beat grid"));
                 }
             }
         }
@@ -162,7 +162,7 @@ impl Deck {
         let len = self.slicer_len();
         let Some(beat) = beat_at(&l.analysis.beats, pos) else {
             drop(l);
-            return self.say("the slicer needs a track with a beat grid");
+            return self.say(tr!("the slicer needs a track with a beat grid"));
         };
         let (start, roll) = roll_beats(self.slicer_range(beat), len, pad, self.slicer_roll());
         let Some((s, e)) = Self::slicer_ms(&l, start, roll).filter(|(s, e)| e > s) else {

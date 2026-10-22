@@ -153,7 +153,7 @@ pub fn wire(app: &App, decks: Decks) {
                 .collect::<Vec<_>>(),
         )),
         status: match bus.as_deref().map(Bus::headphones) {
-            Some(Headphones::Device(name)) => format!("Headphones: {name}"),
+            Some(Headphones::Device(name)) => tr!("Headphones: {}", name),
             Some(Headphones::Failed(why)) => {
                 eprintln!("mixer: {why}");
                 why.clone()

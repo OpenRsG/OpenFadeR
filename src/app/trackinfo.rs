@@ -106,16 +106,14 @@ fn detected_text(t: &Track, (bpm, key): &analyze::Found, notation: prefs::KeyNot
     let mut parts = Vec::new();
     if t.bpm_x100 > 0 && *bpm > 0 && (bpm - t.bpm_x100).abs() as f64 / 100.0 > BPM_TOLERANCE {
         let digits = prefs::with(|p| p.view.tempo_decimals.digits());
-        parts.push(format!(
-            "detected {:.*} BPM (library {:.*})",
-            digits,
-            *bpm as f64 / 100.0,
-            digits,
-            t.bpm_x100 as f64 / 100.0
+        parts.push(tr!(
+            "detected {} BPM (library {})",
+            format!("{:.*}", digits, *bpm as f64 / 100.0),
+            format!("{:.*}", digits, t.bpm_x100 as f64 / 100.0)
         ));
     }
     if !t.key.is_empty() && !key.is_empty() && analyze::keys_differ(&t.key, key) {
-        parts.push(format!(
+        parts.push(tr!(
             "detected {} (library {})",
             display(key, notation),
             display(&t.key, notation)
@@ -138,7 +136,7 @@ fn edit(app: &App, save: impl FnOnce(&store::Store, &str) -> Result<(), String>)
     let draft = s.get_comment();
     let old_comment = edited(&t).0.comment;
     if let Err(e) = save(&store::global(), &store::key(&t)) {
-        let message = format!("not saved: {e}");
+        let message = tr!("not saved: {}", e);
         s.set_edit_status(message.clone().into());
         return set_progress(app, &message);
     }
@@ -156,7 +154,7 @@ fn edit(app: &App, save: impl FnOnce(&store::Store, &str) -> Result<(), String>)
             *shown = Some(t.clone());
         }
     });
-    s.set_edit_status("Saved in OpenFadeR".into());
+    s.set_edit_status(tr!("Saved in OpenFadeR").into());
     LISTENER.with_borrow(|l| l.iter().for_each(|f| f(&t)));
 }
 
@@ -197,8 +195,9 @@ fn wire(app: &App) {
     s.on_metadata_edited(move |title, artist, album, genre, label| {
         let app = weak.unwrap();
         if target().is_none_or(|t| t.file.is_none()) {
-            app.global::<TrackInfoState>()
-                .set_edit_status("Import a local file before editing descriptive fields".into());
+            app.global::<TrackInfoState>().set_edit_status(
+                tr!("Import a local file before editing descriptive fields").into(),
+            );
             return;
         }
         let comment = app.global::<TrackInfoState>().get_comment();
@@ -270,7 +269,7 @@ fn display_track(app: &App, t: &Track) {
     let details = [
         (t.bitrate > 0).then(|| format!("{} kbps", t.bitrate)),
         (t.sample_rate > 0).then(|| format!("{} kHz", t.sample_rate as f64 / 1000.0)),
-        (!t.date_added.is_empty()).then(|| format!("added {}", t.date_added)),
+        (!t.date_added.is_empty()).then(|| tr!("added {}", t.date_added)),
     ];
     s.set_details(
         details
@@ -292,8 +291,8 @@ fn display_track(app: &App, t: &Track) {
 fn phrases(t: &Track, edit: Option<openfader::analysis::Phrases>) -> String {
     let own = || LIBRARY.with_borrow(|l| l.as_ref()?.analysis(t)?.phrases);
     match edit.or_else(own) {
-        Some(p) if p.list.is_empty() => "Phrases: none".into(),
-        Some(p) => format!("Phrases: {:?} · {}", p.mood, p.list.len()),
+        Some(p) if p.list.is_empty() => tr!("Phrases: none").into(),
+        Some(p) => tr!("Phrases: {} · {}", format!("{:?}", p.mood), p.list.len()),
         None => String::new(),
     }
 }

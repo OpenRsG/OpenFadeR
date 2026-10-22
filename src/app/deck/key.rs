@@ -92,22 +92,20 @@ impl Deck {
             return;
         }
         let Some(other) = self.key_target() else {
-            return self.say("key sync: load a track on another deck first");
+            return self.say(tr!("key sync: load a track on another deck first"));
         };
         let (Some(own), Some(target)) = (self.tempo_key(), other.effective_key()) else {
-            return self.say("key sync: both decks need a key");
+            return self.say(tr!("key sync: both decks need a key"));
         };
         let m = sync_shift(own, target);
         self.set_key_shift(m);
-        let relative = if own.1 == target.1 {
-            ""
+        let key = camelot::format(camelot::shift(own, m), prefs::with(|p| p.key_notation));
+        let m = format!("{m:+}");
+        self.say(if own.1 == target.1 {
+            tr!("key sync: {} st → {}", m, key)
         } else {
-            " (relative key)"
-        };
-        self.say(format!(
-            "key sync: {m:+} st → {}{relative}",
-            camelot::format(camelot::shift(own, m), prefs::with(|p| p.key_notation))
-        ));
+            tr!("key sync: {} st → {} (relative key)", m, key)
+        });
     }
 
     /// Refresh the key, shifted flag and shift text in the view (rate, key lock, shift or key changed).

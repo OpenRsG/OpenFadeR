@@ -23,13 +23,18 @@ pub(super) fn score(a: &Item, c: &Item) -> Verdict {
     };
     let score = era + 0.02 * f32::from(u8::from(genre)) + 0.01 * tempo;
     let when = match d {
-        0 => "same year".to_owned(),
-        d if d > 0 => format!("{} year{} later", d, if d == 1 { "" } else { "s" }),
-        d => format!("{} year{} earlier", -d, if d == -1 { "" } else { "s" }),
+        0 => tr!("same year").to_owned(),
+        d if d > 0 => tr_n!("{n} year later", "{n} years later", d),
+        d => tr_n!("{n} year earlier", "{n} years earlier", -d),
     };
     Verdict::Score(
         score,
-        format!("{yc} · {when}{}", if genre { " · same genre" } else { "" }),
+        tr!(
+            "{} · {}{}",
+            yc,
+            when,
+            if genre { tr!(" · same genre") } else { "" }
+        ),
     )
 }
 

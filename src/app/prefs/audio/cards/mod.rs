@@ -62,41 +62,43 @@ fn marks(cards: &[Card], saved: &str, st: &Status, controller: Option<&str>) -> 
         .map(|(i, c)| {
             let (sel, playing) = (selected == Some(i), used == Some(i));
             let (status, kind) = match (sel, playing, st.source) {
-                (true, true, _) => ("IN USE".to_owned(), 1),
-                (true, false, _) if c.missing => {
-                    ("NOT CONNECTED · THE SYSTEM DEFAULT PLAYS".to_owned(), 3)
-                }
+                (true, true, _) => (tr!("IN USE").to_owned(), 1),
+                (true, false, _) if c.missing => (
+                    tr!("NOT CONNECTED · THE SYSTEM DEFAULT PLAYS").to_owned(),
+                    3,
+                ),
                 (true, false, "controller") => (
-                    format!(
+                    tr!(
                         "OVERRIDDEN BY {}",
-                        controller.unwrap_or("CONTROLLER").to_uppercase()
+                        controller.unwrap_or(tr!("CONTROLLER")).to_uppercase()
                     ),
                     2,
                 ),
                 (true, false, "OPENFADER_OUTPUT_DEVICE") => {
-                    ("OVERRIDDEN BY OPENFADER_OUTPUT_DEVICE".to_owned(), 2)
+                    (tr!("OVERRIDDEN BY OPENFADER_OUTPUT_DEVICE").to_owned(), 2)
                 }
                 (true, false, "system default")
                     if c.find(saved).and_then(|p| c.ports[p].plugged) == Some(false) =>
                 {
                     (
-                        "NOTHING PLUGGED IN · THE SYSTEM DEFAULT PLAYS".to_owned(),
+                        tr!("NOTHING PLUGGED IN · THE SYSTEM DEFAULT PLAYS").to_owned(),
                         3,
                     )
                 }
                 (true, false, "system default") if c.busy => {
-                    ("BUSY · THE SYSTEM DEFAULT PLAYS".to_owned(), 3)
+                    (tr!("BUSY · THE SYSTEM DEFAULT PLAYS").to_owned(), 3)
                 }
-                (true, false, "system default") => {
-                    ("COULD NOT OPEN · THE SYSTEM DEFAULT PLAYS".to_owned(), 3)
-                }
-                (true, false, _) => ("SELECTED".to_owned(), 0),
-                (false, true, "controller") => ("IN USE · CONTROLLER AUDIO".to_owned(), 2),
+                (true, false, "system default") => (
+                    tr!("COULD NOT OPEN · THE SYSTEM DEFAULT PLAYS").to_owned(),
+                    3,
+                ),
+                (true, false, _) => (tr!("SELECTED").to_owned(), 0),
+                (false, true, "controller") => (tr!("IN USE · CONTROLLER AUDIO").to_owned(), 2),
                 (false, true, "OPENFADER_OUTPUT_DEVICE") => {
-                    ("IN USE · OPENFADER_OUTPUT_DEVICE".to_owned(), 2)
+                    (tr!("IN USE · OPENFADER_OUTPUT_DEVICE").to_owned(), 2)
                 }
-                (false, true, _) => ("IN USE · FALLBACK".to_owned(), 2),
-                (false, false, _) if c.busy => ("IN USE BY THE SOUND SERVER".to_owned(), 0),
+                (false, true, _) => (tr!("IN USE · FALLBACK").to_owned(), 2),
+                (false, false, _) if c.busy => (tr!("IN USE BY THE SOUND SERVER").to_owned(), 0),
                 _ => (String::new(), 0),
             };
             let port = if sel {
@@ -138,15 +140,17 @@ fn target(c: &Card) -> Option<Target> {
 
 fn no_volume(c: &Card) -> &'static str {
     if !cfg!(target_os = "linux") && !c.missing {
-        return "Volume is the system's: set it in the sound settings of Windows or macOS.";
+        return tr!("Volume is the system's: set it in the sound settings of Windows or macOS.");
     }
     match c.kind {
-        _ if c.missing => "Not connected.",
-        Kind::Raw => "No volume control for raw ALSA devices.",
+        _ if c.missing => tr!("Not connected."),
+        Kind::Raw => tr!("No volume control for raw ALSA devices."),
         Kind::Card => {
-            "No hardware volume control (a card played directly bypasses the sound server's volume)."
+            tr!(
+                "No hardware volume control (a card played directly bypasses the sound server's volume)."
+            )
         }
-        _ => "No volume control: the sound server does not answer (pactl).",
+        _ => tr!("No volume control: the sound server does not answer (pactl)."),
     }
 }
 
@@ -155,21 +159,18 @@ fn details(c: &Card, port: usize, in_use: Option<String>, caps: bool) -> Vec<Str
     let Some(p) = c.ports.get(port) else {
         return Vec::new();
     };
-    let mut d = vec![format!(
-        "{} name: {}",
-        if cfg!(target_os = "linux") {
-            "ALSA"
-        } else {
-            "Device"
-        },
-        if p.name.is_empty() {
-            "(the system default)"
-        } else {
-            p.name.as_str()
-        }
-    )];
+    let name = if p.name.is_empty() {
+        tr!("(the system default)")
+    } else {
+        p.name.as_str()
+    };
+    let mut d = vec![if cfg!(target_os = "linux") {
+        tr!("ALSA name: {}", name)
+    } else {
+        tr!("Device name: {}", name)
+    }];
     if c.missing {
-        d.push("Not connected.".to_owned());
+        d.push(tr!("Not connected.").to_owned());
         return d;
     }
     let found = if caps && (c.kind != Kind::Raw || !cfg!(target_os = "linux")) {
@@ -179,24 +180,24 @@ fn details(c: &Card, port: usize, in_use: Option<String>, caps: bool) -> Vec<Str
     };
     match found {
         Some(k) => {
-            d.push(format!("Channels: {}", k.channels));
+            d.push(tr!("Channels: {}", k.channels));
             let list = |v: &[u32]| v.iter().map(u32::to_string).collect::<Vec<_>>().join(", ");
-            d.push(format!(
+            d.push(tr!(
                 "Sample rates: {} Hz",
                 if k.rates.is_empty() {
-                    "not reported".to_owned()
+                    tr!("not reported").to_owned()
                 } else {
                     list(&k.rates)
                 }
             ));
             if let (Some(lo), Some(hi)) = (k.buffers.first(), k.buffers.last()) {
-                d.push(format!("Buffer sizes: {lo} – {hi} frames"));
+                d.push(tr!("Buffer sizes: {} – {} frames", lo, hi));
             }
         }
-        None if p.channels > 0 => d.push(format!("Channels: {}", p.channels)),
+        None if p.channels > 0 => d.push(tr!("Channels: {}", p.channels)),
         None => {}
     }
-    d.extend(in_use.map(|l| format!("Latency: {l}")));
+    d.extend(in_use.map(|l| tr!("Latency: {}", l)));
     d
 }
 
@@ -242,9 +243,9 @@ fn build(j: &Job) -> Vec<Entry> {
                 None => None,
             };
             let latency = (mark.in_use && j.frames > 0 && st.rate > 0).then(|| {
-                format!(
-                    "~{:.1} ms ({} frames at {} Hz)",
-                    device::latency_ms(j.frames, st.rate),
+                tr!(
+                    "~{} ms ({} frames at {} Hz)",
+                    format!("{:.1}", device::latency_ms(j.frames, st.rate)),
                     j.frames,
                     st.rate
                 )

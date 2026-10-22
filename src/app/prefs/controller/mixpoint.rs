@@ -5,39 +5,39 @@ use super::{Controller, Row};
 
 pub(super) fn rows(c: &Controller) -> Vec<Row> {
     vec![
-        Row::header("MIX POINT LINK"),
+        Row::header(tr!("MIX POINT LINK")),
         Row::check(
             "mix_point_link",
-            "Enable MIX POINT LINK Function",
+            tr!("Enable MIX POINT LINK Function"),
             c.mix_point_link,
         ),
         Row::chips(
             "mix_point_default",
-            "DEFAULT MIX POINT SETTING",
-            &["MIX IN", "MIX OUT"],
+            tr!("DEFAULT MIX POINT SETTING"),
+            &[tr!("MIX IN"), tr!("MIX OUT")],
             c.mix_point_default as usize,
         ),
         Row::check(
             "mix_point_auto_switch",
-            "Automatically switches between MIX IN/MIX OUT",
+            tr!("Automatically switches between MIX IN/MIX OUT"),
             c.mix_point_auto_switch,
         ),
-        Row::check("mix_point_time", "Display time", c.mix_point_time),
-        Row::check("mix_point_grids", "Display grids", c.mix_point_grids),
+        Row::check("mix_point_time", tr!("Display time"), c.mix_point_time),
+        Row::check("mix_point_grids", tr!("Display grids"), c.mix_point_grids),
         Row::check(
             "mix_point_grids_enlarged",
-            "Display only when waveform is enlarged",
+            tr!("Display only when waveform is enlarged"),
             c.mix_point_grids_enlarged,
         )
         .enabled(c.mix_point_grids),
         Row::check(
             "mix_point_auto_sync",
-            "Automatically changes the BEAT/BPM SYNC setting",
+            tr!("Automatically changes the BEAT/BPM SYNC setting"),
             c.mix_point_auto_sync,
         ),
         Row::check(
             "mix_point_zoom_limit",
-            "Automatically limits the zoom out range",
+            tr!("Automatically limits the zoom out range"),
             c.mix_point_zoom_limit,
         ),
     ]

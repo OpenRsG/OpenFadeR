@@ -94,17 +94,17 @@ fn playlist_label(base: usize, p: &Playlist) -> String {
 /// Every row's entry and label, in display order.
 pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
     let mut rows = vec![
-        (Entry::All, "All tracks".to_owned()),
-        (Entry::Tags, format!("Tag List ({})", i.tag_list)),
-        (Entry::Session, format!("Session history ({})", i.session)),
-        (Entry::Dupes, "Duplicate tracks".to_owned()),
-        (Entry::UserRoot, "▸ My Playlists".to_owned()),
+        (Entry::All, tr!("All tracks").to_owned()),
+        (Entry::Tags, tr!("Tag List ({})", i.tag_list)),
+        (Entry::Session, tr!("Session history ({})", i.session)),
+        (Entry::Dupes, tr!("Duplicate tracks").to_owned()),
+        (Entry::UserRoot, tr!("▸ My Playlists").to_owned()),
     ];
     if let Some(n) = i.cue_analysis {
-        rows.insert(4, (Entry::CueAnalysis, format!("CUE Analysis ({n})")));
+        rows.insert(4, (Entry::CueAnalysis, tr!("CUE Analysis ({})", n)));
     }
     if i.all_tracks {
-        rows.push((Entry::PlaylistsAll, indent(1, "All Tracks")));
+        rows.push((Entry::PlaylistsAll, indent(1, tr!("All Tracks"))));
     }
     let mut depth: HashMap<i64, usize> = HashMap::new();
     for n in i.nodes {
@@ -114,24 +114,24 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         let label = match n.kind {
             NodeKind::Folder => format!("▸ {}", n.name),
             NodeKind::Playlist => n.name.clone(),
-            NodeKind::Smart => format!("{} (smart)", n.name),
+            NodeKind::Smart => tr!("{} (smart)", n.name),
         };
         rows.push((Entry::User(n.id), indent(d, &label)));
     }
     if let Some(banks) = i.banks {
-        rows.push((Entry::BankRoot, "▸ Cue Bank".to_owned()));
+        rows.push((Entry::BankRoot, tr!("▸ Cue Bank").to_owned()));
         rows.extend(banks.iter().map(|b| {
             let label = format!("{} ({}/{MAX_BANKS})", b.name, b.slots.len());
             (Entry::Bank(b.id), indent(1, &label))
         }));
     }
-    rows.push((Entry::HistoryRoot, "▸ History".to_owned()));
+    rows.push((Entry::HistoryRoot, tr!("▸ History").to_owned()));
     rows.extend(
         i.days
             .iter()
             .map(|(day, n)| (Entry::Day(day.clone()), indent(1, &format!("{day} ({n})")))),
     );
-    rows.push((Entry::TagsRoot, "▸ Tags".to_owned()));
+    rows.push((Entry::TagsRoot, tr!("▸ Tags").to_owned()));
     for c in i.cats {
         rows.push((Entry::Category(c.id), indent(1, &format!("▸ {}", c.name))));
         rows.extend(
@@ -141,7 +141,7 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
                 .map(|t| (Entry::Tag(t.id), indent(2, &t.name))),
         );
     }
-    rows.push((Entry::LibRoot, "▸ Library (read-only)".to_owned()));
+    rows.push((Entry::LibRoot, tr!("▸ Library (read-only)").to_owned()));
     rows.extend(
         i.lib
             .iter()
@@ -149,7 +149,7 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             .map(|(n, p)| (Entry::Lib(n), playlist_label(1, p))),
     );
     if i.sources.iter().any(|s| s.device) {
-        rows.push((Entry::DevicesRoot, "▸ Devices".to_owned()));
+        rows.push((Entry::DevicesRoot, tr!("▸ Devices").to_owned()));
     }
     for (n, s) in i.sources.iter().enumerate() {
         let d = usize::from(s.device);
@@ -165,7 +165,7 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             ),
         ));
         if s.open {
-            rows.push((Entry::SourceAll(n), indent(d + 1, "All tracks")));
+            rows.push((Entry::SourceAll(n), indent(d + 1, tr!("All tracks"))));
             rows.extend(
                 s.playlists
                     .iter()

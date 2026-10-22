@@ -11,7 +11,7 @@ impl Lighting {
     pub(super) fn changed(&self) {
         if let Some(p) = config::path() {
             if let Err(e) = config::save(&p, &self.cfg.borrow()) {
-                self.say(&format!("settings not saved: {e}"));
+                self.say(&tr!("settings not saved: {}", e));
             }
         }
     }
@@ -36,11 +36,14 @@ impl Lighting {
         let c = self.cfg.borrow();
         let text = match (&*self.out_err.borrow(), c.protocol) {
             (e, _) if !e.is_empty() => e.clone(),
-            (_, Protocol::Off) => "Output off: nothing is sent (the stage view still runs).".into(),
-            _ => format!(
-                "Sending {} to {} · {universes} universe(s) · 40 Hz",
+            (_, Protocol::Off) => {
+                tr!("Output off: nothing is sent (the stage view still runs).").into()
+            }
+            _ => tr!(
+                "Sending {} to {} · {} universe(s) · 40 Hz",
                 c.protocol.label(),
-                c.ip
+                c.ip,
+                universes
             ),
         };
         self.state(|s| s.set_status(text.into()));

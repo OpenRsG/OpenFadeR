@@ -131,7 +131,9 @@ impl Deck {
     pub(super) fn grid_refused(&self) -> bool {
         let locked = self.grid_locked();
         if locked {
-            self.say("Analysis Lock is on: unlock the track to edit its grid");
+            self.say(tr!(
+                "Analysis Lock is on: unlock the track to edit its grid"
+            ));
         }
         locked
     }
@@ -139,16 +141,16 @@ impl Deck {
     /// The padlock of the GRID panel.
     pub fn toggle_grid_lock(&self) {
         let Some(key) = self.loaded.borrow().track.as_ref().map(store::key) else {
-            return self.say("the Analysis Lock needs a track of the library");
+            return self.say(tr!("the Analysis Lock needs a track of the library"));
         };
         let on = !self.grid_locked();
         match store::global().set_analysis_lock(&key, on) {
             Ok(()) => self.say(if on {
-                "Analysis Lock on: the grid and the analysis are kept"
+                tr!("Analysis Lock on: the grid and the analysis are kept")
             } else {
-                "Analysis Lock off"
+                tr!("Analysis Lock off")
             }),
-            Err(e) => self.say(format!("Analysis Lock: {e}")),
+            Err(e) => self.say(tr!("Analysis Lock: {}", e)),
         }
     }
 
@@ -174,9 +176,9 @@ impl Deck {
         let Some(prev) = prev else {
             drop(l);
             return self.say(if undo {
-                "nothing to undo"
+                tr!("nothing to undo")
             } else {
-                "nothing to redo"
+                tr!("nothing to redo")
             });
         };
         let now = std::mem::take(&mut l.analysis.beats);
@@ -188,7 +190,12 @@ impl Deck {
         drop(l);
         self.commit_grid(
             prev,
-            if undo { "grid undone" } else { "grid redone" }.into(),
+            if undo {
+                tr!("grid undone")
+            } else {
+                tr!("grid redone")
+            }
+            .into(),
         );
     }
 
@@ -196,9 +203,9 @@ impl Deck {
     pub fn grid_range(&self, from_here: bool) {
         self.loaded.borrow_mut().grid_hist.from_here = from_here;
         self.say(if from_here {
-            "grid edits apply from the playhead on"
+            tr!("grid edits apply from the playhead on")
         } else {
-            "grid edits apply to the whole track"
+            tr!("grid edits apply to the whole track")
         });
     }
 
@@ -206,7 +213,7 @@ impl Deck {
     pub fn grid_stretch(&self, ms: i32) {
         self.edit_grid(|b, pos| {
             let (i, _) = nearest(b, pos)?;
-            stretch(b, i, ms.into()).map(|v| (v, format!("beat distance {ms:+} ms")))
+            stretch(b, i, ms.into()).map(|v| (v, tr!("beat distance {} ms", format!("{ms:+}"))))
         });
     }
 
@@ -220,7 +227,7 @@ impl Deck {
             let (pos, _) = self.clock(&l);
             nearest(&l.analysis.beats, pos).map_or((pos, 1), |(_, b)| (f64::from(b.time_ms), b.bar_pos))
         };
-        self.regrid(anchor, bpm, "BPM entered");
+        self.regrid(anchor, bpm, tr!("BPM entered"));
     }
 
     pub(in crate::app) fn grid_info(&self) -> GridInfo {

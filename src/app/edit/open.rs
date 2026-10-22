@@ -20,10 +20,10 @@ impl State {
 
     pub(super) fn open_selected(&self) {
         let Some(t) = self.selected.borrow().clone() else {
-            return self.say("select a track in the library first");
+            return self.say(tr!("select a track in the library first"));
         };
         let Some(file) = t.file.clone() else {
-            return self.say("the selected track has no audio file");
+            return self.say(tr!("the selected track has no audio file"));
         };
         if self
             .open
@@ -32,7 +32,7 @@ impl State {
             .is_some_and(|o| o.edit.is_edited())
             && !self.discard.replace(true)
         {
-            return self.say("the edits are not rendered and will be lost: press OPEN SELECTED again to discard them");
+            return self.say(tr!("the edits are not rendered and will be lost: press OPEN SELECTED again to discard them"));
         }
         self.stop();
         let a = self.lib.analysis(&t).unwrap_or_default();
@@ -49,14 +49,14 @@ impl State {
             );
         });
         *self.loading.borrow_mut() = Some(rx);
-        self.say("loading and analysing…");
+        self.say(tr!("loading and analysing…"));
     }
 
     pub(super) fn poll_loading(&self) {
         let got = match self.loading.borrow().as_ref().map(|rx| rx.try_recv()) {
             None | Some(Err(TryRecvError::Empty)) => return,
             Some(Err(TryRecvError::Disconnected)) => {
-                Err("the load stopped unexpectedly".to_string())
+                Err(tr!("the load stopped unexpectedly").to_string())
             }
             Some(Ok(r)) => r,
         };
@@ -64,11 +64,7 @@ impl State {
         match got {
             Ok((t, l)) => {
                 let o = Open::new(t, l);
-                self.say(format!(
-                    "opened {} — {} beats",
-                    o.track.title,
-                    o.lines.len()
-                ));
+                self.say(tr!("opened {} — {} beats", o.track.title, o.lines.len()));
                 *self.open.borrow_mut() = Some(o);
                 *self.sel.borrow_mut() = None;
                 *self.rendered.borrow_mut() = None;
@@ -78,7 +74,7 @@ impl State {
                 self.discard.set(false);
                 self.invalidate();
             }
-            Err(e) => self.say(format!("cannot open: {e}")),
+            Err(e) => self.say(tr!("cannot open: {}", e)),
         }
     }
 }

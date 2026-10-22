@@ -27,7 +27,7 @@ component DeckButton inherits Rectangle {
             font-weight: Theme.weight-bold;
         }
         Text {
-            text: root.state == 0 ? "" : (root.state == 1 || root.state == 3 ? "OUT" : "IN") + (root.state >= 3 ? "⇄" : "");
+            text: root.state == 0 ? "" : (root.state == 1 || root.state == 3 ? @tr("OUT") : @tr("IN")) + (root.state >= 3 ? "⇄" : "");
             vertical-alignment: center;
             color: root.state >= 3 ? Theme.accent-hi : Theme.cue;
             font-size: Theme.font-xs;
@@ -49,7 +49,7 @@ component PointInfo inherits Rectangle {
     HorizontalLayout {
         spacing: Theme.space-sm;
         Text { width: 28px; text: root.title; vertical-alignment: center; color: Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
-        Text { text: root.text == "" ? "not set" : root.text; vertical-alignment: center; color: root.text == "" ? Theme.text-faint : Theme.text; font-size: Theme.font-size; horizontal-stretch: 1; }
+        Text { text: root.text == "" ? @tr("not set") : root.text; vertical-alignment: center; color: root.text == "" ? Theme.text-faint : Theme.text; font-size: Theme.font-size; horizontal-stretch: 1; }
         if root.text != "": Rectangle {
             width: Theme.target-size(18px);
             border-radius: Theme.radius;
@@ -107,7 +107,7 @@ export component MixPointPanel inherits Rectangle {
                 HorizontalLayout {
                     horizontal-stretch: 0;
                     spacing: Theme.gap;
-                    for label[i] in ["MIX IN", "MIX OUT"]: Chip {
+                    for label[i] in [@tr("MIX IN"), @tr("MIX OUT")]: Chip {
                         text: label;
                         height: Theme.target-size(Theme.h-ctl);
                         min-width: Theme.layout-profile == 1 ? max(Theme.touch-target, self.fit-width) : self.fit-width;
@@ -115,33 +115,33 @@ export component MixPointPanel inherits Rectangle {
                         clicked => { MixPointState.set-mode(i); }
                     }
                 }
-                Chip { text: "SELECT"; height: Theme.target-size(Theme.h-ctl); horizontal-stretch: 0; min-width: Theme.layout-profile == 1 ? max(Theme.touch-target, self.fit-width) : 52px; tooltip: "MIX POINT SELECT: the next Hot Cue / memory cue (the current cue without any)"; clicked => { MixPointState.pick-cue(); } }
+                Chip { text: @tr("SELECT"); height: Theme.target-size(Theme.h-ctl); horizontal-stretch: 0; min-width: Theme.layout-profile == 1 ? max(Theme.touch-target, self.fit-width) : 52px; tooltip: @tr("MIX POINT SELECT: the next Hot Cue / memory cue (the current cue without any)"); clicked => { MixPointState.pick-cue(); } }
                 Chip {
-                    text: MixPointState.link-state == 2 ? "LINKED" : "LINK";
+                    text: MixPointState.link-state == 2 ? @tr("LINKED") : @tr("LINK");
                     height: Theme.target-size(Theme.h-ctl);
                     min-width: Theme.layout-profile == 1 ? max(Theme.touch-target, self.fit-width) : 28px;
                     horizontal-stretch: 1;
                     enabled: MixPointState.link-state != 0;
                     active: MixPointState.link-state == 2;
-                    tooltip: MixPointState.link-state == 2 ? "MIX POINT LINK is set: click again to put a running MIX IN deck back in step" : "MIX POINT LINK: the MIX IN deck starts by itself at the MIX POINT";
+                    tooltip: MixPointState.link-state == 2 ? @tr("MIX POINT LINK is set: click again to put a running MIX IN deck back in step") : @tr("MIX POINT LINK: the MIX IN deck starts by itself at the MIX POINT");
                     clicked => { MixPointState.link(); }
                 }
             }
             HorizontalLayout {
                 spacing: Theme.gap;
-                Chip { text: "SILENT"; height: Theme.target-size(Theme.h-ctl); horizontal-stretch: 0; min-width: Theme.layout-profile == 1 ? max(Theme.touch-target, self.fit-width) : 52px; active: MixPointState.silent; tooltip: "SILENT: mute the MIX IN deck from the start of its track to the silent end"; clicked => { MixPointState.silent-toggled(); } }
-                Chip { text: "EDIT"; height: Theme.target-size(Theme.h-ctl); horizontal-stretch: 0; min-width: Theme.target-size(34px); active: MixPointState.silent-edit; tooltip: "SILENT EDIT: click the MIX IN waveform to move the silent end"; clicked => { MixPointState.silent-edit-toggled(); } }
+                Chip { text: @tr("SILENT"); height: Theme.target-size(Theme.h-ctl); horizontal-stretch: 0; min-width: Theme.layout-profile == 1 ? max(Theme.touch-target, self.fit-width) : 52px; active: MixPointState.silent; tooltip: @tr("SILENT: mute the MIX IN deck from the start of its track to the silent end"); clicked => { MixPointState.silent-toggled(); } }
+                Chip { text: @tr("EDIT"); height: Theme.target-size(Theme.h-ctl); horizontal-stretch: 0; min-width: Theme.target-size(34px); active: MixPointState.silent-edit; tooltip: @tr("SILENT EDIT: click the MIX IN waveform to move the silent end"); clicked => { MixPointState.silent-edit-toggled(); } }
                 Rectangle { horizontal-stretch: 1; }
                 for i in DeckState.count: DeckButton { index: i; horizontal-stretch: 0; }
             }
-            PointInfo { title: "OUT"; text: MixPointState.out-text; clear => { MixPointState.clear(1); } }
-            PointInfo { title: "IN"; text: MixPointState.in-text; clear => { MixPointState.clear(0); } }
+            PointInfo { title: @tr("OUT"); text: MixPointState.out-text; clear => { MixPointState.clear(1); } }
+            PointInfo { title: @tr("IN"); text: MixPointState.in-text; clear => { MixPointState.clear(0); } }
         }
         VerticalLayout {
             horizontal-stretch: 1;
             spacing: Theme.gap;
-            Lane { source: MixPointState.lane-out; title: "MIX OUT"; which: 0; vertical-stretch: 1; preferred-height: Theme.target-size(10px); min-height: Theme.target-size(8px); }
-            Lane { source: MixPointState.lane-in; title: "MIX IN"; which: 1; vertical-stretch: 1; preferred-height: Theme.target-size(10px); min-height: Theme.target-size(8px); }
+            Lane { source: MixPointState.lane-out; title: @tr("MIX OUT"); which: 0; vertical-stretch: 1; preferred-height: Theme.target-size(10px); min-height: Theme.target-size(8px); }
+            Lane { source: MixPointState.lane-in; title: @tr("MIX IN"); which: 1; vertical-stretch: 1; preferred-height: Theme.target-size(10px); min-height: Theme.target-size(8px); }
             Rectangle {
                 height: Theme.target-size(12px);
                 background: Theme.wave-bg;

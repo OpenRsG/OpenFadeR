@@ -67,7 +67,7 @@ impl Midi {
         if let Some(e) = sink.lost() {
             *out = None; // no silent retry loop: the status line says the lights stopped following
             app.global::<MidiState>()
-                .set_status(format!("LED output lost: {e}").into());
+                .set_status(tr!("LED output lost: {}", e).into());
         }
     }
 

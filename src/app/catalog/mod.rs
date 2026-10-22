@@ -60,10 +60,6 @@ fn app() -> Option<App> {
     APP.with_borrow(|a| a.as_ref().and_then(slint::Weak::upgrade))
 }
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
 /// A job starts: the buttons wait, `what` is shown.
 fn start(s: &CatalogState, what: &str) {
     s.set_busy(true);
@@ -100,17 +96,19 @@ pub(in crate::app) fn show(app: &App) {
                 match read {
                     Ok(src) => {
                         let mut note = [
-                            (src.plugins.len(), "plugin", "plugins"),
-                            (src.themes.len(), "theme", "themes"),
-                            (src.mappings.len(), "mapping", "mappings"),
+                            (src.plugins.len() > 0)
+                                .then(|| tr_n!("{n} plugin", "{n} plugins", src.plugins.len())),
+                            (src.themes.len() > 0)
+                                .then(|| tr_n!("{n} theme", "{n} themes", src.themes.len())),
+                            (src.mappings.len() > 0)
+                                .then(|| tr_n!("{n} mapping", "{n} mappings", src.mappings.len())),
                         ]
-                        .iter()
-                        .filter(|p| p.0 > 0)
-                        .map(|&(n, one, many)| plural(n, one, many))
+                        .into_iter()
+                        .flatten()
                         .collect::<Vec<_>>()
                         .join(" · ");
                         if src.bad_mappings > 0 {
-                            note += &format!(" ({} unreadable)", src.bad_mappings);
+                            note += &tr!(" ({} unreadable)", src.bad_mappings);
                         }
                         RepoView {
                             name: name.into(),
@@ -143,7 +141,7 @@ fn read_all(refresh: bool) {
         AGAIN.set(true);
         return;
     }
-    start(&s, "Reading the repositories…");
+    start(&s, tr!("Reading the repositories…"));
     let weak = app.as_weak();
     std::thread::spawn(move || {
         let repos = list::load();
@@ -153,7 +151,7 @@ fn read_all(refresh: bool) {
                 let name = r.to_string();
                 let _ = weak.upgrade_in_event_loop(move |app| {
                     app.global::<CatalogState>()
-                        .set_status(format!("Reading {name}…").into());
+                        .set_status(tr!("Reading {}…", name).into());
                 });
                 catalog::read(r, refresh)
             })
@@ -203,19 +201,19 @@ fn loaded(
                 )
             });
     let mut text = match repos.len() {
-        0 => "No repository: add one below.".to_owned(),
-        _ => format!(
+        0 => tr!("No repository: add one below.").to_owned(),
+        _ => tr!(
             "{}, {} and {} found in {}",
-            plural(plugins, "plugin", "plugins"),
-            plural(themes, "theme", "themes"),
-            plural(maps, "mapping", "mappings"),
-            plural(ok, "repository", "repositories")
+            tr_n!("{n} plugin", "{n} plugins", plugins),
+            tr_n!("{n} theme", "{n} themes", themes),
+            tr_n!("{n} mapping", "{n} mappings", maps),
+            tr_n!("{n} repository", "{n} repositories", ok)
         ),
     };
     if bad > 0 {
-        text += &format!(
+        text += &tr!(
             "; {} could not be read",
-            plural(bad, "repository", "repositories")
+            tr_n!("{n} repository", "{n} repositories", bad)
         );
     }
     STATE.with_borrow_mut(|st| {
@@ -264,7 +262,7 @@ fn remove(i: i32) {
     show(&app);
     say(
         &app.global::<CatalogState>(),
-        &format!("Removed {repo}"),
+        &tr!("Removed {}", repo),
         false,
     );
     let weak = app.as_weak();

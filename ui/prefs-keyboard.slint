@@ -32,7 +32,7 @@ export component KeyboardPage inherits Rectangle {
         width: parent.width;
         spacing: Theme.space-lg;
         FormRow {
-            label: "PRESET";
+            label: @tr("PRESET");
             for name[i] in KeymapState.presets: Chip {
                 text: name;
                 width: 110px;
@@ -41,7 +41,7 @@ export component KeyboardPage inherits Rectangle {
                 clicked => { KeymapState.preset-chosen(i); }
             }
             Chip {
-                text: "RESET TO DEFAULTS";
+                text: @tr("RESET TO DEFAULTS");
                 width: 150px;
                 horizontal-stretch: 0;
                 clicked => { KeymapState.reset(); }
@@ -59,19 +59,19 @@ export component KeyboardPage inherits Rectangle {
                 font-size: Theme.font-size;
             }
             if KeymapState.selected >= 0 && !KeymapState.conflict: Chip {
-                text: "CLEAR";
+                text: @tr("CLEAR");
                 width: 70px;
                 horizontal-stretch: 0;
                 clicked => { KeymapState.key-captured("\u{8}", false, false); }
             }
             if KeymapState.conflict: Chip {
-                text: "REPLACE";
+                text: @tr("REPLACE");
                 width: 80px;
                 horizontal-stretch: 0;
                 clicked => { KeymapState.key-captured("\n", false, false); }
             }
             if KeymapState.selected >= 0: Chip {
-                text: "CANCEL";
+                text: @tr("CANCEL");
                 width: 70px;
                 horizontal-stretch: 0;
                 clicked => { KeymapState.key-captured("\u{1b}", false, false); }

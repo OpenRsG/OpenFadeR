@@ -3701,6 +3701,7 @@ dependencies = [
  "serde_json",
  "slint",
  "symphonia",
+ "sys-locale",
  "ureq",
  "wayland-backend",
  "wayland-client",

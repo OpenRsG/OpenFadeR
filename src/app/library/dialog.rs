@@ -67,23 +67,29 @@ impl Ask {
         };
         match self {
             Ask::ImportFiles => (
-                "IMPORT TRACK",
-                "Path of a music file, or several separated by | (mp3, m4a, aac, flac, wav, aiff).",
+                tr!("IMPORT TRACK"),
+                tr!(
+                    "Path of a music file, or several separated by | (mp3, m4a, aac, flac, wav, aiff)."
+                ),
                 music(),
             ),
             Ask::ImportFolder => (
-                "IMPORT FOLDER",
-                "Every music file below this folder joins the Collection.",
+                tr!("IMPORT FOLDER"),
+                tr!("Every music file below this folder joins the Collection."),
                 music(),
             ),
             Ask::ImportPlaylist => (
-                "IMPORT PLAYLIST",
-                "An .m3u, .m3u8 or .pls file: its tracks join the Collection and a playlist of the same name lists them.",
+                tr!("IMPORT PLAYLIST"),
+                tr!(
+                    "An .m3u, .m3u8 or .pls file: its tracks join the Collection and a playlist of the same name lists them."
+                ),
                 music(),
             ),
             Ask::ImportCollection(i) => (
-                "IMPORT COLLECTION",
-                "A collection file of the library plugin you chose: its tracks, playlists, ratings, comments, cues and beat grids are imported.",
+                tr!("IMPORT COLLECTION"),
+                tr!(
+                    "A collection file of the library plugin you chose: its tracks, playlists, ratings, comments, cues and beat grids are imported."
+                ),
                 openfader::plugin::library::readers()
                     .into_iter()
                     .nth(*i)
@@ -97,37 +103,47 @@ impl Ask {
                     .unwrap_or_default(),
             ),
             Ask::BackupTo { .. } => (
-                "BACKUP LIBRARY",
-                "Folder for the backup zip (and for the music files, in a backup folder beside it).",
+                tr!("BACKUP LIBRARY"),
+                tr!(
+                    "Folder for the backup zip (and for the music files, in a backup folder beside it)."
+                ),
                 openfader::paths::output_dir("OPENFADER_EXPORT_DIR")
                     .map(|p| p.display().to_string())
                     .unwrap_or_default(),
             ),
             Ask::Restore => (
-                "RESTORE LIBRARY",
-                "A backup zip made by Backup Library. The Collection, playlists, cues and every other stored edit are replaced.",
+                tr!("RESTORE LIBRARY"),
+                tr!(
+                    "A backup zip made by Backup Library. The Collection, playlists, cues and every other stored edit are replaced."
+                ),
                 String::new(),
             ),
             Ask::ExportList(f) => (
                 match f {
-                    Format::M3u8 => "EXPORT PLAYLIST (M3U8)",
-                    Format::Pls => "EXPORT PLAYLIST (PLS)",
-                    Format::Text => "EXPORT PLAYLIST (TEXT)",
+                    Format::M3u8 => tr!("EXPORT PLAYLIST (M3U8)"),
+                    Format::Pls => tr!("EXPORT PLAYLIST (PLS)"),
+                    Format::Text => tr!("EXPORT PLAYLIST (TEXT)"),
                 },
-                "File to write (an existing file is never overwritten).",
+                tr!("File to write (an existing file is never overwritten)."),
                 String::new(),
             ),
             Ask::Relocate(_) => (
-                "RELOCATE",
-                "The new file of the first track — the others are looked for in its folder — or a folder to look in for all of them.",
+                tr!("RELOCATE"),
+                tr!(
+                    "The new file of the first track — the others are looked for in its folder — or a folder to look in for all of them."
+                ),
                 String::new(),
             ),
             Ask::Connect { folder } => (
-                "ADD LIBRARY",
+                tr!("ADD LIBRARY"),
                 if *folder {
-                    "A folder of music: its files and sub-folders are synced into the Collection and follow the folder."
+                    tr!(
+                        "A folder of music: its files and sub-folders are synced into the Collection and follow the folder."
+                    )
                 } else {
-                    "A library file another app wrote, read by an enabled library plugin: its tracks and playlists are synced into the Collection."
+                    tr!(
+                        "A library file another app wrote, read by an enabled library plugin: its tracks and playlists are synced into the Collection."
+                    )
                 },
                 settings::music_dir().map(|p| p.display().to_string()).unwrap_or_default(),
             ),
@@ -279,5 +295,5 @@ pub fn open_external(target: &str) -> Result<(), String> {
         .stderr(std::process::Stdio::null())
         .spawn()
         .map(drop)
-        .map_err(|e| format!("cannot open {target}: {e}"))
+        .map_err(|e| tr!("cannot open {}: {}", target, e))
 }

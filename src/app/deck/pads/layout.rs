@@ -64,7 +64,7 @@ pub(super) fn mode_views(
             .take(8)
             .map(|&(name, _, beat)| {
                 pad(
-                    format!("{name}\n{}", BEAT_TEXT[beat]),
+                    format!("{}\n{}", crate::app::i18n::tr_dyn(name), BEAT_TEXT[beat]),
                     [230, 60, 160],
                     false,
                 )
@@ -83,12 +83,15 @@ pub(super) fn mode_views(
         PadMode::Stems => (0..8)
             .map(|i| match i {
                 // Theme.stem-vocal / stem-inst / stem-bass / stem-drums: the same colours as the V I B D buttons and the ISO knobs.
-                0 => pad("VOCAL".into(), [0x02, 0xda, 0x0c], false),
-                1 => pad("INST".into(), [0xda, 0x1b, 0x02], false),
-                2 => pad("BASS".into(), [0xff, 0xa6, 0x00], false),
-                3 => pad("DRUMS".into(), [0x46, 0x55, 0xff], false),
+                0 => pad(tr!("VOCAL").into(), [0x02, 0xda, 0x0c], false),
+                1 => pad(tr!("INST").into(), [0xda, 0x1b, 0x02], false),
+                2 => pad(tr!("BASS").into(), [0xff, 0xa6, 0x00], false),
+                3 => pad(tr!("DRUMS").into(), [0x46, 0x55, 0xff], false),
                 i => pad(
-                    format!("DBL\n{}", audio::STEM_NAMES[i - audio::STEM_COUNT]),
+                    tr!(
+                        "DBL\n{}",
+                        crate::app::i18n::tr_dyn(audio::STEM_NAMES[i - audio::STEM_COUNT])
+                    ),
                     [90, 60, 120],
                     false,
                 ),

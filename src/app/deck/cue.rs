@@ -77,7 +77,7 @@ impl Deck {
         let at = match act {
             Press::Preview { set: Some(ms) } => {
                 self.loaded.borrow_mut().cue_ms = ms;
-                self.say(format!("cue point set at {} (session only)", fmt_ms(ms)));
+                self.say(tr!("cue point set at {} (session only)", fmt_ms(ms)));
                 ms
             }
             _ => cue,

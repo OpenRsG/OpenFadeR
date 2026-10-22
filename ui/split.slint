@@ -18,7 +18,7 @@ export global LayoutState {
 /// root has globals of its own, so Rust (src/app/split/) copies the browser's state into this window's and forwards its callbacks to
 /// the main window's handlers; nothing here knows it is a second window.
 export component SplitWindow inherits Window {
-    title: "OpenFadeR — Browser";
+    title: @tr("OpenFadeR — Browser");
     icon: @image-url("../assets/icon.png");
     preferred-width: 1000px;
     preferred-height: 760px;
@@ -51,9 +51,9 @@ export component SplitWindow inherits Window {
                         padding-left: Theme.space-md;
                         padding-right: Theme.space-sm;
                         spacing: Theme.space-md;
-                        Text { text: "DECK " + (d + 1); vertical-alignment: center; horizontal-stretch: 0; color: [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][min(d, 3)]; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
-                        Text { text: title == "" ? "drop a track here" : title; vertical-alignment: center; overflow: elide; color: title == "" ? Theme.text-faint : Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
-                        Chip { text: "LOAD"; width: 50px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; enabled: BrowserState.current-row >= 0; tooltip: "Load the chosen track onto deck " + (d + 1); clicked => { root.load(d); } }
+                        Text { text: @tr("DECK {}", d + 1); vertical-alignment: center; horizontal-stretch: 0; color: [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][min(d, 3)]; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+                        Text { text: title == "" ? @tr("drop a track here") : title; vertical-alignment: center; overflow: elide; color: title == "" ? Theme.text-faint : Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
+                        Chip { text: @tr("LOAD"); width: 50px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; enabled: BrowserState.current-row >= 0; tooltip: @tr("Load the chosen track onto deck {}", d + 1); clicked => { root.load(d); } }
                     }
                     // A track dragged from the list or the Tag List onto the deck loads there.
                     DeckDropTarget { index: d; }

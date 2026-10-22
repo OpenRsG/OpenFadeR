@@ -206,7 +206,7 @@ export component RingButton inherits Rectangle {
     width: Theme.ring;
     height: Theme.ring;
     accessible-role: button;
-    accessible-label: root.text != "" ? root.text : root.icon == Icon.play ? "Play" : root.icon == Icon.pause ? "Pause" : "Transport";
+    accessible-label: root.text != "" ? root.text : root.icon == Icon.play ? @tr("Play") : root.icon == Icon.pause ? @tr("Pause") : @tr("Transport");
     accessible-action-default => { if root.enabled { root.pressed(); root.released(); root.clicked(); } }
     face := Rectangle {
         border-radius: root.width / 2;

@@ -150,7 +150,7 @@ pub fn open(c: &Rc<Ctx>) {
 pub fn scan(c: &Rc<Ctx>) {
     let tracks = match c.lib.tracks(None) {
         Ok(t) => t,
-        Err(e) => return c.say(&format!("duplicates: {e}")),
+        Err(e) => return c.say(&tr!("duplicates: {}", e)),
     };
     let sets: Vec<Vec<Track>> = find(&tracks)
         .into_iter()
@@ -158,10 +158,11 @@ pub fn scan(c: &Rc<Ctx>) {
         .collect();
     let n: usize = sets.iter().map(Vec::len).sum();
     let status = if sets.is_empty() {
-        "No duplicate track found".to_owned()
+        tr!("No duplicate track found").to_owned()
     } else {
-        format!(
-            "Duplicated tracks are found: {n} tracks in {} sets",
+        tr!(
+            "Duplicated tracks are found: {} tracks in {} sets",
+            n,
             sets.len()
         )
     };
@@ -197,7 +198,7 @@ pub fn keep(c: &Rc<Ctx>, i: usize) {
 
 /// MERGE: every set into its representative.
 pub fn merge(c: &Rc<Ctx>) {
-    if c.protected("merge duplicates") {
+    if c.protected(tr!("merge duplicates")) {
         return;
     }
     let st = std::mem::take(&mut c.state.borrow_mut().dupes);
@@ -221,27 +222,28 @@ pub fn merge(c: &Rc<Ctx>) {
         if merged.len() != before {
             merged_cues += merged.len() - before;
             if let Err(e) = c.store.set_cues(&rep_key, Some(&merged)) {
-                return c.say(&format!("merge failed: {e}"));
+                return c.say(&tr!("merge failed: {}", e));
             }
         }
         for o in others {
             if let Err(e) = c.store.rekey(&store::key(o), &rep_key) {
-                return c.say(&format!("merge failed: {e}"));
+                return c.say(&tr!("merge failed: {}", e));
             }
             removed.push(o.clone());
         }
     }
     c.remove_tracks(&removed);
-    c.say(&format!(
-        "merged {} duplicate files · {merged_cues} cues added to the representatives",
-        removed.len()
+    c.say(&tr!(
+        "merged {} duplicate files · {} cues added to the representatives",
+        removed.len(),
+        merged_cues
     ));
     scan(c);
 }
 
 /// DELETE: the ticked tracks leave the Collection.
 pub fn delete(c: &Rc<Ctx>) {
-    if c.protected("remove tracks") {
+    if c.protected(tr!("remove tracks")) {
         return;
     }
     let ticked: Vec<Track> = {
@@ -259,13 +261,10 @@ pub fn delete(c: &Rc<Ctx>) {
             .collect()
     };
     if ticked.is_empty() {
-        return c.say("tick the tracks to remove from the Collection");
+        return c.say(tr!("tick the tracks to remove from the Collection"));
     }
     c.remove_tracks(&ticked);
-    c.say(&format!(
-        "removed {} tracks from the Collection",
-        ticked.len()
-    ));
+    c.say(&tr!("removed {} tracks from the Collection", ticked.len()));
     scan(c);
 }
 

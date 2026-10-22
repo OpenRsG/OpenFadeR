@@ -76,29 +76,29 @@ pub(super) fn wire(cx: &Rc<Ctx>, app: &App) {
     s.on_restore(move || {
         let sel = selected(&c);
         let (Some(dev), [b]) = (c.current(), sel.as_slice()) else {
-            return c.say("Choose a device and select one backup", true);
+            return c.say(tr!("Choose a device and select one backup"), true);
         };
         if !c.writable(&dev) {
             return;
         }
-        let text = format!(
+        let text = tr!(
             "Restore the backup of {} ({}) onto {}? The library on the device is replaced.",
             b.name,
             when(b.taken_at),
             dev.label
         );
         let b = b.clone();
-        c.confirm(&text, "RESTORE", move |c| restore(c, &dev, &b, false));
+        c.confirm(&text, tr!("RESTORE"), move |c| restore(c, &dev, &b, false));
     });
     let c = cx.clone();
     s.on_backup_delete(move || {
         let sel = selected(&c);
         if sel.is_empty() {
-            return c.say("Select the backups to delete", true);
+            return c.say(tr!("Select the backups to delete"), true);
         }
         c.confirm(
-            &format!("Delete {} backup(s) from this computer?", sel.len()),
-            "DELETE",
+            &tr!("Delete {} backup(s) from this computer?", sel.len()),
+            tr!("DELETE"),
             move |c| {
                 for b in &sel {
                     let path = Path::new(&b.path);
@@ -110,7 +110,7 @@ pub(super) fn wire(cx: &Rc<Ctx>, app: &App) {
                     }
                 }
                 refresh(c);
-                c.say("Backups deleted", false);
+                c.say(tr!("Backups deleted"), false);
             },
         );
     });
@@ -131,13 +131,13 @@ pub(super) fn now(
     then: impl FnOnce(&Rc<Ctx>, &Result<String, String>) + 'static,
 ) {
     if !dev.can(Feature::Backup) || !dev.has_library() {
-        return cx.say(&format!("{} holds no library to back up", dev.label), true);
+        return cx.say(&tr!("{} holds no library to back up", dev.label), true);
     }
     let typed = cx
         .with_state(|s| s.get_backup_dir().trim().to_owned())
         .filter(|d| !d.is_empty());
     let Some(dir) = typed.map(PathBuf::from).or_else(backup::default_dir) else {
-        return cx.say("No backup folder: type one", true);
+        return cx.say(tr!("No backup folder: type one"), true);
     };
     let (store, dev) = (cx.store.clone(), dev.clone());
     let computer = device_settings::Behaviour::load(&cx.store).computer();
@@ -147,7 +147,7 @@ pub(super) fn now(
         .unwrap_or(0);
     cx.start_then(
         Some(dev.id.clone()),
-        "Backing up",
+        tr!("Backing up"),
         move |ctl| {
             let made = backup::create(&dev, &dir, &computer, &ctl)?;
             store.add_backup(&NewBackup {
@@ -159,7 +159,7 @@ pub(super) fn now(
                 fs: &dev.fs,
                 bg,
             })?;
-            Ok(format!(
+            Ok(tr!(
                 "Backed up the library of {} ({} files) to {}",
                 dev.label,
                 made.files,
@@ -183,7 +183,7 @@ fn restore(cx: &Rc<Ctx>, dev: &Device, b: &DeviceBackup, go_on: bool) {
     let (asked_dev, asked_b) = (dev.clone(), b.clone());
     cx.start_then(
         Some(dev.id.clone()),
-        "Restoring",
+        tr!("Restoring"),
         move |ctl| {
             // The collection's files by "file name|size", the way the store keys a track.
             let files: HashMap<String, PathBuf> = snap
@@ -201,13 +201,14 @@ fn restore(cx: &Rc<Ctx>, dev: &Device, b: &DeviceBackup, go_on: bool) {
                 &ctl,
             )? {
                 backup::Restore::Missing(titles) => Ok(format!("{MISSING}{}", titles.join("\n"))),
-                backup::Restore::Done { tracks, missing } => Ok(format!(
-                    "Restored the library onto {} and {tracks} track(s){}",
+                backup::Restore::Done { tracks, missing } => Ok(tr!(
+                    "Restored the library onto {} and {} track(s){}",
                     dev.label,
+                    tracks,
                     if missing.is_empty() {
                         String::new()
                     } else {
-                        format!("; {} track(s) were not in the collection", missing.len())
+                        tr!("; {} track(s) were not in the collection", missing.len())
                     }
                 )),
             }
@@ -224,11 +225,15 @@ fn restore(cx: &Rc<Ctx>, dev: &Device, b: &DeviceBackup, go_on: bool) {
                 .collect::<Vec<_>>()
                 .join("\n");
             if total > MISSING_SHOWN {
-                list.push_str(&format!("\n… and {} more", total - MISSING_SHOWN));
+                list.push('\n');
+                list.push_str(&tr!("… and {} more", total - MISSING_SHOWN));
             }
             cx.confirm(
-                &format!("The following tracks cannot be found. Continue to restore?\n{list}"),
-                "CONTINUE",
+                &tr!(
+                    "The following tracks cannot be found. Continue to restore?\n{}",
+                    list
+                ),
+                tr!("CONTINUE"),
                 move |c| restore(c, &asked_dev, &asked_b, true),
             );
         },
@@ -251,16 +256,16 @@ impl Ctx {
         let loaded = self.loaded_from(dev);
         if loaded > 0 && !confirmed {
             let d = dev.clone();
-            return self.confirm(&format!("The library is loaded from {}: {loaded} track(s) play from it and stop working when it is removed. Eject anyway?", dev.label), "EJECT", move |c| c.eject(&d, true));
+            return self.confirm(&tr!("The library is loaded from {}: {} track(s) play from it and stop working when it is removed. Eject anyway?", dev.label, loaded), tr!("EJECT"), move |c| c.eject(&d, true));
         }
         let refusal = self.job.borrow().as_ref().map(|j| {
             if j.device.as_deref() == Some(dev.id.as_str()) {
-                format!(
+                tr!(
                     "A transfer to {} is running: cancel it (X) before ejecting",
                     dev.label
                 )
             } else {
-                BUSY.to_owned()
+                crate::app::i18n::tr_dyn(BUSY).to_owned()
             }
         });
         if let Some(msg) = refusal {
@@ -268,7 +273,7 @@ impl Ctx {
         }
         let go = |cx: &Rc<Ctx>, dev: &Device| {
             let d = dev.clone();
-            cx.start(Some(dev.id.clone()), "Ejecting", move |_| {
+            cx.start(Some(dev.id.clone()), tr!("Ejecting"), move |_| {
                 device::eject::eject(&d)
             });
         };
@@ -279,7 +284,7 @@ impl Ctx {
             let d = dev.clone();
             now(self, dev, move |cx, r| match r {
                 Ok(_) => go(cx, &d),
-                Err(e) => cx.say(&format!("Not ejected: the backup failed ({e})"), true),
+                Err(e) => cx.say(&tr!("Not ejected: the backup failed ({})", e), true),
             });
         } else {
             go(self, dev);

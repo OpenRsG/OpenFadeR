@@ -58,7 +58,7 @@ impl Midi {
             && let Some(app) = self.app.upgrade()
         {
             app.global::<MidiState>()
-                .set_status("JOG CUTTER needs VINYL mode (SHIFT + JOG CUTTER)".into());
+                .set_status(tr!("JOG CUTTER needs VINYL mode (SHIFT + JOG CUTTER)").into());
         }
     }
 

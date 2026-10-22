@@ -18,13 +18,13 @@ component Cell inherits Text {
 /// from the collection.
 export component BackupPage inherits VerticalLayout {
     spacing: Theme.space-lg;
-    Note { text: "A backup keeps the library of a device (databases, analysis files, artwork, settings), not its music. Restoring puts the library back and copies the missing tracks from your collection."; vertical-stretch: 0; }
+    Note { text: @tr("A backup keeps the library of a device (databases, analysis files, artwork, settings), not its music. Restoring puts the library back and copies the missing tracks from your collection."); vertical-stretch: 0; }
     FormRow {
-        label: "BACKUP FOLDER";
+        label: @tr("BACKUP FOLDER");
         vertical-stretch: 0;
-        TextField { text <=> DeviceState.backup-dir; placeholder-text: "folder on this computer"; horizontal-stretch: 1; }
+        TextField { text <=> DeviceState.backup-dir; placeholder-text: @tr("folder on this computer"); horizontal-stretch: 1; }
     }
-    Caption { text: "BACKED UP DEVICE LIBRARIES"; }
+    Caption { text: @tr("BACKED UP DEVICE LIBRARIES"); }
     Rectangle {
         min-height: Theme.layout-profile == 1 ? 5 * Theme.target-size(Theme.h-row) : 0px;
         background: Theme.bg-deep;
@@ -37,10 +37,10 @@ export component BackupPage inherits VerticalLayout {
                 HorizontalLayout {
                     padding-left: Theme.space-md;
                     spacing: Theme.space-md;
-                    Text { text: "DATE AND TIME"; width: 150px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
-                    Text { text: "COMPUTER"; width: 140px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
-                    Text { text: "DEVICE"; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
-                    Text { text: "FILE SYSTEM"; width: 90px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                    Text { text: @tr("DATE AND TIME"); width: 150px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                    Text { text: @tr("COMPUTER"); width: 140px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                    Text { text: @tr("DEVICE"); color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                    Text { text: @tr("FILE SYSTEM"); width: 90px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
                 }
             }
             ListView {
@@ -63,8 +63,8 @@ export component BackupPage inherits VerticalLayout {
     HorizontalLayout {
         spacing: Theme.space-md;
         vertical-stretch: 0;
-        Chip { text: "BACKUP NOW"; enabled: !DeviceState.busy && DeviceState.current >= 0; tooltip: "Back up the library of the chosen device"; clicked => { DeviceState.backup-now(); } }
-        Chip { text: "RESTORE TO DEVICE"; enabled: !DeviceState.busy && DeviceState.current >= 0; clicked => { DeviceState.restore(); } }
-        Chip { text: "DELETE"; enabled: !DeviceState.busy; clicked => { DeviceState.backup-delete(); } }
+        Chip { text: @tr("BACKUP NOW"); enabled: !DeviceState.busy && DeviceState.current >= 0; tooltip: @tr("Back up the library of the chosen device"); clicked => { DeviceState.backup-now(); } }
+        Chip { text: @tr("RESTORE TO DEVICE"); enabled: !DeviceState.busy && DeviceState.current >= 0; clicked => { DeviceState.restore(); } }
+        Chip { text: @tr("DELETE"); enabled: !DeviceState.busy; clicked => { DeviceState.backup-delete(); } }
     }
 }

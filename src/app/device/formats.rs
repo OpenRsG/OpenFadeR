@@ -42,7 +42,7 @@ impl Ctx {
             .collect();
         if w.is_empty() {
             self.say(
-                &format!("{}: switch on at least one library format", d.label),
+                &tr!("{}: switch on at least one library format", d.label),
                 true,
             );
             return None;

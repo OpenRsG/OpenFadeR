@@ -24,31 +24,31 @@ impl State {
         need_sel: bool,
         f: impl FnOnce(&mut Open, Range<usize>) -> Option<Range<usize>>,
     ) {
+        let what = crate::app::i18n::tr_dyn(what);
         self.discard.set(false);
         let sel = self.sel();
         let cursor = self.cursor.get();
         let mut open = self.open.borrow_mut();
         let Some(o) = open.as_mut() else {
-            return self.say("open a track first: OPEN SELECTED");
+            return self.say(tr!("open a track first: OPEN SELECTED"));
         };
         if need_sel && sel.is_none() {
-            return self.say(format!(
-                "{what}: select a range first (drag on the waveform)"
-            ));
+            return self.say(tr!("{}: select a range first (drag on the waveform)", what));
         }
         self.stop();
         match f(o, sel.unwrap_or(cursor..cursor)) {
             Some(r) => {
                 o.refresh();
                 self.cursor.set(r.start);
-                self.say(format!(
-                    "{what}: done ({:.2} s)",
-                    r.len() as f64 / o.edit.rate() as f64
+                self.say(tr!(
+                    "{}: done ({} s)",
+                    what,
+                    format!("{:.2}", r.len() as f64 / o.edit.rate() as f64)
                 ));
                 *self.sel.borrow_mut() = (!r.is_empty()).then_some(r);
                 self.invalidate();
             }
-            None => self.say(format!("{what}: nothing to do")),
+            None => self.say(tr!("{}: nothing to do", what)),
         }
     }
 
@@ -59,7 +59,7 @@ impl State {
             .as_ref()
             .is_some_and(|o| o.edit.clip_len() == 0);
         if empty {
-            self.say("the clipboard is empty: copy or cut a range first");
+            self.say(tr!("the clipboard is empty: copy or cut a range first"));
         }
         !empty
     }
@@ -67,47 +67,47 @@ impl State {
     pub(super) fn copy(&self) {
         let (sel, mut open) = (self.sel(), self.open.borrow_mut());
         let Some(o) = open.as_mut() else {
-            return self.say("open a track first: OPEN SELECTED");
+            return self.say(tr!("open a track first: OPEN SELECTED"));
         };
         match sel.filter(|r| o.edit.copy(r.clone())) {
-            Some(r) => self.say(format!(
-                "copied {:.2} s",
-                r.len() as f64 / o.edit.rate() as f64
+            Some(r) => self.say(tr!(
+                "copied {} s",
+                format!("{:.2}", r.len() as f64 / o.edit.rate() as f64)
             )),
-            None => self.say("copy: select a range first (drag on the waveform)"),
+            None => self.say(tr!("copy: select a range first (drag on the waveform)")),
         }
     }
 
     pub(super) fn cut(&self) {
-        self.apply("cut", true, |o, r| o.edit.cut(r));
+        self.apply(n_!("cut"), true, |o, r| o.edit.cut(r));
     }
 
     /// Overwrites from the selection start / playhead with the clipboard.
     pub(super) fn paste(&self) {
         if self.need_clip() {
-            self.apply("paste", false, |o, r| o.edit.paste(r.start));
+            self.apply(n_!("paste"), false, |o, r| o.edit.paste(r.start));
         }
     }
 
     /// Inserts the clipboard at the selection start / playhead, the rest moves down.
     pub(super) fn insert(&self) {
         if self.need_clip() {
-            self.apply("insert", false, |o, r| o.edit.insert(r.start));
+            self.apply(n_!("insert"), false, |o, r| o.edit.insert(r.start));
         }
     }
 
     pub(super) fn delete(&self) {
-        self.apply("delete", true, |o, r| o.edit.delete(r));
+        self.apply(n_!("delete"), true, |o, r| o.edit.delete(r));
     }
 
     /// Mutes the selection (its length stays).
     pub(super) fn clear(&self) {
-        self.apply("mute", true, |o, r| o.edit.clear(r));
+        self.apply(n_!("mute"), true, |o, r| o.edit.clear(r));
     }
 
     /// Silence the size of the selection, or four beats, at the playhead.
     pub(super) fn silence(&self) {
-        self.apply("insert silence", false, |o, r| {
+        self.apply(n_!("insert silence"), false, |o, r| {
             let n = if r.is_empty() {
                 o.bar_frames()
             } else {
@@ -118,7 +118,7 @@ impl State {
     }
 
     pub(super) fn duplicate(&self) {
-        self.apply("duplicate", true, |o, r| o.edit.duplicate(r));
+        self.apply(n_!("duplicate"), true, |o, r| o.edit.duplicate(r));
     }
 
     pub(super) fn select_all(&self) {
@@ -133,7 +133,7 @@ impl State {
         let mut open = self.open.borrow_mut();
         let Some(o) = open.as_mut() else { return };
         let done = if undo { o.edit.undo() } else { o.edit.redo() };
-        let name = if undo { "undo" } else { "redo" };
+        let name = if undo { tr!("undo") } else { tr!("redo") };
         if done {
             o.refresh();
             self.cursor.set(self.cursor.get().min(o.edit.len()));
@@ -142,8 +142,10 @@ impl State {
         }
         self.say(if done {
             name.to_string()
+        } else if undo {
+            tr!("nothing to undo").to_string()
         } else {
-            format!("nothing to {name}")
+            tr!("nothing to redo").to_string()
         });
     }
 
@@ -161,7 +163,7 @@ impl State {
         };
         match Play::start(pcm, from) {
             Ok(p) => *self.play.borrow_mut() = Some(p),
-            Err(e) => self.say(format!("cannot play: {e}")),
+            Err(e) => self.say(tr!("cannot play: {}", e)),
         }
         self.dirty.set(true);
     }
@@ -187,7 +189,9 @@ impl State {
     /// The arrangement as a WAV under the output folder; the file of the last render when nothing changed since.
     fn render_file(&self) -> Result<PathBuf, String> {
         let open = self.open.borrow();
-        let o = open.as_ref().ok_or("open a track first: OPEN SELECTED")?;
+        let o = open
+            .as_ref()
+            .ok_or(tr!("open a track first: OPEN SELECTED"))?;
         if let Some((edl, path)) = &*self.rendered.borrow() {
             if edl == o.edit.edl() {
                 return Ok(path.clone());
@@ -202,8 +206,8 @@ impl State {
     pub(super) fn render(&self) {
         self.discard.set(false);
         match self.render_file() {
-            Ok(p) => self.say(format!("rendered {}", p.display())),
-            Err(e) => self.say(format!("render failed: {e}")),
+            Ok(p) => self.say(tr!("rendered {}", p.display())),
+            Err(e) => self.say(tr!("render failed: {}", e)),
         }
     }
 
@@ -211,7 +215,7 @@ impl State {
     pub(super) fn to_deck(&self, i: usize) {
         let path = match self.render_file() {
             Ok(p) => p,
-            Err(e) => return self.say(format!("render failed: {e}")),
+            Err(e) => return self.say(tr!("render failed: {}", e)),
         };
         let Some(deck) = self.decks.get(i) else {
             return;
@@ -221,7 +225,7 @@ impl State {
             None => return,
         };
         let t = Track {
-            title: format!("{} (edit)", src.title),
+            title: tr!("{} (edit)", src.title),
             artist: src.artist,
             key: src.key,
             bpm_x100: src.bpm_x100,
@@ -230,6 +234,6 @@ impl State {
             ..Track::default()
         };
         deck.load(&t, &*self.lib);
-        self.say(format!("loaded on deck {}: {}", i + 1, path.display()));
+        self.say(tr!("loaded on deck {}: {}", i + 1, path.display()));
     }
 }

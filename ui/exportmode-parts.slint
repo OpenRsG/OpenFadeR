@@ -41,17 +41,17 @@ export component Ops inherits Rectangle {
         if root.search: HorizontalLayout {
             spacing: 2px;
             height: Theme.target-size(22px);
-            IconButton { icon: Icon.prev; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; solid: true; width: Theme.target-size(28px); tooltip: "Start of the track; twice: previous track"; clicked => { if (root.armed) { root.armed = false; root.step(-1); } else { DeckState.seek(root.index, 0.0); root.armed = true; } } }
-            IconButton { icon: Icon.next; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; solid: true; width: Theme.target-size(28px); tooltip: "Next track"; clicked => { root.step(1); } }
+            IconButton { icon: Icon.prev; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; solid: true; width: Theme.target-size(28px); tooltip: @tr("Start of the track; twice: previous track"); clicked => { if (root.armed) { root.armed = false; root.step(-1); } else { DeckState.seek(root.index, 0.0); root.armed = true; } } }
+            IconButton { icon: Icon.next; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; solid: true; width: Theme.target-size(28px); tooltip: @tr("Next track"); clicked => { root.step(1); } }
         }
         if root.jump: HorizontalLayout {
             spacing: 2px;
             height: Theme.target-size(22px);
-            IconButton { icon: Icon.chevron-left; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; solid: true; enabled: root.loaded; width: Theme.target-size(28px); tooltip: "Jump back"; clicked => { DeckState.beat-jump(root.index, -root.beats[root.jump-i]); } }
-            IconButton { icon: Icon.chevron-right; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; solid: true; enabled: root.loaded; width: Theme.target-size(28px); tooltip: "Jump forward"; clicked => { DeckState.beat-jump(root.index, root.beats[root.jump-i]); } }
+            IconButton { icon: Icon.chevron-left; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; solid: true; enabled: root.loaded; width: Theme.target-size(28px); tooltip: @tr("Jump back"); clicked => { DeckState.beat-jump(root.index, -root.beats[root.jump-i]); } }
+            IconButton { icon: Icon.chevron-right; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; solid: true; enabled: root.loaded; width: Theme.target-size(28px); tooltip: @tr("Jump forward"); clicked => { DeckState.beat-jump(root.index, root.beats[root.jump-i]); } }
         }
         if root.jump: Dropdown {
-            options: ["1Beat", "2Beats", "4Beats", "8Beats", "2Bars", "4Bars", "8Bars", "16Bars"];
+            options: [@tr("1Beat"), @tr("2Beats"), @tr("4Beats"), @tr("8Beats"), @tr("2Bars"), @tr("4Bars"), @tr("8Bars"), @tr("16Bars")];
             current: root.jump-i;
             font-size: Theme.font-xs;
             height: Theme.target-size(18px);
@@ -63,7 +63,7 @@ export component Ops inherits Rectangle {
             alignment: center;
             RingButton {
                 tone: Theme.cue;
-                text: "CUE";
+                text: @tr("CUE");
                 lit: DeckState.decks[root.index].at-cue;
                 enabled: root.loaded;
                 width: root.ring;
@@ -103,12 +103,12 @@ export component GainEq inherits Rectangle {
             alignment: center;
             Knob { width: Theme.target-size(20px); height: Theme.target-size(20px); detent: true; value: MixerState.channels[root.index].auto-gain; edited(v) => { MixerState.auto-gain-knob(root.index, v); } }
         }
-        Text { text: "A-GAIN"; color: Theme.text-dim; font-size: Theme.font-xs; font-weight: Theme.weight-bold; horizontal-alignment: center; }
-        for band[i] in ["HIGH", "MID", "LOW"]: Chip {
+        Text { text: @tr("A-GAIN"); color: Theme.text-dim; font-size: Theme.font-xs; font-weight: Theme.weight-bold; horizontal-alignment: center; }
+        for band[i] in [@tr("HIGH"), @tr("MID"), @tr("LOW")]: Chip {
             text: band;
             height: Theme.target-size(18px);
             font-size: Theme.font-xs;
-            tooltip: "Mute the band";
+            tooltip: @tr("Mute the band");
             active: MixerState.channels[root.index].knobs[i + 1] < 0.02;
             active-color: Theme.danger;
             clicked => { MixerState.knob(root.index, i + 1, MixerState.channels[root.index].knobs[i + 1] < 0.02 ? 0.5 : 0.0); }
@@ -144,13 +144,13 @@ component SyncBar inherits HorizontalLayout {
     in property <bool> dual;
     property <bool> loaded: DeckState.decks[root.index].loaded;
     spacing: 2px;
-    if root.dual: Chip { width: Theme.layout-profile == 1 ? 80px : 56px; height: Theme.target-size(18px); horizontal-stretch: 0; font-size: Theme.font-xs; text: "KEY SYNC"; enabled: root.loaded; clicked => { DeckState.key-sync(root.index); } }
-    if root.dual: Chip { width: Theme.target-size(18px); height: Theme.target-size(18px); horizontal-stretch: 0; text: "−"; tooltip: "Key down"; enabled: root.loaded; clicked => { DeckState.key-step(root.index, -1); } }
+    if root.dual: Chip { width: Theme.layout-profile == 1 ? 80px : 56px; height: Theme.target-size(18px); horizontal-stretch: 0; font-size: Theme.font-xs; text: @tr("KEY SYNC"); enabled: root.loaded; clicked => { DeckState.key-sync(root.index); } }
+    if root.dual: Chip { width: Theme.target-size(18px); height: Theme.target-size(18px); horizontal-stretch: 0; text: "−"; tooltip: @tr("Key down"); enabled: root.loaded; clicked => { DeckState.key-step(root.index, -1); } }
     if root.dual: Text { width: 44px; text: DeckState.decks[root.index].key-shift != "" ? DeckState.decks[root.index].key-shift : "±0"; color: DeckState.decks[root.index].key-shifted ? Theme.accent-hi : Theme.text-dim; font-size: Theme.font-sm; horizontal-alignment: center; vertical-alignment: center; }
-    if root.dual: Chip { width: Theme.target-size(18px); height: Theme.target-size(18px); horizontal-stretch: 0; text: "+"; tooltip: "Key up"; enabled: root.loaded; clicked => { DeckState.key-step(root.index, 1); } }
-    if root.dual: Chip { width: Theme.target-size(30px); height: Theme.target-size(18px); horizontal-stretch: 0; font-size: Theme.font-xs; text: "RST"; tooltip: "Back to the track's key"; enabled: root.loaded; clicked => { DeckState.key-reset(root.index); } }
-    Chip { width: Theme.layout-profile == 1 ? 88px : 62px; height: Theme.target-size(18px); horizontal-stretch: 0; font-size: Theme.font-xs; text: "BEAT SYNC"; enabled: root.loaded; active: DeckState.decks[root.index].synced; active-color: Theme.sync; clicked => { DeckState.sync(root.index); } }
-    Chip { width: Theme.layout-profile == 1 ? 80px : 50px; height: Theme.target-size(18px); horizontal-stretch: 0; font-size: Theme.font-xs; text: "MASTER"; enabled: root.loaded; active: DeckState.decks[root.index].master; active-color: Theme.master; clicked => { DeckState.master-toggle(root.index); } }
+    if root.dual: Chip { width: Theme.target-size(18px); height: Theme.target-size(18px); horizontal-stretch: 0; text: "+"; tooltip: @tr("Key up"); enabled: root.loaded; clicked => { DeckState.key-step(root.index, 1); } }
+    if root.dual: Chip { width: Theme.target-size(30px); height: Theme.target-size(18px); horizontal-stretch: 0; font-size: Theme.font-xs; text: @tr("RST"); tooltip: @tr("Back to the track's key"); enabled: root.loaded; clicked => { DeckState.key-reset(root.index); } }
+    Chip { width: Theme.layout-profile == 1 ? 88px : 62px; height: Theme.target-size(18px); horizontal-stretch: 0; font-size: Theme.font-xs; text: @tr("BEAT SYNC"); enabled: root.loaded; active: DeckState.decks[root.index].synced; active-color: Theme.sync; clicked => { DeckState.sync(root.index); } }
+    Chip { width: Theme.layout-profile == 1 ? 80px : 50px; height: Theme.target-size(18px); horizontal-stretch: 0; font-size: Theme.font-xs; text: @tr("MASTER"); enabled: root.loaded; active: DeckState.decks[root.index].master; active-color: Theme.master; clicked => { DeckState.master-toggle(root.index); } }
 }
 
 /// Playback track information: artwork (a click loads the browser's chosen track), title / artist, BPM and key,
@@ -195,13 +195,13 @@ component LoopBar inherits HorizontalLayout {
     property <int> shown: root.custom ? root.auto-n : (DeckState.decks[root.index].auto-beats > 0 ? DeckState.decks[root.index].auto-beats : root.auto-n);
     spacing: 2px;
     horizontal-stretch: 0;
-    SegmentedChips { options: ["AU", "MA"]; current: root.manual ? 1 : 0; font-size: Theme.font-xs; width: Theme.layout-profile == 1 ? 2 * Theme.touch-target : 60px; horizontal-stretch: 0; chose(i) => { root.manual = i == 1; } }
+    SegmentedChips { options: [@tr("AU"), @tr("MA")]; current: root.manual ? 1 : 0; font-size: Theme.font-xs; width: Theme.layout-profile == 1 ? 2 * Theme.touch-target : 60px; horizontal-stretch: 0; chose(i) => { root.manual = i == 1; } }
     if !root.manual: Chip {
         text: "<";
         width: Theme.target-size(24px);
         horizontal-stretch: 0;
         enabled: root.loaded && (root.active || true);
-        tooltip: "Halve the loop";
+        tooltip: @tr("Halve the loop");
         clicked => { if (root.active) { DeckState.loop-halve(root.index); } else { root.auto-n = Math.max(1, Math.floor(root.shown / 2)); root.custom = true; } }
     }
     if !root.manual: Rectangle {
@@ -211,7 +211,7 @@ component LoopBar inherits HorizontalLayout {
         border-width: 1px;
         border-color: root.active ? Theme.accent : Theme.line;
         opacity: root.loaded ? 1 : 0.5;
-        Text { text: root.active ? (DeckState.decks[root.index].loop-beats > 0 ? "" + DeckState.decks[root.index].loop-beats : "LOOP") : "" + root.shown; color: root.active ? Theme.accent-hi : Theme.text-bright; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+        Text { text: root.active ? (DeckState.decks[root.index].loop-beats > 0 ? "" + DeckState.decks[root.index].loop-beats : @tr("LOOP")) : "" + root.shown; color: root.active ? Theme.accent-hi : Theme.text-bright; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
         TouchArea {
             enabled: root.loaded;
             clicked => { if (root.active) { DeckState.reloop(root.index); } else { DeckState.auto-loop(root.index, root.custom ? root.auto-n : 0); } }
@@ -222,12 +222,12 @@ component LoopBar inherits HorizontalLayout {
         width: Theme.target-size(24px);
         horizontal-stretch: 0;
         enabled: root.loaded;
-        tooltip: "Double the loop";
+        tooltip: @tr("Double the loop");
         clicked => { if (root.active) { DeckState.loop-double(root.index); } else { root.auto-n = Math.min(16, root.shown * 2); root.custom = true; } }
     }
-    if root.manual: Chip { text: "IN"; width: Theme.target-size(34px); horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; clicked => { DeckState.loop-in(root.index); } }
-    if root.manual: Chip { text: "OUT"; width: Theme.target-size(38px); horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; clicked => { DeckState.loop-out(root.index); } }
-    if root.manual: Chip { text: "RELOOP"; width: Theme.layout-profile == 1 ? 70px : 52px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; active: root.active; clicked => { DeckState.reloop(root.index); } }
+    if root.manual: Chip { text: @tr("IN"); width: Theme.target-size(34px); horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; clicked => { DeckState.loop-in(root.index); } }
+    if root.manual: Chip { text: @tr("OUT"); width: Theme.target-size(38px); horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; clicked => { DeckState.loop-out(root.index); } }
+    if root.manual: Chip { text: @tr("RELOOP"); width: Theme.layout-profile == 1 ? 70px : 52px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; active: root.active; clicked => { DeckState.reloop(root.index); } }
 }
 
 /// The ≡ menu: the enlarged waveform's colours, analyse the playing track, export tracks.
@@ -237,7 +237,7 @@ component FuncMenu inherits IconButton {
     icon-size: 12px;
     solid: true;
     width: Theme.target-size(24px);
-    tooltip: "Waveform colour, analyse the track, export";
+    tooltip: @tr("Waveform colour, analyse the track, export");
     clicked => { pop.show(); }
     pop := PopupWindow {
         x: root.width - self.width;
@@ -251,7 +251,7 @@ component FuncMenu inherits IconButton {
             border-radius: Theme.radius;
             VerticalLayout {
                 padding: 1px;
-                for o[i] in ["WAVEFORM: 3BAND", "WAVEFORM: RGB", "WAVEFORM: BLUE", "ANALYZE TRACK", "EXPORT TRACKS…", "DEVICES…"]: Rectangle {
+                for o[i] in [@tr("WAVEFORM: 3BAND"), @tr("WAVEFORM: RGB"), @tr("WAVEFORM: BLUE"), @tr("ANALYZE TRACK"), @tr("EXPORT TRACKS…"), @tr("DEVICES…")]: Rectangle {
                     height: Theme.target-size(Theme.h-row);
                     background: ma.has-hover ? Theme.select : transparent;
                     Text { x: Theme.space-md; text: o; color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; }
@@ -275,13 +275,13 @@ component TempoBar inherits HorizontalLayout {
     in property <int> index;
     property <bool> loaded: DeckState.decks[root.index].loaded;
     spacing: 2px;
-    Chip { text: "MT"; width: Theme.target-size(28px); horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; active: DeckState.decks[root.index].key-lock; tooltip: "Master tempo"; clicked => { DeckState.key-lock(root.index); } }
-    Chip { text: "RST"; width: Theme.target-size(30px); horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; tooltip: "Tempo reset"; clicked => { DeckState.tempo(root.index, 0.5); } }
-    Chip { text: DeckState.decks[root.index].tempo-range; width: Theme.target-size(40px); horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: "Tempo range"; clicked => { DeckState.tempo-range(root.index); } }
+    Chip { text: @tr("MT"); width: Theme.target-size(28px); horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; active: DeckState.decks[root.index].key-lock; tooltip: @tr("Master tempo"); clicked => { DeckState.key-lock(root.index); } }
+    Chip { text: @tr("RST"); width: Theme.target-size(30px); horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; tooltip: @tr("Tempo reset"); clicked => { DeckState.tempo(root.index, 0.5); } }
+    Chip { text: DeckState.decks[root.index].tempo-range; width: Theme.target-size(40px); horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: @tr("Tempo range"); clicked => { DeckState.tempo-range(root.index); } }
     Fader { detent: true; min-width: 80px; horizontal-stretch: 1; value: DeckState.decks[root.index].tempo; edited(p) => { DeckState.tempo(root.index, p); } }
     Text { text: DeckState.decks[root.index].tempo-text; width: 44px; color: Theme.text; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
-    Chip { text: "−"; width: Theme.target-size(22px); horizontal-stretch: 0; enabled: root.loaded; tooltip: "Pitch bend: hold to slow down"; pressed => { ExportModeState.bend(root.index, -0.08); } released => { ExportModeState.bend(root.index, 0.0); } }
-    Chip { text: "+"; width: Theme.target-size(22px); horizontal-stretch: 0; enabled: root.loaded; tooltip: "Pitch bend: hold to speed up"; pressed => { ExportModeState.bend(root.index, 0.08); } released => { ExportModeState.bend(root.index, 0.0); } }
+    Chip { text: "−"; width: Theme.target-size(22px); horizontal-stretch: 0; enabled: root.loaded; tooltip: @tr("Pitch bend: hold to slow down"); pressed => { ExportModeState.bend(root.index, -0.08); } released => { ExportModeState.bend(root.index, 0.0); } }
+    Chip { text: "+"; width: Theme.target-size(22px); horizontal-stretch: 0; enabled: root.loaded; tooltip: @tr("Pitch bend: hold to speed up"); pressed => { ExportModeState.bend(root.index, 0.08); } released => { ExportModeState.bend(root.index, 0.0); } }
 }
 
 /// Function panel. 1 PLAYER (`tabs`): CUE/LOOP and GRID stacked on the left, the hot cues, MEMORY, the cue
@@ -305,10 +305,10 @@ export component Func inherits Rectangle {
         if root.tabs: VerticalLayout {
             width: Theme.layout-profile == 1 ? 80px : 66px;
             spacing: 2px;
-            Chip { text: "CUE/LOOP"; active: !root.grid; font-size: Theme.font-xs; clicked => { if (root.grid) { DeckState.grid-toggle(root.index); } } }
-            Chip { text: "GRID"; active: root.grid; font-size: Theme.font-xs; enabled: root.loaded; clicked => { if (!root.grid) { DeckState.grid-toggle(root.index); } } }
+            Chip { text: @tr("CUE/LOOP"); active: !root.grid; font-size: Theme.font-xs; clicked => { if (root.grid) { DeckState.grid-toggle(root.index); } } }
+            Chip { text: @tr("GRID"); active: root.grid; font-size: Theme.font-xs; enabled: root.loaded; clicked => { if (!root.grid) { DeckState.grid-toggle(root.index); } } }
         }
-        if !root.tabs: Chip { text: "GRID"; width: Theme.layout-profile == 1 ? 60px : 38px; horizontal-stretch: 0; active: root.grid; font-size: Theme.font-xs; enabled: root.loaded; tooltip: "Adjust the beat grid"; clicked => { DeckState.grid-toggle(root.index); } }
+        if !root.tabs: Chip { text: @tr("GRID"); width: Theme.layout-profile == 1 ? 60px : 38px; horizontal-stretch: 0; active: root.grid; font-size: Theme.font-xs; enabled: root.loaded; tooltip: @tr("Adjust the beat grid"); clicked => { DeckState.grid-toggle(root.index); } }
         if root.grid && !ExportModeState.decks[root.index].phrase-panel: VerticalLayout { alignment: center; GridTools { index: root.index; } }
         if root.grid && ExportModeState.decks[root.index].phrase-panel: VerticalLayout { alignment: center; PhraseTools { index: root.index; } }
         if !root.grid: HorizontalLayout {
@@ -320,10 +320,10 @@ export component Func inherits Rectangle {
                 HorizontalLayout {
                     spacing: 4px;
                     if root.tabs: HotRow { index: root.index; }
-                    Chip { text: "MEMORY"; width: Theme.layout-profile == 1 ? 80px : 54px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; tooltip: "Save a memory cue at the playhead"; clicked => { DeckState.memory-cue(root.index); } }
-                    if root.tabs: Chip { text: "◀"; width: Theme.target-size(24px); horizontal-stretch: 0; enabled: root.loaded; tooltip: "Previous cue or loop"; clicked => { ExportModeState.cue-step(root.index, -1); } }
-                    if root.tabs: Chip { text: "▶"; width: Theme.target-size(24px); horizontal-stretch: 0; enabled: root.loaded; tooltip: "Next cue or loop"; clicked => { ExportModeState.cue-step(root.index, 1); } }
-                    if root.tabs: Chip { text: "×"; width: Theme.target-size(24px); horizontal-stretch: 0; enabled: root.loaded; tooltip: "Delete the cue or loop at the playhead"; clicked => { ExportModeState.memory-delete(root.index); } }
+                    Chip { text: @tr("MEMORY"); width: Theme.layout-profile == 1 ? 80px : 54px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.loaded; tooltip: @tr("Save a memory cue at the playhead"); clicked => { DeckState.memory-cue(root.index); } }
+                    if root.tabs: Chip { text: "◀"; width: Theme.target-size(24px); horizontal-stretch: 0; enabled: root.loaded; tooltip: @tr("Previous cue or loop"); clicked => { ExportModeState.cue-step(root.index, -1); } }
+                    if root.tabs: Chip { text: "▶"; width: Theme.target-size(24px); horizontal-stretch: 0; enabled: root.loaded; tooltip: @tr("Next cue or loop"); clicked => { ExportModeState.cue-step(root.index, 1); } }
+                    if root.tabs: Chip { text: "×"; width: Theme.target-size(24px); horizontal-stretch: 0; enabled: root.loaded; tooltip: @tr("Delete the cue or loop at the playhead"); clicked => { ExportModeState.memory-delete(root.index); } }
                     LoopBar { index: root.index; }
                 }
             }
@@ -334,7 +334,7 @@ export component Func inherits Rectangle {
                 horizontal-stretch: 0;
                 HorizontalLayout {
                     spacing: 2px;
-                    Chip { text: "Q"; width: Theme.target-size(24px); horizontal-stretch: 0; active: DeckState.decks[root.index].quantize; tooltip: "Quantize"; clicked => { DeckState.quantize(root.index); } }
+                    Chip { text: "Q"; width: Theme.target-size(24px); horizontal-stretch: 0; active: DeckState.decks[root.index].quantize; tooltip: @tr("Quantize"); clicked => { DeckState.quantize(root.index); } }
                     FuncMenu { index: root.index; }
                 }
             }

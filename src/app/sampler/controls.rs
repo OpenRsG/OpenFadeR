@@ -85,7 +85,7 @@ pub fn wire(app: &App, decks: &Decks, track: Rc<RefCell<Option<Track>>>) {
         if let Some((_, i)) = s.state() {
             let c = &s.cfg.borrow()[i];
             if c.sync && c.loaded && c.bpm <= 0.0 {
-                s.say("this slice has no tempo: SYNC does nothing");
+                s.say(tr!("this slice has no tempo: SYNC does nothing"));
             }
         }
     });

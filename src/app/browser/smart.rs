@@ -80,41 +80,43 @@ impl Cond {
                 s.parse::<f64>()
                     .ok()
                     .filter(|v| *v >= 0.0)
-                    .ok_or_else(|| format!("“{s}” is not a BPM"))
+                    .ok_or_else(|| tr!("“{}” is not a BPM", s))
             }
         };
         let date = |s: &str| {
             if s.is_empty() || NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok() {
                 Ok(s.to_owned())
             } else {
-                Err(format!("“{s}” is not a date (YYYY-MM-DD)"))
+                Err(tr!("“{}” is not a date (YYYY-MM-DD)", s))
             }
         };
         match kind {
             0 => match (bound(a)?, bound(b)?) {
-                (0.0, 0.0) => Err("BPM needs a min or a max".into()),
+                (0.0, 0.0) => Err(tr!("BPM needs a min or a max").into()),
                 (min, max) => Ok(Cond::Bpm { min, max }),
             },
             1 => camelot(a)
                 .map(|_| Cond::Key(a.to_owned()))
-                .ok_or_else(|| format!("“{a}” is not a key")),
+                .ok_or_else(|| tr!("“{}” is not a key", a)),
             2 => a
                 .parse()
                 .ok()
                 .filter(|n| (1..=5).contains(n))
                 .map(Cond::Rating)
-                .ok_or_else(|| "rating is 1 to 5 stars".to_owned()),
+                .ok_or_else(|| tr!("rating is 1 to 5 stars").to_owned()),
             3 if !a.is_empty() => Ok(Cond::Genre(a.to_owned())),
-            3 => Err("genre needs some text".into()),
+            3 => Err(tr!("genre needs some text").into()),
             4 => tag_id(a)
                 .map(Cond::Tag)
-                .ok_or_else(|| format!("no tag called “{a}”")),
-            5 if a.is_empty() && b.is_empty() => Err("date added needs a from or a to date".into()),
+                .ok_or_else(|| tr!("no tag called “{}”", a)),
+            5 if a.is_empty() && b.is_empty() => {
+                Err(tr!("date added needs a from or a to date").into())
+            }
             5 => Ok(Cond::Added {
                 from: date(a)?,
                 to: date(b)?,
             }),
-            _ => Err("pick a condition".into()),
+            _ => Err(tr!("pick a condition").into()),
         }
     }
 }
@@ -162,12 +164,12 @@ impl Smart {
         let any = match lines.next() {
             Some("all") => false,
             Some("any") => true,
-            _ => return Err("smart playlist: missing all/any line".into()),
+            _ => return Err(tr!("smart playlist: missing all/any line").into()),
         };
         let conds = lines
             .map(|l| {
                 let f: Vec<&str> = l.split('\t').collect();
-                let bad = || format!("smart playlist: bad line “{l}”");
+                let bad = || tr!("smart playlist: bad line “{}”", l);
                 let num = |s: &str| s.parse::<f64>().map_err(|_| bad());
                 Ok(match f[..] {
                     ["bpm", a, b] => Cond::Bpm {

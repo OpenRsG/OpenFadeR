@@ -6,7 +6,7 @@
 //! A scan stats every track's file on a thread (a USB stick is slow); [`is_missing`] answers from the last scan.
 
 use super::{Ask, Confirm, Ctx, settings};
-use crate::app::{LibraryState, MissingRow, plural};
+use crate::app::{LibraryState, MissingRow};
 use openfader::library::{Track, relocate};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::{
@@ -78,12 +78,12 @@ fn status(c: &Ctx, text: &str) {
 fn scan(c: &Rc<Ctx>) {
     let tracks = match c.lib.tracks(None) {
         Ok(t) => t,
-        Err(e) => return status(c, &format!("scan failed: {e}")),
+        Err(e) => return status(c, &tr!("scan failed: {}", e)),
     };
     let app = c.app();
     let s = app.global::<LibraryState>();
     s.set_busy(true);
-    status(c, "Searching…");
+    status(c, tr!("Searching…"));
     c.spawn(
         move || {
             tracks
@@ -94,12 +94,12 @@ fn scan(c: &Rc<Ctx>) {
         |c, gone| {
             update_marks(gone.iter().filter_map(|t| t.file.clone()).collect());
             let msg = if gone.is_empty() {
-                "File is not missing: every track has its file".to_owned()
+                tr!("File is not missing: every track has its file").to_owned()
             } else {
-                format!(
-                    "File is Missing: {} track{}",
-                    gone.len(),
-                    plural(gone.len())
+                tr_n!(
+                    "File is Missing: {n} track",
+                    "File is Missing: {n} tracks",
+                    gone.len()
                 )
             };
             c.state.borrow_mut().missing = State {
@@ -160,19 +160,20 @@ fn move_files(c: &Ctx, tracks: &[Track], path: &Path) -> Result<usize, String> {
 /// RELOCATE answered with `path`.
 pub fn relocate_to(c: &Rc<Ctx>, tracks: Vec<Track>, path: PathBuf) {
     match move_files(c, &tracks, &path) {
-        Ok(0) => c.say(&format!(
+        Ok(0) => c.say(&tr!(
             "nothing relocated: no file found at {}",
             path.display()
         )),
         Ok(n) => {
-            c.say(&format!(
-                "relocated {n} of {} track{}",
+            c.say(&tr_n!(
+                "relocated {} of {n} track",
+                "relocated {} of {n} tracks",
                 tracks.len(),
-                plural(tracks.len())
+                n
             ));
             changed(c);
         }
-        Err(e) => c.say(&format!("relocate failed: {e}")),
+        Err(e) => c.say(&tr!("relocate failed: {}", e)),
     }
 }
 
@@ -181,7 +182,7 @@ pub fn relocate_to(c: &Rc<Ctx>, tracks: Vec<Track>, path: PathBuf) {
 pub fn auto(c: &Rc<Ctx>, tracks: Vec<Track>) {
     let folders = settings::search_folders(&settings::get());
     if folders.is_empty() {
-        return c.say("no search folder: add one in Preferences > Advanced > Database > Auto Relocate Search Folders");
+        return c.say(tr!("no search folder: add one in Preferences > Advanced > Database > Auto Relocate Search Folders"));
     }
     let (store, names) = (
         c.store.clone(),
@@ -192,7 +193,7 @@ pub fn auto(c: &Rc<Ctx>, tracks: Vec<Track>) {
             .join(", "),
     );
     c.app().global::<LibraryState>().set_busy(true);
-    status(c, &format!("Searching {names}…"));
+    status(c, &tr!("Searching {}…", names));
     c.spawn(
         move || {
             let idx = relocate::index(&folders);
@@ -216,7 +217,7 @@ pub fn auto(c: &Rc<Ctx>, tracks: Vec<Track>) {
         },
         |c, (found, total)| {
             c.app().global::<LibraryState>().set_busy(false);
-            c.say(&format!("Auto Relocate: {found} of {total} found"));
+            c.say(&tr!("Auto Relocate: {} of {} found", found, total));
             changed(c);
         },
     );
@@ -267,15 +268,16 @@ pub fn wire(c: &Rc<Ctx>) {
     let k = c.clone();
     s.on_missing_delete(move || {
         let t = targets(&k);
-        if t.is_empty() || k.protected("remove tracks") {
+        if t.is_empty() || k.protected(tr!("remove tracks")) {
             return;
         }
         let n = t.len();
-        let text = format!(
-            "Remove {n} missing track{} from the Collection? Playlist places and edits of them are dropped; no file is touched.",
-            plural(n)
+        let text = tr_n!(
+            "Remove {n} missing track from the Collection? Playlist places and edits of them are dropped; no file is touched.",
+            "Remove {n} missing tracks from the Collection? Playlist places and edits of them are dropped; no file is touched.",
+            n
         );
-        k.confirm(Confirm::RemoveMissing(t), "DELETE FROM COLLECTION", &text, "OK", "");
+        k.confirm(Confirm::RemoveMissing(t), tr!("DELETE FROM COLLECTION"), &text, tr!("OK"), "");
     });
     // Mark missing files from the start; no dialog, no status.
     let tracks = c.lib.tracks(None).unwrap_or_default();

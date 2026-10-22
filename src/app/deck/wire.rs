@@ -43,7 +43,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
     on!(state, at decks, on_overview_resized, |d, w, h| d.overview_size.set((w, h)));
     on!(state, at decks, on_load, |d| match selected.borrow().as_ref() {
         Some(t) => d.load(t, &*lib),
-        None => d.say("select a track in the library first"),
+        None => d.say(tr!("select a track in the library first")),
     });
     on!(state, at decks, on_play_pause, |d| d.play_pause());
     on!(state, at decks, on_seek, |d, f| d.seek_frac(f));

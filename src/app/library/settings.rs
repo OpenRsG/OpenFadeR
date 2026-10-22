@@ -91,22 +91,26 @@ pub fn wire() {
 pub fn database_rows(p: &Prefs) -> Vec<Row> {
     let l = Lib::of(p);
     vec![
-        Row::header("AUTO RELOCATE SEARCH FOLDERS"),
-        Row::check("lib_search_user", "User specified folders", l.search_user),
+        Row::header(tr!("AUTO RELOCATE SEARCH FOLDERS")),
+        Row::check(
+            "lib_search_user",
+            tr!("User specified folders"),
+            l.search_user,
+        ),
         Row::text(
             "lib_search",
-            "FOLDERS",
+            tr!("FOLDERS"),
             &l.search
                 .iter()
                 .map(|f| f.display().to_string())
                 .collect::<Vec<_>>()
                 .join(&format!("{SEP} ")),
         )
-        .hint("separate with ;")
+        .hint(tr!("separate with ;"))
         .enabled(l.search_user),
-        Row::header("DATABASE MANAGEMENT"),
-        Row::text("lib_db", "LIBRARY DATABASE", &l.db)
-            .hint("opened at start-up when no path is given"),
+        Row::header(tr!("DATABASE MANAGEMENT")),
+        Row::text("lib_db", tr!("LIBRARY DATABASE"), &l.db)
+            .hint(tr!("opened at start-up when no path is given")),
     ]
 }
 
@@ -117,30 +121,31 @@ pub fn database_choose(p: &mut Prefs, key: &str, i: usize) -> bool {
 pub fn browse_rows(p: &Prefs) -> Vec<Row> {
     let l = Lib::of(p);
     vec![
-        Row::header("TAGS"),
+        Row::header(tr!("TAGS")),
         Row::check(
             "lib_mytag_comment",
-            "Add Tags to the Comments",
+            tr!("Add Tags to the Comments"),
             l.mytag_comment,
         )
-        .hint("writes /*Tag Tag*/ into the comment"),
-        Row::header("TRACK LIST"),
-        Row::check("lib_dropdown", "Drop-down menu", l.dropdown).hint("hold a track for 1 s"),
-        Row::header("TAG LIST"),
+        .hint(tr!("writes /*Tag Tag*/ into the comment")),
+        Row::header(tr!("TRACK LIST")),
+        Row::check("lib_dropdown", tr!("Drop-down menu"), l.dropdown)
+            .hint(tr!("hold a track for 1 s")),
+        Row::header(tr!("TAG LIST")),
         Row::check(
             "lib_taglist_load",
-            "Delete the track from the Tag List when loading it to a deck",
+            tr!("Delete the track from the Tag List when loading it to a deck"),
             l.taglist_load,
         ),
         Row::check(
             "lib_taglist_quit",
-            "Delete all tracks from the Tag List when quitting",
+            tr!("Delete all tracks from the Tag List when quitting"),
             l.taglist_quit,
         ),
-        Row::header("LIBRARY"),
-        Row::check("lib_protect", "Library Protection", l.protect)
-            .hint("no accidental edit / delete"),
-        Row::check("lib_edit", "Edit Library", l.edit).hint("rename by double click"),
+        Row::header(tr!("LIBRARY")),
+        Row::check("lib_protect", tr!("Library Protection"), l.protect)
+            .hint(tr!("no accidental edit / delete")),
+        Row::check("lib_edit", tr!("Edit Library"), l.edit).hint(tr!("rename by double click")),
     ]
 }
 

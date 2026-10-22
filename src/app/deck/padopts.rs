@@ -36,18 +36,18 @@ impl Deck {
             PadMode::Slicer | PadMode::SlicerLoop => {
                 let (len, roll) = self.slicer_text();
                 vec![
-                    opt("◀", false, "Move the slicer range back by its length"),
-                    opt("▶", false, "Move the slicer range on by its length"),
-                    opt(len, false, "LENGTH of the range cut into 8 slices"),
+                    opt("◀", false, tr!("Move the slicer range back by its length")),
+                    opt("▶", false, tr!("Move the slicer range on by its length")),
+                    opt(len, false, tr!("LENGTH of the range cut into 8 slices")),
                     opt(
                         roll,
                         false,
-                        "ROLL: how much of the slice loops while the pad is held",
+                        tr!("ROLL: how much of the slice loops while the pad is held"),
                     ),
                     opt(
-                        "LOOP",
+                        tr!("LOOP"),
                         mode == PadMode::SlicerLoop,
-                        "SLICE LOOP: the range loops",
+                        tr!("SLICE LOOP: the range loops"),
                     ),
                 ]
             }
@@ -58,30 +58,30 @@ impl Deck {
                 let s = app.global::<SamplerState>();
                 let running = matches!(s.get_seq_mode(), 1 | 3);
                 vec![
-                    opt(format!("BANK {}", s.get_bank() + 1), false, "Sampler bank"),
+                    opt(tr!("BANK {}", s.get_bank() + 1), false, tr!("Sampler bank")),
                     opt(
-                        "REC",
+                        tr!("REC"),
                         s.get_seq_mode() >= 2,
-                        "Sequence REC: the first pad hit starts it",
+                        tr!("Sequence REC: the first pad hit starts it"),
                     ),
                     opt(
-                        if running { "STOP" } else { "PLAY" },
+                        if running { tr!("STOP") } else { tr!("PLAY") },
                         running,
-                        "Play / stop the sequence",
+                        tr!("Play / stop the sequence"),
                     ),
                     opt(
-                        "MUTE",
+                        tr!("MUTE"),
                         s.get_seq_mute(),
-                        "Then press a pad: mute its slot in the sequence",
+                        tr!("Then press a pad: mute its slot in the sequence"),
                     ),
                     opt(
-                        "ERASE",
+                        tr!("ERASE"),
                         s.get_seq_erase(),
-                        "Then press a pad: erase its slot from the sequence",
+                        tr!("Then press a pad: erase its slot from the sequence"),
                     ),
                 ]
             }
-            PadMode::SeqCall => vec![opt("STOP", false, "Pause the sequence")],
+            PadMode::SeqCall => vec![opt(tr!("STOP"), false, tr!("Pause the sequence"))],
             _ => vec![],
         }
     }

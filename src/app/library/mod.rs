@@ -26,7 +26,7 @@ pub mod settings;
 mod track;
 mod undo;
 
-use super::{App, BrowserState, LibraryState, analyze, deck::Decks, plural, prefs, toast};
+use super::{App, BrowserState, LibraryState, analyze, deck::Decks, prefs, toast};
 use openfader::{
     library::{Library, Track},
     store::{self, Store},
@@ -88,8 +88,9 @@ impl Ctx {
     pub fn protected(&self, what: &str) -> bool {
         let on = settings::get().protect;
         if on {
-            self.say(&format!(
-                "Library Protection is on: cannot {what} (Preferences > Advanced > Browse)"
+            self.say(&tr!(
+                "Library Protection is on: cannot {} (Preferences > Advanced > Browse)",
+                what
             ));
         }
         on
@@ -109,7 +110,7 @@ impl Ctx {
     pub fn remove_tracks(&self, tracks: &[Track]) {
         let done = self
             .store
-            .action("Remove from Collection", || -> Result<(), String> {
+            .action(tr!("Remove from Collection"), || -> Result<(), String> {
                 for t in tracks {
                     self.store.collection_remove(t)?;
                 }
@@ -127,17 +128,17 @@ impl Ctx {
             });
         match done {
             Ok(()) => self.reload(None),
-            Err(e) => self.say(&format!("store: {e}")),
+            Err(e) => self.say(&tr!("store: {}", e)),
         }
     }
 
     /// [`Ctx::remove_tracks`], then says how many left the Collection.
     pub fn remove_and_say(&self, tracks: &[Track]) {
         self.remove_tracks(tracks);
-        self.say(&format!(
-            "removed {} track{} from the Collection",
-            tracks.len(),
-            plural(tracks.len())
+        self.say(&tr_n!(
+            "removed {n} track from the Collection",
+            "removed {n} tracks from the Collection",
+            tracks.len()
         ));
     }
 
@@ -200,7 +201,7 @@ fn path_done(c: &Rc<Ctx>, ok: bool) {
     );
     let (Some(ask), true) = (ask, ok) else { return };
     if text.is_empty() {
-        return c.say("a path is needed");
+        return c.say(tr!("a path is needed"));
     }
     let path = PathBuf::from(&text);
     match ask {
@@ -246,7 +247,13 @@ pub(in crate::app) fn ask_connect(folder: bool) {
 /// Asks whether to write the planned changes back to a connected library file ([`super::connect`]).
 pub(in crate::app) fn ask_writeback(text: &str) {
     if let Some(c) = CTX.with(|c| c.borrow().clone()) {
-        c.confirm(Confirm::WriteBack, "WRITE BACK", text, "WRITE", "CANCEL");
+        c.confirm(
+            Confirm::WriteBack,
+            tr!("WRITE BACK"),
+            text,
+            tr!("WRITE"),
+            tr!("CANCEL"),
+        );
     }
 }
 
@@ -272,9 +279,9 @@ pub(in crate::app) fn import_recorded(app: &App, file: &Path, import: bool, sele
                     }],
                     false,
                 );
-                c.say(&format!("recording added to the Collection ({})", r.text()));
+                c.say(&tr!("recording added to the Collection ({})", r.text()));
             }
-            Err(e) => c.say(&format!("recording not imported: {e}")),
+            Err(e) => c.say(&tr!("recording not imported: {}", e)),
         }
     }
     if select {
@@ -312,10 +319,10 @@ fn act(c: &Rc<Ctx>, id: &str) {
         "dupes" => dupes::open(c),
         "backup" => c.confirm(
             Confirm::BackupMusic,
-            "BACKUP LIBRARY",
-            "Do you want to back up music files as well?",
-            "YES",
-            "NO",
+            tr!("BACKUP LIBRARY"),
+            tr!("Do you want to back up music files as well?"),
+            tr!("YES"),
+            tr!("NO"),
         ),
         "restore" => c.ask_path(Ask::Restore, None),
         id if id.starts_with("export-collection:") => {
@@ -330,7 +337,7 @@ fn act(c: &Rc<Ctx>, id: &str) {
         }
         id if id.starts_with("track-") => track::act(c, id),
         id if id.starts_with("playlist-") => playlist::act(c, id),
-        _ => c.say(&format!("unknown menu action {id}")),
+        _ => c.say(&tr!("unknown menu action {}", id)),
     }
 }
 

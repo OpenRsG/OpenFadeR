@@ -20,7 +20,7 @@ impl Mixer {
             self.bus.as_deref().map(Bus::headphones),
             Some(Headphones::Device(_))
         ) {
-            return self.set_status("SPLIT is off while a headphone device is in use".into());
+            return self.set_status(tr!("SPLIT is off while a headphone device is in use").into());
         }
         self.edit_bus(|b| b.split = !b.split);
         self.apply_bus();

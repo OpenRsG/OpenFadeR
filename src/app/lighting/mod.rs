@@ -116,7 +116,7 @@ pub fn wire(app: &App, decks: Decks) -> Rc<Lighting> {
     on!(st, weak l, on_add_fixture, |l| {
         let added = l.cfg.borrow_mut().rig.add(&l.profiles[l.pick.get()]);
         if added.is_none() {
-            l.say("that profile does not fit a universe");
+            l.say(tr!("that profile does not fit a universe"));
         }
         l.patch_changed();
     });

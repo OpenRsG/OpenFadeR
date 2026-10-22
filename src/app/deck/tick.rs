@@ -177,7 +177,7 @@ impl Deck {
                 json!({"deck": deck, "track": track, "position_ms": pos}),
             );
             if !playing && at_end(pos, l.duration_ms) {
-                v.status = "end of track".into();
+                v.status = tr!("end of track").into();
                 openfader::plugin::event::fire(
                     "track_ended",
                     json!({"deck": deck, "track": track}),

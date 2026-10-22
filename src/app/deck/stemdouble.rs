@@ -55,23 +55,25 @@ impl Deck {
         }
         let (stems, four) = prefs::with(|p| (p.stems, p.stems_four));
         if !stems {
-            return self.say("STEMS is off: turn it on in PREFS");
+            return self.say(tr!("STEMS is off: turn it on in PREFS"));
         }
         if k >= STEM_COUNT || (k == BASS && !four) {
             return;
         }
         let Some(from) = self.partner() else {
-            return self.say("instant doubles: no other deck in this layout");
+            return self.say(tr!("instant doubles: no other deck in this layout"));
         };
         let src = {
             let l = from.loaded.borrow();
             l.track.clone().map(|t| (t, l.analysis.clone()))
         };
         let Some((track, analysis)) = src else {
-            return self.say("instant doubles: the other deck has no library track");
+            return self.say(tr!("instant doubles: the other deck has no library track"));
         };
         let Some(stems) = from.completed_stems() else {
-            return self.say("instant doubles: the other deck's stems are not finished yet");
+            return self.say(tr!(
+                "instant doubles: the other deck's stems are not finished yet"
+            ));
         };
         let Some(pcm) = from.with_player(|p| p.pcm()) else {
             return;
@@ -80,7 +82,10 @@ impl Deck {
         self.install_shared(
             &track,
             analysis,
-            vec![format!("instant double {}", STEM_NAMES[k])],
+            vec![tr!(
+                "instant double {}",
+                crate::app::i18n::tr_dyn(STEM_NAMES[k])
+            )],
             pcm.clone(),
             stems,
         );
@@ -107,7 +112,7 @@ impl Deck {
                 pending.matches(from.load_serial.get(), &source, &target)
             });
         if !same {
-            return self.say("instant doubles: the other deck changed track");
+            return self.say(tr!("instant doubles: the other deck changed track"));
         }
         let k = pending.part;
         let (pos, playing, key_lock) = from
@@ -126,9 +131,12 @@ impl Deck {
                 p.play();
             }
         });
-        self.say(format!(
+        let name = crate::app::i18n::tr_dyn(STEM_NAMES[k]);
+        self.say(tr!(
             "instant double {}: {} here, muted on {}",
-            STEM_NAMES[k], STEM_NAMES[k], DECK_NAMES[from.index]
+            name,
+            name,
+            DECK_NAMES[from.index]
         ));
     }
 }

@@ -137,21 +137,21 @@ export component DeckDetail inherits Rectangle {
     if MixPointState.active && MixPointState.decks[root.index].out-set && MixPointState.decks[root.index].out-x >= 0 && MixPointState.decks[root.index].out-x <= 1: MixMarker {
         x: 24px + (root.width - 24px - 14px) * MixPointState.decks[root.index].out-x - 1px;
         height: root.height;
-        label: "OUT";
+        label: @tr("OUT");
         flag-left: true;
         tone: MixPointState.decks[root.index].linked ? Theme.accent-hi : Theme.cue;
     }
     if MixPointState.active && MixPointState.decks[root.index].in-set && MixPointState.decks[root.index].in-x >= 0 && MixPointState.decks[root.index].in-x <= 1: MixMarker {
         x: 24px + (root.width - 24px - 14px) * MixPointState.decks[root.index].in-x - 1px;
         height: root.height;
-        label: "IN";
+        label: @tr("IN");
         tone: MixPointState.decks[root.index].linked ? Theme.accent-hi : Theme.cue;
     }
     if MixPointState.active && MixPointState.decks[root.index].silent-set && MixPointState.decks[root.index].silent-x >= 0 && MixPointState.decks[root.index].silent-x <= 1: MixMarker {
         x: 24px + (root.width - 24px - 14px) * MixPointState.decks[root.index].silent-x - 1px;
         y: root.height - 11px;
         height: 11px;
-        label: "SILENT";
+        label: @tr("SILENT");
         tone: Theme.danger;
     }
     // Drag = scratch: press holds the platter, the waveform follows the hand, release lets go. With VIEW > Click on the
@@ -202,9 +202,9 @@ export component DeckDetail inherits Rectangle {
         HorizontalLayout {
             padding: 1px;
             spacing: 2px;
-            IconButton { icon: Icon.minus; width: 20px; height: 18px; solid: true; tooltip: "Zoom out"; clicked => { DeckState.zoom(root.index, -1); } }
+            IconButton { icon: Icon.minus; width: 20px; height: 18px; solid: true; tooltip: @tr("Zoom out"); clicked => { DeckState.zoom(root.index, -1); } }
             Text { text: DeckState.decks[root.index].zoom-text; color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; horizontal-alignment: center; horizontal-stretch: 1; }
-            IconButton { icon: Icon.plus; width: 20px; height: 18px; solid: true; tooltip: "Zoom in"; clicked => { DeckState.zoom(root.index, 1); } }
+            IconButton { icon: Icon.plus; width: 20px; height: 18px; solid: true; tooltip: @tr("Zoom in"); clicked => { DeckState.zoom(root.index, 1); } }
         }
     }
     // Right gutter: the expander.

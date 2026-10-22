@@ -88,7 +88,7 @@ fn run(jobs: Vec<Job>) {
     if s.get_busy() {
         return;
     }
-    start(&s, &format!("Installing {}…", jobs[0].2.manifest.name));
+    start(&s, &tr!("Installing {}…", jobs[0].2.manifest.name));
     let weak = app.as_weak();
     std::thread::spawn(move || {
         let (mut ok, mut errs) = (Vec::new(), Vec::new());
@@ -96,7 +96,7 @@ fn run(jobs: Vec<Job>) {
             let name = e.manifest.name.clone();
             let _ = weak.upgrade_in_event_loop(move |app| {
                 app.global::<CatalogState>()
-                    .set_status(SharedString::from(format!("Installing {name}…")));
+                    .set_status(SharedString::from(tr!("Installing {}…", name)));
             });
             match catalog::plugins::install(repo, zip, e) {
                 Ok(name) => ok.push(name),

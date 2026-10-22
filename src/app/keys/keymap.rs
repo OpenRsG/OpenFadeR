@@ -297,8 +297,9 @@ pub fn fit(act: Act, b: Bind) -> Result<Bind, String> {
                 ..b
             })
         }
-        _ => Err(format!(
-            "{n} consecutive digits or letters are needed: press the first one (1 → 1-8, a → a-h)"
+        _ => Err(tr!(
+            "{} consecutive digits or letters are needed: press the first one (1 → 1-8, a → a-h)",
+            n
         )),
     }
 }

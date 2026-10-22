@@ -128,6 +128,7 @@ fn lane(c: &mut Canvas, s: &Scene, band: usize) {
         );
         let (colour, label) = match *seg {
             Seg::Src { start, .. } => (BLOCKS[i % 2], mmss(ms(start, s.rate))),
+            // drawn with the canvas's own A-Z glyphs (render/font.rs), which have no accented letters: stays English
             Seg::Silence(_) => (SILENCE, "SILENCE".into()),
         };
         c.shade(a, b, rows.clone(), colour, 1.0);
