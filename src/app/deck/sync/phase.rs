@@ -6,14 +6,16 @@ use openfader::analysis::Beat;
 
 /// Tempo multiples of the master a follower may play at (double / half time, 87 vs 174 BPM).
 const MULTIPLES: [f64; 3] = [1.0, 2.0, 0.5];
-/// Phase error (ms) that starts a nudge, and the smaller one it stops at (hysteresis).
-const ENGAGE_MS: f64 = 10.0;
-const RELEASE_MS: f64 = 3.0;
-/// Above this the error is a jump, not drift: seek to the aligned spot.
-const JUMP_MS: f64 = 80.0;
+/// Phase error (ms) that starts a nudge, and the smaller one it stops at (hysteresis). Measured on click tracks: with 10 / 3 ms
+/// a synced pair stayed 4 ms apart for good. Beat times are whole milliseconds, so 1 ms is as close as the grids tell.
+const ENGAGE_MS: f64 = 1.0;
+const RELEASE_MS: f64 = 0.3;
+/// Above this the error is a jump, not drift: seek to the aligned spot (pressing SYNC lands at once instead of being nudged
+/// in over seconds).
+const JUMP_MS: f64 = 25.0;
 /// Largest nudge (fraction of the rate) and the seconds it takes to cancel an error.
 const MAX_NUDGE: f64 = 0.04;
-const CLOSE_S: f64 = 1.5;
+const CLOSE_S: f64 = 0.5;
 
 /// Rate for a deck with grid tempo `own_grid` to play at a multiple `k` of `master_bpm`, `k` picked
 /// so the rate stays closest to 1 within 0.5 to 2× (SYNC never follows below half speed). `half_double` off (Preferences > Controller >
@@ -231,33 +233,33 @@ mod tests {
 
     #[test]
     fn small_drift_nudges_with_hysteresis_and_big_errors_seek() {
-        assert_eq!(correct(5.0, false), Fix::Nudge(0.0), "inside the dead band");
-        assert_eq!(correct(10.0, false), Fix::Nudge(0.0));
+        assert_eq!(correct(0.8, false), Fix::Nudge(0.0), "inside the dead band");
+        assert_eq!(correct(1.0, false), Fix::Nudge(0.0));
         assert!(
-            matches!(correct(20.0, false), Fix::Nudge(d) if d < 0.0),
+            matches!(correct(4.0, false), Fix::Nudge(d) if d < 0.0),
             "ahead: slow down"
         );
         assert!(
-            matches!(correct(-20.0, false), Fix::Nudge(d) if d > 0.0),
+            matches!(correct(-4.0, false), Fix::Nudge(d) if d > 0.0),
             "behind: speed up"
         );
         assert_eq!(
-            correct(5.0, true),
-            Fix::Nudge(nudge_for(5.0)),
-            "an active nudge keeps going until 3 ms"
+            correct(0.8, true),
+            Fix::Nudge(nudge_for(0.8)),
+            "an active nudge keeps going until 0.3 ms"
         );
-        assert_eq!(correct(2.0, true), Fix::Nudge(0.0));
-        assert_eq!(correct(81.0, false), Fix::Seek);
+        assert_eq!(correct(0.2, true), Fix::Nudge(0.0));
+        assert_eq!(correct(26.0, false), Fix::Seek);
         assert_eq!(correct(-300.0, true), Fix::Seek);
     }
 
     #[test]
     fn nudge_is_tiny_and_capped() {
-        let Fix::Nudge(d) = correct(50.0, false) else {
+        let Fix::Nudge(d) = correct(10.0, false) else {
             panic!()
         };
         assert!(d < 0.0 && d.abs() < 0.04);
-        assert!((nudge_for(-30.0) - 0.02).abs() < 1e-6);
+        assert!((nudge_for(-10.0) - 0.02).abs() < 1e-6);
         assert!(nudge_for(10_000.0) >= -0.04 && nudge_for(-10_000.0) <= 0.04);
     }
 

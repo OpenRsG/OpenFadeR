@@ -25,7 +25,7 @@ use super::groove;
 use super::metronome::{self, Hits};
 use super::transport::Transport;
 use super::{Pcm, STEM_COUNT, Stems, Track16, clamped_in, load_f32, store_clamped};
-use clock::{Anchor, Clock, heard_frames};
+use clock::{Anchor, Clock, audible, heard_frames};
 use engine::{ENGINE, Engine};
 pub use engine::{configure, live_bus, set_output};
 pub use output::{Status, controller, release_controller, status};
@@ -603,6 +603,13 @@ impl Player {
             self.pos_frames().min(frames)
         };
         f * 1000.0 / self.src_rate as f64
+    }
+
+    /// [`Self::position_ms`] follows the audio being heard: no seek waits for the next buffer and, playing, the first buffer
+    /// since the last seek or start is past its output latency (until then the position holds at the target).
+    pub fn settled(&self) -> bool {
+        self.shared.seek.load(Relaxed) == NO_SEEK
+            && audible(&self.shared.clock.lock(), Instant::now())
     }
 
     /// Clamped to the track length. Leaves the loop as is (see the module doc).

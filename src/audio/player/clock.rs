@@ -81,6 +81,12 @@ pub(super) fn heard_frames(c: &Clock, now: Instant, frames: f64) -> f64 {
     h.clamp(0.0, frames)
 }
 
+/// The audio of the current run is being heard: playing and the run's first buffer is past its output latency (after a seek or the
+/// start of play the reported position waits at the target until then), or not playing.
+pub(super) fn audible(c: &Clock, now: Instant) -> bool {
+    !c.playing || c.anchors.front().is_some_and(|a| a.at + a.latency <= now)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,6 +131,21 @@ mod tests {
                 last = f;
             }
         }
+    }
+
+    #[test]
+    fn a_seek_is_audible_only_after_its_output_latency() {
+        let (t0, mut c) = (Instant::now(), clock());
+        let a = |t: u64, pos: f64| Anchor { at: t0 + MS(t), pos, latency: MS(40), fps: SRC, lp: None };
+        c.push(a(0, 0.0), true, true);
+        assert!(!audible(&c, t0 + MS(39)) && audible(&c, t0 + MS(40)));
+        c.push(a(100, 4410.0), true, false);
+        assert!(audible(&c, t0 + MS(100)), "a plain callback keeps the run audible");
+        // A seek resets the run: the position holds at the target until the jump is heard.
+        c.push(a(200, 88_200.0), true, true);
+        assert!(!audible(&c, t0 + MS(220)) && audible(&c, t0 + MS(240)));
+        c.push(a(300, 88_200.0), false, true);
+        assert!(audible(&c, t0 + MS(300)), "paused: the resting position is the one heard");
     }
 
     #[test]
