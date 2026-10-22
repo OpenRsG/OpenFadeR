@@ -32,7 +32,7 @@ use super::{
     App, camelot,
     prefs::{
         self,
-        analysis::{CueSetting, Process},
+        analysis::{CueSetting, GridSource, Process},
     },
     trackinfo,
 };
@@ -247,6 +247,30 @@ pub fn request(tracks: &[Track]) {
     start_run(&app, jobs(&*lib, &refs, true), prefs::with(settings));
 }
 
+/// The status line's tail for an explicit ANALYZE of `t` whose shown grid stays the library's: the preference picks the
+/// library, the library has beats and the user did not edit the grid, so our detected grid changes nothing visible.
+pub fn library_grid_notice(t: &Track) -> &'static str {
+    let edited = store::global()
+        .edits(&store::key(t))
+        .is_ok_and(|e| e.grid.is_some());
+    let library_beats = context()
+        .and_then(|(_, lib)| lib.analysis(t))
+        .is_some_and(|a| !a.beats.is_empty());
+    notice_for(
+        prefs::with(|p| p.analysis.grid_source),
+        library_beats,
+        edited,
+    )
+}
+
+fn notice_for(source: GridSource, library_beats: bool, edited: bool) -> &'static str {
+    if source == GridSource::Library && library_beats && !edited {
+        " · library grid in use: PREFS > ANALYSIS > BEAT GRID FROM > OPENFADER ANALYSIS shows ours"
+    } else {
+        ""
+    }
+}
+
 fn settings(p: &prefs::Prefs) -> Settings {
     let (a, notation) = (&p.analysis, p.key_notation);
     Settings {
@@ -370,5 +394,13 @@ mod tests {
             store.edits("b.mp3|10").unwrap().cues.is_none(),
             "other tracks are untouched"
         );
+    }
+
+    #[test]
+    fn library_grid_notice_only_when_ours_stays_hidden() {
+        assert!(!notice_for(GridSource::Library, true, false).is_empty());
+        assert!(notice_for(GridSource::Ours, true, false).is_empty());
+        assert!(notice_for(GridSource::Library, false, false).is_empty());
+        assert!(notice_for(GridSource::Library, true, true).is_empty());
     }
 }
