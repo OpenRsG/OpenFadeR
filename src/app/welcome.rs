@@ -43,7 +43,7 @@ pub fn show(app: &App) {
         .map(|p| SuggestView {
             name: p.manifest.name.as_str().into(),
             kind: kind(&p.manifest).into(),
-            description: p.manifest.description.as_str().into(),
+            description: p.tr(&p.manifest.description).into(),
         })
         .collect();
     if !prefs::with(|p| p.stems) {

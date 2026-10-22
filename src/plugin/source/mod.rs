@@ -173,14 +173,14 @@ impl Library for Sources {
                 let folder = format!("{PREFIX}{}:{id}", plugin.manifest.name);
                 mine.push(Playlist {
                     id: folder.clone(),
-                    name: name.clone(),
+                    name: plugin.tr(name),
                     depth: 0,
                     is_folder: true,
                 });
                 if *search {
                     mine.push(Playlist {
                         id: format!("{folder}:search"),
-                        name: "Search".into(),
+                        name: plugin.tr("Search"),
                         depth: 1,
                         is_folder: false,
                     });

@@ -124,6 +124,29 @@ that asset for the user's platform nothing is installed and the page says `no pr
 | `knob_modes` | COLOR FX knob behaviours (see [Knob modes](#knob-modes)). |
 | `pad_modes` | Performance-pad modes (see [Pad modes](#pad-modes)). |
 
+### Languages
+
+The app shows a plugin's texts in its UI language (PREFERENCES > VIEW > LANGUAGE) when the plugin folder holds
+`locales/<lang>.json` for it (`fr`, `es`, `de`, `pt`, `it`, `nl`): one object, English text → translation.
+
+```json
+{
+  "YouTube and SoundCloud: search, playlists and downloads through the yt-dlp program": "YouTube et SoundCloud : recherche, playlists et téléchargements avec le programme yt-dlp",
+  "Download from URL…": "Télécharger depuis une URL…",
+  "{} tracks downloaded": "{} pistes téléchargées"
+}
+```
+
+* Translated where they are shown: `description`, the settings' `label`, `help` and `choices` (the stored value stays the
+  English one), `sources` names, `actions` `label` and `input`, `library.browser.label`, `collection_writer`, the `"error"` of
+  any reply, the `text` of a `toast`, the `kind` of a library, and the texts of the device replies (`title`, `about`, `label`,
+  `help`, `hint`, `message`, `text`, `yes`, `warnings`, `notes`, `apply_label`, `read_label`).
+* A key with `{}` matches a text built at run time; each `{}` stands for at least one character, and the translation takes
+  the values in order, or by position with `{0}`, `{1}` (`"{} of {} done": "{1} : {0} terminés"`). The most specific key wins.
+* `name`, effect, knob-mode and pad-mode names are not translated (like the app's own DJ labels).
+* A text the file lacks stays English; a broken file is reported on stderr and ignored.
+* Every request also carries the language as `"lang"` (`"en"`, `"fr"` …), for a plugin that writes its texts itself.
+
 ## The protocol
 
 A plugin's script answers **requests**: one JSON object in, one JSON object out. A Python script or program (`script: "main.py"`

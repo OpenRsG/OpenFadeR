@@ -85,8 +85,8 @@ fn setting_views(p: &Plugin) -> Vec<PluginSettingView> {
         .map(|s| {
             let v = &values[&s.id];
             PluginSettingView {
-                label: s.label.as_str().into(),
-                help: s.help.as_str().into(),
+                label: p.tr(&s.label).into(),
+                help: p.tr(&s.help).into(),
                 kind: match s.kind {
                     SettingKind::Bool => 0,
                     SettingKind::Text => 1,
@@ -103,7 +103,7 @@ fn setting_views(p: &Plugin) -> Vec<PluginSettingView> {
                 choices: ModelRc::new(VecModel::from(
                     s.choices
                         .iter()
-                        .map(|c| SharedString::from(c.as_str()))
+                        .map(|c| SharedString::from(p.tr(c)))
                         .collect::<Vec<_>>(),
                 )),
                 choice: s
@@ -152,7 +152,7 @@ pub(super) fn refresh(app: &App) {
                 name: m.name.as_str().into(),
                 version: m.version.as_str().into(),
                 author: m.author.as_str().into(),
-                description: m.description.as_str().into(),
+                description: p.tr(&m.description).into(),
                 homepage: m.homepage.as_str().into(),
                 kind: kind(p).into(),
                 provides: provides(p).into(),
@@ -259,7 +259,7 @@ fn set(app: &App, i: i32, k: i32, value: impl FnOnce(&plugin::SettingDecl) -> Op
     };
     match value(s) {
         Some(v) => changed(app, config::update(|c| c.set(&p.manifest.name, &s.id, v))),
-        None => say(app, &tr!("{}: not a number", s.label)),
+        None => say(app, &tr!("{}: not a number", p.tr(&s.label))),
     }
 }
 

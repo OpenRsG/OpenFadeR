@@ -165,7 +165,10 @@ fn call_sends_the_request_on_stdin_and_reads_the_reply() {
     let reply = r.plugins[0]
         .call(&json!({"op": "x", "n": 1}), Duration::from_secs(5))
         .unwrap();
-    assert_eq!(reply, json!({"got": {"op": "x", "n": 1, "settings": {}}}));
+    assert_eq!(
+        reply,
+        json!({"got": {"op": "x", "n": 1, "settings": {}, "lang": "en"}})
+    );
 }
 
 #[test]
@@ -196,7 +199,11 @@ while IFS= read -r line; do
   printf '{"id":%s,"n":%s,"pid":%s}\n' "$id" "$n" "$$"
 done"#;
     let r = registry_of(&d, "keep", action.clone(), counter);
-    let ask = || r.plugins[0].call(&json!({"op": "x"}), Duration::from_secs(5)).unwrap();
+    let ask = || {
+        r.plugins[0]
+            .call(&json!({"op": "x"}), Duration::from_secs(5))
+            .unwrap()
+    };
     let (a, b) = (ask(), ask());
     assert_eq!((&a["n"], &b["n"]), (&json!(1), &json!(2)));
     assert_eq!(a["pid"], b["pid"], "one process for both requests");

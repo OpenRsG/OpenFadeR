@@ -65,11 +65,40 @@ impl Loaded {
             }
     }
 
-    /// One request, one answer: the JSON bytes cross the ABI both ways; an `{"error"}` answer is an `Err`. The plugin gets the
-    /// host's callbacks ([`host`]).
+    /// One request, one answer: the JSON bytes cross the ABI both ways; an `{"error"}` answer is an `Err` (translated,
+    /// [`Plugin::tr`]). The request carries the language as `"lang"` ([`crate::locale`]); the plugin gets the host's
+    /// callbacks ([`host`]).
     pub(super) fn call<T: DeserializeOwned>(&self, req: &impl Serialize) -> Result<T, String> {
         let name = self.name();
-        let body = serde_json::to_vec(req).map_err(|e| format!("{name}: {e}"))?;
+        serde_json::from_value(self.reply(req)?)
+            .map_err(|e| format!("{name}: unexpected answer ({e})"))
+    }
+
+    /// [`Loaded::call`] for an answer the user reads (device pages, reports, the format's `kind`): its texts are translated
+    /// ([`localize`]).
+    pub(super) fn call_shown<T: DeserializeOwned>(
+        &self,
+        req: &impl Serialize,
+    ) -> Result<T, String> {
+        let name = self.name();
+        let mut reply = self.reply(req)?;
+        localize(&self.plugin, &mut reply);
+        serde_json::from_value(reply).map_err(|e| format!("{name}: unexpected answer ({e})"))
+    }
+
+    fn reply(&self, req: &impl Serialize) -> Result<Value, String> {
+        #[derive(Serialize)]
+        struct WithLang<'a, R> {
+            #[serde(flatten)]
+            req: &'a R,
+            lang: String,
+        }
+        let name = self.name();
+        let body = serde_json::to_vec(&WithLang {
+            req,
+            lang: crate::locale::code(),
+        })
+        .map_err(|e| format!("{name}: {e}"))?;
         // SAFETY: `call` and `free` come from a checked table; the buffer is read before it is freed, once; the host table is
         // a static.
         let reply = unsafe {
@@ -80,19 +109,19 @@ impl Loaded {
         }
         .map_err(|e| format!("{name}: unreadable answer ({e})"))?;
         if let Some(e) = reply.get("error").and_then(Value::as_str) {
-            return Err(format!("{name}: {e}"));
+            return Err(format!("{name}: {}", self.plugin.tr(e)));
         }
-        serde_json::from_value(reply).map_err(|e| format!("{name}: unexpected answer ({e})"))
+        Ok(reply)
     }
 
     fn probe(&self, path: &Path) -> Result<Probe, String> {
-        self.call(&Request::Probe {
+        self.call_shown(&Request::Probe {
             path: path.to_owned(),
         })
     }
 
     fn open(&self, path: &Path) -> Result<PluginLibrary, String> {
-        let o: Opened = self.call(&Request::Open {
+        let o: Opened = self.call_shown(&Request::Open {
             path: path.to_owned(),
             settings: self.settings(),
         })?;
@@ -341,7 +370,7 @@ fn entries(label: impl Fn(&LibraryDecl) -> Option<&String>) -> Vec<Entry> {
             });
             Some(Entry {
                 plugin: l.name().to_owned(),
-                label: label(l.decl())?.clone(),
+                label: l.plugin.tr(label(l.decl())?),
                 path: path.unwrap_or_default(),
                 samples: l.decl().samples,
                 formats: l.decl().formats.clone(),
@@ -376,7 +405,7 @@ pub fn sources() -> Vec<Source> {
             let path = PathBuf::from(settings.get(&b.path_setting)?.as_str()?);
             path.is_file().then(|| Source {
                 plugin: l.name().to_owned(),
-                label: b.label.clone(),
+                label: l.plugin.tr(&b.label),
                 path,
             })
         })
@@ -393,6 +422,47 @@ fn named(plugin: &str) -> Result<&'static Loaded, String> {
 /// Opens `path` with the plugin named `plugin` (not probing: the user chose the plugin).
 pub fn open_with(plugin: &str, path: &Path) -> Result<PluginLibrary, String> {
     named(plugin)?.open(path)
+}
+
+/// Translates in place ([`Plugin::tr`]) the texts of an answer the user reads: the strings (or lists of them) under these
+/// keys, at any depth outside the track data.
+fn localize(plugin: &Plugin, v: &mut Value) {
+    const SHOWN: [&str; 13] = [
+        "title",
+        "about",
+        "label",
+        "help",
+        "hint",
+        "warnings",
+        "notes",
+        "message",
+        "text",
+        "yes",
+        "apply_label",
+        "read_label",
+        "kind",
+    ];
+    const DATA: [&str; 5] = ["edits", "tracks", "playlists", "values", "baselines"];
+    fn shown(plugin: &Plugin, v: &mut Value) {
+        match v {
+            Value::String(s) => *s = plugin.tr(s),
+            Value::Array(a) => a.iter_mut().for_each(|x| shown(plugin, x)),
+            v => localize(plugin, v),
+        }
+    }
+    match v {
+        Value::Object(o) => {
+            for (k, x) in o.iter_mut() {
+                if SHOWN.contains(&k.as_str()) {
+                    shown(plugin, x);
+                } else if !DATA.contains(&k.as_str()) {
+                    localize(plugin, x);
+                }
+            }
+        }
+        Value::Array(a) => a.iter_mut().for_each(|x| localize(plugin, x)),
+        _ => {}
+    }
 }
 
 /// Has plugin `plugin` write `snapshot` as a new file at `path` in its format; returns the number of tracks written. The

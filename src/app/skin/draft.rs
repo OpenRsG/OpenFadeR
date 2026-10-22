@@ -19,6 +19,8 @@ pub struct Draft {
     pub author: String,
     pub description: String,
     pub layout: Vec<(String, String)>,
+    /// The theme's translations, kept as they are ([`Skin::locales`]).
+    pub locales: serde_json::Map<String, serde_json::Value>,
     /// The colour token open in the picker and its hue (degrees), saturation, value and alpha, kept apart because a grey has no hue.
     pub picked: Option<usize>,
     pub hsva: [f32; 4],
@@ -73,6 +75,7 @@ pub fn open(skins: &[Skin], name: &str) -> bool {
             author: file.map_or_else(String::new, |s| s.author.clone()),
             description: file.map_or_else(String::new, |s| s.description.clone()),
             layout: file.map_or_else(Vec::new, |s| s.layout.clone()),
+            locales: file.map_or_else(serde_json::Map::new, |s| s.locales.clone()),
             picked: None,
             hsva: [0.0; 4],
         });
@@ -229,6 +232,7 @@ impl Draft {
             author: self.author.clone(),
             description: self.description.clone(),
             layout: self.layout.clone(),
+            locales: self.locales.clone(),
             path: None,
         }
     }

@@ -109,6 +109,7 @@ impl Provider {
         self.0.name()
     }
 
+    /// A device op; the texts of its answer are translated ([`super::library::Loaded::call_shown`]).
     fn call<T: serde::de::DeserializeOwned>(
         &self,
         req: impl FnOnce(serde_json::Value) -> Request,
@@ -116,8 +117,8 @@ impl Provider {
     ) -> Result<T, String> {
         let req = req(self.0.settings());
         match ctl {
-            Some(c) => with_job(c, || self.0.call(&req)),
-            None => self.0.call(&req),
+            Some(c) => with_job(c, || self.0.call_shown(&req)),
+            None => self.0.call_shown(&req),
         }
     }
 
@@ -213,10 +214,10 @@ impl Provider {
         )
     }
 
-    /// The device settings pages of this plugin; asked once per plugin settings.
+    /// The device settings pages of this plugin; asked once per plugin settings and language.
     pub fn schema(&self) -> Result<SettingsSchema, String> {
         let settings = self.0.settings();
-        let key = settings.to_string();
+        let key = format!("{} {settings}", crate::locale::code());
         if let Some((k, s)) = SCHEMAS.lock().get(self.name())
             && *k == key
         {

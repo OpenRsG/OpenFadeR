@@ -46,7 +46,7 @@ pub(super) fn call(
     } else {
         load(plugin, script, timeout).and_then(|(lua, handle)| ask(&lua, &handle, request, timeout))
     };
-    r.map_err(|e| format!("{name}: {e}"))
+    r.map_err(|e| format!("{name}: {}", plugin.tr(&e)))
 }
 
 /// A persistent plugin's loaded script, and what it was loaded from (folder, script, version, file time).

@@ -7,6 +7,7 @@ pub mod device;
 pub mod edit;
 pub mod library;
 pub mod lighting;
+pub mod locale;
 pub mod paths;
 pub mod plugin;
 #[cfg(feature = "stems")]

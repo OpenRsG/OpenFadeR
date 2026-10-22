@@ -88,7 +88,7 @@ fn cards(skins: &[Skin], chosen: &str) -> Vec<ThemeCard> {
                     .map_or_else(|| "Catppuccin".into(), |s| s.author.clone())
                     .into(),
                 description: file
-                    .map_or_else(String::new, |s| s.description.clone())
+                    .map_or_else(String::new, Skin::shown_description)
                     .into(),
                 user: file.is_some_and(store::is_user),
                 active: name.eq_ignore_ascii_case(chosen),

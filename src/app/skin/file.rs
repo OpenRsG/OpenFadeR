@@ -108,7 +108,16 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
     notes.extend(
         obj.keys()
             .filter(|k| {
-                !["name", "base", "tokens", "author", "description", "layout"].contains(&k.as_str())
+                ![
+                    "name",
+                    "base",
+                    "tokens",
+                    "author",
+                    "description",
+                    "layout",
+                    "locales",
+                ]
+                .contains(&k.as_str())
             })
             .map(|k| tr!("unknown key {} ignored", format!("{k:?}"))),
     );
@@ -121,6 +130,14 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
         }
     };
     let (author, description) = (string("author"), string("description"));
+    let locales = match obj.get("locales") {
+        None => serde_json::Map::new(),
+        Some(Json::Object(m)) => m.clone(),
+        Some(_) => {
+            notes.push(tr!("\"locales\" must be an object, ignored").into());
+            serde_json::Map::new()
+        }
+    };
     let mut layout = Vec::new();
     match obj.get("layout") {
         None => {}
@@ -176,6 +193,7 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
         author,
         description,
         layout,
+        locales,
         path: None,
     };
     Ok((skin, notes))
@@ -315,6 +333,9 @@ pub fn serialize(skin: &Skin) -> String {
         if !v.is_empty() {
             out += &format!("  \"{key}\": {},\n", q(v));
         }
+    }
+    if !skin.locales.is_empty() {
+        out += &format!("  \"locales\": {},\n", Json::Object(skin.locales.clone()));
     }
     let base = if skin.base == Base::Light {
         "light"

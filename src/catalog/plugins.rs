@@ -16,6 +16,8 @@ pub struct Entry {
     /// The entry prefix of its folder in the repository zip (`top/my-fx/`).
     pub dir: String,
     pub manifest: Manifest,
+    /// `(language, description)` from the plugin's `locales/` ([`crate::locale::pick`]).
+    pub descriptions: Vec<(String, String)>,
 }
 
 /// The biggest `plugin.json` read.
@@ -48,10 +50,46 @@ pub fn scan(z: &mut Zip) -> Vec<Entry> {
             continue;
         };
         if !out.iter().any(|e| e.manifest.name == manifest.name) {
-            out.push(Entry { dir, manifest });
+            let descriptions = descriptions(z, &dir, &manifest.description);
+            out.push(Entry {
+                dir,
+                manifest,
+                descriptions,
+            });
         }
     }
     out.sort_by_key(|e| e.manifest.name.to_lowercase());
+    out
+}
+
+/// The translations of `description` in the `locales/<lang>.json` files of the plugin at `dir` in `z`.
+fn descriptions(z: &mut Zip, dir: &str, description: &str) -> Vec<(String, String)> {
+    let prefix = format!("{dir}locales/");
+    let files: Vec<String> = z
+        .names()
+        .filter(|n| {
+            n.strip_prefix(&prefix)
+                .is_some_and(|f| f.ends_with(".json") && !f.contains('/'))
+        })
+        .map(str::to_owned)
+        .collect();
+    let mut out = Vec::new();
+    for f in files {
+        if z.size(&f).is_none_or(|s| s > MAX_MANIFEST) {
+            continue;
+        }
+        let Some(map) = z.read(&f).ok().and_then(|b| {
+            serde_json::from_slice::<std::collections::HashMap<String, String>>(&b).ok()
+        }) else {
+            continue;
+        };
+        if let (Some(lang), Some(t)) = (
+            f[prefix.len()..].strip_suffix(".json"),
+            map.get(description),
+        ) {
+            out.push((lang.to_owned(), t.clone()));
+        }
+    }
     out
 }
 

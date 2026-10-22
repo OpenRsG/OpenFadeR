@@ -74,6 +74,7 @@ tests/
 - Every text a user sees is marked: `@tr("…")` in `.slint` files, `tr!` / `tr_n!` in `src/app` (`n_!` in a table, translated where it is shown with `i18n::tr_dyn`). Ids, setting values, compared strings and log output are never marked. See `src/app/i18n.rs`.
 - Placeholders follow Slint: `{}`, `{0}`, `{n}` (the count of a plural). Numbers are formatted before they are passed.
 - After adding or changing a text, run `python3 ui/translations/extract.py`: it updates `ui/translations/openfader-ui.pot` and adds the new texts to each language's `.po` file, where they show in English until translated. The test `every_language_translates_every_text_with_its_placeholders` lists the missing ones.
+- A text an extension gives (its `plugin.json`, a reply, a theme's description) is never marked: show it through `Plugin::tr` (or `Registry::tr` by plugin name), device replies through `Loaded::call_shown`, theme descriptions through `Skin::shown_description`. They read the extension's own `locales/` (`src/locale.rs`, `docs/plugins.md` Languages).
 - Texts drawn on canvas pixels (`app/render/font.rs`, A–Z only) stay English.
 
 ## Performance contracts

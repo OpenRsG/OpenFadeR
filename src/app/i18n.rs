@@ -47,12 +47,14 @@ fn catalogs() -> &'static [Catalog; 6] {
     &CATALOGS
 }
 
-/// Shows `lang` (a [`LANGS`] code, or anything else for the system's language when it is one of them, else English).
+/// Shows `lang` (a [`LANGS`] code, or anything else for the system's language when it is one of them, else English), in the
+/// windows and in the extensions' texts ([`openfader::locale`]).
 pub fn apply(lang: &str) {
     let i = index(lang)
         .or_else(|| sys_locale::get_locale().and_then(|l| index(base(&l))))
         .unwrap_or(0);
     CURRENT.store(i, Ordering::Relaxed);
+    openfader::locale::set(LANGS[i].0);
     if let Err(e) = slint::select_bundled_translation(LANGS[i].0) {
         eprintln!("language {}: {e}", LANGS[i].0);
     }

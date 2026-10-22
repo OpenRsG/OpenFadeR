@@ -260,7 +260,9 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks, selected: Rc<RefCell<
         discard: Cell::new(false),
         base: RefCell::default(),
         dirty: Cell::new(true),
-        status: RefCell::new("EDIT: OPEN SELECTED loads the track selected in the library".into()),
+        status: RefCell::new(
+            tr!("EDIT: OPEN SELECTED loads the track selected in the library").into(),
+        ),
         timer: Timer::default(),
     });
     let g = app.global::<EditState>();

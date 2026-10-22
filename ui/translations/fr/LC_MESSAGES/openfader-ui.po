@@ -192,7 +192,7 @@ msgstr "Relocalisation auto"
 
 #: ui/app.slint:215
 #: ui/browser-table.slint:263
-#: src/app/library/mod.rs:113
+#: src/app/library/mod.rs:114
 msgid "Remove from Collection"
 msgstr "Retirer de la collection"
 
@@ -1572,7 +1572,7 @@ msgstr "Sauvegarder ou restaurer la bibliothèque de cet appareil"
 #: ui/exportmode-dock.slint:69
 #: ui/plugins.slint:167
 msgid "SETTINGS"
-msgstr "PRÉFÉRENCES"
+msgstr "RÉGLAGES"
 
 #: ui/device-devices.slint:236
 msgid "The player settings this device carries (Preferences > DJ SYSTEM)"
@@ -2404,7 +2404,7 @@ msgid "Up / Down move the track selection (when the search box is not focused). 
 msgstr "Haut / Bas déplacent la sélection de piste (quand la zone de recherche n'a pas le focus).  Un BEAT JUMP avec une LOOP active déplace la LOOP.  Maintenez CUE pour écouter, relâchez pour revenir ; PLAY pendant le maintien continue la lecture.  SYNC se verrouille : le deck suit le tempo et les beats du MASTER.  Faites glisser une forme d'onde pour scratcher.  Les touches sont le preset KEYBOARD actuel plus vos modifications (PRÉFÉRENCES > KEYBOARD).  ? ou clic pour fermer."
 
 #: ui/library.slint:46
-#: src/app/library/mod.rs:324
+#: src/app/library/mod.rs:325
 msgid "YES"
 msgstr "OUI"
 
@@ -4095,7 +4095,7 @@ msgid "store: {}"
 msgstr "magasin : {}"
 
 #: src/app/browser/palette/edit.rs:86
-#: src/app/browser/wire.rs:271
+#: src/app/browser/wire.rs:278
 msgid "“{}” is already in the Tag List"
 msgstr "« {} » est déjà dans la liste de tags"
 
@@ -4104,7 +4104,7 @@ msgid "the Tag List holds up to {} tracks"
 msgstr "la liste de tags contient jusqu'à {} pistes"
 
 #: src/app/browser/palette/edit.rs:92
-#: src/app/browser/wire.rs:273
+#: src/app/browser/wire.rs:280
 msgid "tagged “{}” ({} in the Tag List)"
 msgstr "« {} » taguée ({} dans la liste de tags)"
 
@@ -4278,7 +4278,7 @@ msgid "ADD TO PLAYLIST"
 msgstr "AJOUTER À LA PLAYLIST"
 
 #: src/app/browser/playlists/mod.rs:92
-#: src/app/library/mod.rs:91
+#: src/app/library/mod.rs:92
 msgid "Library Protection is on: cannot {} (Preferences > Advanced > Browse)"
 msgstr "La protection de la bibliothèque est activée : impossible de {} (Préférences > Avancé > Parcourir)"
 
@@ -4685,7 +4685,7 @@ msgid " · reading {}/{}"
 msgstr " · lecture {}/{}"
 
 #: src/app/browser/tagging.rs:141
-#: src/app/browser/wire.rs:270
+#: src/app/browser/wire.rs:277
 msgid "select a track to tag"
 msgstr "sélectionnez une piste à taguer"
 
@@ -4727,11 +4727,11 @@ msgstr[1] "{n} pistes enregistrées dans {}"
 msgid "save failed: {}"
 msgstr "échec de l'enregistrement : {}"
 
-#: src/app/browser/wire.rs:262
+#: src/app/browser/wire.rs:269
 msgid "select a track to see what relates to it"
 msgstr "sélectionnez une piste pour voir ce qui s'y rapporte"
 
-#: src/app/browser/wire.rs:313
+#: src/app/browser/wire.rs:320
 msgid "AUTOMIX stopped"
 msgstr "AUTOMIX arrêté"
 
@@ -5880,6 +5880,10 @@ msgid_plural "importing {n} items…"
 msgstr[0] "import de {n} élément…"
 msgstr[1] "import de {n} éléments…"
 
+#: src/app/edit/mod.rs:264
+msgid "EDIT: OPEN SELECTED loads the track selected in the library"
+msgstr "ÉDITION : OUVRIR LA SÉLECTION charge la piste sélectionnée dans la bibliothèque"
+
 #: src/app/edit/open.rs:26
 msgid "the selected track has no audio file"
 msgstr "la piste sélectionnée n'a pas de fichier audio"
@@ -6460,7 +6464,7 @@ msgid "A collection file of the library plugin you chose: its tracks, playlists,
 msgstr "Un fichier de collection du plugin de bibliothèque choisi : ses pistes, playlists, notes, commentaires, cues et grilles de beats sont importés."
 
 #: src/app/library/dialog.rs:106
-#: src/app/library/mod.rs:322
+#: src/app/library/mod.rs:323
 msgid "BACKUP LIBRARY"
 msgstr "SAUVEGARDER LA BIBLIOTHÈQUE"
 
@@ -6667,41 +6671,41 @@ msgstr[1] "Supprimer {n} pistes manquantes de la collection ? Leurs emplacements
 msgid "DELETE FROM COLLECTION"
 msgstr "SUPPRIMER DE LA COLLECTION"
 
-#: src/app/library/mod.rs:138
+#: src/app/library/mod.rs:139
 msgid "removed {n} track from the Collection"
 msgid_plural "removed {n} tracks from the Collection"
 msgstr[0] "{n} piste supprimée de la collection"
 msgstr[1] "{n} pistes supprimées de la collection"
 
-#: src/app/library/mod.rs:204
+#: src/app/library/mod.rs:205
 msgid "a path is needed"
 msgstr "un chemin est requis"
 
-#: src/app/library/mod.rs:252
+#: src/app/library/mod.rs:253
 msgid "WRITE BACK"
 msgstr "RÉÉCRIRE"
 
-#: src/app/library/mod.rs:254
+#: src/app/library/mod.rs:255
 msgid "WRITE"
 msgstr "ÉCRIRE"
 
-#: src/app/library/mod.rs:282
+#: src/app/library/mod.rs:283
 msgid "recording added to the Collection ({})"
 msgstr "enregistrement ajouté à la collection ({})"
 
-#: src/app/library/mod.rs:284
+#: src/app/library/mod.rs:285
 msgid "recording not imported: {}"
 msgstr "enregistrement non importé : {}"
 
-#: src/app/library/mod.rs:323
+#: src/app/library/mod.rs:324
 msgid "Do you want to back up music files as well?"
 msgstr "Voulez-vous aussi sauvegarder les fichiers musicaux ?"
 
-#: src/app/library/mod.rs:325
+#: src/app/library/mod.rs:326
 msgid "NO"
 msgstr "NON"
 
-#: src/app/library/mod.rs:340
+#: src/app/library/mod.rs:341
 msgid "unknown menu action {}"
 msgstr "action de menu inconnue {}"
 
@@ -7217,7 +7221,7 @@ msgstr "pas de raccourci {}"
 msgid "{}: {}"
 msgstr "{} : {}"
 
-#: src/app/plugins/mod.rs:256
+#: src/app/plugins/mod.rs:264
 msgid "nothing was typed"
 msgstr "rien n'a été saisi"
 
@@ -8382,6 +8386,14 @@ msgstr "STATUT"
 msgid "ERROR: {}"
 msgstr "ERREUR : {}"
 
+#: src/app/prefs/dj_system/mod.rs:442
+msgid "DEFAULTS FOR EVERY DEVICE"
+msgstr "VALEURS PAR DÉFAUT DE TOUS LES APPAREILS"
+
+#: src/app/prefs/dj_system/mod.rs:448
+msgid "DEVICE {}"
+msgstr "APPAREIL {}"
+
 #: src/app/prefs/extensions.rs:88
 msgid "ENABLE THE STEMS FUNCTION"
 msgstr "ACTIVER LA FONCTION STEMS"
@@ -9285,7 +9297,7 @@ msgstr "séquence NON supprimée : {}"
 msgid "no saved sequence in slot {}"
 msgstr "aucune séquence enregistrée dans le slot {}"
 
-#: src/app/skin/draft.rs:144
+#: src/app/skin/draft.rs:147
 msgid "no such token"
 msgstr "token inexistant"
 
@@ -9305,67 +9317,71 @@ msgstr "\"name\" doit être une chaîne non vide"
 msgid "\"base\" must be \"dark\" or \"light\", using \"dark\""
 msgstr "\"base\" doit être \"dark\" ou \"light\", \"dark\" est utilisé"
 
-#: src/app/skin/file.rs:113
+#: src/app/skin/file.rs:122
 msgid "unknown key {} ignored"
 msgstr "clé inconnue {} ignorée"
 
-#: src/app/skin/file.rs:119
+#: src/app/skin/file.rs:128
 msgid "{} must be a string, ignored"
 msgstr "{} doit être une chaîne, ignoré"
 
-#: src/app/skin/file.rs:133
+#: src/app/skin/file.rs:137
+msgid "\"locales\" must be an object, ignored"
+msgstr "\"locales\" doit être un objet, ignoré"
+
+#: src/app/skin/file.rs:150
 msgid "layout {}: expected a text, number or true / false, got {}"
 msgstr "layout {} : texte, nombre ou true / false attendu, reçu {}"
 
-#: src/app/skin/file.rs:143
+#: src/app/skin/file.rs:160
 msgid "unknown layout setting {} (one of {})"
 msgstr "réglage de layout inconnu {} (parmi {})"
 
-#: src/app/skin/file.rs:151
+#: src/app/skin/file.rs:168
 msgid "\"layout\" must be an object, none applied"
 msgstr "\"layout\" doit être un objet, aucun appliqué"
 
-#: src/app/skin/file.rs:159
+#: src/app/skin/file.rs:176
 msgid "unknown token {} (the names are the in-out properties of ui/theme.slint, docs/skins.md)"
 msgstr "token inconnu {} (les noms sont les propriétés in-out de ui/theme.slint, docs/skins.md)"
 
-#: src/app/skin/file.rs:164
+#: src/app/skin/file.rs:181
 msgid "token {}: {}"
 msgstr "token {} : {}"
 
-#: src/app/skin/file.rs:168
+#: src/app/skin/file.rs:185
 msgid "\"tokens\" must be an object, no token applied"
 msgstr "\"tokens\" doit être un objet, aucun token appliqué"
 
-#: src/app/skin/file.rs:186
+#: src/app/skin/file.rs:204
 msgid "expected {}, got {}"
 msgstr "{} attendu, reçu {}"
 
-#: src/app/skin/file.rs:190
+#: src/app/skin/file.rs:208
 msgid "a colour like \"#1473eb\""
 msgstr "une couleur comme \"#1473eb\""
 
-#: src/app/skin/file.rs:193
+#: src/app/skin/file.rs:211
 msgid "a length like 12 or \"12px\""
 msgstr "une longueur comme 12 ou \"12px\""
 
-#: src/app/skin/file.rs:195
+#: src/app/skin/file.rs:213
 msgid "a string"
 msgstr "une chaîne"
 
-#: src/app/skin/file.rs:199
+#: src/app/skin/file.rs:217
 msgid "a whole number"
 msgstr "un nombre entier"
 
-#: src/app/skin/file.rs:201
+#: src/app/skin/file.rs:219
 msgid "a number"
 msgstr "un nombre"
 
-#: src/app/skin/file.rs:217
+#: src/app/skin/file.rs:235
 msgid "a duration like 80, \"80ms\" or \"0.2s\""
 msgstr "une durée comme 80, \"80ms\" ou \"0.2s\""
 
-#: src/app/skin/file.rs:237
+#: src/app/skin/file.rs:255
 msgid "bad colour {}, use #rrggbb or #rrggbbaa"
 msgstr "couleur incorrecte {}, utilisez #rrggbb ou #rrggbbaa"
 
