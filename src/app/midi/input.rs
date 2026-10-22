@@ -92,7 +92,7 @@ impl Midi {
         if b.deck as usize >= active() {
             if !self.layer34_noted.replace(true) {
                 app.global::<MidiState>().set_status(
-                    "deck 3/4 layer ignored in the 2-deck layout (4 DECKS chip or D switches)"
+                    tr!("deck 3/4 layer ignored in the 2-deck layout (4 DECKS chip or D switches)")
                         .into(),
                 );
             }
@@ -167,9 +167,11 @@ impl Midi {
         self.dual.set(dual);
         let (a, c) = (DECK_NAMES[side], DECK_NAMES[side + 2]);
         app.global::<MidiState>().set_status(
-            format!(
-                "DUAL DECK {a} + {c} {}",
-                if dual[side] { "on" } else { "off" }
+            tr!(
+                "DUAL DECK {} + {} {}",
+                a,
+                c,
+                if dual[side] { tr!("on") } else { tr!("off") }
             )
             .into(),
         );
@@ -211,7 +213,7 @@ impl Midi {
         if l != self.layer.replace(l) {
             self.snap_at.set(None);
             app.global::<MidiState>()
-                .set_status(format!("controller decks: {}", layer::describe(l)).into());
+                .set_status(tr!("controller decks: {}", layer::describe(l)).into());
         }
     }
 }

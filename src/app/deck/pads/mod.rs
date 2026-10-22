@@ -79,18 +79,18 @@ impl PadMode {
     ];
     /// Mode button labels, in the order of [`PadMode::ALL`].
     const NAMES: [&'static str; 12] = [
-        "HOT CUE",
-        "JUMP",
-        "KEYBOARD",
-        "LOOP",
-        "PAD FX",
-        "KEY SHIFT",
-        "S.SCRATCH",
-        "SLICER",
-        "SLICE LOOP",
-        "SAMPLER",
-        "SEQ. CALL",
-        "STEMS",
+        n_!("HOT CUE"),
+        n_!("JUMP"),
+        n_!("KEYBOARD"),
+        n_!("LOOP"),
+        n_!("PAD FX"),
+        n_!("KEY SHIFT"),
+        n_!("S.SCRATCH"),
+        n_!("SLICER"),
+        n_!("SLICE LOOP"),
+        n_!("SAMPLER"),
+        n_!("SEQ. CALL"),
+        n_!("STEMS"),
     ];
 
     /// Mode indices a controller's mode cycle wraps at: the built-ins and the plugin modes. STEMS keeps its index
@@ -125,7 +125,11 @@ impl PadMode {
 /// The mode button labels for the selector: the built-ins (STEMS only with `stems`), then the plugin modes.
 pub(super) fn mode_names(stems: bool) -> ModelRc<slint::SharedString> {
     let built_in = &PadMode::NAMES[..PadMode::NAMES.len() - usize::from(!stems)];
-    let names = built_in.iter().copied().chain(plugin::names());
+    let names = built_in
+        .iter()
+        .copied()
+        .map(crate::app::i18n::tr_dyn)
+        .chain(plugin::names());
     ModelRc::new(VecModel::from(names.map(Into::into).collect::<Vec<_>>()))
 }
 
@@ -134,22 +138,22 @@ const KEY_SHIFTS: [i32; 8] = [4, 5, 6, 7, 0, 1, 2, 3];
 /// PAD FX pads: label, effect and index into [`BEAT_TEXT`]. The slots are our choice (effects A to H), built from the Beat FX effects. Slots 8 to 15 are the
 /// SHIFT page, effects I to P; the controller's SHIFT + pad reaches them, page 1 of [`page_range`].
 const PAD_FX: [(&str, Effect, usize); 16] = [
-    ("ECHO", Effect::Echo, 3),
-    ("DLY", Effect::Delay, 4),
-    ("REV", Effect::Reverb, 5),
-    ("FLNG", Effect::Flanger, 7),
-    ("PHSR", Effect::Phaser, 7),
-    ("ROLL", Effect::Roll, 3),
-    ("TRNS", Effect::Trans, 3),
-    ("HPF", Effect::Hpf, 6),
-    ("LPF", Effect::Lpf, 5),
-    ("ECHO", Effect::Echo, 5),
-    ("DLY", Effect::Delay, 2),
-    ("REV", Effect::Reverb, 7),
-    ("FLNG", Effect::Flanger, 5),
-    ("PHSR", Effect::Phaser, 5),
-    ("ROLL", Effect::Roll, 2),
-    ("TRNS", Effect::Trans, 2),
+    (n_!("ECHO"), Effect::Echo, 3),
+    (n_!("DLY"), Effect::Delay, 4),
+    (n_!("REV"), Effect::Reverb, 5),
+    (n_!("FLNG"), Effect::Flanger, 7),
+    (n_!("PHSR"), Effect::Phaser, 7),
+    (n_!("ROLL"), Effect::Roll, 3),
+    (n_!("TRNS"), Effect::Trans, 3),
+    (n_!("HPF"), Effect::Hpf, 6),
+    (n_!("LPF"), Effect::Lpf, 5),
+    (n_!("ECHO"), Effect::Echo, 5),
+    (n_!("DLY"), Effect::Delay, 2),
+    (n_!("REV"), Effect::Reverb, 7),
+    (n_!("FLNG"), Effect::Flanger, 5),
+    (n_!("PHSR"), Effect::Phaser, 5),
+    (n_!("ROLL"), Effect::Roll, 2),
+    (n_!("TRNS"), Effect::Trans, 2),
 ];
 /// LEVEL / DEPTH of the PAD FX unit while a pad is held.
 const PAD_FX_LEVEL: f32 = 0.8;
@@ -217,7 +221,11 @@ impl Deck {
         });
         self.pad_fx.set(Some(pad));
         self.refresh_pads();
-        self.say(format!("pad fx {name} {}", BEAT_TEXT[beat]));
+        self.say(tr!(
+            "pad fx {} {}",
+            crate::app::i18n::tr_dyn(name),
+            BEAT_TEXT[beat]
+        ));
     }
 
     /// Releases the held PAD FX pad (whatever the mode now is); the effect fades out, echo / reverb tails ring out.
@@ -253,7 +261,7 @@ impl Deck {
         if mode == PadMode::HotCue && l.auto_cues.get() {
             v.iter_mut()
                 .filter(|p| p.set)
-                .for_each(|p| p.time = format!("AUTO  {}", p.time).into());
+                .for_each(|p| p.time = tr!("AUTO  {}", p.time).into());
         }
         match mode {
             PadMode::PadFx => {
@@ -403,19 +411,20 @@ impl Deck {
         }
         let slots = prefs::with(|p| p.controller.slots());
         if slot >= slots {
-            return self.say(format!(
-                "sampler slot {} is not in use ({slots} slots)",
-                slot + 1
+            return self.say(tr!(
+                "sampler slot {} is not in use ({} slots)",
+                slot + 1,
+                slots
             ));
         }
         let Some(pcm) = self.with_player(|p| p.bus().sampler.slice(slot)).flatten() else {
-            return self.say(format!(
+            return self.say(tr!(
                 "sampler slot {} is empty (fill it in the sampler panel)",
                 slot + 1
             ));
         };
         let t = Track {
-            title: format!("Sampler slot {}", slot + 1),
+            title: tr!("Sampler slot {}", slot + 1),
             length_s: pcm.duration_ms() as i64 / 1000,
             ..Default::default()
         };
@@ -443,7 +452,7 @@ impl Deck {
             (v.loaded, v.loading, v.playing, v.at_cue, v.ending) =
                 (false, false, false, false, false);
             (v.detail, v.overview) = Default::default();
-            v.status = "Select a track, then LOAD".into();
+            v.status = tr!("Select a track, then LOAD").into();
         });
         self.scroll.set_row_data(self.index, Default::default());
         openfader::plugin::event::fire(

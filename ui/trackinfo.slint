@@ -66,7 +66,7 @@ export component TrackInfo inherits Rectangle {
     }
 
     if !TrackInfoState.has-track: Text {
-        text: "Select a track";
+        text: @tr("Select a track");
         color: Theme.text-faint;
         font-family: Theme.font;
         font-size: Theme.font-size;
@@ -152,7 +152,7 @@ export component TrackInfo inherits Rectangle {
         }
         if root.expanded: VerticalLayout {
             spacing: Theme.space-sm;
-            Line { text: "Rating (select the current star again to clear)"; }
+            Line { text: @tr("Rating (select the current star again to clear)"); }
             HorizontalLayout {
                 alignment: start;
                 spacing: Theme.space-sm;
@@ -160,48 +160,48 @@ export component TrackInfo inherits Rectangle {
                     icon: Icon.star;
                     solid: true;
                     active: i < TrackInfoState.rating;
-                    tooltip: "Rating: " + (i + 1) + " stars";
+                    tooltip: @tr("Rating: {} stars", i + 1);
                     clicked => { TrackInfoState.rating-set(i + 1); }
                 }
             }
-            Line { text: "Colour (select the current colour again to clear)"; }
+            Line { text: @tr("Colour (select the current colour again to clear)"); }
             for row in 2: HorizontalLayout {
                 spacing: Theme.space-sm;
                 for col in 4: Chip {
-                    text: ["Pink", "Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple"][row * 4 + col];
+                    text: [@tr("Pink"), @tr("Red"), @tr("Orange"), @tr("Yellow"), @tr("Green"), @tr("Aqua"), @tr("Blue"), @tr("Purple")][row * 4 + col];
                     active: TrackInfoState.color == row * 4 + col + 1;
                     clicked => { TrackInfoState.color-set(row * 4 + col + 1); }
                 }
             }
-            Line { text: "Comment"; }
+            Line { text: @tr("Comment"); }
         }
         TextField {
             text <=> TrackInfoState.comment;
-            placeholder-text: "comment (Enter saves)";
+            placeholder-text: @tr("comment (Enter saves)");
             accepted(t) => { if root.expanded { root.save-details(); } else { TrackInfoState.comment-edited(t); } }
             init => { if root.expanded { self.focus-field(); } }
         }
         if root.expanded && TrackInfoState.metadata-writable: VerticalLayout {
             spacing: Theme.space-sm;
-            Line { text: "Title"; }
+            Line { text: @tr("Title"); }
             TextField { text <=> TrackInfoState.edit-title; accepted => { root.save-details(); } }
-            Line { text: "Artist"; }
+            Line { text: @tr("Artist"); }
             TextField { text <=> TrackInfoState.edit-artist; accepted => { root.save-details(); } }
-            Line { text: "Album"; }
+            Line { text: @tr("Album"); }
             TextField { text <=> TrackInfoState.edit-album; accepted => { root.save-details(); } }
-            Line { text: "Genre"; }
+            Line { text: @tr("Genre"); }
             TextField { text <=> TrackInfoState.edit-genre; accepted => { root.save-details(); } }
-            Line { text: "Label"; }
+            Line { text: @tr("Label"); }
             TextField { text <=> TrackInfoState.edit-label; accepted => { root.save-details(); } }
         }
-        if root.expanded && !TrackInfoState.metadata-writable: Note { text: "Descriptive fields need a local file. Comments, rating and colour are still editable."; }
+        if root.expanded && !TrackInfoState.metadata-writable: Note { text: @tr("Descriptive fields need a local file. Comments, rating and colour are still editable."); }
     }
 }
 
 /// The same metadata controls, reachable from a browser row even when the sidebar is hidden.
 export component TrackInfoEditor inherits Rectangle {
     DialogFrame {
-        title: "EDIT TRACK DETAILS";
+        title: @tr("EDIT TRACK DETAILS");
         card-width: min(480px, root.width - 16px);
         card-height: min(560px, root.height - 16px);
         body-padding: Theme.space-md;
@@ -214,12 +214,12 @@ export component TrackInfoEditor inherits Rectangle {
                 spacing: Theme.space-md;
                 alignment: start;
                 track-details := TrackInfo { expanded: true; vertical-stretch: 0; }
-                Note { text: "Enter or Save stores fields and comments in OpenFadeR. Rating and colour save immediately. Close discards unsaved text. BPM/key stay in their grid/analysis controls. Audio-file tags are not changed; opted-in two-way library connections keep their normal write-back behavior."; }
+                Note { text: @tr("Enter or Save stores fields and comments in OpenFadeR. Rating and colour save immediately. Close discards unsaved text. BPM/key stay in their grid/analysis controls. Audio-file tags are not changed; opted-in two-way library connections keep their normal write-back behavior."); }
                 if TrackInfoState.edit-status != "": Note { text: TrackInfoState.edit-status; }
                 HorizontalLayout {
                     spacing: Theme.space-sm;
-                    Chip { text: "Save fields and comment"; active: true; clicked => { track-details.save-details(); } }
-                    Chip { text: "Close"; clicked => { TrackInfoState.editor-closed(); } }
+                    Chip { text: @tr("Save fields and comment"); active: true; clicked => { track-details.save-details(); } }
+                    Chip { text: @tr("Close"); clicked => { TrackInfoState.editor-closed(); } }
                 }
             }
         }

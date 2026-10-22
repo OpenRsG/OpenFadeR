@@ -120,84 +120,84 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         .position(|&n| n == a.cue_repeat_bars)
         .unwrap_or(4);
     let mut rows = vec![
-        Row::header("TRACK ANALYSIS"),
+        Row::header(tr!("TRACK ANALYSIS")),
         Row::check(
             "high_precision",
-            "Use high precision BeatGrid analysis",
+            tr!("Use high precision BeatGrid analysis"),
             a.high_precision,
         )
-        .hint("1 ms frames"),
+        .hint(tr!("1 ms frames")),
         Row::chips(
             "track_mode",
-            "TRACK ANALYSIS MODE",
+            tr!("TRACK ANALYSIS MODE"),
             mode_names,
             a.mode() as usize,
         )
         .hint(if a.high_precision {
-            "AUTO: Dynamic when the tempo drifts"
+            tr!("AUTO: Dynamic when the tempo drifts")
         } else {
-            "AUTO needs high precision"
+            tr!("AUTO needs high precision")
         }),
-        Row::of("bpm_range", "BPM RANGE", a.bpm_range).hint("BPM"),
-        Row::header("TRACK ANALYSIS SETTING"),
-        Row::check("part_grid", "BPM / Grid", a.part_grid),
-        Row::check("part_key", "KEY", a.part_key),
-        Row::check("part_phrase", "Phrase", a.part_phrase).hint("needs the grid"),
-        Row::check("part_vocal", "Vocal", a.part_vocal).hint("heuristic"),
+        Row::of("bpm_range", tr!("BPM RANGE"), a.bpm_range).hint("BPM"),
+        Row::header(tr!("TRACK ANALYSIS SETTING")),
+        Row::check("part_grid", tr!("BPM / Grid"), a.part_grid),
+        Row::check("part_key", tr!("KEY"), a.part_key),
+        Row::check("part_phrase", tr!("Phrase"), a.part_phrase).hint(tr!("needs the grid")),
+        Row::check("part_vocal", tr!("Vocal"), a.part_vocal).hint(tr!("heuristic")),
         Row::chips(
             "grid_source",
-            "BEAT GRID AND CUES FROM",
-            &["THE CONNECTED LIBRARY", "OPENFADER ANALYSIS"],
+            tr!("BEAT GRID AND CUES FROM"),
+            &[tr!("THE CONNECTED LIBRARY"), tr!("OPENFADER ANALYSIS")],
             a.grid_source as usize,
         )
-        .hint("your own edits win over both"),
-        Row::header("AUTO ANALYSIS"),
-        Row::check("auto_analysis", "Auto Analysis", a.auto_analysis)
-            .hint("tracks without a BPM or key"),
+        .hint(tr!("your own edits win over both")),
+        Row::header(tr!("AUTO ANALYSIS")),
+        Row::check("auto_analysis", tr!("Auto Analysis"), a.auto_analysis)
+            .hint(tr!("tracks without a BPM or key")),
         Row::chips(
             "analyze_now",
-            "ANALYZE LIBRARY",
-            &["ANALYZE NOW"],
+            tr!("ANALYZE LIBRARY"),
+            &[tr!("ANALYZE NOW")],
             usize::MAX,
         ),
-        Row::header("KEY ANALYSIS"),
+        Row::header(tr!("KEY ANALYSIS")),
         Row::check(
             "key_write_tag",
-            "Write the value to the ID3 tag",
+            tr!("Write the value to the ID3 tag"),
             a.key_write_tag,
         )
         .hint("MP3, WAV, AIFF, FLAC")
         .enabled(a.part_key),
-        Row::header("ANALYSIS PROCESS"),
-        Row::of("process", "ANALYSIS PROCESS", a.process).hint(&format!(
+        Row::header(tr!("ANALYSIS PROCESS")),
+        Row::of("process", tr!("ANALYSIS PROCESS"), a.process).hint(&tr!(
             "{} worker thread(s)",
             crate::app::analyze::workers(a.process)
         )),
-        Row::header("CUE ANALYSIS"),
+        Row::header(tr!("CUE ANALYSIS")),
         Row::chips(
             "cue_mode",
-            "SET CUE DURING ANALYSIS",
-            &["AUTO", "MANUAL"],
+            tr!("SET CUE DURING ANALYSIS"),
+            &[tr!("AUTO"), tr!("MANUAL")],
             a.cue_mode as usize,
         ),
     ];
     if auto_cue {
         rows.push(match &learnt.tendency {
             Some(t) => Row::info(
-                "PERSONAL CUE TENDENCY",
-                &format!(
+                tr!("PERSONAL CUE TENDENCY"),
+                &tr!(
                     "{} tracks: first cue at bar {}, {}, {} hot / {} memory",
                     t.tracks,
                     t.offset_bars + 1,
                     t.spacing_bars
-                        .map_or("on phrases".to_owned(), |n| format!("every {n} bars")),
+                        .map_or(tr!("on phrases").to_owned(), |n| tr!("every {} bars", n)),
                     t.hot,
                     t.memory
                 ),
             ),
             None => Row::info(
-                "PERSONAL CUE TENDENCY",
-                &format!(
+                tr!("PERSONAL CUE TENDENCY"),
+                &tr!(
                     "needs {} tracks with cues ({} found): MANUAL settings apply",
                     MIN_TRACKS, learnt.found
                 ),
@@ -207,39 +207,40 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     rows.extend([
         manual_only(Row::dropdown_of(
             "cue_hot",
-            "HOT CUES",
+            tr!("HOT CUES"),
             numbers(MAX_HOT as usize),
             a.cue_hot.min(MAX_HOT) as usize,
         )),
         manual_only(Row::dropdown_of(
             "cue_memory",
-            "MEMORY CUES",
+            tr!("MEMORY CUES"),
             numbers(MAX_MEMORY as usize),
             a.cue_memory.min(MAX_MEMORY) as usize,
         )),
         manual_only(Row::check(
             "cue_first_bar",
-            "Set to 1.1 Bars",
+            tr!("Set to 1.1 Bars"),
             a.cue_first_bar,
         )),
         Row::check(
             "cue_repeat",
-            "Repeat CUE settings per N bars from 1.1 Bars",
+            tr!("Repeat CUE settings per N bars from 1.1 Bars"),
             a.cue_repeat && !auto_cue,
         )
         .enabled(!auto_cue),
         Row::dropdown_of(
             "cue_repeat_bars",
-            "N BARS",
+            tr!("N BARS"),
             REPEAT_BARS.iter().map(|n| n.to_string()).collect(),
             repeat_at,
         )
         .enabled(!auto_cue && a.cue_repeat),
-        Row::check("cue_keep", "Prohibit overwriting CUEs", a.cue_keep),
-        Row::check("cue_comment", "Add a comment to CUE", a.cue_comment).hint("phrase or bar"),
+        Row::check("cue_keep", tr!("Prohibit overwriting CUEs"), a.cue_keep),
+        Row::check("cue_comment", tr!("Add a comment to CUE"), a.cue_comment)
+            .hint(tr!("phrase or bar")),
         Row::check(
             "panel_cue_analysis",
-            "Display the CUE Analysis playlist",
+            tr!("Display the CUE Analysis playlist"),
             p.view.panel_cue_analysis,
         ),
     ]);

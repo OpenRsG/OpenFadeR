@@ -124,7 +124,7 @@ export component RingColumn inherits VerticalLayout {
         width: root.size;
         height: root.size;
         tone: Theme.cue;
-        text: "CUE";
+        text: @tr("CUE");
         lit: root.v.at-cue;
         enabled: root.v.loaded;
         pressed => { DeckState.cue(root.index); }
@@ -149,9 +149,9 @@ export component SideButtons inherits VerticalLayout {
     property <DeckView> v: DeckState.decks[root.index];
     alignment: center;
     spacing: root.h > 16px ? 4px : 2px;
-    Chip { height: root.h; font-size: Theme.font-xs; text: "SLIP"; tooltip: "Slip mode"; active: root.v.slip; active-color: Theme.danger; enabled: root.v.loaded; clicked => { DeckState.slip(root.index); } }
-    Chip { height: root.h; font-size: Theme.font-xs; text: "Q"; tooltip: "Quantize"; active: root.v.quantize; clicked => { DeckState.quantize(root.index); } }
-    Chip { height: root.h; font-size: Theme.font-xs; text: "MT"; tooltip: "Master tempo (key lock)"; active: root.v.key-lock; clicked => { DeckState.key-lock(root.index); } }
+    Chip { height: root.h; font-size: Theme.font-xs; text: @tr("SLIP"); tooltip: @tr("Slip mode"); active: root.v.slip; active-color: Theme.danger; enabled: root.v.loaded; clicked => { DeckState.slip(root.index); } }
+    Chip { height: root.h; font-size: Theme.font-xs; text: "Q"; tooltip: @tr("Quantize"); active: root.v.quantize; clicked => { DeckState.quantize(root.index); } }
+    Chip { height: root.h; font-size: Theme.font-xs; text: @tr("MT"); tooltip: @tr("Master tempo (key lock)"); active: root.v.key-lock; clicked => { DeckState.key-lock(root.index); } }
 }
 
 /// Vertical tempo fader (1 = top = fastest, or the bottom with `DeckState.tempo-reverse`) over the range chip that cycles ±6 / ±10 / ±16 / WIDE.
@@ -166,7 +166,7 @@ export component TempoColumn inherits VerticalLayout {
         value: DeckState.tempo-fader(root.v.tempo);
         edited(p) => { DeckState.tempo(root.index, DeckState.tempo-fader(p)); }
     }
-    Chip { height: Theme.layout-profile == 1 ? Theme.touch-target : 18px; font-size: Theme.font-xs; text: root.v.tempo-range; tooltip: "Tempo range"; vertical-stretch: 0; clicked => { DeckState.tempo-range(root.index); } }
+    Chip { height: Theme.layout-profile == 1 ? Theme.touch-target : 18px; font-size: Theme.font-xs; text: root.v.tempo-range; tooltip: @tr("Tempo range"); vertical-stretch: 0; clicked => { DeckState.tempo-range(root.index); } }
 }
 
 /// Loop block (64 px): AU = number box starts / leaves an auto loop of the shown beats, `<` `>` halve / double (or
@@ -190,7 +190,7 @@ export component LoopBlock inherits VerticalLayout {
         border-color: root.v.loop-active ? Theme.accent : Theme.line;
         opacity: root.v.loaded ? 1 : 0.5;
         Text {
-            text: root.v.loop-active ? (root.v.loop-beats > 0 ? "" + root.v.loop-beats : "LOOP") : "" + root.shown;
+            text: root.v.loop-active ? (root.v.loop-beats > 0 ? "" + root.v.loop-beats : @tr("LOOP")) : "" + root.shown;
             color: root.v.loop-active ? Theme.accent-hi : Theme.text-bright;
             font-size: Theme.font-lg;
             font-weight: Theme.weight-bold;
@@ -206,25 +206,25 @@ export component LoopBlock inherits VerticalLayout {
         spacing: 2px;
         HorizontalLayout {
             spacing: 2px;
-            Chip { text: "IN"; font-size: Theme.font-xs; enabled: root.v.loaded; clicked => { DeckState.loop-in(root.index); } }
-            Chip { text: "OUT"; font-size: Theme.font-xs; enabled: root.v.loaded; clicked => { DeckState.loop-out(root.index); } }
+            Chip { text: @tr("IN"); font-size: Theme.font-xs; enabled: root.v.loaded; clicked => { DeckState.loop-in(root.index); } }
+            Chip { text: @tr("OUT"); font-size: Theme.font-xs; enabled: root.v.loaded; clicked => { DeckState.loop-out(root.index); } }
         }
-        Chip { text: "RELOOP"; font-size: Theme.font-xs; active: root.v.loop-active; enabled: root.v.loaded; clicked => { DeckState.reloop(root.index); } }
+        Chip { text: @tr("RELOOP"); font-size: Theme.font-xs; active: root.v.loop-active; enabled: root.v.loaded; clicked => { DeckState.reloop(root.index); } }
     }
     HorizontalLayout {
         spacing: 2px;
         Chip {
             text: "<";
-            tooltip: "Halve the loop";
+            tooltip: @tr("Halve the loop");
             enabled: root.resize;
             clicked => { if (root.v.loop-active) { DeckState.loop-halve(root.index); } else { root.auto-n = Math.max(1, Math.floor(root.shown / 2)); root.custom = true; } }
         }
         Chip {
             text: ">";
-            tooltip: "Double the loop";
+            tooltip: @tr("Double the loop");
             enabled: root.resize;
             clicked => { if (root.v.loop-active) { DeckState.loop-double(root.index); } else { root.auto-n = Math.min(16, root.shown * 2); root.custom = true; } }
         }
     }
-    SegmentedChips { options: ["AU", "MA"]; current: root.manual ? 1 : 0; font-size: Theme.font-xs; chose(i) => { root.manual = i == 1; } }
+    SegmentedChips { options: [@tr("AU"), @tr("MA")]; current: root.manual ? 1 : 0; font-size: Theme.font-xs; chose(i) => { root.manual = i == 1; } }
 }

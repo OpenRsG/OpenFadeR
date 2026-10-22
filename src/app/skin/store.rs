@@ -13,7 +13,9 @@ pub fn user_dir() -> Option<PathBuf> {
 
 /// The folder, made if it does not exist yet (for the editor's save and the "open folder" button).
 pub fn ensure_user_dir() -> Result<PathBuf, String> {
-    let dir = user_dir().ok_or("no config folder: neither XDG_CONFIG_HOME nor HOME is set")?;
+    let dir = user_dir().ok_or(tr!(
+        "no config folder: neither XDG_CONFIG_HOME nor HOME is set"
+    ))?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     Ok(dir)
 }
@@ -69,14 +71,20 @@ fn slug(name: &str) -> String {
 pub fn write_into(dir: &Path, skins: &[Skin], skin: &Skin) -> Result<PathBuf, String> {
     let name = skin.name.trim();
     if name.is_empty() {
-        return Err("give the theme a name".into());
+        return Err(tr!("give the theme a name").into());
     }
     if BUILTIN.iter().any(|b| b.eq_ignore_ascii_case(name)) {
-        return Err(format!("{name:?} is a built-in theme: pick another name"));
+        return Err(tr!(
+            "{} is a built-in theme: pick another name",
+            format!("{name:?}")
+        ));
     }
     let same = skins.iter().find(|s| s.name.eq_ignore_ascii_case(name));
     if same.is_some_and(|s| !is_user_in(dir, s)) {
-        return Err(format!("{name:?} is a bundled theme: pick another name"));
+        return Err(tr!(
+            "{} is a bundled theme: pick another name",
+            format!("{name:?}")
+        ));
     }
     let path = match same.and_then(|s| s.path.clone()) {
         Some(p) => p,
@@ -113,7 +121,7 @@ pub fn install_in(dir: &Path, skins: &[Skin], path: &Path) -> Result<String, Str
     let (skin, notes) = file::parse(&text, &stem).map_err(|e| format!("{at}: {e}"))?;
     if skin.tokens.is_empty() {
         let why = notes.first().map_or(String::new(), |n| format!(" ({n})"));
-        return Err(format!("{at}: no theme tokens in the file{why}"));
+        return Err(tr!("{}: no theme tokens in the file{}", at, why));
     }
     write_into(dir, skins, &skin)?;
     Ok(skin.name)
@@ -133,10 +141,11 @@ pub fn remove_in(dir: &Path, skins: &[Skin], name: &str) -> Result<(), String> {
     let skin = skins
         .iter()
         .find(|s| s.name.eq_ignore_ascii_case(name))
-        .ok_or_else(|| format!("no theme {name:?}"))?;
+        .ok_or_else(|| tr!("no theme {}", format!("{name:?}")))?;
     if !is_user_in(dir, skin) {
-        return Err(format!(
-            "{name:?} is not one of your themes: only the files in {} can be deleted",
+        return Err(tr!(
+            "{} is not one of your themes: only the files in {} can be deleted",
+            format!("{name:?}"),
             dir.display()
         ));
     }

@@ -24,7 +24,7 @@ export component GridTools inherits HorizontalLayout {
     init => { field.text = root.bpm; }
     spacing: 2px;
     alignment: start;
-    Tool { width: Theme.layout-profile == 1 ? 60px : 40px; text: "BEAT 1"; enabled: root.en; tooltip: "Set the playhead to the first beat of a bar"; clicked => { DeckState.grid-beat1(root.index); } }
+    Tool { width: Theme.layout-profile == 1 ? 60px : 40px; text: @tr("BEAT 1"); enabled: root.en; tooltip: @tr("Set the playhead to the first beat of a bar"); clicked => { DeckState.grid-beat1(root.index); } }
     field := TextField {
         width: Theme.layout-profile == 1 ? 80px : 58px;
         horizontal-stretch: 0;
@@ -34,27 +34,27 @@ export component GridTools inherits HorizontalLayout {
         opacity: root.en ? 1 : 0.5;
         accepted(t) => { ExportModeState.grid-bpm(root.index, t); }
     }
-    Tool { width: Theme.target-size(30px); text: "TAP"; enabled: root.en; tooltip: "Set the grid by the click interval"; clicked => { DeckState.grid-tap(root.index); } }
-    Tool { width: Theme.target-size(28px); text: "−1"; enabled: root.en; tooltip: "Move the beat grid 1 ms to the left"; clicked => { DeckState.grid-shift(root.index, -1); } }
-    Tool { width: Theme.target-size(28px); text: "+1"; enabled: root.en; tooltip: "Move the beat grid 1 ms to the right"; clicked => { DeckState.grid-shift(root.index, 1); } }
-    Tool { width: Theme.target-size(28px); text: "|<>|"; enabled: root.en; tooltip: "Widen the beat distance by 1 ms"; clicked => { ExportModeState.grid-stretch(root.index, 1); } }
-    Tool { width: Theme.target-size(28px); text: "|><|"; enabled: root.en; tooltip: "Narrow the beat distance by 1 ms"; clicked => { ExportModeState.grid-stretch(root.index, -1); } }
-    Tool { width: Theme.target-size(28px); text: "×2"; enabled: root.en; tooltip: "Double the BPM"; clicked => { DeckState.grid-double(root.index); } }
-    Tool { width: Theme.target-size(28px); text: "÷2"; enabled: root.en; tooltip: "Halve the BPM"; clicked => { DeckState.grid-halve(root.index); } }
-    Tool { width: Theme.layout-profile == 1 ? 64px : 44px; text: "WHOLE"; enabled: root.en; active: !ExportModeState.decks[root.index].from-here; tooltip: "Edit the whole track"; clicked => { ExportModeState.grid-range(root.index, false); } }
-    Tool { width: Theme.layout-profile == 1 ? 88px : 66px; text: "FROM HERE"; enabled: root.en; active: ExportModeState.decks[root.index].from-here; tooltip: "Edit from the playhead on"; clicked => { ExportModeState.grid-range(root.index, true); } }
-    Tool { width: Theme.layout-profile == 1 ? 56px : 40px; text: "UNDO"; enabled: root.en && ExportModeState.decks[root.index].can-undo; clicked => { ExportModeState.grid-undo(root.index); } }
-    Tool { width: Theme.layout-profile == 1 ? 56px : 40px; text: "REDO"; enabled: root.en && ExportModeState.decks[root.index].can-redo; clicked => { ExportModeState.grid-redo(root.index); } }
-    Tool { width: Theme.layout-profile == 1 ? 64px : 44px; text: "METRO"; enabled: root.loaded; active: DeckState.decks[root.index].metronome; tooltip: "Metronome on the beat grid"; clicked => { DeckState.metronome(root.index); } }
+    Tool { width: Theme.target-size(30px); text: @tr("TAP"); enabled: root.en; tooltip: @tr("Set the grid by the click interval"); clicked => { DeckState.grid-tap(root.index); } }
+    Tool { width: Theme.target-size(28px); text: "−1"; enabled: root.en; tooltip: @tr("Move the beat grid 1 ms to the left"); clicked => { DeckState.grid-shift(root.index, -1); } }
+    Tool { width: Theme.target-size(28px); text: "+1"; enabled: root.en; tooltip: @tr("Move the beat grid 1 ms to the right"); clicked => { DeckState.grid-shift(root.index, 1); } }
+    Tool { width: Theme.target-size(28px); text: "|<>|"; enabled: root.en; tooltip: @tr("Widen the beat distance by 1 ms"); clicked => { ExportModeState.grid-stretch(root.index, 1); } }
+    Tool { width: Theme.target-size(28px); text: "|><|"; enabled: root.en; tooltip: @tr("Narrow the beat distance by 1 ms"); clicked => { ExportModeState.grid-stretch(root.index, -1); } }
+    Tool { width: Theme.target-size(28px); text: "×2"; enabled: root.en; tooltip: @tr("Double the BPM"); clicked => { DeckState.grid-double(root.index); } }
+    Tool { width: Theme.target-size(28px); text: "÷2"; enabled: root.en; tooltip: @tr("Halve the BPM"); clicked => { DeckState.grid-halve(root.index); } }
+    Tool { width: Theme.layout-profile == 1 ? 64px : 44px; text: @tr("WHOLE"); enabled: root.en; active: !ExportModeState.decks[root.index].from-here; tooltip: @tr("Edit the whole track"); clicked => { ExportModeState.grid-range(root.index, false); } }
+    Tool { width: Theme.layout-profile == 1 ? 88px : 66px; text: @tr("FROM HERE"); enabled: root.en; active: ExportModeState.decks[root.index].from-here; tooltip: @tr("Edit from the playhead on"); clicked => { ExportModeState.grid-range(root.index, true); } }
+    Tool { width: Theme.layout-profile == 1 ? 56px : 40px; text: @tr("UNDO"); enabled: root.en && ExportModeState.decks[root.index].can-undo; clicked => { ExportModeState.grid-undo(root.index); } }
+    Tool { width: Theme.layout-profile == 1 ? 56px : 40px; text: @tr("REDO"); enabled: root.en && ExportModeState.decks[root.index].can-redo; clicked => { ExportModeState.grid-redo(root.index); } }
+    Tool { width: Theme.layout-profile == 1 ? 64px : 44px; text: @tr("METRO"); enabled: root.loaded; active: DeckState.decks[root.index].metronome; tooltip: @tr("Metronome on the beat grid"); clicked => { DeckState.metronome(root.index); } }
     Tool {
         width: Theme.layout-profile == 1 ? 60px : 38px;
-        text: "VOL " + (ExportModeState.metro-level + 1);
-        tooltip: "Metronome volume: one of three levels";
+        text: @tr("VOL {}", ExportModeState.metro-level + 1);
+        tooltip: @tr("Metronome volume: one of three levels");
         clicked => { PrefsState.chose("metronome_volume", [3, 6, 10][Math.mod(ExportModeState.metro-level + 1, 3)]); }
     }
-    IconButton { width: Theme.target-size(24px); height: Theme.target-size(22px); icon: Icon.lock; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; enabled: root.loaded; active: root.locked; active-color: Theme.danger; solid: true; tooltip: "Analysis Lock: keep the grid, no re-analysis"; clicked => { ExportModeState.grid-lock(root.index); } }
-    Tool { width: Theme.layout-profile == 1 ? 64px : 40px; text: "RESET"; enabled: root.en; tooltip: "Back to the library's grid"; clicked => { DeckState.grid-reset(root.index); } }
-    Tool { width: Theme.layout-profile == 1 ? 72px : 52px; text: "PHRASE"; enabled: root.loaded; tooltip: "PHRASE EDIT: cut, retype and move the phrases"; clicked => { ExportModeState.phrase-panel(root.index, true); } }
+    IconButton { width: Theme.target-size(24px); height: Theme.target-size(22px); icon: Icon.lock; icon-size: Theme.layout-profile == 1 ? Theme.icon-size : 12px; enabled: root.loaded; active: root.locked; active-color: Theme.danger; solid: true; tooltip: @tr("Analysis Lock: keep the grid, no re-analysis"); clicked => { ExportModeState.grid-lock(root.index); } }
+    Tool { width: Theme.layout-profile == 1 ? 64px : 40px; text: @tr("RESET"); enabled: root.en; tooltip: @tr("Back to the library's grid"); clicked => { DeckState.grid-reset(root.index); } }
+    Tool { width: Theme.layout-profile == 1 ? 72px : 52px; text: @tr("PHRASE"); enabled: root.loaded; tooltip: @tr("PHRASE EDIT: cut, retype and move the phrases"); clicked => { ExportModeState.phrase-panel(root.index, true); } }
 }
 
 /// [PHRASE EDIT] row, shown in place of the GRID row: CUT (lit: a click on the overview's phrase strip
@@ -68,11 +68,11 @@ export component PhraseTools inherits HorizontalLayout {
     property <bool> has-sel: ExportModeState.decks[root.index].phrase-sel > 0;
     spacing: 2px;
     alignment: start;
-    Tool { width: Theme.layout-profile == 1 ? 72px : 52px; text: "‹ GRID"; tooltip: "Back to the GRID tools"; clicked => { ExportModeState.phrase-panel(root.index, false); } }
-    Text { text: "PHRASE EDIT"; color: Theme.text-dim; font-size: Theme.font-xs; vertical-alignment: center; horizontal-stretch: 0; }
-    Tool { width: Theme.target-size(40px); text: "CUT"; enabled: root.en; active: ExportModeState.decks[root.index].phrase-cut; tooltip: "Light it, then click the phrase to divide on the phrase strip"; clicked => { ExportModeState.phrase-cut-toggle(root.index); } }
-    Tool { width: Theme.layout-profile == 1 ? 64px : 50px; text: "CLEAR"; enabled: root.en; tooltip: "Delete all phrases"; clicked => { ExportModeState.phrase-clear(root.index); } }
-    Tool { width: Theme.layout-profile == 1 ? 64px : 50px; text: "RESET"; enabled: root.en; tooltip: "Back to the analysed phrases"; clicked => { ExportModeState.phrase-reset(root.index); } }
+    Tool { width: Theme.layout-profile == 1 ? 72px : 52px; text: @tr("‹ GRID"); tooltip: @tr("Back to the GRID tools"); clicked => { ExportModeState.phrase-panel(root.index, false); } }
+    Text { text: @tr("PHRASE EDIT"); color: Theme.text-dim; font-size: Theme.font-xs; vertical-alignment: center; horizontal-stretch: 0; }
+    Tool { width: Theme.target-size(40px); text: @tr("CUT"); enabled: root.en; active: ExportModeState.decks[root.index].phrase-cut; tooltip: @tr("Light it, then click the phrase to divide on the phrase strip"); clicked => { ExportModeState.phrase-cut-toggle(root.index); } }
+    Tool { width: Theme.layout-profile == 1 ? 64px : 50px; text: @tr("CLEAR"); enabled: root.en; tooltip: @tr("Delete all phrases"); clicked => { ExportModeState.phrase-clear(root.index); } }
+    Tool { width: Theme.layout-profile == 1 ? 64px : 50px; text: @tr("RESET"); enabled: root.en; tooltip: @tr("Back to the analysed phrases"); clicked => { ExportModeState.phrase-reset(root.index); } }
     Rectangle {
         width: 104px;
         height: Theme.target-size(22px);
@@ -80,8 +80,8 @@ export component PhraseTools inherits HorizontalLayout {
         border-radius: Theme.radius;
         background: root.has-sel ? ExportModeState.decks[root.index].phrase-color : Theme.panel-raised;
         opacity: root.en ? 1 : 0.5;
-        Text { text: root.has-sel ? ExportModeState.decks[root.index].phrase-label : "select a phrase"; color: root.has-sel ? Colors.white : Theme.text-dim; font-size: Theme.font-xs; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+        Text { text: root.has-sel ? ExportModeState.decks[root.index].phrase-label : @tr("select a phrase"); color: root.has-sel ? Colors.white : Theme.text-dim; font-size: Theme.font-xs; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
         TouchArea { enabled: root.en && root.has-sel; clicked => { ExportModeState.phrase-kind(root.index); } }
     }
-    if !root.en && DeckState.decks[root.index].loaded: Text { text: "Analysis Lock on, or no phrases / beat grid"; color: Theme.text-dim; font-size: Theme.font-xs; vertical-alignment: center; horizontal-stretch: 0; }
+    if !root.en && DeckState.decks[root.index].loaded: Text { text: @tr("Analysis Lock on, or no phrases / beat grid"); color: Theme.text-dim; font-size: Theme.font-xs; vertical-alignment: center; horizontal-stretch: 0; }
 }

@@ -136,10 +136,11 @@ fn write_new(dir: &Path, tracks: &[Track]) -> Result<(PathBuf, usize), String> {
 /// Writes `<$OPENFADER_EXPORT_DIR | …>/history-YYYYmmdd-HHMMSS.m3u8` (never overwrites). Returns the path and the track count.
 pub fn save(tracks: &[Track]) -> Result<(PathBuf, usize), String> {
     if tracks.is_empty() {
-        return Err("this list is empty".into());
+        return Err(tr!("this list is empty").into());
     }
     write_new(
-        &paths::output_dir("OPENFADER_EXPORT_DIR").ok_or("set OPENFADER_EXPORT_DIR or HOME")?,
+        &paths::output_dir("OPENFADER_EXPORT_DIR")
+            .ok_or(tr!("set OPENFADER_EXPORT_DIR or HOME"))?,
         tracks,
     )
 }

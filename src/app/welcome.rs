@@ -23,12 +23,12 @@ fn offered() -> Vec<Plugin> {
 /// What a plugin brings, for its badge.
 fn kind(m: &Manifest) -> &'static str {
     match &m.library {
-        Some(l) if l.device => "LIBRARY + DEVICES",
-        Some(_) => "LIBRARY",
-        None if m.effects.is_some() => "EFFECTS",
-        None if !m.pad_modes.is_empty() => "PAD MODE",
-        None if !m.knob_modes.is_empty() => "KNOB MODE",
-        None => "PLUGIN",
+        Some(l) if l.device => tr!("LIBRARY + DEVICES"),
+        Some(_) => tr!("LIBRARY"),
+        None if m.effects.is_some() => tr!("EFFECTS"),
+        None if !m.pad_modes.is_empty() => tr!("PAD MODE"),
+        None if !m.knob_modes.is_empty() => tr!("KNOB MODE"),
+        None => tr!("PLUGIN"),
     }
 }
 
@@ -49,8 +49,8 @@ pub fn show(app: &App) {
     if !prefs::with(|p| p.stems) {
         views.push(SuggestView {
             name: STEMS.into(),
-            kind: "FEATURE".into(),
-            description: format!(
+            kind: tr!("FEATURE").into(),
+            description: tr!(
                 "Splits a track into vocals, instruments and drums. Switching it on downloads a {} MB model once.",
                 model::SIZE / 1_000_000
             )
@@ -58,15 +58,15 @@ pub fn show(app: &App) {
         });
     }
     let intro = if targets.is_empty() {
-        "Switch these on to get the most out of OpenFadeR.".to_owned()
+        tr!("Switch these on to get the most out of OpenFadeR.").to_owned()
     } else {
-        format!(
+        tr!(
             "These make OpenFadeR fully compatible with {}: its libraries, devices, effects and pad modes.",
-            targets.join(" and ")
+            targets.join(&tr!(" and "))
         )
     };
     let s = app.global::<WelcomeState>();
-    s.set_intro(format!("{intro} They stay off until you switch them on.").into());
+    s.set_intro(tr!("{} They stay off until you switch them on.", intro).into());
     s.set_plugins(ModelRc::new(VecModel::from(views)));
     s.set_done("".into());
     s.set_restart(false);
@@ -94,21 +94,21 @@ fn accept(app: &App) {
         match config::update(|c| names.iter().for_each(|n| c.set_enabled(n, true))) {
             Ok(()) => {
                 plugins::installed(app, &names);
-                done.push(format!("{} extensions switched on", names.len()));
+                done.push(tr!("{} extensions switched on", names.len()));
             }
             Err(e) => done.push(e),
         }
     }
     if stems {
         prefs::update(|p| p.stems = true); // starts the model download (`stems_model`)
-        done.push("STEMS on: its model is downloading".into());
+        done.push(tr!("STEMS on: its model is downloading").into());
     }
     let needed = current().restart_needed();
     let restart = names.iter().any(|n| needed.contains(n));
     if restart {
-        done.push("restart OpenFadeR to load their effects and libraries".into());
+        done.push(tr!("restart OpenFadeR to load their effects and libraries").into());
     }
-    s.set_done(format!("{}.", done.join("; ")).into());
+    s.set_done(tr!("{}.", done.join("; ")).into());
     s.set_restart(restart);
     seen();
 }

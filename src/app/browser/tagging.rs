@@ -105,7 +105,7 @@ impl View {
             .collect();
         t.comment = with_tags(&t.comment, &names);
         if let Err(e) = self.store.set_comment(&store::key(&t), Some(&t.comment)) {
-            return self.say(app, format!("store: {e}"));
+            return self.say(app, tr!("store: {}", e));
         }
         self.track_edited(app, &t);
         trackinfo::show(app, &t);
@@ -138,12 +138,12 @@ impl View {
     /// TAGS (`assign`: tags of the chosen track) or TAG FILTER pressed.
     pub(super) fn open_tag_panel(&mut self, app: &App, assign: bool) {
         if assign && self.selected.is_none() {
-            return self.say(app, "select a track to tag");
+            return self.say(app, tr!("select a track to tag"));
         }
         if self.mytags.is_empty() {
             return self.say(
                 app,
-                "no tags yet: choose a category under Tags in the tree and + NEW > New tag",
+                tr!("no tags yet: choose a category under Tags in the tree and + NEW > New tag"),
             );
         }
         let on = if assign {
@@ -153,12 +153,17 @@ impl View {
         };
         let (rows, ids) = panel_rows(&self.cats, &self.mytags, |t| on.contains(&t));
         if assign {
-            self.show_panel(app, Panel::Assign(ids), "TAGS OF THE CHOSEN TRACK", rows);
+            self.show_panel(
+                app,
+                Panel::Assign(ids),
+                tr!("TAGS OF THE CHOSEN TRACK"),
+                rows,
+            );
         } else {
             self.show_panel(
                 app,
                 Panel::Filter(ids),
-                "TAG FILTER (tracks need every tag ticked)",
+                tr!("TAG FILTER (tracks need every tag ticked)"),
                 rows,
             );
         }
@@ -177,7 +182,7 @@ impl View {
                 return;
             };
             if let Err(e) = self.store.set_track_mytag(&store::key(&t), id, !was) {
-                return self.say(app, format!("store: {e}"));
+                return self.say(app, tr!("store: {}", e));
             }
             self.reload_tag_map(app);
         } else if was {
@@ -206,7 +211,11 @@ impl View {
         if assign {
             self.say(
                 app,
-                format!("{} “{name}”", if was { "removed" } else { "added" }),
+                if was {
+                    tr!("removed “{}”", name)
+                } else {
+                    tr!("added “{}”", name)
+                },
             );
             self.tags_into_comment(app);
         }
@@ -218,7 +227,7 @@ impl View {
     pub(super) fn tag_track(&mut self, app: &App, t: &Track, id: i64) {
         let key = store::key(t);
         if let Err(e) = self.store.set_track_mytag(&key, id, true) {
-            return self.say(app, format!("store: {e}"));
+            return self.say(app, tr!("store: {}", e));
         }
         self.reload_tag_map(app);
         if matches!(self.home, Home::Tag(_) | Home::Smart(_)) {
@@ -231,7 +240,7 @@ impl View {
             .map(|m| m.name.as_str());
         self.say(
             app,
-            format!("added “{}” to tag “{}”", t.title, name.unwrap_or_default()),
+            tr!("added “{}” to tag “{}”", t.title, name.unwrap_or_default()),
         );
         if self.selected.as_ref().is_some_and(|s| store::key(s) == key) {
             self.tags_into_comment(app);

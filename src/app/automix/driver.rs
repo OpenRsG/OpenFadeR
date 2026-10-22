@@ -137,7 +137,7 @@ impl Automix {
                         let (pos, playing, dur) = self.pos(c);
                         !playing && at_end(pos, dur)
                     });
-                    return ended.then(|| "AUTOMIX: end of list".to_owned());
+                    return ended.then(|| tr!("AUTOMIX: end of list").to_owned());
                 }
                 if self.decks[inc].playing() {
                     return None; // played by hand: wait until it is free
@@ -150,7 +150,7 @@ impl Automix {
             Stage::Loading { cur, inc, serial } => {
                 let d = &self.decks[inc];
                 if d.serial() != Some(serial) {
-                    return Some("AUTOMIX stopped: a deck was loaded by hand".into());
+                    return Some(tr!("AUTOMIX stopped: a deck was loaded by hand").into());
                 }
                 if !d.ready() {
                     return None;
@@ -158,7 +158,7 @@ impl Automix {
                 if d.with_player(|p| p.duration_ms()) == Some(0) {
                     let title = &run.queue[run.next - 1].title;
                     app.global::<BrowserState>().set_status(
-                        format!("AUTOMIX: skipped “{title}” (its audio did not load)").into(),
+                        tr!("AUTOMIX: skipped “{}” (its audio did not load)", title).into(),
                     );
                     run.stage = Stage::OnAir { cur };
                     return None;
@@ -182,7 +182,7 @@ impl Automix {
                 rb,
             } => {
                 if self.decks[inc].serial() != Some(serial) {
-                    return Some("AUTOMIX stopped: a deck was loaded by hand".into());
+                    return Some(tr!("AUTOMIX stopped: a deck was loaded by hand").into());
                 }
                 let (pos, playing, dur) = self.pos(cur);
                 let ra_now = self.decks[cur].rate();
@@ -281,11 +281,11 @@ impl Automix {
             .and_then(|i| run.queue.get(i))
             .map_or("", |t| t.title.as_str());
         match run.stage {
-            Stage::OnAir { .. } => format!(
+            Stage::OnAir { .. } => tr!(
                 "AUTOMIX · on air · {} left in the list",
                 run.queue.len() - run.next
             ),
-            Stage::Loading { .. } => format!("AUTOMIX · loading “{incoming}”"),
+            Stage::Loading { .. } => tr!("AUTOMIX · loading “{}”", incoming),
             Stage::Armed {
                 cur,
                 plan: Some(p),
@@ -293,19 +293,26 @@ impl Automix {
                 ..
             } => {
                 let s = ((p.out_ms - self.pos(cur).0) / ra / 1000.0).max(0.0) as u32;
-                format!(
-                    "AUTOMIX · “{incoming}” mixes in over {} bars in {}:{:02}",
+                tr!(
+                    "AUTOMIX · “{}” mixes in over {} bars in {}",
+                    incoming,
                     p.bars,
-                    s / 60,
-                    s % 60
+                    format!("{}:{:02}", s / 60, s % 60)
                 )
             }
             Stage::Armed { plan: None, .. } => {
-                format!("AUTOMIX · “{incoming}” cuts in when this track ends (no grid or no room)")
+                tr!(
+                    "AUTOMIX · “{}” cuts in when this track ends (no grid or no room)",
+                    incoming
+                )
             }
             Stage::Fading { out, plan, .. } => {
                 let x = ((self.pos(out).0 - plan.out_ms) / plan.fade_ms).clamp(0.0, 1.0);
-                format!("AUTOMIX · mixing “{incoming}” {:.0}%", x * 100.0)
+                tr!(
+                    "AUTOMIX · mixing “{}” {}",
+                    incoming,
+                    format!("{:.0}%", x * 100.0)
+                )
             }
         }
     }

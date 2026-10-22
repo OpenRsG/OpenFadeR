@@ -92,7 +92,7 @@ impl Ctx {
         let (found, id) = (out.clone(), d.id.clone());
         self.start_then(
             Some(d.id.clone()),
-            "Matching tracks",
+            tr!("Matching tracks"),
             move |ctl| {
                 let lib = device::open_library(&dev)?;
                 let links = link::links(&*lib, &dev.mount, collection)?;
@@ -113,9 +113,11 @@ impl Ctx {
                     record_all(&store, Some(&dev), &done, &dev.label)?;
                 }
                 Ok(if pulled + pushed > 0 {
-                    format!(
-                        "{}: cue sync filled {pulled} track(s) here and {pushed} on the device",
-                        dev.label
+                    tr!(
+                        "{}: cue sync filled {} track(s) here and {} on the device",
+                        dev.label,
+                        pulled,
+                        pushed
                     )
                 } else {
                     String::new()
@@ -215,11 +217,11 @@ impl Ctx {
             return;
         };
         let (o, store, n) = (self.options(Some(&d)), self.store.clone(), tracks.len());
-        self.start(Some(id), "Writing cues", move |ctl| {
+        self.start(Some(id), tr!("Writing cues"), move |ctl| {
             let done =
                 device::export::export(&writers, &d.mount, &Snapshot::of_tracks(tracks), &o, &ctl)?;
             record_all(&store, Some(&d), &done, &d.label)?;
-            Ok(format!("cues of {n} track(s) written to {}", d.label))
+            Ok(tr!("cues of {} track(s) written to {}", n, d.label))
         });
     }
 }

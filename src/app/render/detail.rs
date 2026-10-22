@@ -47,12 +47,12 @@ pub fn beat_count_text(
     match mode {
         BeatCount::Position => {
             let n = between(f64::NEG_INFINITY, pos_ms);
-            Some(format!("{}.{}BARS", n / 4, n % 4))
+            Some(tr!("{}.{}BARS", n / 4, n % 4))
         }
         BeatCount::NextBars => next()
             .map(|t| between(pos_ms, t as f64 - 1.0))
-            .map(|n| format!("{}.{}BARS", n / 4, n % 4)),
-        BeatCount::NextBeats => next().map(|t| format!("{}BEATS", between(pos_ms, t as f64 - 1.0))),
+            .map(|n| tr!("{}.{}BARS", n / 4, n % 4)),
+        BeatCount::NextBeats => next().map(|t| tr!("{}BEATS", between(pos_ms, t as f64 - 1.0))),
     }
 }
 

@@ -12,7 +12,7 @@ pub const RANGES: [(f64, &str); 4] = [
     (0.06, "±6%"),
     (0.10, "±10%"),
     (0.16, "±16%"),
-    (1.00, "WIDE"),
+    (1.00, n_!("WIDE")),
 ];
 
 /// Detail window limits in ms.
@@ -121,7 +121,7 @@ impl Deck {
     fn needle_free(&self) -> bool {
         let locked = prefs::with(|p| p.controller.needle_lock) && self.playing();
         if locked {
-            self.say("needle lock: no needle search while playing");
+            self.say(tr!("needle lock: no needle search while playing"));
         }
         !locked
     }
@@ -163,7 +163,7 @@ impl Deck {
             let pos = self.view.borrow().tempo;
             self.tempo(pos);
         }
-        self.show(|v| v.tempo_range = RANGES[next].1.into());
+        self.show(|v| v.tempo_range = crate::app::i18n::tr_dyn(RANGES[next].1).into());
     }
 
     /// Detail waveform dragged / jog touched: the platter scratches (`Player::scratch_*`). Sync holds
@@ -252,7 +252,7 @@ impl Deck {
                     self.apply_loop(l, Some(lp));
                     self.with_player(|p| p.seek(at));
                 }
-                None => self.say("loop cannot move that far"),
+                None => self.say(tr!("loop cannot move that far")),
             }
             return;
         }
@@ -262,7 +262,7 @@ impl Deck {
             Some(ms) => {
                 self.with_player(|p| p.seek(ms));
             }
-            None => self.say("beat jump needs a beat grid"),
+            None => self.say(tr!("beat jump needs a beat grid")),
         }
     }
 }

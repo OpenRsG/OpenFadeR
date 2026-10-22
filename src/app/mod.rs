@@ -56,15 +56,8 @@ fn gain(v: f32) -> f32 {
     v * 2.0
 }
 
-/// The "s" of "{n} track{}": empty for exactly one.
-fn plural(n: usize) -> &'static str {
-    if n == 1 {
-        ""
-    } else {
-        "s"
-    }
-}
-
+#[macro_use]
+pub mod i18n;
 mod about;
 mod analyze;
 mod automix;
@@ -134,6 +127,15 @@ pub fn run(
     let _ = slint::set_xdg_app_id("openfader");
     about::wire(&app);
     let _prefs = prefs::wire(&app); // before everything that reads the settings
+    // the UI language before the texts the views below write
+    let lang = prefs::with(|p| p.view.language);
+    i18n::apply(prefs::Choice::name(lang));
+    let shown = std::cell::Cell::new(lang);
+    prefs::on_change(move |p| {
+        if p.view.language != shown.replace(p.view.language) {
+            i18n::apply(prefs::Choice::name(p.view.language));
+        }
+    });
     stems_model::wire(&app);
     let _skin = skin::wire(&app); // PREFS > THEMES and the skin folder watcher; the guard holds the watcher's timer
     catalog::wire(&app); // GET PLUGINS / THEMES / MAPPINGS; before the controller session, which asks it about a controller with no mapping

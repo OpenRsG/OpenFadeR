@@ -148,10 +148,10 @@ impl Automix {
         };
         let say = |t: &str| app.global::<BrowserState>().set_status(t.into());
         if queue.is_empty() {
-            return say("AUTOMIX: the list is empty");
+            return say(tr!("AUTOMIX: the list is empty"));
         }
         if self.decks.iter().any(|d| d.with_player(|_| ()).is_none()) {
-            return say("AUTOMIX: no audio output");
+            return say(tr!("AUTOMIX: no audio output"));
         }
         let (view, master) = (
             app.global::<DeckState>().get_decks(),
@@ -181,7 +181,7 @@ impl Automix {
         self.timer.restart();
         let s = app.global::<AutomixState>();
         s.set_running(true);
-        s.set_status(format!("AUTOMIX · {n} tracks").into());
+        s.set_status(tr!("AUTOMIX · {} tracks", n).into());
     }
 
     /// Stops the driver and hands the mixer back; the decks keep playing. `why` goes to the browser status line.
@@ -214,7 +214,7 @@ impl Automix {
             Stage::OnAir { cur: Some(_) } if run.next < run.queue.len() => run.asap = true,
             _ => app
                 .global::<BrowserState>()
-                .set_status("AUTOMIX: no next track to skip to".into()),
+                .set_status(tr!("AUTOMIX: no next track to skip to").into()),
         }
     }
 }

@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 default = ["app"]
-app = ["stems", "dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend"]
+app = ["stems", "dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend", "dep:sys-locale"]
 stems = ["dep:ort"]
 
 [[bin]]
@@ -31,6 +31,7 @@ libloading = "0.8" # Beat FX plugin libraries (src/plugin/effect.rs)
 openfader-plugin = { path = "sdk", features = ["library"] } # the plugin ABIs (effects, track libraries) and the shared library types: one definition for host and plugins
 mlua = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"] } # Lua plugins, run in-process (src/plugin/lua.rs)
 openfader-ui = { path = "ui", optional = true } # the Slint UI, built as its own crate
+sys-locale = { version = "0.3", optional = true } # the system's language for PREFS > VIEW > LANGUAGE = SYSTEM (src/app/i18n.rs); already in the tree through Slint
 
 # Linux only: the mixer of the card we open (src/audio/device/mixer.rs, already in the tree through cpal), and drag-and-drop of
 # files onto the window under Wayland, where winit 0.30 has none (src/app/drop/wayland.rs): a data device on winit's own connection.

@@ -122,14 +122,14 @@ impl Editor {
                 .map_or_else(String::new, keys::name)
         };
         match (&self.pending, &self.selected) {
-            (Some((b, victims)), _) => format!(
+            (Some((b, victims)), _) => tr!(
                 "{} is already used by {}. REPLACE (Enter) takes it from there, CANCEL (Esc) keeps things as they are.",
                 keys::label(b),
                 victims.iter().map(what).collect::<Vec<_>>().join(", ")
             ),
             (None, Some(_)) if !self.note.is_empty() => self.note.clone(),
-            (None, Some(id)) => format!("Press the new key for “{}”.  Backspace clears it, Esc cancels.", what(id)),
-            _ => "Click an action, then press the key to give it.  Changes apply at once and are saved.".into(),
+            (None, Some(id)) => tr!("Press the new key for “{}”.  Backspace clears it, Esc cancels.", what(id)),
+            _ => tr!("Click an action, then press the key to give it.  Changes apply at once and are saved.").into(),
         }
     }
 }

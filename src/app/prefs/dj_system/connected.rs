@@ -19,21 +19,21 @@ fn has_settings(d: &Device, provider: Option<&str>) -> bool {
 
 /// "CONNECTED DEVICES": a button to the settings of each device that has some.
 pub fn rows(devices: &[Device]) -> Vec<Row> {
-    let mut rows = vec![Row::header("CONNECTED DEVICES")];
+    let mut rows = vec![Row::header(tr!("CONNECTED DEVICES"))];
     let before = rows.len();
     rows.extend(devices.iter().filter(|d| has_settings(d, None)).map(|d| {
         Row::chips(
             &format!("djs.dev.{}", d.id),
             &d.label,
-            &["DEVICE SETTINGS"],
+            &[tr!("DEVICE SETTINGS")],
             usize::MAX,
         )
         .hint(&d.fs)
     }));
     if rows.len() == before {
         rows.push(Row::info(
-            "No device connected",
-            "settings of one device are edited here once it is connected",
+            tr!("No device connected"),
+            tr!("settings of one device are edited here once it is connected"),
         ));
     }
     rows
@@ -54,7 +54,7 @@ pub fn apply(c: &Ctx, provider: &Provider, tab: &Tab, devices: &[Device]) -> Don
         .filter(|d| d.writable() && has_settings(d, Some(provider.name())))
         .collect();
     if targets.is_empty() {
-        return Err("no writable device is connected".into());
+        return Err(tr!("no writable device is connected").into());
     }
     let fields: Vec<_> = all_fields(tab)
         .filter(|f| f.kind != FieldKind::Info)
@@ -63,7 +63,7 @@ pub fn apply(c: &Ctx, provider: &Provider, tab: &Tab, devices: &[Device]) -> Don
         Ctx::new(c.store, &d.id, c.files.clone()).reset(fields.iter().copied())?;
         write(c.store, provider, d)?;
     }
-    Ok(format!("applied to {} device(s)", targets.len()))
+    Ok(tr!("applied to {} device(s)", targets.len()))
 }
 
 /// A device's setting was edited: when its tab has an `auto_key` that is on and the device is connected, it is written at
@@ -116,10 +116,10 @@ pub fn read(c: &Ctx, provider: &Provider, devices: &[Device]) -> Done {
     let d = devices
         .iter()
         .find(|d| d.id == c.scope)
-        .ok_or("the device is not connected")?;
+        .ok_or(tr!("the device is not connected"))?;
     let r = provider.settings_read(&d.mount)?;
     let n = take(c.store, provider, d, &r)?;
-    Ok(format!("{n} setting(s) changed on the player"))
+    Ok(tr!("{} setting(s) changed on the player", n))
 }
 
 /// For the code that sees a device appear: takes over what the player changed since we last wrote its settings; 0 and nothing

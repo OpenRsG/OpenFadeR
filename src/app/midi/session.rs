@@ -36,7 +36,7 @@ pub struct Link {
 
 impl Link {
     fn text(&self) -> String {
-        format!("connected · {} · {}", self.audio, self.dump)
+        tr!("connected · {} · {}", self.audio, self.dump)
     }
 }
 
@@ -131,9 +131,9 @@ impl Midi {
 
         let ports = port::connect(self.filter.as_deref(), super::wire::wake_input);
         state.set_ports(match &ports {
-            Ok(p) if p.names.is_empty() => "no MIDI input ports".into(),
+            Ok(p) if p.names.is_empty() => tr!("no MIDI input ports").into(),
             Ok(p) => p.names.join(", ").into(),
-            Err(e) => format!("MIDI unavailable: {e}").into(),
+            Err(e) => tr!("MIDI unavailable: {}", e).into(),
         });
         let loaded = self.load_mapping(ports.as_ref().map_or(&[][..], |p| &p.names));
         *self.ports.borrow_mut() = ports.ok();
@@ -146,7 +146,7 @@ impl Midi {
         // What the user is told: the old controller left, the new one arrived (the same one again = a port change, not news).
         let changed = before.as_ref().map(|b| &b.controller) != loaded.controller.as_ref();
         if let (Some(b), true) = (&before, changed) {
-            self.notify(format!("{} disconnected", b.controller));
+            self.notify(tr!("{} disconnected", b.controller));
             if b.switched {
                 self.restore_audio(app);
             }
@@ -161,14 +161,14 @@ impl Midi {
         catalog::mapped();
         let mut link = Link {
             controller: name.clone(),
-            audio: "audio unchanged".into(),
-            dump: "no state dump".into(),
+            audio: tr!("audio unchanged").into(),
+            dump: tr!("no state dump").into(),
             switched: false,
         };
         if let (Some(b), false) = (before, changed) {
             (link.audio, link.switched) = (b.audio, b.switched);
         } else {
-            self.notify(format!("{name} connected"));
+            self.notify(tr!("{} connected", name));
             self.leds.borrow_mut().intro();
             self.switch_audio(app, &mut link);
         }
@@ -184,7 +184,7 @@ impl Midi {
         let mut status = Vec::new();
         match mapfile::load(in_names) {
             Ok(Some(m)) => {
-                let mut text = format!(
+                let mut text = tr!(
                     "{}: {} bindings, {} LEDs",
                     m.controller,
                     m.binds.len(),
@@ -199,7 +199,7 @@ impl Midi {
                             Duration::from_millis(m.out_ms.unwrap_or(port::OUT_MS)),
                         ));
                     }
-                    Err(e) => status.push(format!("no LED output: {e}")),
+                    Err(e) => status.push(tr!("no LED output: {}", e)),
                 }
                 eprintln!("midi: {text}");
                 status.extend(m.bad.iter().map(|b| format!("{}: {b}", m.controller)));
@@ -216,11 +216,11 @@ impl Midi {
                 }
             }
             Ok(None) => Loaded {
-                text: "no controller mapping for these ports (mappings/*.xml)".to_owned(),
+                text: tr!("no controller mapping for these ports (mappings/*.xml)").to_owned(),
                 ..Loaded::default()
             },
             Err(e) => Loaded {
-                text: "controller mapping failed".to_owned(),
+                text: tr!("controller mapping failed").to_owned(),
                 status: vec![e],
                 ..Loaded::default()
             },
@@ -230,19 +230,19 @@ impl Midi {
     /// The controller's audio interface becomes the output (PREFS "Use controller audio when connected").
     fn switch_audio(&self, app: &App, link: &mut Link) {
         if !prefs_audio() {
-            link.audio = "audio unchanged (PREFS: controller audio off)".into();
+            link.audio = tr!("audio unchanged (PREFS: controller audio off)").into();
             return;
         }
         match audio::set_output(Some(&link.controller)) {
             Ok(dev) => {
                 eprintln!("midi: audio output: {dev}");
-                (link.audio, link.switched) = (format!("audio: {dev}"), true);
-                self.notify(format!("Audio output: {}", link.controller));
+                (link.audio, link.switched) = (tr!("audio: {}", dev), true);
+                self.notify(tr!("Audio output: {}", link.controller));
             }
             Err(e) => {
                 eprintln!("midi: {}: audio output not switched: {e}", link.controller);
-                link.audio = "audio unchanged (no output device of its own)".into();
-                self.notify("Audio output: unchanged".into());
+                link.audio = tr!("audio unchanged (no output device of its own)").into();
+                self.notify(tr!("Audio output: unchanged").into());
             }
         }
         self.show_headphones(app);
@@ -257,11 +257,11 @@ impl Midi {
         match audio::set_output(None) {
             Ok(dev) => {
                 eprintln!("midi: audio output restored: {dev}");
-                self.notify("Audio output: restored".into());
+                self.notify(tr!("Audio output: restored").into());
             }
             Err(e) => {
                 eprintln!("midi: audio output not restored: {e}");
-                self.notify("Audio output: could not restore".into());
+                self.notify(tr!("Audio output: could not restore").into());
             }
         }
         self.show_headphones(app);
@@ -277,7 +277,7 @@ impl Midi {
             (false, true) => {
                 self.restore_audio(app);
                 (link.audio, link.switched) = (
-                    "audio unchanged (PREFS: controller audio off)".into(),
+                    tr!("audio unchanged (PREFS: controller audio off)").into(),
                     false,
                 );
             }
@@ -293,7 +293,7 @@ impl Midi {
             return;
         };
         let text = match bus.headphones() {
-            audio::Headphones::Device(n) => format!("Headphones: {n}"),
+            audio::Headphones::Device(n) => tr!("Headphones: {}", n),
             audio::Headphones::Failed(why) => why,
             audio::Headphones::Split => String::new(),
         };
@@ -309,7 +309,7 @@ impl Midi {
             return;
         }
         *self.dump_due.borrow_mut() = Some(req);
-        link.dump = "state dump requested".into();
+        link.dump = tr!("state dump requested").into();
     }
 
     /// Sends the pending request and opens the reply window. Runs from the 5 ms input tick and ahead of every light update, so the
@@ -336,9 +336,9 @@ impl Midi {
         }
         self.dump.set(None);
         let note = if w.seen == 0 {
-            "no reply to the state dump: controls sync on their first move".to_owned()
+            tr!("no reply to the state dump: controls sync on their first move").to_owned()
         } else {
-            format!("state dump: {} of {} reports applied", w.applied, w.seen)
+            tr!("state dump: {} of {} reports applied", w.applied, w.seen)
         };
         eprintln!("midi: {note}");
         let (Some(app), Some(link)) = (

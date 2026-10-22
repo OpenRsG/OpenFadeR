@@ -128,7 +128,7 @@ impl Deck {
             Some(Plan::Now(shifted)) => self.run(shifted, Some(pos)),
             Some(Plan::At(ms)) => {
                 self.pending.set(Some((ms, call)));
-                self.say("quantize: jumping on the next beat…");
+                self.say(tr!("quantize: jumping on the next beat…"));
             }
         }
     }

@@ -97,7 +97,7 @@ component PaletteColumn inherits Rectangle {
                     width: Theme.h-ctl;
                     icon: Icon.chevron-down;
                     icon-size: 10px;
-                    tooltip: "Playlist for this palette";
+                    tooltip: @tr("Playlist for this palette");
                     clicked => { BrowserState.palette-menu(root.slot); choose.show(); }
                 }
                 choose := PopupWindow {
@@ -160,7 +160,7 @@ component PaletteColumn inherits Rectangle {
     if root.rows.length == 0: Text {
         y: Theme.h-header;
         height: parent.height - Theme.h-header;
-        text: root.slot == 0 ? "Drop tracks here (Tag List)" : "Drop a playlist or tracks here";
+        text: root.slot == 0 ? @tr("Drop tracks here (Tag List)") : @tr("Drop a playlist or tracks here");
         horizontal-alignment: center;
         vertical-alignment: center;
         color: Theme.text-faint;
@@ -178,8 +178,8 @@ component PaletteColumn inherits Rectangle {
             border-color: Theme.line-strong;
             VerticalLayout {
                 padding: 1px;
-                Item { text: "Load to deck"; activated => { BrowserState.palette-track-load(root.slot, root.menu-row); menu.close(); } }
-                Item { text: "Remove from list"; activated => { BrowserState.palette-track-remove(root.slot, root.menu-row); menu.close(); } }
+                Item { text: @tr("Load to deck"); activated => { BrowserState.palette-track-load(root.slot, root.menu-row); menu.close(); } }
+                Item { text: @tr("Remove from list"); activated => { BrowserState.palette-track-remove(root.slot, root.menu-row); menu.close(); } }
             }
         }
     }

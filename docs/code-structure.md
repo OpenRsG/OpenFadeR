@@ -70,6 +70,12 @@ tests/
 - Format claims are labelled inferred or ours in the doc comment of the child that implements them. The core names no third-party software; only plugins and mapping files may.
 - Repositories: core (`OpenFadeR`), `OpenFadeR-Plugins` (`extension/plugin/`), `OpenFadeR-Map` (`mappings/`), `OpenFadeR-Themes` (`extension/skin/`).
 
+## Translations
+- Every text a user sees is marked: `@tr("…")` in `.slint` files, `tr!` / `tr_n!` in `src/app` (`n_!` in a table, translated where it is shown with `i18n::tr_dyn`). Ids, setting values, compared strings and log output are never marked. See `src/app/i18n.rs`.
+- Placeholders follow Slint: `{}`, `{0}`, `{n}` (the count of a plural). Numbers are formatted before they are passed.
+- After adding or changing a text, run `python3 ui/translations/extract.py`: it updates `ui/translations/openfader-ui.pot` and adds the new texts to each language's `.po` file, where they show in English until translated. The test `every_language_translates_every_text_with_its_placeholders` lists the missing ones.
+- Texts drawn on canvas pixels (`app/render/font.rs`, A–Z only) stay English.
+
 ## Performance contracts
 
 - Delay-line reset invalidates history in constant time. Interpolated reads must treat both unwritten taps as silence; resetting an effect must not clear its full buffer inside the callback.

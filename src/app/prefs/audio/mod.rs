@@ -119,7 +119,7 @@ fn db_gain(db: i32) -> f32 {
 
 fn db_label(db: i32) -> String {
     if db <= -96 {
-        "MUTE".to_owned()
+        tr!("MUTE").to_owned()
     } else {
         format!("{db:+} dB").replace("+0", "0")
     }

@@ -13,10 +13,10 @@ export component TouchTransport inherits Rectangle {
         y: Math.floor(i / root.columns) * (Theme.touch-target + 2px) + 4px;
         width: root.width / root.columns - 8px; height: Theme.touch-target;
         spacing: 4px;
-        Chip { text: ["A", "B", "C", "D"][i] + (DeckState.decks[i].playing ? " Pause" : " Play"); width: 64px; horizontal-stretch: 0; active: DeckState.decks[i].playing; active-color: Theme.play; enabled: DeckState.decks[i].loaded; clicked => { DeckState.play-pause(i); } }
-        Chip { text: "CUE"; width: Theme.touch-target; horizontal-stretch: 0; active: DeckState.decks[i].at-cue; active-color: Theme.cue; enabled: DeckState.decks[i].loaded; pressed => { DeckState.cue(i); } released => { DeckState.cue-released(i); } }
+        Chip { text: ["A", "B", "C", "D"][i] + (DeckState.decks[i].playing ? @tr(" Pause") : @tr(" Play")); width: 64px; horizontal-stretch: 0; active: DeckState.decks[i].playing; active-color: Theme.play; enabled: DeckState.decks[i].loaded; clicked => { DeckState.play-pause(i); } }
+        Chip { text: @tr("CUE"); width: Theme.touch-target; horizontal-stretch: 0; active: DeckState.decks[i].at-cue; active-color: Theme.cue; enabled: DeckState.decks[i].loaded; pressed => { DeckState.cue(i); } released => { DeckState.cue-released(i); } }
         Fader { value: MixerState.channels[i].fader; edited(v) => { MixerState.fader(i, v); } }
-        IconButton { icon: Icon.headphones; tooltip: "Headphone cue deck " + ["A", "B", "C", "D"][i]; active: MixerState.channels[i].cue; clicked => { MixerState.cue-toggled(i); } }
+        IconButton { icon: Icon.headphones; tooltip: @tr("Headphone cue deck {}", ["A", "B", "C", "D"][i]); active: MixerState.channels[i].cue; clicked => { MixerState.cue-toggled(i); } }
     }
     HorizontalLayout {
         x: 8px; y: root.height - Theme.touch-target - 4px;
@@ -24,7 +24,7 @@ export component TouchTransport inherits Rectangle {
         Text { text: "A"; color: Theme.deck1; horizontal-stretch: 0; vertical-alignment: center; }
         Fader { value: MixerState.crossfader; detent: true; edited(v) => { MixerState.crossfader = v; MixerState.crossfade(v); } }
         Text { text: "B"; color: Theme.deck2; horizontal-stretch: 0; vertical-alignment: center; }
-        Chip { text: "Mid"; width: 52px; horizontal-stretch: 0; tooltip: "Center crossfader"; clicked => { MixerState.crossfader = 0.5; MixerState.crossfade(0.5); } }
+        Chip { text: @tr("Mid"); width: 52px; horizontal-stretch: 0; tooltip: @tr("Center crossfader"); clicked => { MixerState.crossfader = 0.5; MixerState.crossfade(0.5); } }
     }
 }
 
@@ -36,12 +36,12 @@ component TouchChannel inherits Rectangle {
     controls := VerticalLayout {
         x: 8px; y: 8px; width: parent.width - 16px; height: self.preferred-height;
         spacing: 8px; alignment: start;
-        Text { text: "Deck " + ["A", "B", "C", "D"][root.index]; color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; }
+        Text { text: @tr("Deck {}", ["A", "B", "C", "D"][root.index]); color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; }
         HorizontalLayout {
             height: 80px; spacing: 8px;
-            for label[p] in ["Trim", "High", "Mid", "Low", "CFX"]: VerticalLayout {
+            for label[p] in [@tr("Trim"), @tr("High"), @tr("Mid"), @tr("Low"), @tr("CFX")]: VerticalLayout {
                 spacing: 4px; alignment: center;
-                Text { height: 20px; text: root.ch.iso && p >= 1 && p <= 3 ? ["", "Inst", "Vocal", "Drums"][p] : label; color: Theme.text; font-size: Theme.font-sm; horizontal-alignment: center; overflow: elide; }
+                Text { height: 20px; text: root.ch.iso && p >= 1 && p <= 3 ? ["", @tr("Inst"), @tr("Vocal"), @tr("Drums")][p] : label; color: Theme.text; font-size: Theme.font-sm; horizontal-alignment: center; overflow: elide; }
                 HorizontalLayout {
                     height: 48px; alignment: center;
                     Knob { width: 48px; height: 48px; horizontal-stretch: 0; value: root.ch.iso && p >= 1 && p <= 3 ? root.ch.iso-knobs[p - 1] : root.ch.knobs[p]; detent: true; stop: p == 4 ? MixerState.cfx-stop : -1; edited(v) => { MixerState.knob(root.index, p, v); } }
@@ -49,10 +49,10 @@ component TouchChannel inherits Rectangle {
             }
         }
         HorizontalLayout {
-            Chip { text: "CUE"; active: root.ch.cue; clicked => { MixerState.cue-toggled(root.index); } }
-            Chip { text: "STEM ISO"; active: root.ch.iso; enabled: DeckState.decks[root.index].stems; clicked => { MixerState.iso-toggled(root.index); } }
+            Chip { text: @tr("CUE"); active: root.ch.cue; clicked => { MixerState.cue-toggled(root.index); } }
+            Chip { text: @tr("STEM ISO"); active: root.ch.iso; enabled: DeckState.decks[root.index].stems; clicked => { MixerState.iso-toggled(root.index); } }
         }
-        Dropdown { options: ["Crossfader A", "Through", "Crossfader B"]; current: root.ch.xf; chose(n) => { if n != root.ch.xf { MixerState.xf-assigned(root.index, n == 1 ? root.ch.xf : n); } } }
+        Dropdown { options: [@tr("Crossfader A"), @tr("Through"), @tr("Crossfader B")]; current: root.ch.xf; chose(n) => { if n != root.ch.xf { MixerState.xf-assigned(root.index, n == 1 ? root.ch.xf : n); } } }
         Fader { height: Theme.touch-target; value: root.ch.fader; edited(v) => { MixerState.fader(root.index, v); } }
         Meter { level: root.ch.level; peak: root.ch.peak; height: 8px; }
     }
@@ -68,12 +68,12 @@ export component TouchMixer inherits Rectangle {
         x: 8px; y: 8px; width: parent.width - 16px; spacing: 8px; alignment: start;
         Dropdown { options: MixerState.cfx-names; current: MixerState.cfx-type; chose(n) => { MixerState.cfx-selected(n); } }
         HorizontalLayout {
-            for i in DeckState.count: Chip { text: "Deck " + ["A", "B", "C", "D"][i]; active: root.channel == i; clicked => { root.channel = i; } }
+            for i in DeckState.count: Chip { text: @tr("Deck {}", ["A", "B", "C", "D"][i]); active: root.channel == i; clicked => { root.channel = i; } }
         }
         TouchChannel { index: min(root.channel, DeckState.count - 1); }
         HorizontalLayout {
             height: 104px; spacing: 8px;
-            for label[p] in ["Master", "Headphone mix", "Headphone level"]: VerticalLayout {
+            for label[p] in [@tr("Master"), @tr("Headphone mix"), @tr("Headphone level")]: VerticalLayout {
                 spacing: 4px; alignment: center;
                 Text { height: 32px; text: label; color: Theme.text; font-size: Theme.font-sm; horizontal-alignment: center; vertical-alignment: center; wrap: word-wrap; }
                 HorizontalLayout {
@@ -84,10 +84,10 @@ export component TouchMixer inherits Rectangle {
             }
         }
         HorizontalLayout {
-            Chip { text: "Split cue"; active: MixerState.bus.split; clicked => { MixerState.split-toggled(); } }
-            Chip { text: MixerState.bus.rec ? "Stop recording" : "Record"; active: MixerState.bus.rec; active-color: Theme.rec; clicked => { MixerState.rec-toggled(); } }
+            Chip { text: @tr("Split cue"); active: MixerState.bus.split; clicked => { MixerState.split-toggled(); } }
+            Chip { text: MixerState.bus.rec ? @tr("Stop recording") : @tr("Record"); active: MixerState.bus.rec; active-color: Theme.rec; clicked => { MixerState.rec-toggled(); } }
         }
-        Chip { text: "Crossfader: " + ["Smooth", "Sharp", "Constant"][MixerState.curve]; clicked => { MixerState.curve-cycled(); } }
+        Chip { text: @tr("Crossfader: {}", [@tr("Smooth"), @tr("Sharp"), @tr("Constant")][MixerState.curve]); clicked => { MixerState.curve-cycled(); } }
         Text { text: MixerState.bus.status; color: Theme.text; font-size: Theme.font-size; wrap: word-wrap; }
     }
 }

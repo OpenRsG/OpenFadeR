@@ -28,7 +28,7 @@ impl State {
         let open = self.open.borrow();
         let (title, pos, sel, len) = match open.as_ref() {
             None => (
-                "no track open".to_string(),
+                tr!("no track open").to_string(),
                 "—".to_string(),
                 String::new(),
                 String::new(),
@@ -39,27 +39,34 @@ impl State {
                 let pos = format!(
                     "{}{}",
                     clock(c, rate),
-                    bar_beat(&o.lines, c)
-                        .map_or(String::new(), |(b, n)| format!("   bar {b} beat {n}"))
+                    bar_beat(&o.lines, c).map_or(String::new(), |(b, n)| format!(
+                        "   {}",
+                        tr!("bar {} beat {}", b, n)
+                    ))
                 );
                 let sel =
                     self.sel()
-                        .map_or("no selection: drag on the waveform".to_string(), |r| {
+                        .map_or(tr!("no selection: drag on the waveform").to_string(), |r| {
                             let beats = o.lines.iter().filter(|l| r.contains(&l.frame)).count();
-                            format!(
-                                "SELECTION {} → {}   {:.2} s   {beats} beats",
+                            tr!(
+                                "SELECTION {} → {}   {} s   {} beats",
                                 clock(r.start, rate),
                                 clock(r.end, rate),
-                                r.len() as f64 / rate as f64
+                                format!("{:.2}", r.len() as f64 / rate as f64),
+                                beats
                             )
                         });
                 let src = o.edit.pcm().samples.len() / 2;
-                let len = format!(
-                    "LENGTH {} (source {}){}   CLIPBOARD {:.2} s",
+                let len = tr!(
+                    "LENGTH {} (source {}){}   CLIPBOARD {} s",
                     clock(o.edit.len(), rate),
                     clock(src, rate),
-                    if o.edit.is_edited() { "   EDITED" } else { "" },
-                    o.edit.clip_len() as f64 / rate as f64,
+                    if o.edit.is_edited() {
+                        format!("   {}", tr!("EDITED"))
+                    } else {
+                        String::new()
+                    },
+                    format!("{:.2}", o.edit.clip_len() as f64 / rate as f64),
                 );
                 let t = &o.track;
                 (

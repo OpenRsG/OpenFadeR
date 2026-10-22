@@ -24,7 +24,7 @@ fn start(app: &App, pending: &RefCell<Option<Pending>>, file: PathBuf, from_ms: 
     *pending.borrow_mut() = Some((audio::decode_async(file), from_ms));
     let state = app.global::<BrowserState>();
     state.set_preview_playing(true);
-    state.set_status("preview: decoding…".into());
+    state.set_status(tr!("preview: decoding…").into());
 }
 
 /// Connects the button and the strips; keep the returned timer alive as long as the window.
@@ -42,7 +42,7 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) -> Timer {
         }
         match v.borrow().selected.as_ref().and_then(|t| t.file.clone()) {
             Some(file) => start(&app, &p, file, 0),
-            None => state.set_status("select a track with a file to preview".into()),
+            None => state.set_status(tr!("select a track with a file to preview").into()),
         }
     });
     let (p, weak, v) = (pending.clone(), app.as_weak(), view.clone());
@@ -58,7 +58,7 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) -> Timer {
             Some(file) => start(&app, &p, file, from_ms),
             None => app
                 .global::<BrowserState>()
-                .set_status("this track has no file to preview".into()),
+                .set_status(tr!("this track has no file to preview").into()),
         }
     });
     let weak = app.as_weak();
@@ -76,11 +76,11 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) -> Timer {
                         b.preview.load(Arc::new(pcm));
                         b.preview.seek_ms(*from_ms);
                         b.preview.play();
-                        state.set_status("previewing on the headphones".into());
+                        state.set_status(tr!("previewing on the headphones").into());
                     }
-                    None => state.set_status("preview: no audio output".into()),
+                    None => state.set_status(tr!("preview: no audio output").into()),
                 },
-                Ok(Err(e)) => state.set_status(format!("preview: {e}").into()),
+                Ok(Err(e)) => state.set_status(tr!("preview: {}", e).into()),
                 Err(TryRecvError::Disconnected) => {}
             }
             *slot = None;

@@ -1,13 +1,11 @@
 //! The sidebar's management bar: name bar, + NEW, rename, delete, DUPLICATE TO MY PLAYLISTS, MORE and ADD TO PLAYLIST.
 
-use super::{is_named, more_rows, playlist_labels, Act, Ask, Panel};
-use crate::app::{
-    browser::{
-        sidebar::{self, Entry},
-        smart::Smart,
-        tagging, App, BrowserState, Home, View,
-    },
-    plural,
+use super::{Act, Ask, Panel, is_named, more_rows, playlist_labels};
+use crate::app::browser::{
+    App, BrowserState, Home, View,
+    sidebar::{self, Entry},
+    smart::Smart,
+    tagging,
 };
 use openfader::{
     library::Track,
@@ -36,7 +34,7 @@ impl View {
             "delete" => self.side_delete(app),
             "renumber" | "sort-title" | "sort-artist" | "sort-genre" | "sort-key" | "sort-bpm"
             | "sort-time" | "sort-rating" | "sort-comment" => self.reorder(app, op),
-            _ => self.say(app, format!("unknown playlist action {op}")),
+            _ => self.say(app, tr!("unknown playlist action {}", op)),
         }
     }
 
@@ -64,14 +62,19 @@ impl View {
                 };
                 let k = kind[which as usize];
                 let prompt = [
-                    "New playlist name:",
-                    "New folder name:",
-                    "New smart playlist name:",
+                    tr!("New playlist name:"),
+                    tr!("New folder name:"),
+                    tr!("New smart playlist name:"),
                 ][which as usize];
                 self.ask(app, Ask::NewNode(parent, k), prompt, String::new());
             }
-            (5..=7, 0) => self.ask(app, Ask::NewCategory, "New tag category:", String::new()),
-            (13 | 14, 0) => self.ask(app, Ask::NewBank, "New Cue Bank:", String::new()),
+            (5..=7, 0) => self.ask(
+                app,
+                Ask::NewCategory,
+                tr!("New tag category:"),
+                String::new(),
+            ),
+            (13 | 14, 0) => self.ask(app, Ask::NewBank, tr!("New Cue Bank:"), String::new()),
             (6 | 7, 1) => {
                 let cat = match &self.entry {
                     Entry::Category(c) => Some(*c),
@@ -79,7 +82,7 @@ impl View {
                     _ => None,
                 };
                 if let Some(c) = cat {
-                    self.ask(app, Ask::NewTag(c), "New tag:", String::new());
+                    self.ask(app, Ask::NewTag(c), tr!("New tag:"), String::new());
                 }
             }
             _ => {}
@@ -96,10 +99,10 @@ impl View {
         if rows.is_empty() {
             return self.say(
                 app,
-                "nothing to do here: it is the only item and has no folder to move into",
+                tr!("nothing to do here: it is the only item and has no folder to move into"),
             );
         }
-        self.show_panel(app, Panel::More(acts), "MORE", rows);
+        self.show_panel(app, Panel::More(acts), tr!("MORE"), rows);
     }
 
     /// A MORE row was chosen.
@@ -124,13 +127,13 @@ impl View {
     pub(super) fn open_new(&mut self, app: &App) {
         let (rows, ids): (Vec<&str>, Vec<Option<i64>>) = match self.side_kind(&self.entry) {
             1..=4 => vec![
-                ("New playlist", 0),
-                ("New folder", 1),
-                ("New smart playlist", 2),
+                (tr!("New playlist"), 0),
+                (tr!("New folder"), 1),
+                (tr!("New smart playlist"), 2),
             ],
-            5 => vec![("New category", 0)],
-            6 | 7 => vec![("New category", 0), ("New tag", 1)],
-            13 | 14 => vec![("New Cue Bank", 0)],
+            5 => vec![(tr!("New category"), 0)],
+            6 | 7 => vec![(tr!("New category"), 0), (tr!("New tag"), 1)],
+            13 | 14 => vec![(tr!("New Cue Bank"), 0)],
             _ => return,
         }
         .into_iter()
@@ -139,7 +142,7 @@ impl View {
         self.show_panel(
             app,
             Panel::New(ids),
-            "NEW",
+            tr!("NEW"),
             rows.into_iter().map(str::to_owned).collect(),
         );
     }
@@ -153,10 +156,10 @@ impl View {
         if matches!(e, Entry::Category(_)) && tagging::is_default(&name) {
             return self.say(
                 app,
-                "the Genre, Components and Situation categories keep their names",
+                tr!("the Genre, Components and Situation categories keep their names"),
             );
         }
-        self.ask(app, Ask::Rename(e), "Rename to:", name);
+        self.ask(app, Ask::Rename(e), tr!("Rename to:"), name);
     }
 
     /// The name bar closed: `ok` = OK / Enter. Does what was asked and shows the result.
@@ -168,7 +171,7 @@ impl View {
         };
         let name = s.get_name_text().trim().to_owned();
         if name.is_empty() {
-            return self.say(app, "a name is needed");
+            return self.say(app, tr!("a name is needed"));
         }
         let st = self.store.clone();
         let new_smart = matches!(ask, Ask::NewNode(_, NodeKind::Smart));
@@ -199,7 +202,7 @@ impl View {
     }
 
     pub(super) fn side_delete(&mut self, app: &App) {
-        if self.protected(app, "delete") {
+        if self.protected(app, tr!("delete")) {
             return;
         }
         let e = self.entry.clone();
@@ -210,24 +213,27 @@ impl View {
         if matches!(e, Entry::Category(_)) && tagging::is_default(&name) {
             return self.say(
                 app,
-                "the Genre, Components and Situation categories cannot be deleted",
+                tr!("the Genre, Components and Situation categories cannot be deleted"),
             );
         }
         if self.confirm.as_ref() != Some(&e) {
             self.confirm = Some(e);
             return self.say(
                 app,
-                format!("press DELETE again to delete “{name}” (the tracks stay in the library)"),
+                tr!(
+                    "press DELETE again to delete “{}” (the tracks stay in the library)",
+                    name
+                ),
             );
         }
-        let (s, label) = (&self.store, "Delete ");
+        let s = &self.store;
         let r = match &e {
-            Entry::User(id) => s.action(&format!("{label}playlist"), || s.delete_node(*id)),
-            Entry::Category(id) => s.action(&format!("{label}tag category"), || {
-                s.delete_mytag_category(*id)
-            }),
-            Entry::Tag(id) => s.action(&format!("{label}tag"), || s.delete_mytag(*id)),
-            Entry::Bank(id) => s.action(&format!("{label}cue bank"), || s.delete_bank(*id)),
+            Entry::User(id) => s.action(tr!("Delete playlist"), || s.delete_node(*id)),
+            Entry::Category(id) => {
+                s.action(tr!("Delete tag category"), || s.delete_mytag_category(*id))
+            }
+            Entry::Tag(id) => s.action(tr!("Delete tag"), || s.delete_mytag(*id)),
+            Entry::Bank(id) => s.action(tr!("Delete cue bank"), || s.delete_bank(*id)),
             _ => return,
         };
         if self.try_store(app, r).is_none() {
@@ -243,7 +249,7 @@ impl View {
         self.tag_filter.retain(|t| live.contains(t));
         self.reload_tag_map(app);
         self.show(app);
-        self.say(app, format!("deleted “{name}”"));
+        self.say(app, tr!("deleted “{}”", name));
     }
 
     /// DUPLICATE TO MY PLAYLISTS: the chosen library playlist (a folder: with everything under it) as new top-level items of My Playlists.
@@ -252,7 +258,7 @@ impl View {
         if openfader::plugin::source::is_plugin(&self.lib_playlists[at].id) {
             return self.say(
                 app,
-                "tracks of a plugin source have no file to copy yet: load them first",
+                tr!("tracks of a plugin source have no file to copy yet: load them first"),
             );
         }
         let mut parents: Vec<Option<i64>> = vec![None];
@@ -281,7 +287,7 @@ impl View {
                     first.get_or_insert(id);
                     lists += usize::from(!p.is_folder);
                 }
-                Err(e) => return self.say(app, format!("duplicate failed: {e}")),
+                Err(e) => return self.say(app, tr!("duplicate failed: {}", e)),
             }
         }
         let Some(first) = first else { return };
@@ -290,23 +296,27 @@ impl View {
         self.show(app);
         self.say(
             app,
-            format!("copied {lists} playlist{} to My Playlists", plural(lists)),
+            tr_n!(
+                "copied {n} playlist to My Playlists",
+                "copied {n} playlists to My Playlists",
+                lists
+            ),
         );
     }
 
     /// ADD TO PLAYLIST pressed.
     pub(super) fn open_add_to(&mut self, app: &App) {
         if self.selected.is_none() {
-            return self.say(app, "select a track to add");
+            return self.say(app, tr!("select a track to add"));
         }
         let (rows, ids) = playlist_labels(&self.nodes);
         if rows.is_empty() {
             return self.say(
                 app,
-                "no playlists yet: choose My Playlists and + NEW > New playlist",
+                tr!("no playlists yet: choose My Playlists and + NEW > New playlist"),
             );
         }
-        self.show_panel(app, Panel::AddTo(ids), "ADD TO PLAYLIST", rows);
+        self.show_panel(app, Panel::AddTo(ids), tr!("ADD TO PLAYLIST"), rows);
     }
 
     /// A row of the ADD TO panel was clicked: the chosen track goes to the end of that playlist.
@@ -323,12 +333,12 @@ impl View {
         let name = self.node(id).map(|n| n.name.clone()).unwrap_or_default();
         let add = || -> Result<String, String> {
             if self.store.entries(id)?.contains(&key) {
-                return Ok(format!("“{}” is already in {name}", t.title));
+                return Ok(tr!("“{}” is already in {}", t.title, name));
             }
             self.store.add_entries(id, std::slice::from_ref(&key))?;
-            Ok(format!("added “{}” to {name}", t.title))
+            Ok(tr!("added “{}” to {}", t.title, name))
         };
-        let msg = add().unwrap_or_else(|e| format!("store: {e}"));
+        let msg = add().unwrap_or_else(|e| tr!("store: {}", e));
         if matches!(self.home, Home::User(h) if h == id) {
             self.load(app);
         }

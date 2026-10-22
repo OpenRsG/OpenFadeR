@@ -81,7 +81,7 @@ export component PickerPanel inherits Rectangle {
         HorizontalLayout {
             spacing: Theme.space-sm;
             Text { text: BrowserState.panel-title; color: Theme.text; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; overflow: elide; }
-            IconButton { icon: Icon.close; tooltip: "Close"; clicked => { BrowserState.panel-close(); } }
+            IconButton { icon: Icon.close; tooltip: @tr("Close"); clicked => { BrowserState.panel-close(); } }
         }
         ListView {
             for item[i] in BrowserState.panel-rows: Rectangle {
@@ -99,19 +99,19 @@ export component SmartEditor inherits Rectangle {
     background: Theme.panel;
     border-width: 1px;
     border-color: Theme.line-strong;
-    property <[string]> kinds: ["BPM", "Key", "Rating ≥", "Genre contains", "Tags", "Date added"];
-    property <[string]> hints-a: ["BPM min", "8A / Am / …", "1-5 stars", "text", "tag name", "from YYYY-MM-DD"];
-    property <[string]> hints-b: ["BPM max", "", "", "", "", "to YYYY-MM-DD"];
+    property <[string]> kinds: ["BPM", @tr("Key"), @tr("Rating ≥"), @tr("Genre contains"), @tr("Tags"), @tr("Date added")];
+    property <[string]> hints-a: [@tr("BPM min"), "8A / Am / …", @tr("1-5 stars"), @tr("text"), @tr("tag name"), @tr("from YYYY-MM-DD")];
+    property <[string]> hints-b: [@tr("BPM max"), "", "", "", "", @tr("to YYYY-MM-DD")];
     VerticalLayout {
         padding: Theme.space-md;
         spacing: Theme.space-sm;
         HorizontalLayout {
             spacing: Theme.space-sm;
-            Text { text: "SMART PLAYLIST: " + BrowserState.editor-title; color: Theme.text; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; overflow: elide; }
-            Chip { text: BrowserState.editor-any ? "MATCH ANY" : "MATCH ALL"; width: 84px; horizontal-stretch: 0; clicked => { BrowserState.editor-any = !BrowserState.editor-any; } }
-            Chip { text: "+ CONDITION"; width: 88px; horizontal-stretch: 0; clicked => { BrowserState.cond-add(); } }
-            Chip { text: "SAVE"; width: 54px; horizontal-stretch: 0; active: true; clicked => { BrowserState.editor-save(); } }
-            Chip { text: "CANCEL"; width: 64px; horizontal-stretch: 0; clicked => { BrowserState.editor-cancel(); } }
+            Text { text: @tr("SMART PLAYLIST: {}", BrowserState.editor-title); color: Theme.text; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; overflow: elide; }
+            Chip { text: BrowserState.editor-any ? @tr("MATCH ANY") : @tr("MATCH ALL"); width: 84px; horizontal-stretch: 0; clicked => { BrowserState.editor-any = !BrowserState.editor-any; } }
+            Chip { text: @tr("+ CONDITION"); width: 88px; horizontal-stretch: 0; clicked => { BrowserState.cond-add(); } }
+            Chip { text: @tr("SAVE"); width: 54px; horizontal-stretch: 0; active: true; clicked => { BrowserState.editor-save(); } }
+            Chip { text: @tr("CANCEL"); width: 64px; horizontal-stretch: 0; clicked => { BrowserState.editor-cancel(); } }
         }
         if BrowserState.editor-error != "": Text { text: BrowserState.editor-error; color: Theme.danger; font-family: Theme.font; font-size: Theme.font-size; overflow: elide; vertical-stretch: 0; }
         ListView {
@@ -122,7 +122,7 @@ export component SmartEditor inherits Rectangle {
                 Chip { text: kinds[kind]; width: 110px; horizontal-stretch: 0; clicked => { BrowserState.cond-kind(i); } }
                 TextField { placeholder-text: hints-a[kind]; text: BrowserState.cond-a[i]; edited(t) => { BrowserState.cond-edit(i, 0, t); } }
                 if kind == 0 || kind == 5: TextField { placeholder-text: hints-b[kind]; text: BrowserState.cond-b[i]; edited(t) => { BrowserState.cond-edit(i, 1, t); } }
-                IconButton { icon: Icon.close; tooltip: "Remove condition"; clicked => { BrowserState.cond-remove(i); } }
+                IconButton { icon: Icon.close; tooltip: @tr("Remove condition"); clicked => { BrowserState.cond-remove(i); } }
             }
         }
     }

@@ -55,7 +55,7 @@ impl Midi {
         state.set_last(
             match saved {
                 Ok(()) => format!("{} → {}", describe(key), Outcome::Done(act, deck)),
-                Err(e) => format!("bound, but midi.map not saved: {e}"),
+                Err(e) => tr!("bound, but midi.map not saved: {}", e),
             }
             .into(),
         );

@@ -65,13 +65,13 @@ export component DeckCompact inherits Rectangle {
                         edited(p) => { DeckState.tempo(root.index, p); }
                     }
                     Text { text: root.v.tempo-text; color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; horizontal-alignment: right; width: 46px; }
-                    Chip { text: root.v.tempo-range; width: 44px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: "Tempo range"; clicked => { DeckState.tempo-range(root.index); } }
+                    Chip { text: root.v.tempo-range; width: 44px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: @tr("Tempo range"); clicked => { DeckState.tempo-range(root.index); } }
                 }
                 HorizontalLayout {
                     height: 18px;
                     spacing: 2px;
-                    Chip { text: "SYNC"; width: 44px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.synced; active-color: Theme.sync; clicked => { DeckState.sync(root.index); } }
-                    Chip { text: "MASTER"; width: 50px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.master; active-color: Theme.master; clicked => { DeckState.master-toggle(root.index); } }
+                    Chip { text: @tr("SYNC"); width: 44px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.synced; active-color: Theme.sync; clicked => { DeckState.sync(root.index); } }
+                    Chip { text: @tr("MASTER"); width: 50px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.master; active-color: Theme.master; clicked => { DeckState.master-toggle(root.index); } }
                     if root.v.sync-rate != "": Text { text: root.v.sync-rate; width: 22px; horizontal-stretch: 0; color: Theme.accent-hi; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
                     Text {
                         text: (!root.v.stem-buttons && root.v.stem-text != "" ? root.v.stem-text + " · " : "") + (root.v.title != "" ? root.v.key-shift : root.v.status);

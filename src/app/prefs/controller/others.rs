@@ -4,38 +4,38 @@ use super::{Controller, Row};
 
 pub(super) fn rows(c: &Controller) -> Vec<Row> {
     vec![
-        Row::header("OTHERS (needs Q on)"),
+        Row::header(tr!("OTHERS (needs Q on)")),
         Row::chips(
             "quantize_mode",
-            "MODE",
-            &["IMMEDIATE", "NEXT BEAT"],
+            tr!("MODE"),
+            &[tr!("IMMEDIATE"), tr!("NEXT BEAT")],
             c.quantize_mode as usize,
         )
-        .hint("hot cue / loop"),
-        Row::of("snap_length", "SNAP", c.snap_length).hint("beats"),
-        Row::of("quantize_length", "QUANTIZE", c.quantize_length).hint("beats"),
-        Row::check("quantize_hot_cue", "QUANTIZE: HOT CUE", c.quantize_hot_cue),
+        .hint(tr!("hot cue / loop")),
+        Row::of("snap_length", tr!("SNAP"), c.snap_length).hint(tr!("beats")),
+        Row::of("quantize_length", tr!("QUANTIZE"), c.quantize_length).hint(tr!("beats")),
+        Row::check("quantize_hot_cue", tr!("QUANTIZE: HOT CUE"), c.quantize_hot_cue),
         Row::check(
             "quantize_loop",
-            "QUANTIZE: LOOP/SAMPLER(LOOP)",
+            tr!("QUANTIZE: LOOP/SAMPLER(LOOP)"),
             c.quantize_loop,
         ),
-        Row::check("quantize_reverse", "QUANTIZE: REVERSE", c.quantize_reverse),
+        Row::check("quantize_reverse", tr!("QUANTIZE: REVERSE"), c.quantize_reverse),
         Row::check(
             "quantize_sequencer",
-            "QUANTIZE: SEQUENCER",
+            tr!("QUANTIZE: SEQUENCER"),
             c.quantize_sequencer,
         ),
         Row::check(
             "quantize_all_decks",
-            "Q switches all decks at once",
+            tr!("Q switches all decks at once"),
             c.quantize_all_decks,
         ),
-        Row::header("MIDI CLOCK OUT"),
-        Row::text("midi_clock_port", "OUTPUT PORT", &c.midi_clock_port),
+        Row::header(tr!("MIDI CLOCK OUT")),
+        Row::text("midi_clock_port", tr!("OUTPUT PORT"), &c.midi_clock_port),
         Row::info(
             "",
-            "part of the port name; empty = off. 24 PPQN at the playing master deck's tempo and beat, START on its next bar",
+            tr!("part of the port name; empty = off. 24 PPQN at the playing master deck's tempo and beat, START on its next bar"),
         ),
     ]
 }

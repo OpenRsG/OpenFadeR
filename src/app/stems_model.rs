@@ -22,7 +22,7 @@ pub fn start(app: &App) {
     let s = app.global::<StemsModelState>();
     s.set_failed(false);
     s.set_progress(0.0);
-    s.set_text(format!("0 of {} MB", model::SIZE / MB).into());
+    s.set_text(tr!("0 of {} MB", model::SIZE / MB).into());
     s.set_shown(true);
     let weak = app.as_weak();
     POLL.with(|t| {
@@ -32,7 +32,7 @@ pub fn start(app: &App) {
             };
             let s = app.global::<StemsModelState>();
             s.set_progress(got as f32 / model::SIZE as f32);
-            s.set_text(format!("{} of {} MB", got / MB, model::SIZE / MB).into());
+            s.set_text(tr!("{} of {} MB", got / MB, model::SIZE / MB).into());
         })
     });
     let weak = app.as_weak();
@@ -45,7 +45,7 @@ pub fn start(app: &App) {
             match r {
                 Ok(()) => {
                     s.set_shown(false);
-                    toast::show(&app, "STEMS model ready");
+                    toast::show(&app, tr!("STEMS model ready"));
                 }
                 Err(e) => {
                     s.set_failed(true);

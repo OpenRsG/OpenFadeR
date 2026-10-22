@@ -9,7 +9,7 @@
 
 use super::super::View;
 use super::{Conditions, Item, Links, Mode, max_list, rank};
-use crate::app::{App, BrowserState, DeckState, deck, plural, prefs};
+use crate::app::{App, BrowserState, DeckState, deck, prefs};
 use openfader::{
     analysis::similar::{Profile, Theirs, index},
     library::Track,
@@ -86,18 +86,18 @@ impl Default for State {
 
 fn mode_name(m: Mode) -> &'static str {
     match m {
-        Mode::Radar => "Collection Radar",
-        Mode::Era => "Era",
-        Mode::Mood => "Mood",
-        Mode::Association => "Association",
+        Mode::Radar => tr!("Collection Radar"),
+        Mode::Era => tr!("Era"),
+        Mode::Mood => tr!("Mood"),
+        Mode::Association => tr!("Association"),
     }
 }
 
 /// What the mode could not judge a track for.
 fn lacks(m: Mode) -> &'static str {
     match m {
-        Mode::Era => "a year tag",
-        _ => "analysis data",
+        Mode::Era => tr!("a year tag"),
+        _ => tr!("analysis data"),
     }
 }
 
@@ -173,7 +173,7 @@ impl View {
     /// Pushes the tab's state to the Slint globals.
     fn publish_suggest(&self, app: &App) {
         let s = app.global::<BrowserState>();
-        let anchors: Vec<SharedString> = ["LIST".to_owned(), "MASTER".to_owned()]
+        let anchors: Vec<SharedString> = [tr!("LIST").to_owned(), tr!("MASTER").to_owned()]
             .into_iter()
             .chain((1..=deck::active()).map(|n| n.to_string()))
             .map(Into::into)
@@ -207,9 +207,11 @@ impl View {
             self.list = Rc::default();
             self.suggest.seen = (String::new(), version);
             self.suggest.status = match self.suggest.anchor {
-                Anchor::List => "Track Suggestion: click a track, then press LIST".to_owned(),
-                _ => "Track Suggestion: load a track on a deck, or click a track and press LIST"
-                    .to_owned(),
+                Anchor::List => tr!("Track Suggestion: click a track, then press LIST").to_owned(),
+                _ => {
+                    tr!("Track Suggestion: load a track on a deck, or click a track and press LIST")
+                        .to_owned()
+                }
             };
             return;
         };
@@ -252,23 +254,23 @@ impl View {
         };
         let (done, total) = ix.progress();
         let mut status = match out.blocked {
-            Some(why) => format!("{} for “{}”: {why}", mode_name(mode), anchor.title),
-            None => format!(
-                "{} track{} suggested for “{}” by {}",
+            Some(why) => tr!("{} for “{}”: {}", mode_name(mode), anchor.title, why),
+            None => tr_n!(
+                "{n} track suggested for “{}” by {}",
+                "{n} tracks suggested for “{}” by {}",
                 out.picks.len(),
-                plural(out.picks.len()),
                 anchor.title,
                 mode_name(mode)
             ),
         };
         if out.picks.is_empty() && out.blocked.is_none() && mode == Mode::Association {
-            status += " · no shared label, composer, artist, album or playlist";
+            status += tr!(" · no shared label, composer, artist, album or playlist");
         }
         if out.no_data > 0 {
-            status += &format!(" · {} without {}", out.no_data, lacks(mode));
+            status += &tr!(" · {} without {}", out.no_data, lacks(mode));
         }
         if ix.pending() > 0 {
-            status += &format!(" · reading {done}/{total}");
+            status += &tr!(" · reading {}/{}", done, total);
         }
         self.suggest.status = status;
         self.suggest.notes = out.picks.iter().map(|p| p.note.clone()).collect();

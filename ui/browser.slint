@@ -141,16 +141,16 @@ export component Browser inherits Rectangle {
                 padding: 2px;
                 spacing: 2px;
                 alignment: start;
-                IconButton { icon: Icon.list; icon-size: 16px; tooltip: "All tracks"; active: tree.current-item == 0 && !BrowserState.related; clicked => { root.show-list(0); } }
-                IconButton { icon: Icon.tag; icon-size: 16px; tooltip: "Tag List"; active: BrowserState.tag-view && !BrowserState.related; clicked => { root.show-list(BrowserState.tag-row); } }
-                IconButton { icon: Icon.loop; icon-size: 16px; tooltip: "Session history"; active: tree.current-item == 2 && !BrowserState.related; clicked => { root.show-list(2); } }
-                IconButton { icon: Icon.grid; icon-size: 16px; tooltip: "Duplicate tracks"; active: tree.current-item == 3 && !BrowserState.related; clicked => { root.show-list(3); } }
-                if BrowserState.related-enabled: IconButton { icon: Icon.link; icon-size: 16px; tooltip: "Related tracks"; active: BrowserState.related; clicked => { BrowserState.related-toggled(!BrowserState.related); } }
+                IconButton { icon: Icon.list; icon-size: 16px; tooltip: @tr("All tracks"); active: tree.current-item == 0 && !BrowserState.related; clicked => { root.show-list(0); } }
+                IconButton { icon: Icon.tag; icon-size: 16px; tooltip: @tr("Tag List"); active: BrowserState.tag-view && !BrowserState.related; clicked => { root.show-list(BrowserState.tag-row); } }
+                IconButton { icon: Icon.loop; icon-size: 16px; tooltip: @tr("Session history"); active: tree.current-item == 2 && !BrowserState.related; clicked => { root.show-list(2); } }
+                IconButton { icon: Icon.grid; icon-size: 16px; tooltip: @tr("Duplicate tracks"); active: tree.current-item == 3 && !BrowserState.related; clicked => { root.show-list(3); } }
+                if BrowserState.related-enabled: IconButton { icon: Icon.link; icon-size: 16px; tooltip: @tr("Related tracks"); active: BrowserState.related; clicked => { BrowserState.related-toggled(!BrowserState.related); } }
                 if DeviceState.devices.length > 0: Rectangle { height: 1px; background: Theme.line-strong; }
                 for d[i] in DeviceState.devices: IconButton {
                     icon: Icon.usb;
                     icon-size: 16px;
-                    tooltip: d.name + " (" + d.library + "): open its device window";
+                    tooltip: @tr("{} ({}): open its device window", d.name, d.library);
                     active: DeviceState.visible && DeviceState.current == i;
                     clicked => {
                         DeviceState.tab = 0;
@@ -182,10 +182,10 @@ export component Browser inherits Rectangle {
                 spacing: Theme.gap;
                 vertical-stretch: 0;
                 property <bool> editable: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || (BrowserState.side-kind >= 6 && BrowserState.side-kind <= 7) || BrowserState.side-kind == 14;
-                Chip { text: "NEW"; font-size: Theme.font-xs; tooltip: "New playlist / folder / smart playlist / Tags / Cue Bank"; enabled: (BrowserState.side-kind >= 1 && BrowserState.side-kind <= 7) || BrowserState.side-kind >= 13; clicked => { BrowserState.panel-request(3); } }
-                Chip { text: "RENAME"; font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-rename(); } }
-                Chip { text: "DELETE"; font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-delete(); } }
-                Chip { text: "MORE"; font-size: Theme.font-xs; tooltip: "Edit smart playlist, move; Cue Bank: add cues, load onto a deck"; enabled: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || BrowserState.side-kind == 14; clicked => { BrowserState.panel-request(4); } }
+                Chip { text: @tr("NEW"); font-size: Theme.font-xs; tooltip: @tr("New playlist / folder / smart playlist / Tags / Cue Bank"); enabled: (BrowserState.side-kind >= 1 && BrowserState.side-kind <= 7) || BrowserState.side-kind >= 13; clicked => { BrowserState.panel-request(3); } }
+                Chip { text: @tr("RENAME"); font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-rename(); } }
+                Chip { text: @tr("DELETE"); font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-delete(); } }
+                Chip { text: @tr("MORE"); font-size: Theme.font-xs; tooltip: @tr("Edit smart playlist, move; Cue Bank: add cues, load onto a deck"); enabled: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || BrowserState.side-kind == 14; clicked => { BrowserState.panel-request(4); } }
             }
             // Shrinks (clipped) with the browser instead of forcing it taller than the window allows.
             if !root.dock && !root.touch: TrackInfo { min-height: 0px; preferred-height: root.info-h; max-height: root.info-h; clip: true; vertical-stretch: 0; }
@@ -208,18 +208,18 @@ export component Browser inherits Rectangle {
                     width: parent.content-width; height: parent.height;
                     padding-right: Theme.space-md;
                     spacing: Theme.space-sm;
-                    Tab { text: "TRACKS"; active: (root.area == 2 || root.area == 0) && !BrowserState.suggest; clicked => { root.show-list(root.list-row); } }
-                    Tab { text: "TAG LIST"; active: root.area == 1; clicked => { root.show-list(BrowserState.tag-row); } }
-                    if BrowserState.related-enabled: Tab { text: "RELATED"; active: root.area == 3; clicked => { BrowserState.related-toggled(true); } }
-                    if BrowserState.suggest-enabled: Tab { text: "SUGGEST"; active: BrowserState.suggest; clicked => { BrowserState.suggest-toggled(!BrowserState.suggest); } }
+                    Tab { text: @tr("TRACKS"); active: (root.area == 2 || root.area == 0) && !BrowserState.suggest; clicked => { root.show-list(root.list-row); } }
+                    Tab { text: @tr("TAG LIST"); active: root.area == 1; clicked => { root.show-list(BrowserState.tag-row); } }
+                    if BrowserState.related-enabled: Tab { text: @tr("RELATED"); active: root.area == 3; clicked => { BrowserState.related-toggled(true); } }
+                    if BrowserState.suggest-enabled: Tab { text: @tr("SUGGEST"); active: BrowserState.suggest; clicked => { BrowserState.suggest-toggled(!BrowserState.suggest); } }
                     Rectangle { }
-                    Chip { text: "AUTOMIX"; width: 66px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: AutomixState.running; clicked => { AutomixState.toggled(); } }
+                    Chip { text: @tr("AUTOMIX"); width: 66px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: AutomixState.running; clicked => { AutomixState.toggled(); } }
                     Chip {
-                        text: AutomixState.bars + " BARS"; width: 58px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0;
+                        text: @tr("{} BARS", AutomixState.bars); width: 58px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0;
                         clicked => { AutomixState.bars = AutomixState.bars == 8 ? 16 : (AutomixState.bars == 16 ? 32 : 8); }
                     }
-                    Chip { text: "SKIP"; width: 44px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; enabled: AutomixState.running; clicked => { AutomixState.skip(); } }
-                    Chip { text: "EXPORT"; width: 64px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; clicked => { BrowserState.export-collection(); } }
+                    Chip { text: @tr("SKIP"); width: 44px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; enabled: AutomixState.running; clicked => { AutomixState.skip(); } }
+                    Chip { text: @tr("EXPORT"); width: 64px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; clicked => { BrowserState.export-collection(); } }
                 }
                 }
             }
@@ -239,13 +239,13 @@ export component Browser inherits Rectangle {
                         font-family: Theme.font;
                         font-size: Theme.font-size;
                     }
-                    Chip { text: "FILTER"; width: 54px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: root.filter-open; clicked => { root.filter-open = !root.filter-open; } }
+                    Chip { text: @tr("FILTER"); width: 54px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: root.filter-open; clicked => { root.filter-open = !root.filter-open; } }
                     search := TextField {
                         width: 200px;
                         y: (parent.height - self.height) / 2;
                         horizontal-stretch: 0;
                         icon: Icon.search;
-                        placeholder-text: BrowserState.remote-search ? "Search online (Enter)" : "Search tracks (Ctrl+F)";
+                        placeholder-text: BrowserState.remote-search ? @tr("Search online (Enter)") : @tr("Search tracks (Ctrl+F)");
                         edited(text) => { BrowserState.search-edited(text); }
                         accepted(text) => { BrowserState.search-accepted(text); table.focus(); }
                     }
@@ -264,18 +264,18 @@ export component Browser inherits Rectangle {
                     padding-bottom: Theme.space-sm;
                     spacing: Theme.space-sm;
                     Text { text: "BPM"; color: Theme.text-dim; vertical-alignment: center; horizontal-stretch: 0; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
-                    TextField { width: 56px; horizontal-stretch: 0; placeholder-text: "min"; input-type: decimal; text <=> BrowserState.bpm-min; edited(t) => { BrowserState.filter-changed(); } }
-                    Text { text: "–"; color: Theme.text-dim; vertical-alignment: center; horizontal-stretch: 0; }
-                    TextField { width: 56px; horizontal-stretch: 0; placeholder-text: "max"; input-type: decimal; text <=> BrowserState.bpm-max; edited(t) => { BrowserState.filter-changed(); } }
-                    Chip { text: "±6% MASTER"; width: 84px; horizontal-stretch: 0; active: BrowserState.bpm-around; clicked => { BrowserState.bpm-around = !BrowserState.bpm-around; BrowserState.filter-changed(); } }
-                    Chip { text: "KEY MATCH"; width: 74px; horizontal-stretch: 0; active: BrowserState.key-match; clicked => { BrowserState.key-match = !BrowserState.key-match; BrowserState.filter-changed(); } }
+                    TextField { width: 56px; horizontal-stretch: 0; placeholder-text: @tr("min"); input-type: decimal; text <=> BrowserState.bpm-min; edited(t) => { BrowserState.filter-changed(); } }
+                    Text { text: @tr("–"); color: Theme.text-dim; vertical-alignment: center; horizontal-stretch: 0; }
+                    TextField { width: 56px; horizontal-stretch: 0; placeholder-text: @tr("max"); input-type: decimal; text <=> BrowserState.bpm-max; edited(t) => { BrowserState.filter-changed(); } }
+                    Chip { text: @tr("±6% MASTER"); width: 84px; horizontal-stretch: 0; active: BrowserState.bpm-around; clicked => { BrowserState.bpm-around = !BrowserState.bpm-around; BrowserState.filter-changed(); } }
+                    Chip { text: @tr("KEY MATCH"); width: 74px; horizontal-stretch: 0; active: BrowserState.key-match; clicked => { BrowserState.key-match = !BrowserState.key-match; BrowserState.filter-changed(); } }
                     Chip {
-                        text: BrowserState.min-rating == 0 ? "RATING ≥ any" : "RATING ≥ " + BrowserState.min-rating + "★";
+                        text: BrowserState.min-rating == 0 ? @tr("RATING ≥ any") : @tr("RATING ≥ {}★", BrowserState.min-rating);
                         width: 96px; horizontal-stretch: 0; active: BrowserState.min-rating > 0;
                         clicked => { BrowserState.min-rating = Math.mod(BrowserState.min-rating + 1, 6); BrowserState.filter-changed(); }
                     }
                     Chip {
-                        text: BrowserState.tag-filter-count > 0 ? "TAG FILTER (" + BrowserState.tag-filter-count + ")" : "TAG FILTER";
+                        text: BrowserState.tag-filter-count > 0 ? @tr("TAG FILTER ({})", BrowserState.tag-filter-count) : @tr("TAG FILTER");
                         width: 112px; horizontal-stretch: 0; active: BrowserState.tag-filter-count > 0;
                         clicked => { BrowserState.panel-request(2); }
                     }
@@ -297,8 +297,8 @@ export component Browser inherits Rectangle {
                         accepted => { BrowserState.name-done(true); }
                         init => { self.focus-field(); }
                     }
-                    Chip { text: "OK"; width: 50px; horizontal-stretch: 0; active: true; clicked => { BrowserState.name-done(true); } }
-                    Chip { text: "CANCEL"; width: 64px; horizontal-stretch: 0; clicked => { BrowserState.name-done(false); } }
+                    Chip { text: @tr("OK"); width: 50px; horizontal-stretch: 0; active: true; clicked => { BrowserState.name-done(true); } }
+                    Chip { text: @tr("CANCEL"); width: 64px; horizontal-stretch: 0; clicked => { BrowserState.name-done(false); } }
                 }
             }
             Rectangle {
@@ -345,33 +345,33 @@ export component Browser inherits Rectangle {
                 alignment: start;
                 if root.touch: HorizontalLayout {
                     spacing: 4px;
-                    Dropdown { options: ["Sort: Title", "Sort: Artist", "Sort: Genre", "Sort: Key", "Sort: BPM", "Sort: Time", "Sort: Rating", "Sort: Comment"]; current: root.sorted-col; chose(n) => { root.sort-by(n); } }
-                    Chip { text: root.sorted-asc ? "Ascending" : "Descending"; width: 120px; horizontal-stretch: 0; clicked => { root.sort-by(max(0, root.sorted-col)); } }
+                    Dropdown { options: [@tr("Sort: Title"), @tr("Sort: Artist"), @tr("Sort: Genre"), @tr("Sort: Key"), @tr("Sort: BPM"), @tr("Sort: Time"), @tr("Sort: Rating"), @tr("Sort: Comment")]; current: root.sorted-col; chose(n) => { root.sort-by(n); } }
+                    Chip { text: root.sorted-asc ? @tr("Ascending") : @tr("Descending"); width: 120px; horizontal-stretch: 0; clicked => { root.sort-by(max(0, root.sorted-col)); } }
                 }
-                IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Add to playlist"; active: BrowserState.panel-open && BrowserState.panel-title == "ADD TO PLAYLIST"; clicked => { BrowserState.panel-request(0); } }
-                IconButton { icon: Icon.tag; icon-size: 16px; tooltip: "Tags of the chosen track"; active: BrowserState.panel-open && BrowserState.panel-title == "TAGS OF THE CHOSEN TRACK"; clicked => { BrowserState.panel-request(1); } }
-                IconButton { icon: Icon.check; icon-size: 16px; tooltip: "Add to the Tag List (T)"; clicked => { BrowserState.tag-add(); } }
-                IconButton { icon: BrowserState.preview-playing ? Icon.stop : Icon.headphones; icon-size: 16px; tooltip: "Preview the chosen track on the headphones"; active: BrowserState.preview-playing; clicked => { BrowserState.preview-toggled(); } }
-                if root.touch: Text { text: "Headphone preview: tap the waveform to seek"; color: Theme.text-dim; font-size: Theme.font-sm; wrap: word-wrap; }
+                IconButton { icon: Icon.plus; icon-size: 16px; tooltip: @tr("Add to playlist"); active: BrowserState.panel-open && BrowserState.panel-title == "ADD TO PLAYLIST"; clicked => { BrowserState.panel-request(0); } }
+                IconButton { icon: Icon.tag; icon-size: 16px; tooltip: @tr("Tags of the chosen track"); active: BrowserState.panel-open && BrowserState.panel-title == "TAGS OF THE CHOSEN TRACK"; clicked => { BrowserState.panel-request(1); } }
+                IconButton { icon: Icon.check; icon-size: 16px; tooltip: @tr("Add to the Tag List (T)"); clicked => { BrowserState.tag-add(); } }
+                IconButton { icon: BrowserState.preview-playing ? Icon.stop : Icon.headphones; icon-size: 16px; tooltip: @tr("Preview the chosen track on the headphones"); active: BrowserState.preview-playing; clicked => { BrowserState.preview-toggled(); } }
+                if root.touch: Text { text: @tr("Headphone preview: tap the waveform to seek"); color: Theme.text-dim; font-size: Theme.font-sm; wrap: word-wrap; }
                 if root.touch: Rectangle {
                     height: Theme.touch-target;
                     background: Theme.bg-deep;
                     Image { source: BrowserState.previews[root.preview-row]; width: parent.width; height: parent.height; image-fit: fill; }
                     TouchArea { enabled: root.preview-row >= 0; clicked => { BrowserState.preview-seek(root.preview-row, self.mouse-x / self.width); } }
                 }
-                if BrowserState.palette-enabled: IconButton { icon: Icon.layout-4h; icon-size: 16px; tooltip: "Playlist Palette"; active: BrowserState.palette-open; clicked => { BrowserState.palette-open = !BrowserState.palette-open; } }
-                IconButton { icon: Icon.chevron-up; icon-size: 16px; tooltip: "Move up"; enabled: root.list-edit; clicked => { BrowserState.list-move(-1); } }
-                IconButton { icon: Icon.chevron-down; icon-size: 16px; tooltip: "Move down"; enabled: root.list-edit; clicked => { BrowserState.list-move(1); } }
-                IconButton { icon: Icon.trash; icon-size: 16px; tooltip: "Remove from the list"; enabled: root.list-edit; clicked => { BrowserState.list-remove(); } }
-                if BrowserState.side-kind == 8 || BrowserState.side-kind == 9: IconButton { icon: Icon.folder; icon-size: 16px; tooltip: "Duplicate to My Playlists"; clicked => { BrowserState.side-copy(); } }
-                if BrowserState.side-kind == 3 || BrowserState.side-kind == 8: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: "Export to a device"; clicked => { LibraryState.action("playlist-export-device"); } }
-                if BrowserState.side-kind == 11: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Import to Collection"; clicked => { LibraryState.action("source-import"); } }
-                if BrowserState.side-kind == 11: IconButton { icon: Icon.link; icon-size: 16px; tooltip: "Connect: keep this library synced into the Collection"; clicked => { LibraryState.action("source-connect"); } }
-                if BrowserState.side-kind == 12: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Import to Collection as a playlist"; clicked => { DeviceState.import-playlist(BrowserState.source-device, BrowserState.source-list); } }
-                if BrowserState.side-kind == 12 && BrowserState.source-history: IconButton { icon: Icon.check; icon-size: 16px; tooltip: "Import into the play history"; clicked => { DeviceState.import-history(BrowserState.source-device, BrowserState.source-list); } }
-                if BrowserState.side-kind == 12: IconButton { icon: Icon.trash; icon-size: 16px; tooltip: "Delete from the device"; clicked => { DeviceState.delete-playlist(BrowserState.source-device, BrowserState.source-list); } }
-                if BrowserState.history-view: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: "Save as M3U8"; clicked => { BrowserState.history-save(); } }
-                if !root.detached: IconButton { icon: Icon.expand; icon-size: 16px; tooltip: "Browse view (W)"; active: BrowserState.browse-max; clicked => { BrowserState.browse-max = !BrowserState.browse-max; } }
+                if BrowserState.palette-enabled: IconButton { icon: Icon.layout-4h; icon-size: 16px; tooltip: @tr("Playlist Palette"); active: BrowserState.palette-open; clicked => { BrowserState.palette-open = !BrowserState.palette-open; } }
+                IconButton { icon: Icon.chevron-up; icon-size: 16px; tooltip: @tr("Move up"); enabled: root.list-edit; clicked => { BrowserState.list-move(-1); } }
+                IconButton { icon: Icon.chevron-down; icon-size: 16px; tooltip: @tr("Move down"); enabled: root.list-edit; clicked => { BrowserState.list-move(1); } }
+                IconButton { icon: Icon.trash; icon-size: 16px; tooltip: @tr("Remove from the list"); enabled: root.list-edit; clicked => { BrowserState.list-remove(); } }
+                if BrowserState.side-kind == 8 || BrowserState.side-kind == 9: IconButton { icon: Icon.folder; icon-size: 16px; tooltip: @tr("Duplicate to My Playlists"); clicked => { BrowserState.side-copy(); } }
+                if BrowserState.side-kind == 3 || BrowserState.side-kind == 8: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: @tr("Export to a device"); clicked => { LibraryState.action("playlist-export-device"); } }
+                if BrowserState.side-kind == 11: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: @tr("Import to Collection"); clicked => { LibraryState.action("source-import"); } }
+                if BrowserState.side-kind == 11: IconButton { icon: Icon.link; icon-size: 16px; tooltip: @tr("Connect: keep this library synced into the Collection"); clicked => { LibraryState.action("source-connect"); } }
+                if BrowserState.side-kind == 12: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: @tr("Import to Collection as a playlist"); clicked => { DeviceState.import-playlist(BrowserState.source-device, BrowserState.source-list); } }
+                if BrowserState.side-kind == 12 && BrowserState.source-history: IconButton { icon: Icon.check; icon-size: 16px; tooltip: @tr("Import into the play history"); clicked => { DeviceState.import-history(BrowserState.source-device, BrowserState.source-list); } }
+                if BrowserState.side-kind == 12: IconButton { icon: Icon.trash; icon-size: 16px; tooltip: @tr("Delete from the device"); clicked => { DeviceState.delete-playlist(BrowserState.source-device, BrowserState.source-list); } }
+                if BrowserState.history-view: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: @tr("Save as M3U8"); clicked => { BrowserState.history-save(); } }
+                if !root.detached: IconButton { icon: Icon.expand; icon-size: 16px; tooltip: @tr("Browse view (W)"); active: BrowserState.browse-max; clicked => { BrowserState.browse-max = !BrowserState.browse-max; } }
             }
             }
         }
@@ -414,14 +414,14 @@ export component Browser inherits Rectangle {
     if root.touch: HorizontalLayout {
         x: 4px; y: 0; width: root.width - 8px; height: Theme.touch-target; spacing: 4px;
         Dropdown {
-            options: ["Tracks", "Sources", "Info", "Actions"];
+            options: [@tr("Tracks"), @tr("Sources"), @tr("Info"), @tr("Actions")];
             current: root.touch-pane;
             chose(n) => { root.touch-pane = n; }
         }
         for i in DeckState.count: Chip {
             width: root.width < 480px ? Theme.touch-target : 80px; horizontal-stretch: 0;
-            text: (root.width < 480px ? "→ " : "Load ") + ["A", "B", "C", "D"][i];
-            tooltip: "Load the selected track to deck " + ["A", "B", "C", "D"][i];
+            text: root.width < 480px ? @tr("→ {}", ["A", "B", "C", "D"][i]) : @tr("Load {}", ["A", "B", "C", "D"][i]);
+            tooltip: @tr("Load the selected track to deck {}", ["A", "B", "C", "D"][i]);
             clicked => { DeckState.load(i); }
         }
     }

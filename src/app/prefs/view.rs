@@ -108,10 +108,17 @@ choice!(
     /// browser) or FULL BROWSER (no player). The default is 2 PLAYER.
     ExportLayout { OnePlayer = "1-player", #[default] TwoPlayer = "2-player", DualPlayer = "dual-player", SimplePlayer = "simple-player", FullBrowser = "full-browser" }
 );
+choice!(
+    /// The UI language ([`crate::app::i18n`]): the system's (English when it is not one of ours) or a given one, by
+    /// [`crate::app::i18n::LANGS`] code.
+    Language { #[default] System = "system", En = "en", Fr = "fr", Es = "es", De = "de", Pt = "pt", It = "it", Nl = "nl" }
+);
 
 section!(
     /// The VIEW settings; every field is stored under its own name.
     View {
+        /// The UI language, applied by [`crate::app::i18n::apply`] at start and when it changes.
+        language: Language = Language::System;
         /// Tooltips: hover texts of the buttons.
         tooltips: bool = true;
         /// Decimal places in BPM readouts, including the jog; two preserves the original display.
@@ -240,147 +247,161 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     let key = |c: KeyNotation| {
         Row::chips(
             "key",
-            "KEY DISPLAY",
-            &["ALPHANUMERIC", "CLASSIC", "OPEN KEY", "DATABASE"],
+            tr!("KEY DISPLAY"),
+            &[tr!("ALPHANUMERIC"), tr!("CLASSIC"), tr!("OPEN KEY"), tr!("DATABASE")],
             c as usize,
         )
     };
     vec![
-        Row::header("DISPLAY TYPE"),
-        Row::info("LANGUAGE", "English (the only language so far)"),
-        Row::check("tooltips", "Tooltips", v.tooltips),
+        Row::header(tr!("DISPLAY TYPE")),
+        Row::dropdown(
+            "language",
+            tr!("LANGUAGE"),
+            &[
+                tr!("SYSTEM"),
+                "English",
+                "Français",
+                "Español",
+                "Deutsch",
+                "Português",
+                "Italiano",
+                "Nederlands",
+            ],
+            v.language as usize,
+        ),
+        Row::check("tooltips", tr!("Tooltips"), v.tooltips),
         Row::chips(
             "tempo_decimals",
-            "TEMPO DECIMAL PLACES",
+            tr!("TEMPO DECIMAL PLACES"),
             &["1", "2"],
             v.tempo_decimals as usize,
         ),
         Row::check(
             "tempo_reverse",
-            "Tempo fader: + at the bottom",
+            tr!("Tempo fader: + at the bottom"),
             v.tempo_reverse,
         )
-        .hint("vertical faders only; a horizontal one keeps + at the right"),
-        Row::header("BROWSE"),
-        Row::of("browse_font", "FONT SIZE", v.browse_font),
-        Row::check("browse_bold", "Bold characters", v.browse_bold),
-        Row::of("line_space", "LINE SPACE", v.line_space),
+        .hint(tr!("vertical faders only; a horizontal one keeps + at the right")),
+        Row::header(tr!("BROWSE")),
+        Row::of("browse_font", tr!("FONT SIZE"), v.browse_font),
+        Row::check("browse_bold", tr!("Bold characters"), v.browse_bold),
+        Row::of("line_space", tr!("LINE SPACE"), v.line_space),
         Row::check(
             "center_selected",
-            "Show the selected track to the center",
+            tr!("Show the selected track to the center"),
             v.center_selected,
         ),
-        Row::check("played_color", "Coloring of played tracks", v.played_color),
+        Row::check("played_color", tr!("Coloring of played tracks"), v.played_color),
         Row::check(
             "played_reset_on_quit",
-            "Reset the colour of played tracks when quitting",
+            tr!("Reset the colour of played tracks when quitting"),
             v.played_reset_on_quit,
         )
         .enabled(v.played_color),
-        Row::chips("played_reset", "PLAYED TRACKS", &["RESET NOW"], usize::MAX)
+        Row::chips("played_reset", tr!("PLAYED TRACKS"), &[tr!("RESET NOW")], usize::MAX)
             .enabled(v.played_color),
         key(p.key_notation),
-        Row::header("WAVEFORM"),
-        Row::of("draw_rate", "DRAWING RATE", v.draw_rate).hint("frames / s"),
+        Row::header(tr!("WAVEFORM")),
+        Row::of("draw_rate", tr!("DRAWING RATE"), v.draw_rate).hint(tr!("frames / s")),
         Row::chips(
             "overview",
-            "OVERVIEW / PREVIEW",
-            &["FULL", "HALF"],
+            tr!("OVERVIEW / PREVIEW"),
+            &[tr!("FULL"), tr!("HALF")],
             v.overview as usize,
         ),
-        Row::of("beat_count", "BEAT COUNT", v.beat_count),
-        Row::of("beat_grid", "BEAT GRID", v.beat_grid).hint("Bold: thicker lines, wider downbeats"),
-        Row::of("cue_markers", "HOT CUE MARKERS", v.cue_markers)
-            .hint("Large: double-size flags and letters"),
+        Row::of("beat_count", tr!("BEAT COUNT"), v.beat_count),
+        Row::of("beat_grid", tr!("BEAT GRID"), v.beat_grid).hint(tr!("Bold: thicker lines, wider downbeats")),
+        Row::of("cue_markers", tr!("HOT CUE MARKERS"), v.cue_markers)
+            .hint(tr!("Large: double-size flags and letters")),
         Row::check(
             "click_wave",
-            "Click on the waveform for PLAY and CUE",
+            tr!("Click on the waveform for PLAY and CUE"),
             v.click_wave,
         ),
         Row::chips(
             "jog_display",
-            "JOG DISPLAY",
-            &["CUE / SLIP", "HOT CUE COUNTDOWN"],
+            tr!("JOG DISPLAY"),
+            &[tr!("CUE / SLIP"), tr!("HOT CUE COUNTDOWN")],
             v.jog_display as usize,
         ),
-        Row::of("traffic_light", "TRAFFIC LIGHT", v.traffic_light),
-        Row::header("LAYOUT: MEDIA BROWSER"),
-        Row::check("media_related", "Related Tracks", v.media_related),
-        Row::check("media_hot_cue_bank", "Cue Bank", v.media_hot_cue_bank),
+        Row::of("traffic_light", tr!("TRAFFIC LIGHT"), v.traffic_light),
+        Row::header(tr!("LAYOUT: MEDIA BROWSER")),
+        Row::check("media_related", tr!("Related Tracks"), v.media_related),
+        Row::check("media_hot_cue_bank", tr!("Cue Bank"), v.media_hot_cue_bank),
         Row::check(
             "media_track_suggestion",
-            "Track Suggestion",
+            tr!("Track Suggestion"),
             v.media_track_suggestion,
         ),
-        Row::check("media_explorer", "Explorer", v.media_explorer),
-        Row::header("LAYOUT: BROWSER PANEL"),
+        Row::check("media_explorer", tr!("Explorer"), v.media_explorer),
+        Row::header(tr!("LAYOUT: BROWSER PANEL")),
         Row::check(
             "panel_cue_analysis",
-            "CUE Analysis Playlist",
+            tr!("CUE Analysis Playlist"),
             v.panel_cue_analysis,
         ),
-        Row::check("panel_palette", "Playlist Palette", v.panel_palette),
+        Row::check("panel_palette", tr!("Playlist Palette"), v.panel_palette),
         Row::check(
             "panel_preview_cues",
-            "Display Cue Markers on Preview",
+            tr!("Display Cue Markers on Preview"),
             v.panel_preview_cues,
         ),
         Row::check(
             "panel_all_tracks",
-            "Display All Tracks in the Playlists",
+            tr!("Display All Tracks in the Playlists"),
             v.panel_all_tracks,
         ),
-        Row::header("LAYOUT: DECK"),
-        Row::check("deck_sync_rate", "Display SYNC RATE", v.deck_sync_rate),
+        Row::header(tr!("LAYOUT: DECK")),
+        Row::check("deck_sync_rate", tr!("Display SYNC RATE"), v.deck_sync_rate),
         Row::check(
             "phrase_enlarged",
-            "Phrase (Enlarged Waveform)",
+            tr!("Phrase (Enlarged Waveform)"),
             v.phrase_enlarged,
         ),
-        Row::check("phrase_full", "Phrase (Full Waveform)", v.phrase_full),
+        Row::check("phrase_full", tr!("Phrase (Full Waveform)"), v.phrase_full),
         Row::check(
             "phrase_names_always",
-            "Always show the types of phrases",
+            tr!("Always show the types of phrases"),
             v.phrase_names_always,
         ),
         Row::check(
             "vocal_enlarged",
-            "Vocal (Enlarged Waveform)",
+            tr!("Vocal (Enlarged Waveform)"),
             v.vocal_enlarged,
         ),
-        Row::check("vocal_full", "Vocal (Full Waveform)", v.vocal_full),
-        Row::of("effect_panel", "EFFECT PANEL", v.effect_panel),
-        Row::dropdown_of("wave_order", "ENLARGED WAVEFORMS", order, at).hint("deck order, 4 decks"),
+        Row::check("vocal_full", tr!("Vocal (Full Waveform)"), v.vocal_full),
+        Row::of("effect_panel", tr!("EFFECT PANEL"), v.effect_panel),
+        Row::dropdown_of("wave_order", tr!("ENLARGED WAVEFORMS"), order, at).hint(tr!("deck order, 4 decks")),
         Row::chips(
             "pad_mode",
-            "PAD MODE",
-            &["AUTO", "MANUAL"],
+            tr!("PAD MODE"),
+            &[tr!("AUTO"), tr!("MANUAL")],
             v.pad_mode as usize,
         ),
-        Row::header("COLOR"),
+        Row::header(tr!("COLOR")),
         skin_row(p),
         Row::chips(
             "wave",
-            "WAVEFORM COLOR",
-            &["3BAND", "RGB", "BLUE"],
+            tr!("WAVEFORM COLOR"),
+            &[tr!("3BAND"), tr!("RGB"), tr!("BLUE")],
             p.waveform_colors as usize,
         ),
-        Row::of("hot_cue_colors", "HOT CUE COLOR", v.hot_cue_colors),
-        Row::of("pad_fx_color", "PAD FX COLOR", v.pad_fx_color),
+        Row::of("hot_cue_colors", tr!("HOT CUE COLOR"), v.hot_cue_colors),
+        Row::of("pad_fx_color", tr!("PAD FX COLOR"), v.pad_fx_color),
         Row::chips(
             "sampler_color",
-            "SAMPLER COLOR",
-            &["SYNC WITH FREQUENCY", "PURPLE"],
+            tr!("SAMPLER COLOR"),
+            &[tr!("SYNC WITH FREQUENCY"), tr!("PURPLE")],
             v.sampler_color as usize,
         ),
-        Row::of("deck_layout", "DECK LAYOUT", v.deck_layout).hint("enlarged waveforms"),
-        Row::check("show_mixer", "Mixer", v.show_mixer),
-        Row::of("export_layout", "EXPORT LAYOUT", v.export_layout),
-        Row::header("DECKS"),
+        Row::of("deck_layout", tr!("DECK LAYOUT"), v.deck_layout).hint(tr!("enlarged waveforms")),
+        Row::check("show_mixer", tr!("Mixer"), v.show_mixer),
+        Row::of("export_layout", tr!("EXPORT LAYOUT"), v.export_layout),
+        Row::header(tr!("DECKS")),
         Row::chips(
             "decks",
-            "DECKS",
-            &["2 DECKS", "4 DECKS"],
+            tr!("DECKS"),
+            &[tr!("2 DECKS"), tr!("4 DECKS")],
             (p.decks == 4) as usize,
         ),
     ]
@@ -393,9 +414,9 @@ fn skin_row(p: &Prefs) -> Row {
     let at = skin::position(skin_name(p));
     if names.len() <= 4 {
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
-        Row::chips("skin", "SKIN", &names, at)
+        Row::chips("skin", tr!("SKIN"), &names, at)
     } else {
-        Row::dropdown_of("skin", "SKIN", names, at).hint("see THEMES")
+        Row::dropdown_of("skin", tr!("SKIN"), names, at).hint(tr!("see THEMES"))
     }
 }
 

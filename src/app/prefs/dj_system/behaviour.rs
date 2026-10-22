@@ -7,46 +7,55 @@ use openfader::store::{Store, device_settings::Behaviour};
 pub fn rows(store: &Store) -> Vec<Row> {
     let b = Behaviour::load(store);
     vec![
-        Row::header("DELETE TRACKS"),
+        Row::header(tr!("DELETE TRACKS")),
         Row::check(
             "djs.beh.delete_tracks",
-            "Delete playlist tracks from device if playlist is deleted",
+            tr!("Delete playlist tracks from device if playlist is deleted"),
             b.delete_tracks,
         ),
-        Row::header("HISTORY"),
+        Row::header(tr!("HISTORY")),
         Row::check(
             "djs.beh.import_history",
-            "Import the play history automatically",
+            tr!("Import the play history automatically"),
             b.import_history,
         ),
         Row::check(
             "djs.beh.delete_history_after_import",
-            "Delete from the device after importing the play history",
+            tr!("Delete from the device after importing the play history"),
             b.delete_history_after_import,
         ),
-        Row::header("CUE SYNC"),
+        Row::header(tr!("CUE SYNC")),
         Row::check(
             "djs.beh.sync_cues",
-            "Keep cues, grid and phrases the same on the collection and the device copy of a track",
+            tr!(
+                "Keep cues, grid and phrases the same on the collection and the device copy of a track"
+            ),
             b.sync_cues,
         ),
         Row::info(
-            "How",
-            "Plugging a device in fills the copy that has none; loading a track makes the copy you loaded win",
+            tr!("How"),
+            tr!(
+                "Plugging a device in fills the copy that has none; loading a track makes the copy you loaded win"
+            ),
         ),
-        Row::header("DEVICE LIBRARY BACKUP"),
+        Row::header(tr!("DEVICE LIBRARY BACKUP")),
         Row::check(
             "djs.beh.auto_backup",
-            "Automatically backup device library upon removal",
+            tr!("Automatically backup device library upon removal"),
             b.auto_backup,
         ),
         Row::info(
-            "Backups",
-            "Backup now and the list of backups are on each device's panel",
+            tr!("Backups"),
+            tr!("Backup now and the list of backups are on each device's panel"),
         ),
-        Row::header("THIS COMPUTER"),
-        Row::text("djs.beh.computer_name", "Computer Name", &b.computer()),
-        Row::chips("djs.reset", "Reset to defaults", &["RESET"], usize::MAX),
+        Row::header(tr!("THIS COMPUTER")),
+        Row::text("djs.beh.computer_name", tr!("Computer Name"), &b.computer()),
+        Row::chips(
+            "djs.reset",
+            tr!("Reset to defaults"),
+            &[tr!("RESET")],
+            usize::MAX,
+        ),
     ]
 }
 

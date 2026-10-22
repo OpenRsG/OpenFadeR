@@ -27,11 +27,11 @@ impl View {
     pub(super) fn tags_changed(&mut self, app: &App) {
         self.sidebar.set_row_data(
             TAG_ROW,
-            StandardListViewItem::from(format!("Tag List ({})", self.tags.len()).as_str()),
+            StandardListViewItem::from(tr!("Tag List ({})", self.tags.len()).as_str()),
         );
         let keys: Vec<String> = self.tags.iter().map(store::key).collect();
         if let Err(e) = self.store.set_taglist(&keys) {
-            self.say(app, format!("store: {e}"));
+            self.say(app, tr!("store: {}", e));
         }
         if self.related.is_none() && matches!(self.home, Home::Tags) {
             self.load(app);
@@ -57,9 +57,7 @@ impl View {
         self.history.push(t);
         self.sidebar.set_row_data(
             HISTORY_ROW,
-            StandardListViewItem::from(
-                format!("Session history ({})", self.history.len()).as_str(),
-            ),
+            StandardListViewItem::from(tr!("Session history ({})", self.history.len()).as_str()),
         );
         if self.related.is_none() && matches!(self.home, Home::History) {
             self.load(app);
@@ -73,7 +71,7 @@ impl View {
         if let Err(e) = history::log_today(&self.store, t) {
             return app
                 .global::<BrowserState>()
-                .set_status(format!("history: {e}").into());
+                .set_status(tr!("history: {}", e).into());
         }
         self.rebuild(app);
         if self.related.is_none() && matches!(self.home, Home::Day(_)) {

@@ -51,21 +51,21 @@ export component MidiOverlay inherits Rectangle {
             padding: 16px;
             spacing: 6px;
             HorizontalLayout {
-                Text { text: "MIDI learn"; color: Theme.overlay-title; font-size: Theme.font-xl; font-weight: Theme.weight-bold; }
+                Text { text: @tr("MIDI learn"); color: Theme.overlay-title; font-size: Theme.font-xl; font-weight: Theme.weight-bold; }
                 Rectangle {}
-                Chip { text: "DONE"; width: 60px; height: Theme.layout-profile == 1 ? Theme.touch-target : 22px; horizontal-stretch: 0; clicked => { MidiState.visible = false; } }
+                Chip { text: @tr("DONE"); width: 60px; height: Theme.layout-profile == 1 ? Theme.touch-target : 22px; horizontal-stretch: 0; clicked => { MidiState.visible = false; } }
             }
-            Text { text: "Inputs: " + MidiState.ports + "  ·  " + MidiState.mapped + " mapped"; color: Theme.overlay-dim; font-size: Theme.font-size; wrap: word-wrap; }
+            Text { text: @tr("Inputs: {}  ·  {} mapped", MidiState.ports, MidiState.mapped); color: Theme.overlay-dim; font-size: Theme.font-size; wrap: word-wrap; }
             Text { text: MidiState.controller; color: Theme.overlay-ok; font-size: Theme.font-size; wrap: word-wrap; }
             if MidiState.status != "": Text { text: MidiState.status; color: Theme.overlay-warn; font-size: Theme.font-size; wrap: word-wrap; }
-            Text { text: MidiState.connected == "" ? "No controller connected" : MidiState.connected + " · " + MidiState.link; color: MidiState.connected == "" ? Theme.overlay-dim : Theme.overlay-ok; font-size: Theme.font-size; font-weight: Theme.weight-bold; wrap: word-wrap; }
+            Text { text: MidiState.connected == "" ? @tr("No controller connected") : @tr("{} · {}", MidiState.connected, MidiState.link); color: MidiState.connected == "" ? Theme.overlay-dim : Theme.overlay-ok; font-size: Theme.font-size; font-weight: Theme.weight-bold; wrap: word-wrap; }
             Text {
-                text: MidiState.captured == "" ? "Move a control on your controller…" : "Captured " + MidiState.captured + " — pick an action (A / B = deck):";
+                text: MidiState.captured == "" ? @tr("Move a control on your controller…") : @tr("Captured {} — pick an action (A / B = deck):", MidiState.captured);
                 color: Theme.overlay-text;
                 font-weight: Theme.weight-bold;
                 wrap: word-wrap;
             }
-            if MidiState.last != "": Text { text: "Bound " + MidiState.last; color: Theme.overlay-bound; font-size: Theme.font-size; wrap: word-wrap; }
+            if MidiState.last != "": Text { text: @tr("Bound {}", MidiState.last); color: Theme.overlay-bound; font-size: Theme.font-size; wrap: word-wrap; }
             ListView {
                 for name[i] in MidiState.actions: HorizontalLayout {
                     height: Theme.layout-profile == 1 ? Theme.touch-target : 24px;

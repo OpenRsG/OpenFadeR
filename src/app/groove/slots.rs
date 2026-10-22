@@ -17,7 +17,7 @@ use std::{
 impl Groove {
     /// Puts `drum` into slot `i` of deck `d` with what its tile shows.
     fn put(&self, d: usize, i: usize, drum: groove::Drum, entry: Option<Entry>, title: String) {
-        let info = format!("{:.1} BPM · {} BEATS", drum.bpm, drum.beats);
+        let info = tr!("{} BPM · {} BEATS", format!("{:.1}", drum.bpm), drum.beats);
         let l = Loop {
             title: title.into(),
             info: info.into(),
@@ -59,12 +59,12 @@ impl Groove {
             return;
         }
         let Some(t) = self.track.borrow().clone() else {
-            return self.say("select a track in the library first");
+            return self.say(tr!("select a track in the library first"));
         };
         let Some(file) = t.file.clone() else {
-            return self.say("this track has no audio file");
+            return self.say(tr!("this track has no audio file"));
         };
-        self.say(format!("slot {}: decoding {}…", slot_name(i), t.title));
+        self.say(tr!("slot {}: decoding {}…", slot_name(i), t.title));
         let entry = Entry {
             file,
             bpm: t.bpm_x100 as f32 / 100.0,
@@ -90,15 +90,16 @@ impl Groove {
                 Ok(drum) => {
                     entry.bpm = drum.bpm;
                     let title = entry.title.clone();
-                    self.say(format!(
-                        "slot {}: {title} · {:.1} BPM · {} beats",
+                    self.say(tr!(
+                        "slot {}: {} · {} BPM · {} beats",
                         slot_name(slot),
-                        drum.bpm,
+                        title,
+                        format!("{:.1}", drum.bpm),
                         drum.beats
                     ));
                     self.put(d, slot, drum, Some(entry), title);
                 }
-                Err(e) => self.say(format!("slot {}: {} — {e}", slot_name(slot), entry.title)),
+                Err(e) => self.say(tr!("slot {}: {} — {}", slot_name(slot), entry.title, e)),
             }
         }
     }
@@ -115,23 +116,25 @@ impl Groove {
             return;
         };
         if !has {
-            return self.say(format!(
+            return self.say(tr!(
                 "slot {} is empty: ⤓ loads the selected track, PRESET loads eight",
                 slot_name(i)
             ));
         }
         if state == State::Idle {
             if !self.decks[d].playing() {
-                return self.say(format!(
+                return self.say(tr!(
                     "deck {} is not playing: DRUM SWAP plays in time with it",
                     d + 1
                 ));
             }
             if self.decks[d].with_analysis(|a, _| a.beats.len() < 2) {
-                return self.say("this track has no beat grid: DRUM SWAP cannot keep time");
+                return self.say(tr!(
+                    "this track has no beat grid: DRUM SWAP cannot keep time"
+                ));
             }
             if !multi && !stems {
-                self.say("this deck has no stems: the loop plays over its drums");
+                self.say(tr!("this deck has no stems: the loop plays over its drums"));
             }
         }
         self.with(d, |c| c.press(i));
@@ -145,7 +148,7 @@ impl Groove {
         let original = prefs::with(|p| p.extensions.drum_source == DrumSource::Original);
         let drum = match capture::take(&self.decks[from], beats, original) {
             Ok(drum) => drum,
-            Err(e) => return self.say(format!("DRUM CAPTURE: {e}")),
+            Err(e) => return self.say(tr!("DRUM CAPTURE: {}", e)),
         };
         let title = self.decks[from]
             .track()
@@ -157,20 +160,25 @@ impl Groove {
             title: title.clone(),
         });
         let what = if original {
-            "the track"
+            tr!("the track")
         } else {
-            "the DRUMS stem"
+            tr!("the DRUMS stem")
         };
         self.say(match &saved {
-            Ok(p) => format!(
-                "DRUM CAPTURE: {beats} beats of {what} of deck {} into slot {} · {}",
+            Ok(p) => tr!(
+                "DRUM CAPTURE: {} beats of {} of deck {} into slot {} · {}",
+                beats,
+                what,
                 from + 1,
                 slot_name(i),
                 p.display()
             ),
-            Err(e) => format!(
-                "DRUM CAPTURE: {beats} beats of {what} into slot {} (not saved: {e})",
-                slot_name(i)
+            Err(e) => tr!(
+                "DRUM CAPTURE: {} beats of {} into slot {} (not saved: {})",
+                beats,
+                what,
+                slot_name(i),
+                e
             ),
         });
         self.put(d, i, drum, entry, title);
@@ -183,20 +191,21 @@ impl Groove {
             if cfg.iter().any(|c| c.cap.is_some()) {
                 cfg.iter_mut().for_each(|c| c.cap = None);
                 drop(cfg);
-                return self.say("DRUM CAPTURE off");
+                return self.say(tr!("DRUM CAPTURE off"));
             }
             cfg[d].cap_beats
         };
         match self.decks[d].capture_range(beats) {
             Ok((from, _)) => {
                 self.cfg.borrow_mut()[d].cap = Some(beats);
-                self.say(format!(
-                    "DRUM CAPTURE: {beats} beats from {} of deck {}: pick a slot",
+                self.say(tr!(
+                    "DRUM CAPTURE: {} beats from {} of deck {}: pick a slot",
+                    beats,
                     fmt_ms(from as u32),
                     d + 1
                 ));
             }
-            Err(e) => self.say(format!("DRUM CAPTURE: {e}")),
+            Err(e) => self.say(tr!("DRUM CAPTURE: {}", e)),
         }
     }
 
@@ -210,7 +219,7 @@ impl Groove {
             }
             c.cap_beats
         };
-        self.say(format!("DRUM CAPTURE range: {beats} beats"));
+        self.say(tr!("DRUM CAPTURE range: {} beats", beats));
     }
 
     /// Reads the factory presets of the PREFS pack and the user's presets into the PRESET list.
@@ -224,7 +233,7 @@ impl Groove {
         p.extend(preset::user());
         *self.pack.borrow_mut() = pack;
         let mut names: Vec<SharedString> = p.iter().map(|p| p.name.as_str().into()).collect();
-        names.push(SAVE_AS.into());
+        names.push(crate::app::i18n::tr_dyn(SAVE_AS).into());
         *self.presets.borrow_mut() = p;
         if let Some(a) = self.state() {
             a.global::<GrooveState>()
@@ -248,11 +257,7 @@ impl Groove {
                 _ => {}
             }
         }
-        self.say(format!(
-            "Drum Preset {}: loading {} loops…",
-            p.name,
-            jobs.len()
-        ));
+        self.say(tr!("Drum Preset {}: loading {} loops…", p.name, jobs.len()));
         self.spawn(d, jobs);
     }
 
@@ -264,7 +269,7 @@ impl Groove {
             .collect();
         match preset::save(name, slots) {
             Ok(p) => {
-                self.say(format!("Drum Preset {} saved", p.name));
+                self.say(tr!("Drum Preset {} saved", p.name));
                 if let Some(a) = self.state() {
                     a.global::<GrooveState>().set_saving(-1);
                 }

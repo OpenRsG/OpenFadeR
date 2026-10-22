@@ -37,16 +37,16 @@ impl Progress {
 
     pub fn text(&self) -> String {
         if self.done < self.total {
-            return format!("analyzing {}/{}", self.done, self.total);
+            return tr!("analyzing {}/{}", self.done, self.total);
         }
-        let mut s = format!("analyzed {}", self.done - self.failed);
+        let mut s = tr!("analyzed {}", self.done - self.failed);
         for (n, what) in [
-            (self.cached, "from cache"),
-            (self.failed, "failed"),
-            (self.recomputed, "stale/corrupt cache files recomputed"),
-            (self.cues, "cue lists set"),
-            (self.tags, "key tags written"),
-            (self.tag_failed, "key tags not written"),
+            (self.cached, tr!("from cache")),
+            (self.failed, tr!("failed")),
+            (self.recomputed, tr!("stale/corrupt cache files recomputed")),
+            (self.cues, tr!("cue lists set")),
+            (self.tags, tr!("key tags written")),
+            (self.tag_failed, tr!("key tags not written")),
         ] {
             if n > 0 {
                 let _ = write!(s, " · {n} {what}");

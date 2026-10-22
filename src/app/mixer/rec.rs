@@ -41,9 +41,9 @@ fn clock(d: Duration) -> String {
 /// in all, and a warning for frames the disk could not take; `auto` = it ended by itself (silence).
 fn saved_text(files: &[PathBuf], total: Duration, dropped: u64, auto: bool) -> String {
     let mut text = match files {
-        [] => return "REC stopped: no audio came, nothing saved".into(),
-        [f] => format!("Saved {} ({})", file_name(f), clock(total)),
-        [first, .., last] => format!(
+        [] => return tr!("REC stopped: no audio came, nothing saved").into(),
+        [f] => tr!("Saved {} ({})", file_name(f), clock(total)),
+        [first, .., last] => tr!(
             "Saved {} files: {} … {} ({} in all)",
             files.len(),
             file_name(first),
@@ -52,10 +52,10 @@ fn saved_text(files: &[PathBuf], total: Duration, dropped: u64, auto: bool) -> S
         ),
     };
     if auto {
-        text.insert_str(0, "REC ended after silence. ");
+        text.insert_str(0, tr!("REC ended after silence. "));
     }
     if dropped > 0 {
-        text += &format!(", {dropped} frames lost: the disk could not keep up");
+        text += &tr!(", {} frames lost: the disk could not keep up", dropped);
     }
     text
 }
@@ -76,12 +76,14 @@ impl Mixer {
         let (tap, input) = if p.audio.rec_input() {
             match openfader::audio::input::open(&p.audio.input_device, p.audio.input_pair) {
                 Ok(i) => (i.tap(), Some(i)),
-                Err(e) => return self.set_status(format!("REC: input: {e}")),
+                Err(e) => return self.set_status(tr!("REC: input: {}", e)),
             }
         } else {
             match &self.bus {
                 Some(bus) => (bus.tap(), None),
-                None => return self.set_status("REC: no audio output, nothing to record".into()),
+                None => {
+                    return self.set_status(tr!("REC: no audio output, nothing to record").into());
+                }
             }
         };
         let a = p.advanced;
@@ -94,8 +96,8 @@ impl Mixer {
             Ok(recorder) => {
                 let seen = recorder.path();
                 self.set_status(match &seen {
-                    Some(p) => format!("REC → {}", file_name(p)),
-                    None => "REC armed: waiting for audio".into(),
+                    Some(p) => tr!("REC → {}", file_name(p)),
+                    None => tr!("REC armed: waiting for audio").into(),
                 });
                 self.edit_bus(|b| {
                     (b.rec, b.rec_armed, b.rec_text) =
@@ -109,7 +111,7 @@ impl Mixer {
                     seen,
                 });
             }
-            Err(e) => self.set_status(format!("REC failed: {e}")),
+            Err(e) => self.set_status(tr!("REC failed: {}", e)),
         }
     }
 
@@ -134,9 +136,11 @@ impl Mixer {
                 );
                 saved_text(&t.files, t.duration(), t.dropped, auto)
             }
-            Err(e) => format!(
-                "REC stopped at {so_far}, {} may be incomplete: {e}",
-                seen.as_deref().map_or("the file".into(), file_name)
+            Err(e) => tr!(
+                "REC stopped at {}, {} may be incomplete: {}",
+                so_far,
+                seen.as_deref().map_or(tr!("the file").into(), file_name),
+                e
             ),
         };
         self.set_status(text);
@@ -159,7 +163,7 @@ impl Mixer {
                 self.import(&[done]);
             }
             if let Some(p) = &path {
-                self.set_status(format!("REC → {}", file_name(p)));
+                self.set_status(tr!("REC → {}", file_name(p)));
             }
         }
         self.edit_bus(|b| (b.rec_armed, b.rec_text) = (path.is_none(), clock(elapsed).into()));

@@ -58,7 +58,7 @@ component Two inherits Rectangle {
                     height: Theme.target-size(34px);
                     solid: true;
                     active: ExportModeState.dual-control;
-                    tooltip: "DUAL CONTROL: PLAY / PAUSE both players together";
+                    tooltip: @tr("DUAL CONTROL: PLAY / PAUSE both players together");
                     clicked => { ExportModeState.dual-control = !ExportModeState.dual-control; }
                 }
             }
@@ -98,9 +98,9 @@ component Two inherits Rectangle {
         width: Theme.layout-profile == 1 ? 90px : 74px;
         height: Theme.target-size(18px);
         font-size: Theme.font-xs;
-        text: "MATCHING";
+        text: @tr("MATCHING");
         active: ExportModeState.decks[0].matched;
-        tooltip: "Register the two loaded tracks as related tracks";
+        tooltip: @tr("Register the two loaded tracks as related tracks");
         enabled: DeckState.decks[0].loaded && DeckState.decks[1].loaded;
         clicked => { ExportModeState.matching(); }
     }
@@ -136,7 +136,7 @@ component Simple inherits Rectangle {
             horizontal-stretch: 0;
             alignment: center;
             spacing: 2px;
-            Text { text: "VOLUME " + MixerState.bus.readouts[0]; color: Theme.text-dim; font-size: Theme.font-xs; font-weight: Theme.weight-bold; }
+            Text { text: @tr("VOLUME {}", MixerState.bus.readouts[0]); color: Theme.text-dim; font-size: Theme.font-xs; font-weight: Theme.weight-bold; }
             Fader { value: MixerState.bus.knobs[0]; detent: true; edited(v) => { MixerState.bus-knob(0, v); } }
         }
     }
@@ -165,19 +165,19 @@ export component ExportRecPanel inherits Rectangle {
         Dropdown {
             width: 76px;
             horizontal-stretch: 0;
-            options: ["MASTER", "INPUT"];
+            options: [@tr("MASTER"), @tr("INPUT")];
             current: ExportModeState.rec-source;
             chose(i) => { PrefsState.chose("rec_source", i); }
         }
         Knob { width: Theme.target-size(22px); height: Theme.target-size(22px); horizontal-stretch: 0; detent: true; value: MixerState.bus.knobs[0]; edited(v) => { MixerState.bus-knob(0, v); } }
         VerticalLayout { width: 90px; horizontal-stretch: 0; alignment: center; Meter { level: MixerState.bus.level; peak: MixerState.bus.peak; } }
         Chip {
-            text: MixerState.bus.rec-armed ? "● ARMED" : "● REC";
+            text: MixerState.bus.rec-armed ? @tr("● ARMED") : @tr("● REC");
             width: Theme.layout-profile == 1 ? 88px : 66px;
             horizontal-stretch: 0;
             active: MixerState.bus.rec;
             active-color: Theme.rec;
-            tooltip: "Start / stop recording";
+            tooltip: @tr("Start / stop recording");
             clicked => { MixerState.rec-toggled(); }
         }
         Text { text: MixerState.bus.rec ? MixerState.bus.rec-text : "0:00"; color: Theme.text; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 1; }

@@ -53,7 +53,7 @@ pub(super) fn run(cx: &Rc<Ctx>, dev: &Device, auto: bool) {
     if ticked.is_empty() {
         if !auto {
             cx.say(
-                "No playlist is set to synchronize: tick some in the list",
+                tr!("No playlist is set to synchronize: tick some in the list"),
                 true,
             );
         }
@@ -70,10 +70,10 @@ pub(super) fn run(cx: &Rc<Ctx>, dev: &Device, auto: bool) {
     let id = dev.id.clone();
     cx.start_then(
         Some(dev.id.clone()),
-        "Syncing",
+        tr!("Syncing"),
         move |ctl| {
             let done = sync::sync(&writers, &snap, &ticked, &dev.mount, &o, &ctl)?;
-            record_all(&store, Some(&dev), &done, &dev.label).map(|t| format!("synced: {t}"))
+            record_all(&store, Some(&dev), &done, &dev.label).map(|t| tr!("synced: {}", t))
         },
         move |cx, _| cx.relink(&id),
     );

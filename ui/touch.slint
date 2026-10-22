@@ -77,34 +77,34 @@ export component TouchWorkspace inherits Rectangle {
                 height: Theme.touch-target; spacing: 4px;
                 Dropdown {
                     preferred-width: 3 * Theme.touch-target; horizontal-stretch: root.compact-header ? 0 : 1;
-                    options: LightingState.enabled && VideoState.enabled ? ["Export", "Performance", "Edit", "Lighting", "Video"] : LightingState.enabled ? ["Export", "Performance", "Edit", "Lighting"] : VideoState.enabled ? ["Export", "Performance", "Edit", "Video"] : ["Export", "Performance", "Edit"];
+                    options: LightingState.enabled && VideoState.enabled ? [@tr("Export"), @tr("Performance"), @tr("Edit"), @tr("Lighting"), @tr("Video")] : LightingState.enabled ? [@tr("Export"), @tr("Performance"), @tr("Edit"), @tr("Lighting")] : VideoState.enabled ? [@tr("Export"), @tr("Performance"), @tr("Edit"), @tr("Video")] : [@tr("Export"), @tr("Performance"), @tr("Edit")];
                     current: root.mode == 4 && !LightingState.enabled ? 3 : root.mode;
                     chose(n) => { root.set-mode(n == 3 && !LightingState.enabled ? 4 : n); }
                 }
-                if root.compact-header: Dropdown { options: [root.mode == 1 ? "Decks" : root.mode == 0 ? "Export players" : root.mode == 2 ? "Edit" : root.mode == 3 ? "Lighting" : "Video", "Library", "Mixer & output", "Effects", "Sampler", "Mix point link", "Beat Lab", "All commands"]; current: root.section; chose(n) => { root.section = n; } }
+                if root.compact-header: Dropdown { options: [root.mode == 1 ? @tr("Decks") : root.mode == 0 ? @tr("Export players") : root.mode == 2 ? @tr("Edit") : root.mode == 3 ? @tr("Lighting") : @tr("Video"), @tr("Library"), @tr("Mixer & output"), @tr("Effects"), @tr("Sampler"), @tr("Mix point link"), @tr("Beat Lab"), @tr("All commands")]; current: root.section; chose(n) => { root.section = n; } }
                 if root.inline-deck: Dropdown {
                     width: root.compact-header ? 2 * Theme.touch-target : 100px; horizontal-stretch: 0;
-                    options: DeckState.count == 4 ? ["Deck A", "Deck B", "Deck C", "Deck D"] : ["Deck A", "Deck B"];
+                    options: DeckState.count == 4 ? [@tr("Deck A"), @tr("Deck B"), @tr("Deck C"), @tr("Deck D")] : [@tr("Deck A"), @tr("Deck B")];
                     current: root.deck; chose(n) => { root.deck = n; }
                 }
-                if root.compact-header && root.mode == 1: Dropdown { width: 2 * Theme.touch-target; horizontal-stretch: 0; options: ["2 decks", "4 decks"]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose("decks", n); } }
+                if root.compact-header && root.mode == 1: Dropdown { width: 2 * Theme.touch-target; horizontal-stretch: 0; options: [@tr("2 decks"), @tr("4 decks")]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose(@tr("decks"), n); } }
                 if root.compact-header && root.mode == 0: Dropdown { width: 3 * Theme.touch-target; horizontal-stretch: 0; options: ExportModeState.layout-names; current: ExportModeState.layout; chose(n) => { PrefsState.chose("export_layout", n); } }
-                IconButton { icon: Icon.usb; tooltip: "Devices"; clicked => { DeviceState.visible = true; DeviceState.opened(); } }
-                IconButton { icon: Icon.gear; tooltip: "Preferences, themes and extensions"; clicked => { PrefsState.visible = true; } }
-                IconButton { icon: Icon.more; tooltip: "All commands"; active: root.section == 7; clicked => { root.section = root.section == 7 ? 0 : 7; } }
+                IconButton { icon: Icon.usb; tooltip: @tr("Devices"); clicked => { DeviceState.visible = true; DeviceState.opened(); } }
+                IconButton { icon: Icon.gear; tooltip: @tr("Preferences, themes and extensions"); clicked => { PrefsState.visible = true; } }
+                IconButton { icon: Icon.more; tooltip: @tr("All commands"); active: root.section == 7; clicked => { root.section = root.section == 7 ? 0 : 7; } }
             }
             if !root.compact-header: HorizontalLayout {
                 height: Theme.touch-target; spacing: 4px;
-                Dropdown { options: [root.mode == 1 ? "Decks" : root.mode == 0 ? "Export players" : root.mode == 2 ? "Edit" : root.mode == 3 ? "Lighting" : "Video", "Library", "Mixer & output", "Effects", "Sampler", "Mix point link", "Beat Lab", "All commands"]; current: root.section; chose(n) => { root.section = n; } }
-                if root.mode == 1: Dropdown { width: 100px; horizontal-stretch: 0; options: ["2 decks", "4 decks"]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose("decks", n); } }
+                Dropdown { options: [root.mode == 1 ? @tr("Decks") : root.mode == 0 ? @tr("Export players") : root.mode == 2 ? @tr("Edit") : root.mode == 3 ? @tr("Lighting") : @tr("Video"), @tr("Library"), @tr("Mixer & output"), @tr("Effects"), @tr("Sampler"), @tr("Mix point link"), @tr("Beat Lab"), @tr("All commands")]; current: root.section; chose(n) => { root.section = n; } }
+                if root.mode == 1: Dropdown { width: 100px; horizontal-stretch: 0; options: [@tr("2 decks"), @tr("4 decks")]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose(@tr("decks"), n); } }
                 if root.mode == 0: Dropdown { width: 130px; horizontal-stretch: 0; options: ExportModeState.layout-names; current: ExportModeState.layout; chose(n) => { PrefsState.chose("export_layout", n); } }
             }
             if root.deck-page && !root.inline-deck: HorizontalLayout {
                 height: Theme.touch-target; spacing: 4px;
-                for i in DeckState.count: Chip { text: (root.width < 480px ? "" : "Deck ") + ["A", "B", "C", "D"][i]; tooltip: "Select deck " + ["A", "B", "C", "D"][i]; active: root.dual ? floor(root.deck / 2) == floor(i / 2) : root.deck == i; clicked => { root.deck = i; } }
-                IconButton { icon: Icon.zoom-out; tooltip: "Zoom out"; clicked => { DeckState.zoom(root.deck, -1); } }
-                IconButton { icon: Icon.zoom-reset; tooltip: "Reset waveform zoom"; clicked => { DeckState.zoom(root.deck, 0); } }
-                IconButton { icon: Icon.zoom-in; tooltip: "Zoom in"; clicked => { DeckState.zoom(root.deck, 1); } }
+                for i in DeckState.count: Chip { text: (root.width < 480px ? "" : @tr("Deck") + " ") + ["A", "B", "C", "D"][i]; tooltip: @tr("Select deck {}", ["A", "B", "C", "D"][i]); active: root.dual ? floor(root.deck / 2) == floor(i / 2) : root.deck == i; clicked => { root.deck = i; } }
+                IconButton { icon: Icon.zoom-out; tooltip: @tr("Zoom out"); clicked => { DeckState.zoom(root.deck, -1); } }
+                IconButton { icon: Icon.zoom-reset; tooltip: @tr("Reset waveform zoom"); clicked => { DeckState.zoom(root.deck, 0); } }
+                IconButton { icon: Icon.zoom-in; tooltip: @tr("Zoom in"); clicked => { DeckState.zoom(root.deck, 1); } }
             }
         }
         viewport := Flickable {
@@ -149,16 +149,16 @@ export component TouchWorkspace inherits Rectangle {
                 if root.visible && root.section == 5 && MixPointState.enabled: HorizontalLayout {
                     height: Theme.touch-target; spacing: 4px;
                     for i in DeckState.count: Chip {
-                        text: "Deck " + ["A", "B", "C", "D"][i]; height: Theme.touch-target; min-width: max(Theme.touch-target, self.fit-width);
-                        active: root.deck == i; tooltip: "Select deck waveform for MIX POINT / SILENT editing";
+                        text: @tr("Deck {}", ["A", "B", "C", "D"][i]); height: Theme.touch-target; min-width: max(Theme.touch-target, self.fit-width);
+                        active: root.deck == i; tooltip: @tr("Select deck waveform for MIX POINT / SILENT editing");
                         clicked => { root.deck = i; }
                     }
-                    IconButton { icon: Icon.zoom-out; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Deck waveform zoom out"; clicked => { DeckState.zoom(root.deck, -1); } }
-                    IconButton { icon: Icon.zoom-reset; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Reset deck waveform zoom"; clicked => { DeckState.zoom(root.deck, 0); } }
-                    IconButton { icon: Icon.zoom-in; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Deck waveform zoom in"; clicked => { DeckState.zoom(root.deck, 1); } }
-                    Text { text: "Mix point lane zoom"; color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; horizontal-alignment: TextHorizontalAlignment.right; horizontal-stretch: 1; }
-                    IconButton { icon: Icon.minus; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Mix point lanes zoom out"; clicked => { MixPointState.zoom(-1); } }
-                    IconButton { icon: Icon.plus; width: Theme.touch-target; height: Theme.touch-target; tooltip: "Mix point lanes zoom in"; clicked => { MixPointState.zoom(1); } }
+                    IconButton { icon: Icon.zoom-out; width: Theme.touch-target; height: Theme.touch-target; tooltip: @tr("Deck waveform zoom out"); clicked => { DeckState.zoom(root.deck, -1); } }
+                    IconButton { icon: Icon.zoom-reset; width: Theme.touch-target; height: Theme.touch-target; tooltip: @tr("Reset deck waveform zoom"); clicked => { DeckState.zoom(root.deck, 0); } }
+                    IconButton { icon: Icon.zoom-in; width: Theme.touch-target; height: Theme.touch-target; tooltip: @tr("Deck waveform zoom in"); clicked => { DeckState.zoom(root.deck, 1); } }
+                    Text { text: @tr("Mix point lane zoom"); color: Theme.text; font-size: Theme.font-size; vertical-alignment: center; horizontal-alignment: TextHorizontalAlignment.right; horizontal-stretch: 1; }
+                    IconButton { icon: Icon.minus; width: Theme.touch-target; height: Theme.touch-target; tooltip: @tr("Mix point lanes zoom out"); clicked => { MixPointState.zoom(-1); } }
+                    IconButton { icon: Icon.plus; width: Theme.touch-target; height: Theme.touch-target; tooltip: @tr("Mix point lanes zoom in"); clicked => { MixPointState.zoom(1); } }
                 }
                 if root.visible && root.section == 5 && MixPointState.enabled: DeckDetail { index: root.deck; height: max(88px, 2 * Theme.touch-target); }
                 if root.visible && root.section == 5 && MixPointState.enabled: DeckOverview { index: root.deck; height: Theme.target-size(Theme.h-overview); }

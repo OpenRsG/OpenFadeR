@@ -15,7 +15,7 @@ export component SuggestBar inherits Rectangle {
         padding-bottom: Theme.space-sm;
         spacing: Theme.space-sm;
         SegmentedChips {
-            options: ["COLLECTION RADAR", "ERA", "MOOD", "ASSOCIATION"];
+            options: [@tr("COLLECTION RADAR"), @tr("ERA"), @tr("MOOD"), @tr("ASSOCIATION")];
             current: BrowserState.suggest-mode;
             horizontal-stretch: 0;
             width: 330px;
@@ -28,13 +28,13 @@ export component SuggestBar inherits Rectangle {
                 text: c;
                 width: 92px;
                 horizontal-stretch: 0;
-                tooltip: i == 0 ? "Tempo window around the track (click to change)" : i == 1 ? "Key rule (click to change)" : "Vocals included / not included (click to change)";
+                tooltip: i == 0 ? @tr("Tempo window around the track (click to change)") : i == 1 ? @tr("Key rule (click to change)") : @tr("Vocals included / not included (click to change)");
                 clicked => { BrowserState.suggest-condition(i); }
             }
         }
         Rectangle { horizontal-stretch: 1; }
         Text {
-            text: "FOR";
+            text: @tr("FOR");
             color: Theme.text-dim;
             vertical-alignment: center;
             horizontal-stretch: 0;

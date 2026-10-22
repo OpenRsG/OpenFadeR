@@ -3,7 +3,7 @@
 //! Export a playlist to a file (M3U8, PLS, text) and Import Playlist (M3U / M3U8 / PLS).
 
 use super::{Ask, BrowserState, Ctx};
-use crate::app::{DeviceState, browser, plural};
+use crate::app::{DeviceState, browser};
 use openfader::{
     library::playlist_file::{self, Format},
     paths,
@@ -21,7 +21,9 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
     if let Some(f) = format {
         let ctx = browser::context();
         if ctx.list.is_empty() {
-            return c.say("this list is empty: choose a playlist with tracks first");
+            return c.say(tr!(
+                "this list is empty: choose a playlist with tracks first"
+            ));
         }
         let name: String = ctx
             .name
@@ -48,7 +50,9 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
                 .app()
                 .global::<DeviceState>()
                 .invoke_export_playlists(id.into()),
-            None => c.say("choose one of your playlists or a playlist of the library first"),
+            None => c.say(tr!(
+                "choose one of your playlists or a playlist of the library first"
+            )),
         },
         _ => c
             .app()
@@ -61,11 +65,12 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
 pub fn write(c: &Rc<Ctx>, path: PathBuf, format: Format) {
     let list = browser::context().list;
     match playlist_file::write(&path, &list, format) {
-        Ok(n) => c.say(&format!(
-            "exported {n} track{} to {}",
-            plural(n),
+        Ok(n) => c.say(&tr_n!(
+            "exported {n} track to {}",
+            "exported {n} tracks to {}",
+            n,
             path.display()
         )),
-        Err(e) => c.say(&format!("export failed: {e}")),
+        Err(e) => c.say(&tr!("export failed: {}", e)),
     }
 }

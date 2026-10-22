@@ -16,9 +16,9 @@ pub fn run(c: &Rc<Ctx>, dir: PathBuf, music: bool) {
     let (store, settings) = (c.store.clone(), prefs::path());
     let stamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
     c.say(if music {
-        "backing up the library and its music…"
+        tr!("backing up the library and its music…")
     } else {
-        "backing up the library…"
+        tr!("backing up the library…")
     });
     c.spawn(
         move || store.backup(&dir, settings.as_deref(), &files, &stamp),
@@ -29,10 +29,11 @@ pub fn run(c: &Rc<Ctx>, dir: PathBuf, music: bool) {
                 music_failed,
             }) => {
                 let files = if music + music_failed > 0 {
-                    format!(
-                        " · {music} music files copied{}",
+                    tr!(
+                        " · {} music files copied{}",
+                        music,
                         if music_failed > 0 {
-                            format!(", {music_failed} failed")
+                            tr!(", {} failed", music_failed)
                         } else {
                             String::new()
                         }
@@ -40,12 +41,9 @@ pub fn run(c: &Rc<Ctx>, dir: PathBuf, music: bool) {
                 } else {
                     String::new()
                 };
-                c.say(&format!(
-                    "Collection was backed up: {}{files}",
-                    zip.display()
-                ));
+                c.say(&tr!("Collection was backed up: {}{}", zip.display(), files));
             }
-            Err(e) => c.say(&format!("backup failed: {e}")),
+            Err(e) => c.say(&tr!("backup failed: {}", e)),
         },
     );
 }
@@ -53,48 +51,54 @@ pub fn run(c: &Rc<Ctx>, dir: PathBuf, music: bool) {
 /// The zip was chosen: confirm before replacing anything.
 pub fn confirm_restore(c: &Rc<Ctx>, zip: PathBuf) {
     if !zip.is_file() {
-        return c.say(&format!("{}: no such file", zip.display()));
+        return c.say(&tr!("{}: no such file", zip.display()));
     }
-    let text = format!(
+    let text = tr!(
         "Restore {}? The Collection, playlists, cues, grids, ratings, tags, history and settings are replaced by the backup's.",
         zip.display()
     );
     c.confirm(
         Confirm::Restore(zip),
-        "RESTORE LIBRARY",
+        tr!("RESTORE LIBRARY"),
         &text,
-        "RESTORE",
+        tr!("RESTORE"),
         "",
     );
 }
 
 pub fn restore(c: &Rc<Ctx>, zip: PathBuf) {
-    if c.protected("restore a library") {
+    if c.protected(tr!("restore a library")) {
         return;
     }
     let store = c.store.clone();
-    c.say("restoring the library…");
-    c.spawn(move || store.restore(&zip), |c, r| match r {
-        Ok(Restored {
-            settings,
-            music,
-            music_present,
-            music_lost,
-        }) => {
-            if let Some(text) = settings.map(|s| String::from_utf8_lossy(&s).into_owned()) {
-                let (restored, _) = prefs::Prefs::parse(&text);
-                prefs::update(|p| *p = restored);
+    c.say(tr!("restoring the library…"));
+    c.spawn(
+        move || store.restore(&zip),
+        |c, r| match r {
+            Ok(Restored {
+                settings,
+                music,
+                music_present,
+                music_lost,
+            }) => {
+                if let Some(text) = settings.map(|s| String::from_utf8_lossy(&s).into_owned()) {
+                    let (restored, _) = prefs::Prefs::parse(&text);
+                    prefs::update(|p| *p = restored);
+                }
+                let files = if music + music_present + music_lost > 0 {
+                    tr!(
+                        " · music: {} copied back, {} already there, {} not in the backup",
+                        music,
+                        music_present,
+                        music_lost
+                    )
+                } else {
+                    String::new()
+                };
+                c.say(&tr!("Collection was restored{}", files));
+                c.reload(None);
             }
-            let files = if music + music_present + music_lost > 0 {
-                format!(
-                    " · music: {music} copied back, {music_present} already there, {music_lost} not in the backup"
-                )
-            } else {
-                String::new()
-            };
-            c.say(&format!("Collection was restored{files}"));
-            c.reload(None);
-        }
-        Err(e) => c.say(&format!("restore failed: {e}")),
-    });
+            Err(e) => c.say(&tr!("restore failed: {}", e)),
+        },
+    );
 }

@@ -11,9 +11,9 @@ use std::{path::PathBuf, time::Instant};
 fn progress_text(phase: Phase, f: f32) -> String {
     let pct = (f * 100.0) as u32;
     match phase {
-        Phase::Opening => "STEMS 0%".into(),
-        Phase::Download => format!("MODEL {pct}%"),
-        Phase::Separate => format!("STEMS {pct}%"),
+        Phase::Opening => tr!("STEMS 0%").into(),
+        Phase::Download => tr!("MODEL {}%", pct),
+        Phase::Separate => tr!("STEMS {}%", pct),
     }
 }
 
@@ -137,7 +137,7 @@ impl Deck {
         let mut s = self.stems.borrow_mut();
         s.job = None;
         s.complete = true;
-        s.text = "100% READY".into();
+        s.text = tr!("100% READY").into();
         drop(s);
         self.show_stems();
         true
@@ -154,11 +154,11 @@ impl Deck {
                 true
             }
             failed => {
-                self.say(format!(
+                self.say(tr!(
                     "stems: {}",
                     failed
                         .and_then(Result::err)
-                        .unwrap_or_else(|| "no audio".into())
+                        .unwrap_or_else(|| tr!("no audio").into())
                 ));
                 false
             }
@@ -240,7 +240,7 @@ impl Deck {
                 }
                 {
                     let mut s = self.stems.borrow_mut();
-                    (s.complete, s.text) = (true, "100% READY".into());
+                    (s.complete, s.text) = (true, tr!("100% READY").into());
                 }
                 if let Some(stems) = stems {
                     self.stemwave_stems(&stems);
@@ -255,9 +255,9 @@ impl Deck {
                 s.attached = None;
                 s.ready = false;
                 s.text = if e.starts_with("STEMS model") {
-                    "NO MODEL".into()
+                    tr!("NO MODEL").into()
                 } else {
-                    "NO STEMS".into()
+                    tr!("NO STEMS").into()
                 };
                 drop(s);
                 self.show_stems();

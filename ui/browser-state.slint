@@ -62,7 +62,7 @@ export global BrowserState {
     in property <bool> suggest-enabled: true;
     in property <int> suggest-mode;
     callback suggest-mode-chosen(int);
-    in property <[string]> suggest-anchors: ["LIST", "MASTER", "1", "2"];
+    in property <[string]> suggest-anchors: [@tr("LIST"), @tr("MASTER"), "1", "2"];
     in property <int> suggest-anchor: 1;
     callback suggest-anchor-chosen(int);
     in property <[string]> suggest-conditions;

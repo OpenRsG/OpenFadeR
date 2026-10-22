@@ -162,9 +162,9 @@ export component CueList inherits Rectangle {
         spacing: 3px;
         HorizontalLayout {
             spacing: 4px;
-            Text { text: "CUES / LOOPS"; color: Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+            Text { text: @tr("CUES / LOOPS"); color: Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
             Chip {
-                text: "SAVE LOOP";
+                text: @tr("SAVE LOOP");
                 height: Theme.h-ctl-sm;
                 min-width: 62px;
                 horizontal-stretch: 0;
@@ -197,7 +197,7 @@ export component CueList inherits Rectangle {
                 if Theme.layout-profile == 1: IconButton {
                     x: parent.width - self.width;
                     icon: Icon.more;
-                    tooltip: "Cue color and comment";
+                    tooltip: @tr("Cue color and comment");
                     enabled: root.enabled;
                     clicked => { pop.show(); }
                 }
@@ -240,7 +240,7 @@ export component CueList inherits Rectangle {
                             }
                             TextField {
                                 text: c.comment;
-                                placeholder-text: "comment";
+                                placeholder-text: @tr("comment");
                                 accepted(t) => { root.cue-comment(i, t); pop.close(); }
                             }
                         }

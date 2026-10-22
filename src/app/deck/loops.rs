@@ -76,8 +76,8 @@ impl Deck {
             v.loop_beats = beats;
             v.pads = ModelRc::new(VecModel::from(pads));
             v.loop_active = new.is_some();
-            v.status = new.map_or("loop off".into(), |(s, e)| {
-                format!("loop {} – {} (session only)", fmt_ms(s), fmt_ms(e)).into()
+            v.status = new.map_or(tr!("loop off").into(), |(s, e)| {
+                tr!("loop {} – {} (session only)", fmt_ms(s), fmt_ms(e)).into()
             });
         });
     }
@@ -133,11 +133,11 @@ impl Deck {
         match cur {
             Some((_, e)) => match close(Some(at), e) {
                 Some(lp) => self.apply_loop(l, Some(lp)),
-                None => self.say("loop in must come before the loop end"),
+                None => self.say(tr!("loop in must come before the loop end")),
             },
             None => {
                 l.loop_in = Some(at);
-                self.say(format!("loop in at {}", fmt_ms(at)));
+                self.say(tr!("loop in at {}", fmt_ms(at)));
             }
         }
     }
@@ -156,7 +156,7 @@ impl Deck {
                 self.apply_loop(l, Some(lp));
                 self.with_player(|p| p.seek(lp.0));
             }
-            None => self.say("loop out must come after loop in"),
+            None => self.say(tr!("loop out must come after loop in")),
         }
     }
 
@@ -183,16 +183,16 @@ impl Deck {
                     }
                 });
             }
-            (None, None) => self.say("no loop to re-enter"),
+            (None, None) => self.say(tr!("no loop to re-enter")),
         }
     }
 
     pub fn loop_halve(&self) {
-        self.resize_loop(|lp, _| halve(lp), "loop is at its shortest");
+        self.resize_loop(|lp, _| halve(lp), tr!("loop is at its shortest"));
     }
 
     pub fn loop_double(&self) {
-        self.resize_loop(double, "no room to double the loop");
+        self.resize_loop(double, tr!("no room to double the loop"));
     }
 
     /// Replaces the active loop by `f(loop, track duration)`. A playing deck past the new end is wrapped into it by the audio
@@ -203,7 +203,7 @@ impl Deck {
         }
         let l = self.loaded.borrow_mut();
         let Some(cur) = l.loop_ else {
-            return self.say("no active loop");
+            return self.say(tr!("no active loop"));
         };
         let (pos, playing) = self.clock(&l);
         match f(cur, l.duration_ms) {

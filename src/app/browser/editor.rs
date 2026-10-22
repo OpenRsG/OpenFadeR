@@ -33,9 +33,15 @@ pub fn to_rows(smart: &Smart, tag_name: impl Fn(i64) -> String) -> Vec<Fields> {
 /// The smart playlist the rows describe; the error names the first bad row.
 pub fn from_rows(rows: &[Fields], any: bool, tag_id: impl Fn(&str) -> Option<i64>) -> Result<Smart, String> {
     if rows.is_empty() {
-        return Err("add at least one condition".into());
+        return Err(tr!("add at least one condition").into());
     }
-    let conds = rows.iter().enumerate().map(|(n, (k, a, b))| Cond::from_fields(*k, a, b, &tag_id).map_err(|e| format!("condition {}: {e}", n + 1))).collect::<Result<_, _>>()?;
+    let conds = rows
+        .iter()
+        .enumerate()
+        .map(|(n, (k, a, b))| {
+            Cond::from_fields(*k, a, b, &tag_id).map_err(|e| tr!("condition {}: {}", n + 1, e))
+        })
+        .collect::<Result<_, _>>()?;
     Ok(Smart { any, conds })
 }
 
@@ -120,7 +126,14 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
         if let Some(ed) = v.editing.as_mut().filter(|_| !full) {
             ed.rows.push((0, String::new(), String::new()));
         }
-        v.editor_sync(&app, if full { "that is the most conditions the editor holds" } else { "" });
+        v.editor_sync(
+            &app,
+            if full {
+                tr!("that is the most conditions the editor holds")
+            } else {
+                ""
+            },
+        );
     });
     let (v, weak) = (view.clone(), app.as_weak());
     state.on_cond_remove(move |i| {

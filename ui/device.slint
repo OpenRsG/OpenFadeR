@@ -9,7 +9,7 @@ export { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOpti
 
 /// Toolbar button that opens the device windows; lit while a job writes to a device.
 export component DeviceChip inherits Chip {
-    text: "DEVICES";
+    text: @tr("DEVICES");
     active: DeviceState.busy;
     clicked => {
         DeviceState.visible = true;
@@ -49,7 +49,7 @@ export component DeviceProgress inherits Rectangle {
         height: parent.height;
         icon: Icon.close;
         icon-size: 10px;
-        tooltip: "Cancel";
+        tooltip: @tr("Cancel");
         clicked => { DeviceState.cancel(); }
     }
 }
@@ -57,12 +57,12 @@ export component DeviceProgress inherits Rectangle {
 /// The device windows in one dialog: DEVICES, EXPORT, SYNC MANAGER, BACKUPS (src/app/device/).
 component DeviceWindow inherits DialogFrame {
     visible: DeviceState.visible;
-    title: "DEVICES";
+    title: @tr("DEVICES");
     card-width: 900px;
     card-height: 780px;
     closed => { DeviceState.visible = false; }
     if Theme.layout-profile == 0: SegmentedChips {
-        options: ["DEVICES", "EXPORT", "SYNC MANAGER", "BACKUPS"];
+        options: [@tr("DEVICES"), @tr("EXPORT"), @tr("SYNC MANAGER"), @tr("BACKUPS")];
         current: DeviceState.tab;
         vertical-stretch: 0;
         alignment: start;
@@ -72,7 +72,7 @@ component DeviceWindow inherits DialogFrame {
         }
     }
     if Theme.layout-profile == 1: Dropdown {
-        options: ["DEVICES", "EXPORT", "SYNC MANAGER", "BACKUPS"];
+        options: [@tr("DEVICES"), @tr("EXPORT"), @tr("SYNC MANAGER"), @tr("BACKUPS")];
         current: DeviceState.tab;
         width: 240px;
         list-width: 240px;
@@ -101,7 +101,7 @@ component DeviceWindow inherits DialogFrame {
 /// A question the device actions ask: restore with missing tracks, a plugin's own question, delete. Above the window.
 component DeviceConfirm inherits DialogFrame {
     visible: DeviceState.confirm-open;
-    title: "CONFIRM";
+    title: @tr("CONFIRM");
     card-width: Theme.layout-profile == 1 ? min(460px, root.width - 16px) : 460px;
     closed => { DeviceState.confirmed(false); }
     Text {
@@ -116,7 +116,7 @@ component DeviceConfirm inherits DialogFrame {
         alignment: end;
         vertical-stretch: 0;
         Chip { text: DeviceState.confirm-yes; width: 120px; horizontal-stretch: 0; active: true; clicked => { DeviceState.confirmed(true); } }
-        Chip { text: "CANCEL"; width: 80px; horizontal-stretch: 0; clicked => { DeviceState.confirmed(false); } }
+        Chip { text: @tr("CANCEL"); width: 80px; horizontal-stretch: 0; clicked => { DeviceState.confirmed(false); } }
     }
 }
 

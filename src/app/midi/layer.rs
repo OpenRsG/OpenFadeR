@@ -41,7 +41,7 @@ pub fn selected(layer: Layer, d: usize) -> bool {
 /// "left C, right B" for the status line.
 pub fn describe(layer: Layer) -> String {
     let name = |side: usize| DECK_NAMES[side + 2 * layer[side].min(1)];
-    format!("left {}, right {}", name(0), name(1))
+    tr!("left {}, right {}", name(0), name(1))
 }
 
 #[cfg(test)]

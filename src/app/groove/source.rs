@@ -33,7 +33,7 @@ pub fn load(file: &Path, bpm: f32) -> Result<Drum, String> {
         .find(|b| *b > 0.0)
         .unwrap_or_else(|| detect(&pcm));
     if bpm <= 0.0 {
-        return Err("no tempo found for this drum loop".into());
+        return Err(tr!("no tempo found for this drum loop").into());
     }
     Drum::new(pcm, bpm)
 }

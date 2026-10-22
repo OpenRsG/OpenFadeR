@@ -111,19 +111,19 @@ export component RepoBar inherits VerticalLayout {
                 font-family: Theme.font;
                 font-size: Theme.font-sm;
             }
-            IconButton { icon: Icon.close; tooltip: "Remove this repository"; clicked => { CatalogState.remove(i); } }
+            IconButton { icon: Icon.close; tooltip: @tr("Remove this repository"); clicked => { CatalogState.remove(i); } }
         }
     }
-    if CatalogState.repos.length == 0: Note { text: "No repository yet: add one below."; }
+    if CatalogState.repos.length == 0: Note { text: @tr("No repository yet: add one below."); }
     HorizontalLayout {
         spacing: Theme.space-md;
         height: Theme.h-ctl;
         field := TextField {
-            placeholder-text: "owner/repo or https://github.com/owner/repo";
+            placeholder-text: @tr("owner/repo or https://github.com/owner/repo");
             accepted(t) => { CatalogState.add(t); self.text = ""; }
         }
-        Chip { text: "ADD"; width: 70px; horizontal-stretch: 0; active: field.text != ""; tooltip: "Add this GitHub repository to the list"; clicked => { CatalogState.add(field.text); field.text = ""; } }
-        Chip { text: "REFRESH"; width: 90px; horizontal-stretch: 0; enabled: !CatalogState.busy; tooltip: "Download the repositories again"; clicked => { CatalogState.refresh(); } }
+        Chip { text: @tr("ADD"); width: 70px; horizontal-stretch: 0; active: field.text != ""; tooltip: @tr("Add this GitHub repository to the list"); clicked => { CatalogState.add(field.text); field.text = ""; } }
+        Chip { text: @tr("REFRESH"); width: 90px; horizontal-stretch: 0; enabled: !CatalogState.busy; tooltip: @tr("Download the repositories again"); clicked => { CatalogState.refresh(); } }
     }
     Text {
         text: CatalogState.busy ? CatalogState.status : CatalogState.message;
@@ -139,12 +139,12 @@ export component RepoBar inherits VerticalLayout {
 export component GetMappings inherits VerticalLayout {
     spacing: Theme.space-md;
     init => { CatalogState.opened(); }
-    Text { text: "GET MAPPINGS"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
-    Note { text: "Controller mappings from your GitHub repositories (the same list as GET PLUGINS and GET THEMES). A controller that is plugged in without a mapping is offered one at once."; }
+    Text { text: @tr("GET MAPPINGS"); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+    Note { text: @tr("Controller mappings from your GitHub repositories (the same list as GET PLUGINS and GET THEMES). A controller that is plugged in without a mapping is offered one at once."); }
     RepoBar { }
     TextField {
         icon: Icon.search;
-        placeholder-text: "Search by controller or port name";
+        placeholder-text: @tr("Search by controller or port name");
         edited(t) => { CatalogState.search-mappings(t); }
     }
     for m in CatalogState.mappings: Rectangle {
@@ -163,7 +163,7 @@ export component GetMappings inherits VerticalLayout {
                 horizontal-stretch: 0;
                 alignment: center;
                 Chip {
-                    text: m.action == 0 ? "INSTALL" : m.action == 1 ? "UPDATE" : "INSTALLED";
+                    text: m.action == 0 ? @tr("INSTALL") : m.action == 1 ? @tr("UPDATE") : @tr("INSTALLED");
                     active: m.action != 2;
                     enabled: m.action != 2 && !CatalogState.busy;
                     font-size: Theme.font-xs;
@@ -191,7 +191,7 @@ export component OfferBanner inherits Rectangle {
         padding-left: Theme.space-xl;
         spacing: Theme.space-lg;
         Text { text: CatalogState.offer + ":"; color: Theme.toast-text; font-size: Theme.font-toast; font-weight: Theme.weight-semi; vertical-alignment: center; }
-        Chip { text: "INSTALL"; width: 80px; horizontal-stretch: 0; active: true; enabled: !CatalogState.busy; clicked => { CatalogState.install-offer(); } }
-        IconButton { icon: Icon.close; tooltip: "Not now"; clicked => { CatalogState.dismiss-offer(); } }
+        Chip { text: @tr("INSTALL"); width: 80px; horizontal-stretch: 0; active: true; enabled: !CatalogState.busy; clicked => { CatalogState.install-offer(); } }
+        IconButton { icon: Icon.close; tooltip: @tr("Not now"); clicked => { CatalogState.dismiss-offer(); } }
     }
 }

@@ -229,7 +229,7 @@ impl Deck {
             })
         };
         if let Err(e) = saved {
-            status += &format!(" · NOT saved: {e}");
+            status += &tr!(" · NOT saved: {}", e);
         }
         self.apply_grid(beats, status);
     }
@@ -288,21 +288,28 @@ impl Deck {
         drop(l);
         match r {
             Some((beats, status)) => self.set_grid(beats, status),
-            None => self.say("grid: needs a beat grid with at least 2 beats (TAP sets one) and a tempo that fits"),
+            None => self.say(tr!(
+                "grid: needs a beat grid with at least 2 beats (TAP sets one) and a tempo that fits"
+            )),
         }
     }
 
     /// Shift the whole grid by `ms` (negative = earlier).
     pub fn grid_shift(&self, ms: i32) {
         self.edit_grid(|b, _| {
-            (!b.is_empty()).then(|| (shift(b, ms.into()), format!("grid shifted {ms:+} ms")))
+            (!b.is_empty()).then(|| {
+                (
+                    shift(b, ms.into()),
+                    tr!("grid shifted {} ms", format!("{ms:+}")),
+                )
+            })
         });
     }
 
     /// "Beat 1 here": the beat nearest the playhead lands on it as the downbeat (always the whole grid).
     pub fn grid_beat1(&self) {
         self.edit_range(false, |b, pos| {
-            set_downbeat(b, pos).map(|v| (v, format!("beat 1 at {}", fmt_ms(pos as u32))))
+            set_downbeat(b, pos).map(|v| (v, tr!("beat 1 at {}", fmt_ms(pos as u32))))
         });
     }
 
@@ -317,7 +324,11 @@ impl Deck {
     fn rescale(&self, f: fn(&[Beat]) -> Option<Vec<Beat>>, label: &str) {
         self.edit_grid(|b, _| {
             f(b).map(|v| {
-                let s = format!("grid {label} · {:.2} BPM", grid_bpm(&v).unwrap_or(0.0));
+                let s = tr!(
+                    "grid {} · {} BPM",
+                    label,
+                    format!("{:.2}", grid_bpm(&v).unwrap_or(0.0))
+                );
                 (v, s)
             })
         });
@@ -341,10 +352,10 @@ impl Deck {
         }
         let Some(((anchor, bar), bpm)) = t.anchor.zip(bpm) else {
             drop((t, l));
-            return self.say("tap tempo: keep tapping on the beat");
+            return self.say(tr!("tap tempo: keep tapping on the beat"));
         };
         drop((t, l));
-        self.regrid((anchor, bar), bpm, "tap tempo");
+        self.regrid((anchor, bar), bpm, tr!("tap tempo"));
     }
 
     /// A constant-tempo grid of `bpm` through the beat `(ms, bar position)`: the whole track, or from that beat on (GRID range).
@@ -366,8 +377,8 @@ impl Deck {
         });
         drop(l);
         match grid {
-            Some(v) => self.set_grid(v, format!("{label} · {bpm:.2} BPM")),
-            None => self.say(format!("{label}: tempo does not fit the grid")),
+            Some(v) => self.set_grid(v, tr!("{} · {} BPM", label, format!("{bpm:.2}"))),
+            None => self.say(tr!("{}: tempo does not fit the grid", label)),
         }
     }
 
@@ -384,15 +395,15 @@ impl Deck {
         let (beats, status) = match stored {
             Some(Ok(Some(orig))) => {
                 l.lib_beats = orig.clone();
-                (orig, "grid reset to the original".to_owned())
+                (orig, tr!("grid reset to the original").to_owned())
             }
             Some(Err(e)) => {
                 drop(l);
-                return self.say(format!("grid reset failed: {e}"));
+                return self.say(tr!("grid reset failed: {}", e));
             }
             _ => (
                 l.lib_beats.clone(),
-                "grid reset to the library's".to_owned(),
+                tr!("grid reset to the library's").to_owned(),
             ),
         };
         record_undo(&mut l);

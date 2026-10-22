@@ -33,7 +33,7 @@ fn progress(app: Weak<super::App>, what: &'static str) -> impl Fn(usize, usize) 
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(app) = app.upgrade() {
                 app.global::<BrowserState>()
-                    .set_status(format!("{what} {done}/{total}…").into());
+                    .set_status(tr!("{} {}/{}…", what, done, total).into());
             }
         });
     }
@@ -63,21 +63,21 @@ fn finished(c: &Rc<Ctx>, r: Result<Report, String>) {
                 false,
             );
         }
-        Err(e) => c.say(&format!("import failed: {e}")),
+        Err(e) => c.say(&tr!("import failed: {}", e)),
     }
 }
 
 /// Music files and folders.
 pub fn files(c: &Rc<Ctx>, paths: Vec<PathBuf>) {
-    let (store, known, p) = job(c, "reading tags");
-    c.say("importing…");
+    let (store, known, p) = job(c, tr!("reading tags"));
+    c.say(tr!("importing…"));
     c.spawn(move || import::files(&store, &known, &paths, &p), finished);
 }
 
 /// A playlist file.
 pub fn playlist(c: &Rc<Ctx>, path: PathBuf) {
-    let (store, known, p) = job(c, "reading tags");
-    c.say("importing…");
+    let (store, known, p) = job(c, tr!("reading tags"));
+    c.say(tr!("importing…"));
     c.spawn(
         move || import::playlist_file(&store, &known, &path, &p),
         finished,
@@ -163,11 +163,11 @@ fn samples(
 /// fills the empty sampler slots with its first list.
 pub fn collection(c: &Rc<Ctx>, path: PathBuf, i: usize) {
     let Some(r) = readers().into_iter().nth(i) else {
-        return c.say("that library plugin is not loaded");
+        return c.say(tr!("that library plugin is not loaded"));
     };
     let (plugin, sampler) = (r.plugin, r.samples);
-    let (store, known, p) = job(c, "importing");
-    c.say("importing…");
+    let (store, known, p) = job(c, tr!("importing"));
+    c.say(tr!("importing…"));
     c.spawn(
         move || {
             let src = open_with(&plugin, &path)?;
@@ -187,7 +187,7 @@ pub fn collection(c: &Rc<Ctx>, path: PathBuf, i: usize) {
         |c, r: Result<(Report, Option<Vec<(PathBuf, f32)>>), String>| match r {
             Ok((report, Some(bank))) => {
                 let n = crate::app::sampler::load_bank(&c.app(), bank);
-                let text = format!("{} · {n} sampler slots loading", report.text());
+                let text = tr!("{} · {} sampler slots loading", report.text(), n);
                 finished(c, Ok(report));
                 c.say(&text);
             }
@@ -202,10 +202,12 @@ pub fn collection(c: &Rc<Ctx>, path: PathBuf, i: usize) {
 pub fn source(c: &Rc<Ctx>) {
     use crate::app::browser::{self, SourceType};
     let Some((path, kind, list)) = browser::context().source else {
-        return c.say("choose All tracks or a playlist of a library source or Explorer first");
+        return c.say(tr!(
+            "choose All tracks or a playlist of a library source or Explorer first"
+        ));
     };
-    let (store, known, p) = job(c, "importing");
-    c.say("importing…");
+    let (store, known, p) = job(c, tr!("importing"));
+    c.say(tr!("importing…"));
     c.spawn(
         move || {
             let src: Box<dyn library::Library> = match kind {

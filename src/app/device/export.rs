@@ -22,7 +22,7 @@ pub(super) fn refresh(cx: &Rc<Ctx>, count: bool) {
     cx.export.set(&snap, &|id| pre.iter().any(|p| p == id));
     if count && s.get_tab() == 1 && !cx.busy() {
         cx.say(
-            &format!(
+            &tr!(
                 "{} tracks, {} playlists in the collection",
                 snap.len(),
                 snap.playlists().count()
@@ -66,7 +66,7 @@ fn start(cx: &Rc<Ctx>) {
     let dest = match (&dev, folder.is_empty()) {
         (_, false) => PathBuf::from(&folder),
         (Some(d), _) => d.mount.clone(),
-        (None, true) => return cx.say("Choose a device or type a folder", true),
+        (None, true) => return cx.say(tr!("Choose a device or type a folder"), true),
     };
     if dev.as_ref().is_some_and(|d| !cx.writable(d)) {
         return;
@@ -74,13 +74,13 @@ fn start(cx: &Rc<Ctx>) {
     let writers = match &dev {
         Some(d) => cx.writers(d),
         None => plugins::find(&dest).map(|f| vec![f.0]).or_else(|| {
-            cx.say("No device plugin can write a library there", true);
+            cx.say(tr!("No device plugin can write a library there"), true);
             None
         }),
     };
     let Some(writers) = writers else { return };
     let Some(full) = cx.snap.borrow().clone() else {
-        return cx.say("Nothing to export: reopen the window", true);
+        return cx.say(tr!("Nothing to export: reopen the window"), true);
     };
     let ticked = cx.export.ticked();
     let ids: Vec<&str> = ticked.iter().map(String::as_str).collect();
@@ -89,7 +89,7 @@ fn start(cx: &Rc<Ctx>) {
     } else {
         match full.narrowed(&ids) {
             Some(s) => s,
-            None => return cx.say("None of the ticked playlists has tracks", true),
+            None => return cx.say(tr!("None of the ticked playlists has tracks"), true),
         }
     };
     let (o, store) = (cx.options(dev.as_ref()), cx.store.clone());
@@ -99,7 +99,7 @@ fn start(cx: &Rc<Ctx>) {
     let target = dev.clone();
     cx.start_then(
         dev.as_ref().map(|d| d.id.clone()),
-        "Exporting",
+        tr!("Exporting"),
         move |ctl| {
             let done = device::export::export(&writers, &dest, &snap, &o, &ctl)?;
             record_all(&store, target.as_ref(), &done, &name)

@@ -47,7 +47,7 @@ fn status(slots: &[Slot], note: &str) -> String {
                 .iter()
                 .filter(|s| matches!(s.src, Source::Ready(..)))
                 .count();
-            format!("{with_video} of {} decks with a picture", slots.len())
+            tr!("{} of {} decks with a picture", with_video, slots.len())
         }
     }
 }
@@ -138,7 +138,7 @@ impl Video {
             }
             let row = VideoDeckView {
                 title: if slot.serial == 0 {
-                    "empty".into()
+                    tr!("empty").into()
                 } else {
                     slot.title.as_str().into()
                 },

@@ -39,7 +39,7 @@ component CueRow inherits Rectangle {
         }
         if root.set: TextField {
             text: root.comment;
-            placeholder-text: "comment";
+            placeholder-text: @tr("comment");
             height: Theme.target-size(20px);
             y: Theme.layout-profile == 1 ? 0px : 1px;
             accepted(t) => { DeckState.cue-comment(root.deck, root.list-row, t); }
@@ -53,7 +53,7 @@ component CueRow inherits Rectangle {
             horizontal-stretch: 0;
             font-size: Theme.font-xs;
             active-color: Theme.cue;
-            tooltip: "Loop: click to play it";
+            tooltip: @tr("Loop: click to play it");
             clicked => { DeckState.cue-jump(root.deck, root.list-row); }
         }
         if root.set: IconButton {
@@ -62,7 +62,7 @@ component CueRow inherits Rectangle {
             width: Theme.target-size(18px);
             height: Theme.target-size(18px);
             y: Theme.layout-profile == 1 ? 0px : 2px;
-            tooltip: "Delete";
+            tooltip: @tr("Delete");
             clicked => { ExportModeState.cue-remove(root.deck, root.list-row); }
         }
     }
@@ -145,7 +145,7 @@ export component SubPanel inherits Rectangle {
         padding: 2px;
         spacing: 2px;
         SegmentedChips {
-            options: ["MEMORY", "HOT CUE", "INFO"];
+            options: [@tr("MEMORY"), @tr("HOT CUE"), @tr("INFO")];
             current: root.tab;
             vertical-stretch: 0;
             font-size: Theme.font-xs;
@@ -200,12 +200,12 @@ export component SubPanel inherits Rectangle {
                     for s in 5: Glyph { width: 14px; height: 14px; icon: Icon.star; tint: s < ExportModeState.decks[root.index].rating ? Theme.cue : Theme.text-disabled; }
                 }
                 for line[i] in [
-                    ["Color", ExportModeState.decks[root.index].color-name],
-                    ["Comment", ExportModeState.decks[root.index].comment],
-                    ["File type", ExportModeState.decks[root.index].file-type],
-                    ["File size", ExportModeState.decks[root.index].file-size],
-                    ["Sample rate", ExportModeState.decks[root.index].sample-rate],
-                    ["Bit rate", ExportModeState.decks[root.index].bit-rate],
+                    [@tr("Color"), ExportModeState.decks[root.index].color-name],
+                    [@tr("Comment"), ExportModeState.decks[root.index].comment],
+                    [@tr("File type"), ExportModeState.decks[root.index].file-type],
+                    [@tr("File size"), ExportModeState.decks[root.index].file-size],
+                    [@tr("Sample rate"), ExportModeState.decks[root.index].sample-rate],
+                    [@tr("Bit rate"), ExportModeState.decks[root.index].bit-rate],
                 ]: HorizontalLayout {
                     spacing: 6px;
                     Text { text: line[0]; width: 62px; color: Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }

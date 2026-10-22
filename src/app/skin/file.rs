@@ -86,22 +86,22 @@ fn load_dir(dir: &Path, out: &mut Vec<Skin>) -> Vec<String> {
 
 /// The skin in `text` (`stem`: the file name without `.json`) and the notes on what was left out. An error means the file holds no skin.
 pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
-    let json: Json = serde_json::from_str(text).map_err(|e| format!("not valid JSON: {e}"))?;
+    let json: Json = serde_json::from_str(text).map_err(|e| tr!("not valid JSON: {}", e))?;
     let obj = json
         .as_object()
-        .ok_or("the file must hold one JSON object")?;
+        .ok_or(tr!("the file must hold one JSON object"))?;
     let mut notes = Vec::new();
     let name = match obj.get("name") {
         None => stem.to_owned(),
         Some(Json::String(s)) if !s.trim().is_empty() => s.trim().to_owned(),
-        Some(_) => return Err("\"name\" must be a non-empty string".into()),
+        Some(_) => return Err(tr!("\"name\" must be a non-empty string").into()),
     };
     let base = match obj.get("base").map(Json::as_str) {
         None => Base::Dark,
         Some(Some(b)) if b.eq_ignore_ascii_case("dark") => Base::Dark,
         Some(Some(b)) if b.eq_ignore_ascii_case("light") => Base::Light,
         Some(_) => {
-            notes.push("\"base\" must be \"dark\" or \"light\", using \"dark\"".into());
+            notes.push(tr!("\"base\" must be \"dark\" or \"light\", using \"dark\"").into());
             Base::Dark
         }
     };
@@ -110,13 +110,13 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
             .filter(|k| {
                 !["name", "base", "tokens", "author", "description", "layout"].contains(&k.as_str())
             })
-            .map(|k| format!("unknown key {k:?} ignored")),
+            .map(|k| tr!("unknown key {} ignored", format!("{k:?}"))),
     );
     let mut string = |key: &str| match obj.get(key) {
         None => String::new(),
         Some(Json::String(s)) => s.trim().to_owned(),
         Some(_) => {
-            notes.push(format!("{key:?} must be a string, ignored"));
+            notes.push(tr!("{} must be a string, ignored", format!("{key:?}")));
             String::new()
         }
     };
@@ -130,22 +130,25 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
                     Json::String(s) => s.trim().to_owned(),
                     Json::Bool(_) | Json::Number(_) => v.to_string(),
                     _ => {
-                        notes.push(format!(
-                            "layout {key:?}: expected a text, number or true / false, got {v}"
+                        notes.push(tr!(
+                            "layout {}: expected a text, number or true / false, got {}",
+                            format!("{key:?}"),
+                            v
                         ));
                         continue;
                     }
                 };
                 match LAYOUT_KEYS.iter().find(|k| **k == key) {
                     Some(k) => layout.push((k.to_string(), v)),
-                    None => notes.push(format!(
-                        "unknown layout setting {key:?} (one of {})",
+                    None => notes.push(tr!(
+                        "unknown layout setting {} (one of {})",
+                        format!("{key:?}"),
                         LAYOUT_KEYS.join(", ")
                     )),
                 }
             }
         }
-        Some(_) => notes.push("\"layout\" must be an object, none applied".into()),
+        Some(_) => notes.push(tr!("\"layout\" must be an object, none applied").into()),
     }
     let mut tokens = Vec::new();
     match obj.get("tokens") {
@@ -153,16 +156,16 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
         Some(Json::Object(map)) => {
             for (key, v) in map {
                 let Some(&(token, ty)) = TOKENS.iter().find(|(n, _)| n == key) else {
-                    notes.push(format!("unknown token {key:?} (the names are the in-out properties of ui/theme.slint, docs/skins.md)"));
+                    notes.push(tr!("unknown token {} (the names are the in-out properties of ui/theme.slint, docs/skins.md)", format!("{key:?}")));
                     continue;
                 };
                 match value(ty, v) {
                     Ok(v) => tokens.push((token, v)),
-                    Err(e) => notes.push(format!("token {key:?}: {e}")),
+                    Err(e) => notes.push(tr!("token {}: {}", format!("{key:?}"), e)),
                 }
             }
         }
-        Some(_) => notes.push("\"tokens\" must be an object, no token applied".into()),
+        Some(_) => notes.push(tr!("\"tokens\" must be an object, no token applied").into()),
     }
     // the file order is the JSON map's (sorted by name); the theme.slint order is the one the editor and the files we write use
     tokens.sort_by_key(|(n, _)| TOKENS.iter().position(|t| t.0 == *n));
@@ -180,21 +183,22 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
 
 /// `j` as a value of type `ty`.
 fn value(ty: Ty, j: &Json) -> Result<Value, String> {
-    let bad = |want: &str| format!("expected {want}, got {j}");
+    let bad = |want: &str| tr!("expected {}, got {}", want, j);
     Ok(match ty {
         Ty::Color => Value::Color(color(
-            j.as_str().ok_or_else(|| bad("a colour like \"#1473eb\""))?,
+            j.as_str()
+                .ok_or_else(|| bad(tr!("a colour like \"#1473eb\"")))?,
         )?),
         Ty::Length => Value::Length(
-            number(j, "px").ok_or_else(|| bad("a length like 12 or \"12px\""))? as f32,
+            number(j, "px").ok_or_else(|| bad(tr!("a length like 12 or \"12px\"")))? as f32,
         ),
-        Ty::Str => Value::Str(j.as_str().ok_or_else(|| bad("a string"))?.to_owned()),
+        Ty::Str => Value::Str(j.as_str().ok_or_else(|| bad(tr!("a string")))?.to_owned()),
         Ty::Int => Value::Int(
             j.as_i64()
                 .and_then(|n| i32::try_from(n).ok())
-                .ok_or_else(|| bad("a whole number"))?,
+                .ok_or_else(|| bad(tr!("a whole number")))?,
         ),
-        Ty::Float => Value::Float(j.as_f64().ok_or_else(|| bad("a number"))? as f32),
+        Ty::Float => Value::Float(j.as_f64().ok_or_else(|| bad(tr!("a number")))? as f32),
         Ty::Duration => {
             // a bare number is ms; "80ms" and "0.2s" as in ui/theme.slint
             let ms = match j.as_str() {
@@ -210,7 +214,7 @@ fn value(ty: Ty, j: &Json) -> Result<Value, String> {
             };
             let ms = ms
                 .filter(|ms| ms.is_finite() && *ms >= 0.0)
-                .ok_or_else(|| bad("a duration like 80, \"80ms\" or \"0.2s\""))?;
+                .ok_or_else(|| bad(tr!("a duration like 80, \"80ms\" or \"0.2s\"")))?;
             Value::Duration(ms.round() as i64)
         }
     })
@@ -230,7 +234,7 @@ fn color(s: &str) -> Result<Color, String> {
     let hex = s
         .strip_prefix('#')
         .filter(|h| matches!(h.len(), 6 | 8) && h.bytes().all(|b| b.is_ascii_hexdigit()))
-        .ok_or_else(|| format!("bad colour {s:?}, use #rrggbb or #rrggbbaa"))?;
+        .ok_or_else(|| tr!("bad colour {}, use #rrggbb or #rrggbbaa", format!("{s:?}")))?;
     let v = u32::from_str_radix(hex, 16).expect("checked hex digits");
     let (rgb, a) = if hex.len() == 6 {
         (v, 255)

@@ -36,7 +36,7 @@ component Category inherits Rectangle {
 /// right in a scrolling viewport. Page rows are built by Rust (src/app/prefs); a page may add its own controls.
 export component PrefsOverlay inherits DialogFrame {
     visible: PrefsState.visible;
-    title: "PREFERENCES";
+    title: @tr("PREFERENCES");
     // The card follows the window (DialogFrame keeps 8 px of scrim around it): 80 % of the width (at least 860 px, at most 1400 px), 92 % of the height.
     card-width: Theme.layout-profile == 1 ? root.width - 16px : min(1400px, max(860px, root.width * 0.8));
     card-height: root.height * 0.92;
@@ -46,7 +46,7 @@ export component PrefsOverlay inherits DialogFrame {
         if self.visible { PrefsState.category-chosen(PrefsState.category); }
     }
     if Theme.layout-profile == 1: Dropdown {
-        options: ["VIEW", "THEMES", "AUDIO", "ANALYSIS", "CONTROLLER", "KEYBOARD", "EXTENSIONS", "DJ SYSTEM", "ADVANCED", "LIBRARIES"];
+        options: [@tr("VIEW"), @tr("THEMES"), @tr("AUDIO"), @tr("ANALYSIS"), @tr("CONTROLLER"), @tr("KEYBOARD"), @tr("EXTENSIONS"), @tr("DJ SYSTEM"), @tr("ADVANCED"), @tr("LIBRARIES")];
         current: PrefsState.category == 9 ? 9 : PrefsState.category == 8 ? 1 : PrefsState.category > 0 ? PrefsState.category + 1 : 0;
         chose(n) => {
             PrefsState.category = n == 9 ? 9 : n == 1 ? 8 : n > 1 ? n - 1 : n;
@@ -65,7 +65,7 @@ export component PrefsOverlay inherits DialogFrame {
                 padding-top: Theme.space-sm;
                 alignment: start;
                 // THEMES (category 8, added last so the numbers of the others stay) is listed second, next to VIEW.
-                for name[i] in ["VIEW", "THEMES", "AUDIO", "ANALYSIS", "CONTROLLER", "KEYBOARD", "EXTENSIONS", "DJ SYSTEM", "ADVANCED", "LIBRARIES"]: Category {
+                for name[i] in [@tr("VIEW"), @tr("THEMES"), @tr("AUDIO"), @tr("ANALYSIS"), @tr("CONTROLLER"), @tr("KEYBOARD"), @tr("EXTENSIONS"), @tr("DJ SYSTEM"), @tr("ADVANCED"), @tr("LIBRARIES")]: Category {
                     property <int> cat: i == 9 ? 9 : i == 1 ? 8 : i > 1 ? i - 1 : i;
                     text: name;
                     active: PrefsState.category == self.cat;
@@ -99,7 +99,7 @@ export component PrefsOverlay inherits DialogFrame {
                     if PrefsState.category == 9: PrefRows {}
                 }
             }
-            Note { text: "Saved on every change to " + PrefsState.path + "."; }
+            Note { text: @tr("Saved on every change to {}.", PrefsState.path); }
         }
     }
 }

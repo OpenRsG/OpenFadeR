@@ -15,64 +15,64 @@ pub fn rows(_: &Prefs) -> Vec<Row> {
     let mut rows = Vec::new();
     let views = connect::views();
     if views.is_empty() {
-        rows.push(Row::header("CONNECTED"));
-        rows.push(Row::info("", "No library is connected."));
+        rows.push(Row::header(tr!("CONNECTED")));
+        rows.push(Row::info("", tr!("No library is connected.")));
     }
     for v in views {
         let c = &v.conn;
         let id = c.id;
         let source = if c.plugin.is_empty() {
-            "folder".to_owned()
+            tr!("folder").to_owned()
         } else {
             c.plugin.clone()
         };
         let state = if v.busy {
-            "syncing…".to_owned()
+            tr!("syncing…").to_owned()
         } else {
-            format!("synced {}", connect::ago(c.last_sync))
+            tr!("synced {}", connect::ago(c.last_sync))
         };
         rows.push(Row::header(&c.label));
         rows.push(Row::info(
-            "SOURCE",
+            tr!("SOURCE"),
             &format!("{source}: {}", c.path.display()),
         ));
-        rows.push(Row::info("TRACKS", &format!("{}, {state}", v.tracks)));
+        rows.push(Row::info(tr!("TRACKS"), &format!("{}, {state}", v.tracks)));
         rows.push(Row::chips(
             &format!("conn.{id}.mode"),
-            "MODE",
-            &["IMPORT", "TWO-WAY"],
+            tr!("MODE"),
+            &[tr!("IMPORT"), tr!("TWO-WAY")],
             c.mode as usize,
         ));
         rows.push(Row::chips(
             &format!("conn.{id}.wins"),
-            "ON CONFLICT",
-            &["SOURCE WINS", "OURS WINS", "NEWEST WINS"],
+            tr!("ON CONFLICT"),
+            &[tr!("SOURCE WINS"), tr!("OURS WINS"), tr!("NEWEST WINS")],
             c.wins as usize,
         ));
         rows.push(Row::chips(
             &format!("conn.{id}.act"),
             "",
-            &["SYNC NOW", "DISCONNECT"],
+            &[tr!("SYNC NOW"), tr!("DISCONNECT")],
             NONE,
         ));
     }
-    rows.push(Row::header("DETECTED"));
+    rows.push(Row::header(tr!("DETECTED")));
     let found = connect::found();
     if found.is_empty() {
         let text = if openfader::plugin::registry().libraries.is_empty() {
-            "No library plugin is on: switch one on in EXTENSIONS, then restart, to find other apps' libraries."
+            tr!("No library plugin is on: switch one on in EXTENSIONS, then restart, to find other apps' libraries.")
         } else {
-            "No library of another app found in its usual place."
+            tr!("No library of another app found in its usual place.")
         };
         rows.push(Row::info("", text));
     }
     for (i, f) in found.iter().enumerate() {
         rows.push(
-            Row::chips(&format!("det.{i}"), &f.label, &["CONNECT"], NONE)
+            Row::chips(&format!("det.{i}"), &f.label, &[tr!("CONNECT")], NONE)
                 .hint(&f.path.display().to_string()),
         );
     }
-    rows.push(Row::chips("add", "ADD", &["FILE…", "FOLDER…"], NONE));
+    rows.push(Row::chips("add", tr!("ADD"), &[tr!("FILE…"), tr!("FOLDER…")], NONE));
     rows
 }
 

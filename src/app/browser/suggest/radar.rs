@@ -52,19 +52,19 @@ impl Conditions {
     pub fn labels(&self) -> [&'static str; 3] {
         [
             match self.bpm {
-                BpmRange::Near => "BPM ±6%",
-                BpmRange::Wide => "BPM ±12%",
-                BpmRange::Any => "BPM ANY",
+                BpmRange::Near => tr!("BPM ±6%"),
+                BpmRange::Wide => tr!("BPM ±12%"),
+                BpmRange::Any => tr!("BPM ANY"),
             },
             match self.key {
-                KeyRule::Related => "KEY RELATED",
-                KeyRule::Same => "KEY SAME",
-                KeyRule::Any => "KEY ANY",
+                KeyRule::Related => tr!("KEY RELATED"),
+                KeyRule::Same => tr!("KEY SAME"),
+                KeyRule::Any => tr!("KEY ANY"),
             },
             match self.vocal {
-                VocalRule::Any => "VOCAL ANY",
-                VocalRule::With => "VOCAL WITH",
-                VocalRule::Without => "NO VOCAL",
+                VocalRule::Any => tr!("VOCAL ANY"),
+                VocalRule::With => tr!("VOCAL WITH"),
+                VocalRule::Without => tr!("NO VOCAL"),
             },
         ]
     }
@@ -141,10 +141,12 @@ pub(super) fn score(a: &Item, c: &Item, cond: &Conditions) -> Verdict {
     };
     Verdict::Score(
         score,
-        format!(
-            "{:.0}% · sound {:.0}%{bpm}{key}",
-            score * 100.0,
-            timbre * 100.0
+        tr!(
+            "{}% · sound {}%{}{}",
+            format!("{:.0}", score * 100.0),
+            format!("{:.0}", timbre * 100.0),
+            bpm,
+            key
         ),
     )
 }

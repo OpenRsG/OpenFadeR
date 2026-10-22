@@ -16,7 +16,10 @@ impl Video {
                 state.set_overlay_on(true);
                 self.note.borrow_mut().clear();
             }
-            Err(e) => *self.note.borrow_mut() = format!("cannot read an image from {path}: {e:?}"),
+            Err(e) => {
+                *self.note.borrow_mut() =
+                    tr!("cannot read an image from {}: {}", path, format!("{e:?}"))
+            }
         }
     }
 

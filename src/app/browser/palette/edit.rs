@@ -33,17 +33,20 @@ impl Palette {
         let mut v = self.view.borrow_mut();
         match drag {
             Drag::Palette(from, _) if from == pal => {
-                v.say(app, "the track is already in this list")
+                v.say(app, tr!("the track is already in this list"))
             }
             Drag::Tree(row) => {
                 let Some(id) = v.entries.get(row).and_then(|e| Self::playlist_of(&v, e)) else {
-                    return v.say(app, "only a playlist of My Playlists can go on a palette");
+                    return v.say(
+                        app,
+                        tr!("only a playlist of My Playlists can go on a palette"),
+                    );
                 };
                 self.put_playlist(app, &mut v, pal, id);
             }
             Drag::Track(_) | Drag::Palette(..) => match self.track_of(&v, &drag) {
                 Some(t) => self.add_track(app, &mut v, pal, &t),
-                None => v.say(app, "that track is gone"),
+                None => v.say(app, tr!("that track is gone")),
             },
         }
     }
@@ -64,13 +67,13 @@ impl Palette {
             }
             v.say(
                 app,
-                format!("{} tracks added to the Tag List", v.tags.len() - before),
+                tr!("{} tracks added to the Tag List", v.tags.len() - before),
             );
         } else {
             let store = v.store.clone();
             let r = self.assign.borrow_mut().set(&store, pal - 1, Some(id));
             if let Err(e) = r {
-                return v.say(app, format!("store: {e}"));
+                return v.say(app, tr!("store: {}", e));
             }
         }
         self.sync(v);
@@ -80,13 +83,13 @@ impl Palette {
     pub(super) fn add_track(&self, app: &App, v: &mut View, pal: usize, t: &Track) {
         if pal == 0 {
             let msg = if v.tags.contains(t) {
-                format!("“{}” is already in the Tag List", t.title)
+                tr!("“{}” is already in the Tag List", t.title)
             } else if v.tags.len() >= TAG_LIST_MAX {
-                format!("the Tag List holds up to {TAG_LIST_MAX} tracks")
+                tr!("the Tag List holds up to {} tracks", TAG_LIST_MAX)
             } else {
                 v.tags.push(t.clone());
                 v.tags_changed(app);
-                format!("tagged “{}” ({} in the Tag List)", t.title, v.tags.len())
+                tr!("tagged “{}” ({} in the Tag List)", t.title, v.tags.len())
             };
             v.say(app, msg);
             return self.sync(v);
@@ -103,7 +106,7 @@ impl Palette {
                     fresh = true;
                     id
                 }
-                Err(e) => return v.say(app, format!("store: {e}")),
+                Err(e) => return v.say(app, tr!("store: {}", e)),
             },
         };
         let key = store::key(t);
@@ -113,16 +116,16 @@ impl Palette {
             .find(|n| n.id == id)
             .map_or_else(|| UNTITLED.to_owned(), |n| n.name.clone());
         let msg = match store.entries(id) {
-            Ok(have) if have.contains(&key) => format!("“{}” is already in {name}", t.title),
+            Ok(have) if have.contains(&key) => tr!("“{}” is already in {}", t.title, name),
             Ok(_) => match store.add_entries(id, &[key]) {
-                Ok(()) => format!("added “{}” to {name}", t.title),
-                Err(e) => format!("store: {e}"),
+                Ok(()) => tr!("added “{}” to {}", t.title, name),
+                Err(e) => tr!("store: {}", e),
             },
-            Err(e) => format!("store: {e}"),
+            Err(e) => tr!("store: {}", e),
         };
         if fresh {
             if let Err(e) = self.assign.borrow_mut().set(&store, slot, Some(id)) {
-                return v.say(app, format!("store: {e}"));
+                return v.say(app, tr!("store: {}", e));
             }
             v.rebuild(app); // the tree lists the new playlist
             app.global::<BrowserState>().set_palette_edit(pal as i32);
@@ -161,11 +164,11 @@ impl Palette {
             return;
         };
         if name.is_empty() {
-            return v.say(app, "a name is needed");
+            return v.say(app, tr!("a name is needed"));
         }
         match v.store.rename_node(id, name) {
             Ok(()) => v.rebuild(app),
-            Err(e) => v.say(app, format!("store: {e}")),
+            Err(e) => v.say(app, tr!("store: {}", e)),
         }
         self.sync(&mut v);
     }
@@ -199,7 +202,7 @@ impl Palette {
         }
         let store = v.store.clone();
         if let Err(e) = self.assign.borrow_mut().set(&store, slot, id) {
-            return v.say(app, format!("store: {e}"));
+            return v.say(app, tr!("store: {}", e));
         }
         self.sync(&mut v);
     }
@@ -232,7 +235,7 @@ impl Palette {
                 if let Some(at) = keys.iter().position(|k| *k == key) {
                     keys.remove(at);
                     if let Err(e) = v.store.set_entries(id, &keys) {
-                        return v.say(app, format!("store: {e}"));
+                        return v.say(app, tr!("store: {}", e));
                     }
                     if matches!(v.home, Home::User(h) if h == id) && v.related.is_none() {
                         v.load(app);

@@ -7,7 +7,7 @@ export global EditState {
     in-out property <bool> visible;
     /// The timeline picture, rendered at the element's physical size.
     in property <image> timeline;
-    in property <string> title: "no track open";
+    in property <string> title: @tr("no track open");
     /// Playhead position with bar and beat, the selection, lengths and clipboard, the last message.
     in property <string> pos-text;
     in property <string> sel-text;
@@ -109,57 +109,57 @@ export component EditView inherits Rectangle {
                 spacing: 8px;
                 height: root.toolbar-height;
                 vertical-stretch: 0;
-                Text { text: "EDIT"; color: Theme.text-bright; font-size: Theme.font-xl; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+                Text { text: @tr("EDIT"); color: Theme.text-bright; font-size: Theme.font-xl; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
                 Text { text: EditState.title; color: Theme.text; font-size: Theme.font-md; vertical-alignment: center; overflow: elide; }
-                Chip { text: EditState.busy ? "LOADING…" : "OPEN SELECTED"; width: 130px; horizontal-stretch: 0; enabled: !EditState.busy; clicked => { EditState.open-selected(); } }
+                Chip { text: EditState.busy ? @tr("LOADING…") : @tr("OPEN SELECTED"); width: 130px; horizontal-stretch: 0; enabled: !EditState.busy; clicked => { EditState.open-selected(); } }
             }
             HorizontalLayout {
                 spacing: 4px;
                 height: root.toolbar-height;
                 vertical-stretch: 0;
-                Chip { text: EditState.playing ? "STOP" : "PLAY"; width: 66px; horizontal-stretch: 0; enabled: EditState.loaded; active: EditState.playing; clicked => { EditState.play-toggle(); } }
-                Chip { text: "|◀"; width: root.touch ? max(38px, Theme.touch-target) : 38px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.rewind(); } }
+                Chip { text: EditState.playing ? @tr("STOP") : @tr("PLAY"); width: 66px; horizontal-stretch: 0; enabled: EditState.loaded; active: EditState.playing; clicked => { EditState.play-toggle(); } }
+                Chip { text: @tr("|◀"); width: root.touch ? max(38px, Theme.touch-target) : 38px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.rewind(); } }
                 Rectangle { width: 10px; horizontal-stretch: 0; }
-                Label { text: "SNAP"; }
-                Chip { text: "OFF"; width: 44px; horizontal-stretch: 0; active: EditState.snap == 0; clicked => { EditState.set-snap(0); } }
-                Chip { text: "BEAT"; width: 48px; horizontal-stretch: 0; active: EditState.snap == 1; clicked => { EditState.set-snap(1); } }
-                Chip { text: "BAR"; width: 44px; horizontal-stretch: 0; active: EditState.snap == 2; clicked => { EditState.set-snap(2); } }
+                Label { text: @tr("SNAP"); }
+                Chip { text: @tr("OFF"); width: 44px; horizontal-stretch: 0; active: EditState.snap == 0; clicked => { EditState.set-snap(0); } }
+                Chip { text: @tr("BEAT"); width: 48px; horizontal-stretch: 0; active: EditState.snap == 1; clicked => { EditState.set-snap(1); } }
+                Chip { text: @tr("BAR"); width: 44px; horizontal-stretch: 0; active: EditState.snap == 2; clicked => { EditState.set-snap(2); } }
                 Rectangle { width: 10px; horizontal-stretch: 0; }
-                Label { text: "ZOOM"; }
-                Chip { text: "−"; width: root.touch ? max(34px, Theme.touch-target) : 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(-1); } }
-                Chip { text: "+"; width: root.touch ? max(34px, Theme.touch-target) : 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(1); } }
-                Chip { text: "FIT"; width: root.touch ? max(40px, Theme.touch-target) : 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(0); } }
+                Label { text: @tr("ZOOM"); }
+                Chip { text: @tr("−"); width: root.touch ? max(34px, Theme.touch-target) : 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(-1); } }
+                Chip { text: @tr("+"); width: root.touch ? max(34px, Theme.touch-target) : 34px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(1); } }
+                Chip { text: @tr("FIT"); width: root.touch ? max(40px, Theme.touch-target) : 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.zoom(0); } }
                 Rectangle { }
-                if !root.touch: Chip { text: "RENDER WAV"; width: 100px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.render(); } }
-                if !root.touch: Label { text: "LOAD ON"; }
-                for d in (root.touch ? 0 : EditState.deck-count): Chip { text: "DECK " + (d + 1); width: 64px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.to-deck(d); } }
+                if !root.touch: Chip { text: @tr("RENDER WAV"); width: 100px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.render(); } }
+                if !root.touch: Label { text: @tr("LOAD ON"); }
+                for d in (root.touch ? 0 : EditState.deck-count): Chip { text: @tr("DECK {}", d + 1); width: 64px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.to-deck(d); } }
             }
             if root.touch: HorizontalLayout {
                 spacing: 4px;
                 height: root.toolbar-height;
                 vertical-stretch: 0;
                 alignment: start;
-                Chip { text: "RENDER WAV"; width: 100px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.render(); } }
-                Label { text: "LOAD ON"; }
-                for d in EditState.deck-count: Chip { text: "DECK " + (d + 1); width: 64px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.to-deck(d); } }
+                Chip { text: @tr("RENDER WAV"); width: 100px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.render(); } }
+                Label { text: @tr("LOAD ON"); }
+                for d in EditState.deck-count: Chip { text: @tr("DECK {}", d + 1); width: 64px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.to-deck(d); } }
             }
             HorizontalLayout {
                 spacing: 4px;
                 height: root.toolbar-height;
                 vertical-stretch: 0;
                 alignment: start;
-                Chip { text: "COPY"; width: 54px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.copy(); } }
-                Chip { text: "CUT"; width: 46px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.cut(); } }
-                Chip { text: "PASTE"; width: 56px; horizontal-stretch: 0; enabled: EditState.has-clip; clicked => { EditState.paste(); } }
-                Chip { text: "INSERT"; width: 58px; horizontal-stretch: 0; enabled: EditState.has-clip; clicked => { EditState.insert(); } }
-                Chip { text: "DELETE"; width: 58px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.delete(); } }
-                Chip { text: "MUTE"; width: 50px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.clear(); } }
-                Chip { text: "+ SILENCE"; width: 82px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.silence(); } }
-                Chip { text: "DUPLICATE"; width: 82px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.duplicate(); } }
-                Chip { text: "ALL"; width: root.touch ? max(40px, Theme.touch-target) : 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.select-all(); } }
+                Chip { text: @tr("COPY"); width: 54px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.copy(); } }
+                Chip { text: @tr("CUT"); width: 46px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.cut(); } }
+                Chip { text: @tr("PASTE"); width: 56px; horizontal-stretch: 0; enabled: EditState.has-clip; clicked => { EditState.paste(); } }
+                Chip { text: @tr("INSERT"); width: 58px; horizontal-stretch: 0; enabled: EditState.has-clip; clicked => { EditState.insert(); } }
+                Chip { text: @tr("DELETE"); width: 58px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.delete(); } }
+                Chip { text: @tr("MUTE"); width: 50px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.clear(); } }
+                Chip { text: @tr("+ SILENCE"); width: 82px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.silence(); } }
+                Chip { text: @tr("DUPLICATE"); width: 82px; horizontal-stretch: 0; enabled: EditState.has-sel; clicked => { EditState.duplicate(); } }
+                Chip { text: @tr("ALL"); width: root.touch ? max(40px, Theme.touch-target) : 40px; horizontal-stretch: 0; enabled: EditState.loaded; clicked => { EditState.select-all(); } }
                 Rectangle { width: 10px; horizontal-stretch: 0; }
-                Chip { text: "UNDO"; width: 54px; horizontal-stretch: 0; enabled: EditState.can-undo; clicked => { EditState.undo(); } }
-                Chip { text: "REDO"; width: 54px; horizontal-stretch: 0; enabled: EditState.can-redo; clicked => { EditState.redo(); } }
+                Chip { text: @tr("UNDO"); width: 54px; horizontal-stretch: 0; enabled: EditState.can-undo; clicked => { EditState.undo(); } }
+                Chip { text: @tr("REDO"); width: 54px; horizontal-stretch: 0; enabled: EditState.can-redo; clicked => { EditState.redo(); } }
             }
             Rectangle {
                 min-height: root.touch ? 180px : 0px;
@@ -207,7 +207,7 @@ export component EditView inherits Rectangle {
             }
             Text {
                 min-height: root.touch ? 24px : 0px;
-                text: "click: playhead · drag: select (snapped) · wheel: scroll · Ctrl+wheel: zoom · Space play · Ctrl+C/X/V copy/cut/paste · Ctrl+I insert · Del delete · M mute · S silence · Ctrl+D duplicate · Ctrl+Z/Y undo/redo · B snap · 0 fit";
+                text: @tr("click: playhead · drag: select (snapped) · wheel: scroll · Ctrl+wheel: zoom · Space play · Ctrl+C/X/V copy/cut/paste · Ctrl+I insert · Del delete · M mute · S silence · Ctrl+D duplicate · Ctrl+Z/Y undo/redo · B snap · 0 fit");
                 color: Theme.text-faint;
                 font-size: Theme.font-sm;
                 overflow: elide;

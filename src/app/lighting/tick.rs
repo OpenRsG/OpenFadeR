@@ -28,11 +28,13 @@ fn scene_text(ctl: &Control, inp: &Input, playing: bool) -> String {
             inp.bpm
         )
         .to_uppercase(),
-        (Mode::Auto, None) if playing => "AUTO · the master track has no phrases: ambient".into(),
-        (Mode::Auto, None) => "AUTO · no deck is playing: ambient".into(),
-        (Mode::Ambient, _) => format!("AMBIENT · {}", ctl.palette.label()),
-        (Mode::Solid(_), _) => "MANUAL COLOUR".into(),
-        (Mode::BlackOut, _) => "BLACK OUT".into(),
+        (Mode::Auto, None) if playing => {
+            tr!("AUTO · the master track has no phrases: ambient").into()
+        }
+        (Mode::Auto, None) => tr!("AUTO · no deck is playing: ambient").into(),
+        (Mode::Ambient, _) => tr!("AMBIENT · {}", ctl.palette.label()),
+        (Mode::Solid(_), _) => tr!("MANUAL COLOUR").into(),
+        (Mode::BlackOut, _) => tr!("BLACK OUT").into(),
     }
 }
 
@@ -58,7 +60,7 @@ impl Lighting {
         drop(cfg);
         let sent = self.out.borrow_mut().as_mut().map(|o| o.send(&frames));
         if let Some(Err(e)) = &sent {
-            self.out_err.replace(format!("send failed: {e}"));
+            self.out_err.replace(tr!("send failed: {}", e));
         }
         if !self.state(|s| s.get_visible()).unwrap_or(false) {
             return;

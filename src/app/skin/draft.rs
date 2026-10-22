@@ -141,7 +141,7 @@ impl Draft {
 
     /// Sets token `i` from what was typed in its field.
     pub fn set_text(&mut self, i: usize, text: &str) -> Result<(), String> {
-        let ty = TOKENS.get(i).ok_or("no such token")?.1;
+        let ty = TOKENS.get(i).ok_or(tr!("no such token"))?.1;
         let v = file::from_text(ty, text)?;
         self.set(i, v);
         Ok(())

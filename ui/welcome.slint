@@ -66,7 +66,7 @@ component Suggestion inherits Rectangle {
 
 export component WelcomeOverlay inherits DialogFrame {
     visible: WelcomeState.visible;
-    title: "Welcome";
+    title: @tr("Welcome");
     card-width: 680px;
     closed => { WelcomeState.skip(); }
     HorizontalLayout {
@@ -75,13 +75,13 @@ export component WelcomeOverlay inherits DialogFrame {
     }
     VerticalLayout {
         spacing: Theme.space-xs;
-        Text { text: "Welcome to OpenFadeR"; horizontal-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-xxl; font-weight: Theme.weight-bold; }
-        Text { text: "Open-source DJ software for two or four decks. Load a track, press play, and mix."; horizontal-alignment: center; color: Theme.text; font-family: Theme.font; font-size: Theme.font-md; }
+        Text { text: @tr("Welcome to OpenFadeR"); horizontal-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-xxl; font-weight: Theme.weight-bold; }
+        Text { text: @tr("Open-source DJ software for two or four decks. Load a track, press play, and mix."); horizontal-alignment: center; color: Theme.text; font-family: Theme.font; font-size: Theme.font-md; }
     }
     Rectangle { height: 1px; background: Theme.line; }
     if WelcomeState.done == "" && WelcomeState.plugins.length > 0: VerticalLayout {
         spacing: Theme.space-md;
-        Text { text: "SUGGESTED EXTENSIONS (" + WelcomeState.plugins.length + ")"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+        Text { text: @tr("SUGGESTED EXTENSIONS ({})", WelcomeState.plugins.length); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
         Note { text: WelcomeState.intro; }
         ListView {
             height: min(320px, WelcomeState.plugins.length * 78px);
@@ -89,7 +89,7 @@ export component WelcomeOverlay inherits DialogFrame {
         }
     }
     if WelcomeState.done == "" && WelcomeState.plugins.length == 0: Note {
-        text: "Every suggested extension is already on. More are in PREFERENCES > EXTENSIONS > GET PLUGINS.";
+        text: @tr("Every suggested extension is already on. More are in PREFERENCES > EXTENSIONS > GET PLUGINS.");
         horizontal-alignment: center;
     }
     if WelcomeState.done != "": Text {
@@ -100,14 +100,14 @@ export component WelcomeOverlay inherits DialogFrame {
         font-family: Theme.font;
         font-size: Theme.font-md;
     }
-    Note { text: "You can change this later in PREFERENCES > EXTENSIONS, and open this window again from Help > Welcome."; horizontal-alignment: center; }
+    Note { text: @tr("You can change this later in PREFERENCES > EXTENSIONS, and open this window again from Help > Welcome."); horizontal-alignment: center; }
     HorizontalLayout {
         alignment: end;
         spacing: Theme.space-sm;
-        if WelcomeState.done == "" && WelcomeState.plugins.length > 0: Chip { text: "SKIP"; width: 80px; horizontal-stretch: 0; clicked => { WelcomeState.skip(); } }
-        if WelcomeState.done == "" && WelcomeState.plugins.length > 0: Chip { text: "SWITCH ON " + WelcomeState.plugins.length; width: 120px; horizontal-stretch: 0; active: true; clicked => { WelcomeState.accept(); } }
-        if WelcomeState.done != "" && WelcomeState.restart: Chip { text: "LATER"; width: 80px; horizontal-stretch: 0; clicked => { WelcomeState.skip(); } }
-        if WelcomeState.done != "" && WelcomeState.restart: Chip { text: "RESTART NOW"; width: 120px; horizontal-stretch: 0; active: true; clicked => { WelcomeState.restart-now(); } }
-        if WelcomeState.plugins.length == 0 || (WelcomeState.done != "" && !WelcomeState.restart): Chip { text: "START"; width: 80px; horizontal-stretch: 0; active: true; clicked => { WelcomeState.skip(); } }
+        if WelcomeState.done == "" && WelcomeState.plugins.length > 0: Chip { text: @tr("SKIP"); width: 80px; horizontal-stretch: 0; clicked => { WelcomeState.skip(); } }
+        if WelcomeState.done == "" && WelcomeState.plugins.length > 0: Chip { text: @tr("SWITCH ON {}", WelcomeState.plugins.length); width: 120px; horizontal-stretch: 0; active: true; clicked => { WelcomeState.accept(); } }
+        if WelcomeState.done != "" && WelcomeState.restart: Chip { text: @tr("LATER"); width: 80px; horizontal-stretch: 0; clicked => { WelcomeState.skip(); } }
+        if WelcomeState.done != "" && WelcomeState.restart: Chip { text: @tr("RESTART NOW"); width: 120px; horizontal-stretch: 0; active: true; clicked => { WelcomeState.restart-now(); } }
+        if WelcomeState.plugins.length == 0 || (WelcomeState.done != "" && !WelcomeState.restart): Chip { text: @tr("START"); width: 80px; horizontal-stretch: 0; active: true; clicked => { WelcomeState.skip(); } }
     }
 }

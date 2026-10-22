@@ -27,14 +27,14 @@ export component StemsModelCard inherits Rectangle {
         padding: Theme.space-xl;
         spacing: Theme.space-md;
         Text {
-            text: StemsModelState.failed ? "STEMS model download failed" : "Downloading the STEMS model";
+            text: StemsModelState.failed ? @tr("STEMS model download failed") : @tr("Downloading the STEMS model");
             color: StemsModelState.failed ? Theme.danger : Theme.text-bright;
             font-family: Theme.font;
             font-size: Theme.font-md;
             font-weight: Theme.weight-bold;
         }
         Text {
-            text: StemsModelState.failed ? StemsModelState.text : "Needed once to split tracks into vocals, instruments and drums. STEMS works as soon as it is done.";
+            text: StemsModelState.failed ? StemsModelState.text : @tr("Needed once to split tracks into vocals, instruments and drums. STEMS works as soon as it is done.");
             color: Theme.text-dim;
             font-family: Theme.font;
             font-size: Theme.font-sm;
@@ -60,8 +60,8 @@ export component StemsModelCard inherits Rectangle {
         if StemsModelState.failed: HorizontalLayout {
             alignment: end;
             spacing: Theme.space-sm;
-            Chip { text: "CLOSE"; width: 70px; horizontal-stretch: 0; clicked => { StemsModelState.close(); } }
-            Chip { text: "RETRY"; width: 70px; horizontal-stretch: 0; active: true; clicked => { StemsModelState.retry(); } }
+            Chip { text: @tr("CLOSE"); width: 70px; horizontal-stretch: 0; clicked => { StemsModelState.close(); } }
+            Chip { text: @tr("RETRY"); width: 70px; horizontal-stretch: 0; active: true; clicked => { StemsModelState.retry(); } }
         }
     }
 }

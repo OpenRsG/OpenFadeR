@@ -126,11 +126,11 @@ pub(super) fn parse(text: &str) -> Result<(Mapping, String), String> {
                 Some(h) => i64::from_str_radix(h, 16),
                 None => v.parse(),
             };
-            r.map_err(|_| format!("<{}> {k}=\"{v}\" is not a number", t.name))
+            r.map_err(|_| tr!("<{}> {}=\"{}\" is not a number", t.name, k, v))
         };
         let opt = |k: &str| t.attrs.contains_key(k).then(|| num(k)).transpose();
         let byte = |k: &str| {
-            num(k).and_then(|n| u8::try_from(n).map_err(|_| format!("{k}={n} is not a byte")))
+            num(k).and_then(|n| u8::try_from(n).map_err(|_| tr!("{}={} is not a byte", k, n)))
         };
         match (t.name.as_str(), t.edge) {
             ("name" | "port" | "outInterval" | "ringInterval" | "stateRequest", Edge::Open) => {
@@ -146,16 +146,14 @@ pub(super) fn parse(text: &str) -> Result<(Mapping, String), String> {
                         .collect()
                     {
                         Ok(bytes) => m.request = bytes,
-                        Err(_) => m
-                            .bad
-                            .push(format!("<stateRequest> \"{v}\" is not hex bytes")),
+                        Err(_) => m.bad.push(tr!("<stateRequest> \"{}\" is not hex bytes", v)),
                     },
                 }
             }
             ("control", Edge::Empty | Edge::Open) => {
                 let name = t.attrs.get("action").map(String::as_str).unwrap_or("");
                 let Some(act) = ACTIONS.iter().position(|a| a.name == name) else {
-                    m.bad.push(format!("unknown action \"{name}\""));
+                    m.bad.push(tr!("unknown action \"{}\"", name));
                     continue;
                 };
                 let b = Binding {
@@ -172,7 +170,7 @@ pub(super) fn parse(text: &str) -> Result<(Mapping, String), String> {
             ("output", Edge::Empty | Edge::Open) => {
                 let light = t.attrs.get("light").map(String::as_str).unwrap_or("");
                 let Some(led) = led(light) else {
-                    m.bad.push(format!("unknown light \"{light}\""));
+                    m.bad.push(tr!("unknown light \"{}\"", light));
                     continue;
                 };
                 m.leds.push(LedRow {
@@ -186,7 +184,7 @@ pub(super) fn parse(text: &str) -> Result<(Mapping, String), String> {
         }
     }
     if m.controller.is_empty() {
-        return Err("no <name>".into());
+        return Err(tr!("no <name>").into());
     }
     if port.is_empty() {
         port = m.controller.clone();

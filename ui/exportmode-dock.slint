@@ -19,7 +19,7 @@ export component ExportDock inherits Rectangle {
     VerticalLayout {
         padding: 3px;
         spacing: 2px;
-        Text { text: "DEVICES"; height: Theme.layout-profile == 1 ? 22px : 14px; color: Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; vertical-stretch: 0; }
+        Text { text: @tr("DEVICES"); height: Theme.layout-profile == 1 ? 22px : 14px; color: Theme.text-dim; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; vertical-stretch: 0; }
         Rectangle {
             vertical-stretch: 1;
             min-height: Theme.layout-profile == 1 ? 2 * max(52px, Theme.target-size(30px)) : 0px;
@@ -28,7 +28,7 @@ export component ExportDock inherits Rectangle {
                 x: 6px;
                 width: parent.width - 12px;
                 height: parent.height;
-                text: "No USB drive or SD card is mounted.";
+                text: @tr("No USB drive or SD card is mounted.");
                 wrap: word-wrap;
                 vertical-alignment: center;
                 color: Theme.text-faint;
@@ -58,16 +58,16 @@ export component ExportDock inherits Rectangle {
         HorizontalLayout {
             spacing: 2px;
             vertical-stretch: 0;
-            Chip { text: "EXPORT"; min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.writable && root.can-export; tooltip: "Create or extend the library on this device"; clicked => { DeviceState.tab = 1; DeviceState.visible = true; DeviceState.opened(); } }
-            Chip { text: "SYNC"; min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.writable && root.can-export; tooltip: "SYNC MANAGER"; clicked => { DeviceState.tab = 2; DeviceState.visible = true; DeviceState.opened(); } }
-            Chip { text: "BACKUPS"; min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.can-backup; clicked => { DeviceState.tab = 3; DeviceState.visible = true; DeviceState.opened(); } }
+            Chip { text: @tr("EXPORT"); min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.writable && root.can-export; tooltip: @tr("Create or extend the library on this device"); clicked => { DeviceState.tab = 1; DeviceState.visible = true; DeviceState.opened(); } }
+            Chip { text: @tr("SYNC"); min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.writable && root.can-export; tooltip: @tr("SYNC MANAGER"); clicked => { DeviceState.tab = 2; DeviceState.visible = true; DeviceState.opened(); } }
+            Chip { text: @tr("BACKUPS"); min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.can-backup; clicked => { DeviceState.tab = 3; DeviceState.visible = true; DeviceState.opened(); } }
         }
         HorizontalLayout {
             spacing: 2px;
             vertical-stretch: 0;
-            Chip { text: "UPDATE"; min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.has-library && root.can-update && !DeviceState.busy; tooltip: "UPDATE COLLECTION: import the edits made on the player"; clicked => { DeviceState.update-collection(); } }
-            Chip { text: "SETTINGS"; min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.can-settings; clicked => { DeviceState.edit-settings(); } }
-            Chip { text: "EJECT"; min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.picked && !DeviceState.busy; clicked => { DeviceState.eject(); } }
+            Chip { text: @tr("UPDATE"); min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.has-library && root.can-update && !DeviceState.busy; tooltip: @tr("UPDATE COLLECTION: import the edits made on the player"); clicked => { DeviceState.update-collection(); } }
+            Chip { text: @tr("SETTINGS"); min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.can-settings; clicked => { DeviceState.edit-settings(); } }
+            Chip { text: @tr("EJECT"); min-width: Theme.target-size(28px); font-size: Theme.font-xs; height: Theme.target-size(20px); enabled: root.picked && !DeviceState.busy; clicked => { DeviceState.eject(); } }
         }
         Rectangle {
             height: Theme.layout-profile == 1 ? 22px : 14px;

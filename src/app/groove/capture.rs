@@ -24,26 +24,26 @@ pub fn take(deck: &Deck, beats: u32, original: bool) -> Result<Drum, String> {
     deck.with_player(|p| {
         let rate = p.capture(0.0, 0.0).rate;
         if rate == 0 {
-            return Err("no audio on this deck".to_string());
+            return Err(tr!("no audio on this deck").to_string());
         }
         let pcm: Pcm = if original {
             p.capture(from, (to - from) / 1000.0)
         } else {
-            let stems = p
-                .stems()
-                .ok_or("DRUM CAPTURE needs the STEMS of this track (PREFS > Extensions)")?;
+            let stems = p.stems().ok_or(tr!(
+                "DRUM CAPTURE needs the STEMS of this track (PREFS > Extensions)"
+            ))?;
             let frame = |ms: f64| (ms * rate as f64 / 1000.0).round() as usize;
             capture::drums(&stems, rate, frame(from), frame(to) - frame(from))?
         };
         capture::drum(pcm, beats)
     })
-    .ok_or("no audio on this deck")?
+    .ok_or(tr!("no audio on this deck"))?
 }
 
 /// Writes the loop as a WAV file named after `title`; returns its path.
 pub fn save(d: &Drum, title: &str) -> Result<PathBuf, String> {
     let dir = prefs::with(|p| paths::capture_dir(&p.extensions.drum_dir, DIR_ENV, "Drums"))
-        .ok_or(format!("set a capture location, {DIR_ENV} or HOME"))?;
+        .ok_or(tr!("set a capture location, {} or HOME", DIR_ENV))?;
     let prefix = format!(
         "{}-drums-{}b-{:.2}bpm",
         paths::file_stem(title, STEM_MAX),

@@ -138,15 +138,15 @@ export component TrackTable inherits Rectangle {
             Rectangle {
                 height: Theme.h-header;
                 background: Theme.list-head;
-                if root.w-preview > 0px: HeaderCell { x: root.x-preview; width: root.w-preview; height: parent.height; title: "PREVIEW"; }
-                HeaderCell { x: root.x-title; width: root.w-title; height: parent.height; title: "TRACK TITLE"; sorted: root.sorted-col == 0; asc: root.sorted-asc; clicked => { root.sort-clicked(0); } }
-                HeaderCell { x: root.x-artist; width: root.w-artist; height: parent.height; title: "ARTIST"; sorted: root.sorted-col == 1; asc: root.sorted-asc; clicked => { root.sort-clicked(1); } }
-                if root.wide: HeaderCell { x: root.x-genre; width: root.w-genre; height: parent.height; title: "GENRE"; sorted: root.sorted-col == 2; asc: root.sorted-asc; clicked => { root.sort-clicked(2); } }
-                if root.wide: HeaderCell { x: root.x-comment; width: root.w-comment; height: parent.height; title: "COMMENT"; sorted: root.sorted-col == 7; asc: root.sorted-asc; clicked => { root.sort-clicked(7); } }
+                if root.w-preview > 0px: HeaderCell { x: root.x-preview; width: root.w-preview; height: parent.height; title: @tr("PREVIEW"); }
+                HeaderCell { x: root.x-title; width: root.w-title; height: parent.height; title: @tr("TRACK TITLE"); sorted: root.sorted-col == 0; asc: root.sorted-asc; clicked => { root.sort-clicked(0); } }
+                HeaderCell { x: root.x-artist; width: root.w-artist; height: parent.height; title: @tr("ARTIST"); sorted: root.sorted-col == 1; asc: root.sorted-asc; clicked => { root.sort-clicked(1); } }
+                if root.wide: HeaderCell { x: root.x-genre; width: root.w-genre; height: parent.height; title: @tr("GENRE"); sorted: root.sorted-col == 2; asc: root.sorted-asc; clicked => { root.sort-clicked(2); } }
+                if root.wide: HeaderCell { x: root.x-comment; width: root.w-comment; height: parent.height; title: @tr("COMMENT"); sorted: root.sorted-col == 7; asc: root.sorted-asc; clicked => { root.sort-clicked(7); } }
                 HeaderCell { x: root.x-bpm; width: root.w-bpm; height: parent.height; title: "BPM"; right: true; sorted: root.sorted-col == 4; asc: root.sorted-asc; clicked => { root.sort-clicked(4); } }
-                HeaderCell { x: root.x-rating; width: root.w-rating; height: parent.height; title: "RATING"; sorted: root.sorted-col == 6; asc: root.sorted-asc; clicked => { root.sort-clicked(6); } }
-                HeaderCell { x: root.x-time; width: root.w-time; height: parent.height; title: "TIME"; right: true; sorted: root.sorted-col == 5; asc: root.sorted-asc; clicked => { root.sort-clicked(5); } }
-                HeaderCell { x: root.x-key; width: root.w-key; height: parent.height; title: "KEY"; sorted: root.sorted-col == 3; asc: root.sorted-asc; clicked => { root.sort-clicked(3); } }
+                HeaderCell { x: root.x-rating; width: root.w-rating; height: parent.height; title: @tr("RATING"); sorted: root.sorted-col == 6; asc: root.sorted-asc; clicked => { root.sort-clicked(6); } }
+                HeaderCell { x: root.x-time; width: root.w-time; height: parent.height; title: @tr("TIME"); right: true; sorted: root.sorted-col == 5; asc: root.sorted-asc; clicked => { root.sort-clicked(5); } }
+                HeaderCell { x: root.x-key; width: root.w-key; height: parent.height; title: @tr("KEY"); sorted: root.sorted-col == 3; asc: root.sorted-asc; clicked => { root.sort-clicked(3); } }
                 // The column borders (drag; double-click = the default width); the title's right border drags the artist column.
                 ColEdge { dflt: 130px; invert: true; border: root.x-artist; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-artist-d; }
                 ColEdge { dflt: 130px; border: root.x-artist + root.w-artist; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-artist-d; }
@@ -176,7 +176,7 @@ export component TrackTable inherits Rectangle {
                     if root.wide: Cell { x: root.x-genre; width: root.w-genre - Theme.space-md; text: cells[2].text; color: on-deck ? Theme.row-loaded : Theme.row-dim; }
                     if root.wide: Cell { x: root.x-comment; width: root.w-comment - Theme.space-md; text: cells[7].text; color: on-deck ? Theme.row-loaded : Theme.row-dim; }
                     Cell { x: root.x-bpm; width: root.w-bpm - Theme.space-md; text: cells[4].text; right: true; color: on-deck ? Theme.row-loaded : hints == "b" || hints == "kb" ? Theme.play : Theme.text; }
-                    Text { x: root.x-rating + Theme.space-md; height: parent.height; text: "★★★★★"; vertical-alignment: center; color: Theme.text-faint; font-size: 10px; letter-spacing: 1px; }
+                    Text { x: root.x-rating + Theme.space-md; height: parent.height; text: @tr("★★★★★"); vertical-alignment: center; color: Theme.text-faint; font-size: 10px; letter-spacing: 1px; }
                     Text { x: root.x-rating + Theme.space-md; height: parent.height; text: cells[6].text; vertical-alignment: center; color: Theme.text; font-size: 10px; letter-spacing: 1px; }
                     Cell { x: root.x-time; width: root.w-time - Theme.space-md; text: cells[5].text; right: true; color: on-deck ? Theme.row-loaded : Theme.row-dim; }
                     // Camelot hue on the key; a bar before it when the key mixes with the master deck.
@@ -220,7 +220,7 @@ export component TrackTable inherits Rectangle {
     if BrowserState.tracks.length == 0: Text {
         y: Theme.h-header;
         height: parent.height - Theme.h-header;
-        text: "No tracks";
+        text: @tr("No tracks");
         horizontal-alignment: center;
         vertical-alignment: center;
         color: Theme.text-faint;
@@ -242,25 +242,25 @@ export component TrackTable inherits Rectangle {
             border-radius: Theme.radius;
             VerticalLayout {
                 padding: 1px;
-                MenuItem { text: "Load to deck"; activated => { BrowserState.track-pressed(BrowserState.current-row); BrowserState.track-pressed(BrowserState.current-row); menu.close(); } }
-                MenuItem { text: "Edit track details…"; activated => { LibraryState.action("track-edit"); menu.close(); } }
-                MenuItem { text: "Add to Tag List (T)"; activated => { BrowserState.tag-add(); menu.close(); } }
-                MenuItem { text: "Add to playlist…"; activated => { BrowserState.panel-request(0); menu.close(); } }
-                if BrowserState.palette-enabled: MenuItem { text: "Add to palette 1"; activated => { BrowserState.palette-add-chosen(1); menu.close(); } }
-                if BrowserState.palette-enabled: MenuItem { text: "Add to palette 2"; activated => { BrowserState.palette-add-chosen(2); menu.close(); } }
-                if BrowserState.palette-enabled: MenuItem { text: "Add to palette 3"; activated => { BrowserState.palette-add-chosen(3); menu.close(); } }
-                MenuItem { text: "Tags…"; activated => { BrowserState.panel-request(1); menu.close(); } }
-                MenuItem { text: BrowserState.related ? "Hide related tracks" : "Related tracks"; activated => { BrowserState.related-toggled(!BrowserState.related); menu.close(); } }
-                if root.list-view: MenuItem { text: "Move up"; activated => { BrowserState.list-move(-1); menu.close(); } }
-                if root.list-view: MenuItem { text: "Move down"; activated => { BrowserState.list-move(1); menu.close(); } }
-                if root.list-view: MenuItem { text: "Remove from list"; activated => { BrowserState.list-remove(); menu.close(); } }
-                MenuItem { text: "Analyze track"; activated => { LibraryState.action("track-analyze"); menu.close(); } }
-                MenuItem { text: "Analysis lock"; activated => { LibraryState.action("track-lock"); menu.close(); } }
-                MenuItem { text: "Reload tag"; activated => { LibraryState.action("track-reload-tag"); menu.close(); } }
-                MenuItem { text: "Show in file manager"; activated => { LibraryState.action("track-show"); menu.close(); } }
-                MenuItem { text: "Relocate…"; activated => { LibraryState.action("track-relocate"); menu.close(); } }
-                MenuItem { text: "Auto relocate"; activated => { LibraryState.action("track-auto-relocate"); menu.close(); } }
-                MenuItem { text: "Remove from Collection"; activated => { LibraryState.action("track-remove"); menu.close(); } }
+                MenuItem { text: @tr("Load to deck"); activated => { BrowserState.track-pressed(BrowserState.current-row); BrowserState.track-pressed(BrowserState.current-row); menu.close(); } }
+                MenuItem { text: @tr("Edit track details…"); activated => { LibraryState.action("track-edit"); menu.close(); } }
+                MenuItem { text: @tr("Add to Tag List (T)"); activated => { BrowserState.tag-add(); menu.close(); } }
+                MenuItem { text: @tr("Add to playlist…"); activated => { BrowserState.panel-request(0); menu.close(); } }
+                if BrowserState.palette-enabled: MenuItem { text: @tr("Add to palette 1"); activated => { BrowserState.palette-add-chosen(1); menu.close(); } }
+                if BrowserState.palette-enabled: MenuItem { text: @tr("Add to palette 2"); activated => { BrowserState.palette-add-chosen(2); menu.close(); } }
+                if BrowserState.palette-enabled: MenuItem { text: @tr("Add to palette 3"); activated => { BrowserState.palette-add-chosen(3); menu.close(); } }
+                MenuItem { text: @tr("Tags…"); activated => { BrowserState.panel-request(1); menu.close(); } }
+                MenuItem { text: BrowserState.related ? @tr("Hide related tracks") : @tr("Related tracks"); activated => { BrowserState.related-toggled(!BrowserState.related); menu.close(); } }
+                if root.list-view: MenuItem { text: @tr("Move up"); activated => { BrowserState.list-move(-1); menu.close(); } }
+                if root.list-view: MenuItem { text: @tr("Move down"); activated => { BrowserState.list-move(1); menu.close(); } }
+                if root.list-view: MenuItem { text: @tr("Remove from list"); activated => { BrowserState.list-remove(); menu.close(); } }
+                MenuItem { text: @tr("Analyze track"); activated => { LibraryState.action("track-analyze"); menu.close(); } }
+                MenuItem { text: @tr("Analysis lock"); activated => { LibraryState.action("track-lock"); menu.close(); } }
+                MenuItem { text: @tr("Reload tag"); activated => { LibraryState.action("track-reload-tag"); menu.close(); } }
+                MenuItem { text: @tr("Show in file manager"); activated => { LibraryState.action("track-show"); menu.close(); } }
+                MenuItem { text: @tr("Relocate…"); activated => { LibraryState.action("track-relocate"); menu.close(); } }
+                MenuItem { text: @tr("Auto relocate"); activated => { LibraryState.action("track-auto-relocate"); menu.close(); } }
+                MenuItem { text: @tr("Remove from Collection"); activated => { LibraryState.action("track-remove"); menu.close(); } }
             }
         }
     }

@@ -64,7 +64,7 @@ impl Kind {
 
     fn name(&self) -> String {
         match self {
-            Kind::Device(d) => format!("{}  ({}, {} free)", d.label, d.fs, device::size(d.free)),
+            Kind::Device(d) => tr!("{}  ({}, {} free)", d.label, d.fs, device::size(d.free)),
             _ => self.short(),
         }
     }
@@ -74,7 +74,7 @@ impl Kind {
         match self {
             Kind::Device(d) => d.label.clone(),
             Kind::Plugin { label, .. } => label.clone(),
-            Kind::Explorer(_) => "Explorer".to_owned(),
+            Kind::Explorer(_) => tr!("Explorer").to_owned(),
         }
     }
 
@@ -231,12 +231,16 @@ impl View {
     pub(super) fn source_hint(&self, e: &Entry) -> Option<&'static str> {
         Some(match e {
             Entry::DevicesRoot => {
-                "Devices: choose a device to open it and its window (eject, sync, backup, update collection …)"
+                tr!(
+                    "Devices: choose a device to open it and its window (eject, sync, backup, update collection …)"
+                )
             }
             Entry::Source(_) => {
-                "Choose All tracks or a playlist; IMPORT TO COLLECTION (File and Track menus) adds what you choose to the Collection"
+                tr!(
+                    "Choose All tracks or a playlist; IMPORT TO COLLECTION (File and Track menus) adds what you choose to the Collection"
+                )
             }
-            Entry::SourceList(..) => "Folder of the source: choose a playlist inside it",
+            Entry::SourceList(..) => tr!("Folder of the source: choose a playlist inside it"),
             _ => return None,
         })
     }
@@ -299,7 +303,7 @@ impl View {
             return;
         };
         s.reading = true;
-        loading(app, &format!("{}: reading…", s.kind.short()), Some(0.0));
+        loading(app, &tr!("{}: reading…", s.kind.short()), Some(0.0));
         read(app, s.kind.clone());
     }
 
@@ -316,15 +320,15 @@ impl View {
                 let lists = playlists.iter().filter(|p| !p.is_folder).count();
                 let lib: Rc<dyn Library> = openfader::store::overlay(lib).into();
                 (s.lib, s.playlists) = (Some(lib), playlists);
-                let s_ = |n: usize| if n == 1 { "" } else { "s" };
-                format!(
-                    "{}: {tracks} track{}, {lists} playlist{} ready ({secs:.1} s)",
+                tr!(
+                    "{}: {}, {} ready ({} s)",
                     kind.short(),
-                    s_(tracks),
-                    s_(lists),
+                    tr_n!("{n} track", "{n} tracks", tracks),
+                    tr_n!("{n} playlist", "{n} playlists", lists),
+                    format!("{secs:.1}")
                 )
             }
-            Err(e) => format!("{}: cannot read it: {e}", kind.short()),
+            Err(e) => tr!("{}: cannot read it: {}", kind.short(), e),
         };
         eprintln!("{text}");
         toast::show(app, &text);
@@ -408,13 +412,13 @@ fn read(app: &App, kind: Kind) {
                     shown = pct;
                     let (done, total) = (device::size(done), device::size(total));
                     step(
-                        format!("{name}: reading the library, {done} of {total}"),
+                        tr!("{}: reading the library, {} of {}", name, done, total),
                         0.8 * pct as f32 / 100.0,
                     );
                 }
             });
         }
-        step(format!("{name}: listing tracks and playlists"), 0.85);
+        step(tr!("{}: listing tracks and playlists", name), 0.85);
         let read: Read = kind.open().and_then(|lib| {
             let playlists = lib.playlists()?;
             let tracks = lib.tracks(None)?.len();

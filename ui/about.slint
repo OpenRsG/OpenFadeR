@@ -35,7 +35,7 @@ component Link inherits HorizontalLayout {
 
 export component AboutOverlay inherits DialogFrame {
     visible: AboutState.visible;
-    title: "ABOUT OPENFADER";
+    title: @tr("ABOUT OPENFADER");
     card-width: 460px;
     closed => { AboutState.visible = false; }
     HorizontalLayout {
@@ -44,28 +44,28 @@ export component AboutOverlay inherits DialogFrame {
     }
     VerticalLayout {
         spacing: Theme.space-xs;
-        Text { text: "OpenFadeR"; horizontal-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md * 1.6; font-weight: Theme.weight-bold; }
+        Text { text: @tr("OpenFadeR"); horizontal-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md * 1.6; font-weight: Theme.weight-bold; }
         Text { text: "Version " + AboutState.version; horizontal-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-md; }
-        Text { text: "Open-source DJ software for two or four decks"; horizontal-alignment: center; color: Theme.text; font-family: Theme.font; font-size: Theme.font-md; }
+        Text { text: @tr("Open-source DJ software for two or four decks"); horizontal-alignment: center; color: Theme.text; font-family: Theme.font; font-size: Theme.font-md; }
     }
     Rectangle { height: 1px; background: Theme.line; }
     VerticalLayout {
         spacing: Theme.space-sm;
-        Link { label: "AUTHOR"; text: "OpenRsG"; url: "https://github.com/OpenRsG"; }
-        Link { label: "SOURCE"; text: "github.com/OpenRsG/OpenFadeR"; url: "https://github.com/OpenRsG/OpenFadeR"; }
-        Link { label: "PLUGINS"; text: "github.com/OpenRsG/OpenFadeR-Plugins"; url: "https://github.com/OpenRsG/OpenFadeR-Plugins"; }
-        Link { label: "THEMES"; text: "github.com/OpenRsG/OpenFadeR-Themes"; url: "https://github.com/OpenRsG/OpenFadeR-Themes"; }
-        Link { label: "MAPPINGS"; text: "github.com/OpenRsG/OpenFadeR-Map"; url: "https://github.com/OpenRsG/OpenFadeR-Map"; }
-        Link { label: "ISSUES"; text: "Report a bug or ask for a feature"; url: "https://github.com/OpenRsG/OpenFadeR/issues"; }
-        Link { label: "LICENSE"; text: "GNU AGPL v3"; url: "https://github.com/OpenRsG/OpenFadeR/blob/main/LICENSE"; }
+        Link { label: @tr("AUTHOR"); text: "OpenRsG"; url: "https://github.com/OpenRsG"; }
+        Link { label: @tr("SOURCE"); text: "github.com/OpenRsG/OpenFadeR"; url: "https://github.com/OpenRsG/OpenFadeR"; }
+        Link { label: @tr("PLUGINS"); text: "github.com/OpenRsG/OpenFadeR-Plugins"; url: "https://github.com/OpenRsG/OpenFadeR-Plugins"; }
+        Link { label: @tr("THEMES"); text: "github.com/OpenRsG/OpenFadeR-Themes"; url: "https://github.com/OpenRsG/OpenFadeR-Themes"; }
+        Link { label: @tr("MAPPINGS"); text: "github.com/OpenRsG/OpenFadeR-Map"; url: "https://github.com/OpenRsG/OpenFadeR-Map"; }
+        Link { label: @tr("ISSUES"); text: @tr("Report a bug or ask for a feature"); url: "https://github.com/OpenRsG/OpenFadeR/issues"; }
+        Link { label: @tr("LICENSE"); text: "GNU AGPL v3"; url: "https://github.com/OpenRsG/OpenFadeR/blob/main/LICENSE"; }
     }
-    Note { text: "Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."; wrap: word-wrap; horizontal-alignment: center; }
+    Note { text: @tr("Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."); wrap: word-wrap; horizontal-alignment: center; }
 }
 
 /// Shown at launch when GitHub has a newer release: DOWNLOAD opens its page, LATER closes until the next launch.
 export component UpdateOverlay inherits DialogFrame {
     visible: AboutState.update != "";
-    title: "Update available";
+    title: @tr("Update available");
     card-width: 420px;
     closed => { AboutState.update = ""; }
     HorizontalLayout {
@@ -80,7 +80,7 @@ export component UpdateOverlay inherits DialogFrame {
     HorizontalLayout {
         alignment: end;
         spacing: Theme.space-sm;
-        Chip { text: "LATER"; width: 80px; horizontal-stretch: 0; clicked => { AboutState.update = ""; } }
-        Chip { text: "DOWNLOAD"; width: 110px; horizontal-stretch: 0; active: true; clicked => { AboutState.open(AboutState.update-url); AboutState.update = ""; } }
+        Chip { text: @tr("LATER"); width: 80px; horizontal-stretch: 0; clicked => { AboutState.update = ""; } }
+        Chip { text: @tr("DOWNLOAD"); width: 110px; horizontal-stretch: 0; active: true; clicked => { AboutState.open(AboutState.update-url); AboutState.update = ""; } }
     }
 }

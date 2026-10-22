@@ -251,7 +251,7 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     rows.extend(mixer::rows(p));
     rows.extend(effect::rows(c));
     rows.extend(sampler::rows(c));
-    rows.push(Row::header("RECORDINGS"));
+    rows.push(Row::header(tr!("RECORDINGS")));
     rows.extend(super::advanced::recording_rows(&p.advanced));
     rows.extend(mixpoint::rows(c));
     rows.extend(others::rows(c));

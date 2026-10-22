@@ -156,7 +156,7 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>, on_track: Rc<dyn Fn(&Tra
         let mut v = q.view.borrow_mut();
         match v.selected.clone() {
             Some(t) => q.add_track(&app, &mut v, pal, &t),
-            None => v.say(&app, "select a track to add"),
+            None => v.say(&app, tr!("select a track to add")),
         }
     });
     let (weak, q) = (app.as_weak(), p.clone());
@@ -241,7 +241,7 @@ impl Palette {
         let (names, keys) = {
             let mut a = self.assign.borrow_mut();
             a.prune(&store, |id| nodes.iter().any(|n| n.id == id));
-            let mut names = vec!["TAG LIST".to_owned()];
+            let mut names = vec![tr!("TAG LIST").to_owned()];
             let mut keys = vec![v.tags.iter().map(store::key).collect::<Vec<_>>()];
             for slot in 0..SLOTS {
                 let id = a.get(slot);

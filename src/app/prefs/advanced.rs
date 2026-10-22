@@ -95,11 +95,11 @@ pub fn recording_rows(a: &Advanced) -> Vec<Row> {
     let db: Vec<String> = THRESHOLDS.iter().map(|d| format!("{d} dB")).collect();
     let secs: Vec<String> = (1..=10).map(|s| format!("{s} s")).collect();
     vec![
-        Row::text("rec_location", "LOCATION OF FILES", &a.rec_location),
-        Row::info("", "empty = ~/Music/OpenFadeR"),
+        Row::text("rec_location", tr!("LOCATION OF FILES"), &a.rec_location),
+        Row::info("", tr!("empty = ~/Music/OpenFadeR")),
         Row::dropdown_of(
             "rec_threshold",
-            "SILENCE LEVEL THRESHOLD",
+            tr!("SILENCE LEVEL THRESHOLD"),
             db,
             THRESHOLDS
                 .iter()
@@ -108,41 +108,41 @@ pub fn recording_rows(a: &Advanced) -> Vec<Row> {
         ),
         Row::chips(
             "rec_start_on_audio",
-            "RECORDING STARTS WHEN",
-            &["REC BUTTON", "AUDIO INPUT"],
+            tr!("RECORDING STARTS WHEN"),
+            &[tr!("REC BUTTON"), tr!("AUDIO INPUT")],
             a.rec_start_on_audio as usize,
         ),
         Row::chips(
             "rec_end_on_silence",
-            "RECORDING ENDS WHEN",
-            &["REC BUTTON", "20 S SILENCE"],
+            tr!("RECORDING ENDS WHEN"),
+            &[tr!("REC BUTTON"), tr!("20 S SILENCE")],
             a.rec_end_on_silence as usize,
         ),
         Row::check(
             "rec_split",
-            "Automatically separate files when silence continues",
+            tr!("Automatically separate files when silence continues"),
             a.rec_split,
         ),
         Row::dropdown_of(
             "rec_split_secs",
-            "SILENCE LENGTH",
+            tr!("SILENCE LENGTH"),
             secs,
             a.rec_split_secs.clamp(1, 10) as usize - 1,
         )
         .enabled(a.rec_split),
         Row::check(
             "rec_optimise",
-            "Automatically optimize the audio level of a recorded file",
+            tr!("Automatically optimize the audio level of a recorded file"),
             a.rec_optimise,
         ),
         Row::check(
             "rec_import",
-            "Automatically import a recorded file",
+            tr!("Automatically import a recorded file"),
             a.rec_import,
         ),
         Row::check(
             "rec_tag_window",
-            "Automatically display the tag information of a recorded file",
+            tr!("Automatically display the tag information of a recorded file"),
             a.rec_tag_window,
         ),
     ]
@@ -158,23 +158,23 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     // The database and browse rows bring their own headings.
     let mut rows = library::database_rows(p);
     rows.extend(library::browse_rows(p));
-    rows.push(Row::header("RECORDINGS"));
+    rows.push(Row::header(tr!("RECORDINGS")));
     rows.extend(recording_rows(a));
     rows.extend([
-        Row::header("OTHERS"),
-        Row::of("sync_type", "SYNC TYPE", c.sync_type),
+        Row::header(tr!("OTHERS")),
+        Row::of("sync_type", tr!("SYNC TYPE"), c.sync_type),
         Row::check(
             "sync_half_double",
-            "Allow BEAT/BPM SYNC with double/half BPM",
+            tr!("Allow BEAT/BPM SYNC with double/half BPM"),
             c.sync_half_double,
         ),
         Row::check(
             "hot_cue_gate",
-            "HOT CUE: during pause, GATE playback is applied",
+            tr!("HOT CUE: during pause, GATE playback is applied"),
             c.hot_cue_gate,
         ),
-        Row::dropdown_of("export_loop_hz", "EXPORT LOOP AS WAV", rates, at)
-            .hint("sampling frequency"),
+        Row::dropdown_of("export_loop_hz", tr!("EXPORT LOOP AS WAV"), rates, at)
+            .hint(tr!("sampling frequency")),
     ]);
     rows
 }

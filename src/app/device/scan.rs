@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 fn item(d: &Device) -> DeviceItem {
     let library = match d.held() {
-        h if h.is_empty() => "no library yet".to_owned(),
+        h if h.is_empty() => tr!("no library yet").to_owned(),
         h => h,
     };
     let warning = d
@@ -23,7 +23,7 @@ fn item(d: &Device) -> DeviceItem {
         .map(str::to_owned)
         .or_else(|| {
             d.read_only
-                .then(|| "mounted read-only: nothing can be written".to_owned())
+                .then(|| tr!("mounted read-only: nothing can be written").to_owned())
         })
         .unwrap_or_default();
     DeviceItem {
@@ -60,7 +60,7 @@ impl Ctx {
             let Some(app) = self.app() else { return };
             loading(
                 &app,
-                &format!("{}: plugged in, mounting /dev/{}…", u.label, u.part),
+                &tr!("{}: plugged in, mounting /dev/{}…", u.label, u.part),
                 Some(0.02),
             );
             let weak = self.app.clone();
@@ -72,7 +72,7 @@ impl Ctx {
                     match r {
                         Ok(at) => eprintln!("{}: mounted at {}", u.label, at.display()),
                         Err(e) => {
-                            let text = format!("{}: cannot mount /dev/{}: {e}", u.label, u.part);
+                            let text = tr!("{}: cannot mount /dev/{}: {}", u.label, u.part, e);
                             eprintln!("{text}");
                             toast::show(&app, &text);
                         }
@@ -100,7 +100,7 @@ impl Ctx {
         };
         let before = self.devices.replace(now.clone());
         for d in now.iter().filter(|d| !before.iter().any(|b| b.id == d.id)) {
-            say(&format!("{} connected ({})", d.label, d.summary()));
+            say(&tr!("{} connected ({})", d.label, d.summary()));
             if let Some(w) = d.support.message() {
                 say(w);
             }
@@ -111,9 +111,10 @@ impl Ctx {
                 // What the player changed in its settings since we wrote them becomes the device's settings here.
                 if let Ok(n @ 1..) = crate::app::prefs::dj_system::sync_from_device(&self.store, d)
                 {
-                    say(&format!(
-                        "{}: {n} setting(s) changed on the player were taken over",
-                        d.label
+                    say(&tr!(
+                        "{}: {} setting(s) changed on the player were taken over",
+                        d.label,
+                        n
                     ));
                 }
             }
@@ -142,7 +143,7 @@ impl Ctx {
                 .push_back((d.id.clone(), Auto::Link));
         }
         for d in before.iter().filter(|d| !now.iter().any(|n| n.id == d.id)) {
-            say(&format!("{} removed", d.label));
+            say(&tr!("{} removed", d.label));
             self.links.borrow_mut().remove(&d.id);
             self.pushes.borrow_mut().remove(&d.id);
         }

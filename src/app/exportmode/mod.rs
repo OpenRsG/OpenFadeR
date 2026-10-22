@@ -159,7 +159,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
             Some(bpm) => d.grid_set_bpm(bpm),
             None => {
                 if let Some(app) = w.upgrade() {
-                    toast::show(&app, "BPM: type a tempo between 30 and 300");
+                    toast::show(&app, tr!("BPM: type a tempo between 30 and 300"));
                 }
             }
         });
@@ -180,13 +180,13 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
             let Some(app) = w.upgrade() else { return };
             let d = &decks[i as usize % PLAYERS];
             let msg = match d.track() {
-                None => "load a track first".to_owned(),
+                None => tr!("load a track first").to_owned(),
                 Some(_) if d.grid_locked() => {
-                    "this track has an Analysis Lock: unlock it first".to_owned()
+                    tr!("this track has an Analysis Lock: unlock it first").to_owned()
                 }
                 Some((_, t)) => {
                     analyze::request(std::slice::from_ref(&t));
-                    format!(
+                    tr!(
                         "analysing “{}”…{}",
                         t.title,
                         analyze::library_grid_notice(&t)
@@ -201,7 +201,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         state.on_matching(move || {
             let Some(app) = w.upgrade() else { return };
             let Some((a, b)) = pair(&decks) else {
-                return toast::show(&app, "load a track in both players first");
+                return toast::show(&app, tr!("load a track in both players first"));
             };
             let (ka, kb) = (store::key(&a), store::key(&b));
             let s = store::global();
@@ -212,9 +212,9 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
                 s.remove_match(&ka, &kb)
             };
             let msg = match (&done, on) {
-                (Err(e), _) => format!("matching: {e}"),
-                (_, true) => format!("“{}” and “{}” are now related tracks", a.title, b.title),
-                (_, false) => format!("“{}” and “{}” are no longer related", a.title, b.title),
+                (Err(e), _) => tr!("matching: {}", e),
+                (_, true) => tr!("“{}” and “{}” are now related tracks", a.title, b.title),
+                (_, false) => tr!("“{}” and “{}” are no longer related", a.title, b.title),
             };
             toast::show(&app, &msg);
             if let Some(mut row) = model.row_data(0) {

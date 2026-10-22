@@ -103,14 +103,14 @@ pub fn rescan() {
 /// "3 min ago" style text for a unix time.
 pub fn ago(at: i64) -> String {
     if at == 0 {
-        return "never".into();
+        return tr!("never").into();
     }
     let d = (now() - at).max(0);
     match d {
-        0..=59 => "just now".into(),
-        60..=3599 => format!("{} min ago", d / 60),
-        3600..=86399 => format!("{} h ago", d / 3600),
-        _ => format!("{} d ago", d / 86400),
+        0..=59 => tr!("just now").into(),
+        60..=3599 => tr!("{} min ago", d / 60),
+        3600..=86399 => tr!("{} h ago", d / 3600),
+        _ => tr!("{} d ago", d / 86400),
     }
 }
 
@@ -138,7 +138,7 @@ fn start_sync(c: Connection) {
                     };
                     browser::loading(
                         &app,
-                        &format!("Syncing {label}: {done} / {total} tracks"),
+                        &tr!("Syncing {}: {} / {} tracks", label, done, total),
                         Some(frac),
                     );
                 }
@@ -164,7 +164,7 @@ fn synced(c: &Connection, stamp: String, result: Result<Report, String>) {
         }
         Err(e) => {
             with(|s| s.failed.insert(c.id, stamp));
-            toast::show(&app, &format!("{}: sync failed: {e}", c.label));
+            toast::show(&app, &tr!("{}: sync failed: {}", c.label, e));
         }
     }
     prefs::refresh();
@@ -186,7 +186,9 @@ pub fn sync_now(id: i64) {
 /// CONNECT on the Media Browser library on screen: the same library file or folder, synced from now on.
 pub fn connect_context() {
     let Some((path, kind, _)) = browser::context().source else {
-        return say("choose All tracks or a playlist of a library source first");
+        return say(tr!(
+            "choose All tracks or a playlist of a library source first"
+        ));
     };
     let (plugin, label) = match kind {
         browser::SourceType::Plugin(p) => (p.clone(), p),
@@ -200,7 +202,7 @@ pub fn connect_context() {
     };
     match connect::connect(&store::global(), &plugin, &path, &label) {
         Ok(c) => {
-            say(&format!("Connected {}", c.label));
+            say(&tr!("Connected {}", c.label));
             rescan();
             start_sync(c);
         }
@@ -213,7 +215,7 @@ pub fn add(path: &Path) {
     let store = store::global();
     match connect::adopt(&store, path) {
         Ok(c) => {
-            say(&format!("Connected {}", c.label));
+            say(&tr!("Connected {}", c.label));
             rescan();
             start_sync(c);
         }
@@ -346,13 +348,15 @@ pub fn writeback_answer(yes: bool) {
         let _ = slint::invoke_from_event_loop(move || {
             with(|s| s.busy.remove(&id));
             match r {
-                Ok(n) => say(&format!(
-                    "{label}: wrote {n} tracks (backup in the backups folder)"
+                Ok(n) => say(&tr!(
+                    "{}: wrote {} tracks (backup in the backups folder)",
+                    label,
+                    n
                 )),
                 Err(e) => {
                     // plan again on the next look: the source or the pending edits may still differ
                     with(|s| s.seen.insert(id, 0));
-                    say(&format!("{label}: not written: {e}"))
+                    say(&tr!("{}: not written: {}", label, e))
                 }
             }
             prefs::refresh();
@@ -394,7 +398,7 @@ pub fn wire(app: &App) {
     {
         toast::show(
             app,
-            &format!("Found {}: connect it in Preferences > Libraries", f.label),
+            &tr!("Found {}: connect it in Preferences > Libraries", f.label),
         );
     }
     TIMER.with(|t| t.start(TimerMode::Repeated, POLL, tick));

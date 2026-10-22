@@ -97,7 +97,7 @@ component FxSlotView inherits HorizontalLayout {
     in property <length> ctl-h;
     property <bool> touch: Theme.layout-profile == 1;
     spacing: root.touch ? 6px : 3px;
-    Chip { text: "" + (root.i + 1); font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; active: root.s.on; active-color: Theme.play; tooltip: "FX" + (root.unit + 1) + "-" + (root.i + 1) + " ON"; clicked => { FxState.toggled(root.unit, root.i); } }
+    Chip { text: "" + (root.i + 1); font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; active: root.s.on; active-color: Theme.play; tooltip: @tr("FX{}-{} ON", root.unit + 1, root.i + 1); clicked => { FxState.toggled(root.unit, root.i); } }
     Dropdown {
         options: FxState.effects;
         current: root.s.effect;
@@ -107,7 +107,7 @@ component FxSlotView inherits HorizontalLayout {
         height: root.ctl-h;
         chose(e) => { FxState.effect-selected(root.unit, root.i, e); }
     }
-    Chip { text: root.s.beat-text; font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 32px; max-width: root.touch ? root.ctl-h : 32px; horizontal-stretch: 0; height: root.ctl-h; active: root.target; tooltip: "Beat (lit: BEAT ◀ ▶ step this slot)"; clicked => { FxState.target-selected(root.unit, root.i); } }
+    Chip { text: root.s.beat-text; font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 32px; max-width: root.touch ? root.ctl-h : 32px; horizontal-stretch: 0; height: root.ctl-h; active: root.target; tooltip: @tr("Beat (lit: BEAT ◀ ▶ step this slot)"); clicked => { FxState.target-selected(root.unit, root.i); } }
     Knob { width: root.ctl-h; height: root.ctl-h; value: root.s.level; edited(v) => { FxState.level-edited(root.unit, root.i, v); } }
 }
 
@@ -127,7 +127,7 @@ component Unit inherits Rectangle {
         spacing: 8px;
         VerticalLayout {
             alignment: center;
-            Chip { text: "FX" + (root.n + 1); font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 36px; max-width: root.touch ? root.ctl-h : 36px; height: root.touch ? 2 * root.ctl-h + 8px : 46px; active: FxState.unit == root.n; tooltip: "Unit the keyboard edits"; clicked => { FxState.unit = root.n; } }
+            Chip { text: @tr("FX{}", root.n + 1); font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 36px; max-width: root.touch ? root.ctl-h : 36px; height: root.touch ? 2 * root.ctl-h + 8px : 46px; active: FxState.unit == root.n; tooltip: @tr("Unit the keyboard edits"); clicked => { FxState.unit = root.n; } }
         }
         VerticalLayout {
             alignment: center;
@@ -158,13 +158,13 @@ component Unit inherits Rectangle {
                 height: root.ctl-h;
                 spacing: 10px;
                 Chip {
-                    text: "HOLD: RELEASE FX";
+                    text: @tr("HOLD: RELEASE FX");
                     font-size: Theme.font-xs;
                     min-width: 80px;
                     height: root.ctl-h;
                     active: u.releasing;
                     active-color: Theme.play;
-                    tooltip: "Hold: echo-out";
+                    tooltip: @tr("Hold: echo-out");
                     pressed => { FxState.release(root.n, true); }
                     released => { FxState.release(root.n, false); }
                 }
@@ -173,13 +173,13 @@ component Unit inherits Rectangle {
             if FxState.view == 2: HorizontalLayout {
                 height: root.ctl-h;
                 spacing: 4px;
-                FxLabel { text: "PRESET"; }
-                Chip { text: "M" + (root.n + 1) + " " + u.merge-name; font-size: Theme.font-xs; min-width: 80px; horizontal-stretch: 0; height: root.ctl-h; enabled: FxState.merge-enabled; tooltip: "MERGE FX preset (click: next)"; clicked => { FxState.merge-preset(root.n, 1); } }
+                FxLabel { text: @tr("PRESET"); }
+                Chip { text: @tr("M{} {}", root.n + 1, u.merge-name); font-size: Theme.font-xs; min-width: 80px; horizontal-stretch: 0; height: root.ctl-h; enabled: FxState.merge-enabled; tooltip: @tr("MERGE FX preset (click: next)"); clicked => { FxState.merge-preset(root.n, 1); } }
                 Rectangle { width: 6px; }
-                FxLabel { text: "BUILD-UP"; }
+                FxLabel { text: @tr("BUILD-UP"); }
                 Fader { min-width: root.touch ? 3 * root.ctl-h : 60px; height: root.ctl-h; opacity: FxState.merge-enabled ? 1 : 0.4; value: u.merge-knob; edited(v) => { FxState.merge-knob(root.n, v); } }
                 Chip {
-                    text: "GO";
+                    text: @tr("GO");
                     font-size: Theme.font-xs;
                     min-width: root.button-w;
                     horizontal-stretch: 0;
@@ -187,16 +187,16 @@ component Unit inherits Rectangle {
                     enabled: FxState.merge-enabled;
                     active: u.merge-on;
                     active-color: Theme.play;
-                    tooltip: "Hold: MERGE FX build-up";
+                    tooltip: @tr("Hold: MERGE FX build-up");
                     pressed => { FxState.merge-on(root.n, true); }
                     released => { FxState.merge-on(root.n, false); }
                 }
-                Chip { text: "ABORT"; font-size: Theme.font-xs; min-width: 48px; horizontal-stretch: 0; height: root.ctl-h; enabled: FxState.merge-enabled; tooltip: "Stop the effect at once"; clicked => { FxState.merge-abort(root.n); } }
+                Chip { text: @tr("ABORT"); font-size: Theme.font-xs; min-width: 48px; horizontal-stretch: 0; height: root.ctl-h; enabled: FxState.merge-enabled; tooltip: @tr("Stop the effect at once"); clicked => { FxState.merge-abort(root.n); } }
             }
             if FxState.view == 2: HorizontalLayout {
                 height: root.ctl-h;
                 spacing: 4px;
-                FxLabel { text: "SAMPLE"; }
+                FxLabel { text: @tr("SAMPLE"); }
                 Fader { min-width: root.touch ? 3 * root.ctl-h : 60px; height: root.ctl-h; detent: true; opacity: FxState.merge-enabled ? 1 : 0.4; value: u.merge-volume; edited(v) => { FxState.merge-volume(root.n, v); } }
             }
             if FxState.view != 2: HorizontalLayout {
@@ -205,27 +205,27 @@ component Unit inherits Rectangle {
                 if FxState.view == 0: HorizontalLayout {
                     spacing: 3px;
                     horizontal-stretch: 0;
-                    FxLabel { text: "BEAT"; }
+                    FxLabel { text: @tr("BEAT"); }
                     Rectangle { width: 2px; }
-                    Chip { text: "◀"; font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; tooltip: "BEAT down (the lit slot)"; clicked => { FxState.beat-step(root.n, -1); } }
-                    Chip { text: "▶"; font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; tooltip: "BEAT up (the lit slot)"; clicked => { FxState.beat-step(root.n, 1); } }
+                    Chip { text: "◀"; font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; tooltip: @tr("BEAT down (the lit slot)"); clicked => { FxState.beat-step(root.n, -1); } }
+                    Chip { text: "▶"; font-size: Theme.font-xs; min-width: root.ctl-h; max-width: root.ctl-h; horizontal-stretch: 0; height: root.ctl-h; tooltip: @tr("BEAT up (the lit slot)"); clicked => { FxState.beat-step(root.n, 1); } }
                 }
                 if FxState.view == 0: FxDivider { }
                 if FxState.view == 0: HorizontalLayout {
                     spacing: 3px;
                     horizontal-stretch: 0;
-                    FxLabel { text: "TEMPO"; }
+                    FxLabel { text: @tr("TEMPO"); }
                     Rectangle { width: 2px; }
-                    Chip { text: "TAP"; font-size: Theme.font-xs; min-width: root.button-w; horizontal-stretch: 0; height: root.ctl-h; tooltip: "Tap the tempo"; clicked => { FxState.tapped(root.n); } }
-                    Chip { text: "AUTO"; font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 38px; horizontal-stretch: 0; height: root.ctl-h; active: !u.tapped; tooltip: "Follow the master deck's tempo"; clicked => { FxState.auto-beat(root.n); } }
+                    Chip { text: @tr("TAP"); font-size: Theme.font-xs; min-width: root.button-w; horizontal-stretch: 0; height: root.ctl-h; tooltip: @tr("Tap the tempo"); clicked => { FxState.tapped(root.n); } }
+                    Chip { text: @tr("AUTO"); font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 38px; horizontal-stretch: 0; height: root.ctl-h; active: !u.tapped; tooltip: @tr("Follow the master deck's tempo"); clicked => { FxState.auto-beat(root.n); } }
                     Chip {
-                        text: "REL";
+                        text: @tr("REL");
                         font-size: Theme.font-xs;
                         min-width: root.button-w;
                         horizontal-stretch: 0;
                         height: root.ctl-h;
                         active: u.releasing;
-                        tooltip: "Hold: RELEASE FX (echo-out)";
+                        tooltip: @tr("Hold: RELEASE FX (echo-out)");
                         pressed => { FxState.release(root.n, true); }
                         released => { FxState.release(root.n, false); }
                     }
@@ -234,7 +234,7 @@ component Unit inherits Rectangle {
                 HorizontalLayout {
                     spacing: 3px;
                     horizontal-stretch: 0;
-                    FxLabel { text: "CH"; }
+                    FxLabel { text: @tr("CH"); }
                     Rectangle { width: 2px; }
                     for name[i] in DeckState.count == 4 ? ["1", "2", "3", "4", "M"] : ["1", "2", "M"]: Chip {
                         text: name;
@@ -243,12 +243,12 @@ component Unit inherits Rectangle {
                         max-width: root.touch ? root.ctl-h : 22px;
                         horizontal-stretch: 0;
                         height: root.ctl-h;
-                        tooltip: name == "M" ? "Apply to the master" : "Apply to channel " + name;
+                        tooltip: name == "M" ? @tr("Apply to the master") : @tr("Apply to channel {}", name);
                         active: u.assign == (name == "M" ? 4 : i);
                         clicked => { FxState.assign-selected(root.n, name == "M" ? 4 : i); }
                     }
                     if DeckState.decks[0].stems && FxState.stem-fx: Chip {
-                        text: ["ALL", "VOCAL", "INST", "BASS", "DRUMS"][u.part];
+                        text: [@tr("ALL"), @tr("VOCAL"), @tr("INST"), @tr("BASS"), @tr("DRUMS")][u.part];
                         font-size: Theme.font-xs;
                         min-width: 44px;
                         horizontal-stretch: 0;
@@ -256,7 +256,7 @@ component Unit inherits Rectangle {
                         enabled: u.assign != 4;
                         active: u.part != 0 && u.assign != 4;
                         active-color: Theme.stem-vocal;
-                        tooltip: "FX PART: the stem the effect runs on";
+                        tooltip: @tr("FX PART: the stem the effect runs on");
                         clicked => { FxState.part-step(root.n); }
                     }
                 }
@@ -265,21 +265,21 @@ component Unit inherits Rectangle {
                 if FxState.view == 0: HorizontalLayout {
                     spacing: 3px;
                     horizontal-stretch: 0;
-                    FxLabel { text: "MERGE"; }
+                    FxLabel { text: @tr("MERGE"); }
                     Rectangle { width: 2px; }
                     Chip {
-                        text: "M" + (root.n + 1) + " " + u.merge-name;
+                        text: @tr("M{} {}", root.n + 1, u.merge-name);
                         font-size: Theme.font-xs;
                         min-width: 64px;
                         horizontal-stretch: 0;
                         height: root.ctl-h;
                         enabled: FxState.merge-enabled;
-                        tooltip: "MERGE FX preset (click: next)";
+                        tooltip: @tr("MERGE FX preset (click: next)");
                         clicked => { FxState.merge-preset(root.n, 1); }
                     }
                     Fader { min-width: root.touch ? root.ctl-h : 40px; max-width: 80px; height: root.ctl-h; opacity: FxState.merge-enabled ? 1 : 0.4; value: u.merge-knob; edited(v) => { FxState.merge-knob(root.n, v); } }
                     Chip {
-                        text: "GO";
+                        text: @tr("GO");
                         font-size: Theme.font-xs;
                         min-width: root.touch ? root.ctl-h : 30px;
                         horizontal-stretch: 0;
@@ -287,7 +287,7 @@ component Unit inherits Rectangle {
                         enabled: FxState.merge-enabled;
                         active: u.merge-on;
                         active-color: Theme.play;
-                        tooltip: "Hold: MERGE FX build-up";
+                        tooltip: @tr("Hold: MERGE FX build-up");
                         pressed => { FxState.merge-on(root.n, true); }
                         released => { FxState.merge-on(root.n, false); }
                     }
@@ -315,7 +315,7 @@ export component FxPanel inherits Rectangle {
                 padding-bottom: root.touch ? 6px : 3px;
                 spacing: root.touch ? 6px : 2px;
                 alignment: start;
-                for name[i] in ["BEAT FX", "RELEASE FX", "MERGE FX", "SEND FX", "LEVER FX", "MIC FX"]: Chip {
+                for name[i] in [@tr("BEAT FX"), @tr("RELEASE FX"), @tr("MERGE FX"), @tr("SEND FX"), @tr("LEVER FX"), @tr("MIC FX")]: Chip {
                     text: name;
                     font-size: Theme.font-xs;
                     height: root.ctl-h;
@@ -350,7 +350,7 @@ export component FxPanel inherits Rectangle {
                 padding-top: 3px;
                 padding-bottom: 3px;
                 spacing: 2px;
-                FxLabel { text: "COLOR FX"; }
+                FxLabel { text: @tr("COLOR FX"); }
                 Rectangle { width: 6px; horizontal-stretch: 0; }
                 for name[i] in MixerState.cfx-names: Chip {
                     text: name;
@@ -385,7 +385,7 @@ export component FxPanel inherits Rectangle {
                 HorizontalLayout {
                     height: root.ctl-h;
                     spacing: 8px;
-                    FxLabel { text: "COLOR FX"; }
+                    FxLabel { text: @tr("COLOR FX"); }
                     Flickable {
                         content-width: max(self.width, color-types.preferred-width);
                         content-height: self.height;
@@ -413,7 +413,7 @@ export component FxPanel inherits Rectangle {
                     for n in DeckState.count: HorizontalLayout {
                         spacing: 6px;
                         horizontal-stretch: 0;
-                        FxLabel { text: "CH " + (n + 1); }
+                        FxLabel { text: @tr("CH {}", n + 1); }
                         Knob {
                             width: root.ctl-h;
                             height: root.ctl-h;

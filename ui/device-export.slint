@@ -6,7 +6,7 @@ import { Caption, DeviceState, PickList } from "device-state.slint";
 /// The library formats written to the chosen device: one chip per format a plugin can write there (a dot: its library is on
 /// the device already). The DEVICES tab shows the same with what reads each format and its options.
 component FormatChips inherits FormRow {
-    label: "FORMATS";
+    label: @tr("FORMATS");
     vertical-stretch: 0;
     HorizontalLayout {
         spacing: Theme.space-xs;
@@ -26,37 +26,37 @@ component FormatChips inherits FormRow {
 /// copied and analysed, tracks it has are refreshed, same-named playlists replaced, everything else stays).
 export component ExportPage inherits VerticalLayout {
     spacing: Theme.space-lg;
-    Note { text: "Writes the library, its analysis and the audio in every format that is on: several formats share one copy of each track, so the device works with any software. A library already on the device is extended, never wiped."; vertical-stretch: 0; }
+    Note { text: @tr("Writes the library, its analysis and the audio in every format that is on: several formats share one copy of each track, so the device works with any software. A library already on the device is extended, never wiped."); vertical-stretch: 0; }
     FormRow {
-        label: "DEVICE";
+        label: @tr("DEVICE");
         vertical-stretch: 0;
         Dropdown {
             options: DeviceState.device-names;
             current: max(0, DeviceState.current);
             enabled: DeviceState.device-names.length > 0 && !DeviceState.busy;
-            label: DeviceState.current < 0 ? "no device" : "";
+            label: DeviceState.current < 0 ? @tr("no device") : "";
             list-width: 320px;
             chose(i) => { DeviceState.select(i); }
         }
     }
     if DeviceState.folder == "" && DeviceState.formats.length > 0: FormatChips {}
     FormRow {
-        label: "OR A FOLDER";
+        label: @tr("OR A FOLDER");
         vertical-stretch: 0;
-        TextField { text <=> DeviceState.folder; placeholder-text: "any folder, e.g. a mounted share"; horizontal-stretch: 1; }
+        TextField { text <=> DeviceState.folder; placeholder-text: @tr("any folder, e.g. a mounted share"); horizontal-stretch: 1; }
     }
     HorizontalLayout {
         spacing: Theme.space-sm;
         vertical-stretch: 0;
-        Caption { text: "PLAYLISTS (none ticked = everything)"; }
-        Chip { text: "CLEAR"; width: 60px; horizontal-stretch: 0; clicked => { DeviceState.export-clear(); } }
+        Caption { text: @tr("PLAYLISTS (none ticked = everything)"); }
+        Chip { text: @tr("CLEAR"); width: 60px; horizontal-stretch: 0; clicked => { DeviceState.export-clear(); } }
     }
     PickList { rows: DeviceState.export-rows; toggled(i) => { DeviceState.export-toggle(i); } }
     HorizontalLayout {
         alignment: end;
         vertical-stretch: 0;
         Chip {
-            text: "EXPORT";
+            text: @tr("EXPORT");
             width: 100px;
             horizontal-stretch: 0;
             enabled: !DeviceState.busy && (DeviceState.folder != "" || DeviceState.current >= 0);
@@ -71,21 +71,21 @@ export component ExportPage inherits VerticalLayout {
 export component SyncPage inherits VerticalLayout {
     spacing: Theme.space-lg;
     Toggle {
-        text: "Synchronize playlists with " + (DeviceState.current < 0 ? "a device" : DeviceState.device-names[DeviceState.current]);
+        text: DeviceState.current < 0 ? @tr("Synchronize playlists with a device") : @tr("Synchronize playlists with {}", DeviceState.device-names[DeviceState.current]);
         checked: DeviceState.sync-on;
         enabled: DeviceState.current >= 0;
         vertical-stretch: 0;
         toggled(on) => { DeviceState.sync-set-on(on); }
     }
-    Note { text: "The ticked playlists are exported always in the latest state: new tracks are copied, tracks the device has are updated, the playlists get the current content."; vertical-stretch: 0; }
+    Note { text: @tr("The ticked playlists are exported always in the latest state: new tracks are copied, tracks the device has are updated, the playlists get the current content."); vertical-stretch: 0; }
     if DeviceState.formats.length > 0: FormatChips {}
-    Caption { text: "PLAYLISTS TO KEEP IN SYNC"; }
+    Caption { text: @tr("PLAYLISTS TO KEEP IN SYNC"); }
     PickList { rows: DeviceState.sync-rows; toggled(i) => { DeviceState.sync-toggle(i); } }
     HorizontalLayout {
         alignment: end;
         vertical-stretch: 0;
         Chip {
-            text: "SYNC NOW";
+            text: @tr("SYNC NOW");
             width: 100px;
             horizontal-stretch: 0;
             enabled: !DeviceState.busy && DeviceState.current >= 0;

@@ -32,17 +32,17 @@ struct Builtin {
 
 const BUILTIN: [Builtin; 3] = [
     Builtin {
-        label: "OpenFadeR JSON (.json)",
+        label: n_!("OpenFadeR JSON (.json)"),
         ext: "json",
         write: open_format::write_json,
     },
     Builtin {
-        label: "CSV table (.csv)",
+        label: n_!("CSV table (.csv)"),
         ext: "csv",
         write: open_format::write_csv,
     },
     Builtin {
-        label: "M3U8 playlist (.m3u8)",
+        label: n_!("M3U8 playlist (.m3u8)"),
         ext: "m3u8",
         write: open_format::write_m3u8,
     },
@@ -58,11 +58,11 @@ enum Target {
 /// again when it fails. The message says what a plugin's format could not keep.
 fn write(target: &Target, snap: &Snapshot) -> Result<String, String> {
     let dir =
-        paths::output_dir("OPENFADER_EXPORT_DIR").ok_or("set OPENFADER_EXPORT_DIR or HOME")?;
+        paths::output_dir("OPENFADER_EXPORT_DIR").ok_or(tr!("set OPENFADER_EXPORT_DIR or HOME"))?;
     let (prefix, ext) = match target {
         Target::Plugin(p) => (
             p.as_str(),
-            extension(p).ok_or_else(|| format!("{p}: writes no collection"))?,
+            extension(p).ok_or_else(|| tr!("{}: writes no collection", p))?,
         ),
         Target::Builtin(b) => ("openfader", b.ext.to_owned()),
     };
@@ -75,9 +75,9 @@ fn write(target: &Target, snap: &Snapshot) -> Result<String, String> {
         }
         Target::Builtin(b) => ((b.write)(&path, snap)?, Loss::default()),
     };
-    let mut msg = format!("exported {n} tracks to {}", path.display());
+    let mut msg = tr!("exported {} tracks to {}", n, path.display());
     if !loss.is_empty() {
-        msg.push_str(&format!(" · not kept by this format: {loss}"));
+        msg.push_str(&tr!(" · not kept by this format: {}", loss));
     }
     Ok(msg)
 }
@@ -89,21 +89,21 @@ pub fn collection(c: &Rc<Ctx>, i: usize) {
         Some(w) => Target::Plugin(w.plugin.clone()),
         None => match BUILTIN.get(i - plugins.len()) {
             Some(b) => Target::Builtin(b),
-            None => return c.say("no such export format"),
+            None => return c.say(tr!("no such export format")),
         },
     };
     let mut snap =
         match Snapshot::take(&*c.lib).and_then(|mut s| s.add_store(&store::global()).map(|()| s)) {
             Ok(s) => s,
-            Err(e) => return c.say(&format!("export failed: {e}")),
+            Err(e) => return c.say(&tr!("export failed: {}", e)),
         };
     for (t, beats, cues) in c.decks.iter().filter_map(|d| d.session()) {
         snap.override_session(&t, beats, cues);
     }
-    c.say(&format!("exporting {} tracks…", snap.len()));
+    c.say(&tr!("exporting {} tracks…", snap.len()));
     c.spawn(
         move || write(&target, &snap),
-        |c, r| c.say(&r.unwrap_or_else(|e| format!("export failed: {e}"))),
+        |c, r| c.say(&r.unwrap_or_else(|e| tr!("export failed: {}", e))),
     );
 }
 
@@ -126,7 +126,11 @@ pub fn wire(app: &App, c: &Rc<Ctx>) {
         writers()
             .into_iter()
             .map(|e| e.label)
-            .chain(BUILTIN.iter().map(|b| b.label.to_owned()))
+            .chain(
+                BUILTIN
+                    .iter()
+                    .map(|b| crate::app::i18n::tr_dyn(b.label).to_owned()),
+            )
             .collect(),
     ));
     let k = c.clone();

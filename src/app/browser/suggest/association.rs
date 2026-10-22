@@ -13,25 +13,21 @@ pub(super) fn score(a: &Item, c: &Item, links: &Links) -> Verdict {
     let mut score = 0.0;
     let mut why: Vec<String> = Vec::new();
     for (hit, weight, text) in [
-        (
-            same(a.label(), c.label()),
-            0.3,
-            format!("label {}", c.label()),
-        ),
+        (same(a.label(), c.label()), 0.3, tr!("label {}", c.label())),
         (
             same(a.composer(), c.composer()),
             0.3,
-            format!("composer {}", c.composer()),
+            tr!("composer {}", c.composer()),
         ),
         (
             shares_artist(&a.track.artist, &c.track.artist),
             0.2,
-            "same artist".to_owned(),
+            tr!("same artist").to_owned(),
         ),
         (
             same(&a.track.album, &c.track.album),
             0.1,
-            "same album".to_owned(),
+            tr!("same album").to_owned(),
         ),
     ] {
         if hit {
@@ -43,9 +39,9 @@ pub(super) fn score(a: &Item, c: &Item, links: &Links) -> Verdict {
     if w > 0.0 {
         score += 0.4 * w.min(1.0);
         why.push(if w >= 1.0 {
-            "often together in lists".into()
+            tr!("often together in lists").into()
         } else {
-            "together in a list".into()
+            tr!("together in a list").into()
         });
     }
     if score == 0.0 {

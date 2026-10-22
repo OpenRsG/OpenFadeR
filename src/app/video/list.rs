@@ -12,7 +12,7 @@ impl Video {
                 .filter(|t| t.file.as_deref().is_some_and(video::is_video))
                 .collect::<Vec<_>>(),
             Err(e) => {
-                *self.note.borrow_mut() = format!("library: {e}");
+                *self.note.borrow_mut() = tr!("library: {}", e);
                 return;
             }
         };

@@ -51,7 +51,7 @@ fn decode_and_analyze(
         let pcm = match pcm.map(Ok).unwrap_or_else(|| {
             t.file
                 .as_deref()
-                .ok_or_else(|| "no file path".into())
+                .ok_or_else(|| tr!("no file path").into())
                 .and_then(|file| audio::decode_cancellable(file, &stop))
         }) {
             Ok(pcm) => pcm,
@@ -156,9 +156,9 @@ impl Deck {
             None => {
                 notes.push(
                     if downloading {
-                        "downloading…"
+                        tr!("downloading…")
                     } else {
-                        "not analysed"
+                        tr!("not analysed")
                     }
                     .into(),
                 );
@@ -199,7 +199,7 @@ impl Deck {
         let answer = match self.download.borrow().as_ref().map(|d| d.rx.try_recv()) {
             None | Some(Err(TryRecvError::Empty)) => return,
             Some(Ok(r)) => r,
-            Some(Err(TryRecvError::Disconnected)) => Err("the download stopped".into()),
+            Some(Err(TryRecvError::Disconnected)) => Err(tr!("the download stopped").into()),
         };
         let Some(Download { track, .. }) = self.download.borrow_mut().take() else {
             return;
@@ -221,7 +221,7 @@ impl Deck {
             }
             Err(e) => self.show(|v| {
                 (v.loading, v.loaded) = (false, true);
-                v.status = format!("download failed: {e}").into();
+                v.status = tr!("download failed: {}", e).into();
             }),
         }
     }
@@ -287,7 +287,7 @@ impl Deck {
             && pcm.is_none()
             && shared.is_none()
         {
-            notes.push("no file path".into());
+            notes.push(tr!("no file path").into());
         }
         let status = summary(&t.title, &a, grid, auto_cues, &notes);
         let library = pcm.is_none(); // a sampler slice is no library track: not exported, not in the history
@@ -387,7 +387,7 @@ impl Deck {
             (v.elapsed_text, v.remain_text) =
                 (fmt_ms(0).into(), format!("-{}", fmt_ms(duration)).into());
             v.status = if loading {
-                format!("loading… · {status}")
+                tr!("loading… · {}", status)
             } else {
                 status
             }
@@ -510,7 +510,7 @@ impl Deck {
                 }
             }
             Ok(Decoded::Analyzed(an)) => {
-                pending.notes.retain(|n| n != "not analysed");
+                pending.notes.retain(|n| n != tr!("not analysed"));
                 let edits = l
                     .track
                     .as_ref()
@@ -529,7 +529,7 @@ impl Deck {
             }
             Ok(Decoded::Finished) => finished = true,
             Err(e) => {
-                pending.notes.push(format!("audio: {e}"));
+                pending.notes.push(tr!("audio: {}", e));
                 finished = true;
             }
         }
@@ -609,7 +609,9 @@ impl Deck {
     pub(super) fn eject_locked(&self) -> bool {
         let locked = prefs::with(|p| p.controller.eject_lock) && self.playing();
         if locked {
-            self.say("eject lock: pause the deck before loading another track");
+            self.say(tr!(
+                "eject lock: pause the deck before loading another track"
+            ));
         }
         locked
     }
@@ -632,7 +634,7 @@ impl Deck {
                 self.load(&next, &*self.lib);
                 self.autoplay.set(true);
             }
-            None => self.say("continuous playing: no next track in the list"),
+            None => self.say(tr!("continuous playing: no next track in the list")),
         }
     }
 }
@@ -649,12 +651,12 @@ fn merge_analysis(
     if l.analysis.beats.is_empty() && edits.grid.is_none() && !an.beats.is_empty() {
         l.lib_beats = an.beats.clone();
         l.analysis.beats = an.beats;
-        notes.push("grid: analysed".into());
+        notes.push(tr!("grid: analysed").into());
     }
     if l.analysis.three_band_detail.is_empty() && !an.three_band_detail.is_empty() {
         l.analysis.three_band_detail = an.three_band_detail;
         l.analysis.three_band_preview = an.three_band_preview;
-        notes.push("waveform: analysed".into());
+        notes.push(tr!("waveform: analysed").into());
     }
 }
 
@@ -667,13 +669,23 @@ fn summary(
     auto_cues: bool,
     notes: &[String],
 ) -> String {
-    std::iter::once(format!(
-        "{title} — {} beats @ {}, {} {}cues",
-        a.beats.len(),
-        bpm_text(grid, 1.0),
-        a.cues.len(),
-        if auto_cues { "automatic " } else { "" }
-    ))
+    std::iter::once(if auto_cues {
+        tr!(
+            "{} — {} beats @ {}, {} automatic cues",
+            title,
+            a.beats.len(),
+            bpm_text(grid, 1.0),
+            a.cues.len()
+        )
+    } else {
+        tr!(
+            "{} — {} beats @ {}, {} cues",
+            title,
+            a.beats.len(),
+            bpm_text(grid, 1.0),
+            a.cues.len()
+        )
+    })
     .chain(notes.iter().cloned())
     .collect::<Vec<_>>()
     .join(" · ")

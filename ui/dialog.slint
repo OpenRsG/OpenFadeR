@@ -44,7 +44,7 @@ export component DialogFrame inherits Rectangle {
                 x: parent.width - self.width - Theme.space-sm;
                 y: (parent.height - self.height) / 2;
                 icon: Icon.close;
-                tooltip: "Close";
+                tooltip: @tr("Close");
                 clicked => { root.closed(); }
             }
         }

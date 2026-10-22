@@ -76,20 +76,22 @@ impl Deck {
             self.sync.waiting.set(None);
             self.set_nudge(0.0);
             self.show(|v| v.synced = false);
-            return self.say("sync off: the tempo fader is yours again");
+            return self.say(tr!("sync off: the tempo fader is yours again"));
         }
         let Some(peer) = self.leader(|d| self.can_follow(d)) else {
-            return self.say("sync: load a track on another deck first");
+            return self.say(tr!("sync: load a track on another deck first"));
         };
         if !peer.ready() || !self.can_follow(&peer) {
-            return self.say("sync: both decks need a beat grid and a tempo within 0.5–2×");
+            return self.say(tr!(
+                "sync: both decks need a beat grid and a tempo within 0.5–2×"
+            ));
         }
         if self.sync.link.master.get() != Some(peer.index) {
             self.set_master(Some(peer.index)); // SYNC on the master (or with none): another deck leads
         }
         self.sync.synced.set(true);
         self.show(|v| v.synced = true);
-        self.say(format!(
+        self.say(tr!(
             "synced to deck {} (tempo and beats follow it)",
             DECK_NAMES[peer.index]
         ));
@@ -102,14 +104,14 @@ impl Deck {
         if self.is_master() {
             l.manual.set(!l.manual.get());
             self.say(if l.manual.get() {
-                "master: pinned here"
+                tr!("master: pinned here")
             } else {
-                "master: automatic (first playing deck)"
+                tr!("master: automatic (first playing deck)")
             });
         } else {
             self.set_master(Some(self.index));
             l.manual.set(true);
-            self.say("master: this deck, pinned");
+            self.say(tr!("master: this deck, pinned"));
         }
     }
 

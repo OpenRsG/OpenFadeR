@@ -39,7 +39,7 @@ use std::{cell::RefCell, rc::Rc, sync::mpsc::Receiver, time::Duration};
 const WAVE_W: u32 = 120;
 const WAVE_H: u32 = 24;
 /// "Save as New Preset…", the last entry of the PRESET list.
-const SAVE_AS: &str = "Save as New Preset…";
+const SAVE_AS: &str = n_!("Save as New Preset…");
 /// DRUM ROLL / DRUM TRANS beat index of the controller's four pads (1/8, 1/4, 1/2, 1 beat) in [`BEATS`].
 pub const PAD_BEATS: [usize; 4] = [1, 2, 3, 5];
 
@@ -166,7 +166,7 @@ impl Groove {
         let locked = prefs::with(|p| p.extensions.drum_lock)
             && self.with(d, |c| c.state(i) != State::Idle).unwrap_or(false);
         if locked {
-            self.say(format!(
+            self.say(tr!(
                 "slot {} is playing: loading is locked (PREFS > Extensions > DRUM SWAP)",
                 slot_name(i)
             ));

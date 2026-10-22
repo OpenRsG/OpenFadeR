@@ -80,7 +80,9 @@ impl Deck {
     fn phrase_refused(&self) -> bool {
         let locked = self.grid_locked();
         if locked {
-            self.say("Analysis Lock is on: unlock the track to edit its phrases");
+            self.say(tr!(
+                "Analysis Lock is on: unlock the track to edit its phrases"
+            ));
         }
         locked
     }
@@ -104,7 +106,7 @@ impl Deck {
             Ok(s) => s,
             Err(e) => {
                 drop(l);
-                self.say(format!("phrases: {e}"));
+                self.say(tr!("phrases: {}", e));
                 return false;
             }
         };
@@ -118,7 +120,7 @@ impl Deck {
         l.invalidate();
         drop(l);
         match saved {
-            Err(e) => self.say(format!("{status} · NOT saved: {e}")),
+            Err(e) => self.say(tr!("{} · NOT saved: {}", status, e)),
             Ok(()) if !status.is_empty() => self.say(status),
             Ok(()) => {}
         }
@@ -130,13 +132,13 @@ impl Deck {
         self.phrase_change(true, |p, beats, dur| {
             if p.list.is_empty() {
                 p.list = phrase_edit::blank(beats, p.mood)
-                    .ok_or("a beat grid with a whole bar is needed")?
+                    .ok_or(tr!("a beat grid with a whole bar is needed"))?
                     .list;
             }
-            let n = phrase_edit::bar_at(beats, f64::from(frac) * dur).ok_or("no beat grid")?;
+            let n = phrase_edit::bar_at(beats, f64::from(frac) * dur).ok_or(tr!("no beat grid"))?;
             phrase_edit::cut(p, n)
-                .then(|| format!("phrase divided at beat {n}"))
-                .ok_or("click inside a phrase, away from its start")
+                .then(|| tr!("phrase divided at beat {}", n))
+                .ok_or(tr!("click inside a phrase, away from its start"))
         })
     }
 
@@ -144,24 +146,24 @@ impl Deck {
     pub(in crate::app) fn phrase_next_kind(&self, i: usize) -> bool {
         self.phrase_change(true, |p, _, _| {
             phrase_edit::next_kind(p, i)
-                .then(|| format!("phrase {} is now {}", i + 1, p.list[i].label()))
-                .ok_or("select a phrase first")
+                .then(|| tr!("phrase {} is now {}", i + 1, p.list[i].label()))
+                .ok_or(tr!("select a phrase first"))
         })
     }
 
     /// Dragging the divider after phrase `i` to `frac` of the track (snapped to a bar line); `save` on release.
     pub(in crate::app) fn phrase_move(&self, i: usize, frac: f32, save: bool) -> bool {
         self.phrase_change(save, |p, beats, dur| {
-            let n = phrase_edit::bar_at(beats, f64::from(frac) * dur).ok_or("no beat grid")?;
+            let n = phrase_edit::bar_at(beats, f64::from(frac) * dur).ok_or(tr!("no beat grid"))?;
             phrase_edit::move_boundary(p, i, n, beats)
                 .then(|| {
                     if save {
-                        format!("phrase boundary at beat {}", p.list[i].end_beat)
+                        tr!("phrase boundary at beat {}", p.list[i].end_beat)
                     } else {
                         String::new()
                     }
                 })
-                .ok_or("there is no divider there")
+                .ok_or(tr!("there is no divider there"))
         })
     }
 
@@ -169,7 +171,7 @@ impl Deck {
     pub(in crate::app) fn phrase_clear(&self) -> bool {
         self.phrase_change(true, |p, _, _| {
             phrase_edit::clear(p);
-            Ok("all phrases deleted".into())
+            Ok(tr!("all phrases deleted").into())
         })
     }
 
@@ -188,8 +190,8 @@ impl Deck {
         l.invalidate();
         drop(l);
         self.say(match saved {
-            Ok(()) => "phrases back to the analysis".to_owned(),
-            Err(e) => format!("phrases: {e}"),
+            Ok(()) => tr!("phrases back to the analysis").to_owned(),
+            Err(e) => tr!("phrases: {}", e),
         });
     }
 

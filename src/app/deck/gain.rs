@@ -59,7 +59,7 @@ impl Deck {
             l.track.as_ref().map(store::key)
         };
         if let Some(Err(e)) = key.map(|k| store::global().set_gain_adjust(&k, db)) {
-            self.say(format!("AUTO GAIN not saved: {e}"));
+            self.say(tr!("AUTO GAIN not saved: {}", e));
         }
     }
 }

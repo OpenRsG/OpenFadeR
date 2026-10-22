@@ -108,7 +108,7 @@ export component VideoWindow inherits Window {
     in property <float> alpha;
     in property <float> size;
     callback toggle-full-screen();
-    title: "OpenFadeR — video output";
+    title: @tr("OpenFadeR — video output");
     icon: @image-url("../assets/icon.png");
     preferred-width: 960px;
     preferred-height: 540px;
@@ -140,17 +140,17 @@ component DeckStrip inherits Rectangle {
             background: Theme.bg-deep;
             horizontal-stretch: 0;
             Image { source: root.v.thumb; width: 100%; height: 100%; image-fit: contain; }
-            if !root.v.has-video: Text { text: "NO PICTURE"; color: Theme.text-faint; font-size: Theme.font-sm; }
+            if !root.v.has-video: Text { text: @tr("NO PICTURE"); color: Theme.text-faint; font-size: Theme.font-sm; }
         }
         VerticalLayout {
             spacing: 3px;
-            Text { text: "DECK " + ["A", "B", "C", "D"][root.index]; color: Theme.accent; font-weight: Theme.weight-bold; font-size: Theme.font-md; }
+            Text { text: @tr("DECK {}", ["A", "B", "C", "D"][root.index]); color: Theme.accent; font-weight: Theme.weight-bold; font-size: Theme.font-md; }
             Text { text: root.v.title; color: Theme.text; font-size: Theme.font-size; overflow: elide; }
             Text { text: root.v.info; color: Theme.text-dim; font-size: Theme.font-sm; overflow: elide; }
             HorizontalLayout {
                 spacing: 6px;
                 Chip {
-                    text: DeckState.decks[root.index].playing ? "PAUSE" : "PLAY";
+                    text: DeckState.decks[root.index].playing ? @tr("PAUSE") : @tr("PLAY");
                     active: DeckState.decks[root.index].playing;
                     enabled: DeckState.decks[root.index].loaded;
                     width: 64px;
@@ -197,9 +197,9 @@ export component VideoView inherits Rectangle {
         width: parent.width - 16px;
         height: Theme.layout-profile == 1 ? Theme.touch-target : 24px;
         spacing: 6px;
-        Text { text: "VIDEO"; color: Theme.text-bright; font-size: Theme.font-xl; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
-        Chip { text: "OUTPUT WINDOW"; active: VideoState.window-open; width: 120px; horizontal-stretch: 0; clicked => { VideoState.window-toggled(); } }
-        Chip { text: "FULL SCREEN"; width: 100px; horizontal-stretch: 0; clicked => { VideoState.full-screen(); } }
+        Text { text: @tr("VIDEO"); color: Theme.text-bright; font-size: Theme.font-xl; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+        Chip { text: @tr("OUTPUT WINDOW"); active: VideoState.window-open; width: 120px; horizontal-stretch: 0; clicked => { VideoState.window-toggled(); } }
+        Chip { text: @tr("FULL SCREEN"); width: 100px; horizontal-stretch: 0; clicked => { VideoState.full-screen(); } }
         Rectangle {}
     }
     VerticalLayout {
@@ -230,24 +230,24 @@ export component VideoView inherits Rectangle {
                     spacing: 6px;
                     height: Theme.layout-profile == 1 ? Theme.touch-target : 26px;
                     vertical-stretch: 0;
-                    Chip { text: "TEXT"; active: VideoState.overlay-mode == 0; width: 56px; horizontal-stretch: 0; clicked => { VideoState.overlay-mode = 0; } }
-                    Chip { text: "IMAGE"; active: VideoState.overlay-mode == 1; width: 56px; horizontal-stretch: 0; clicked => { VideoState.overlay-mode = 1; } }
-                    if VideoState.overlay-mode == 0: TextField { text <=> VideoState.text; placeholder-text: "text on the output"; }
+                    Chip { text: @tr("TEXT"); active: VideoState.overlay-mode == 0; width: 56px; horizontal-stretch: 0; clicked => { VideoState.overlay-mode = 0; } }
+                    Chip { text: @tr("IMAGE"); active: VideoState.overlay-mode == 1; width: 56px; horizontal-stretch: 0; clicked => { VideoState.overlay-mode = 1; } }
+                    if VideoState.overlay-mode == 0: TextField { text <=> VideoState.text; placeholder-text: @tr("text on the output"); }
                     if VideoState.overlay-mode == 1: TextField {
                         text <=> VideoState.image-path;
-                        placeholder-text: "image file, Enter to load";
+                        placeholder-text: @tr("image file, Enter to load");
                         accepted(t) => { VideoState.image-chosen(t); }
                     }
-                    Chip { text: "ON"; active: VideoState.overlay-on; width: 44px; horizontal-stretch: 0; clicked => { VideoState.overlay-on = !VideoState.overlay-on; } }
-                    Chip { text: "CLEAR"; width: 56px; horizontal-stretch: 0; clicked => { VideoState.clear-overlay(); } }
+                    Chip { text: @tr("ON"); active: VideoState.overlay-on; width: 44px; horizontal-stretch: 0; clicked => { VideoState.overlay-on = !VideoState.overlay-on; } }
+                    Chip { text: @tr("CLEAR"); width: 56px; horizontal-stretch: 0; clicked => { VideoState.clear-overlay(); } }
                 }
                 HorizontalLayout {
                     spacing: 6px;
                     height: Theme.layout-profile == 1 ? Theme.touch-target : 22px;
                     vertical-stretch: 0;
-                    Text { text: "OPACITY"; color: Theme.text-dim; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 0; }
+                    Text { text: @tr("OPACITY"); color: Theme.text-dim; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 0; }
                     Fader { value: VideoState.opacity; edited(v) => { VideoState.opacity = v; } }
-                    Text { text: "SIZE"; color: Theme.text-dim; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 0; }
+                    Text { text: @tr("SIZE"); color: Theme.text-dim; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 0; }
                     Fader { value: VideoState.size; edited(v) => { VideoState.size = max(v, 0.05); } }
                 }
             }
@@ -255,7 +255,7 @@ export component VideoView inherits Rectangle {
                 spacing: 4px;
                 horizontal-stretch: 1;
                 min-width: Theme.layout-profile == 1 ? 320px : 280px;
-                Text { text: "ALL VIDEOS"; color: Theme.accent; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-stretch: 0; }
+                Text { text: @tr("ALL VIDEOS"); color: Theme.accent; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-stretch: 0; }
                 Rectangle {
                     background: Theme.bg-deep;
                     border-color: Theme.line;
@@ -278,7 +278,7 @@ export component VideoView inherits Rectangle {
                             }
                         }
                     }
-                    if VideoState.list.length == 0: Text { text: "no mp4 / mov / m4v tracks in this library"; color: Theme.text-faint; font-size: Theme.font-sm; }
+                    if VideoState.list.length == 0: Text { text: @tr("no mp4 / mov / m4v tracks in this library"); color: Theme.text-faint; font-size: Theme.font-sm; }
                 }
             }
         }
@@ -299,9 +299,9 @@ export component VideoView inherits Rectangle {
                 edited(v) => { MixerState.crossfader = v; MixerState.crossfade(v); }
             }
             Text { text: "B"; color: Theme.accent; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
-            Chip { text: "FADE"; active: VideoState.transition == 0; width: 60px; horizontal-stretch: 0; clicked => { VideoState.transition = 0; } }
-            Chip { text: "CUT"; active: VideoState.transition == 1; width: 60px; horizontal-stretch: 0; clicked => { VideoState.transition = 1; } }
-            Chip { text: "CH FADER DIMS"; active: VideoState.follow-fader; width: 110px; horizontal-stretch: 0; clicked => { VideoState.follow-fader = !VideoState.follow-fader; } }
+            Chip { text: @tr("FADE"); active: VideoState.transition == 0; width: 60px; horizontal-stretch: 0; clicked => { VideoState.transition = 0; } }
+            Chip { text: @tr("CUT"); active: VideoState.transition == 1; width: 60px; horizontal-stretch: 0; clicked => { VideoState.transition = 1; } }
+            Chip { text: @tr("CH FADER DIMS"); active: VideoState.follow-fader; width: 110px; horizontal-stretch: 0; clicked => { VideoState.follow-fader = !VideoState.follow-fader; } }
         }
         Text { text: VideoState.status; color: Theme.text-dim; font-size: Theme.font-sm; height: Theme.layout-profile == 1 ? 18px : 14px; vertical-stretch: 0; overflow: elide; }
     }

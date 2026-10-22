@@ -229,7 +229,7 @@ fn pages(scope: &str, devices: &[Device]) -> Vec<Entry> {
     }
     if scope == GLOBAL && !providers.is_empty() {
         pages.push(Entry {
-            label: "DEVICE".into(),
+            label: tr!("DEVICE").into(),
             page: Page::Device,
         });
     }
@@ -257,12 +257,12 @@ fn schema_rows(c: &Ctx, tab: &Tab) -> Vec<Row> {
     }
     let button = |key: &str, label: &str, text: &str| Row::chips(key, label, &[text], usize::MAX);
     if let Some(l) = tab.apply_label.as_deref().filter(|_| !c.is_device()) {
-        rows.push(button("djs.apply", l, "APPLY"));
+        rows.push(button("djs.apply", l, tr!("APPLY")));
     }
     if let Some(l) = tab.read_label.as_deref().filter(|_| c.is_device()) {
-        rows.push(button("djs.read", l, "READ"));
+        rows.push(button("djs.read", l, tr!("READ")));
     }
-    rows.push(button("djs.reset", "Reset to defaults", "RESET"));
+    rows.push(button("djs.reset", tr!("Reset to defaults"), tr!("RESET")));
     rows
 }
 
@@ -300,8 +300,8 @@ pub fn rows(_: &Prefs) -> Vec<Row> {
     let (mut rows, lists) = match pages.get(i).map(|e| &e.page) {
         None => (
             vec![Row::info(
-                "No device plugin",
-                "install or enable one in EXTENSIONS",
+                tr!("No device plugin"),
+                tr!("install or enable one in EXTENSIONS"),
             )],
             Vec::new(),
         ),
@@ -309,7 +309,7 @@ pub fn rows(_: &Prefs) -> Vec<Row> {
         Some(Page::Schema { tab, .. }) => (schema_rows(&c, tab), lists::items(&c, tab)),
     };
     if !status.is_empty() {
-        rows.insert(0, Row::info("STATUS", &status));
+        rows.insert(0, Row::info(tr!("STATUS"), &status));
     }
     if scope == GLOBAL && i == 0 && !pages.is_empty() {
         rows.splice(0..0, connected::rows(&devices));
@@ -334,7 +334,7 @@ fn run(f: impl FnOnce(&mut Ctx, &Page, &[Device]) -> Done) {
     let r = pages
         .get(open(tab, pages.len()))
         .map_or(Ok(String::new()), |e| f(&mut c, &e.page, &devices));
-    STATE.with(|s| s.borrow_mut().status = r.unwrap_or_else(|e| format!("ERROR: {e}")));
+    STATE.with(|s| s.borrow_mut().status = r.unwrap_or_else(|e| tr!("ERROR: {}", e)));
 }
 
 /// A successful edit of a device's setting is written to the connected device at once when its tab says so
