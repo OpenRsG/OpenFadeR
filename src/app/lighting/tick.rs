@@ -3,7 +3,7 @@
 use super::Lighting;
 use crate::app::{
     DeckState,
-    deck::{DECKS, Decks},
+    deck::{Decks, lead},
 };
 use openfader::lighting::{Control, Input, Mode, scene};
 use slint::{ComponentHandle, Model, SharedString};
@@ -15,11 +15,7 @@ const IDLE_BPM: f64 = 120.0;
 
 /// The first deck (master first, then A to D) that plays on a grid.
 fn master_input(decks: &Decks, master: i32) -> Option<Input> {
-    let first = usize::try_from(master).ok().filter(|&m| m < DECKS);
-    first
-        .into_iter()
-        .chain(0..DECKS)
-        .find_map(|i| decks[i].light_input())
+    lead(decks, usize::try_from(master).ok(), |d| d.light_input())
 }
 
 fn scene_text(ctl: &Control, inp: &Input, playing: bool) -> String {
