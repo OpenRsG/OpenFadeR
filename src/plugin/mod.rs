@@ -226,6 +226,15 @@ impl Registry {
         self.plugins.iter().find(|p| p.manifest.name == name)
     }
 
+    /// [`Plugin::tr`] of the plugin called `name`; `text` as it is when there is none.
+    pub fn tr(&self, name: &str, text: &str) -> String {
+        self.plugins
+            .iter()
+            .chain(&self.disabled)
+            .find(|p| p.manifest.name == name)
+            .map_or_else(|| text.to_owned(), |p| p.tr(text))
+    }
+
     /// The effects of `slot`, in selector order (after the slot's built-ins).
     pub fn slot(&self, slot: effect::Slot) -> &[effect::Effect] {
         let at = |s: u32| self.effects.partition_point(|e| (e.slot as u32) < s);
@@ -474,16 +483,23 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
 }
 
 impl Plugin {
-    /// Sends `request` (`{"op": …}`, given the plugin's `settings`, see [`config`]) to the plugin and returns its reply: a
+    /// `text` given by this plugin (its manifest, a reply) in the language set, from its `locales/` ([`crate::locale`]).
+    pub fn tr(&self, text: &str) -> String {
+        crate::locale::tr(&self.dir, text)
+    }
+
+    /// Sends `request` (`{"op": …}`, given the plugin's `settings`, see [`config`], and the language `lang`, see
+    /// [`crate::locale`]) to the plugin and returns its reply: a
     /// Lua `script` runs here ([`lua`]), else a fresh run of its process (`command`, or the `script` with `python3` /
     /// as a program); a `persistent` plugin keeps its Lua state or its process ([`process`]). The process gets the plugin folder as working directory; whatever it prints to stderr is passed on to
-    /// ours. A reply with an `"error"` string, a non-zero exit, output that is not one JSON object, or no reply within
+    /// ours. A reply with an `"error"` string (shown translated, [`Plugin::tr`]), a non-zero exit, output that is not one JSON object, or no reply within
     /// `timeout` (the process is killed, the script stopped) is an `Err`.
     pub fn call(&self, request: &Value, timeout: Duration) -> Result<Value, String> {
         let name = &self.manifest.name;
         let mut request = request.clone();
         if let Some(o) = request.as_object_mut() {
             o.insert("settings".into(), config::get().values(&self.manifest));
+            o.insert("lang".into(), crate::locale::code().into());
         }
         let command: Vec<String> = match (&self.manifest.command[..], &self.manifest.script) {
             ([], Some(s)) if s.ends_with(".lua") => {
@@ -541,7 +557,7 @@ impl Plugin {
             }
         })?;
         if let Some(e) = reply.get("error").and_then(Value::as_str) {
-            return Err(format!("{name}: {e}"));
+            return Err(format!("{name}: {}", self.tr(e)));
         }
         if !status.success() {
             return Err(format!("{name}: exited with {status}"));

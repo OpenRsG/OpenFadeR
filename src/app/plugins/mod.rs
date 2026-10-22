@@ -94,7 +94,7 @@ impl Ctx {
         let Some((plugin, decl)) = self.actions.borrow().get(i).cloned() else {
             return;
         };
-        say(&self.app(), &format!("{}…", decl.label));
+        say(&self.app(), &format!("{}…", plugin.tr(&decl.label)));
         let context = context(self, &plugin);
         std::thread::spawn(move || {
             let result = action::run(&plugin, &decl.id, input.as_deref(), context);
@@ -131,7 +131,7 @@ impl Ctx {
             d
         };
         match command {
-            Command::Toast(text) => say(app, &text),
+            Command::Toast(text) => say(app, &current().tr(plugin, &text)),
             Command::Load { deck: n, file } => match deck(n) {
                 None => {}
                 Some(_) if !file.is_file() => say(app, &tr!("{}: no such file", file.display())),
@@ -181,6 +181,12 @@ impl Ctx {
     }
 }
 
+/// Writes the plugin manager and the Plugins menu again (after a language change: their texts are the plugins' own).
+pub fn retranslate(app: &App) {
+    manager::refresh(app);
+    refresh_menu(app);
+}
+
 /// Fills the Plugins menu from [`current`] (at start-up and after a reload).
 pub fn refresh_menu(app: &App) {
     let Some(c) = CTX.with(|c| c.borrow().clone()) else {
@@ -200,7 +206,9 @@ pub fn refresh_menu(app: &App) {
         .set_actions(ModelRc::new(VecModel::from(
             actions
                 .iter()
-                .map(|(p, a)| SharedString::from(format!("{}: {}", p.manifest.name, a.label)))
+                .map(|(p, a)| {
+                    SharedString::from(format!("{}: {}", p.manifest.name, p.tr(&a.label)))
+                })
                 .collect::<Vec<_>>(),
         )));
     *c.actions.borrow_mut() = actions;
@@ -224,7 +232,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) {
     refresh_menu(app);
     let k = c.clone();
     state.on_run(move |i| {
-        let Some((_, decl)) = usize::try_from(i)
+        let Some((p, decl)) = usize::try_from(i)
             .ok()
             .and_then(|i| k.actions.borrow().get(i).cloned())
         else {
@@ -235,8 +243,8 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) {
             Some(label) => {
                 let app = k.app();
                 let s = app.global::<PluginState>();
-                s.set_prompt_title(decl.label.as_str().into());
-                s.set_prompt_label(label.as_str().into());
+                s.set_prompt_title(p.tr(&decl.label).into());
+                s.set_prompt_label(p.tr(label).into());
                 s.set_prompt_text("".into());
                 s.set_prompt_open(true);
                 k.asking.set(Some(i as usize));

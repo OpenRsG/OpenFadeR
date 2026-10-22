@@ -257,7 +257,7 @@ pub(super) fn call(
     }
     match rx.recv_timeout(timeout) {
         Ok(reply) => match reply.get("error").and_then(Value::as_str) {
-            Some(e) => Err(format!("{name}: {e}")),
+            Some(e) => Err(format!("{name}: {}", plugin.tr(e))),
             None => Ok(reply),
         },
         Err(mpsc::RecvTimeoutError::Timeout) => {

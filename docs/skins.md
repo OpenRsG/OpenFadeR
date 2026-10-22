@@ -99,6 +99,7 @@ Put `*.json` files in any of these folders (the first folder that has a name win
 |---|---|
 | `name` | What the gallery lists and the settings file stores. Optional (default: the file name without `.json`). `Catppuccin Mocha` and `Catppuccin Latte` are the built-in themes' names and cannot be reused; a name already taken by an earlier theme is skipped. |
 | `author`, `description` | Text for the gallery card (optional). |
+| `locales` | Translations of the description, per language of the app (`fr`, `es`, `de`, `pt`, `it`, `nl`): `{"fr": {"Cool blues on a near-black window": "Bleus froids sur fenêtre presque noire"}}`. The gallery shows the description in the UI language when it is there, else as written. |
 | `base` | `"dark"` (default) or `"light"`: the built-in values every token you do not list keeps. It also picks the light or dark scheme of the menu bar and its menus, which Slint draws itself and which no token reaches. |
 | `layout` | VIEW settings the theme sets when it is chosen (optional), see below. |
 | `tokens` | Token name to value. Anything you leave out is the base's value. Files written by the editor list every token. |

@@ -192,7 +192,7 @@ msgstr ""
 
 #: ui/app.slint:215
 #: ui/browser-table.slint:263
-#: src/app/library/mod.rs:113
+#: src/app/library/mod.rs:114
 msgid "Remove from Collection"
 msgstr ""
 
@@ -2404,7 +2404,7 @@ msgid "Up / Down move the track selection (when the search box is not focused). 
 msgstr ""
 
 #: ui/library.slint:46
-#: src/app/library/mod.rs:324
+#: src/app/library/mod.rs:325
 msgid "YES"
 msgstr ""
 
@@ -4095,7 +4095,7 @@ msgid "store: {}"
 msgstr ""
 
 #: src/app/browser/palette/edit.rs:86
-#: src/app/browser/wire.rs:271
+#: src/app/browser/wire.rs:278
 msgid "“{}” is already in the Tag List"
 msgstr ""
 
@@ -4104,7 +4104,7 @@ msgid "the Tag List holds up to {} tracks"
 msgstr ""
 
 #: src/app/browser/palette/edit.rs:92
-#: src/app/browser/wire.rs:273
+#: src/app/browser/wire.rs:280
 msgid "tagged “{}” ({} in the Tag List)"
 msgstr ""
 
@@ -4278,7 +4278,7 @@ msgid "ADD TO PLAYLIST"
 msgstr ""
 
 #: src/app/browser/playlists/mod.rs:92
-#: src/app/library/mod.rs:91
+#: src/app/library/mod.rs:92
 msgid "Library Protection is on: cannot {} (Preferences > Advanced > Browse)"
 msgstr ""
 
@@ -4685,7 +4685,7 @@ msgid " · reading {}/{}"
 msgstr ""
 
 #: src/app/browser/tagging.rs:141
-#: src/app/browser/wire.rs:270
+#: src/app/browser/wire.rs:277
 msgid "select a track to tag"
 msgstr ""
 
@@ -4727,11 +4727,11 @@ msgstr[1] ""
 msgid "save failed: {}"
 msgstr ""
 
-#: src/app/browser/wire.rs:262
+#: src/app/browser/wire.rs:269
 msgid "select a track to see what relates to it"
 msgstr ""
 
-#: src/app/browser/wire.rs:313
+#: src/app/browser/wire.rs:320
 msgid "AUTOMIX stopped"
 msgstr ""
 
@@ -5876,6 +5876,10 @@ msgid_plural "importing {n} items…"
 msgstr[0] ""
 msgstr[1] ""
 
+#: src/app/edit/mod.rs:264
+msgid "EDIT: OPEN SELECTED loads the track selected in the library"
+msgstr ""
+
 #: src/app/edit/open.rs:26
 msgid "the selected track has no audio file"
 msgstr ""
@@ -6456,7 +6460,7 @@ msgid "A collection file of the library plugin you chose: its tracks, playlists,
 msgstr ""
 
 #: src/app/library/dialog.rs:106
-#: src/app/library/mod.rs:322
+#: src/app/library/mod.rs:323
 msgid "BACKUP LIBRARY"
 msgstr ""
 
@@ -6663,41 +6667,41 @@ msgstr[1] ""
 msgid "DELETE FROM COLLECTION"
 msgstr ""
 
-#: src/app/library/mod.rs:138
+#: src/app/library/mod.rs:139
 msgid "removed {n} track from the Collection"
 msgid_plural "removed {n} tracks from the Collection"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/app/library/mod.rs:204
+#: src/app/library/mod.rs:205
 msgid "a path is needed"
 msgstr ""
 
-#: src/app/library/mod.rs:252
+#: src/app/library/mod.rs:253
 msgid "WRITE BACK"
 msgstr ""
 
-#: src/app/library/mod.rs:254
+#: src/app/library/mod.rs:255
 msgid "WRITE"
 msgstr ""
 
-#: src/app/library/mod.rs:282
+#: src/app/library/mod.rs:283
 msgid "recording added to the Collection ({})"
 msgstr ""
 
-#: src/app/library/mod.rs:284
+#: src/app/library/mod.rs:285
 msgid "recording not imported: {}"
 msgstr ""
 
-#: src/app/library/mod.rs:323
+#: src/app/library/mod.rs:324
 msgid "Do you want to back up music files as well?"
 msgstr ""
 
-#: src/app/library/mod.rs:325
+#: src/app/library/mod.rs:326
 msgid "NO"
 msgstr ""
 
-#: src/app/library/mod.rs:340
+#: src/app/library/mod.rs:341
 msgid "unknown menu action {}"
 msgstr ""
 
@@ -7213,7 +7217,7 @@ msgstr ""
 msgid "{}: {}"
 msgstr ""
 
-#: src/app/plugins/mod.rs:256
+#: src/app/plugins/mod.rs:264
 msgid "nothing was typed"
 msgstr ""
 
@@ -8378,6 +8382,14 @@ msgstr ""
 msgid "ERROR: {}"
 msgstr ""
 
+#: src/app/prefs/dj_system/mod.rs:442
+msgid "DEFAULTS FOR EVERY DEVICE"
+msgstr ""
+
+#: src/app/prefs/dj_system/mod.rs:448
+msgid "DEVICE {}"
+msgstr ""
+
 #: src/app/prefs/extensions.rs:88
 msgid "ENABLE THE STEMS FUNCTION"
 msgstr ""
@@ -9281,7 +9293,7 @@ msgstr ""
 msgid "no saved sequence in slot {}"
 msgstr ""
 
-#: src/app/skin/draft.rs:144
+#: src/app/skin/draft.rs:147
 msgid "no such token"
 msgstr ""
 
@@ -9301,67 +9313,71 @@ msgstr ""
 msgid "\"base\" must be \"dark\" or \"light\", using \"dark\""
 msgstr ""
 
-#: src/app/skin/file.rs:113
+#: src/app/skin/file.rs:122
 msgid "unknown key {} ignored"
 msgstr ""
 
-#: src/app/skin/file.rs:119
+#: src/app/skin/file.rs:128
 msgid "{} must be a string, ignored"
 msgstr ""
 
-#: src/app/skin/file.rs:133
+#: src/app/skin/file.rs:137
+msgid "\"locales\" must be an object, ignored"
+msgstr ""
+
+#: src/app/skin/file.rs:150
 msgid "layout {}: expected a text, number or true / false, got {}"
 msgstr ""
 
-#: src/app/skin/file.rs:143
+#: src/app/skin/file.rs:160
 msgid "unknown layout setting {} (one of {})"
 msgstr ""
 
-#: src/app/skin/file.rs:151
+#: src/app/skin/file.rs:168
 msgid "\"layout\" must be an object, none applied"
 msgstr ""
 
-#: src/app/skin/file.rs:159
+#: src/app/skin/file.rs:176
 msgid "unknown token {} (the names are the in-out properties of ui/theme.slint, docs/skins.md)"
 msgstr ""
 
-#: src/app/skin/file.rs:164
+#: src/app/skin/file.rs:181
 msgid "token {}: {}"
 msgstr ""
 
-#: src/app/skin/file.rs:168
+#: src/app/skin/file.rs:185
 msgid "\"tokens\" must be an object, no token applied"
 msgstr ""
 
-#: src/app/skin/file.rs:186
+#: src/app/skin/file.rs:204
 msgid "expected {}, got {}"
 msgstr ""
 
-#: src/app/skin/file.rs:190
+#: src/app/skin/file.rs:208
 msgid "a colour like \"#1473eb\""
 msgstr ""
 
-#: src/app/skin/file.rs:193
+#: src/app/skin/file.rs:211
 msgid "a length like 12 or \"12px\""
 msgstr ""
 
-#: src/app/skin/file.rs:195
+#: src/app/skin/file.rs:213
 msgid "a string"
 msgstr ""
 
-#: src/app/skin/file.rs:199
+#: src/app/skin/file.rs:217
 msgid "a whole number"
 msgstr ""
 
-#: src/app/skin/file.rs:201
+#: src/app/skin/file.rs:219
 msgid "a number"
 msgstr ""
 
-#: src/app/skin/file.rs:217
+#: src/app/skin/file.rs:235
 msgid "a duration like 80, \"80ms\" or \"0.2s\""
 msgstr ""
 
-#: src/app/skin/file.rs:237
+#: src/app/skin/file.rs:255
 msgid "bad colour {}, use #rrggbb or #rrggbbaa"
 msgstr ""
 

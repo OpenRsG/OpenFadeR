@@ -131,9 +131,17 @@ pub fn run(
     let lang = prefs::with(|p| p.view.language);
     i18n::apply(prefs::Choice::name(lang));
     let shown = std::cell::Cell::new(lang);
+    let w = app.as_weak();
     prefs::on_change(move |p| {
         if p.view.language != shown.replace(p.view.language) {
             i18n::apply(prefs::Choice::name(p.view.language));
+            // what Rust wrote from the extensions' and the menus' texts
+            if let Some(app) = w.upgrade() {
+                plugins::retranslate(&app);
+                library::menu_labels(&app);
+                skin::refresh();
+                app.global::<BrowserState>().invoke_reload(-1);
+            }
         }
     });
     stems_model::wire(&app);

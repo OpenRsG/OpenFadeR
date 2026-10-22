@@ -104,11 +104,12 @@ export component Knob inherits Rectangle {
     property <angle> sweep: (root.value - 0.5) * 270deg;
     width: 34px;
     height: 34px;
+    // Path commands need "." decimals whatever the UI language: to-string-unlocalized, not "" + number.
     pure function pt(r: length, a: angle) -> string {
-        return "" + (root.width / 2 + r * sin(a)) / 1px + " " + (root.height / 2 - r * cos(a)) / 1px;
+        return ((root.width / 2 + r * sin(a)) / 1px).to-string-unlocalized() + " " + ((root.height / 2 - r * cos(a)) / 1px).to-string-unlocalized();
     }
     pure function arc(r: length, a0: angle, a1: angle) -> string {
-        return "M " + root.pt(r, a0) + " A " + r / 1px + " " + r / 1px + " 0 " + (abs((a1 - a0) / 1deg) > 180 ? "1" : "0") + " " + (a1 >= a0 ? "1" : "0") + " " + root.pt(r, a1);
+        return "M " + root.pt(r, a0) + " A " + (r / 1px).to-string-unlocalized() + " " + (r / 1px).to-string-unlocalized() + " 0 " + (abs((a1 - a0) / 1deg) > 180 ? "1" : "0") + " " + (a1 >= a0 ? "1" : "0") + " " + root.pt(r, a1);
     }
     // body
     Rectangle {

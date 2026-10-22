@@ -110,6 +110,14 @@ pub fn collection(c: &Rc<Ctx>, i: usize) {
 /// The File menus' entries for the plugins that read / write a collection file plus our own formats, and the browser's EXPORT
 /// button (the first choice).
 pub fn wire(app: &App, c: &Rc<Ctx>) {
+    labels(app);
+    let k = c.clone();
+    app.global::<BrowserState>()
+        .on_export_collection(move || collection(&k, 0));
+}
+
+/// The File menus' import / export entries, in the UI language (at start and after a language change).
+pub fn labels(app: &App) {
     let labels = |v: Vec<String>| {
         ModelRc::new(VecModel::from(
             v.into_iter().map(SharedString::from).collect::<Vec<_>>(),
@@ -133,7 +141,4 @@ pub fn wire(app: &App, c: &Rc<Ctx>) {
             )
             .collect(),
     ));
-    let k = c.clone();
-    app.global::<BrowserState>()
-        .on_export_collection(move || collection(&k, 0));
 }

@@ -45,7 +45,7 @@ pub(super) fn views(st: &State) -> Vec<GetPlugin> {
                 name: m.name.as_str().into(),
                 version: m.version.as_str().into(),
                 installed: installed_version(&m.name).unwrap_or_default().into(),
-                description: m.description.as_str().into(),
+                description: openfader::locale::pick(&e.descriptions, &m.description).into(),
                 repo: repo.to_string().into(),
                 native: !catalog::plugins::natives(m).is_empty(),
                 action: action(e),

@@ -42,7 +42,7 @@ pub(super) fn views(st: &State) -> Vec<GetTheme> {
                 skin.author.clone()
             }
             .into(),
-            description: skin.description.as_str().into(),
+            description: skin.shown_description().into(),
             repo: repo.to_string().into(),
             action: code(get::action(skin)),
             active: get::is_chosen(&skin.name),

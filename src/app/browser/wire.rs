@@ -232,7 +232,14 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
     state.on_filter_changed(move || {
         let app = weak.unwrap();
         let s = app.global::<BrowserState>();
-        let bound = |t: slint::SharedString| t.trim().parse::<f64>().unwrap_or(0.0).max(0.0);
+        // a decimal comma is what the field takes in most UI languages
+        let bound = |t: slint::SharedString| {
+            t.trim()
+                .replace(',', ".")
+                .parse::<f64>()
+                .unwrap_or(0.0)
+                .max(0.0)
+        };
         let mut v = v.borrow_mut();
         v.filter = Filter {
             bpm_min: bound(s.get_bpm_min()),

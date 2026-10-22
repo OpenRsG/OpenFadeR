@@ -31,7 +31,7 @@ use render::{Palette, Rgb};
 use slint::ComponentHandle;
 use std::{cell::OnceCell, cell::RefCell, path::PathBuf, rc::Rc};
 
-pub use page::{install_and_choose, wire};
+pub use page::{install_and_choose, refresh, wire};
 
 /// The names of the two built-in skins (the dark and the light base), which skin files cannot take. The first is the default.
 pub const BUILTIN: [&str; 2] = ["Catppuccin Mocha", "Catppuccin Latte"];
@@ -53,6 +53,8 @@ pub struct Skin {
     pub description: String,
     /// VIEW settings the skin sets when it is chosen: `(setting, value)` as in the settings file ([`file::LAYOUT_KEYS`]).
     pub layout: Vec<(String, String)>,
+    /// The file's `"locales"`: language → {English text → translation}, kept as written ([`Skin::shown_description`]).
+    pub locales: serde_json::Map<String, serde_json::Value>,
     /// The file it was read from (`None`: made in memory).
     pub path: Option<PathBuf>,
 }
@@ -66,8 +68,19 @@ impl Skin {
             author: String::new(),
             description: String::new(),
             layout: Vec::new(),
+            locales: serde_json::Map::new(),
             path: None,
         }
+    }
+
+    /// The description in the UI language when `locales` translates it.
+    pub fn shown_description(&self) -> String {
+        self.locales
+            .get(&openfader::locale::code())
+            .and_then(|m| m.get(&self.description))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or(&self.description)
+            .to_owned()
     }
 }
 

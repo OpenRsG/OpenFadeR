@@ -439,13 +439,13 @@ fn show<'a>(
     )));
     s.set_tab(open as i32);
     s.set_title(if scope == GLOBAL {
-        "DEFAULTS FOR EVERY DEVICE".into()
+        tr!("DEFAULTS FOR EVERY DEVICE").into()
     } else {
         let name = devices
             .iter()
             .find(|d| d.id == scope)
             .map_or_else(|| scope.to_owned(), |d| format!("{} ({})", d.label, d.id));
-        format!("DEVICE {name}").into()
+        tr!("DEVICE {}", name).into()
     });
     s.set_device(scope != GLOBAL);
     sync_editors(lists);

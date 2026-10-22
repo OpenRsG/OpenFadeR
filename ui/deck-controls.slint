@@ -42,7 +42,7 @@ export component JogWheel inherits Rectangle {
         height: root.height;
         viewbox-width: 100;
         viewbox-height: 100;
-        commands: "M " + (50 + 47 * Math.cos(root.spin)) + " " + (50 + 47 * Math.sin(root.spin)) + " A 47 47 0 0 1 " + (50 + 47 * Math.cos(root.spin + 60deg)) + " " + (50 + 47 * Math.sin(root.spin + 60deg));
+        commands: "M " + (50 + 47 * Math.cos(root.spin)).to-string-unlocalized() + " " + (50 + 47 * Math.sin(root.spin)).to-string-unlocalized() + " A 47 47 0 0 1 " + (50 + 47 * Math.cos(root.spin + 60deg)).to-string-unlocalized() + " " + (50 + 47 * Math.sin(root.spin + 60deg)).to-string-unlocalized();
         stroke: Theme.jog-arc;
         stroke-width: root.t;
     }
@@ -64,7 +64,7 @@ export component JogWheel inherits Rectangle {
         height: root.height;
         viewbox-width: 100;
         viewbox-height: 100;
-        commands: "M 50 3 A 47 47 0 " + (root.left > 0.5 ? 1 : 0) + " 1 " + (50 + 47 * Math.sin(Math.min(root.left, 0.999) * 360deg)) + " " + (50 - 47 * Math.cos(Math.min(root.left, 0.999) * 360deg));
+        commands: "M 50 3 A 47 47 0 " + (root.left > 0.5 ? 1 : 0) + " 1 " + (50 + 47 * Math.sin(Math.min(root.left, 0.999) * 360deg)).to-string-unlocalized() + " " + (50 - 47 * Math.cos(Math.min(root.left, 0.999) * 360deg)).to-string-unlocalized();
         stroke: Theme.cue;
         stroke-width: root.t;
     }

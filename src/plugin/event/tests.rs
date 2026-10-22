@@ -30,7 +30,7 @@ fn only_plugins_that_list_an_event_get_it_and_they_get_it_with_its_data() {
             .unwrap();
     assert_eq!(
         got,
-        json!({"op": "event", "event": "track_loaded", "data": {"deck": 1, "track": {"title": "T"}}, "settings": {}})
+        json!({"op": "event", "event": "track_loaded", "data": {"deck": 1, "track": {"title": "T"}}, "settings": {}, "lang": "en"})
     );
     assert!(!dir.join("deaf/got.json").exists());
     assert!(fire_in(&reg, "unheard", json!({})).is_empty());
