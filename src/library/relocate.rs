@@ -5,8 +5,8 @@
 //! File names are compared case-insensitively (libraries often come from Windows); of several matches the one whose
 //! path shares the most trailing components with the lost path wins.
 
-use super::{folder, walk_files, Track};
-use crate::{analysis::fingerprint, audio::decode, store::Store};
+use super::{Track, folder, walk_files};
+use crate::{audio::decode_track16_cancellable, store::Store};
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
@@ -71,7 +71,7 @@ const LENGTH_SLACK_S: i64 = 2;
 
 /// Finds the files of lost tracks by their audio when no file of the same name exists: candidates in the search folders with
 /// the lost file's extension and a tag length within [`LENGTH_SLACK_S`] are decoded (at most [`MAX_DECODES`] per lost track)
-/// and the one whose fingerprint ([`fingerprint::of`]) equals the track's `collection.fingerprint` is the track. A track
+/// and the one whose fingerprint ([`crate::analysis::fingerprint::of`]) equals the track's `collection.fingerprint` is the track. A track
 /// whose audio was never analysed has no fingerprint and is not found this way. Lengths and fingerprints of candidates are
 /// kept, so a candidate is read and decoded once for all the tracks of one search.
 pub struct ByAudio<'a> {
@@ -124,10 +124,11 @@ impl<'a> ByAudio<'a> {
                 break;
             }
             decodes += 1;
-            let print = self
-                .prints
-                .entry(c)
-                .or_insert_with(|| decode(c).map(|p| fingerprint::of(&p)).unwrap_or_default());
+            let print = self.prints.entry(c).or_insert_with(|| {
+                decode_track16_cancellable(c, &|| false)
+                    .map(|(_, print)| print)
+                    .unwrap_or_default()
+            });
             if *print == want {
                 return Some(c);
             }
@@ -139,6 +140,7 @@ impl<'a> ByAudio<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{analysis::fingerprint, audio::decode};
 
     #[test]
     fn finds_by_name_preferring_the_closest_path_and_ignoring_case() {

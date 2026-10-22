@@ -1,0 +1,12 @@
+# Build context of Dockerfile.pi: the sources only (no build output, no host-built plugin libraries, no local state).
+.git
+**/target
+dist
+.local
+.omp
+.signet
+**/__pycache__
+extension/plugin/*/*.so
+extension/plugin/*/*.dll
+extension/plugin/*/*.dylib
+extension/plugin/yt-dlp/yt-dlp

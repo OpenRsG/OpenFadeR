@@ -1,0 +1,64 @@
+# syntax=docker/dockerfile:1.7
+# OpenFadeR for Raspberry Pi 3 / 4 / CM4 (64-bit Raspberry Pi OS based on Debian 13 "trixie"), cross-compiled on any x86_64 machine:
+#
+#   docker buildx build -f Dockerfile.pi -o dist/pi .
+#
+# writes dist/pi/openfader-<version>-linux-aarch64-pi.tar.gz (the program with its plugins, themes and controller mappings, as a
+# release archive) and the same folder unpacked. The cargo registry and both target folders live in BuildKit cache mounts: a
+# second build recompiles only what changed. Debian 13, as ONNX Runtime's ARM build (STEMS) needs glibc 2.38 and GCC 14's
+# libstdc++. See docs/raspberry-pi.md.
+
+ARG RUST_VERSION=1.99
+
+FROM rust:${RUST_VERSION}-trixie AS build
+ARG PLUGINS_REF=main
+ARG THEMES_REF=main
+ARG MAPPINGS_REF=main
+# Cortex-A53 (Pi 3) code also runs on the A72 of the Pi 4 / CM4 and on later cores.
+ARG TARGET_CPU=cortex-a53
+ENV DEBIAN_FRONTEND=noninteractive
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && dpkg --add-architecture arm64 && apt-get update \
+    && apt-get install -y --no-install-recommends crossbuild-essential-arm64 pkg-config python3 git perl make \
+       libasound2-dev:arm64 libfontconfig1-dev:arm64 libxkbcommon-dev:arm64 libwayland-dev:arm64 libudev-dev:arm64 libssl-dev:arm64 \
+    && rustup target add aarch64-unknown-linux-gnu
+
+ENV TARGET=aarch64-unknown-linux-gnu \
+    CARGO_BUILD_TARGET=aarch64-unknown-linux-gnu \
+    CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+    CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
+    CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
+    AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar \
+    PKG_CONFIG_ALLOW_CROSS_aarch64_unknown_linux_gnu=1 \
+    PKG_CONFIG_LIBDIR_aarch64_unknown_linux_gnu=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig \
+    AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu \
+    AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR=/usr/include \
+    CARGO_TERM_COLOR=never \
+    CARGO_INCREMENTAL=0
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C target-cpu=${TARGET_CPU}"
+
+WORKDIR /src
+COPY . .
+# The companions, as the release workflow takes them; checkouts already in the build context (a local working copy) win.
+RUN for pair in "extension/plugin OpenFadeR-Plugins $PLUGINS_REF" "extension/skin OpenFadeR-Themes $THEMES_REF" "mappings OpenFadeR-Map $MAPPINGS_REF"; do \
+      set -- $pair; [ -e "$1/.git" ] || [ -n "$(ls -A "$1" 2>/dev/null)" ] || git clone --quiet --depth 1 --branch "$3" "https://github.com/OpenRsG/$2.git" "$1"; \
+    done
+
+# The native plugins (their own workspace), then the app without the GPU STEMS engine (no ONNX Runtime WebGPU build for ARM Linux).
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/src/extension/plugin/target \
+    --mount=type=cache,target=/src/target \
+    extension/plugin/build.sh --quiet \
+    && cargo build --locked --quiet --profile pi --no-default-features --features app \
+    && v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1) \
+    && d=/out/openfader-$v-linux-aarch64-pi \
+    && mkdir -p "$d" \
+    && cp target/$TARGET/pi/openfader "$d/" \
+    && python3 .github/bundle.py "$d" \
+    && cp LICENSE README.md "$d/" && cp assets/icon.png "$d/openfader.png" \
+    && tar -C /out -czf "$d.tar.gz" "$(basename "$d")"
+
+FROM scratch AS bundle
+COPY --from=build /out/ /

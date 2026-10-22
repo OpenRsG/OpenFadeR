@@ -1,7 +1,7 @@
 //! Our own analysis for audio without stored analysis: beat grid and 3-band waveforms from decoded PCM.
 //! The design is ours.
 //!
-//! Input is interleaved stereo f32 as in [`crate::audio::Pcm`] (`samples`, `rate`).
+//! Input is stereo audio read through [`Frames`] (interleaved f32 as in [`crate::audio::Pcm`] `samples`, or a `Track16`) and its `rate`.
 //!
 //! This base owns the band split ([`hops`]: mean-square energy per band every 2.5 ms, or 1 ms with high
 //! precision) and the waveform. Children: [`grid`] (`beat_grid_with`: tempo, phase, bar positions, tempo changes) and
@@ -20,6 +20,7 @@ pub(crate) use vocal::vocal_regions_cancellable;
 pub use vocal::{VocalRegion, vocal_regions};
 
 use super::{DETAIL_ENTRIES_PER_SEC, PREVIEW_ENTRIES};
+use crate::audio::{Frames, mono};
 
 const FLUX_HZ: u32 = 400;
 /// Flux rate of high precision BeatGrid analysis.
@@ -69,15 +70,15 @@ impl Split {
     }
 }
 
-fn bands(samples: &[f32], rate: u32) -> impl Iterator<Item = [f32; 3]> + '_ {
+fn bands<S: Frames + ?Sized>(samples: &S, rate: u32) -> impl Iterator<Item = [f32; 3]> {
     let mut s = Split::new(rate);
     samples
-        .chunks_exact(2)
-        .map(move |f| s.push((f[0] + f[1]) * 0.5))
+        .frames_in(0..samples.frame_count())
+        .map(move |f| s.push(mono(f)))
 }
 
 /// Mean-square energy per hop of each band `[low, mid, high]` at about `hz` hops per second, and the exact hops per second.
-fn hops(samples: &[f32], rate: u32, hz: u32) -> ([Vec<f32>; 3], f64) {
+fn hops<S: Frames + ?Sized>(samples: &S, rate: u32, hz: u32) -> ([Vec<f32>; 3], f64) {
     let h = (rate / hz).max(1) as usize;
     let (mut out, mut acc, mut n) = ([Vec::new(), Vec::new(), Vec::new()], [0f32; 3], 0);
     for b in bands(samples, rate) {
@@ -96,12 +97,9 @@ fn hops(samples: &[f32], rate: u32, hz: u32) -> ([Vec<f32>; 3], f64) {
 }
 
 /// Per column ([`DETAIL_ENTRIES_PER_SEC`] per second) peak of each band `[low, mid, high]`, unscaled. Empty for empty input.
-pub fn peaks(samples: &[f32], rate: u32) -> Vec<[f32; 3]> {
-    peaks_of(
-        samples.chunks_exact(2).map(|f| [f[0], f[1]]),
-        samples.len() / 2,
-        rate,
-    )
+pub fn peaks<S: Frames + ?Sized>(samples: &S, rate: u32) -> Vec<[f32; 3]> {
+    let n = samples.frame_count();
+    peaks_of(samples.frames_in(0..n), n, rate)
 }
 
 /// [`peaks`] of `n` stereo frames read one by one (a mix computed on the fly needs no full-length buffer).
@@ -167,14 +165,14 @@ pub fn quantise(peak: &[[f32; 3]], top: f32) -> (Vec<[u8; 3]>, Vec<[u8; 3]>) {
 }
 
 /// `(detail, preview)` of the audio, the loudest peak being 127 ([`peaks`], [`quantise`]).
-pub fn waveform(samples: &[f32], rate: u32) -> (Vec<[u8; 3]>, Vec<[u8; 3]>) {
+pub fn waveform<S: Frames + ?Sized>(samples: &S, rate: u32) -> (Vec<[u8; 3]>, Vec<[u8; 3]>) {
     let (detail, preview, _) = waveform_and_grid(samples, rate, None);
     (detail, preview)
 }
 
 /// One band split supplies waveform peaks and, when requested, grid hop energies.
-pub(crate) fn waveform_and_grid(
-    samples: &[f32],
+pub(crate) fn waveform_and_grid<S: Frames + ?Sized>(
+    samples: &S,
     rate: u32,
     opt: Option<&GridOptions>,
 ) -> (Vec<[u8; 3]>, Vec<[u8; 3]>, Vec<super::Beat>) {
@@ -182,8 +180,8 @@ pub(crate) fn waveform_and_grid(
         .expect("uncancelled waveform and grid analysis")
 }
 
-pub(crate) fn waveform_and_grid_cancellable(
-    samples: &[f32],
+pub(crate) fn waveform_and_grid_cancellable<S: Frames + ?Sized>(
+    samples: &S,
     rate: u32,
     opt: Option<&GridOptions>,
     cancelled: &(dyn Fn() -> bool + Sync),
@@ -192,16 +190,12 @@ pub(crate) fn waveform_and_grid_cancellable(
         return None;
     }
     let Some(opt) = opt else {
-        let peak = peaks_of_cancellable(
-            samples.chunks_exact(2).map(|f| [f[0], f[1]]),
-            samples.len() / 2,
-            rate,
-            cancelled,
-        )?;
+        let n = samples.frame_count();
+        let peak = peaks_of_cancellable(samples.frames_in(0..n), n, rate, cancelled)?;
         let (detail, preview) = quantise(&peak, loudest(&peak));
         return (!cancelled()).then_some((detail, preview, Vec::new()));
     };
-    let frames = samples.len() / 2;
+    let frames = samples.frame_count();
     let cols = (frames * DETAIL_ENTRIES_PER_SEC as usize).div_ceil(rate as usize);
     let mut peak = vec![[0f32; 3]; cols];
     let h = (rate / opt.flux_hz()).max(1) as usize;

@@ -1,5 +1,5 @@
 //! The PREVIEW button (right strip) and the Preview column's strips ([`super::strip`]): decode the chosen track on a worker
-//! and play it on the browser preview player ([`openfader::audio::preview`]: heard on the headphone feed, level =
+//! (straight to a 16-bit track) and play it on the browser preview player ([`openfader::audio::preview`]: heard on the headphone feed, level =
 //! Preferences > Audio > Preview Volume). A second press of the button stops it; the button lights while a decode is pending
 //! or the preview plays. The button starts from the beginning, a click on a strip from the clicked point (or its cue).
 
@@ -16,12 +16,12 @@ use std::{
 };
 
 /// A decode in flight and the position (ms) the preview starts at once it is done.
-type Pending = (audio::DecodeJob, u32);
+type Pending = (audio::DecodeJob<(audio::Track16, String)>, u32);
 
 /// Decodes `file`; the preview starts at `from_ms` when the audio is there.
 fn start(app: &App, pending: &RefCell<Option<Pending>>, file: PathBuf, from_ms: u32) {
     audio::live_bus().iter().for_each(|b| b.preview.stop());
-    *pending.borrow_mut() = Some((audio::decode_async(file), from_ms));
+    *pending.borrow_mut() = Some((audio::decode_track16_async(file), from_ms));
     let state = app.global::<BrowserState>();
     state.set_preview_playing(true);
     state.set_status(tr!("preview: decoding…").into());
@@ -71,9 +71,9 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) -> Timer {
         if let Some((rx, from_ms)) = slot.as_ref() {
             match rx.try_recv() {
                 Err(TryRecvError::Empty) => return,
-                Ok(Ok(pcm)) => match &bus {
+                Ok(Ok((track, _))) => match &bus {
                     Some(b) => {
-                        b.preview.load(Arc::new(pcm));
+                        b.preview.load(Arc::new(track));
                         b.preview.seek_ms(*from_ms);
                         b.preview.play();
                         state.set_status(tr!("previewing on the headphones").into());

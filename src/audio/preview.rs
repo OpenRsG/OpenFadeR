@@ -10,7 +10,7 @@
 //! `Bus::apply`. The audio thread only `try_lock`s the track (a concurrent `load` costs one silent buffer) and
 //! never allocates; the replaced track is dropped by the UI thread.
 
-use super::Pcm;
+use super::Track16;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering::Relaxed};
@@ -19,7 +19,7 @@ const NO_SEEK: u64 = u64::MAX;
 
 /// What the UI sets and the callback reads.
 pub struct Controls {
-    pcm: Mutex<Option<Arc<Pcm>>>,
+    pcm: Mutex<Option<Arc<Track16>>>,
     rate: AtomicU32,
     frames: AtomicU64,
     /// f64 bits, source frame of the next frame to play (written by the callback).
@@ -46,10 +46,10 @@ impl Default for Controls {
 
 impl Controls {
     /// Replaces the preview track (stopped, at the start).
-    pub fn load(&self, pcm: Arc<Pcm>) {
+    pub fn load(&self, pcm: Arc<Track16>) {
         self.playing.store(false, Relaxed);
         self.rate.store(pcm.rate, Relaxed);
-        self.frames.store((pcm.samples.len() / 2) as u64, Relaxed);
+        self.frames.store(pcm.frames() as u64, Relaxed);
         self.seek.store(0f64.to_bits(), Relaxed);
         let old = self.pcm.lock().replace(pcm);
         drop(old); // freed here, never on the audio thread
@@ -168,14 +168,16 @@ impl Voice {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::audio::Pcm;
 
-    fn track(rate: u32, frames: usize) -> Arc<Pcm> {
-        Arc::new(Pcm {
+    /// A ramp: sample `i / frames`, quantised like a decoded track.
+    fn track(rate: u32, frames: usize) -> Arc<Track16> {
+        Arc::new(Track16::from(Pcm {
             rate,
             samples: (0..frames)
                 .flat_map(|i| [i as f32 / frames as f32, -(i as f32) / frames as f32])
                 .collect(),
-        })
+        }))
     }
 
     fn render(v: &mut Voice, c: &Controls, rate: u32, n: usize) -> Vec<Option<[f32; 2]>> {
@@ -196,7 +198,7 @@ mod tests {
         let out = render(&mut v, &c, 48_000, 8);
         assert_eq!(out[0], Some([0.0, 0.0]));
         assert!(
-            (out[2].unwrap()[0] - 0.001).abs() < 1e-6,
+            (out[2].unwrap()[0] - 0.001).abs() < 1e-4,
             "24 kHz track on a 48 kHz device: half a source frame per output frame"
         );
         assert!((c.position_ms() - 8.0 * 0.5 * 1000.0 / 24_000.0).abs() < 1e-6);

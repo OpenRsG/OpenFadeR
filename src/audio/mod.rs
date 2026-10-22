@@ -1,7 +1,9 @@
-//! Audio. Base: [`Pcm`] (interleaved stereo f32), its resampling read [`Pcm::frame_at`], the position arithmetic
+//! Audio. Base: [`Pcm`] (interleaved stereo f32), its resampling read [`Pcm::frame_at`], the read-only [`Frames`] view analysis
+//! and measuring code take (f32 slices and [`Track16`]), the position arithmetic
 //! children share ([`Loop`], [`advance`]), the lock-free frame queue [`Ring`], the device-frame writer [`put_frame`], the
 //! output-device lookup [`find_output`], and the knob helpers [`clamped`], [`store_clamped`], [`load_f32`] and [`mono`].
-//! Children: [`decode`] (whole-file symphonia decode, [`decode_async`] on a worker thread), [`dsp`] (EQ + filter biquads),
+//! Children: [`decode`] (whole-file symphonia decode to f32 [`Pcm`], or straight to a [`Track16`] with the audio fingerprint;
+//! [`decode_async`] / [`decode_track16_async`] on a worker thread), [`dsp`] (EQ + filter biquads),
 //! [`stretch`] (WSOLA key lock), [`bus`] (master / headphone routing math and knobs), [`route`] (which device channel pairs
 //! carry Master / Headphones / Booth, or the six External outputs), [`device`] (what the OS devices support), [`input`] (an
 //! input pair for REC), [`mic`] (the microphone and talkover), [`metronome`] (the grid click), [`preview`] (the browser's
@@ -13,7 +15,7 @@
 //! [`stems`] (STEMS: a track's separated parts, [`Source`] and the per-stem gain mix the voice plays; the separation itself
 //! is `crate::stems`), [`sampler`] (16 slice slots mixed into the master bus), [`groove`] (BEAT LAB drum slots),
 //! [`handover`] (the UI to callback mailbox the sampler and groove share), [`loudness`] (AUTO GAIN loudness estimate);
-//! [`track16`] ([`Track16`]: the 16-bit track a deck's player keeps, half the RAM of a [`Pcm`]); [`wavout`] writes a slice as a
+//! [`track16`] ([`Track16`]: the 16-bit track a deck's player and the browser preview keep, half the RAM of a [`Pcm`]); [`wavout`] writes a slice as a
 //! 16-bit stereo WAV.
 
 mod bus;
@@ -42,7 +44,10 @@ mod transport;
 pub(crate) mod wavout;
 
 pub use bus::{Bus, CHANNELS, FX_SLOTS, FX_UNITS, Headphones, MAX_LEVEL, equal_power};
-pub use decode::{DecodeJob, decode, decode_async, decode_cancellable, probe_rate};
+pub use decode::{
+    DecodeJob, decode, decode_async, decode_cancellable, decode_track16_async,
+    decode_track16_cancellable, probe_rate,
+};
 pub use dsp::{EQ_KILL_DB, EQ_MAX_DB};
 pub use player::{
     Player, Status, configure, controller, live_bus, release_controller, set_output, status,
@@ -55,6 +60,7 @@ pub use track16::Track16;
 pub use wavout::write_wav;
 
 use cpal::FromSample;
+use std::ops::Range;
 use std::sync::atomic::{
     AtomicU32, AtomicU64, AtomicUsize,
     Ordering::{Acquire, Relaxed, Release},
@@ -236,6 +242,27 @@ impl Pcm {
     /// material); upgrade to a windowed-sinc/polyphase resampler (e.g. rubato) if that matters.
     pub fn frame_at(&self, pos: f64) -> Option<[f32; 2]> {
         lerp_at(self.samples.len() / 2, pos, |k, c| self.samples[2 * k + c])
+    }
+}
+
+/// Read-only stereo audio, read front to back: the one input of the analysis and measuring code, so a deck's [`Track16`] is
+/// analysed without a full-length f32 copy. Interleaved f32 (`[f32]`, `Vec<f32>`, anything `AsRef<[f32]>`; the rate is then
+/// a separate argument, as it is for [`Track16::rate`]) and [`Track16`] implement it.
+pub trait Frames: Sync {
+    fn frame_count(&self) -> usize;
+    /// Frames `range`, dequantised if need be. Panics when the range is past the end.
+    fn frames_in(&self, range: Range<usize>) -> impl Iterator<Item = [f32; 2]>;
+}
+
+impl<T: AsRef<[f32]> + Sync + ?Sized> Frames for T {
+    fn frame_count(&self) -> usize {
+        self.as_ref().len() / 2
+    }
+
+    fn frames_in(&self, range: Range<usize>) -> impl Iterator<Item = [f32; 2]> {
+        self.as_ref()[2 * range.start..2 * range.end]
+            .chunks_exact(2)
+            .map(|f| [f[0], f[1]])
     }
 }
 

@@ -14,6 +14,7 @@ fn own_folder() -> Option<PathBuf> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    low_memory_malloc();
     openfader::audio::device::quiet_alsa();
     // A path given (or the old Database setting) is a library to connect; the own music folder always is one.
     let legacy = std::env::args_os()
@@ -39,3 +40,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     result
 }
+
+/// glibc's malloc keeps what threads free: its mmap threshold grows to 32 MB after a big block is freed (so the next track's
+/// buffers come from the heap and stay there) and every busy thread gets its own arena. Measured with two 6-min tracks
+/// loaded: 274 MB RSS by default, 203 MB with these. A fixed threshold sends every block of 256 KiB or more to mmap (given
+/// back on free); two arenas and trimming at 256 KiB return the rest. The audio thread does not allocate, so its timing
+/// is unaffected.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn low_memory_malloc() {
+    // SAFETY: called first in main, before any other thread exists.
+    unsafe {
+        libc::mallopt(libc::M_MMAP_THRESHOLD, 256 * 1024);
+        libc::mallopt(libc::M_TRIM_THRESHOLD, 256 * 1024);
+        libc::mallopt(libc::M_ARENA_MAX, 2);
+    }
+}
+
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+fn low_memory_malloc() {}

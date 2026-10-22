@@ -1,4 +1,4 @@
-//! Musical key from decoded PCM, reported in Camelot notation ("8A", "8B", ... as DJ libraries show it).
+//! Musical key from decoded audio (f32 PCM or a `Track16`), reported in Camelot notation ("8A", "8B", ... as DJ libraries show it).
 //!
 //! Pipeline (own design, textbook chroma/profile key finding): mono downmix, tent-filter decimation to
 //! ~11 kHz, Hann STFT (8192, hop 4096), spectral peaks with parabolic frequency refinement, tuning estimate from
@@ -10,6 +10,7 @@
 //! USB library (tests/key_usb.rs); the harmonic voting and the minor prior were tuned on that library too.
 
 use super::Stft;
+use crate::audio::Frames;
 
 /// Krumhansl-Kessler probe-tone ratings, tonic first.
 const KK_MAJOR: [f32; 12] = [
@@ -72,12 +73,12 @@ fn spectral_peaks(
 
 /// Twelve-bin pitch-class profile (C = 0) summed over the track, tuning-corrected, every peak also voting for the
 /// pitch classes of the fundamentals it could be a harmonic of. All zero for silence.
-pub fn chroma(samples: &[f32], rate: u32) -> [f32; 12] {
+pub fn chroma<S: Frames + ?Sized>(samples: &S, rate: u32) -> [f32; 12] {
     chroma_cancellable(samples, rate, &|| false).unwrap()
 }
 
-fn chroma_cancellable(
-    samples: &[f32],
+fn chroma_cancellable<S: Frames + ?Sized>(
+    samples: &S,
     rate: u32,
     cancelled: &dyn Fn() -> bool,
 ) -> Option<[f32; 12]> {
@@ -168,13 +169,13 @@ pub fn from_chroma(c: &[f32; 12]) -> Option<String> {
     Some(camelot(best.1 % 12, best.1 >= 12))
 }
 
-/// Key of interleaved stereo f32 PCM; `None` for silence or audio shorter than one analysis window (~0.75 s).
-pub fn detect(samples: &[f32], rate: u32) -> Option<String> {
+/// Key of stereo audio (interleaved f32 or a `Track16`, see [`Frames`]); `None` for silence or audio shorter than one analysis window (~0.75 s).
+pub fn detect<S: Frames + ?Sized>(samples: &S, rate: u32) -> Option<String> {
     from_chroma(&chroma(samples, rate))
 }
 
-pub(crate) fn detect_cancellable(
-    samples: &[f32],
+pub(crate) fn detect_cancellable<S: Frames + ?Sized>(
+    samples: &S,
     rate: u32,
     cancelled: &dyn Fn() -> bool,
 ) -> Option<Option<String>> {
