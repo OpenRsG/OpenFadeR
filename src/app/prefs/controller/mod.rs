@@ -132,6 +132,8 @@ section!(
         quantize_reverse: bool = true;
         quantize_sequencer: bool = true;
         quantize_all_decks: bool = false;
+        /// Others > MIDI CLOCK OUT: part of the name of the output port that gets the clock; empty = off ([`crate::app::midi`]).
+        midi_clock_port: String = String::new();
         /// MIX POINT LINK > Enable, Default MIX POINT Setting and auto switch, Display time, Display grids (+ only when enlarged),
         /// Automatically changes the BEAT/BPM SYNC setting, Automatically limits the zoom out range.
         mix_point_link: bool = false;
@@ -264,10 +266,13 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
         || super::advanced::choose(p, key, i)
 }
 
-/// Registers the text rows of this page (the sampler's capture location).
+/// Registers the text rows of this page (the sampler's capture location, the MIDI clock port).
 pub fn wire() {
     super::on_text("capture_dir", |v| {
         super::update(|p| p.controller.capture_dir = v.trim().to_owned())
+    });
+    super::on_text("midi_clock_port", |v| {
+        super::update(|p| p.controller.midi_clock_port = v.trim().to_owned())
     });
 }
 

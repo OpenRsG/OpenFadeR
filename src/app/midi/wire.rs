@@ -73,6 +73,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         layer34_noted: Cell::new(false),
         out: RefCell::new(None),
         leds: RefCell::new(Leds::new(Vec::new())),
+        clock: RefCell::new(None),
         snap: RefCell::default(),
         snap_at: Cell::new(None),
         filter: filter.clone(),
@@ -99,6 +100,9 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
     midi.reconnect(app, names.clone());
     *midi.watcher.borrow_mut() = Some(hotplug::Watcher::start(filter, names));
 
+    // MIDI clock output (PREFS > CONTROLLER > MIDI CLOCK OUT); its thread opens the port, now and after a replug.
+    crate::app::prefs::with(|p| midi.clock_port(&p.controller.midi_clock_port));
+
     // PREFS: the jog speed, and "Use controller audio when connected" switched while a controller is connected.
     let (weak_midi, weak_app, was) = (
         Rc::downgrade(&midi),
@@ -108,6 +112,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
     crate::app::prefs::on_change(move |p| {
         let Some(m) = weak_midi.upgrade() else { return };
         m.jog_factor.set(p.controller.jog_factor());
+        m.clock_port(&p.controller.midi_clock_port);
         if p.controller_audio != was.replace(p.controller_audio) {
             if let Some(app) = weak_app.upgrade() {
                 m.audio_pref_changed(&app);
@@ -115,13 +120,14 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         }
     });
 
-    // Input wakes the event loop directly; this timer retains jog decay and session housekeeping.
-    // Without input ports, 100 ms still picks up the hot-plug worker's once-a-second port snapshots.
+    // Input wakes the event loop directly; this timer retains jog decay, session housekeeping and the MIDI clock's view of
+    // the decks. Without input ports or clock, 100 ms still picks up the hot-plug worker's once-a-second port snapshots.
     let (m, input) = (midi.clone(), Rc::new(Timer::default()));
     let weak_input = Rc::downgrade(&input);
     input.start(TimerMode::Repeated, Duration::from_millis(5), move || {
         m.read_input(); // fallback if an event-loop wake could not be queued
         m.tick();
+        m.clock_tick();
         m.dump_tick();
         m.poll_ports();
         m.flush_toasts();
@@ -129,7 +135,8 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
             .ports
             .borrow()
             .as_ref()
-            .is_some_and(|p| !p.names.is_empty());
+            .is_some_and(|p| !p.names.is_empty())
+            || m.clock.borrow().is_some();
         let every = Duration::from_millis(if open { 5 } else { 100 });
         if let Some(t) = weak_input.upgrade().filter(|t| t.interval() != every) {
             t.set_interval(every);

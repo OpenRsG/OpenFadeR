@@ -36,11 +36,13 @@
 //! toasts) and [`dump`] (the state reply: faders, knobs and deck layer land in the app as if moved). One mapped controller per run.
 //!
 //! Children of this base: [`input`] (one decoded message: LEARN capture, state dump, dispatch to the binding's action), [`wheel`]
-//! (jog and platter state), [`learn`] (binding a captured control), [`lights`] (the light timer and signals), [`wire`] (set-up and the
-//! input wakes and jog/housekeeping timer). They add methods to [`Midi`]; the types they share live here. [`get`] is the way in for the repository catalog
+//! (jog and platter state), [`learn`] (binding a captured control), [`lights`] (the light timer and signals), [`clock`] (the MIDI
+//! clock output that external gear follows), [`wire`] (set-up and the input wakes and jog/housekeeping timer). They add methods to
+//! [`Midi`]; the types they share live here. [`get`] is the way in for the repository catalog
 //! (`app/catalog`): mapping files read, installed into the config folder, and the session opened again with one.
 
 mod actions;
+mod clock;
 mod dump;
 pub mod get;
 mod hotplug;
@@ -307,6 +309,8 @@ struct Midi {
     layer34_noted: Cell<bool>,
     out: RefCell<Option<Sink>>,
     leds: RefCell<Leds>,
+    /// The MIDI clock output (PREFS > CONTROLLER > MIDI CLOCK OUT), `None` while that setting is empty ([`clock`]).
+    clock: RefCell<Option<clock::Clock>>,
     /// What the lights show: the whole Slint state every [`lights::STATE_EVERY`], the jog ring's playheads on every light tick.
     snap: RefCell<led::Snap>,
     snap_at: Cell<Option<Instant>>,

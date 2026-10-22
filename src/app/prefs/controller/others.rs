@@ -1,4 +1,4 @@
-//! OTHERS tab: quantize. (Ableton Link is network-based and left out.)
+//! OTHERS tab: quantize, the MIDI clock output. (Ableton Link is network-based and left out.)
 
 use super::{Controller, Row};
 
@@ -30,6 +30,12 @@ pub(super) fn rows(c: &Controller) -> Vec<Row> {
             "quantize_all_decks",
             "Q switches all decks at once",
             c.quantize_all_decks,
+        ),
+        Row::header("MIDI CLOCK OUT"),
+        Row::text("midi_clock_port", "OUTPUT PORT", &c.midi_clock_port),
+        Row::info(
+            "",
+            "part of the port name; empty = off. 24 PPQN at the playing master deck's tempo and beat, START on its next bar",
         ),
     ]
 }

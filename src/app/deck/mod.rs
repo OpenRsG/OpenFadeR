@@ -41,6 +41,7 @@ pub(in crate::app) mod grid;
 mod groove;
 mod key;
 mod light;
+pub(in crate::app) use light::{Pulse, lead};
 mod load;
 #[cfg(test)]
 mod readout_tests;
