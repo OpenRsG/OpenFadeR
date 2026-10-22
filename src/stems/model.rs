@@ -252,7 +252,11 @@ impl Model {
         };
         let cpu = ep::CPU::default().with_arena_allocator(false).build();
         let providers = if gpu {
-            vec![ep::WebGPU::default().build().error_on_failure(), cpu]
+            #[cfg(feature = "stems-gpu")]
+            let providers = vec![ep::WebGPU::default().build().error_on_failure(), cpu];
+            #[cfg(not(feature = "stems-gpu"))]
+            let providers = vec![cpu];
+            providers
         } else {
             vec![cpu]
         };
@@ -367,9 +371,12 @@ fn gpu_verdict<T>(out: &Result<T, String>, took: Duration) -> Option<String> {
     }
 }
 
-/// `OPENFADER_STEMS_GPU=0` keeps the GPU out (comparisons, machines where Vulkan misbehaves).
+/// `OPENFADER_STEMS_GPU=0` keeps the GPU out (comparisons, machines where Vulkan misbehaves); a build without the `stems-gpu`
+/// feature has none.
 fn gpu_allowed() -> Result<(), &'static str> {
-    if std::env::var("OPENFADER_STEMS_GPU").is_ok_and(|v| v == "0") {
+    if !cfg!(feature = "stems-gpu") {
+        Err("not in this build")
+    } else if std::env::var("OPENFADER_STEMS_GPU").is_ok_and(|v| v == "0") {
         Err("disabled by OPENFADER_STEMS_GPU=0")
     } else {
         Ok(())

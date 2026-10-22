@@ -27,16 +27,19 @@ pub use openfader_plugin::library::{
     Phrases,
 };
 
+use crate::audio::{Frames, mono};
+
 /// Beat grid, 3-band waveforms, musical key, vocal regions and phrases (`beats`, `three_band_detail`,
-/// `three_band_preview`, `key`, `vocal`, `phrases` from [`auto::phrases`]) computed from interleaved stereo f32 PCM
-/// (`audio::Pcm::samples`, `.rate`) under the current [`options`]; a part switched off stays empty, other fields stay
+/// `three_band_preview`, `key`, `vocal`, `phrases` from [`auto::phrases`]) computed from stereo audio at `rate` Hz, read
+/// front to back through [`Frames`]: interleaved f32 (`audio::Pcm::samples`) or a deck's `audio::Track16` (no f32 copy of
+/// it is made), under the current [`options`]; a part switched off stays empty, other fields stay
 /// empty. CPU heavy (seconds for a long track): call off the UI thread.
-pub fn analyze(samples: &[f32], rate: u32) -> Analysis {
+pub fn analyze<S: Frames + ?Sized>(samples: &S, rate: u32) -> Analysis {
     analyze_with(samples, rate, &options::get())
 }
 
 /// [`analyze`] under `o`, with parallel key and vocal detection for interactive loads.
-pub fn analyze_with(samples: &[f32], rate: u32, o: &options::Options) -> Analysis {
+pub fn analyze_with<S: Frames + ?Sized>(samples: &S, rate: u32, o: &options::Options) -> Analysis {
     analyze_cancellable(samples, rate, o, Execution::Interactive, &|| false).unwrap()
 }
 
@@ -48,8 +51,8 @@ pub enum Execution {
 }
 
 /// Cancellation discards the result between detector stages; no partial analysis is returned or stored.
-pub fn analyze_cancellable(
-    samples: &[f32],
+pub fn analyze_cancellable<S: Frames + ?Sized>(
+    samples: &S,
     rate: u32,
     o: &options::Options,
     execution: Execution,
@@ -229,18 +232,17 @@ impl Stft {
     }
 }
 
-/// Mono, anti-aliased (triangular window of 2d samples) decimation by `d` of interleaved stereo. The mono signal is read on
+/// Mono, anti-aliased (triangular window of 2d samples) decimation by `d` of stereo audio. The mono signal is read on
 /// the fly: no full-length copy (key and vocal detection run this at once, on tracks of up to an hour).
-fn mono_decimate_cancellable(
-    samples: &[f32],
+fn mono_decimate_cancellable<S: Frames + ?Sized>(
+    samples: &S,
     d: usize,
     cancelled: &dyn Fn() -> bool,
 ) -> Option<Vec<f32>> {
     if cancelled() {
         return None;
     }
-    let n = samples.len() / 2;
-    let mono = |i: usize| (samples[2 * i] + samples[2 * i + 1]) * 0.5;
+    let n = samples.frame_count();
     let norm = 1.0 / (d * d) as f32;
     let mut out = Vec::with_capacity(n / d);
     for k in 0..n / d {
@@ -248,13 +250,15 @@ fn mono_decimate_cancellable(
             return None;
         }
         if d == 1 {
-            out.push(mono(k));
+            out.extend(samples.frames_in(k..k + 1).map(mono));
         } else {
             let lo = (k * d).saturating_sub(d);
             let hi = (k * d + d).min(n);
             out.push(
-                (lo..hi)
-                    .map(|i| mono(i) * (d - (i as isize - (k * d) as isize).unsigned_abs()) as f32)
+                samples
+                    .frames_in(lo..hi)
+                    .enumerate()
+                    .map(|(j, f)| mono(f) * (d - (lo + j).abs_diff(k * d)) as f32)
                     .sum::<f32>()
                     * norm,
             );

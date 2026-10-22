@@ -18,7 +18,7 @@ use crate::app::prefs::{
     view::{BeatCount, BeatGrid, CueMarkers},
 };
 use openfader::analysis::{self, Analysis, Beat, Cue, DETAIL_ENTRIES_PER_SEC};
-use openfader::audio::Pcm;
+use openfader::audio::{Frames, Pcm};
 
 pub const DEFAULT_SPAN_MS: u32 = 8000;
 const LOOP_RGB: super::Rgb = [255, 153, 0];
@@ -74,7 +74,7 @@ pub fn wave(a: &Analysis, pcm: Option<&Pcm>) -> Option<Wave> {
             Src::Mono => a.detail.iter().map(|&v| mono_layers(v)).collect(),
         })
         .find(|l: &Vec<Layers>| !l.is_empty())
-        .or_else(|| pcm.map(peaks))?;
+        .or_else(|| pcm.map(|p| peaks(&p.samples, p.rate)))?;
     (!layers.is_empty()).then_some(Wave {
         layers,
         per_ms: PER_MS,
@@ -89,24 +89,24 @@ pub fn wave_3band(detail: &[[u8; 3]]) -> Option<Wave> {
     })
 }
 
-/// Audio-only fallback, prepared off the UI thread without reading UI preferences.
-pub(in crate::app) fn audio_wave(pcm: &Pcm) -> Option<Wave> {
-    (!pcm.samples.is_empty() && pcm.rate > 0).then(|| Wave {
-        layers: peaks(pcm),
+/// Audio-only fallback (`rate` Hz), prepared off the UI thread without reading UI preferences.
+pub(in crate::app) fn audio_wave<S: Frames + ?Sized>(audio: &S, rate: u32) -> Option<Wave> {
+    (audio.frame_count() > 0 && rate > 0).then(|| Wave {
+        layers: peaks(audio, rate),
         per_ms: PER_MS,
     })
 }
 
 /// Peak (both channels) per 1/150 s of decoded audio, fixed whiteness.
-fn peaks(pcm: &Pcm) -> Vec<super::Layers> {
-    let rate = pcm.rate as f64;
-    let frames = pcm.samples.len() / 2;
+fn peaks<S: Frames + ?Sized>(audio: &S, rate: u32) -> Vec<super::Layers> {
+    let rate = rate as f64;
+    let frames = audio.frame_count();
     let rgb = mono_rgbh(4 << 5).0;
     let from = |i: usize| (i as f64 * rate / DETAIL_ENTRIES_PER_SEC as f64) as usize;
     (0..(frames as f64 * DETAIL_ENTRIES_PER_SEC as f64 / rate).ceil() as usize)
         .map(|i| {
-            let s = &pcm.samples[2 * from(i).min(frames)..2 * from(i + 1).min(frames)];
-            single(rgb, s.iter().fold(0f32, |m, v| m.max(v.abs())).min(1.0))
+            let s = audio.frames_in(from(i).min(frames)..from(i + 1).min(frames));
+            single(rgb, s.flatten().fold(0f32, |m, v| m.max(v.abs())).min(1.0))
         })
         .collect()
 }
@@ -370,23 +370,13 @@ mod tests {
         // 1 s at 44.1 kHz with a single full-scale spike at 0.5 s => entry 75
         let mut samples = vec![0.0; 2 * 44100];
         samples[2 * 22050] = -1.0;
-        let p = peaks(&Pcm {
-            rate: 44100,
-            samples,
-        });
+        let p = peaks(&samples, 44100);
         assert_eq!(p.len(), 150);
         let hs: Vec<_> = p.iter().map(|l| l[0].h).collect();
         assert_eq!(hs.iter().position(|&h| h == 1.0), Some(75));
         assert_eq!(hs.iter().filter(|&&h| h > 0.0).count(), 1);
         // non-integer frames per entry (11025 Hz => 73.5) still ends at the right entry
-        assert_eq!(
-            peaks(&Pcm {
-                rate: 11025,
-                samples: vec![0.5; 2 * 11025]
-            })
-            .len(),
-            150
-        );
+        assert_eq!(peaks(&vec![0.5; 2 * 11025], 11025).len(), 150);
     }
 }
 

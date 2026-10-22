@@ -8,6 +8,7 @@
 /mobile/android/app/src/main/jniLibs/
 /mobile/android/local.properties
 /.local
+/dist/
 
 # The companion repositories, cloned in place by start.sh: OpenFadeR-Plugins, OpenFadeR-Themes, OpenFadeR-Map.
 /extension/

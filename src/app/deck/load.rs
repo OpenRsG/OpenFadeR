@@ -1,5 +1,6 @@
-//! LOAD publishes decoded audio before optional analysis. The worker also prepares loudness,
-//! auto cue and the audio-only waveform; the UI merges late results without replacing edits.
+//! LOAD publishes decoded audio before optional analysis. The worker decodes straight to the 16-bit [`audio::Track16`] the
+//! player keeps (no full-length f32 copy), and prepares loudness, auto cue, the audio-only waveform and the analysis from that
+//! same shared track; the UI merges late results without replacing edits.
 //! Replacing the loaded track cancels its worker at decode packet and analysis stage boundaries.
 
 use super::{
@@ -48,30 +49,35 @@ fn decode_and_analyze(
     let (tx, rx) = channel();
     std::thread::spawn(move || {
         let stop = || cancelled.load(Ordering::Relaxed);
-        let pcm = match pcm.map(Ok).unwrap_or_else(|| {
-            t.file
+        let decoded = match pcm {
+            // A sampler slice is no library track: no fingerprint to remember.
+            Some(pcm) => Ok((audio::Track16::from(pcm), String::new())),
+            None => t
+                .file
                 .as_deref()
                 .ok_or_else(|| tr!("no file path").into())
-                .and_then(|file| audio::decode_cancellable(file, &stop))
-        }) {
-            Ok(pcm) => pcm,
+                .and_then(|file| audio::decode_track16_cancellable(file, &stop)),
+        };
+        let (track, print) = match decoded {
+            Ok(decoded) => decoded,
             Err(e) => {
                 let _ = tx.send(Err(e));
                 return;
             }
         };
+        let track = Arc::new(track);
         if stop() {
             return;
         }
-        let gain = gain::resolve(library.then_some(&t), &pcm).0;
+        let gain = gain::resolve(library.then_some(&t), &*track, track.rate).0;
         if stop() {
             return;
         }
-        let cue = auto_cue.and_then(|db| autocue::first_sound(&pcm, db));
+        let cue = auto_cue.and_then(|db| autocue::first_sound(&*track, track.rate, db));
         if stop()
             || tx
                 .send(Ok(Decoded::Playable {
-                    pcm: Arc::new(audio::Track16::from(&pcm)),
+                    pcm: track.clone(),
                     stems: None,
                     gain: Some(gain),
                     cue,
@@ -80,16 +86,18 @@ fn decode_and_analyze(
         {
             return;
         }
-        let detail = fallback.then(|| render::detail::audio_wave(&pcm)).flatten();
+        let detail = fallback
+            .then(|| render::detail::audio_wave(&*track, track.rate))
+            .flatten();
         if stop() || tx.send(Ok(Decoded::Detail(detail))).is_err() {
             return;
         }
         if library {
-            analysis::cache::remember_fingerprint(&t, &pcm);
+            analysis::cache::remember_fingerprint(&t, &print);
         }
         if need && !stop() {
             let Some((a, _)) =
-                analysis::cache::analyze_cached_cancellable(&t, &pcm.samples, pcm.rate, &stop)
+                analysis::cache::analyze_cached_cancellable(&t, &*track, track.rate, &stop)
             else {
                 return;
             };
@@ -712,9 +720,9 @@ mod tests {
             samples,
         };
         let expected = audio::Track16::from(&pcm);
-        let expected_gain = audio::loudness::auto_gain_db(&pcm);
-        let expected_cue = autocue::first_sound(&pcm, -36.0);
-        let expected_detail = render::detail::audio_wave(&pcm).unwrap();
+        let expected_gain = audio::loudness::auto_gain_db(&expected, expected.rate);
+        let expected_cue = autocue::first_sound(&expected, expected.rate, -36.0);
+        let expected_detail = render::detail::audio_wave(&expected, expected.rate).unwrap();
         let rx = decode_and_analyze(
             Track::default(),
             true,

@@ -10,6 +10,7 @@
 //! regions under 2 s dropped.
 
 use crate::analysis::{Stft, mono_decimate_cancellable};
+use crate::audio::Frames;
 
 const N: usize = 4096;
 const HOP: usize = N / 2;
@@ -135,13 +136,13 @@ fn regions(p: &[Option<f32>], frame_ms: f64) -> Vec<VocalRegion> {
         .collect()
 }
 
-/// Vocal regions of interleaved stereo f32 PCM (`rate` Hz). CPU light (a few hundred ms for a long track).
-pub fn vocal_regions(samples: &[f32], rate: u32) -> Vec<VocalRegion> {
+/// Vocal regions of stereo audio (`rate` Hz; interleaved f32 or a `Track16`, see [`Frames`]). CPU light (a few hundred ms for a long track).
+pub fn vocal_regions<S: Frames + ?Sized>(samples: &S, rate: u32) -> Vec<VocalRegion> {
     vocal_regions_cancellable(samples, rate, &|| false).expect("uncancelled vocal analysis")
 }
 
-pub(crate) fn vocal_regions_cancellable(
-    samples: &[f32],
+pub(crate) fn vocal_regions_cancellable<S: Frames + ?Sized>(
+    samples: &S,
     rate: u32,
     cancelled: &dyn Fn() -> bool,
 ) -> Option<Vec<VocalRegion>> {

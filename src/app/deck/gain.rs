@@ -4,21 +4,25 @@
 
 use super::Deck;
 use openfader::{
-    audio::{Pcm, loudness},
+    audio::{Frames, loudness},
     library::Track,
     store,
 };
 
-/// `(analysed, adjust)` in dB for a track just decoded: the analysed value from the store, else measured from `pcm` and stored
-/// (the adjustment is untouched). A sampler slice (no track) is measured every time and has no adjustment.
-pub(super) fn resolve(track: Option<&Track>, pcm: &Pcm) -> (f32, f32) {
+/// `(analysed, adjust)` in dB for a track just decoded: the analysed value from the store, else measured from `audio` (`rate`
+/// Hz) and stored (the adjustment is untouched). A sampler slice (no track) is measured every time and has no adjustment.
+pub(super) fn resolve<S: Frames + ?Sized>(
+    track: Option<&Track>,
+    audio: &S,
+    rate: u32,
+) -> (f32, f32) {
     let Some(key) = track.map(store::key) else {
-        return (loudness::auto_gain_db(pcm), 0.0);
+        return (loudness::auto_gain_db(audio, rate), 0.0);
     };
     let st = store::global();
     let stored = st.gain(&key).ok().flatten().unwrap_or_default();
     let analysed = stored.analysed_db.unwrap_or_else(|| {
-        let db = loudness::auto_gain_db(pcm);
+        let db = loudness::auto_gain_db(audio, rate);
         if let Err(e) = st.set_gain_analysed(&key, db) {
             eprintln!("deck: AUTO GAIN not saved: {e}");
         }

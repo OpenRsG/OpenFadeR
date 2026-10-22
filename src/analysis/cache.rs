@@ -18,7 +18,7 @@ use super::{
     detect::VocalRegion,
     options::{self, Options, Profile},
 };
-use crate::{library::Track, paths::at, store};
+use crate::{audio::Frames, library::Track, paths::at, store};
 use std::path::{Path, PathBuf};
 
 const MAGIC: &[u8; 4] = b"RKAC";
@@ -280,14 +280,14 @@ pub enum Source {
 
 /// Stored analysis under the current [`options`], else [`super::analyze`] of the decoded `samples` + [`store`].
 /// ponytail: a failed cache write is dropped silently; the result is still returned.
-pub fn analyze_cached(t: &Track, samples: &[f32], rate: u32) -> (Analysis, Source) {
+pub fn analyze_cached<S: Frames + ?Sized>(t: &Track, samples: &S, rate: u32) -> (Analysis, Source) {
     analyze_cached_cancellable(t, samples, rate, &|| false).unwrap()
 }
 
 /// Like [`analyze_cached`], but abandoned loads cannot publish partial or stale results.
-pub fn analyze_cached_cancellable(
+pub fn analyze_cached_cancellable<S: Frames + ?Sized>(
     t: &Track,
-    samples: &[f32],
+    samples: &S,
     rate: u32,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> Option<(Analysis, Source)> {
@@ -303,9 +303,9 @@ pub fn analyze_cached_cancellable(
     )
 }
 
-fn analyze_pcm(
+fn analyze_pcm<S: Frames + ?Sized>(
     t: &Track,
-    samples: &[f32],
+    samples: &S,
     rate: u32,
     o: &Options,
     explicit: bool,
@@ -347,15 +347,15 @@ pub fn get_or_analyze_with(
             return Ok((!cancelled()).then_some((a, Source::Cache)));
         }
     }
-    let pcm = crate::audio::decode_cancellable(audio_of(t)?, cancelled)?;
+    let (track, print) = crate::audio::decode_track16_cancellable(audio_of(t)?, cancelled)?;
     if cancelled() {
         return Ok(None);
     }
-    remember_fingerprint(t, &pcm);
+    remember_fingerprint(t, &print);
     Ok(analyze_pcm(
         t,
-        &pcm.samples,
-        pcm.rate,
+        &track,
+        track.rate,
         o,
         explicit,
         super::Execution::Bulk,
@@ -364,7 +364,12 @@ pub fn get_or_analyze_with(
 }
 
 /// [`super::analyze_with`] `o`, stored for `t` whatever the cache held.
-pub fn analyze_fresh(t: &Track, samples: &[f32], rate: u32, o: &Options) -> Analysis {
+pub fn analyze_fresh<S: Frames + ?Sized>(
+    t: &Track,
+    samples: &S,
+    rate: u32,
+    o: &Options,
+) -> Analysis {
     let a = super::analyze_with(samples, rate, o);
     let _ = store(t, &a, o.profile());
     a
@@ -375,30 +380,30 @@ pub fn get_or_analyze(t: &Track) -> Result<(Analysis, Source), String> {
     if let Ok(Some(a)) = load_for(t, &options::get()) {
         return Ok((a, Source::Cache));
     }
-    let pcm = crate::audio::decode(audio_of(t)?)?;
-    remember_fingerprint(t, &pcm);
-    Ok(analyze_cached(t, &pcm.samples, pcm.rate))
+    let (track, print) = crate::audio::decode_track16_cancellable(audio_of(t)?, &|| false)?;
+    remember_fingerprint(t, &print);
+    Ok(analyze_cached(t, &track, track.rate))
 }
 
 /// Analyses `t` again under the current options, ignoring and replacing what the cache holds (an explicit
 /// "Analyze Track").
 pub fn reanalyze(t: &Track) -> Result<Analysis, String> {
-    let pcm = crate::audio::decode(audio_of(t)?)?;
-    remember_fingerprint(t, &pcm);
-    Ok(analyze_fresh(t, &pcm.samples, pcm.rate, &options::get()))
+    let (track, print) = crate::audio::decode_track16_cancellable(audio_of(t)?, &|| false)?;
+    remember_fingerprint(t, &print);
+    Ok(analyze_fresh(t, &track, track.rate, &options::get()))
 }
 
-/// Gives a Collection track the fingerprint of its decoded audio ([`super::fingerprint`]) when it has none yet: what finds
-/// the file again after it moved. Tracks outside the Collection (no id) and failed writes are skipped silently.
-pub fn remember_fingerprint(t: &Track, pcm: &crate::audio::Pcm) {
+/// Gives a Collection track the fingerprint `print` of its decoded audio ([`super::fingerprint`], empty for no audio) when it
+/// has none yet: what finds the file again after it moved. Tracks outside the Collection (no id) and failed writes are
+/// skipped silently.
+pub fn remember_fingerprint(t: &Track, print: &str) {
     let Some(id) = t.id else { return };
     let store = store::global();
     if store.fingerprint(id).ok().flatten().is_some() {
         return;
     }
-    let fp = super::fingerprint::of(pcm);
-    if !fp.is_empty() {
-        let _ = store.set_fingerprint(id, &fp);
+    if !print.is_empty() {
+        let _ = store.set_fingerprint(id, print);
     }
 }
 

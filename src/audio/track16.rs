@@ -1,7 +1,8 @@
-//! [`Track16`]: the track a deck's player keeps for the whole session, as 16-bit integers (half the RAM of the f32 [`Pcm`]
-//! it is built from: 10.6 MB per minute of stereo at 44.1 kHz).
+//! [`Track16`]: the track a deck's player (and the browser preview) keeps for the whole session, as 16-bit integers (half the
+//! RAM of the f32 [`Pcm`] it is built from: 10.6 MB per minute of stereo at 44.1 kHz). The decoder can fill one directly
+//! ([`super::decode_track16_cancellable`]), so a loaded track never exists as a full-length f32 buffer.
 
-use super::{Pcm, Source, lerp_at};
+use super::{Frames, Pcm, Source, lerp_at};
 use std::ops::Range;
 
 /// Stored value = sample × `SCALE`: the i16 range covers ±2.0, so a decoded file's overs up to +6 dBFS survive and a
@@ -10,8 +11,8 @@ const SCALE: f32 = 16384.0;
 
 /// Interleaved stereo at `rate` Hz as `i16` with 6 dB of headroom: sample `x` is stored as `round(x / 2 · 32768)` clamped to
 /// the i16 range and read back as `v · 2 / 32768` (so ±2.0, the positive end 32767/16384). Immutable: built once from a
-/// decoded [`Pcm`] by [`Track16::from`], read through [`Source::frame_at`] (the same interpolation as [`Pcm::frame_at`]) or
-/// [`Track16::iter_f32`]. Analysis and transient work (sampler, edit, preview) stay on f32 [`Pcm`].
+/// decoded [`Pcm`] by [`Track16::from`] or filled by the decoder, read through [`Source::frame_at`] (the same interpolation as
+/// [`Pcm::frame_at`]), [`Track16::iter_f32`] or [`Frames`] (analysis). Sampler, edit and groove stay on f32 [`Pcm`].
 #[derive(Default)]
 pub struct Track16 {
     pub rate: u32,
@@ -23,6 +24,12 @@ fn deq(v: i16) -> f32 {
     v as f32 * (1.0 / SCALE)
 }
 
+/// The stored value of sample `x` (NaN becomes silence, overs past ±2.0 clip).
+#[inline]
+pub(super) fn quantise(x: f32) -> i16 {
+    (x * SCALE).round() as i16
+}
+
 impl From<Pcm> for Track16 {
     /// Quantises `pcm` (dropped on return; NaN becomes silence, overs past ±2.0 clip).
     fn from(pcm: Pcm) -> Self {
@@ -32,11 +39,7 @@ impl From<Pcm> for Track16 {
 
 impl From<&Pcm> for Track16 {
     fn from(pcm: &Pcm) -> Self {
-        let samples = pcm
-            .samples
-            .iter()
-            .map(|&x| (x * SCALE).round() as i16)
-            .collect();
+        let samples = pcm.samples.iter().map(|&x| quantise(x)).collect();
         Track16 {
             rate: pcm.rate,
             samples,
@@ -45,6 +48,14 @@ impl From<&Pcm> for Track16 {
 }
 
 impl Track16 {
+    /// A track of `rate` Hz from interleaved stereo `samples` already quantised with [`quantise`] (shrunk to fit).
+    pub(super) fn new(rate: u32, samples: Vec<i16>) -> Self {
+        Track16 {
+            rate,
+            samples: samples.into_boxed_slice(),
+        }
+    }
+
     pub fn frames(&self) -> usize {
         self.samples.len() / 2
     }
@@ -60,6 +71,18 @@ impl Track16 {
         self.samples[2 * frames.start..2 * frames.end]
             .iter()
             .map(|&v| deq(v))
+    }
+}
+
+impl Frames for Track16 {
+    fn frame_count(&self) -> usize {
+        self.frames()
+    }
+
+    fn frames_in(&self, range: Range<usize>) -> impl Iterator<Item = [f32; 2]> {
+        self.samples[2 * range.start..2 * range.end]
+            .chunks_exact(2)
+            .map(|f| [deq(f[0]), deq(f[1])])
     }
 }
 
