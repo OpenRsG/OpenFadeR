@@ -60,8 +60,12 @@ export component PadGrid inherits Rectangle {
     for p[i] in root.pads: Rectangle {
         /// The pad's colour: its own, but the PAD FX pads wear the VIEW > PAD FX COLOR.
         property <color> tone: root.mode == 4 ? [Theme.accent, Theme.play, Theme.deck2, Theme.danger, Theme.sampler][root.fx-color] : p.color;
-        x: root.grid ? Math.mod(i, 4) * (root.cw + Theme.gap) : Math.floor(i / 4) * (root.cw + Theme.gap);
-        y: root.grid ? Math.floor(i / 4) * (root.ch + Theme.gap) : Math.mod(i, 4) * (root.ch + Theme.gap);
+        // BEAT JUMP pairs pad 2k (-n) with pad 2k+1 (+n): over it on the 4x2 grid, beside it on 2 columns. The pad index, so the jump, is unchanged.
+        property <bool> pairs: root.mode == 1;
+        property <int> c: self.pairs ? (root.grid ? Math.floor(i / 2) : Math.mod(i, 2)) : root.grid ? Math.mod(i, 4) : Math.floor(i / 4);
+        property <int> r: self.pairs ? (root.grid ? Math.mod(i, 2) : Math.floor(i / 2)) : root.grid ? Math.floor(i / 4) : Math.mod(i, 4);
+        x: self.c * (root.cw + Theme.gap);
+        y: self.r * (root.ch + Theme.gap);
         width: root.cw;
         height: root.ch;
         opacity: root.live ? 1 : 0.4;
