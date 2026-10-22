@@ -8,9 +8,9 @@
 //! * Tempo: the follower plays at `master BPM × k`, k ∈ {1, 2, ½} whichever needs the rate closest
 //!   to 1 (87 BPM follows 174 BPM at 1×, not 2×); its own tempo fader is ignored ([`target`]).
 //! * Phase: the grids' fractional beat numbers are compared (`k` beats of the follower per master
-//!   beat). Drift above 10 ms is pulled in with a tiny `Player::nudge`, never a seek; a
-//!   bigger error (a hot-cue jump, SYNC pressed while playing) re-seeks once to the aligned spot
-//!   ([`correct`]). No correction while scratching, bending, looping or reversing, or when the master's loop
+//!   beat). Drift above 1 ms is pulled in with a tiny `Player::nudge`, never a seek; an
+//!   error above 25 ms (SYNC pressed while playing, a hot-cue jump) re-seeks once to the aligned spot, in phase with what is
+//!   heard ([`correct`]). Nothing is measured while a seek or start is still on its way to the speakers. No correction while scratching, bending, looping or reversing, or when the master's loop
 //!   cannot preserve the follower's beat phase. Tempo following continues through those loops.
 //! * PLAY on a paused synced deck waits for the master's next beat, unless its loop cannot preserve that phase.
 //!
@@ -191,6 +191,11 @@ impl Deck {
     fn apply_nudge(&self) {
         let total = self.sync.bend.get() + self.sync.nudge.get();
         self.with_player(|p| p.nudge(total));
+    }
+
+    /// The player's position is what is being heard (see `Player::settled`); true without a player.
+    fn settled(&self) -> bool {
+        self.with_player(|p| p.settled()).unwrap_or(true)
     }
 
     /// A LOAD starts clean: no bend, nudge or armed start.

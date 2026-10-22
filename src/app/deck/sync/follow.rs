@@ -70,9 +70,16 @@ impl Deck {
         } else {
             (None, None)
         };
-        let aligned = (waiting.is_none() && playing && their_playing && free)
-            .then(|| align(ob, own_pos, tb, their_pos, k))
-            .flatten();
+        // A seek or start not yet heard holds the reported position at its target: measured then, the phase
+        // would be off by the output latency, and a correction made on it would land off by as much.
+        let aligned = (waiting.is_none()
+            && playing
+            && their_playing
+            && free
+            && self.settled()
+            && peer.settled())
+        .then(|| align(ob, own_pos, tb, their_pos, k))
+        .flatten();
         drop((own, theirs));
         if (rate - self.rate.get()).abs() > 1e-9 {
             self.set_rate(rate);
@@ -103,7 +110,8 @@ impl Deck {
         };
         match correct(error_ms(err, g * rate), self.sync.nudge.get() != 0.0) {
             Fix::Seek => {
-                self.with_player(|p| p.seek(ms.max(0.0).round() as u32));
+                // In phase: the jump is heard one buffer and one output latency later, as far past `ms` as the deck plays meanwhile.
+                self.with_player(|p| p.seek_in_phase(ms.max(0.0).round() as u32, own_pos));
                 self.set_nudge(0.0);
             }
             Fix::Nudge(d) => self.set_nudge(d),
