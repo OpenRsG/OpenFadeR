@@ -81,6 +81,8 @@ section!(
         eject_lock: bool = false;
         needle_lock: bool = false;
         memory_cue_lock: bool = false;
+        /// Deck > Invert hardware tempo fader: for controllers whose tempo fader reports 1 at the top (+ end).
+        tempo_invert: bool = false;
         /// Deck > Load > Load Setting: the cue point is the memory / hot cue nearest to the start.
         load_nearest_cue: bool = false;
         /// Deck > Auto Cue and its level in dB (one of [`AUTO_CUE_DB`]).

@@ -9,6 +9,8 @@ the executable; a file in an earlier folder replaces one of the same name in a l
 
 Input callbacks queue messages in order and wake the UI event loop once per pending batch. Each UI turn dispatches at most 256 messages, then yields without dropping or merging controls. The 5 ms timer remains for jog decay and session housekeeping, not as the normal input-delivery clock. Audio buffers and the output device add separate control-to-sound latency.
 
+A controller whose tempo fader moves the tempo the wrong way (the app takes 0 at the fader's top as the + end; some report 1 there) is corrected with PREFERENCES > CONTROLLER > Deck > **Invert hardware tempo fader**. It is independent of PREFERENCES > VIEW > **Tempo fader: + at the bottom**, which only reverses the on-screen fader.
+
 ## Install from a repository
 
 PREFERENCES > CONTROLLER > **GET MAPPINGS** lists the mapping files of your GitHub repositories, with the same repository list as GET

@@ -1,10 +1,10 @@
 //! The actions MIDI LEARN offers and midi.map accepts.
 
 use super::{Action, App, JogMode, Kind, jog, knob, press, rel};
+use crate::app::prefs;
 use crate::app::{BrowserState, DeckState, FxSlot, FxState, GrooveState, KeysState, MixerState};
 use openfader::audio::fx::BEATS;
 use slint::{ComponentHandle, Model};
-use std::sync::LazyLock;
 
 /// `press` calling `State::cb(deck, extra...)`; the deck column is the deck, FX unit or MERGE side.
 macro_rules! press_cb {
@@ -65,13 +65,17 @@ fn fx_level<const S: i32>(a: &App, u: i32, v: f32) {
     a.global::<FxState>().invoke_level_edited(u, S, v);
 }
 
-/// Some controllers' tempo faders report 0 at the top (the + end: rate = 1 − v/8192;
-/// not checked on this hardware). `OPENFADER_TEMPO_INVERT=1` flips it.
+/// Fader position for a hardware tempo value `v`: such faders report 0 at the top (the + end:
+/// rate = 1 − v/8192; not checked on this hardware), so `invert` (CONTROLLER > Invert hardware
+/// tempo fader) passes `v` through for the ones that report 1 at the top.
+fn hw_tempo_pos(v: f32, invert: bool) -> f32 {
+    if invert { v } else { 1.0 - v }
+}
+
 fn tempo_hw(a: &App, d: i32, v: f32) {
-    static FLIP: LazyLock<bool> =
-        LazyLock::new(|| std::env::var_os("OPENFADER_TEMPO_INVERT").is_some());
+    let invert = prefs::with(|p| p.controller.tempo_invert);
     a.global::<DeckState>()
-        .invoke_tempo(d, if *FLIP { v } else { 1.0 - v });
+        .invoke_tempo(d, hw_tempo_pos(v, invert));
 }
 
 pub(super) const TABLE: &[Action] = &[
@@ -231,3 +235,18 @@ pub(super) const TABLE: &[Action] = &[
         }
     }),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::hw_tempo_pos;
+
+    #[test]
+    fn hardware_tempo_faders_report_zero_at_the_top_unless_inverted() {
+        // top of the fader (+ end, fastest) is position 1 in the app
+        assert_eq!(hw_tempo_pos(0.0, false), 1.0);
+        assert_eq!(hw_tempo_pos(1.0, false), 0.0);
+        assert_eq!(hw_tempo_pos(0.0, true), 0.0);
+        assert_eq!(hw_tempo_pos(1.0, true), 1.0);
+        assert_eq!(hw_tempo_pos(0.5, false), 0.5);
+    }
+}

@@ -31,6 +31,11 @@ pub(super) fn rows(p: &Prefs) -> Vec<Row> {
             c.memory_cue_lock,
         ),
         Row::check(
+            "tempo_invert",
+            "Invert hardware tempo fader (+ at the other end)",
+            c.tempo_invert,
+        ),
+        Row::check(
             "load_nearest_cue",
             "Load Setting: playback starts at the Memory/Hot Cue nearest to the beginning",
             c.load_nearest_cue,
