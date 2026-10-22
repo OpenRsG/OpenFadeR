@@ -188,10 +188,12 @@ fn draw(a: &Analysis, duration_ms: u32, cues: bool, scale: usize) -> Image {
         let large = prefs::with(|p| p.view.cue_markers == CueMarkers::Large);
         for cue in a.cues.iter().filter(|_| cues) {
             let (x, rgb) = (axis.col(f64::from(cue.time_ms)), cue_color(cue));
-            c.vline(x, 0..h, rgb);
-            if cue.hot_cue > 0 {
-                c.cue_box(x, 0, cue_letter(cue.hot_cue as u8), rgb, large);
+            if cue.hot_cue == 0 {
+                c.memory_cue(x, 2 + usize::from(large), rgb, Some(0), large);
+                continue;
             }
+            c.vline(x, 0..h, rgb);
+            c.cue_box(x, 0, cue_letter(cue.hot_cue as u8), rgb, large);
         }
     }
     c.image()

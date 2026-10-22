@@ -116,6 +116,8 @@ section!(
         tooltips: bool = true;
         /// Decimal places in BPM readouts, including the jog; two preserves the original display.
         tempo_decimals: TempoDecimals = TempoDecimals::Two;
+        /// Vertical on-screen tempo fader: + at the bottom (turntable style) instead of the top; pushed to `DeckState.tempo-reverse`.
+        tempo_reverse: bool = false;
         /// Browse > FontSize / bold, Line Space; read by the browser lists via `Theme`.
         browse_font: FontSize = FontSize::Normal;
         browse_bold: bool = false;
@@ -253,6 +255,12 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             &["1", "2"],
             v.tempo_decimals as usize,
         ),
+        Row::check(
+            "tempo_reverse",
+            "Tempo fader: + at the bottom",
+            v.tempo_reverse,
+        )
+        .hint("vertical faders only; a horizontal one keeps + at the right"),
         Row::header("BROWSE"),
         Row::of("browse_font", "FONT SIZE", v.browse_font),
         Row::check("browse_bold", "Bold characters", v.browse_bold),

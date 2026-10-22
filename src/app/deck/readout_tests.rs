@@ -115,3 +115,26 @@ fn tempo_readout_rounds_both_precisions_without_losing_neighbouring_values() {
         }
     }
 }
+
+#[test]
+fn reversed_tempo_fader_flips_display_and_drag_the_same_way() {
+    use super::transport::{RANGES, rate_at};
+    headless::init();
+    let app = TempoReadoutTest::new().unwrap();
+    let state = app.global::<DeckState>();
+    for reverse in [false, true] {
+        state.set_tempo_reverse(reverse);
+        for (range, _) in RANGES {
+            // fader position 1 = top: faster by default, slower when reversed; the middle is 1.0 either way
+            let (top, bottom) = (1.0 + range, 1.0 - range);
+            let drag = |f: f32| rate_at(state.invoke_tempo_fader(f), range);
+            assert_eq!(drag(1.0), if reverse { bottom } else { top });
+            assert_eq!(drag(0.0), if reverse { top } else { bottom });
+            assert_eq!(drag(0.5), 1.0);
+            // what the fader draws for a tempo position, dragged back, is the same tempo position
+            for p in [0.0, 0.2, 0.5, 0.75, 1.0] {
+                assert!((state.invoke_tempo_fader(state.invoke_tempo_fader(p)) - p).abs() < 1e-6);
+            }
+        }
+    }
+}

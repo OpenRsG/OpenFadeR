@@ -109,6 +109,12 @@ export global DeckState {
     in property <[DeckScroll]> scroll;
     /// Decks shown: 2 (A, B) or 4 (A to D, the 4-deck layout; the `decks` setting, written by Rust).
     in property <int> count: 2;
+    /// Vertical tempo faders show + at the bottom (PREFS > VIEW); the fader position then runs the other way.
+    in property <bool> tempo-reverse;
+    /// Tempo position (1 = faster, what `tempo` takes) ↔ vertical fader position (1 = top); the same flip both ways.
+    public pure function tempo-fader(p: float) -> float {
+        return root.tempo-reverse ? 1 - p : p;
+    }
     /// Index of the master deck (the tempo source SYNC follows; the reference for browser, FX, sampler
     /// and AUTOMIX); -1 before any deck plays or is made master. Written by Rust.
     in-out property <int> master: -1;

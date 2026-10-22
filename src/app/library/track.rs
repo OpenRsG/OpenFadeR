@@ -2,7 +2,7 @@
 //! Reload Tag, Show in file manager, Relocate, Auto Relocate, Remove from Collection.
 
 use super::{Ask, Confirm, Ctx, missing, show_in_folder};
-use crate::app::browser;
+use crate::app::{analyze, browser};
 use openfader::{
     library::{Track, folder},
     store,
@@ -20,7 +20,11 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
             if c.store.analysis_locked(&store::key(&t)).unwrap_or(false) {
                 return c.say("this track has an Analysis Lock: unlock it first");
             }
-            c.say(&format!("analysing “{}”…", t.title));
+            c.say(&format!(
+                "analysing “{}”…{}",
+                t.title,
+                analyze::library_grid_notice(&t)
+            ));
             c.analyze(vec![t], true);
         }
         "track-lock" => lock(c, &t),

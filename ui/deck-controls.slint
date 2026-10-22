@@ -154,7 +154,7 @@ export component SideButtons inherits VerticalLayout {
     Chip { height: root.h; font-size: Theme.font-xs; text: "MT"; tooltip: "Master tempo (key lock)"; active: root.v.key-lock; clicked => { DeckState.key-lock(root.index); } }
 }
 
-/// Vertical tempo fader (1 = top = fastest, as before) over the range chip that cycles ±6 / ±10 / ±16 / WIDE.
+/// Vertical tempo fader (1 = top = fastest, or the bottom with `DeckState.tempo-reverse`) over the range chip that cycles ±6 / ±10 / ±16 / WIDE.
 export component TempoColumn inherits VerticalLayout {
     in property <int> index;
     property <DeckView> v: DeckState.decks[root.index];
@@ -163,8 +163,8 @@ export component TempoColumn inherits VerticalLayout {
         vertical: true;
         detent: true;
         vertical-stretch: 1;
-        value: root.v.tempo;
-        edited(p) => { DeckState.tempo(root.index, p); }
+        value: DeckState.tempo-fader(root.v.tempo);
+        edited(p) => { DeckState.tempo(root.index, DeckState.tempo-fader(p)); }
     }
     Chip { height: Theme.layout-profile == 1 ? Theme.touch-target : 18px; font-size: Theme.font-xs; text: root.v.tempo-range; tooltip: "Tempo range"; vertical-stretch: 0; clicked => { DeckState.tempo-range(root.index); } }
 }

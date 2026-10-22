@@ -220,11 +220,11 @@ pub(super) fn segments(times: &[f64], fr: f64) -> (Vec<f64>, Vec<u16>) {
 
 /// The beats of a track whose tempo changes, with each beat's `bpm_x100`: `None` when the window tempi say the
 /// track is steady and `wanted(drifts)` declines (Auto), when the track is shorter than one window or has fewer
-/// than 8 beats. `p` is the constant period (frames) of the whole track, `f` the onset flux, `mid` the mid-band
+/// than 8 beats. `p` is the constant period (frames) of the whole track, `f` the onset flux, `low` the low-band
 /// amplitude (for the kick phase) and `onsets` as in [`super::beat_grid_with`].
 pub(super) fn tracked(
     f: &[f32],
-    mid: &[f32],
+    low: &[f32],
     onsets: &[(f64, f64)],
     p: f64,
     fr: f64,
@@ -239,7 +239,7 @@ pub(super) fn tracked(
         return None;
     }
     // The chain may sit on the off-beat; a grossly shifted kick is moved to the beat.
-    let u = kick_offset(mid, &b, fr);
+    let u = kick_offset(low, &b, fr);
     let s = if u > 0.5 { u - 1.0 } else { u };
     let gap = |k: usize| {
         if k + 1 < b.len() && s >= 0.0 {

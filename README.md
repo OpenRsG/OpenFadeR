@@ -56,9 +56,11 @@ BPM, beat grid, downbeat, key, a three-band waveform, phrases (intro, up, chorus
 
 Loading publishes playable audio after decoding and preparing its initial gain and auto-cue position. Missing waveform, grid and key analysis can finish during playback without replacing cue or grid edits made meanwhile. Bulk analysis requests share a worker budget; replacing a deck load or preview cancels obsolete work.
 
+Grid edits (downbeat, double, halve, tap, shift) re-derive the track's phrases so they start on bar lines, unless you edited the phrases yourself. With PREFERENCES > ANALYSIS > BEAT GRID FROM set to LIBRARY, a track whose library supplies a grid keeps it after ANALYZE; the status line says so, and OPENFADER ANALYSIS shows our grid instead.
+
 SYNC follows tempo while a master deck loops. Beat-phase correction pauses when the loop does not span a whole number of follower beats, so short loops do not make other decks repeat. Phase correction resumes when the loop ends or returns to a whole-beat length.
 
-For clearer waveforms, open PREFERENCES > VIEW > WAVEFORM. Set BEAT GRID to BOLD for outlined lines over the enlarged waveform, with wider downbeats that do not rely on colour alone. The whole-track overview keeps thin bar lines behind the audio in either setting, so track dynamics and phrases stay readable. Set HOT CUE MARKERS to LARGE for double-size flags and letters on the decks and browser previews (when preview cue markers are enabled). Both settings apply immediately and are saved; NORMAL keeps the original sizes.
+For clearer waveforms, open PREFERENCES > VIEW > WAVEFORM. Set BEAT GRID to BOLD for outlined lines over the enlarged waveform, with wider downbeats that do not rely on colour alone. The whole-track overview keeps thin bar lines behind the audio in either setting, so track dynamics and phrases stay readable. Set HOT CUE MARKERS to LARGE for double-size flags and letters on the decks and browser previews (when preview cue markers are enabled). Memory cues are solid bars in the theme's memory-cue colour with an M flag, drawn over the grid and wider than a bold downbeat, and they grow with LARGE too. Both settings apply immediately and are saved; NORMAL keeps the original sizes.
 
 ### Two decks or four
 
@@ -205,7 +207,9 @@ The docs write the Linux folders; the others follow their system's convention (`
 
 The release archives hold the bundled folders next to the executable (`OpenFadeR.app/Contents/Resources/` on macOS). Removable devices are found as USB sticks mounted below `/run/media` or `/media` (Linux), removable drive letters (Windows) and volumes below `/Volumes` (macOS); ejecting uses udisks, the volume's own eject request, or `diskutil`. Linux alone has the per-card volume sliders on the audio page (ALSA mixer, the sound server) and mounts a plugged stick itself (udisks): on Windows and macOS the volume is the system's and the OS mounts the stick. File choosers are zenity or kdialog on Linux, PowerShell's dialogs on Windows and `osascript` on macOS.
 
-Audio, MIDI and folder behaviour can be set with `OPENFADER_OUTPUT_DEVICE`, `OPENFADER_HP_CHANNELS`, `OPENFADER_CUE_DEVICE`, `OPENFADER_MIDI_PORT`, `OPENFADER_MIDI_LOG`, `OPENFADER_JOG_TICKS`, `OPENFADER_TEMPO_INVERT`, `OPENFADER_REC_DIR`, `OPENFADER_EXPORT_DIR`, `OPENFADER_PATH_MAP` (audio path remap, `from=>to;…`) and `OPENFADER_DEVICE_ROOTS` (extra folders treated as devices).
+Audio, MIDI and folder behaviour can be set with `OPENFADER_OUTPUT_DEVICE`, `OPENFADER_HP_CHANNELS`, `OPENFADER_CUE_DEVICE`, `OPENFADER_MIDI_PORT`, `OPENFADER_MIDI_LOG`, `OPENFADER_JOG_TICKS`, `OPENFADER_REC_DIR`, `OPENFADER_EXPORT_DIR`, `OPENFADER_PATH_MAP` (audio path remap, `from=>to;…`) and `OPENFADER_DEVICE_ROOTS` (extra folders treated as devices).
+
+The vertical on-screen tempo fader has + at the top; PREFERENCES > VIEW > Tempo fader: + at the bottom reverses it (turntable style; horizontal tempo faders keep + at the right). A controller whose tempo fader moves the wrong way is fixed with PREFERENCES > CONTROLLER > Deck > Invert hardware tempo fader.
 
 ## Documentation
 

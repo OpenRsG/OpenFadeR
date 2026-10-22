@@ -4,7 +4,7 @@
 //! (`PrefsState.vertical`, `PrefsState.export-layout`). Consumers bind to those, never to the settings.
 
 use super::{FontSize, LineSpace, Prefs, view, view::DeckLayout};
-use crate::app::{App, PrefsState, Theme, skin};
+use crate::app::{App, DeckState, PrefsState, Theme, skin};
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 /// Character size of the browse lists in px (VIEW > Browse > FontSize; values ours).
@@ -59,6 +59,7 @@ pub fn apply(app: &App, p: &Prefs) {
     s.set_vertical(p.view.deck_layout == DeckLayout::Vertical);
     s.set_export_layout(p.view.export_layout as i32);
     s.set_show_mixer(p.view.show_mixer);
+    app.global::<DeckState>().set_tempo_reverse(p.view.tempo_reverse);
 }
 
 #[cfg(test)]

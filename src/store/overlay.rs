@@ -121,13 +121,19 @@ impl Overlay {
 }
 
 /// Puts the stored cue list, grid and phrases onto `a`; an unedited part is left alone. A stored phrase list replaces the analysed
-/// one even when empty (CLEAR): `Some` with no phrases, which [`crate::analysis::auto::fill`] leaves alone.
+/// one even when empty (CLEAR): `Some` with no phrases, which [`crate::analysis::auto::fill`] leaves alone. A stored grid with
+/// no stored phrases makes the analysed phrases stale (they are numbered by the old grid): ours are derived from the edited grid
+/// instead, `None` while `a` has no 3-band detail ([`crate::analysis::auto::fill`] derives them once it has).
 pub fn apply(a: &mut Analysis, e: &Edits) {
     if let Some(c) = &e.cues {
         a.cues.clone_from(c);
     }
     if let Some(g) = &e.grid {
         a.beats.clone_from(g);
+        if e.phrases.is_none() {
+            a.phrases = None;
+            crate::analysis::auto::fill(a);
+        }
     }
     if let Some(p) = &e.phrases {
         a.phrases = Some(p.clone());
@@ -189,5 +195,104 @@ impl Library for Overlay {
 
     fn analysis_reader(&self) -> Option<crate::library::AnalysisReader> {
         self.inner.analysis_reader()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analysis::{Beat, Phrase, PhraseKind, Phrases};
+
+    /// 64 bars at 120 BPM whose downbeat is beat `first` (1-based); a waveform with a quiet half and a loud half.
+    fn track(first: usize) -> Analysis {
+        let beats = (0..256)
+            .map(|i| Beat {
+                bar_pos: ((i + 5 - first) % 4 + 1) as u16,
+                bpm_x100: 12000,
+                time_ms: 500 * i as u32,
+            })
+            .collect();
+        let detail = (0..64usize)
+            .flat_map(|bar| {
+                vec![
+                    if bar < 32 {
+                        [20, 30, 20]
+                    } else {
+                        [90, 100, 80]
+                    };
+                    300
+                ]
+            })
+            .collect();
+        Analysis {
+            beats,
+            three_band_detail: detail,
+            ..Default::default()
+        }
+    }
+
+    fn stale() -> Phrases {
+        Phrases {
+            mood: crate::analysis::Mood::Mid,
+            list: vec![Phrase {
+                beat: 2,
+                end_beat: 6,
+                kind: PhraseKind::Intro,
+                variant: 0,
+                fill: None,
+            }],
+        }
+    }
+
+    #[test]
+    fn grid_edit_rederives_the_stale_phrases_on_the_edited_bars() {
+        let edited = track(3);
+        let mut a = track(1);
+        a.three_band_detail.clone_from(&edited.three_band_detail);
+        a.phrases = Some(stale());
+        apply(
+            &mut a,
+            &Edits {
+                grid: Some(edited.beats.clone()),
+                ..Default::default()
+            },
+        );
+        let p = a.phrases.expect("phrases from the edited grid");
+        assert!(p.list.len() > 1 && p.list != stale().list);
+        for ph in p.list.iter().skip(1) {
+            assert_eq!(edited.beats[ph.beat as usize - 1].bar_pos, 1, "{ph:?}");
+        }
+    }
+
+    #[test]
+    fn grid_edit_without_waveform_leaves_phrases_for_fill_and_a_phrase_edit_wins() {
+        let edited = track(3);
+        let mut a = Analysis {
+            phrases: Some(stale()),
+            ..Default::default()
+        };
+        apply(
+            &mut a,
+            &Edits {
+                grid: Some(edited.beats.clone()),
+                ..Default::default()
+            },
+        );
+        assert!(a.phrases.is_none());
+        let mut b = track(1);
+        b.phrases = Some(stale());
+        let mine = Phrases {
+            mood: crate::analysis::Mood::Low,
+            list: vec![],
+        };
+        apply(
+            &mut b,
+            &Edits {
+                grid: Some(edited.beats),
+                phrases: Some(mine.clone()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(b.phrases, Some(mine));
     }
 }

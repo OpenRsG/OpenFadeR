@@ -107,20 +107,25 @@ pub fn render(wave: Option<&Wave>, a: &Analysis, duration_ms: u32, w: usize, h: 
             ); // Theme.stem-vocal
         }
     }
+    let large = view.cue_markers == CueMarkers::Large;
     for cue in &a.cues {
         let (x, rgb) = (
             axis.col(cue.time_ms as f64),
             hot_cue_rgb(view.hot_cue_colors, cue),
         );
-        c.vline(x, 0..hw, rgb);
-        if cue.hot_cue > 0 && hw >= 20 {
-            c.cue_box(
+        if cue.hot_cue == 0 {
+            c.memory_cue(
                 x,
-                0,
-                cue_letter(cue.hot_cue as u8),
+                2 + usize::from(large),
                 rgb,
-                view.cue_markers == CueMarkers::Large,
+                (hw >= 20).then_some(0),
+                large,
             );
+            continue;
+        }
+        c.vline(x, 0..hw, rgb);
+        if hw >= 20 {
+            c.cue_box(x, 0, cue_letter(cue.hot_cue as u8), rgb, large);
         }
     }
     let mut c = c.extended(strip);

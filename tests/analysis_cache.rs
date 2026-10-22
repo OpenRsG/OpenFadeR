@@ -113,10 +113,12 @@ fn second_pass_hits_the_store_and_is_faster() {
         })
         .collect();
     assert_eq!(notes.len(), 1, "{notes:?}");
-    assert!(tracks[1..]
-        .iter()
-        .chain([&(0.0, t_moved.clone())])
-        .all(|(_, t)| matches!(cache::get_or_analyze(t).unwrap().1, Source::Cache)));
+    assert!(
+        tracks[1..]
+            .iter()
+            .chain([&(0.0, t_moved.clone())])
+            .all(|(_, t)| matches!(cache::get_or_analyze(t).unwrap().1, Source::Cache))
+    );
 
     // Old entries (per path, size and mtime, no size field) of Collection tracks move over once; others stay.
     let old_dir = cache::legacy_dir().unwrap();
@@ -143,6 +145,11 @@ fn second_pass_hits_the_store_and_is_faster() {
         old_dir.join("0000000000000000.bin").exists(),
         "what nobody owns is left alone"
     );
+    // its beats come from an older detector: moved, but recomputed on first use, then served from the cache
+    assert!(matches!(
+        cache::get_or_analyze(&fresh).unwrap().1,
+        Source::Computed { .. }
+    ));
     assert!(matches!(
         cache::get_or_analyze(&fresh).unwrap().1,
         Source::Cache

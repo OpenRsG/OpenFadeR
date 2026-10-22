@@ -40,9 +40,9 @@ pub(super) fn mode_views(
             .map(|i| page_jump(i, page))
             .map(|n| {
                 let c = if n < 0 {
-                    [50, 120, 255]
+                    [255, 110, 110]
                 } else {
-                    [20, 200, 170]
+                    [110, 220, 140]
                 };
                 pad(format!("{n:+}"), c, true)
             })
@@ -132,7 +132,12 @@ pub(in crate::app::deck) fn cue_pads<'a>(cue: impl Fn(usize) -> Option<&'a Cue>)
 mod tests {
     use super::*;
 
-    fn mode_views(mode: PadMode, a: &Analysis, key_st: i32, loop_beats: Option<f64>) -> Vec<PadView> {
+    fn mode_views(
+        mode: PadMode,
+        a: &Analysis,
+        key_st: i32,
+        loop_beats: Option<f64>,
+    ) -> Vec<PadView> {
         super::mode_views(mode, a, key_st, loop_beats, 0)
     }
 
@@ -205,6 +210,15 @@ mod tests {
         let v = mode_views(PadMode::BeatJump, &Analysis::default(), 0, None);
         assert_eq!(labels(&v), ["-1", "+1", "-2", "+2", "-4", "+4", "-8", "+8"]);
         assert!(v.iter().all(|p| p.set));
+        let red = Color::from_rgb_u8(255, 110, 110);
+        let green = Color::from_rgb_u8(110, 220, 140);
+        for (i, p) in v.iter().enumerate() {
+            assert_eq!(p.color, if i % 2 == 0 { red } else { green });
+        }
+        // pads.slint's 4x2 grid shows pad i at column i/2, row i%2: -n over +n
+        for col in 0..4 {
+            assert_eq!(page_jump(2 * col, 0), -page_jump(2 * col + 1, 0));
+        }
     }
 
     #[test]

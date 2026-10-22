@@ -9,7 +9,7 @@
 //! ponytail: bar length is the grid's largest bar position (4/4 and 3/4 keep their length); no
 //! per-segment tempo edit, a TAP replaces the whole grid with a constant-tempo one.
 
-use super::{exportedit, fmt_ms, grid_bpm, loops, Deck, Loaded};
+use super::{Deck, Loaded, exportedit, fmt_ms, grid_bpm, loops};
 use openfader::{analysis::Beat, store};
 use std::{
     sync::{Arc, LazyLock},
@@ -240,6 +240,15 @@ impl Deck {
         let grid = grid_bpm(&beats);
         l.base_bpm = grid.unwrap_or(l.lib_bpm);
         l.analysis.beats = beats;
+        // phrases are numbered by beat: derive ours again unless the user edited them
+        let edited = l
+            .track
+            .as_ref()
+            .is_some_and(|t| matches!(store::global().phrase_edit(&store::key(t)), Ok(Some(_))));
+        if !edited {
+            l.analysis.phrases = None;
+            openfader::analysis::auto::fill(&mut l.analysis);
+        }
         l.invalidate();
         let loop_beats = l
             .loop_
