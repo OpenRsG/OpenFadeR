@@ -22,8 +22,9 @@ use crate::{library::Track, paths::at, store};
 use std::path::{Path, PathBuf};
 
 const MAGIC: &[u8; 4] = b"RKAC";
-/// Bump when the layout or the detectors change enough that old results should be recomputed.
-const VERSION: u32 = 4;
+/// Bump when the layout or the detectors change enough that old results should be recomputed (5: bar phase from accent,
+/// novelty and start, see `detect::grid`).
+const VERSION: u32 = 5;
 /// The layout before the audio size was stored: [`migrate`] upgrades these.
 const VERSION_BEFORE_SIZE: u32 = 3;
 
@@ -430,6 +431,8 @@ pub struct Migrated {
 }
 
 /// `old` (a version 3 entry) as the current layout for an audio file of `size`; `None` when it is not a version 3 file.
+/// The old detector made its beats, so the profile is emptied: every part is recomputed when asked for, like any entry made
+/// by an older detector.
 fn upgrade(old: &[u8], size: u64) -> Option<Vec<u8>> {
     let (head, rest) = old.split_at_checked(8)?;
     if &head[..4] != MAGIC || head[4..] != VERSION_BEFORE_SIZE.to_le_bytes() {
@@ -440,7 +443,8 @@ fn upgrade(old: &[u8], size: u64) -> Option<Vec<u8>> {
             MAGIC.as_slice(),
             &VERSION.to_le_bytes(),
             &size.to_le_bytes(),
-            rest,
+            &Profile(0).0.to_le_bytes(),
+            rest.get(8..)?,
         ]
         .concat(),
     )
@@ -689,10 +693,11 @@ mod tests {
     }
 
     #[test]
-    fn upgrade_turns_a_version_3_entry_into_a_valid_current_one() {
+    fn upgrade_turns_a_version_3_entry_into_a_valid_stale_one() {
         let up = upgrade(&old_entry(&sample()), 5).unwrap();
         let (a, p, size) = decode(&up).unwrap();
-        assert_eq!((a.beats, p, size), (sample().beats, profile(), 5));
+        assert_eq!((a.beats, size), (sample().beats, 5));
+        assert!(!p.covers(profile()), "its beats come from the old detector");
         assert!(
             upgrade(&encode(&sample(), profile(), 5), 5).is_none(),
             "a current entry is not an old one"

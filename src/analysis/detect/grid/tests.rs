@@ -368,6 +368,40 @@ fn kick_beats_louder_off_beat_hats() {
 }
 
 #[test]
+fn kick_beats_a_louder_off_beat_bass_stab() {
+    // Dance-track bass: a 55 Hz kick on the beat, a mid-heavy bass stab on every off-beat (the mid band rises there).
+    let (period, mut s) = (60.0 / 128.0, vec![0f32; 30 * RATE as usize * 2]);
+    for k in 0..60 {
+        let t = 0.173 + k as f64 * period;
+        burst(&mut s, t, 55.0, 0.9, 4000);
+        burst(&mut s, t + period / 2.0, 400.0, 0.6, 3000);
+        burst(&mut s, t + period / 2.0, 800.0, 0.4, 3000);
+    }
+    let beats = beat_grid(&s, RATE);
+    let d = (beats[0].time_ms as f64 - 173.0).rem_euclid(period * 1000.0);
+    assert!(
+        d.min(period * 1000.0 - d) <= 10.0,
+        "first beat {} ms is off the kick by {d} ms",
+        beats[0].time_ms
+    );
+}
+
+/// Asserts that, in `beats` of a 128 BPM track whose grid starts at 0.173 s, exactly the beats `bar1 + 4n` are bar position 1.
+fn assert_bar_starts(beats: &[Beat], bar1: i64) {
+    assert!(beats.len() > 100, "{} beats", beats.len());
+    for b in beats.iter().filter(|b| b.time_ms < 60000) {
+        let k = ((b.time_ms as f64 / 1000.0 - 0.173) / (60.0 / 128.0)).round() as i64;
+        assert_eq!(
+            b.bar_pos == 1,
+            (k - bar1).rem_euclid(4) == 0,
+            "beat {k} at {} ms has bar position {}",
+            b.time_ms,
+            b.bar_pos
+        );
+    }
+}
+
+#[test]
 fn downbeat_is_the_beat_with_the_most_low_end() {
     let (period, mut s) = (60.0 / 128.0, vec![0f32; 30 * RATE as usize * 2]);
     for k in 0..60 {
@@ -377,7 +411,8 @@ fn downbeat_is_the_beat_with_the_most_low_end() {
             burst(&mut s, t, 60.0, 0.9, 4000);
         }
     }
-    for b in beat_grid(&s, RATE).iter().filter(|b| b.time_ms < 28000) {
+    let beats = beat_grid(&s, RATE);
+    for b in beats.iter().filter(|b| b.time_ms < 28000) {
         let k = ((b.time_ms as f64 / 1000.0 - 0.173) / period).round() as i64;
         assert_eq!(
             b.bar_pos == 1,
@@ -387,6 +422,35 @@ fn downbeat_is_the_beat_with_the_most_low_end() {
             b.bar_pos
         );
     }
+}
+
+/// 64 s of 128 BPM four-on-the-floor at 0.173 s: the same 60 Hz kick and 1 kHz click on every beat from beat `first`, so no
+/// beat has more low end than another. From beat `section_at` the music changes every 8 bars: an 8 kHz hat on the off-beats
+/// in the odd sections, none in the even ones.
+fn floor_track(first: usize, section_at: usize) -> Vec<f32> {
+    let (period, mut s) = (60.0 / 128.0, vec![0f32; 64 * RATE as usize * 2]);
+    for k in first..136 {
+        let t = 0.173 + k as f64 * period;
+        burst(&mut s, t, 1000.0, 0.5, 90);
+        burst(&mut s, t, 60.0, 0.9, 4000);
+        if k >= section_at && (k - section_at) / 32 % 2 == 1 {
+            burst(&mut s, t + period / 2.0, 8000.0, 0.5, 90);
+        }
+    }
+    s
+}
+
+#[test]
+fn equal_kicks_leave_the_bar_to_the_start_of_the_music() {
+    // Grid beat 0 is silent: the music starts on beat 2, so that is bar 1.
+    assert_bar_starts(&beat_grid(&floor_track(2, usize::MAX), RATE), 2);
+}
+
+#[test]
+fn equal_kicks_leave_the_bar_to_the_section_changes() {
+    // The music starts on beat 0, but every change of section (a hat layer comes and goes every 8 bars) lands on beat 2: a
+    // two-beat pickup, so the changes outweigh the weak preference for the start.
+    assert_bar_starts(&beat_grid(&floor_track(0, 2), RATE), 2);
 }
 
 #[test]
@@ -588,5 +652,176 @@ fn benchmark_exact_fine_search_scaling() {
                 );
             }
         }
+    }
+}
+
+/// Annotated clips under `OPENFADER_DOWNBEAT_AUDIO` (wav/mp3, any depth) with `<stem>.beats` files (`seconds beat-number` per
+/// line) in `OPENFADER_DOWNBEAT_ANN`: `[genre, [accent, novelty, start] scores, true bar phase]` of every clip whose detected
+/// beats match the annotated ones (within 70 ms, over 90% of them) and whose bar has 4 beats.
+fn annotated_clips() -> Vec<(String, [[f64; 4]; 3], usize)> {
+    let (Ok(audio), Ok(ann)) = (
+        std::env::var("OPENFADER_DOWNBEAT_AUDIO"),
+        std::env::var("OPENFADER_DOWNBEAT_ANN"),
+    ) else {
+        return Vec::new();
+    };
+    let mut files = Vec::new();
+    let mut dirs = vec![std::path::PathBuf::from(audio)];
+    while let Some(d) = dirs.pop() {
+        for e in std::fs::read_dir(d).unwrap().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                dirs.push(p);
+            } else if p.extension().is_some_and(|x| x == "wav" || x == "mp3") {
+                files.push(p);
+            }
+        }
+    }
+    files.sort();
+    let mut out = Vec::new();
+    for p in files {
+        let genre = p
+            .parent()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let Ok(text) = std::fs::read_to_string(
+            std::path::Path::new(&ann)
+                .join(p.file_stem().unwrap())
+                .with_extension("beats"),
+        ) else {
+            continue;
+        };
+        let truth: Vec<(f64, i64)> = text
+            .lines()
+            .filter_map(|l| {
+                let mut w = l.split_whitespace();
+                Some((w.next()?.parse().ok()?, w.next()?.parse().ok()?))
+            })
+            .collect();
+        if truth.iter().map(|t| t.1).max() != Some(4) {
+            continue;
+        }
+        let pcm = crate::audio::decode(&p).unwrap();
+        let found = beat_grid(&pcm.samples, pcm.rate);
+        let (mut votes, mut matched) = ([0usize; 4], 0);
+        for (k, b) in found.iter().enumerate() {
+            let t = b.time_ms as f64 / 1000.0;
+            let near = truth
+                .iter()
+                .min_by(|x, y| (x.0 - t).abs().total_cmp(&(y.0 - t).abs()))
+                .unwrap();
+            if (near.0 - t).abs() <= 0.07 {
+                matched += 1;
+                votes[(k as i64 - (near.1 - 1)).rem_euclid(4) as usize] += 1;
+            }
+        }
+        if found.is_empty() || (matched as f64) < 0.9 * found.len() as f64 {
+            continue;
+        }
+        let (e, fr) = hops(&pcm.samples, pcm.rate, GridOptions::default().flux_hz());
+        let amp = e.map(|b| b.iter().map(|v| v.sqrt()).collect::<Vec<f32>>());
+        let times: Vec<f64> = found
+            .iter()
+            .map(|b| b.time_ms as f64 / 1000.0 * fr)
+            .collect();
+        let phase = (0..4).max_by_key(|&c| votes[c]).unwrap();
+        out.push((genre, phase_scores(&amp, &times, fr), phase));
+    }
+    out
+}
+
+/// Bar phase accuracy on an annotated set (see [`annotated_clips`]) for the accent alone (the detector before the novelty
+/// and start evidence), for each evidence alone, and for the weights in use.
+#[test]
+#[ignore]
+fn measure_bar_phase_on_annotated_set() {
+    let clips = annotated_clips();
+    let pick = |s: [f64; 4]| (0..4).max_by(|&a, &b| s[a].total_cmp(&s[b])).unwrap();
+    let acc = |f: &dyn Fn(&[[f64; 4]; 3]) -> [f64; 4], of: &dyn Fn(usize) -> bool| {
+        let set: Vec<_> = clips
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| of(*i))
+            .map(|(_, c)| c)
+            .collect();
+        let ok = set.iter().filter(|c| pick(f(&c.1)) == c.2).count();
+        format!(
+            "{ok}/{} = {:.1}%",
+            set.len(),
+            100.0 * ok as f64 / set.len().max(1) as f64
+        )
+    };
+    let all = |_: usize| true;
+    eprintln!("clips {}", clips.len());
+    eprintln!("accent only (before): {}", acc(&|s| s[0], &all));
+    eprintln!("novelty only: {}", acc(&|s| s[1], &all));
+    eprintln!("start only: {}", acc(&|s| s[2], &all));
+    for w in [0.0, 0.25, 0.5, 1.0, 2.0] {
+        let f = |s: &[[f64; 4]; 3]| std::array::from_fn(|c| s[0][c] + w * s[1][c]);
+        eprintln!(
+            "accent + {w} novelty: all {} | even {} | odd {}",
+            acc(&f, &all),
+            acc(&f, &|i| i % 2 == 0),
+            acc(&f, &|i| i % 2 == 1)
+        );
+    }
+    let f = |s: &[[f64; 4]; 3]| {
+        std::array::from_fn(|c| s[0][c] + NOVELTY_W * s[1][c] + START_W * s[2][c])
+    };
+    eprintln!("weights in use: {}", acc(&f, &all));
+    // Paired: clips the new evidence fixes vs breaks (an exact sign test on these decides whether the gain is chance).
+    let (fixed, broken) = clips.iter().fold((0, 0), |(fx, br), c| {
+        match (pick(c.1[0]) == c.2, pick(f(&c.1)) == c.2) {
+            (false, true) => (fx + 1, br),
+            (true, false) => (fx, br + 1),
+            _ => (fx, br),
+        }
+    });
+    eprintln!("paired vs accent only: fixed {fixed}, broken {broken}");
+    // Held out: the weights chosen on the other folds, scored on each fold in turn (k-fold by clip index).
+    let score = |wn: f64, ws: f64, c: &(String, [[f64; 4]; 3], usize)| {
+        pick(std::array::from_fn(|p| {
+            c.1[0][p] + wn * c.1[1][p] + ws * c.1[2][p]
+        })) == c.2
+    };
+    for k in [2usize, 5] {
+        let mut held = 0;
+        for fold in 0..k {
+            let mut best = (0usize, 0.0, 0.0);
+            for wn in [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0] {
+                for ws in [0.0, 0.05, 0.1, 0.15, 0.25, 0.5] {
+                    let ok = (clips.iter().enumerate())
+                        .filter(|(i, c)| i % k != fold && score(wn, ws, c))
+                        .count();
+                    if ok > best.0 {
+                        best = (ok, wn, ws);
+                    }
+                }
+            }
+            held += (clips.iter().enumerate())
+                .filter(|(i, c)| i % k == fold && score(best.1, best.2, c))
+                .count();
+            eprintln!(
+                "{k}-fold {fold}: chosen novelty {} start {}",
+                best.1, best.2
+            );
+        }
+        eprintln!(
+            "{k}-fold held out: {held}/{} = {:.1}%",
+            clips.len(),
+            100.0 * held as f64 / clips.len().max(1) as f64
+        );
+    }
+    let mut genres: Vec<_> = clips.iter().map(|c| c.0.clone()).collect();
+    genres.dedup();
+    genres.sort();
+    genres.dedup();
+    for g in genres {
+        let of = |i: usize| clips[i].0 == g;
+        let f0 = |s: &[[f64; 4]; 3]| s[0];
+        eprintln!("{g}: before {} | now {}", acc(&f0, &of), acc(&f, &of));
     }
 }

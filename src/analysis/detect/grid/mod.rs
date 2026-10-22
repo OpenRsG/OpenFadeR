@@ -5,22 +5,34 @@
 //! them ([`tempo`]). Searched around the BPM range of [`GridOptions`] (default 85-175: searched 70-180) and
 //! folded into that range ([`fold_bpm`]).
 //!
-//! Phase: the beat is where the mid band (200 Hz - 2.5 kHz) amplitude rises (the kick), not where
+//! Phase: the beat is where the low band (below 200 Hz) amplitude rises (the kick), not where
 //! the onsets are strongest ([`kick_offset`]). A weighted line fit through the onsets near that grid
-//! refines tempo and phase ([`fit`]). Bar positions: beat 1 is the one of four with the most
-//! low-band energy ([`downbeat`]).
+//! refines tempo and phase ([`fit`]). Bar positions: beat 1 is the phase of four with the best sum of
+//! three pieces of evidence: low-band accent, spectral change from the previous beat, and the start of
+//! the music ([`downbeat`], [`phase_scores`]).
 //!
 //! Tempo changes (Track Analysis Mode; [`dynamic`]): tempo is also estimated per 8 s window. Normal never
 //! tracks: one steady tempo. Dynamic always tracks the beats and merges them into segments of one tempo each.
 //! Auto (needs high precision) tracks when a constant grid does not fit a quarter of the periodic windows.
 //!
-//! Measured on the 24-track test USB (tests/detect_usb.rs): tempo equals the stored library grid's in 24/24
-//! and every grid is constant, like the stored ones. The first beat lands within 3 ms of a stored beat
-//! in 24/24 (a strongest-onset phase: 18/24 within 30 ms, 4 of the other 6 half a beat off). Our bar
-//! position agrees with the stored one on 21/24 (strongest onsets: 11/24); the windows never flag
-//! drift (worst window 0.59 of its own best score, flagged below 0.5). ponytail: 24 tracks of one
-//! genre set the mid-band choice and the thresholds; other genres may need other bands. Drift
-//! tracking is verified on synthetic click tracks only (no real variable-tempo audio available).
+//! Measured on the 24-track test USB (tests/detect_usb.rs) with the mid-band kick phase used before: tempo equals the stored
+//! library grid's in 24/24 and every grid is constant, like the stored ones. The first beat landed within 3 ms of a stored
+//! beat in 24/24 (a strongest-onset phase: 18/24 within 30 ms, 4 of the other 6 half a beat off). Our bar position agreed
+//! with the stored one on 21/24 with the accent alone (strongest onsets: 11/24); the windows never flag drift (worst
+//! window 0.59 of its own best score, flagged below 0.5). The low-band kick phase and the bar evidence are not re-measured
+//! there.
+//!
+//! Bar position on the Ballroom dataset (ISMIR 2004 audio, 30 s clips; downbeats from CPJKU/BallroomAnnotations; 4/4
+//! genres, the 297 clips whose detected beats match the annotated ones within 70 ms; `measure_bar_phase_on_annotated_set`):
+//! the accent alone 179/297 = 60.3%, with the two other pieces 192/297 = 64.6%. The two weights were chosen on these
+//! clips (with the mid-band phase); chosen on the other folds instead, held-out accuracy is 191/297 = 64.3% (2-fold) and
+//! 190/297 = 64.0% (5-fold). Against the accent alone they fix 33 clips and break 20 (sign test p = 0.10). Full tracks
+//! with drops and breakdowns: 5 NCS releases at 128 BPM (Candyland, Heroes Tonight, Nekozilla, Sky High, Spectre), the
+//! reference being Beat This! (final0) beats and downbeats: beats within 70 ms on 97-100%, bar position agreeing on
+//! 96-100% of the matched beats in each track (the accent alone: 0% on Heroes Tonight, the others as now). A 174 BPM
+//! drum & bass track the reference counts at 87 BPM is left out. ponytail: few real tracks set the bands and the
+//! thresholds; other genres may need other bands. Drift tracking is verified on synthetic click tracks only (no real
+//! variable-tempo audio available).
 
 mod dynamic;
 #[cfg(test)]
@@ -106,6 +118,14 @@ const FIT_S: f64 = 0.005;
 /// around a beat compared across a bar (seconds).
 const KICK_S: f64 = 0.06;
 const DOWNBEAT_S: [f64; 2] = [-0.02, 0.1];
+/// Bar phase ([`downbeat`]): weights of the novelty and start evidence against the accent, the quietest beat that
+/// still counts as music (share of the median beat's energy), the latest beat (from the grid's start) it may start on,
+/// and the floor of the novelty log ratio (share of the band's mean).
+const NOVELTY_W: f64 = 0.5;
+const START_W: f64 = 0.15;
+const START_LEVEL: f64 = 0.5;
+const START_MAX: usize = 16;
+const NOVELTY_FLOOR: f64 = 0.05;
 /// Tempo window (seconds) and the weight of the beat-interval penalty against the onset flux (flux in
 /// units of its rms, penalty = TIGHT x relative deviation squared) when a drifting tempo is tracked.
 const WINDOW_S: f64 = 8.0;
@@ -341,16 +361,20 @@ fn tempo_search(
 }
 
 /// Where in a beat the kick falls: the fraction (0..1) after each of `beats` (frame times, ascending)
-/// at which the mid-band (200 Hz - 2.5 kHz) amplitude, averaged over all beats, rises most over
-/// [`KICK_S`]. Hi-hats and off-beat bass give onsets as strong as the kick's but no such rise, so this
-/// tells the beat from the off-beat. Measured on the test USB: within 2 frames of the stored grid on 24/24 tracks.
-fn kick_offset(mid: &[f32], beats: &[f64], fr: f64) -> f64 {
+/// at which the low-band (below 200 Hz) amplitude `low`, averaged over all beats, rises most over
+/// [`KICK_S`]. Hi-hats give onsets as strong as the kick's but no such rise, so this tells the beat from the
+/// off-beat. The mid band (200 Hz - 2.5 kHz, used before) put the beat on the off-beat in sidechain-pumped dance
+/// tracks, where pads and bass swell back up between kicks: on 5 full-length 128 BPM NCS tracks, beats matched a
+/// reference tracker (Beat This!, within 70 ms) on 1/5 with the mid band and 5/5 (97-100% of beats) with the low band;
+/// on Ballroom 297 clips matched instead of 287. The mid band was within 2 frames of the test USB's stored grid on
+/// 24/24 tracks; the low band is not re-measured there.
+fn kick_offset(low: &[f32], beats: &[f64], fr: f64) -> f64 {
     let nb = ((beats[beats.len() - 1] - beats[0]) / (beats.len() - 1) as f64).round() as usize;
     let (mut sum, mut cnt) = (vec![0f64; nb], vec![0f64; nb]);
     for w in beats.windows(2) {
-        for i in w[0].ceil() as usize..(w[1].ceil() as usize).min(mid.len()) {
+        for i in w[0].ceil() as usize..(w[1].ceil() as usize).min(low.len()) {
             let j = (((i as f64 - w[0]) / (w[1] - w[0]) * nb as f64) as usize).min(nb - 1);
-            sum[j] += mid[i] as f64;
+            sum[j] += low[i] as f64;
             cnt[j] += 1.0;
         }
     }
@@ -371,11 +395,47 @@ fn kick_offset(mid: &[f32], beats: &[f64], fr: f64) -> f64 {
     (kick as f64 + 0.5) / nb as f64
 }
 
-/// Which of the 4 beats from the first is the bar's first: the one with the most low-band amplitude
-/// in [`DOWNBEAT_S`] around it, each beat scaled by its bar's mean so loud passages do not dominate.
-/// Measured on the test USB: agrees with the stored bar position on 21/24 tracks (strongest onsets: 11/24).
-fn downbeat(low: &[f32], times: &[f64], fr: f64) -> usize {
+/// Mean amplitude of each band `[low, mid, high]` over each interval between consecutive `times` (frames).
+fn beat_bands(amp: &[Vec<f32>; 3], times: &[f64]) -> Vec<[f64; 3]> {
+    times
+        .windows(2)
+        .map(|w| {
+            std::array::from_fn(|b| {
+                let n = amp[b].len();
+                let seg = &amp[b][(w[0].max(0.0) as usize).min(n)..(w[1].max(0.0) as usize).min(n)];
+                seg.iter().map(|&v| v as f64).sum::<f64>() / seg.len().max(1) as f64
+            })
+        })
+        .collect()
+}
+
+/// Per bar position the share of `of` (one value per beat) that falls on it, 1.0 when all four are equal.
+fn share(of: impl Iterator<Item = f64>) -> [f64; 4] {
+    let mut s = [0.0f64; 4];
+    for (k, v) in of.enumerate() {
+        s[k % 4] += v;
+    }
+    let total: f64 = s.iter().sum();
+    if total > 0.0 {
+        s.map(|v| 4.0 * v / total)
+    } else {
+        [1.0; 4]
+    }
+}
+
+/// Evidence for each of the 4 phases being the bar's first beat, each on a scale where "no evidence" is 1.0:
+/// `[accent, novelty, start]`.
+/// - accent: low-band amplitude in [`DOWNBEAT_S`] around the beat, each beat scaled by its bar's mean so loud
+///   passages do not dominate, averaged over the bars.
+/// - novelty: how much the band levels change from the previous beat to this one (`|ln this/previous|` summed over the
+///   3 bands, [`NOVELTY_FLOOR`] of the band's mean keeping a quiet band from dominating), as the share of all change that
+///   lands on this phase (a beat-synchronous spectral difference, Davies & Plumbley 2006): a new chord, drum pattern or
+///   section starts on bar 1 even when the kick does not accent it.
+/// - start: 2.0 for the phase of the first beat that carries music ([`START_LEVEL`] of the median beat), when that is
+///   within [`START_MAX`] beats of the grid's start: dance tracks begin on a bar's first beat. 1.0 elsewhere.
+fn phase_scores(amp: &[Vec<f32>; 3], times: &[f64], fr: f64) -> [[f64; 4]; 3] {
     let [a, b] = DOWNBEAT_S.map(|s| (s * fr).round() as i64);
+    let low = &amp[0];
     let feat: Vec<f64> = times
         .iter()
         .map(|&t| {
@@ -387,17 +447,63 @@ fn downbeat(low: &[f32], times: &[f64], fr: f64) -> usize {
                 .sum()
         })
         .collect();
-    let mut strength = [0.0f64; 4];
+    let (mut accent, mut bars) = ([0.0f64; 4], 0.0);
     for bar in feat.chunks_exact(4) {
         let mean = bar.iter().sum::<f64>() / 4.0;
         if mean > 0.0 {
             for c in 0..4 {
-                strength[c] += bar[c] / mean;
+                accent[c] += bar[c] / mean;
             }
+            bars += 1.0;
         }
     }
+    let accent = if bars > 0.0 {
+        accent.map(|v| v / bars)
+    } else {
+        [1.0; 4]
+    };
+
+    let bands = beat_bands(amp, times);
+    let floor: [f64; 3] = std::array::from_fn(|i| {
+        NOVELTY_FLOOR * bands.iter().map(|b| b[i]).sum::<f64>() / bands.len().max(1) as f64
+    });
+    let novelty = share((0..times.len()).map(|j| {
+        if j == 0 || j >= bands.len() {
+            return 0.0;
+        }
+        (0..3)
+            .map(|i| {
+                ((bands[j][i] + floor[i]) / (bands[j - 1][i] + floor[i]))
+                    .ln()
+                    .abs()
+            })
+            .sum()
+    }));
+
+    let beat_energy: Vec<f64> = bands.iter().map(|b| b.iter().sum()).collect();
+    let mut sorted = beat_energy.clone();
+    sorted.sort_by(f64::total_cmp);
+    let heard = START_LEVEL * sorted.get(sorted.len() / 2).copied().unwrap_or(0.0);
+    let mut start = [1.0; 4];
+    if let Some(k) = beat_energy
+        .iter()
+        .position(|&e| e >= heard)
+        .filter(|&k| k <= START_MAX)
+    {
+        start[k % 4] = 2.0;
+    }
+    [accent, novelty, start]
+}
+
+/// Which of the 4 beats from the first is the bar's first: the phase with the highest sum of [`phase_scores`]
+/// (accent + [`NOVELTY_W`] novelty + [`START_W`] start). Measured: see the module doc.
+fn downbeat(amp: &[Vec<f32>; 3], times: &[f64], fr: f64) -> usize {
+    let [accent, novelty, start] = phase_scores(amp, times, fr);
     (0..4)
-        .max_by(|&a, &b| strength[a].total_cmp(&strength[b]))
+        .max_by(|&a, &b| {
+            let s = |c: usize| accent[c] + NOVELTY_W * novelty[c] + START_W * start[c];
+            s(a).total_cmp(&s(b))
+        })
         .unwrap()
 }
 
@@ -427,9 +533,14 @@ fn fit(onsets: &[(f64, f64)], phase: f64, p: f64, fr: f64) -> (f64, f64) {
     (p, phase)
 }
 
-/// Beats at `times` (frames): bar positions from [`downbeat`], tempo per beat from `bpm_x100`.
-fn beats(times: &[f64], low: &[f32], fr: f64, bpm_x100: impl Fn(usize) -> u16) -> Vec<Beat> {
-    let m = downbeat(low, times, fr) as i64;
+/// Beats at `times` (frames): bar positions from [`downbeat`] of the band amplitudes `amp`, tempo per beat from `bpm_x100`.
+fn beats(
+    times: &[f64],
+    amp: &[Vec<f32>; 3],
+    fr: f64,
+    bpm_x100: impl Fn(usize) -> u16,
+) -> Vec<Beat> {
+    let m = downbeat(amp, times, fr) as i64;
     let at = |k: usize| Beat {
         bar_pos: ((k as i64 - m).rem_euclid(4) + 1) as u16,
         bpm_x100: bpm_x100(k),
@@ -509,20 +620,21 @@ pub(super) fn from_hops_cancellable(
     let Some(p0) = period else {
         return Some(Vec::new());
     };
-    let [low, mid, _] = e.map(|b| b.iter().map(|v| v.sqrt()).collect::<Vec<f32>>());
+    let amp = e.map(|b| b.iter().map(|v| v.sqrt()).collect::<Vec<f32>>());
+    let low = &amp[0];
     let grid: Vec<f64> = (0..(n as f64 / p0) as usize)
         .map(|k| k as f64 * p0)
         .collect();
-    let (p, phi) = fit(&onsets, kick_offset(&mid, &grid, fr) * p0, p0, fr);
+    let (p, phi) = fit(&onsets, kick_offset(low, &grid, fr) * p0, p0, fr);
     if cancelled() {
         return None;
     }
 
     if opt.effective_mode() != Mode::Normal {
         if let Some((times, bpm)) =
-            dynamic::tracked(&f, &mid, &onsets, p, fr, |drifts| opt.tracks(drifts))
+            dynamic::tracked(&f, low, &onsets, p, fr, |drifts| opt.tracks(drifts))
         {
-            return (!cancelled()).then(|| beats(&times, &low, fr, |k| bpm[k]));
+            return (!cancelled()).then(|| beats(&times, &amp, fr, |k| bpm[k]));
         }
     }
     if cancelled() {
@@ -535,5 +647,5 @@ pub(super) fn from_hops_cancellable(
     let k_end = ((frames - phi - 0.5) / p).floor() as i64;
     let times: Vec<f64> = (k0..=k_end).map(|k| phi + 0.5 + k as f64 * p).collect();
     let bpm = (6000.0 * fr / p).round() as u16;
-    Some(beats(&times, &low, fr, |_| bpm))
+    Some(beats(&times, &amp, fr, |_| bpm))
 }
