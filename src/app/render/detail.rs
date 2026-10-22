@@ -185,20 +185,25 @@ pub fn render_strip(
         c.vline(x1, 0..h, LOOP_RGB);
     }
     let box_y = super::font::H * scale + 5;
+    let large = view.cue_markers == CueMarkers::Large;
+    // Memory cues: wider than a beat line, and than a bold downbeat (4 px), so one on a beat still shows.
+    let memory_w = if view.beat_grid == BeatGrid::Bold {
+        6
+    } else {
+        2
+    } + 2 * usize::from(large);
     for cue in &a.cues {
         let (x, rgb) = (
             axis.col(cue.time_ms as f64),
             hot_cue_rgb(view.hot_cue_colors, cue),
         );
+        if cue.hot_cue == 0 {
+            c.memory_cue(x, memory_w, rgb, (h >= 40).then_some(box_y), large);
+            continue;
+        }
         c.vline(x, (0..h).step_by(2), rgb);
-        if cue.hot_cue > 0 && h >= 40 {
-            c.cue_box(
-                x,
-                box_y,
-                cue_letter(cue.hot_cue as u8),
-                rgb,
-                view.cue_markers == CueMarkers::Large,
-            );
+        if h >= 40 {
+            c.cue_box(x, box_y, cue_letter(cue.hot_cue as u8), rgb, large);
         }
     }
     super::cue_marker(&mut c, axis.col(cue_ms as f64), (h / 12).clamp(5, 12));
@@ -303,6 +308,61 @@ mod tests {
         }
         assert_eq!(pixel(20), [80, 90, 100], "audio remains between grid lines");
         prefs::set_for_test(|p| p.view.beat_grid = BeatGrid::Normal);
+    }
+
+    #[test]
+    fn memory_cue_on_a_bold_downbeat_stays_visible_flagged_and_widens_with_large() {
+        let a = Analysis {
+            beats: vec![Beat {
+                bar_pos: 1,
+                bpm_x100: 12700,
+                time_ms: 30,
+            }],
+            cues: vec![Cue {
+                hot_cue: 0,
+                time_ms: 30,
+                loop_end_ms: None,
+                color: None,
+                comment: None,
+            }],
+            ..Default::default()
+        };
+        let draw = |large| {
+            prefs::set_for_test(|p| {
+                p.view.beat_grid = BeatGrid::Bold;
+                p.view.cue_markers = if large {
+                    CueMarkers::Large
+                } else {
+                    CueMarkers::Normal
+                };
+            });
+            render_strip(None, &a, 0.0, 1.0, u32::MAX, None, 80, 60, false)
+                .to_rgba8()
+                .unwrap()
+        };
+        let palette = super::super::palette();
+        let row = |img: &slint::SharedPixelBuffer<slint::Rgba8Pixel>, y: usize| {
+            (0..80)
+                .filter(|&x| {
+                    let p = img.as_slice()[y * 80 + x];
+                    [p.r, p.g, p.b] == palette.memory
+                })
+                .count()
+        };
+        let (normal, large) = (draw(false), draw(true));
+        // Below the flag: only the bar, wider than the 4-px bold downbeat and not the grid's colour.
+        assert_eq!(row(&normal, 55), 6);
+        assert_eq!(row(&large, 55), 8);
+        // The flag's top row: the 8×9 box (16×18 large) in the cue colour, wider than the bar.
+        assert_eq!(row(&normal, 12), 8);
+        assert_eq!(row(&large, 12), 16);
+        // ... with the letter M cut into it
+        assert!(row(&normal, 14) < 8);
+        assert!(row(&large, 14) < 16);
+        prefs::set_for_test(|p| {
+            p.view.beat_grid = BeatGrid::Normal;
+            p.view.cue_markers = CueMarkers::Normal;
+        });
     }
 
     #[test]

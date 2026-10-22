@@ -232,6 +232,7 @@ fn palette(values: &[Value]) -> Palette {
             rgb("wave-high", d.band[2]),
         ],
         cue: rgb("cue", d.cue),
+        memory: rgb("memory-cue", d.memory),
     }
 }
 

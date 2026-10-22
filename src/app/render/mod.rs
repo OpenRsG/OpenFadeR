@@ -39,6 +39,8 @@ pub struct Palette {
     /// Low, mid and high band.
     pub band: [Rgb; 3],
     pub cue: Rgb,
+    /// Memory cue marker (Theme.memory-cue).
+    pub memory: Rgb,
 }
 
 /// Low, mid and high band colours (blue, amber, white) whose overlaps are fixed mixes ([`three_band_in`]).
@@ -50,6 +52,7 @@ impl Palette {
         bg: [0x11, 0x11, 0x1b],
         band: [[0x89, 0xb4, 0xfa], [0xfa, 0xb3, 0x87], [0xcd, 0xd6, 0xf4]],
         cue: [0xfa, 0xb3, 0x87],
+        memory: [0xf5, 0xc2, 0xe7],
     };
 }
 
@@ -61,29 +64,33 @@ fn unpack(v: u32) -> Rgb {
     [(v >> 16) as u8, (v >> 8) as u8, v as u8]
 }
 
-/// [`Palette`] fields as packed `0xRRGGBB`: bg, low, mid, high, cue. Atomics, so a frame reads them without a lock or allocation.
-static PALETTE: [AtomicU32; 5] = [
+/// [`Palette`] fields as packed `0xRRGGBB`: bg, low, mid, high, cue, memory. Atomics, so a frame reads them without a lock or allocation.
+static PALETTE: [AtomicU32; 6] = [
     AtomicU32::new(pack(Palette::DEFAULT.bg)),
     AtomicU32::new(pack(Palette::DEFAULT.band[0])),
     AtomicU32::new(pack(Palette::DEFAULT.band[1])),
     AtomicU32::new(pack(Palette::DEFAULT.band[2])),
     AtomicU32::new(pack(Palette::DEFAULT.cue)),
+    AtomicU32::new(pack(Palette::DEFAULT.memory)),
 ];
 
 /// Makes `p` the colours the renderers draw with.
 pub fn set_palette(p: Palette) {
-    let [bg, lo, mid, hi, cue] = [p.bg, p.band[0], p.band[1], p.band[2], p.cue].map(pack);
-    for (slot, v) in PALETTE.iter().zip([bg, lo, mid, hi, cue]) {
+    let [bg, lo, mid, hi, cue, memory] =
+        [p.bg, p.band[0], p.band[1], p.band[2], p.cue, p.memory].map(pack);
+    for (slot, v) in PALETTE.iter().zip([bg, lo, mid, hi, cue, memory]) {
         slot.store(v, Relaxed);
     }
 }
 
 fn palette() -> Palette {
-    let [bg, lo, mid, hi, cue] = [0, 1, 2, 3, 4].map(|i| unpack(PALETTE[i].load(Relaxed)));
+    let [bg, lo, mid, hi, cue, memory] =
+        [0, 1, 2, 3, 4, 5].map(|i| unpack(PALETTE[i].load(Relaxed)));
     Palette {
         bg,
         band: [lo, mid, hi],
         cue,
+        memory,
     }
 }
 
@@ -231,6 +238,22 @@ impl Canvas {
         };
         self.shade(left - 1, right + 1, 0..self.h, p.bg, 1.0);
         self.shade(left, right, 0..self.h, rgb, 1.0);
+    }
+    /// Memory cue: a solid `width`-px bar centred on `x`, with an "M" flag at `flag_y` when there is room. Drawn after the grid, it
+    /// is wider than a beat line (the callers widen it over the bold grid and with large markers).
+    pub fn memory_cue(
+        &mut self,
+        x: i64,
+        width: usize,
+        rgb: Rgb,
+        flag_y: Option<usize>,
+        large: bool,
+    ) {
+        let left = x - ((width - 1) / 2) as i64;
+        self.shade(left, left + width as i64, 0..self.h, rgb, 1.0);
+        if let Some(y) = flag_y {
+            self.cue_box(left, y, 'M', rgb, large);
+        }
     }
     /// Translucent colour `c` (coverage `cov`) over pixel `rows` of columns `x0..x1`, clipped to the canvas. Coverage 1 fills
     /// (see [`Canvas::vline`]); below 1, [`blend`]'s result per old byte is tabulated once (3×256 entries) instead of
@@ -540,14 +563,14 @@ pub fn cue_letter(hot_cue: u8) -> char {
     (b'A' + (hot_cue - 1) % 26) as char
 }
 
-/// Memory cues keep their own colour (else red) in every mode. Hot cues: COLORFUL = the cue's own colour
+/// Memory cues keep their own colour (else Theme.memory-cue) in every mode. Hot cues: COLORFUL = the cue's own colour
 /// (else green); CLASSIC = hot cues green, hot loops amber; COLD1 = hot cues blue, hot loops green; COLD2 = blue
 /// gradation from light (A) to dark (H); PADS = red, orange, blue, dark blue, green, magenta, cyan, purple by pad.
 /// The RGB values are ours.
 pub fn hot_cue_rgb(mode: HotCueColors, c: &Cue) -> Rgb {
     let own = c.color.filter(|&rgb| rgb != [0, 0, 0]);
     if c.hot_cue == 0 {
-        return own.unwrap_or([230, 40, 40]);
+        return own.unwrap_or(palette().memory);
     }
     let looped = c.loop_end_ms.is_some();
     match mode {
@@ -628,7 +651,7 @@ mod tests {
             hot_cue_rgb(HotCueColors::Cold2, &hot),
             hot_cue_rgb(HotCueColors::Cold2, &cue(8, None, None))
         );
-        assert_eq!(hot_cue_rgb(HotCueColors::Cold1, &memory), [230, 40, 40]);
+        assert_eq!(hot_cue_rgb(HotCueColors::Cold1, &memory), palette().memory);
     }
 
     #[test]
