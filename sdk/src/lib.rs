@@ -20,6 +20,8 @@
 //!
 //! Track libraries (a file or folder format the host reads, and writes for the collection export) are a second kind of
 //! plugin, behind the `library` feature: see [`library`].
+//!
+//! Controller plugins (a native library that drives a MIDI controller port for the host) are a third kind: see [`controller`].
 
 use std::ffi::{CStr, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -242,6 +244,7 @@ macro_rules! export_effects {
     };
 }
 
+pub mod controller;
 pub mod dsp;
 
 #[cfg(feature = "library")]

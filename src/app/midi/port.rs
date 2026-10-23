@@ -2,7 +2,7 @@
 //! midir's own thread, queues the raw 3-byte message and wakes the UI once for a pending batch.
 //! The LED output is one connection to the output port of the mapped controller, written by a [`Sink`] thread.
 
-use midir::{MidiInput, MidiInputConnection, MidiOutput, MidiOutputConnection};
+use midir::{Ignore, MidiInput, MidiInputConnection, MidiOutput, MidiOutputConnection};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc::{channel, Receiver, Sender},
@@ -28,13 +28,20 @@ pub struct Ports {
     wake: Arc<Wake>,
 }
 
-/// One event-loop wake per pending batch, not per MIDI message.
-struct Wake {
+/// One event-loop wake per pending batch, not per MIDI message; the ports of one session share it.
+pub struct Wake {
     pending: AtomicBool,
     notify: fn() -> Result<(), slint::EventLoopError>,
 }
 
 impl Wake {
+    pub fn new(notify: fn() -> Result<(), slint::EventLoopError>) -> Arc<Wake> {
+        Arc::new(Wake {
+            pending: AtomicBool::new(false),
+            notify,
+        })
+    }
+
     fn request(&self) {
         if !self.pending.swap(true, Ordering::AcqRel) && (self.notify)().is_err() {
             self.pending.store(false, Ordering::Release);
@@ -53,12 +60,35 @@ impl Ports {
     }
 }
 
-/// Connects every input port whose name contains `filter` (all when `None`). Only channel
-/// messages (3 bytes) are forwarded; sysex, clock and sensing are dropped by midir's default filter.
-pub fn connect(
-    filter: Option<&str>,
-    notify: fn() -> Result<(), slint::EventLoopError>,
-) -> Result<Ports, String> {
+/// Opens input port `name` (exactly as listed) for a controller plugin: every message whole, sysex included, to the returned
+/// channel; clock and active sensing are dropped. It wakes the UI through `wake` like the other ports do.
+pub fn raw(
+    wake: &Arc<Wake>,
+    name: &str,
+) -> Result<(MidiInputConnection<()>, Receiver<Vec<u8>>), String> {
+    let mut input = MidiInput::new("openfader").map_err(|e| e.to_string())?;
+    input.ignore(Ignore::TimeAndActiveSense);
+    let port = input
+        .ports()
+        .into_iter()
+        .find(|p| input.port_name(p).is_ok_and(|n| n == name))
+        .ok_or_else(|| tr!("no MIDI input port {}", format!("{name:?}")))?;
+    let (tx, rx) = channel();
+    let wake = wake.clone();
+    let on_msg = move |_: u64, m: &[u8], _: &mut ()| {
+        if tx.send(m.to_vec()).is_ok() {
+            wake.request();
+        }
+    };
+    let conn = input
+        .connect(&port, "openfader-in", on_msg, ())
+        .map_err(|e| e.to_string())?;
+    Ok((conn, rx))
+}
+
+/// Connects every input port whose name contains `filter` (all when `None`) except those in `skip` (a plugin drives them,
+/// [`raw`]). Only channel messages (3 bytes) are forwarded; sysex, clock and sensing are dropped by midir's default filter.
+pub fn connect(filter: Option<&str>, skip: &[String], wake: Arc<Wake>) -> Result<Ports, String> {
     // One listing: re-listing per index raced with ports coming and going (hotplug, other clients).
     let lister = MidiInput::new("openfader").map_err(|e| e.to_string())?;
     let ports: Vec<_> = lister
@@ -67,13 +97,9 @@ pub fn connect(
         .filter_map(|p| Some((lister.port_name(&p).ok()?, p)))
         .collect();
     let (tx, rx) = channel();
-    let wake = Arc::new(Wake {
-        pending: AtomicBool::new(false),
-        notify,
-    });
     let (mut conns, mut names) = (Vec::new(), Vec::new());
     for (name, port) in ports {
-        if is_own(&name) || filter.is_some_and(|f| !name.contains(f)) {
+        if is_own(&name) || skip.contains(&name) || filter.is_some_and(|f| !name.contains(f)) {
             continue;
         }
         let input = MidiInput::new("openfader").map_err(|e| e.to_string())?;
@@ -165,7 +191,7 @@ impl Sink {
         self.queue(Packet::Short(m));
     }
 
-    /// A complete system-exclusive message (F0 … F7), written in turn with the lights.
+    /// A complete message of any length (system exclusive F0 … F7, or a plugin's 1 or 2 byte one), written in turn with the lights.
     pub fn send_sysex(&self, m: Vec<u8>) {
         self.queue(Packet::Sysex(m));
     }
@@ -207,7 +233,7 @@ mod tests {
         let Ok(mut out) = out else {
             return eprintln!("skip: no ALSA seq");
         };
-        let ports = connect(Some("rk-virtual-controller"), || Ok(())).unwrap();
+        let ports = connect(Some("rk-virtual-controller"), &[], Wake::new(|| Ok(()))).unwrap();
         assert_eq!(ports.names.len(), 1);
         out.send(&[0xB0, 7, 100]).unwrap();
         out.send(&[0x90, 36, 0]).unwrap();
@@ -219,6 +245,32 @@ mod tests {
             ports.rx.recv_timeout(Duration::from_secs(2)),
             Ok([0x90, 36, 0])
         );
+    }
+
+    /// A plugin's port delivers every message whole (a 2-byte program change, system exclusive) and none of the clock. Skipped
+    /// without ALSA seq.
+    #[test]
+    fn a_plugin_port_gets_messages_of_any_length() {
+        let Ok(out) = MidiOutput::new("rk-test").map(|o| o.create_virtual("rk-virtual-raw")) else {
+            return eprintln!("skip: no MIDI backend");
+        };
+        let Ok(mut out) = out else {
+            return eprintln!("skip: no ALSA seq");
+        };
+        let lister = MidiInput::new("rk-list").unwrap();
+        let name = lister
+            .ports()
+            .iter()
+            .filter_map(|p| lister.port_name(p).ok())
+            .find(|n| n.contains("rk-virtual-raw"))
+            .unwrap();
+        let (_conn, rx) = raw(&Wake::new(|| Ok(())), &name).unwrap();
+        out.send(&[0xF8]).unwrap();
+        out.send(&[0xC0, 5]).unwrap();
+        out.send(&[0xF0, 1, 2, 0xF7]).unwrap();
+        let got = |rx: &Receiver<Vec<u8>>| rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(got(&rx), [0xC0, 5], "the clock tick was dropped");
+        assert_eq!(got(&rx), [0xF0, 1, 2, 0xF7]);
     }
 
     /// A receiver that needs 100 µs per message lost an unpaced 258-message burst with no send error (1..5 arrived);

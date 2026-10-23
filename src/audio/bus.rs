@@ -12,9 +12,9 @@
 //! preview player and the buffer size in use. Which device channel pairs carry master / headphones / booth (or the
 //! External mixer's six outputs) is [`super::route`]'s; the environment variables above still override the Preferences.
 
-use super::{Tap, clamped, load_f32, mono, store_clamped};
-use std::sync::Arc;
+use super::{clamped, load_f32, mono, store_clamped, Tap};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering::Relaxed};
+use std::sync::Arc;
 
 /// Env: substring of the output device to open instead of the system default.
 pub const OUTPUT_ENV: &str = "OPENFADER_OUTPUT_DEVICE";
@@ -138,6 +138,8 @@ pub fn out(master: [f32; 2], cue: [f32; 2], p: &Params) -> Out {
 /// Mixer channels (decks) the bus carries; the audio engine renders this many. Four decks.
 /// In 2-deck mode channels 3 and 4 stay silent (nothing is loaded on them) and cost almost nothing.
 pub const CHANNELS: usize = 4;
+/// Index of the AUX channel's buffer in the channel buffers the mixer sums (the decks come first).
+pub const AUX: usize = CHANNELS;
 /// Beat FX units (FX1, FX2).
 pub const FX_UNITS: usize = 2;
 /// Effect slots of a Beat FX unit (MULTI mode: FX1-1 to FX1-3), each with its own effect, beat, level and ON.
@@ -167,6 +169,8 @@ pub struct Bus {
     pub preview: super::preview::Controls,
     /// The microphone ([`super::mic`]); one process-wide set of knobs, so it survives a device switch.
     pub mic: Arc<super::mic::Controls>,
+    /// The AUX / LINE channel ([`super::auxin`]); process-wide like the mic.
+    pub aux: Arc<super::auxin::Controls>,
     /// MIC FX ([`super::fx::Unit::rack`] of the mic slot): runs on the mic after its level, before it joins the sum.
     pub mic_fx: super::fx::Controls,
     /// SEND FX knobs: ON, effect, RETURN level and parameter. The effect hears [`Bus::sends`] times each channel's master path.
@@ -208,6 +212,7 @@ impl Bus {
             sampler: super::sampler::Controls::default(),
             preview: super::preview::Controls::default(),
             mic: super::mic::controls(),
+            aux: super::auxin::controls(),
             mic_fx: super::fx::Controls::default(),
             send: super::fx::Controls::default(),
             sends: std::array::from_fn(|_| AtomicU32::new(0)),
@@ -234,6 +239,7 @@ impl Bus {
             .set_gain(clamped(s.preview_gain, MAX_LEVEL, 1.0));
         self.mic
             .set(s.mic_gain, s.talkover_advanced, s.talkover_gain);
+        self.aux.set_duck(s.aux_duck, s.aux_release);
     }
 
     /// Send amount of channel `ch` (clamped to 0..=1; out-of-range channels are ignored).
@@ -448,13 +454,14 @@ mod tests {
     #[test]
     fn fx_assignment_reaches_decks_c_and_d() {
         assert_eq!(
-            [0, 1, 2, 3, 4, 9].map(Assign::from_index),
+            [0, 1, 2, 3, 4, 5, 9].map(Assign::from_index),
             [
                 Assign::A,
                 Assign::B,
                 Assign::C,
                 Assign::D,
                 Assign::Master,
+                Assign::Aux,
                 Assign::Master
             ]
         );
@@ -481,6 +488,32 @@ mod tests {
         assert!(
             (0..N).any(|i| sum(i).abs() < 0.05) && (0..N).any(|i| (sum(i) - 4.0).abs() < 0.05),
             "MASTER gates and opens the sum of four channels (the difference lands on channel A)"
+        );
+    }
+
+    /// A Beat FX assigned to AUX runs on the AUX channel's buffer only; MASTER sums it with the decks.
+    #[test]
+    fn a_beat_fx_can_sit_on_the_aux_channel() {
+        let (mut u, c) = (Unit::new(48_000), Controls::default());
+        gate(&c, Assign::Aux);
+        let mut buf = chans(CHANNELS + 1);
+        u.prepare(c.settings().effect);
+        u.apply(&c, &mut buf, N);
+        assert!(gated(&buf[AUX]), "the AUX channel is gated");
+        assert!(
+            (0..CHANNELS).all(|k| buf[k] == chans(CHANNELS)[k]),
+            "the decks are untouched"
+        );
+        assert!(cue_untouched(&buf), "the cue path is never touched");
+        let (mut u, c) = (Unit::new(48_000), Controls::default());
+        gate(&c, Assign::Master);
+        let mut buf = chans(CHANNELS + 1);
+        u.prepare(c.settings().effect);
+        u.apply(&c, &mut buf, N);
+        let sum = |i: usize| buf.iter().map(|b| b[i].0[0]).sum::<f32>();
+        assert!(
+            (0..N).any(|i| (sum(i) - 5.0).abs() < 0.05) && (0..N).any(|i| sum(i).abs() < 0.05),
+            "MASTER gates and opens the sum of the four decks and the AUX"
         );
     }
 

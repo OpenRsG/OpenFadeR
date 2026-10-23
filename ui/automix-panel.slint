@@ -1,0 +1,72 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, Dropdown, Icon, IconButton } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { AutomixState } from "browser-state.slint";
+
+/// A small heading over a column of the panel.
+component Head inherits Text {
+    color: Theme.text-dim;
+    font-family: Theme.font;
+    font-size: Theme.font-sm;
+    font-weight: Theme.weight-bold;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+/// The automix panel on the table's right edge: LENGTH, the transition STYLE (RANDOM or one), the styles RANDOM may pick from
+/// and the plan (the style of each upcoming transition of the running list).
+export component AutomixPanel inherits Rectangle {
+    background: Theme.panel-raised;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    VerticalLayout {
+        padding: Theme.space-sm;
+        spacing: Theme.space-sm;
+        HorizontalLayout {
+            spacing: Theme.space-sm;
+            vertical-stretch: 0;
+            Text { text: @tr("AUTOMIX"); color: Theme.text; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; overflow: elide; }
+            IconButton { icon: Icon.close; tooltip: @tr("Close"); clicked => { AutomixState.panel-open = false; } }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-sm;
+            vertical-stretch: 0;
+            Head { text: @tr("LENGTH"); width: 56px; horizontal-stretch: 0; }
+            for n in [8, 16, 32]: Chip { text: @tr("{} BARS", n); active: AutomixState.bars == n; clicked => { AutomixState.bars = n; } }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-sm;
+            vertical-stretch: 0;
+            Head { text: @tr("STYLE"); width: 56px; horizontal-stretch: 0; }
+            Dropdown { options: AutomixState.styles; current: AutomixState.style; chose(i) => { AutomixState.style-chose(i); } }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-lg;
+            VerticalLayout {
+                spacing: Theme.space-sm;
+                Head { text: @tr("RANDOM USES"); height: Theme.h-ctl; }
+                ListView {
+                    for name[i] in AutomixState.styles: Rectangle {
+                        height: i > 0 ? Theme.h-ctl + 2px : 0px;
+                        if i > 0: Chip { y: 0; width: parent.width; text: name; active: AutomixState.pool[i]; clicked => { AutomixState.pool-toggled(i); } }
+                    }
+                }
+            }
+            VerticalLayout {
+                spacing: Theme.space-sm;
+                Head { text: @tr("PLAN"); height: Theme.h-ctl; }
+                ListView {
+                    for line in AutomixState.plan: Text {
+                        height: Theme.h-row;
+                        text: line;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        color: Theme.text;
+                        font-family: Theme.font;
+                        font-size: Theme.font-sm;
+                    }
+                }
+            }
+        }
+    }
+}

@@ -2,6 +2,10 @@ name: Bug report
 description: Something does not work the way it should
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        The quickest way to a fixable report: in OpenFadeR choose **Help > Report a Problem**, click **Open GitHub issue** (it fills in the version and environment below and copies the full report), then paste the report into the "Problem report" box. After a crash OpenFadeR offers the same on the next start.
   - type: textarea
     id: what-happened
     attributes:
@@ -18,6 +22,11 @@ body:
         2. See error
     validations:
       required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Problem report
+      description: Paste the report from Help > Report a Problem (Copy report). It holds the environment, the plugins, the changed settings and the last log lines, with paths and passwords removed. Read it before you send it.
   - type: input
     id: version
     attributes:
@@ -25,16 +34,17 @@ body:
       description: Which version of OpenFadeR are you running?
     validations:
       required: true
-  - type: input
+  - type: textarea
     id: environment
     attributes:
       label: Environment
-      placeholder: OS, OpenFadeR version or commit, controller / sound card if relevant
+      description: OS, OpenFadeR version or commit, CPU and graphics, sound card, controller. Filled in by Report a Problem.
+      render: text
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
       label: Relevant output
-      description: Paste any error output. Remove anything secret first.
+      description: Only if OpenFadeR does not start, so there is no report. Paste the end of the log (the logs folder is next to the library, `logs/openfader.log`) or the terminal output, and remove anything secret first.
       render: shell

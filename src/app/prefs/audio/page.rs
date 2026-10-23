@@ -1,16 +1,17 @@
 //! The AUDIO page rows (see the parent doc).
 
 use super::{
-    BOOTH_DB, MIC_DB, MixerMode, PREVIEW_DB, TALK_DB, VOLUME_STEP, buffer_in_use, caps_of,
-    db_label, external_ok, nearest, pairs_of,
+    aux_choices, buffer_in_use, caps_of, db_label, external_ok, nearest, pairs_of, MixerMode,
+    AUX_RELEASE_MS, BOOTH_DB, MIC_DB, PREVIEW_DB, TALK_DB, VOLUME_STEP,
 };
 use crate::app::prefs::{Prefs, Row};
 use openfader::audio::{
-    self, Status,
-    device::{self, Caps, card},
+    self, auxin,
+    device::{self, card, Caps},
     metronome::TONES,
     mic,
     route::{self, EXTERNAL_NAMES},
+    Status,
 };
 
 /// AUTO plus the supported values, and the selected index. A saved value the device does not support is listed
@@ -54,6 +55,20 @@ pub(super) fn numbered(first: &str, pairs: usize, current: u8) -> Vec<String> {
 /// Index into [`pair_labels`] of pair `n` (pair numbers start at 1).
 fn pair_index(n: u8) -> usize {
     n.max(1) as usize - 1
+}
+
+/// The ducking levels ([`TALK_DB`]): OFF, then the dB steps.
+fn talk_labels() -> Vec<String> {
+    TALK_DB
+        .iter()
+        .map(|&d| {
+            if d == 0 {
+                tr!("OFF").to_owned()
+            } else {
+                db_label(d)
+            }
+        })
+        .collect()
 }
 
 fn db_labels(steps: &[i32]) -> Vec<String> {
@@ -294,27 +309,69 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         Row::of("talkover_mode", tr!("TALKOVER MODE"), a.talkover_mode)
             .hint(tr!("advanced: mid range only")),
     );
-    let labels = TALK_DB
-        .iter()
-        .map(|&d| {
-            if d == 0 {
-                tr!("OFF").to_owned()
-            } else {
-                db_label(d)
-            }
-        })
-        .collect();
     rows.push(
         Row::dropdown_of(
             "talkover_level",
             tr!("TALKOVER LEVEL"),
-            labels,
+            talk_labels(),
             nearest(&TALK_DB, a.talkover_level),
         )
         .enabled(a.mic_on),
     );
     if let Some(e) = mic::problem() {
         rows.push(Row::info(tr!("MICROPHONE"), &e));
+    }
+
+    rows.push(Row::header(tr!("AUX INPUT")));
+    rows.push(
+        Row::check("aux_on", tr!("Enable AUX input"), a.aux_on)
+            .hint(tr!("shows the AUX strip in the mixer")),
+    );
+    let ch = aux_choices(&a);
+    let at = ch.iter().position(|(_, n)| *n == a.aux_device).unwrap_or(0);
+    rows.push(
+        Row::dropdown_of(
+            "aux_device",
+            tr!("AUX DEVICE"),
+            ch.into_iter().map(|(l, _)| l).collect(),
+            at,
+        )
+        .enabled(a.aux_on),
+    );
+    let (aux_dev, _) = a.aux_source();
+    let aux_caps = device::input_caps(aux_dev);
+    let (_, aux_pairs) = pairs_of(aux_caps.as_ref());
+    rows.push(
+        Row::dropdown_of(
+            "aux_pair",
+            tr!("AUX CHANNELS"),
+            pair_labels(aux_pairs, a.aux_pair),
+            pair_index(a.aux_pair),
+        )
+        .enabled(a.aux_on && aux_caps.is_some()),
+    );
+    rows.push(
+        Row::dropdown_of(
+            "aux_duck",
+            tr!("AUX DUCK LEVEL"),
+            talk_labels(),
+            nearest(&TALK_DB, a.aux_duck),
+        )
+        .hint(tr!("lowers the decks while the AUX plays"))
+        .enabled(a.aux_on),
+    );
+    let ms: Vec<i32> = AUX_RELEASE_MS.iter().map(|&m| m as i32).collect();
+    rows.push(
+        Row::dropdown_of(
+            "aux_release",
+            tr!("AUX DUCK RELEASE"),
+            ms.iter().map(|m| tr!("{} ms", m)).collect(),
+            nearest(&ms, a.aux_release as i32),
+        )
+        .enabled(a.aux_on && a.aux_duck != 0),
+    );
+    if let Some(e) = auxin::problem() {
+        rows.push(Row::info(tr!("AUX"), &e));
     }
     rows
 }

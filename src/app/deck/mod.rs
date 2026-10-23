@@ -4,7 +4,7 @@
 //! audible position. The `decks` setting (PREFS, the 2/4 chip) decides how many are [`active`]: in 2-deck
 //! mode C and D are hidden, paused and out of every deck pick; the audio engine always carries four channels.
 //!
-//! Base: [`beatmath`] (beat-grid maths: [`grid_bpm`], [`beat_at`], [`ms_at`], [`snap`]) and [`wire`] (creates the
+//! Base: [`beatmath`] (beat-grid maths: [`grid_bpm`], [`tempo_at`], [`beat_at`], [`ms_at`], [`snap`]) and [`wire`] (creates the
 //! decks, routes the `DeckState` callbacks).
 //! Children: [`load`] (analysis + async decode), [`transport`] (play/seek/tempo range/key lock/zoom/
 //! beat jump/scratch), [`cue`] (player CUE state machine), [`sync`] (latched SYNC + MASTER: tempo and
@@ -30,7 +30,7 @@
 mod autocue;
 mod bank;
 mod beatmath;
-pub(in crate::app) use beatmath::{beat_at, grid_bpm, ms_at};
+pub(in crate::app) use beatmath::{beat_at, grid_bpm, ms_at, tempo_at};
 use beatmath::{beats_between, is_loop_len, snap};
 mod cue;
 mod cuelist;
@@ -145,7 +145,7 @@ struct Loaded {
     overview_base: Option<render::Canvas>,
     /// The detail picture the view slides over ([`frame`]); `None` = draw it again.
     strip: Option<frame::Strip>,
-    overview_key: Option<(i64, Size, Option<i64>, u32)>,
+    overview_key: Option<(i64, Size, Option<i64>, u32, bool)>,
     time_key: Option<u32>,
     /// GRID panel undo / redo lists and range ([`exportedit`]); gone with the next LOAD.
     grid_hist: exportedit::Hist,
@@ -372,6 +372,11 @@ impl Deck {
     /// Track loaded and audio decoded: the transport, cue and loop controls work.
     pub(in crate::app) fn ready(&self) -> bool {
         self.view.borrow().loaded
+    }
+
+    /// This deck's place: 0 = A … 3 = D.
+    pub(in crate::app) fn index(&self) -> usize {
+        self.index
     }
 
     /// Is the deck's audio playing? `false` without audio.

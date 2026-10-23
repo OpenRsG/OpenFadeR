@@ -1,0 +1,208 @@
+import { Chip, Dropdown, Fader, Icon, Knob, Meter, SegmentedChips } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { DeckState } from "../deck-state.slint";
+import { ChannelView, MixerState } from "../mixer.slint";
+import { Caption, PillTabs } from "parts.slint";
+
+/// One row of the EQ stack: the knob of channel A, its name in the middle, the knob of channel B. `p` is the knob index of
+/// `ChannelView.knobs` (0 TRIM, 1 HI, 2 MID, 3 LOW, 4 CFX); with STEM ISO on a channel its HIGH / MID / LOW knobs are its
+/// INST / VOCAL / DRUMS levels.
+component KnobRow inherits Rectangle {
+    in property <int> p;
+    in property <string> label;
+    in property <length> size;
+    property <ChannelView> a: MixerState.channels[0];
+    property <ChannelView> b: MixerState.channels[1];
+    property <bool> iso-a: root.a.iso && root.p >= 1 && root.p <= 3;
+    property <bool> iso-b: root.b.iso && root.p >= 1 && root.p <= 3;
+    property <[color]> iso-tone: [Theme.accent, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums];
+    HorizontalLayout {
+        Rectangle {
+            Knob {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: root.size;
+                height: root.size;
+                detent: !root.iso-a;
+                reset: root.iso-a ? 1.0 : 0.5;
+                arc-color: root.iso-a ? root.iso-tone[root.p] : root.p == 4 ? Theme.cue : Theme.accent;
+                value: root.iso-a ? root.a.iso-knobs[root.p - 1] : root.a.knobs[root.p];
+                stop: root.p == 4 ? MixerState.cfx-stop : -1;
+                edited(v) => { MixerState.knob(0, root.p, v); }
+            }
+        }
+        Caption {
+            width: 64px;
+            horizontal-stretch: 0;
+            horizontal-alignment: center;
+            font-size: Theme.font-sm;
+            text: root.iso-a ? ["", @tr("INST"), @tr("VOCAL"), @tr("DRUMS")][root.p] : root.label;
+            color: root.iso-a ? root.iso-tone[root.p] : Theme.text-dim;
+        }
+        Rectangle {
+            Knob {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: root.size;
+                height: root.size;
+                detent: !root.iso-b;
+                reset: root.iso-b ? 1.0 : 0.5;
+                arc-color: root.iso-b ? root.iso-tone[root.p] : root.p == 4 ? Theme.cue : Theme.accent;
+                value: root.iso-b ? root.b.iso-knobs[root.p - 1] : root.b.knobs[root.p];
+                stop: root.p == 4 ? MixerState.cfx-stop : -1;
+                edited(v) => { MixerState.knob(1, root.p, v); }
+            }
+        }
+    }
+}
+
+/// A knob over its caption (MASTER, PHONES).
+component BusKnob inherits VerticalLayout {
+    in property <int> p;
+    in property <string> label;
+    in property <float> reset: 0.5;
+    spacing: 1px;
+    alignment: center;
+    HorizontalLayout {
+        alignment: center;
+        Knob {
+            width: 30px;
+            height: 30px;
+            horizontal-stretch: 0;
+            detent: true;
+            reset: root.reset;
+            value: MixerState.bus.knobs[root.p];
+            edited(v) => { MixerState.bus-knob(root.p, v); }
+        }
+    }
+    Caption { text: root.label; horizontal-alignment: center; height: 12px; }
+}
+
+/// The MIXER tab: the EQ stack of the two channels (GAIN, HIGH, MID, LOW, FILTER), the channel faders with their meters between
+/// them, the headphone CUE buttons, the PHONES / MIX / MASTER knobs and the crossfader.
+component MixerPage inherits Rectangle {
+    /// Height of one knob row, from the column's own height (set by the workspace, not by this layout).
+    in property <length> row-h;
+    VerticalLayout {
+        spacing: Theme.space-md;
+        for label[p] in [@tr("GAIN"), @tr("HIGH"), @tr("MID"), @tr("LOW"), MixerState.cfx-names.length > MixerState.cfx-type ? MixerState.cfx-names[MixerState.cfx-type] : @tr("FILTER")]: KnobRow {
+            height: root.row-h;
+            p: p;
+            label: label;
+            size: min(32px, root.row-h - 4px);
+        }
+        HorizontalLayout {
+            vertical-stretch: 1;
+            min-height: 60px;
+            spacing: Theme.space-md;
+            Fader { vertical: true; width: 30px; horizontal-stretch: 0; value: MixerState.channels[0].fader; edited(v) => { MixerState.fader(0, v); } }
+            HorizontalLayout {
+                alignment: center;
+                spacing: Theme.space-md;
+                Meter { vertical: true; width: 10px; horizontal-stretch: 0; segments: 24; level: MixerState.channels[0].level; peak: MixerState.channels[0].peak; }
+                Meter { vertical: true; width: 10px; horizontal-stretch: 0; segments: 24; level: MixerState.channels[1].level; peak: MixerState.channels[1].peak; }
+            }
+            Fader { vertical: true; width: 30px; horizontal-stretch: 0; value: MixerState.channels[1].fader; edited(v) => { MixerState.fader(1, v); } }
+        }
+        HorizontalLayout {
+            height: 24px;
+            spacing: Theme.space-md;
+            Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; active: MixerState.channels[0].cue; tooltip: @tr("Headphone CUE, deck 1"); clicked => { MixerState.cue-toggled(0); } }
+            Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; active: MixerState.channels[1].cue; tooltip: @tr("Headphone CUE, deck 2"); clicked => { MixerState.cue-toggled(1); } }
+        }
+        HorizontalLayout {
+            height: 46px;
+            spacing: Theme.space-md;
+            BusKnob { p: 2; label: @tr("PHONES"); }
+            BusKnob { p: 1; label: @tr("MIX"); reset: 0.0; }
+            BusKnob { p: 0; label: @tr("MASTER"); }
+        }
+        HorizontalLayout {
+            height: 24px;
+            spacing: Theme.space-md;
+            Caption { text: "A"; width: 12px; horizontal-stretch: 0; font-size: Theme.font-sm; }
+            Fader {
+                detent: true;
+                value: MixerState.crossfader;
+                edited(v) => { MixerState.crossfader = v; MixerState.crossfade(v); }
+            }
+            Caption { text: "B"; width: 12px; horizontal-stretch: 0; font-size: Theme.font-sm; }
+        }
+    }
+}
+
+/// The SETTINGS tab: the COLOR FX the FILTER knobs run, the crossfader's curve and each channel's side of it, SPLIT and REC.
+component SettingsPage inherits Rectangle {
+    VerticalLayout {
+        alignment: start;
+        spacing: Theme.space-md;
+        Caption { text: @tr("FILTER KNOB (COLOR FX)"); height: 14px; }
+        Dropdown { options: MixerState.cfx-names; current: MixerState.cfx-type; list-width: 180px; chose(n) => { MixerState.cfx-selected(n); } }
+        Caption { text: @tr("CROSSFADER CURVE"); height: 14px; }
+        SegmentedChips {
+            options: [@tr("SMOOTH"), @tr("SHARP"), @tr("CONST")];
+            current: MixerState.curve;
+            font-size: Theme.font-xs;
+            chose(n) => {
+                if MixerState.curve != n { MixerState.curve-cycled(); }
+                if MixerState.curve != n { MixerState.curve-cycled(); }
+            }
+        }
+        for ch in 2: VerticalLayout {
+            spacing: Theme.space-sm;
+            Caption { text: @tr("DECK {} ON THE CROSSFADER", ch + 1); height: 14px; }
+            SegmentedChips {
+                options: [@tr("A"), @tr("THRU"), @tr("B")];
+                current: MixerState.channels[ch].xf;
+                font-size: Theme.font-xs;
+                chose(n) => { if n != MixerState.channels[ch].xf { MixerState.xf-assigned(ch, n == 1 ? MixerState.channels[ch].xf : n); } }
+            }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            Chip { text: @tr("SPLIT"); active: MixerState.bus.split; tooltip: @tr("Mono HP left / master right"); clicked => { MixerState.split-toggled(); } }
+            Chip {
+                text: MixerState.bus.rec-armed ? @tr("● ARMED") : MixerState.bus.rec ? "● " + MixerState.bus.rec-text : @tr("● REC");
+                active: MixerState.bus.rec;
+                active-color: Theme.rec;
+                tooltip: MixerState.bus.rec-armed ? @tr("Waiting for audio, click to cancel") : @tr("Record master");
+                clicked => { MixerState.rec-toggled(); }
+            }
+        }
+        Text { text: MixerState.bus.status; color: Theme.cue; font-family: Theme.font; font-size: Theme.font-xs; wrap: word-wrap; }
+    }
+}
+
+/// The centre column: MIXER / SETTINGS tabs, the EQ menu (EQ ↔ STEM ISO on both channels) and the page of the tab.
+export component StudioMixer inherits Rectangle {
+    property <int> tab;
+    property <bool> stems: DeckState.decks[0].stems || DeckState.decks[1].stems;
+    property <bool> iso: MixerState.channels[0].iso || MixerState.channels[1].iso;
+    background: Theme.panel;
+    /// One knob row: what the column leaves after the tabs, the faders, the CUE row, the bus knobs and the crossfader.
+    property <length> row-h: clamp((root.height - 258px) / 5, 26px, 38px);
+    border-radius: Theme.studio-radius;
+    VerticalLayout {
+        padding: Theme.studio-gap;
+        spacing: Theme.space-lg;
+        HorizontalLayout {
+            height: Theme.h-ctl;
+            spacing: Theme.space-md;
+            PillTabs { options: [@tr("MIXER"), @tr("SETTINGS")]; current: root.tab; chose(i) => { root.tab = i; } }
+            Dropdown {
+                width: 70px;
+                horizontal-stretch: 0;
+                enabled: root.stems;
+                options: [@tr("EQ"), @tr("STEM ISO")];
+                current: root.iso ? 1 : 0;
+                list-width: 110px;
+                chose(n) => {
+                    if MixerState.channels[0].iso != (n == 1) { MixerState.iso-toggled(0); }
+                    if MixerState.channels[1].iso != (n == 1) { MixerState.iso-toggled(1); }
+                }
+            }
+        }
+        if root.tab == 0: MixerPage { vertical-stretch: 1; row-h: root.row-h; }
+        if root.tab == 1: SettingsPage { vertical-stretch: 1; }
+    }
+}

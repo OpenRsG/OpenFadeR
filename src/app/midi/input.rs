@@ -68,10 +68,15 @@ impl Midi {
     }
 
     pub(super) fn dispatch(&self, app: &App, ev: Ev) -> Outcome {
-        let key = ev.key();
-        let Some(b) = self.find(key) else {
-            return self.lsb(app, ev);
-        };
+        match self.find(ev.key()) {
+            Some(b) => self.run(app, ev, &b),
+            None => self.lsb(app, ev),
+        }
+    }
+
+    /// Runs binding `b` for `ev` (what [`Midi::dispatch`] does once the message has its binding; controller plugins' controls
+    /// come here too, `claim/control.rs`).
+    pub(super) fn run(&self, app: &App, ev: Ev, b: &Binding) -> Outcome {
         let act = &ACTIONS[b.act];
         // The controller's own layer keys come first: DECK 3 / 4 reach decks a 2-deck layout hides, so they widen it.
         match act.kind {
@@ -99,7 +104,7 @@ impl Midi {
             return Outcome::Ignored(b.deck);
         }
         for d in self.gang(act, b.deck as usize) {
-            if let Some(done) = self.fire(app, ev, &b, d) {
+            if let Some(done) = self.fire(app, ev, b, d) {
                 return done;
             }
         }
@@ -150,7 +155,7 @@ impl Midi {
 
     /// The decks a control of deck `d` drives: itself, and while DUAL DECK is on for its side also the other deck of the pair
     /// ([`layer::dual_partner`]); the decks then answer "as one": which controls are ganged, see [`gangs`].
-    fn gang(&self, act: &Action, d: usize) -> impl Iterator<Item = usize> {
+    pub(super) fn gang(&self, act: &Action, d: usize) -> impl Iterator<Item = usize> {
         let partner = gangs(act)
             .then(|| layer::dual_partner(self.dual.get(), d, active()))
             .flatten();

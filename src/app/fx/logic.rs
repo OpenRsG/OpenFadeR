@@ -3,17 +3,17 @@
 use super::{FxSlot, FxUnit};
 use crate::app::{deck::DECKS, prefs::view::PadFxColor};
 use openfader::audio::{
-    BASS, DRUMS, INST, VOCAL,
-    fx::{BEAT_TEXT, BEATS, Effect},
+    fx::{Effect, BEATS, BEAT_TEXT},
     merge::PRESETS,
+    BASS, DRUMS, INST, VOCAL,
 };
 use slint::Model;
 use std::cell::Cell;
 
-/// A unit's assignment from a selector index (0..3 = CH1..CH4, 4 = MASTER): a channel the layout shows (the first
-/// `decks`) or MASTER, else `None`.
-pub(super) fn assignment(i: i32, decks: usize) -> Option<i32> {
-    (i == 4 || (0..decks.min(DECKS) as i32).contains(&i)).then_some(i)
+/// A unit's assignment from a selector index (0..3 = CH1..CH4, 4 = MASTER, 5 = AUX): a channel the layout shows (the first
+/// `decks`), MASTER, or AUX while the AUX input is enabled (`aux`), else `None`.
+pub(super) fn assignment(i: i32, decks: usize, aux: bool) -> Option<i32> {
+    (i == 4 || (i == 5 && aux) || (0..decks.min(DECKS) as i32).contains(&i)).then_some(i)
 }
 
 /// FX PART SELECT: the stem part a unit's effect is applied to. The selector value is 0 ALL (the whole channel), 1 VOCAL, 2 INST, 3 BASS,

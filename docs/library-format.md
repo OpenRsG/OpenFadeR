@@ -5,7 +5,7 @@ Two things are documented here, so other tools can read and write a collection w
 1. the **open export** (File > Export Collection): a JSON file, a CSV table and an M3U8 playlist;
 2. the **library database** `store.db`, the SQLite file that holds the Collection itself.
 
-The export is the stable interface. The database is documented as it is today (schema version 17); it can only grow:
+The export is the stable interface. The database is documented as it is today (schema version 20); it can only grow:
 migrations append columns and tables, they never rename or reuse one.
 
 ## 1. Open export
@@ -45,7 +45,7 @@ Track (`tracks[]`):
 | `color` | string or null | track colour: Pink, Red, Orange, Yellow, Green, Aqua, Blue, Purple |
 | `tags` | `[[category, tag], …]` | My Tag assignments |
 | `cues` | array | `{"hot_cue": n, "time_ms": ms, "loop_end_ms": ms or null, "color": [r,g,b] or null, "comment": string or null}`; `hot_cue` 0 is a memory cue, 1 and up are hot cues A, B, … |
-| `grid` | `[[time_ms, bpm_x100, bar_pos], …]` | one row per beat; `bar_pos` is 1..=4 |
+| `grid` | `[[time_ms, bpm_x100, bar_pos], …]` | one row per beat; `bar_pos` is 1..=4. `bpm_x100` is the tempo of the beat's own interval, so a grid that changes tempo is a run of rows per tempo section (no separate section table, no migration) |
 | `phrases` | object or null | `{"mood": "High" \| "Mid" \| "Low", "list": [{"beat", "end_beat", "kind", "variant", "fill"}]}`; beats are 1-based grid indexes, `kind` is Intro, Verse, Chorus, Bridge, Outro, Up or Down, `fill` is a beat or null |
 
 Playlist (`playlists[]`, the tree; folders nest through `children`):
@@ -104,6 +104,7 @@ Descriptive edits require an id or file: changing the title or artist of a `meta
 | `date_added` | `YYYY-MM-DD` text; `added_at` the same moment as unix seconds |
 | `size`, `mtime` | the file's size and modification time (s) when last seen |
 | `fingerprint` | hash of the decoded audio, used to find a moved or renamed file; null until computed |
+| `stage` | null: the track is in the Collection; else the `stage.id` it waits in (see [Stages](#stages-inbox--review--collection)). A reader of the Collection lists the rows where it is null. |
 
 Also: `removed(id)` (tracks of a source the user removed), `relocated(orig, path)` (files moved), `analysis_lock(key)`
 (tracks whose analysis the user locked), `taglist(pos, key)` (the Tag List).
@@ -119,7 +120,7 @@ The library overlay applies these fields along with rating and comment, so expor
 are unchanged unless an existing two-way connection writes back the edits.
 `rating` 0..=5. `color` 1..=8 (1 Pink, 2 Red, 3 Orange, 4 Yellow, 5 Green, 6 Aqua, 7 Blue, 8 Purple). `cues_set` is 1 when
 the `cue` rows are the track's complete cue list (it may be empty). `grid` and `grid_orig` (the grid before the first edit)
-are blobs of 8 bytes per beat, little-endian: `time_ms u32, bpm_x100 u16, bar_pos u16`.
+are blobs of 8 bytes per beat, little-endian: `time_ms u32, bpm_x100 u16, bar_pos u16`. A tempo change is just beats whose `bpm_x100` differs; the grid keeps its sections through the store, the cache, the export plan and the library plugins. A plugin without `tempo_changes` (`sdk` `Capabilities`) gets the first beat's tempo from the first beat on instead.
 
 `cue(key, pos, hot, time_ms, loop_end_ms, color, comment)`: `pos` orders the list; `hot` 0 is a memory cue, 1 and up are hot
 cues A, B, …; `color` is `r << 16 | g << 8 | b` or null.
@@ -150,12 +151,44 @@ folder), `path` the source; `mode` 0 import only, 1 two-way; `wins` decides a co
 `source_map(conn, foreign_id, track, sig)`: the source's track id to `collection.id`, `sig` a hash of what the source last said.
 `source_node(conn, foreign_id, node)`: the same for playlists and folders (`node.id`).
 
+### Stages (INBOX → REVIEW → COLLECTION)
+
+Added by schema version 19. New music reaches the Collection in steps. `stage(id, name, pos, role)`: the steps in `pos` order; `name` is the
+user's (renamable); `role` 0 the stage new files arrive in, 1 a stage between, 2 the Collection itself (last). A new store has
+INBOX (0), REVIEW (1) and COLLECTION (2). A track waiting in a stage before the Collection is a `collection` row whose `stage` is
+set; a row with `stage` null is in the Collection (the row of the stage with role 2 stands for those).
+
+`inbox_move(id, track, from_stage, to_stage, from_path, to_path)`: one row per track a move changed; the move batch is the
+journal action the rows were written in (`journal_action.label` "Move 3 tracks to REVIEW"). `from_path` ≠ `to_path` when the file
+was moved too. The change journal restores `collection.stage` and `collection.path`; replaying an undo or a redo also moves the
+files of the step's `inbox_move` rows (undo from `to_path` back to `from_path`, redo the other way), all or none, and fails
+instead of overwriting a file.
+
+`inbox_seen(sig, track)`: files of the watched folders already offered, `sig` = `path|size|mtime(s)`; `track` is the
+`collection.id` a duplicate (same path or same audio `fingerprint`) was linked to instead of being added, else null.
+
 ### Change journal
 
 `journal_action(id, at, label, undone)`: one row per user action (`at` unix seconds, `undone` 1 after undo).
 `journal(seq, action, tbl, op, old, new)`: one row per changed table row; `op` 0 insert, 1 update, 2 delete; `old` and `new` are
 the row as a JSON object (null for the missing side). Undo applies `old`, redo applies `new`; write-back to a connection sends
 what changed after `connection.last_seq`.
+
+### Library health
+
+Added by schema version 18. `health_ignore(check_id, track)`: the check (`missing`, `corrupt`, `not-analysed`, `tags`, `artwork`, `rating`,
+`long`, `not-music`, `duplicate`, `low-bitrate`) no longer lists the `collection.id` `track`; deleting the track deletes its rows. Not
+journaled. `health_failure(track, reason, size, mtime, at)`: the last load or analysis of the track's file failed (`reason` is the decoder's
+message, `at` unix seconds); `size` and `mtime` are the file's at that moment, so the row is dropped when the file has changed since, and
+when the track loads or analyses again.
+
+### Cover art
+
+Added by schema version 20. `artwork(key, path, at)`: the cover kept for an album or a track. `key` is `album:<artist>\x1f<album>` (case and surrounding space ignored) (the
+album's cover: every track of it shows it) or the track key when the track has no album; `path` is the picture, a copy under
+`<data folder>/artwork/`; an empty `path` is a lookup that found nothing, remembered at `at` (unix seconds) for 30 days so a bulk
+fetch does not ask again. A track's own `collection.artwork`, then a folder image beside the file (`cover`, `folder`, `front`,
+with `.jpg`, `.jpeg`, `.png`, `.webp` or `.gif`), are the fallbacks.
 
 ### Devices
 

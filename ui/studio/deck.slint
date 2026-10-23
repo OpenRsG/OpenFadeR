@@ -1,0 +1,32 @@
+import { Theme } from "../theme.slint";
+import { StudioHead } from "deck-head.slint";
+import { StudioFx, StudioMid, StudioPads } from "deck-controls.slint";
+
+/// One side of the studio workspace: the deck panel (`head-h` high) and under it the FX slots, the loop / jog / tempo / transport row
+/// and the pads, which share the rest. Deck `index` takes FX unit `index`; the odd decks are mirrored.
+export component StudioDeck inherits Rectangle {
+    in property <int> index;
+    in property <length> head-h;
+    in property <length> cover;
+    property <length> g: Theme.studio-gap;
+    property <length> fx-h: root.height < 300px ? 40px : 46px;
+    property <length> pads-h: max(76px, min(150px, (root.height - root.head-h - root.fx-h - 4 * root.g) * 0.42));
+    if true: StudioHead { x: 0px; y: 0px; width: root.width; height: root.head-h; index: root.index; cover: root.cover; }
+    if true: Rectangle {
+        x: 0px;
+        y: root.head-h + root.g;
+        width: root.width;
+        height: root.height - root.head-h - root.g;
+        background: Theme.panel;
+        border-radius: Theme.studio-radius;
+        StudioFx { x: root.g; y: root.g; width: parent.width - 2 * root.g; height: root.fx-h; index: root.index; }
+        StudioMid {
+            x: root.g;
+            y: root.g + root.fx-h + root.g;
+            width: parent.width - 2 * root.g;
+            height: parent.height - 4 * root.g - root.fx-h - root.pads-h;
+            index: root.index;
+        }
+        StudioPads { x: root.g; y: parent.height - root.g - root.pads-h; width: parent.width - 2 * root.g; height: root.pads-h; index: root.index; }
+    }
+}

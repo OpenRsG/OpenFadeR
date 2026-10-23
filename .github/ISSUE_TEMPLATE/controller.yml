@@ -1,0 +1,57 @@
+name: Controller problem
+description: A DJ controller does not work, or only partly
+labels: ["controller"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Mapping files live in [OpenFadeR-Map](https://github.com/OpenRsG/OpenFadeR-Map); a fix to a mapping can go there as a pull request. For a crash or a problem that is not about one controller use the Bug report form.
+  - type: input
+    id: controller
+    attributes:
+      label: Controller name
+      description: Make and model, as the system shows it.
+      placeholder: Maker Model
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11, macOS 14, Debian 12, Raspberry Pi OS…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OpenFadeR version
+      description: Help > About OpenFadeR, or Help > Report a Problem.
+    validations:
+      required: true
+  - type: input
+    id: mapping
+    attributes:
+      label: Mapping file
+      description: The file the controller uses (`mappings/*.xml`), or "none" if OpenFadeR says there is no mapping for it, or "my own midi.map".
+    validations:
+      required: true
+  - type: textarea
+    id: what-fails
+    attributes:
+      label: What fails?
+      description: Which controls, and what each does instead of what you expect. Say whether the lights, the jog wheels, the audio interface or the state at connect time are involved.
+    validations:
+      required: true
+  - type: textarea
+    id: midi-monitor
+    attributes:
+      label: MIDI monitor log
+      description: Start OpenFadeR from a terminal with `OPENFADER_MIDI_LOG=1`, press or move the controls that fail, and paste the lines (each shows the message and the action it hit, or `unmapped`). The ports the controller shows are in Help > Report a Problem, under `controller_ports` and `controller_mapping`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Problem report
+      description: Optional. Help > Report a Problem > Copy report, pasted here (paths and passwords are removed).

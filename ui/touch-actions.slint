@@ -8,6 +8,8 @@ import { MidiState } from "midi.slint";
 import { PluginState } from "plugins.slint";
 import { KeysState } from "help.slint";
 import { AboutState } from "about.slint";
+import { ReportState } from "report.slint";
+import { UpdateState } from "update.slint";
 import { WelcomeState } from "welcome.slint";
 import { LayoutState } from "split.slint";
 
@@ -55,6 +57,8 @@ export component TouchActions inherits Rectangle {
         Action { text: @tr("Analysis lock"); action: "track-lock"; }
         Action { text: @tr("Reload tags"); action: "track-reload-tag"; }
         Action { text: @tr("Reload tags (discard edits)"); action: "track-reload-tag-discard"; }
+        Action { text: @tr("Find artwork"); action: "track-artwork"; }
+        Action { text: @tr("Fetch missing artwork"); action: "track-artwork-missing"; }
         Action { text: @tr("Show in file manager"); action: "track-show"; }
         Action { text: @tr("Relocate track"); action: "track-relocate"; }
         Action { text: @tr("Auto relocate"); action: "track-auto-relocate"; }
@@ -77,7 +81,9 @@ export component TouchActions inherits Rectangle {
         for label[i] in PluginState.actions: Chip { text: label; clicked => { PluginState.run(i); } }
         Chip { text: @tr("Keyboard shortcuts"); clicked => { KeysState.help-visible = true; } }
         Chip { text: @tr("Welcome / suggested extensions"); clicked => { WelcomeState.show(); } }
-        Chip { text: @tr("About / updates"); clicked => { AboutState.visible = true; } }
+        Chip { text: @tr("About"); clicked => { AboutState.visible = true; } }
+        Chip { text: @tr("Check for Updates"); clicked => { UpdateState.open(); } }
+        Chip { text: @tr("Report a problem"); clicked => { ReportState.show(); } }
         Action { text: @tr("Exit OpenFadeR"); action: "exit"; }
     }
 }

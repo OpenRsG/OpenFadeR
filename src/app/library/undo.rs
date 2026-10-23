@@ -14,11 +14,10 @@ thread_local! {
 pub(super) fn run(c: &Rc<Ctx>, redo: bool) {
     match if redo { c.store.redo() } else { c.store.undo() } {
         Ok(Some(label)) => {
-            c.reload(None);
             for d in c.decks.iter() {
                 d.reread_edits(&*c.lib);
             }
-            crate::app::trackinfo::reshow(&c.app());
+            crate::app::artwork::changed(c); // reload, jackets and track info
             labels(c);
             c.say(&if redo {
                 tr!("redid {}", label)

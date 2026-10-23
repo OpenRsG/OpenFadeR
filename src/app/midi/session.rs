@@ -93,6 +93,7 @@ impl Midi {
     /// Closes the old session: buttons still held are released, the platter lets go, the lights go dark when the controller is still
     /// there to see it, the ports close.
     pub(super) fn close(&self, controller_present: bool) {
+        self.close_claims();
         (self.dump.set(None), *self.dump_due.borrow_mut() = None);
         let held: Vec<_> = self.held.borrow_mut().drain().collect();
         for (status, d1) in held {
@@ -129,19 +130,32 @@ impl Midi {
         self.layer34_noted.set(false);
         self.snap_at.set(None);
 
-        let ports = port::connect(self.filter.as_deref(), super::wire::wake_input);
+        // The ports a controller plugin drives are its own; the rest are ours.
+        let wake = port::Wake::new(super::wire::wake_input);
+        let claimed = self.open_claims(&wake, &self.names.borrow());
+        let ports = port::connect(self.filter.as_deref(), &claimed, wake);
+        let driven = self.claimed_text(&self.names.borrow());
         state.set_ports(match &ports {
-            Ok(p) if p.names.is_empty() => tr!("no MIDI input ports").into(),
-            Ok(p) => p.names.join(", ").into(),
+            Ok(p) if p.names.is_empty() && driven.is_empty() => tr!("no MIDI input ports").into(),
+            Ok(p) => p
+                .names
+                .iter()
+                .chain(&driven)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+                .into(),
             Err(e) => tr!("MIDI unavailable: {}", e).into(),
         });
         let loaded = self.load_mapping(ports.as_ref().map_or(&[][..], |p| &p.names));
         *self.request.borrow_mut() = loaded.request.clone();
         *self.ports.borrow_mut() = ports.ok();
         *self.leds.borrow_mut() = led::Leds::new(loaded.leds);
-        state.set_controller(loaded.text.into());
+        let plugin = self.claimed_label().filter(|_| loaded.controller.is_none());
+        state.set_controller(plugin.clone().unwrap_or(loaded.text).into());
         state.set_status(loaded.status.join("; ").into());
         state.set_mapped(self.mapped() as i32);
+        crate::app::diag::controller(&self.names.borrow(), loaded.controller.as_deref(), self.file_binds.borrow().len());
         self.restart_lights(loaded.ring_ms.filter(|_| self.out.borrow().is_some()));
 
         // What the user is told: the old controller left, the new one arrived (the same one again = a port change, not news).
@@ -153,10 +167,17 @@ impl Midi {
             }
         }
         let Some(name) = loaded.controller else {
-            state.set_connected("".into());
+            state.set_connected(plugin.unwrap_or_default().into());
             state.set_link("".into());
             // Ports but no mapping: the repositories may have one for them ([`crate::app::catalog`]).
-            catalog::unmapped(self.names.borrow().clone());
+            catalog::unmapped(
+                self.names
+                    .borrow()
+                    .iter()
+                    .filter(|n| !claimed.contains(n))
+                    .cloned()
+                    .collect(),
+            );
             return;
         };
         catalog::mapped();

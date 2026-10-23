@@ -35,6 +35,8 @@ section!(
         doubles_from: DoublesFrom = DoublesFrom::Neighbour;
         /// Multi-thread: the separation uses every core; off = one thread.
         stems_multithread: bool = true;
+        /// STEM FILES: a loaded stem file (`.stem.mp4`) plays its own four parts as the STEMS, instead of separating the mix.
+        stem_files: bool = true;
         /// BEAT LAB: the panel and its toggle in the global bar; the function also needs STEMS.
         groove: bool = false;
         /// The downloaded factory sample pack the Factory Presets come from (empty = none).
@@ -104,6 +106,12 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         )
         .hint(tr!("next track")),
         Row::of("stems_layout", tr!("STEMS LAYOUT"), e.stems_layout),
+        Row::check(
+            "stem_files",
+            tr!("Use the parts of stem files"),
+            e.stem_files,
+        )
+        .hint(tr!("no separation for them")),
         Row::check(
             "layout_active",
             tr!("Custom layout: ACTIVE STEM buttons"),
@@ -234,6 +242,14 @@ mod tests {
         );
         assert!(choose(&mut p, "video", 1) && p.extensions.video);
         assert!(!choose(&mut p, "nope", 1));
+    }
+
+    #[test]
+    fn stem_files_are_used_until_switched_off_and_the_choice_is_kept() {
+        let mut p = Prefs::default();
+        assert!(p.extensions.stem_files, "on by default");
+        assert!(choose(&mut p, "stem_files", 0) && !p.extensions.stem_files);
+        assert_eq!(Prefs::parse(&p.to_text()), (p, vec![]));
     }
 
     #[test]

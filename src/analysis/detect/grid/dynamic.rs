@@ -1,4 +1,4 @@
-//! Tempo-varying grid (Track Analysis Mode Dynamic / Auto): tempo per 8 s window ([`windows`]), beats tracked
+//! Tempo-varying grid (Detect tempo changes = [`super::Mode::Auto`], or Dynamic): tempo per 8 s window ([`windows`]), beats tracked
 //! through those tempi ([`track`]), the beats merged into segments that each carry one tempo ([`segments`]).
 //! Verified on synthetic click tracks only.
 

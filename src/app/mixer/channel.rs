@@ -1,13 +1,11 @@
 //! One channel strip: knobs, EQ / STEM ISO mode, CFX type, fader, CUE and crossfader assignment, pushed to the deck's player.
 
 use super::{
-    auto_db, crossfade_gains, cue_gain, curve, gain, map, side_gain, App, Mixer, MixerState, DECKS,
+    auto_db, crossfade_gains, cue_gain, curve, gain, map, side_gain, App, Mixer, MixerState,
+    AUX_CH, DECKS,
 };
-use crate::app::{ChannelView, prefs::controller::EqType};
-use openfader::audio::{
-    cfx::{self, Kind},
-    EQ_KILL_DB,
-};
+use crate::app::{prefs::controller::EqType, ChannelView};
+use openfader::audio::cfx::{self, Kind};
 use slint::{ComponentHandle, Model};
 
 /// The STEM mode puts INST on the HIGH knob and VOCAL on MID (top to bottom: INST, VOCAL, DRUMS), the player's gains
@@ -21,11 +19,10 @@ fn swap_vocal_inst(v: [f32; 3]) -> [f32; 3] {
 }
 
 /// The EQ the player runs, `[low, mid, high]` in dB, from the EQ knobs alone: STEM ISO only changes what the HIGH / MID / LOW
-/// knobs show, so a band the DJ cut stays cut and the stem levels apply on top. `low_cut` is the AUTO LOW CUT kill.
-fn eq_dbs(row: &ChannelView, eq: EqType, low_cut: bool) -> [f32; 3] {
+/// knobs show, so a band the DJ cut stays cut and the stem levels apply on top.
+pub(super) fn eq_dbs(row: &ChannelView, eq: EqType) -> [f32; 3] {
     let db = |band| map::eq_db(row.knobs.row_data(band).unwrap_or(map::CENTRE), eq);
-    let low = if low_cut { EQ_KILL_DB } else { db(map::LOW) };
-    [low, db(map::MID), db(map::HI)]
+    [db(map::LOW), db(map::MID), db(map::HI)]
 }
 
 /// Knob `knob` of channel `ch` as the strip shows it, 0..1: in STEM mode HI / MID / LOW show the ISO gains ([`Mixer::set_knob`]).
@@ -74,8 +71,12 @@ impl Mixer {
         } else {
             let v = map::snap(v);
             row.knobs.set_row_data(knob, v);
-            row.readouts
-                .set_row_data(knob, self.readout(knob, v).into());
+            let text = if ch == AUX_CH {
+                map::readout(Kind::Filter, self.cfg.get().eq, knob, v) // the AUX FILTER knob is no COLOR FX
+            } else {
+                self.readout(knob, v)
+            };
+            row.readouts.set_row_data(knob, text.into());
         }
         self.apply(ch);
     }
@@ -121,16 +122,15 @@ impl Mixer {
 
     /// Pushes channel `ch`'s knobs, fader, CUE and crossfade side to its player.
     pub(super) fn apply(&self, ch: usize) {
+        if ch == AUX_CH {
+            return self.apply_aux();
+        }
         let row = self.row(ch);
         let cfg = self.cfg.get();
         let k = |i| row.knobs.row_data(i).unwrap_or(map::CENTRE);
-        let (side, low_cut, held) = self.app.upgrade().map_or((1.0, false, false), |a| {
+        let (side, held) = self.app.upgrade().map_or((1.0, false), |a| {
             let s = a.global::<MixerState>();
-            (
-                side_gain(row.xf, crossfade_gains(&s)),
-                (s.get_auto_low_cut() >> ch) & 1 == 1,
-                s.get_release_held(),
-            )
+            (side_gain(row.xf, crossfade_gains(&s)), s.get_release_held())
         });
         self.release.set(held);
         let auto = auto_db(cfg.auto_gain, self.decks[ch].auto_gain_db());
@@ -158,7 +158,7 @@ impl Mixer {
             p.fader().set_index(index);
             p.fader().set_knob(row.fader);
             p.set_cue_gain(cue_gain(trim_db, row.cue));
-            let [low, mid, high] = eq_dbs(&row, cfg.eq, low_cut);
+            let [low, mid, high] = eq_dbs(&row, cfg.eq);
             p.set_eq(low, mid, high);
             p.cfx().set_index(sel);
             p.cfx().set_knob(cfx);
@@ -229,6 +229,7 @@ impl Mixer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use openfader::audio::EQ_KILL_DB;
 
     #[test]
     fn knobs_top_to_bottom_are_inst_vocal_drums_and_the_player_gets_vocal_inst_drums() {
@@ -251,19 +252,11 @@ mod tests {
             ..Default::default()
         }; // LOW killed
         let eq = EqType::Isolator;
-        let in_eq = eq_dbs(&row, eq, false);
+        let in_eq = eq_dbs(&row, eq);
         assert_eq!(in_eq, [EQ_KILL_DB, 0.0, 0.0]);
         row.iso = true;
-        assert_eq!(
-            eq_dbs(&row, eq, false),
-            in_eq,
-            "STEM ISO leaves the band cut"
-        );
+        assert_eq!(eq_dbs(&row, eq), in_eq, "STEM ISO leaves the band cut");
         row.iso = false;
-        assert_eq!(
-            eq_dbs(&row, eq, false),
-            in_eq,
-            "and back to EQ shows the same"
-        );
+        assert_eq!(eq_dbs(&row, eq), in_eq, "and back to EQ shows the same");
     }
 }

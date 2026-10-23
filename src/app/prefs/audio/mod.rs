@@ -32,11 +32,12 @@ pub use page::rows;
 
 use super::{Prefs, choice, section};
 use openfader::audio::{
-    self, Status,
-    device::{self, Caps, card},
+    self,
+    device::{self, card, Caps},
     metronome::TONES,
     mic,
     route::{self, Mixer, Settings},
+    Status,
 };
 use std::{cell::RefCell, rc::Rc};
 
@@ -93,6 +94,13 @@ section!(
         mic_level: i32 = 0;
         talkover_mode: TalkMode = TalkMode::Advanced;
         talkover_level: i32 = -18;
+        /// AUX input: the AUX strip shows in the mixer (its ON opens the input), the input device (empty = the one above) and pair,
+        /// the talkover-style ducking of the decks in dB (0 = off) and their release in ms.
+        aux_on: bool = false;
+        aux_device: String = String::new();
+        aux_pair: u8 = 1;
+        aux_duck: i32 = 0;
+        aux_release: u32 = 400;
     }
 );
 
@@ -103,6 +111,8 @@ const BOOTH_DB: [i32; 7] = [-12, -9, -6, -3, 0, 3, 6];
 /// Mic level steps and talkover levels (the DJM list, 0 = off), dB.
 const MIC_DB: [i32; 8] = [-24, -18, -12, -6, -3, 0, 3, 6];
 const TALK_DB: [i32; 5] = [0, -6, -12, -18, -24];
+/// Release times of the AUX ducking, ms.
+const AUX_RELEASE_MS: [u32; 5] = [200, 400, 800, 1500, 3000];
 /// Metronome volume step, percent.
 const VOLUME_STEP: u8 = 10;
 /// Most output/input pairs offered (cpal reports at most 32 channels).
@@ -186,6 +196,8 @@ impl Audio {
             } else {
                 1.0
             },
+            aux_duck: db_gain(self.aux_duck),
+            aux_release: self.aux_release as f32 / 1000.0,
         }
     }
 
@@ -193,6 +205,14 @@ impl Audio {
     /// and record its `tap()` (`Recorder::start`).
     pub fn rec_input(&self) -> bool {
         self.rec_source == RecSource::Input
+    }
+
+    /// The AUX strip's input: the device (the INPUT DEVICE when no other is picked) and the pair.
+    pub fn aux_source(&self) -> (&str, u8) {
+        match self.aux_device.as_str() {
+            "" => (&self.input_device, self.aux_pair),
+            d => (d, self.aux_pair),
+        }
     }
 }
 
@@ -286,6 +306,14 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
         "mic_pair" => a.mic_pair = (i + 1).min(MAX_PAIRS) as u8,
         "mic_level" => a.mic_level = MIC_DB[i.min(MIC_DB.len() - 1)],
         "talkover_level" => a.talkover_level = TALK_DB[i.min(TALK_DB.len() - 1)],
+        "aux_device" => {
+            if let Some((_, n)) = aux_choices(a).get(i) {
+                a.aux_device = n.clone();
+            }
+        }
+        "aux_pair" => a.aux_pair = (i + 1).min(MAX_PAIRS) as u8,
+        "aux_duck" => a.aux_duck = TALK_DB[i.min(TALK_DB.len() - 1)],
+        "aux_release" => a.aux_release = AUX_RELEASE_MS[i.min(AUX_RELEASE_MS.len() - 1)],
         _ => match key
             .strip_prefix("ext_")
             .and_then(|k| k.parse::<usize>().ok())
@@ -296,6 +324,17 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
         },
     }
     true
+}
+
+/// The AUX device drop-down: "same as the input device" (empty name), then every input device that is not the system default.
+fn aux_choices(a: &Audio) -> Vec<(String, String)> {
+    let mut out = vec![(tr!("SAME AS INPUT DEVICE").to_owned(), String::new())];
+    out.extend(
+        card::choices(&device::cards(true, a.output_show_all, &a.aux_device))
+            .into_iter()
+            .filter(|(_, n)| !n.is_empty()),
+    );
+    out
 }
 
 /// Hands the settings to the audio engine now and after every change ([`audio::configure`]: live knobs at once, the device /

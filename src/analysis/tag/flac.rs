@@ -6,13 +6,13 @@
 const COMMENT: u8 = 4;
 const FIELD: &str = "INITIALKEY";
 
-struct Block {
-    ty: u8,
-    data: std::ops::Range<usize>,
+pub(super) struct Block {
+    pub(super) ty: u8,
+    pub(super) data: std::ops::Range<usize>,
 }
 
 /// The metadata blocks and where the audio starts.
-fn blocks(b: &[u8]) -> Result<(Vec<Block>, usize), String> {
+pub(super) fn blocks(b: &[u8]) -> Result<(Vec<Block>, usize), String> {
     if b.get(..4) != Some(b"fLaC") {
         return Err("not a FLAC file".into());
     }
@@ -93,6 +93,11 @@ pub(super) fn write(b: &[u8], key: &str) -> Result<Vec<u8>, String> {
         Some(i) => parts[i].1 = &data,
         None => parts.insert(1, (COMMENT, &data)),
     }
+    Ok(assemble(b, audio, &parts))
+}
+
+/// `fLaC`, the metadata blocks `parts` (the last one flagged), and the audio that starts at `audio` in `b`.
+fn assemble(b: &[u8], audio: usize, parts: &[(u8, &[u8])]) -> Vec<u8> {
     let mut out = b"fLaC".to_vec();
     for (i, (ty, d)) in parts.iter().enumerate() {
         let last = if i + 1 == parts.len() { 0x80 } else { 0 };
@@ -101,7 +106,39 @@ pub(super) fn write(b: &[u8], key: &str) -> Result<Vec<u8>, String> {
         out.extend_from_slice(d);
     }
     out.extend_from_slice(&b[audio..]);
-    Ok(out)
+    out
+}
+
+/// The `PICTURE` block type and the picture type "front cover" it starts with.
+const PICTURE: u8 = 6;
+const FRONT_COVER: [u8; 4] = 3u32.to_be_bytes();
+
+/// `b` with `picture` as its front cover: the front cover it had is replaced, every other block and picture stays, and the
+/// new block goes after the others. A `PICTURE` block is: picture type, media type, empty description, width, height,
+/// depth and colours (0 = unknown), then the picture; every number a big-endian u32.
+pub(super) fn write_picture(b: &[u8], picture: &[u8], mime: &str) -> Result<Vec<u8>, String> {
+    let (blocks, audio) = blocks(b)?;
+    let len = |n: usize| (n as u32).to_be_bytes();
+    let data = [
+        &FRONT_COVER[..],
+        &len(mime.len()),
+        mime.as_bytes(),
+        &len(0),
+        &[0; 16],
+        &len(picture.len()),
+        picture,
+    ]
+    .concat();
+    if data.len() >= 1 << 24 {
+        return Err("the picture is too big for a FLAC metadata block".into());
+    }
+    let mut parts: Vec<(u8, &[u8])> = blocks
+        .iter()
+        .map(|x| (x.ty, &b[x.data.clone()]))
+        .filter(|(ty, d)| !(*ty == PICTURE && d.starts_with(&FRONT_COVER)))
+        .collect();
+    parts.push((PICTURE, &data));
+    Ok(assemble(b, audio, &parts))
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 import { Chip, Glyph, Icon, IconButton, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DialogFrame, Note } from "dialog.slint";
+import { LibraryState } from "library.slint";
 
 /// Details of the selected track. Rust fills it through this global (src/app/trackinfo.rs).
 export global TrackInfoState {
@@ -18,6 +19,8 @@ export global TrackInfoState {
     in-out property <string> comment;
     /// "Phrases: High · 9" (mood, sections), empty when the track has no phrase analysis.
     in property <string> phrases;
+    /// "Stem file: Drums · Bass · Melody · Vocals" for a stem file, else empty.
+    in property <string> stems;
     /// "detected 125.00 BPM (library 128.00) · detected 9A (library 8A)": what our own analysis found where it differs from
     /// the library; empty when it agrees or nothing was analysed.
     in property <string> detected;
@@ -88,6 +91,8 @@ export component TrackInfo inherits Rectangle {
                 border-width: 1px;
                 border-color: Theme.line;
                 if TrackInfoState.has-cover: Image {
+                    width: parent.width;
+                    height: parent.height;
                     source: TrackInfoState.cover;
                     image-fit: contain;
                 }
@@ -105,6 +110,11 @@ export component TrackInfo inherits Rectangle {
         Text { text: TrackInfoState.details; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; max-height: 28px; overflow: elide; }
         if TrackInfoState.detected != "": Text { text: TrackInfoState.detected; color: Theme.cue; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; max-height: 28px; overflow: elide; }
         if TrackInfoState.phrases != "": Line { text: TrackInfoState.phrases; }
+        if TrackInfoState.stems != "": Line { text: TrackInfoState.stems; }
+        HorizontalLayout {
+            alignment: start;
+            Chip { text: @tr("FIND ARTWORK"); min-width: self.fit-width; tooltip: @tr("Look the cover up online"); clicked => { LibraryState.action("track-artwork"); } }
+        }
         if !root.expanded: HorizontalLayout {
             alignment: start;
             spacing: 1px;

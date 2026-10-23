@@ -89,6 +89,7 @@ export component TrackTable inherits Rectangle {
     property <bool> wide: root.width >= 900px;
     property <length> w-strip: 110px;
     property <length> w-lead: 30px;
+    property <length> w-art: 22px;
     property <length> w-preview: root.width >= 720px ? root.w-strip + 2px : 0px;
     property <length> w-artist: Math.max(PaneState.min-col, 130px + PaneState.col-artist-d);
     property <length> w-genre: root.wide ? Math.max(PaneState.min-col, 90px + PaneState.col-genre-d) : 0px;
@@ -98,8 +99,9 @@ export component TrackTable inherits Rectangle {
     property <length> w-time: Math.max(PaneState.min-col, 50px + PaneState.col-time-d);
     property <length> w-key: Math.max(PaneState.min-col, 52px + PaneState.col-key-d);
     property <length> w-scroll: 14px;
-    property <length> w-title: max(PaneState.min-title, root.width - root.w-scroll - root.w-lead - root.w-preview - root.w-artist - root.w-genre - root.w-comment - root.w-bpm - root.w-rating - root.w-time - root.w-key);
-    property <length> x-preview: root.w-lead;
+    property <length> w-title: max(PaneState.min-title, root.width - root.w-scroll - root.w-lead - root.w-art - root.w-preview - root.w-artist - root.w-genre - root.w-comment - root.w-bpm - root.w-rating - root.w-time - root.w-key);
+    property <length> x-art: root.w-lead;
+    property <length> x-preview: root.x-art + root.w-art;
     property <length> x-title: root.x-preview + root.w-preview;
     property <length> x-artist: root.x-title + root.w-title;
     property <length> x-genre: root.x-artist + root.w-artist;
@@ -112,7 +114,7 @@ export component TrackTable inherits Rectangle {
     property <length> menu-y;
     property <bool> list-view: BrowserState.tag-view || BrowserState.user-view;
     /// Rows of the right-click menu (the library entries come last).
-    property <int> menu-rows: (root.list-view ? 8 : 5) + 8 + (BrowserState.palette-enabled ? 3 : 0);
+    property <int> menu-rows: (root.list-view ? 8 : 5) + 10 + (BrowserState.palette-enabled ? 3 : 0);
     function place-menu(x: length, y: length) {
         root.menu-x = min(x, root.width - 190px);
         root.menu-y = min(y, max(0px, root.height - root.menu-rows * Theme.h-row - 4px));
@@ -164,14 +166,28 @@ export component TrackTable inherits Rectangle {
                     property <string> hints: cells[9].text;
                     property <int> preview-generation: BrowserState.preview-generation;
                     property <bool> preview-enabled: root.w-preview > 0px;
+                    property <int> cover-generation: BrowserState.cover-generation;
                     changed preview-generation => { if (self.preview-enabled) { BrowserState.preview-wanted(i); } }
                     changed preview-enabled => { if (self.preview-enabled) { BrowserState.preview-wanted(i); } }
+                    changed cover-generation => { BrowserState.cover-wanted(i); }
                     /// The track is the one a deck has loaded (its row wears `row-loaded`).
                     property <bool> on-deck: cells[0].text != "" && (DeckState.decks[0].title == cells[0].text || DeckState.decks[1].title == cells[0].text || DeckState.decks[2].title == cells[0].text || DeckState.decks[3].title == cells[0].text);
                     background: current ? Theme.select : (row-ta.has-hover ? Theme.hover-row : (Math.mod(i, 2) == 0 ? Theme.bg-deep : Theme.row-alt));
                     Cell { x: 0; width: root.w-lead - Theme.space-md; text: "\{i + 1}"; right: true; color: Theme.text-faint; }
+                    Image { x: root.x-art; y: 2px; width: 18px; height: 18px; source: BrowserState.covers[i]; image-fit: cover; }
                     if root.w-preview > 0px: Image { x: root.x-preview + 1px; y: (parent.height - self.height) / 2; width: root.w-strip; height: 20px; source: BrowserState.previews[i]; image-fit: fill; }
-                    Cell { x: root.x-title; width: root.w-title - Theme.space-md; text: cells[0].text; color: on-deck ? Theme.row-loaded : cells[10].text == "1" ? Theme.text-dim : Theme.text-bright; }
+                    Cell { x: root.x-title; width: root.w-title - Theme.space-md - (cells[11].text == "1" ? 40px : 0px); text: cells[0].text; color: on-deck ? Theme.row-loaded : cells[10].text == "1" ? Theme.text-dim : Theme.text-bright; }
+                    // A stem file (four parts besides the mix): a badge at the end of the title.
+                    if cells[11].text == "1": Rectangle {
+                        x: root.x-title + root.w-title - 38px - Theme.space-md;
+                        y: (parent.height - self.height) / 2;
+                        width: 36px;
+                        height: 13px;
+                        border-width: 1px;
+                        border-color: Theme.stem-inst;
+                        border-radius: Theme.radius;
+                        Text { text: @tr("STEMS"); color: Theme.stem-inst; font-family: Theme.font; font-size: 9px; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+                    }
                     Cell { x: root.x-artist; width: root.w-artist - Theme.space-md; text: cells[1].text; color: on-deck ? Theme.row-loaded : Theme.row-dim; }
                     if root.wide: Cell { x: root.x-genre; width: root.w-genre - Theme.space-md; text: cells[2].text; color: on-deck ? Theme.row-loaded : Theme.row-dim; }
                     if root.wide: Cell { x: root.x-comment; width: root.w-comment - Theme.space-md; text: cells[7].text; color: on-deck ? Theme.row-loaded : Theme.row-dim; }
@@ -212,7 +228,7 @@ export component TrackTable inherits Rectangle {
                         mouse-cursor: MouseCursor.pointer;
                         clicked => { root.focused(); fs.focus(); root.choose(i); BrowserState.preview-seek(i, self.mouse-x / self.width); }
                     }
-                    init => { if (root.w-preview > 0px) { BrowserState.preview-wanted(i); } }
+                    init => { BrowserState.cover-wanted(i); if (root.w-preview > 0px) { BrowserState.preview-wanted(i); } }
                 }
             }
         }
@@ -258,6 +274,8 @@ export component TrackTable inherits Rectangle {
                 MenuItem { text: @tr("Analysis lock"); activated => { LibraryState.action("track-lock"); menu.close(); } }
                 MenuItem { text: @tr("Reload tag"); activated => { LibraryState.action("track-reload-tag"); menu.close(); } }
                 MenuItem { text: @tr("Reload tag (discard edits)"); activated => { LibraryState.action("track-reload-tag-discard"); menu.close(); } }
+                MenuItem { text: @tr("Find artwork…"); activated => { LibraryState.action("track-artwork"); menu.close(); } }
+                MenuItem { text: @tr("Fetch missing artwork"); activated => { LibraryState.action("track-artwork-missing"); menu.close(); } }
                 MenuItem { text: @tr("Show in file manager"); activated => { LibraryState.action("track-show"); menu.close(); } }
                 MenuItem { text: @tr("Relocate…"); activated => { LibraryState.action("track-relocate"); menu.close(); } }
                 MenuItem { text: @tr("Auto relocate"); activated => { LibraryState.action("track-auto-relocate"); menu.close(); } }

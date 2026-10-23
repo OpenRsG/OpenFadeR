@@ -104,7 +104,16 @@ pub fn natives(m: &Manifest) -> Vec<String> {
         .as_ref()
         .and_then(|l| l.lib.file())
         .map(str::to_owned);
-    effects.into_iter().chain(library).collect()
+    let controller = m
+        .controller
+        .as_ref()
+        .and_then(|c| c.lib.file())
+        .map(str::to_owned);
+    effects
+        .into_iter()
+        .chain(library)
+        .chain(controller)
+        .collect()
 }
 
 /// Lays the plugin out in `to`: its folder of the repository zip, and the native libraries the zip lacks from the release asset.

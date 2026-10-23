@@ -6,9 +6,11 @@ import { AutomixState, BrowserState } from "browser-state.slint";
 import { DeviceState } from "device-state.slint";
 import { LibraryState } from "library.slint";
 import { TrackInfo, TrackInfoEditor, TrackInfoState } from "trackinfo.slint";
+import { ArtworkPicker, ArtworkState } from "artwork.slint";
 import { TrackTable } from "browser-table.slint";
 import { PickerPanel, SmartEditor, TreeView } from "browser-tree.slint";
 import { Palette } from "browser-palette.slint";
+import { AutomixPanel } from "automix-panel.slint";
 import { SuggestBar } from "browser-suggest.slint";
 export { AutomixState, BrowserState }
 
@@ -181,11 +183,11 @@ export component Browser inherits Rectangle {
             HorizontalLayout {
                 spacing: Theme.gap;
                 vertical-stretch: 0;
-                property <bool> editable: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || (BrowserState.side-kind >= 6 && BrowserState.side-kind <= 7) || BrowserState.side-kind == 14;
-                Chip { text: @tr("NEW"); font-size: Theme.font-xs; tooltip: @tr("New playlist / folder / smart playlist / Tags / Cue Bank"); enabled: (BrowserState.side-kind >= 1 && BrowserState.side-kind <= 7) || BrowserState.side-kind >= 13; clicked => { BrowserState.panel-request(3); } }
+                property <bool> editable: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || (BrowserState.side-kind >= 6 && BrowserState.side-kind <= 7) || BrowserState.side-kind == 14 || BrowserState.side-kind == 16;
+                Chip { text: @tr("NEW"); font-size: Theme.font-xs; tooltip: @tr("New playlist / folder / smart playlist / Tags / Cue Bank / Stage"); enabled: (BrowserState.side-kind >= 1 && BrowserState.side-kind <= 7) || BrowserState.side-kind >= 13; clicked => { BrowserState.panel-request(3); } }
                 Chip { text: @tr("RENAME"); font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-rename(); } }
                 Chip { text: @tr("DELETE"); font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-delete(); } }
-                Chip { text: @tr("MORE"); font-size: Theme.font-xs; tooltip: @tr("Edit smart playlist, move; Cue Bank: add cues, load onto a deck"); enabled: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || BrowserState.side-kind == 14; clicked => { BrowserState.panel-request(4); } }
+                Chip { text: @tr("MORE"); font-size: Theme.font-xs; tooltip: @tr("Edit smart playlist, move; Cue Bank: add cues, load onto a deck; Stage: move tracks, recent moves"); enabled: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || BrowserState.side-kind == 14 || BrowserState.side-kind == 15 || BrowserState.side-kind == 16; clicked => { BrowserState.panel-request(4); } }
             }
             // Shrinks (clipped) with the browser instead of forcing it taller than the window allows.
             if !root.dock && !root.touch: TrackInfo { min-height: 0px; preferred-height: root.info-h; max-height: root.info-h; clip: true; vertical-stretch: 0; }
@@ -215,8 +217,9 @@ export component Browser inherits Rectangle {
                     Rectangle { }
                     Chip { text: @tr("AUTOMIX"); width: 66px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: AutomixState.running; clicked => { AutomixState.toggled(); } }
                     Chip {
-                        text: @tr("{} BARS", AutomixState.bars); width: 58px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0;
-                        clicked => { AutomixState.bars = AutomixState.bars == 8 ? 16 : (AutomixState.bars == 16 ? 32 : 8); }
+                        text: AutomixState.styles[AutomixState.style]; width: 96px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0;
+                        tooltip: @tr("Transition style and length"); active: AutomixState.panel-open;
+                        clicked => { AutomixState.panel-open = !AutomixState.panel-open; }
                     }
                     Chip { text: @tr("SKIP"); width: 44px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; enabled: AutomixState.running; clicked => { AutomixState.skip(); } }
                     Chip { text: @tr("EXPORT"); width: 64px; height: Theme.h-ctl-sm; y: (parent.height - self.height) / 2; horizontal-stretch: 0; clicked => { BrowserState.export-collection(); } }
@@ -301,6 +304,34 @@ export component Browser inherits Rectangle {
                     Chip { text: @tr("CANCEL"); width: 64px; horizontal-stretch: 0; clicked => { BrowserState.name-done(false); } }
                 }
             }
+            // Library health: what fixes the problem the chosen check lists. ANALYSE, RELOCATE, EDIT TAGS and REMOVE are the Track menu's
+            // actions on the chosen row, the ALL chips act on every listed track; IGNORE hides a track from this check, SHOW IGNORED lists them.
+            if BrowserState.health-view: Rectangle {
+                height: Theme.h-ctl + Theme.space-sm;
+                background: Theme.panel;
+                Flickable {
+                    content-width: max(self.width, 960px);
+                    content-height: self.height;
+                HorizontalLayout {
+                    width: parent.content-width; height: parent.height;
+                    padding-left: Theme.space-lg;
+                    padding-right: Theme.space-md;
+                    padding-bottom: Theme.space-sm;
+                    spacing: Theme.space-sm;
+                    Chip { text: @tr("ANALYSE"); width: 72px; horizontal-stretch: 0; tooltip: @tr("Analyse the chosen track"); clicked => { LibraryState.action("track-analyze"); } }
+                    Chip { text: @tr("ANALYSE ALL"); width: 100px; horizontal-stretch: 0; tooltip: @tr("Analyse every listed track"); clicked => { LibraryState.action("health-analyze-all"); } }
+                    Chip { text: @tr("RELOCATE"); width: 78px; horizontal-stretch: 0; tooltip: @tr("Point the chosen track at its file"); clicked => { LibraryState.action("track-relocate"); } }
+                    Chip { text: @tr("AUTO RELOCATE ALL"); width: 136px; horizontal-stretch: 0; tooltip: @tr("Search the music folders for every listed track"); clicked => { LibraryState.action("health-relocate-all"); } }
+                    Chip { text: @tr("EDIT TAGS"); width: 82px; horizontal-stretch: 0; tooltip: @tr("Edit the chosen track's tags"); clicked => { LibraryState.action("track-edit"); } }
+                    Chip { text: @tr("REMOVE"); width: 68px; horizontal-stretch: 0; tooltip: @tr("Remove the chosen track from the Collection"); clicked => { LibraryState.action("track-remove"); } }
+                    Chip { text: BrowserState.health-ignored ? @tr("UN-IGNORE") : @tr("IGNORE"); width: 92px; horizontal-stretch: 0; tooltip: @tr("Hide the chosen track from this check, or list it again"); clicked => { BrowserState.health-act("ignore"); } }
+                    Chip { text: BrowserState.health-ignored ? @tr("UN-IGNORE ALL") : @tr("IGNORE ALL"); width: 116px; horizontal-stretch: 0; tooltip: @tr("The same for every listed track"); clicked => { BrowserState.health-act("ignore-all"); } }
+                    Chip { text: @tr("SHOW IGNORED"); width: 110px; horizontal-stretch: 0; active: BrowserState.health-ignored; tooltip: @tr("List the tracks ignored for this check"); clicked => { BrowserState.health-act("ignored"); } }
+                    Chip { text: @tr("RESCAN"); width: 66px; horizontal-stretch: 0; tooltip: @tr("Look at every file again"); clicked => { BrowserState.health-act("rescan"); } }
+                    Rectangle { }
+                }
+                }
+            }
             Rectangle {
                 vertical-stretch: 1;
                 min-height: 0px;
@@ -319,6 +350,11 @@ export component Browser inherits Rectangle {
                 if BrowserState.panel-open: PickerPanel {
                     x: parent.width - self.width;
                     width: min(320px, parent.width);
+                    height: min(parent.height, 300px);
+                }
+                if AutomixState.panel-open: AutomixPanel {
+                    x: parent.width - self.width;
+                    width: min(460px, parent.width);
                     height: min(parent.height, 300px);
                 }
                 if BrowserState.editor-open: SmartEditor { width: parent.width; height: parent.height; }
@@ -426,4 +462,5 @@ export component Browser inherits Rectangle {
         }
     }
     if TrackInfoState.editor-open && (!root.touch || root.detached): TrackInfoEditor {}
+    if ArtworkState.open && (!root.touch || root.detached): ArtworkPicker {}
 }

@@ -2,7 +2,7 @@
 //! and bass swap, the tempo glide and the status line.
 
 use super::{Automix, Run, Stage, next_deck, plan};
-use crate::app::{App, AutomixState, BrowserState, MixerState, deck::active};
+use crate::app::{App, AutomixState, BrowserState, MixerState, deck};
 use slint::ComponentHandle;
 
 /// Tempo ratio moved per tick while gliding back to 1.0 (a 10 % offset takes 4 s).
@@ -20,33 +20,32 @@ impl Automix {
             .unwrap_or_default()
     }
 
-    /// Crossfader, auto-fade flag and bass swap for fade progress `x` towards deck `inc`.
-    fn drive(app: &App, out: usize, inc: usize, x: f64) {
-        let m = plan::mix_at(x);
+    /// Crossfader travel towards the incoming deck, constant power.
+    fn drive(app: &App, _out: usize, inc: usize, x: f64) {
         let s = app.global::<MixerState>();
         let pos = if inc % 2 == 1 {
-            m.travel
+            x as f32
         } else {
-            1.0 - m.travel
+            1.0 - x as f32
         };
         s.set_auto_fade(true);
-        s.set_auto_low_cut(i32::from(m.low_cut_in) << inc | i32::from(m.low_cut_out) << out);
         s.set_crossfader(pos);
-        s.invoke_crossfade(pos); // the mixer re-applies every channel
+        s.invoke_crossfade(pos);
     }
 
-    /// Hands the crossfader and EQ back to the user's own settings.
     pub(super) fn release(app: &App) {
         let s = app.global::<MixerState>();
         s.set_auto_fade(false);
-        s.set_auto_low_cut(0);
         s.invoke_crossfade(s.get_crossfader());
     }
 
     /// The incoming deck takes over completely: crossfader on it, the outgoing deck pauses.
-    pub(super) fn finish(&self, app: &App, out: usize, inc: usize) -> Stage {
+    pub(super) fn finish(&self, run: &mut Run, app: &App, out: usize, inc: usize) -> Stage {
         self.decks[out].with_player(|p| p.pause());
         Self::drive(app, out, inc, 1.0);
+        if let Some(f) = run.fade.take() {
+            f.end();
+        }
         Self::release(app);
         self.glide.set(Some((inc, self.decks[inc].rate())));
         Stage::OnAir { cur: Some(inc) }
@@ -80,12 +79,17 @@ impl Automix {
         let (a, b) = (&self.decks[cur], &self.decks[inc]);
         let ra = a.rate();
         let (pos, ..) = self.pos(cur);
-        let bars = app.global::<AutomixState>().get_bars().max(1) as u32;
+        let recipe = &super::style::all()[super::style::chosen(run)];
+        let bars = recipe
+            .bars
+            .unwrap_or(app.global::<AutomixState>().get_bars().max(1) as u32);
+        let rushed = asap || run.asap;
         let plan = a.with_analysis(|aa, dur| {
-            b.with_analysis(|ba, _| plan::plan(aa, dur, ba, bars, pos, asap || run.asap))
+            b.with_analysis(|ba, _| plan::plan(aa, dur, ba, bars, pos, rushed))
         });
+        run.rushed = rushed;
         run.asap = false;
-        let rb = self.tempo_for(cur, inc).unwrap_or(1.0);
+        let rb = self.tempo_for(cur, inc, pos).unwrap_or(1.0);
         b.set_rate(rb);
         if let Some(p) = plan {
             b.with_player(|pl| pl.seek(p.in_ms.max(0.0) as u32));
@@ -123,10 +127,16 @@ impl Automix {
         (!grids && self.grids(cur, inc)).then(|| self.arm(run, app, cur, inc, serial, false))
     }
 
-    fn tempo_for(&self, cur: usize, inc: usize) -> Option<f64> {
+    /// Playback rate for `inc` to match `cur`'s tempo at its playhead (`pos`), `inc`'s at its mix-in anchor.
+    fn tempo_for(&self, cur: usize, inc: usize, pos: f64) -> Option<f64> {
         let ra = self.decks[cur].rate();
         self.decks[cur].with_analysis(|aa, _| {
-            self.decks[inc].with_analysis(|ba, _| plan::rate_for(&aa.beats, ra, &ba.beats))
+            self.decks[inc].with_analysis(|ba, _| {
+                let out_bpm = deck::tempo_at(&aa.beats, pos)?;
+                let anchor = plan::anchor(ba).unwrap_or(0.0);
+                let inc_bpm = deck::tempo_at(&ba.beats, anchor)?;
+                plan::rate_for(out_bpm, ra, inc_bpm)
+            })
         })
     }
 
@@ -138,6 +148,9 @@ impl Automix {
             let mut guard = self.run.borrow_mut();
             let Some(run) = guard.as_mut() else { return };
             let stopped = self.step(&app, run);
+            if run.plan_at != Some(run.next) {
+                super::style::show(&app, run);
+            }
             if stopped.is_none() {
                 app.global::<AutomixState>()
                     .set_status(self.describe(run).into());
@@ -154,7 +167,7 @@ impl Automix {
         self.glide_step(&run.stage);
         match run.stage {
             Stage::OnAir { cur } => {
-                let inc = next_deck(cur, active(), |d| self.decks[d].playing());
+                let inc = next_deck(cur, deck::active(), |d| self.decks[d].playing());
                 if run.next >= run.queue.len() {
                     let ended = cur.is_none_or(|c| {
                         let (pos, playing, dur) = self.pos(c);
@@ -166,6 +179,7 @@ impl Automix {
                     return None; // played by hand: wait until it is free
                 }
                 self.decks[inc].load(&run.queue[run.next], &*self.lib);
+                run.rushed = false;
                 run.next += 1;
                 let serial = self.decks[inc].serial().unwrap_or(0);
                 run.stage = Stage::Loading { cur, inc, serial };
@@ -214,17 +228,18 @@ impl Automix {
                 }
                 let (pos, playing, dur) = self.pos(cur);
                 let ra_now = self.decks[cur].rate();
-                if (ra_now - ra).abs() > 1e-6 {
-                    // the playing deck's tempo moved: follow it (plan times are on the outgoing track's own timeline)
-                    let rb = self.tempo_for(cur, inc).unwrap_or(1.0);
-                    self.decks[inc].set_rate(rb);
+                let rb_now = self.tempo_for(cur, inc, pos).unwrap_or(rb);
+                if (ra_now - ra).abs() > 1e-6 || (rb_now - rb).abs() > 1e-6 {
+                    // the outgoing deck's tempo moved (its rate fader, or a grid section change): follow it (plan times
+                    // are on the outgoing track's own timeline)
+                    self.decks[inc].set_rate(rb_now);
                     run.stage = Stage::Armed {
                         cur,
                         inc,
                         serial,
                         plan,
                         ra: ra_now,
-                        rb,
+                        rb: rb_now,
                         grids,
                     };
                     return None;
@@ -237,6 +252,16 @@ impl Automix {
                                 pl.seek(pos0 as u32);
                                 pl.play();
                             });
+                            let len = p.bars as f64 * 4.0;
+                            let recipe = &super::style::all()[super::style::chosen(run)];
+                            let mut fade = super::fade::Fade::new(
+                                recipe.timeline(len),
+                                ((pos - p.out_ms) / p.fade_ms * len).max(0.0),
+                                super::rig::Live::new(app, self.decks.clone(), cur, inc),
+                            );
+                            fade.advance(0.0, p.fade_ms / len / ra / 1000.0);
+                            run.fade = Some(fade);
+                            run.clock = std::time::Instant::now();
                             run.stage = Stage::Fading {
                                 out: cur,
                                 inc,
@@ -256,7 +281,7 @@ impl Automix {
                             }
                             pl.play();
                         });
-                        run.stage = self.finish(app, cur, inc);
+                        run.stage = self.finish(run, app, cur, inc);
                     }
                     _ => {}
                 }
@@ -270,8 +295,18 @@ impl Automix {
                 pos0,
                 aligned,
             } => {
-                let (a_pos, ..) = self.pos(out);
-                let x = ((a_pos - plan.out_ms) / plan.fade_ms).clamp(0.0, 1.0);
+                let dt = run.clock.elapsed().as_secs_f64();
+                run.clock = std::time::Instant::now();
+                let beat_secs = plan.fade_ms
+                    / (plan.bars as f64 * 4.0)
+                    / self.decks[out].rate().max(0.001)
+                    / 1000.0;
+                let done = run
+                    .fade
+                    .as_mut()
+                    .is_none_or(|f| f.advance(dt / beat_secs, beat_secs));
+                let x = run.fade.as_ref().map_or(1.0, |f| f.progress());
+                let a_pos = plan.out_ms + plan.fade_ms * x;
                 if !aligned {
                     let (b_pos, ..) = self.pos(inc);
                     if b_pos - pos0 >= 1.0 {
@@ -292,10 +327,8 @@ impl Automix {
                         };
                     }
                 }
-                if x >= 1.0 {
-                    run.stage = self.finish(app, out, inc);
-                } else {
-                    Self::drive(app, out, inc, x);
+                if done {
+                    run.stage = self.finish(run, app, out, inc);
                 }
             }
         }
@@ -323,7 +356,8 @@ impl Automix {
             } => {
                 let s = ((p.out_ms - self.pos(cur).0) / ra / 1000.0).max(0.0) as u32;
                 tr!(
-                    "AUTOMIX · “{}” mixes in over {} bars in {}",
+                    "AUTOMIX · {} · “{}” mixes in over {} bars in {}",
+                    super::style::all()[super::style::chosen(run)].name,
                     incoming,
                     p.bars,
                     format!("{}:{:02}", s / 60, s % 60)
@@ -335,10 +369,11 @@ impl Automix {
                     incoming
                 )
             }
-            Stage::Fading { out, plan, .. } => {
-                let x = ((self.pos(out).0 - plan.out_ms) / plan.fade_ms).clamp(0.0, 1.0);
+            Stage::Fading { .. } => {
+                let x = run.fade.as_ref().map_or(1.0, |f| f.progress());
                 tr!(
-                    "AUTOMIX · mixing “{}” {}",
+                    "AUTOMIX · {} · mixing “{}” {}",
+                    super::style::all()[super::style::chosen(run)].name,
                     incoming,
                     format!("{:.0}%", x * 100.0)
                 )

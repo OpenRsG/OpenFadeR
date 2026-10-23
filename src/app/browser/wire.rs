@@ -1,15 +1,15 @@
 //! Builds the [`View`] and connects the `BrowserState` callbacks to it.
 
 use super::{
-    DOUBLE_CLICK, Home, View, editor,
+    cover, editor,
     filter::Filter,
     history, palette,
     playlists::{self, Panel},
     preview, session,
     sidebar::{Entry, TAG_ROW},
-    strip, suggest,
+    stages, strip, suggest,
     table::Reference,
-    tagging, track_at,
+    tagging, track_at, Home, View, DOUBLE_CLICK,
 };
 use crate::app::{
     App, AutomixState, BrowserState, DeckState, analyze::detected, automix, deck::Decks,
@@ -103,12 +103,15 @@ pub fn wire(
         cache: None,
         slots: Vec::new(),
         dupe_groups: 0,
+        health: super::health::Monitor::new(),
         ask: None,
         panel: Panel::Closed,
         editing: None,
         confirm: None,
         sources: Vec::new(),
         strips: strip::Strips::new(app),
+        stages: stages::Stages::default(),
+        covers: cover::Covers::new(app),
         _timer: Timer::default(),
         _preview: Timer::default(),
         suggest: suggest::State::default(),
@@ -129,6 +132,7 @@ pub fn wire(
     });
     session::start_poll(app, &view, decks);
     wire_prefs(app, &view);
+    super::health::wire(app, &view);
     wire_list(app, &view);
     wire_selection(app, &view, automix, on_track);
     Ok(())
@@ -362,12 +366,14 @@ fn wire_selection(
                 view.selected = Some(t.clone());
             }
             v.borrow().suggest_selected(&app);
+            v.borrow().health_selected(&app, &t);
             trackinfo::show(&app, &t);
             on_selected(&t);
         }
     });
     playlists::wire(app, view);
     strip::wire(app, view);
+    cover::wire(app, view);
     suggest::wire(app, view);
     palette::wire(app, view, on_track.clone());
     super::VIEW.with(|v| *v.borrow_mut() = Some(Rc::downgrade(view)));

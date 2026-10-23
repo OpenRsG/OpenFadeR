@@ -3,7 +3,7 @@ import { Theme } from "theme.slint";
 import { DeckState, DeckView } from "deck-state.slint";
 import { DeckBadge } from "deck-wave.slint";
 
-/// Jacket square: no artwork is read, so it is the empty-jacket look with the deck badge in the corner;
+/// Jacket square: the loaded track's cover, else the empty-jacket look, with the deck badge in the corner;
 /// a click loads the track selected in the browser.
 export component Jacket inherits Rectangle {
     in property <int> index;
@@ -11,7 +11,8 @@ export component Jacket inherits Rectangle {
     width: root.size;
     height: root.size;
     background: Theme.panel-raised;
-    Text { text: "♪"; color: Theme.panel-high; font-size: root.size * 0.6; horizontal-alignment: center; vertical-alignment: center; }
+    if !DeckState.decks[root.index].has-cover: Text { text: "♪"; color: Theme.panel-high; font-size: root.size * 0.6; horizontal-alignment: center; vertical-alignment: center; }
+    if DeckState.decks[root.index].has-cover: Image { source: DeckState.decks[root.index].cover; image-fit: cover; width: root.size; height: root.size; }
     DeckBadge { index: root.index; x: 0; y: 0; }
     ta := TouchArea { clicked => { DeckState.load(root.index); } mouse-cursor: pointer; }
     Rectangle { background: Theme.text-bright.with-alpha(ta.has-hover ? 0.12 : 0); }
@@ -136,6 +137,7 @@ export component StemRow inherits HorizontalLayout {
         pending: !root.v.stem-ready;
         tooltip: !root.v.loaded ? @tr("Load a track with STEMS on (PREFS)")
             : @tr("{}: a click turns it off, or back to full", [@tr("VOCAL"), @tr("INST"), @tr("BASS (rides the INST isolator)"), @tr("DRUMS")][k])
+              + (root.v.stem-names.length > k ? " · " + @tr("stem file part: {}", root.v.stem-names[k]) : "")
               + (root.v.stem-text != "" ? " · " + root.v.stem-text : !root.v.stem-ready ? @tr(" · click to separate") : "");
         clicked => { DeckState.stem-click(root.index, k); }
     }

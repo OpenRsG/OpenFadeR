@@ -2,7 +2,7 @@
 
 use super::super::{Deck, PadMode};
 use crate::app::prefs;
-use openfader::audio;
+use openfader::audio::{self, stemfile};
 use openfader::stems::{Phase, Quality};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
 use std::sync::{Arc, LazyLock};
@@ -65,8 +65,12 @@ impl Deck {
             } else {
                 Quality::Quality
             };
-            // A cached track separates nothing: the job reads the entry, so no engine is needed.
-            if p.stems && !file.is_some_and(|f| openfader::stems::cache::has(f, quality)) {
+            // A cached track separates nothing: the job reads the entry, so no engine is needed. Nor does a stem file.
+            let separates = !file.is_some_and(|f| {
+                openfader::stems::cache::has(f, quality)
+                    || p.extensions.stem_files && stemfile::read_info(f).is_some()
+            });
+            if p.stems && separates {
                 WARM.store(true, Relaxed);
                 LAST_BUSY.store(now_s(), Relaxed);
                 openfader::stems::warm(p.extensions.stems_multithread);
@@ -78,8 +82,14 @@ impl Deck {
 impl Deck {
     /// Starts allocation and separation off the UI thread; unseparated frames play the original.
     pub(in crate::app::deck) fn stems_start(&self, file: PathBuf, pcm: Arc<audio::Track16>) {
-        let (stems, fast, multithread) =
-            prefs::with(|p| (p.stems, p.stems_fast, p.extensions.stems_multithread));
+        let (stems, fast, multithread, from_file) = prefs::with(|p| {
+            (
+                p.stems,
+                p.stems_fast,
+                p.extensions.stems_multithread,
+                p.extensions.stem_files,
+            )
+        });
         if !stems {
             return;
         }
@@ -92,10 +102,15 @@ impl Deck {
         } else {
             Quality::Quality
         };
-        let job = openfader::stems::Job::start(file, pcm, quality, multithread);
+        let parts = from_file.then(|| stemfile::read_info(&file)).flatten();
+        let job = match parts.clone() {
+            Some(info) => openfader::stems::Job::from_stem_file(file, pcm, info),
+            None => openfader::stems::Job::start(file, pcm, quality, multithread),
+        };
         let mut s = self.stems.borrow_mut();
         s.complete = false;
         s.focus = None;
+        s.parts = parts;
         s.text = progress_text(Phase::Opening, 0.0);
         s.job = Some(job);
         drop(s);
@@ -240,7 +255,12 @@ impl Deck {
                 }
                 {
                     let mut s = self.stems.borrow_mut();
-                    (s.complete, s.text) = (true, tr!("100% READY").into());
+                    s.complete = true;
+                    s.text = if s.parts.is_some() {
+                        tr!("STEM FILE").into()
+                    } else {
+                        tr!("100% READY").into()
+                    };
                 }
                 if let Some(stems) = stems {
                     self.stemwave_stems(&stems);
@@ -275,6 +295,7 @@ impl Deck {
                 p.active_part_solo,
                 p.extensions.stem_displays()[0],
                 p.stems_fast,
+                p.extensions.stem_files,
             )
         });
         let stems = now.0;
@@ -282,9 +303,9 @@ impl Deck {
         if before == Some(now) {
             return; // some other setting (the window size is saved on every resize)
         }
-        if stems && before.is_some_and(|b| b.4 != now.4) {
-            // When the STEMS Analysis Process changes the track is separated again at the new
-            // setting (a QUALITY cache entry answers SPEED at once).
+        if stems && before.is_some_and(|b| (b.4, b.5) != (now.4, now.5)) {
+            // When the STEMS Analysis Process or the use of stem files changes the track gets its stems again from the
+            // new source (a QUALITY cache entry answers SPEED at once).
             self.stems_clear_job();
         }
         if !stems {
@@ -323,6 +344,7 @@ impl Deck {
         let mut s = self.stems.borrow_mut();
         s.job = None;
         s.attached = None;
+        s.parts = None;
         (s.ready, s.complete) = (false, false);
         s.text.clear();
         drop(s);

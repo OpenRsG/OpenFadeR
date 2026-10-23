@@ -1,0 +1,109 @@
+import { Chip, Icon, IconButton, TextField } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { BrowserState } from "../browser-state.slint";
+import { DeckState } from "../deck-state.slint";
+import { DeviceState } from "../device-state.slint";
+import { TreeView } from "../browser-tree.slint";
+import { StudioState } from "../studio-state.slint";
+import { StudioTable } from "table.slint";
+
+/// The left of the library: an icon strip (all tracks, the Tag List, the session history, duplicates, related tracks, one USB
+/// icon per connected device) and the folder tree: My Playlists, History, Tags and the opened library's own lists.
+component StudioSidebar inherits Rectangle {
+    background: Theme.panel;
+    border-radius: Theme.studio-radius;
+    function show-list(row: int) {
+        StudioState.tree-focus = false;
+        if (BrowserState.related) { BrowserState.related-toggled(false); }
+        if (BrowserState.suggest) { BrowserState.suggest-toggled(false); }
+        tree.set-current-item(row);
+    }
+    public function focus-tree() { tree.focus(); }
+    HorizontalLayout {
+        padding: Theme.space-sm;
+        spacing: Theme.space-sm;
+        VerticalLayout {
+            width: Theme.h-ctl + 4px;
+            horizontal-stretch: 0;
+            spacing: Theme.space-sm;
+            alignment: start;
+            IconButton { icon: Icon.folder; icon-size: 16px; solid: true; tooltip: @tr("Folders: all tracks"); active: tree.current-item == 0 && !BrowserState.related; clicked => { root.show-list(0); } }
+            IconButton { icon: Icon.star; icon-size: 16px; solid: true; tooltip: @tr("Favourites: the Tag List"); active: BrowserState.tag-view && !BrowserState.related; clicked => { root.show-list(BrowserState.tag-row); } }
+            IconButton { icon: Icon.loop; icon-size: 16px; solid: true; tooltip: @tr("History of this session"); active: tree.current-item == 2 && !BrowserState.related; clicked => { root.show-list(2); } }
+            IconButton { icon: Icon.grid; icon-size: 16px; solid: true; tooltip: @tr("Duplicate tracks"); active: tree.current-item == 3 && !BrowserState.related; clicked => { root.show-list(3); } }
+            if BrowserState.related-enabled: IconButton { icon: Icon.link; icon-size: 16px; solid: true; tooltip: @tr("Related tracks"); active: BrowserState.related; clicked => { BrowserState.related-toggled(!BrowserState.related); } }
+            for d[i] in DeviceState.devices: IconButton {
+                icon: Icon.usb;
+                icon-size: 16px;
+                solid: true;
+                tooltip: @tr("{} ({}): open its device window", d.name, d.library);
+                active: DeviceState.visible && DeviceState.current == i;
+                clicked => {
+                    DeviceState.tab = 0;
+                    DeviceState.visible = true;
+                    DeviceState.select(i);
+                    DeviceState.opened();
+                }
+            }
+        }
+        tree := TreeView {
+            current-item <=> BrowserState.tree-row;
+            border-radius: Theme.studio-radius-ctl;
+            item-changed(i) => { BrowserState.playlist-selected(i); }
+            focused => { StudioState.tree-focus = true; }
+        }
+    }
+}
+
+/// The bottom left and middle of the workspace: the sidebar and the track list under the search field. The search box, the tree
+/// and the list take the focus when `StudioState.focus-pulse` asks (Ctrl+F, the MIDI browse encoder).
+export component StudioLibrary inherits Rectangle {
+    property <length> g: Theme.studio-gap;
+    property <length> side-w: 236px;
+    property <length> bar-h: Theme.h-ctl + 2 * Theme.space-md;
+    property <int> pulse: StudioState.focus-pulse;
+    changed pulse => {
+        if (StudioState.focus-target == 0) { search.focus-field(); }
+        else if (StudioState.focus-target == 1) { sidebar.focus-tree(); }
+        else { table.focus-list(); StudioState.tree-focus = false; }
+    }
+    sidebar := StudioSidebar { x: 0px; y: 0px; width: root.side-w; height: root.height; }
+    Rectangle {
+        x: root.side-w + root.g;
+        y: 0px;
+        width: root.width - root.side-w - root.g;
+        height: root.bar-h;
+        background: Theme.panel;
+        border-radius: Theme.studio-radius;
+        HorizontalLayout {
+            padding: Theme.space-md;
+            spacing: Theme.space-md;
+            search := TextField {
+                horizontal-stretch: 1;
+                max-width: 360px;
+                icon: Icon.search;
+                placeholder-text: BrowserState.remote-search ? @tr("Search online (Enter)") : @tr("Search tracks (Ctrl+F)");
+                edited(text) => { BrowserState.search-edited(text); }
+                accepted(text) => { BrowserState.search-accepted(text); table.focus-list(); }
+            }
+            Text {
+                text: BrowserState.status;
+                vertical-alignment: center;
+                overflow: elide;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+            }
+            Chip { text: @tr("LOAD 1"); width: 62px; horizontal-stretch: 0; tooltip: @tr("Load the chosen track on deck 1"); clicked => { DeckState.load(0); } }
+            Chip { text: @tr("LOAD 2"); width: 62px; horizontal-stretch: 0; tooltip: @tr("Load the chosen track on deck 2"); clicked => { DeckState.load(1); } }
+        }
+    }
+    table := StudioTable {
+        x: root.side-w + root.g;
+        y: root.bar-h + root.g;
+        width: root.width - root.side-w - root.g;
+        height: root.height - root.bar-h - root.g;
+        row-h: root.height > 330px ? Theme.studio-row : 28px;
+        focused => { StudioState.tree-focus = false; }
+    }
+}

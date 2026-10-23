@@ -57,6 +57,10 @@ choice!(
     DrawRate { Fps30 = "30", #[default] Fps60 = "60", Fps120 = "120" }
 );
 choice!(
+    /// AUTO uses hardware image composition; GPU also permits emulated GL; CPU keeps raster overlays.
+    WaveRenderer { #[default] Auto = "auto", Gpu = "gpu", Cpu = "cpu" }
+);
+choice!(
     /// Overview and preview waveform: the whole waveform, or only its upper half.
     OverviewSize { #[default] Full = "full", Half = "half" }
 );
@@ -136,6 +140,7 @@ section!(
         played_reset_on_quit: bool = false;
         /// Waveform Drawing Rate and Full/Half overview.
         draw_rate: DrawRate = DrawRate::Fps60;
+        waveform_renderer: WaveRenderer = WaveRenderer::Auto;
         overview: OverviewSize = OverviewSize::Full;
         /// Waveform beat grid visibility and hot cue letter box size.
         beat_grid: BeatGrid = BeatGrid::Normal;
@@ -302,6 +307,12 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             .enabled(v.played_color),
         key(p.key_notation),
         Row::header(tr!("WAVEFORM")),
+        Row::chips(
+            "waveform_renderer",
+            tr!("RENDERER"),
+            &[tr!("AUTO"), tr!("GPU"), tr!("CPU")],
+            v.waveform_renderer as usize,
+        ),
         Row::of("draw_rate", tr!("DRAWING RATE"), v.draw_rate).hint(tr!("frames / s")),
         Row::chips(
             "overview",

@@ -21,12 +21,16 @@
 //! [`library::dupes`](super::library::dupes) (duplicate-track finder, used by the "Duplicate tracks" list), [`hotcuebank`] (the
 //! Cue Bank node: lists of up to 8 cues A to H, loaded onto a deck's pads, carried by the device export), [`palette`]
 //! (Playlist Palette: the TAG LIST and three playlists under the track list, drag and drop), [`strip`] (the Preview column's
-//! waveform strips with the cue markers), [`preview`] (the PREVIEW button and the strips' click-to-preview player) and [`remote`]
-//! (Enter in the search box on the search entry of a plugin source searches online).
+//! waveform strips with the cue markers), [`preview`] (the PREVIEW button and the strips' click-to-preview player), [`remote`]
+//! (Enter in the search box on the search entry of a plugin source searches online), [`health`] (the Library health node: a scan of
+//! the Collection for problems on a worker thread, a row per check, the fixes and ignores) and [`stages`] (the Stages node: INBOX →
+//! REVIEW → COLLECTION, moving tracks between them, recent moves).
 
+mod cover;
 mod editor;
 mod filter;
-mod history;
+mod health;
+pub(in crate::app) mod history;
 mod hotcuebank;
 mod list;
 mod palette;
@@ -38,6 +42,7 @@ mod session;
 mod sidebar;
 mod smart;
 mod sources;
+mod stages;
 mod strip;
 mod suggest;
 mod table;
@@ -127,6 +132,14 @@ pub fn loading(app: &App, text: &str, progress: Option<f32>) {
     s.set_load_progress(progress.unwrap_or(-1.0));
 }
 
+/// A cover was chosen or undone: the Cover column reads its pictures again.
+pub fn covers_changed(app: &App) {
+    if let Some(v) = view() {
+        let v = v.borrow();
+        v.covers.reset(app, v.shown.len());
+    }
+}
+
 /// Where the list comes from when Related is off.
 #[derive(Clone)]
 enum Home {
@@ -152,8 +165,12 @@ enum Home {
     Dupes,
     /// Tracks CUE Analysis set cues on ([`analyze::cue_analysed`]).
     CueAnalysis,
+    /// The tracks a Library health check lists ([`health`]).
+    Health(crate::app::library::health::Check),
     /// A list of an opened external source (`None`: all its tracks).
     Source(usize, Option<String>),
+    /// The tracks waiting in a stage before the Collection (store stage id, [`stages`]).
+    Stage(i64),
 }
 
 /// The whole library with each track's store key, read again only when the store changed ([`Store::generation`]).
@@ -211,6 +228,8 @@ struct View {
     slots: Vec<usize>,
     /// Groups the Duplicate tracks list found.
     dupe_groups: usize,
+    /// Library health: the scan and its result ([`health`]).
+    health: health::Monitor,
     ask: Option<Ask>,
     panel: Panel,
     editing: Option<editor::Editing>,
@@ -224,6 +243,10 @@ struct View {
     suggest: suggest::State,
     /// The Preview column's waveform strips ([`strip`]).
     strips: strip::Strips,
+    /// The stages INBOX → REVIEW → COLLECTION and their counts ([`stages`]).
+    stages: stages::Stages,
+    /// The Cover column's pictures ([`cover`]).
+    covers: cover::Covers,
 }
 
 impl View {

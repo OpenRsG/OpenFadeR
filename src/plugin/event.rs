@@ -8,13 +8,14 @@
 //!   (`{deck}`), `track_played` (`{track}`: it stayed on air as long as the play history needs);
 //! - `deck_play`, `deck_pause` (`{deck, track, position_ms}`), `track_ended` (`{deck, track}`), `master_changed` (`{deck}`;
 //!   0 = none);
-//! - `recording_started` (`{}`), `recording_stopped` (`{files}`);
+//! - `recording_started` (`{}`), `recording_stopped` (`{files, sidecars}`), `recording_track` (`{deck, position_ms, track}`:
+//!   another deck took over the mix while REC ran);
+//! - `inbox_added` (`{files}`: new music joined INBOX), `inbox_moved` (`{stage, files}`: tracks moved to a stage);
 //! - `timer` (`{}`), every `timer` seconds of the manifest.
 
 use super::{
-    Plugin, Registry,
     action::{self, Command},
-    current,
+    current, Plugin, Registry,
 };
 use serde_json::{Value, json};
 use std::{sync::OnceLock, thread::JoinHandle, time::Duration};

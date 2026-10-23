@@ -10,6 +10,37 @@ pub(in crate::app) fn grid_bpm(beats: &[Beat]) -> Option<f64> {
         .map(|b| b.bpm_x100 as f64 / 100.0)
 }
 
+/// Tempo in BPM of the grid section the playhead `ms` is in: the tempo of the beat it has passed (a beat carries the tempo of
+/// the interval after it), the first section's before the first beat. `None` for an empty or zero-tempo grid.
+pub(in crate::app) fn tempo_at(beats: &[Beat], ms: f64) -> Option<f64> {
+    let i = beats
+        .partition_point(|b| b.time_ms as f64 <= ms)
+        .saturating_sub(1);
+    beats
+        .get(i)
+        .filter(|b| b.bpm_x100 > 0)
+        .map(|b| b.bpm_x100 as f64 / 100.0)
+}
+
+/// Two neighbouring beats are in different tempo sections when their `bpm_x100` differ by more than this (0.5 BPM): edits and
+/// rounding wobble the tempo of single beats by far less.
+const SECTION_STEP: u16 = 50;
+
+/// The tempo sections of a grid: the runs of beats whose tempo stays within [`SECTION_STEP`] of the beat before, as beat index
+/// ranges in order.
+pub(super) fn sections(beats: &[Beat]) -> impl Iterator<Item = std::ops::Range<usize>> + '_ {
+    let mut at = 0;
+    std::iter::from_fn(move || {
+        beats.get(at)?;
+        let len = 1 + beats[at..]
+            .windows(2)
+            .take_while(|w| w[0].bpm_x100.abs_diff(w[1].bpm_x100) <= SECTION_STEP)
+            .count();
+        at += len;
+        Some(at - len..at)
+    })
+}
+
 /// Start (ms) and length of segment `seg..seg+1`; needs 2 beats and a positive interval.
 fn segment(beats: &[Beat], seg: usize) -> Option<(f64, f64)> {
     let (a, b) = (
@@ -107,5 +138,22 @@ mod tests {
     fn loop_length_tolerates_ms_rounding() {
         assert!(is_loop_len(4.01, 4.0) && is_loop_len(0.126, 0.125));
         assert!(!is_loop_len(3.0, 4.0) && !is_loop_len(0.25, 0.125));
+    }
+
+    #[test]
+    fn tempo_follows_the_section_under_the_playhead() {
+        let mut g = grid(0, 8); // 120 BPM
+        g.extend((0..4).map(|i| Beat {
+            bar_pos: 1 + i as u16,
+            bpm_x100: 12800,
+            time_ms: 4000 + i * 469,
+        }));
+        assert_eq!(tempo_at(&g, -10.0), Some(120.0), "before the first beat");
+        assert_eq!(tempo_at(&g, 3999.0), Some(120.0));
+        assert_eq!(tempo_at(&g, 4000.0), Some(128.0));
+        assert_eq!(tempo_at(&g, 9e6), Some(128.0));
+        assert_eq!(grid_bpm(&g), Some(120.0), "the browser BPM stays the first tempo");
+        assert_eq!(sections(&g).collect::<Vec<_>>(), [0..8, 8..12]);
+        assert_eq!(tempo_at(&[], 0.0), None);
     }
 }

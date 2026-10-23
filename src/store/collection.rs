@@ -22,9 +22,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{atomic::Ordering, Arc};
 
-const COLS: &str = "path, title, artist, album, tkey, genre, bpm_x100, length_s, analysis_ref, artwork, comment, date_added, bitrate, sample_rate, label";
+pub(super) const COLS: &str = "path, title, artist, album, tkey, genre, bpm_x100, length_s, analysis_ref, artwork, comment, date_added, bitrate, sample_rate, label";
 
-fn from_row(r: &Row) -> rusqlite::Result<Track> {
+pub(super) fn from_row(r: &Row) -> rusqlite::Result<Track> {
     let opt = |i| r.get::<_, Option<String>>(i).map(|s| s.map(PathBuf::from));
     Ok(Track {
         id: Some(r.get(0)?),
@@ -66,7 +66,8 @@ impl Store {
         self.collection_changes.load(Ordering::Relaxed)
     }
 
-    /// The Collection, in import order, every track with `id: Some(..)`. Read once per [`Store::collection_generation`].
+    /// The Collection, in import order, every track with `id: Some(..)`; a track waiting in INBOX or another stage
+    /// ([`Store::stages`]) is not in it yet. Read once per [`Store::collection_generation`].
     pub fn collection_tracks(&self) -> R<Arc<Vec<Track>>> {
         let mut cache = self.cache.lock();
         let g = self.collection_generation();
@@ -77,7 +78,7 @@ impl Store {
         }
         let rows: Vec<Track> = query_all(
             &self.db(),
-            &format!("SELECT id, {COLS} FROM collection ORDER BY id"),
+            &format!("SELECT id, {COLS} FROM collection WHERE stage IS NULL ORDER BY id"),
             [],
             from_row,
         )?;
@@ -137,7 +138,7 @@ impl Store {
             .filter(|t| t.file.is_some())
             .map(|t| (None, t))
             .collect();
-        self.put_rows(&items, replace).map(|(n, _)| n)
+        self.put_rows(&items, replace, None).map(|(n, _)| n)
     }
 
     /// [`Store::collection_put`] with `replace`, for one track, returning the row's id: `None` inserts (or overwrites the row
@@ -148,10 +149,16 @@ impl Store {
 
     /// [`Store::collection_upsert`] for many in one transaction (one legacy-key scan, not one per track); the ids in order.
     pub fn collection_upsert_many(&self, items: &[(Option<i64>, &Track)]) -> R<Vec<i64>> {
-        self.put_rows(items, true).map(|(_, ids)| ids)
+        self.put_rows(items, true, None).map(|(_, ids)| ids)
     }
 
-    fn put_rows(&self, items: &[(Option<i64>, &Track)], replace: bool) -> R<(usize, Vec<i64>)> {
+    /// `stage`: the stage the rows this adds wait in (`None`: the Collection itself).
+    pub(super) fn put_rows(
+        &self,
+        items: &[(Option<i64>, &Track)],
+        replace: bool,
+        stage: Option<i64>,
+    ) -> R<(usize, Vec<i64>)> {
         let now = chrono::Utc::now().timestamp();
         let insert = format!(
             "INSERT INTO collection(id, {COLS}, size, mtime, key_id, added_at) VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM collection), 0), (SELECT n FROM collection_hwm)) + 1), ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,COALESCE(?19, ?20))"
@@ -208,6 +215,9 @@ impl Store {
                     None => {
                         exec(tx, &insert, with(&now))?;
                         let id = tx.last_insert_rowid();
+                        if let Some(s) = stage {
+                            exec(tx, "UPDATE collection SET stage = ?2 WHERE id = ?1", params![id, s])?;
+                        }
                         fresh.push((id, legacy_key(&file_name(file), size as u64)));
                         n += 1;
                         id

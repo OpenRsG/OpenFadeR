@@ -15,7 +15,9 @@
 //! - declarative controls, no code: COLOR FX knob behaviours ([`KnobMode`]) and performance-pad modes ([`PadModeDecl`]).
 //! - track libraries in a native library: a file or folder format the app reads, and writes as the collection export
 //!   ([`library`]); a library that declares `device` also serves removable devices ([`device`]).
+//! - controller drivers in a native library: a plugin that claims a MIDI port and drives it through the host's controls ([`controller`]).
 //! - settings the user sets in the plugin manager ([`SettingDecl`]); their values come with every request ([`config`]).
+//! - cover art: a plugin with `artwork` answers a track's artist / album with image candidates ([`crate::artwork`]).
 //!
 //! [`registry`] reads everything on first use, which the app makes happen before the audio engine starts (effects are
 //! part of every FX unit from then on). [`reload`] reads the folders again (after [`install`], or a plugin switched on or
@@ -24,6 +26,7 @@
 
 pub mod action;
 pub mod config;
+pub mod controller;
 pub mod device;
 pub mod effect;
 pub mod event;
@@ -82,6 +85,9 @@ pub struct Manifest {
     /// Seconds between two `timer` events (when `events` lists `timer`).
     #[serde(default)]
     pub timer: f64,
+    /// The plugin answers `{"op": "artwork"}` with cover candidates ([`crate::artwork`]); needs a `script` or `command`.
+    #[serde(default)]
+    pub artwork: bool,
     /// Settings shown in the plugin manager.
     #[serde(default)]
     pub settings: Vec<SettingDecl>,
@@ -92,10 +98,16 @@ pub struct Manifest {
     /// A track library in a native library ([`library`]).
     #[serde(default)]
     pub library: Option<library::LibraryDecl>,
+    /// A MIDI controller driver in a native library ([`controller`]).
+    #[serde(default)]
+    pub controller: Option<controller::ControllerDecl>,
     #[serde(default)]
     pub knob_modes: Vec<KnobMode>,
     #[serde(default)]
     pub pad_modes: Vec<PadModeDecl>,
+    /// Automix transition styles in JSON ([`crate::mixstyle`]), offered beside the built-in ones.
+    #[serde(default)]
+    pub automix: Vec<crate::mixstyle::Recipe>,
 }
 
 /// A COLOR FX knob behaviour, offered beside NORMAL by PREFS > CONTROLLER > Mixer > COLOR FX KNOB. `stop` (0 to 1 of the
@@ -218,6 +230,8 @@ pub struct Registry {
     pub effects: Vec<effect::Effect>,
     /// The loaded library plugins ([`library::load`]).
     pub libraries: Vec<library::Loaded>,
+    /// The loaded controller plugins ([`controller::load`]).
+    pub controllers: Vec<controller::Loaded>,
     pub errors: Vec<String>,
 }
 
@@ -251,6 +265,16 @@ impl Registry {
         self.plugins.iter().flat_map(|p| &p.manifest.pad_modes)
     }
 
+    /// Every plugin's Automix styles, in plugin order.
+    pub fn automix_styles(&self) -> impl Iterator<Item = &crate::mixstyle::Recipe> {
+        self.plugins.iter().flat_map(|p| &p.manifest.automix)
+    }
+
+    /// The enabled plugins that answer artwork requests, in plugin order.
+    pub fn artwork(&self) -> impl Iterator<Item = &Plugin> {
+        self.plugins.iter().filter(|p| p.manifest.artwork)
+    }
+
     /// Names of the plugins whose effects, sources, knob or pad modes differ from what the app started with (installed,
     /// removed, switched on or off, or edited since): those parts apply after a restart.
     pub fn restart_needed(&self) -> Vec<String> {
@@ -258,15 +282,19 @@ impl Registry {
             let parts = (
                 &m.effects,
                 &m.library,
+                &m.controller,
                 &m.sources,
                 &m.knob_modes,
                 &m.pad_modes,
+                &m.automix,
             );
             let empty = format!(
                 "{:?}",
                 (
                     &Manifest::default().effects,
                     &Manifest::default().library,
+                    &Manifest::default().controller,
+                    &[(); 0],
                     &[(); 0],
                     &[(); 0],
                     &[(); 0]
@@ -320,6 +348,7 @@ static FIRST: LazyLock<Registry> = LazyLock::new(|| {
     let mut r = read_all();
     r.effects = effect::load(&r.plugins, &mut r.errors);
     r.libraries = library::load(&r.plugins, &mut r.errors);
+    r.controllers = controller::load(&r.plugins, &mut r.errors);
     if let Err(e) = library::migrate_refs(&r.libraries, &crate::store::global()) {
         eprintln!("plugin: analysis refs: {e}");
     }
@@ -337,6 +366,7 @@ static NOW: LazyLock<RwLock<Arc<Registry>>> = LazyLock::new(|| {
         disabled: f.disabled.clone(),
         effects: f.effects.clone(),
         libraries: f.libraries.clone(),
+        controllers: f.controllers.clone(),
         errors: f.errors.clone(),
     }))
 });
@@ -354,7 +384,11 @@ pub fn current() -> Arc<Registry> {
 /// Reads the plugin folders again and makes the result [`current`]. The effects stay those of the first read.
 pub fn reload() -> Arc<Registry> {
     let mut r = read_all();
-    (r.effects, r.libraries) = (FIRST.effects.clone(), FIRST.libraries.clone());
+    (r.effects, r.libraries, r.controllers) = (
+        FIRST.effects.clone(),
+        FIRST.libraries.clone(),
+        FIRST.controllers.clone(),
+    );
     let on: Vec<&str> = r.plugins.iter().map(|p| p.manifest.name.as_str()).collect();
     process::retain(&on);
     lua::retain(&on);
@@ -427,10 +461,10 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
     }
     if m.command.is_empty()
         && m.script.is_none()
-        && !(m.sources.is_empty() && m.actions.is_empty() && m.events.is_empty())
+        && !(m.sources.is_empty() && m.actions.is_empty() && m.events.is_empty() && !m.artwork)
     {
         return Err(format!(
-            "{}: sources, actions and events need a `script` or a `command`",
+            "{}: sources, actions, events and artwork need a `script` or a `command`",
             file.display()
         ));
     }
@@ -479,6 +513,7 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
             p.name
         ));
     }
+    crate::mixstyle::validate_all(&m.automix).map_err(|e| format!("{}: {e}", file.display()))?;
     Ok(m)
 }
 

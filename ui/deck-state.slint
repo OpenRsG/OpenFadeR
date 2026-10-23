@@ -10,12 +10,19 @@ export struct DeckView {
     playing: bool,
     detail: image,
     overview: image,
+    overview-head: image,
+    overview-ghost: image,
     time-text: string,
     /// Elapsed "02:06.4" and remaining "-05:43.9" time of the header; title and artist of the loaded track.
     elapsed-text: string,
     remain-text: string,
+    /// Track length "05:50.2" (the readout under the remaining time).
+    total-text: string,
     title: string,
     artist: string,
+    /// The loaded track's cover (src/app/artwork) and whether it has one.
+    cover: image,
+    has-cover: bool,
     bpm-text: string,
     tempo-text: string,
     status: string,
@@ -67,6 +74,8 @@ export struct DeckView {
     stem-ready: bool,
     stem-full: [bool],
     stem-text: string,
+    /// The loaded stem file's names for its parts, in VOCAL / INST / BASS / DRUMS order; empty for a separated track.
+    stem-names: [string],
     /// SYNC RATE next to BEAT SYNC: the multiple of the master's tempo this deck follows ("×1", "×2", "×½"); "" = not following
     /// or VIEW > Display SYNC RATE is off.
     sync-rate: string,
@@ -81,6 +90,8 @@ export struct DeckView {
     auto-beats: int,
     /// METRO chip (GRID edit block): the deck clicks on every beat of its grid.
     metronome: bool,
+    /// HERE chip (GRID edit block): grid edits change only the tempo section from the playhead on.
+    grid-here: bool,
 }
 
 /// What moves every frame (src/app/deck/frame.rs sets it right before each frame is drawn, so it is kept apart from the
@@ -91,6 +102,8 @@ export struct DeckScroll {
     strip-w: length,
     /// Slip ghost x in the view; negative = none.
     slip-x: length,
+    overview-x: length,
+    overview-slip-x: length,
     /// VIEW > Beat Count Display text right of the playhead; empty = none.
     beat-text: string,
     /// Platter angle of the playhead (degrees, 0 = top, clockwise).
@@ -107,6 +120,7 @@ export struct DeckScroll {
 export global DeckState {
     in property <[DeckView]> decks;
     in property <[DeckScroll]> scroll;
+    in property <bool> waveform-gpu;
     /// Decks shown: 2 (A, B) or 4 (A to D, the 4-deck layout; the `decks` setting, written by Rust).
     in property <int> count: 2;
     /// Vertical tempo faders show + at the bottom (PREFS > VIEW); the fader position then runs the other way.
@@ -197,6 +211,8 @@ export global DeckState {
     callback grid-halve(int);
     callback grid-tap(int);
     callback grid-reset(int);
+    callback grid-here(int);
+    callback grid-merge(int);
     /// VIEW > Click on the waveform for PLAY and CUE: on the enlarged waveform a left click is PLAY / PAUSE and a right
     /// press / release is the CUE button. Drag-scratching works either way. Written by Rust from the setting.
     in property <bool> click-wave: true;

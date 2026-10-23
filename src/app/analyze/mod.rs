@@ -17,11 +17,12 @@
 //!
 //! This base owns the types the children share ([`Found`], [`Outcome`]) and the run on the UI thread. Children: `detected`
 //! (session results, which tracks are pending), `progress` (counters and text), `job` (worker pool), `cue` (library grid
-//! and cue habits), `sync` (settings to options).
+//! and cue habits), `sync` (settings to options), `key_model` (the NEURAL key detector's model download).
 
 mod cue;
 mod detected;
 mod job;
+mod key_model;
 mod progress;
 mod sync;
 
@@ -29,12 +30,12 @@ pub use cue::{Learnt, library_cues};
 pub use detected::{Detected, keys_differ};
 
 use super::{
-    App, camelot,
+    camelot,
     prefs::{
         self,
         analysis::{CueSetting, GridSource, Process},
     },
-    trackinfo,
+    trackinfo, App,
 };
 use job::{Guide, Job, Settings, TagText};
 use openfader::{
@@ -153,6 +154,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>) -> Analyzer {
     });
     set_options(&prefs::get());
     prefs::on_change(set_options);
+    key_model::wire(app);
     prefs::on_action("analyze_now", run_pending);
     let auto = prefs::with(|p| p.analysis.auto_analysis);
     if cache::legacy_dir().is_some_and(|d| d.is_dir()) {
@@ -214,6 +216,7 @@ fn set_options(p: &prefs::Prefs) {
     options::set(sync::options(
         a,
         LEARNT.with(|l| l.borrow().as_ref().and_then(|l| l.tendency)),
+        openfader::analysis::key::neural_ready(),
     ));
 }
 
@@ -342,6 +345,7 @@ fn start_run(app: &App, jobs: Vec<Job>, settings: Settings) {
         return;
     }
     let have = detected();
+    key_model::note(app);
     let progress = Rc::new(RefCell::new(Progress::new(jobs.len())));
     let (tx, rx) = mpsc::channel();
     let cancel = job::spawn(jobs, settings, store::global(), tx);

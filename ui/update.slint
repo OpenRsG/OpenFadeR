@@ -1,0 +1,127 @@
+import { Theme } from "theme.slint";
+import { Chip } from "widgets.slint";
+import { DialogFrame, Note } from "dialog.slint";
+
+/// Help > Check for Updates (src/app/update.rs): the newest release, its notes, and the one-click update.
+export global UpdateState {
+    in-out property <bool> visible;
+    /// The newer version GitHub has; empty while this build is the latest or nothing was found yet.
+    in property <string> version;
+    in property <string> current;
+    /// The release notes, as plain text.
+    in property <string> notes;
+    /// The download size ("148 MB"), empty when unknown.
+    in property <string> size;
+    /// The answer of the last check, or what the update is doing now (failures too).
+    in property <string> status;
+    /// A check or an update runs: the buttons wait.
+    in property <bool> busy;
+    in property <bool> downloading;
+    /// 0 to 1.
+    in property <float> progress;
+    /// false: this install is not replaced by the app (package manager, read-only), UPDATE NOW opens the release page.
+    in property <bool> can-update: true;
+    /// Plugin updates the repositories offer, empty when none.
+    in property <string> addons;
+    /// The version kept in `<install>.prev`, empty when there is none to roll back to.
+    in property <string> rollback;
+    /// The version installed last did not finish starting.
+    in property <bool> failed-start;
+    /// Help > Check for Updates: shows the window and asks GitHub.
+    callback open();
+    callback update-now();
+    callback skip();
+    callback cancel();
+    callback roll-back();
+}
+
+export component UpdateOverlay inherits DialogFrame {
+    visible: UpdateState.visible;
+    title: @tr("UPDATE");
+    card-width: 560px;
+    closed => { UpdateState.visible = false; }
+    VerticalLayout {
+        spacing: Theme.space-xs;
+        Text {
+            text: UpdateState.version != "" ? @tr("OpenFadeR {} is available", UpdateState.version) : UpdateState.status;
+            wrap: word-wrap;
+            color: Theme.text-bright;
+            font-family: Theme.font;
+            font-size: Theme.font-xl;
+            font-weight: Theme.weight-bold;
+        }
+        if UpdateState.version != "": Text {
+            text: UpdateState.size != "" ? @tr("You have version {}. Download size: {}.", UpdateState.current, UpdateState.size) : @tr("You have version {}.", UpdateState.current);
+            color: Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.font-md;
+        }
+    }
+    if UpdateState.version != "": Rectangle {
+        height: 200px;
+        background: Theme.bg;
+        border-radius: Theme.radius;
+        clip: true;
+        Flickable {
+            content-height: notes.preferred-height + 16px;
+            notes := Text {
+                x: 10px;
+                y: 8px;
+                width: parent.width - 20px;
+                text: UpdateState.notes;
+                wrap: word-wrap;
+                color: Theme.text;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+            }
+        }
+    }
+    if UpdateState.downloading: Rectangle {
+        height: 6px;
+        background: Theme.bg;
+        border-radius: 3px;
+        Rectangle {
+            x: 0;
+            width: parent.width * clamp(UpdateState.progress, 0, 1);
+            background: Theme.accent;
+            border-radius: 3px;
+        }
+    }
+    if UpdateState.version != "" && UpdateState.status != "": Text {
+        text: UpdateState.status;
+        wrap: word-wrap;
+        color: Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+    }
+    if UpdateState.failed-start: Text {
+        text: @tr("The version installed last did not finish starting. ROLL BACK goes back to the one before it.");
+        wrap: word-wrap;
+        color: Theme.danger;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+    }
+    if UpdateState.addons != "": Note { text: UpdateState.addons; }
+    HorizontalLayout {
+        spacing: Theme.space-sm;
+        if UpdateState.rollback != "" && !UpdateState.busy: Chip {
+            text: @tr("ROLL BACK TO {}", UpdateState.rollback);
+            width: 170px;
+            horizontal-stretch: 0;
+            active: UpdateState.failed-start;
+            clicked => { UpdateState.roll-back(); }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        if UpdateState.downloading: Chip { text: @tr("CANCEL"); width: 90px; horizontal-stretch: 0; clicked => { UpdateState.cancel(); } }
+        if UpdateState.version != "" && !UpdateState.busy: Chip { text: @tr("SKIP THIS VERSION"); width: 150px; horizontal-stretch: 0; clicked => { UpdateState.skip(); } }
+        if UpdateState.version != "" && !UpdateState.busy: Chip { text: @tr("LATER"); width: 80px; horizontal-stretch: 0; clicked => { UpdateState.visible = false; } }
+        if UpdateState.version != "" && !UpdateState.busy: Chip {
+            text: UpdateState.can-update ? @tr("UPDATE NOW") : @tr("OPEN RELEASE PAGE");
+            width: 150px;
+            horizontal-stretch: 0;
+            active: true;
+            clicked => { UpdateState.update-now(); }
+        }
+        if UpdateState.version == "" && !UpdateState.busy: Chip { text: @tr("CLOSE"); width: 80px; horizontal-stretch: 0; clicked => { UpdateState.visible = false; } }
+    }
+}

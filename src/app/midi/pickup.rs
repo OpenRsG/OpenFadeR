@@ -52,6 +52,11 @@ pub(super) struct Pickup {
 }
 
 impl Pickup {
+    /// The slot of a plugin's control `act` (index into the action table) of deck or unit `deck`: at most [`SLOTS`] distinct.
+    pub(super) fn plugin_slot(act: usize, deck: i32) -> usize {
+        (act * 8 + deck.clamp(0, 7) as usize) % SLOTS
+    }
+
     pub(super) fn new() -> Pickup {
         Pickup {
             slots: vec![Cell::new(FRESH); SLOTS].into(),
@@ -112,18 +117,31 @@ impl Midi {
     /// Applies the absolute value `v` (0..1) of knob binding `b`, unless the control has to wait for pickup (`Some(Waiting)`).
     /// `key` names the control: for a 14-bit pair its MSB.
     pub(super) fn absolute(&self, app: &App, key: (u8, u8), b: &Binding, v: f32) -> Option<Outcome> {
+        self.absolute_in(&self.pickup, Pickup::slot(key), app, b, v)
+    }
+
+    /// [`Midi::absolute`] with the soft takeover state in slot `slot` of `pick` (`None`: the control is not tracked, it is
+    /// applied as sent). A controller plugin's controls have a table of their own ([`Pickup::plugin_slot`]).
+    pub(super) fn absolute_in(
+        &self,
+        pick: &Pickup,
+        slot: Option<usize>,
+        app: &App,
+        b: &Binding,
+        v: f32,
+    ) -> Option<Outcome> {
         let act = &ACTIONS[b.act];
         let Kind::Knob(set) = act.kind else {
             return None;
         };
-        let tracked = Pickup::slot(key).zip(act.read);
+        let tracked = slot.zip(act.read);
         if let Some((slot, read)) = tracked
             && let Some(soft) = read(app, b.deck)
-            && let Some(up) = self.pickup.check(slot, (b.act, b.deck), v, soft)
+            && let Some(up) = pick.check(slot, (b.act, b.deck), v, soft)
             && prefs::with(|p| p.controller.soft_takeover)
             && !self.dump.get().is_some_and(|w| w.open(Instant::now()))
         {
-            if self.pickup.announce(slot, up, Instant::now()) {
+            if pick.announce(slot, up, Instant::now()) {
                 toast::show(app, &hint(act, b.deck, up));
             }
             return Some(Outcome::Waiting(b.act, b.deck));
@@ -132,7 +150,7 @@ impl Midi {
         if let Some((slot, read)) = tracked
             && let Some(soft) = read(app, b.deck)
         {
-            self.pickup.landed(slot, soft);
+            pick.landed(slot, soft);
         }
         None
     }

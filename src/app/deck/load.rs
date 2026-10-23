@@ -5,7 +5,7 @@
 
 use super::{
     Deck, Loaded, Pending, at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm, render,
-    tempo_text,
+    tempo_at, tempo_text,
 };
 use crate::app::prefs::{self, analysis::GridSource};
 use openfader::{
@@ -59,8 +59,17 @@ fn decode_and_analyze(
                 .and_then(|file| audio::decode_track16_cancellable(file, &stop)),
         };
         let (track, print) = match decoded {
-            Ok(decoded) => decoded,
+            Ok(decoded) => {
+                if library {
+                    let _ = store::global().health_clear_failure(&t);
+                }
+                decoded
+            }
             Err(e) => {
+                // Library health lists the file as corrupt; a load the user cancelled says nothing about the file.
+                if library && !stop() {
+                    let _ = store::global().health_note_failure(&t, &e);
+                }
                 let _ = tx.send(Err(e));
                 return;
             }
@@ -146,6 +155,23 @@ impl Deck {
             && store::key(&d.track) == key
         {
             crate::app::trackinfo::copy_metadata(&mut d.track, edited);
+        }
+    }
+
+    /// The jacket shows `t`'s cover ([`crate::app::artwork::cover`]), or the empty jacket when it has none.
+    fn show_cover(&self, t: &Track) {
+        let cover = crate::app::artwork::cover(&store::global(), t, 160);
+        self.show(|v| {
+            v.has_cover = cover.is_some();
+            v.cover = cover.unwrap_or_default();
+        });
+    }
+
+    /// A cover was chosen or undone: the loaded track's jacket reads it again.
+    pub(in crate::app) fn refresh_cover(&self) {
+        let track = self.loaded.borrow().track.clone();
+        if let Some(t) = track {
+            self.show_cover(&t);
         }
     }
 
@@ -398,6 +424,7 @@ impl Deck {
             v.artist = t.artist.clone().into();
             (v.elapsed_text, v.remain_text) =
                 (fmt_ms(0).into(), format!("-{}", fmt_ms(duration)).into());
+            v.total_text = fmt_ms(duration).into();
             v.status = if loading {
                 tr!("loading… · {}", status)
             } else {
@@ -416,7 +443,9 @@ impl Deck {
             v.loop_beats = 0;
             v.loop_active = false;
             v.grid_edit = false;
+            v.grid_here = false;
         });
+        self.show_cover(t);
         self.refresh_key();
         if library && !downloading {
             event::fire(
@@ -562,6 +591,7 @@ impl Deck {
         }
         l.invalidate();
         let grid = grid_bpm(&l.analysis.beats);
+        let here = tempo_at(&l.analysis.beats, self.clock(&l).0);
         let status = summary(
             &pending.title,
             &l.analysis,
@@ -569,7 +599,7 @@ impl Deck {
             l.auto_cues.get(),
             &pending.notes,
         );
-        if let Some(g) = grid {
+        if let Some(g) = here {
             l.base_bpm = g;
         }
         if l.key.is_empty() {
@@ -598,7 +628,7 @@ impl Deck {
                 v.cues = ModelRc::new(VecModel::from(c));
                 v.pads = ModelRc::new(VecModel::from(p));
             }
-            v.bpm_text = bpm_text(grid, rate);
+            v.bpm_text = bpm_text(here, rate);
             v.bpm = (base * rate) as f32;
         });
         self.refresh_key();

@@ -75,6 +75,7 @@ impl View {
                 String::new(),
             ),
             (13 | 14, 0) => self.ask(app, Ask::NewBank, tr!("New Cue Bank:"), String::new()),
+            (15 | 16, 0) => self.ask(app, Ask::NewStage, tr!("New stage:"), String::new()),
             (6 | 7, 1) => {
                 let cat = match &self.entry {
                     Entry::Category(c) => Some(*c),
@@ -91,6 +92,9 @@ impl View {
 
     /// MORE pressed on a node of My Playlists.
     pub(super) fn open_more(&mut self, app: &App) {
+        if matches!(self.entry, Entry::StageRoot | Entry::Stage(_)) {
+            return self.open_stage_panel(app);
+        }
         if matches!(self.entry, Entry::Bank(_)) {
             return self.open_bank_panel(app);
         }
@@ -134,6 +138,7 @@ impl View {
             5 => vec![(tr!("New category"), 0)],
             6 | 7 => vec![(tr!("New category"), 0), (tr!("New tag"), 1)],
             13 | 14 => vec![(tr!("New Cue Bank"), 0)],
+            15 | 16 => vec![(tr!("New stage"), 0)],
             _ => return,
         }
         .into_iter()
@@ -186,10 +191,12 @@ impl View {
             Ask::Rename(e @ Entry::Category(id)) => st.rename_mytag_category(id, &name).map(|()| e),
             Ask::Rename(e @ Entry::Tag(id)) => st.rename_mytag(id, &name).map(|()| e),
             Ask::Rename(e @ Entry::Bank(id)) => st.rename_bank(id, &name).map(|()| e),
+            Ask::Rename(e @ Entry::Stage(id)) => st.rename_stage(id, &name).map(|()| e),
             Ask::Rename(_) => return,
             Ask::NewCategory => st.add_mytag_category(&name).map(Entry::Category),
             Ask::NewTag(c) => st.add_mytag(c, &name).map(Entry::Tag),
             Ask::NewBank => st.add_bank(&name).map(Entry::Bank),
+            Ask::NewStage => st.add_stage(&name).map(Entry::Stage),
         };
         if let Some(e) = self.try_store(app, made) {
             self.entry = e.clone();
@@ -208,6 +215,11 @@ impl View {
         let e = self.entry.clone();
         if !is_named(&e) {
             return;
+        }
+        if let Entry::Stage(id) = e
+            && self.stage(id).is_some_and(|s| s.role != openfader::store::Role::Middle)
+        {
+            return self.say(app, tr!("INBOX and COLLECTION cannot be deleted: rename them instead"));
         }
         let name = self.name_of(&e);
         if matches!(e, Entry::Category(_)) && tagging::is_default(&name) {
@@ -234,6 +246,7 @@ impl View {
             }
             Entry::Tag(id) => s.action(tr!("Delete tag"), || s.delete_mytag(*id)),
             Entry::Bank(id) => s.action(tr!("Delete cue bank"), || s.delete_bank(*id)),
+            Entry::Stage(id) => s.action(tr!("Delete stage"), || s.delete_stage(*id)),
             _ => return,
         };
         if self.try_store(app, r).is_none() {
@@ -242,6 +255,7 @@ impl View {
         self.entry = match e {
             Entry::User(_) => Entry::UserRoot,
             Entry::Bank(_) => Entry::BankRoot,
+            Entry::Stage(_) => Entry::StageRoot,
             _ => Entry::TagsRoot,
         };
         self.rebuild(app);

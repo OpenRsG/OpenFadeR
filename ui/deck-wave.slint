@@ -32,11 +32,13 @@ export component WaveStrip inherits Rectangle {
     changed height => { self.resized(self.width, self.height); }
     changed index => { self.resized(self.width, self.height); }
     Image {
-        x: root.s.strip-x;
+        x: DeckState.waveform-gpu ? 0px : root.s.strip-x;
         y: 0;
-        width: root.s.strip-w;
+        width: DeckState.waveform-gpu ? root.width : root.s.strip-w;
         height: root.height;
         source: DeckState.decks[root.index].detail;
+        source-clip-x: DeckState.waveform-gpu ? round(-root.s.strip-x / max(1px, root.s.strip-w) * self.source.width) : 0;
+        source-clip-width: DeckState.waveform-gpu ? round(root.width / max(1px, root.s.strip-w) * self.source.width) : self.source.width;
         image-fit: fill;
         image-rendering: pixelated;
     }
@@ -226,6 +228,7 @@ export component DeckOverview inherits Rectangle {
     property <bool> loaded: DeckState.decks[root.index].loaded;
     /// The deck's PHRASE EDIT row is open in EXPORT mode and the edit is allowed.
     property <bool> editing: ExportModeState.visible && DeckState.decks[root.index].grid-edit && ExportModeState.decks[root.index].phrase-panel && ExportModeState.decks[root.index].phrase-enabled;
+    clip: true;
     background: Theme.wave-bg;
     // `init` and the first layout pass run before Rust connects the callback, so report again once a track loads.
     changed loaded => { DeckState.overview-resized(root.index, self.width, self.height); }
@@ -233,6 +236,25 @@ export component DeckOverview inherits Rectangle {
     WaveView {
         source: DeckState.decks[root.index].overview;
         resized(w, h) => { DeckState.overview-resized(root.index, w, h); }
+    }
+    // Tiny physical-pixel textures reuse the CPU painter's marks, composed over a static overview.
+    if DeckState.waveform-gpu && root.loaded: Rectangle {
+        if DeckState.scroll[root.index].overview-slip-x >= 0: Image {
+            x: DeckState.scroll[root.index].overview-slip-x;
+            source: DeckState.decks[root.index].overview-ghost;
+            width: parent.height / max(1, self.source.height) * self.source.width;
+            height: parent.height;
+            image-fit: fill;
+            image-rendering: pixelated;
+        }
+        Image {
+            x: DeckState.scroll[root.index].overview-x;
+            source: DeckState.decks[root.index].overview-head;
+            width: parent.height / max(1, self.source.height) * self.source.width;
+            height: parent.height;
+            image-fit: fill;
+            image-rendering: pixelated;
+        }
     }
     Rectangle {
         background: Theme.danger;

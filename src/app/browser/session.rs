@@ -2,9 +2,10 @@
 //! session history, the stored play history, and the 200 ms timer that watches the decks.
 
 use super::{
-    Home, View, history,
+    history,
     sidebar::{HISTORY_ROW, TAG_ROW},
     table::reference,
+    Home, View,
 };
 use crate::app::{
     App, BrowserState, DeckState, analyze::detected, deck::Decks, library::settings, prefs,
@@ -139,6 +140,7 @@ pub(super) fn start_poll(app: &App, view: &Rc<RefCell<View>>, decks: Decks) {
             if ticks % 5 == 0 {
                 v.refresh_sources(&app); // devices plugged / unplugged, Media Browser settings
             }
+            v.health_tick(&app);
             for t in played {
                 v.log(&app, t);
             }

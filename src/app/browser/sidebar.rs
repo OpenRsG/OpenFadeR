@@ -3,7 +3,8 @@
 //! Top to bottom: All tracks, Tag List, Session history, Duplicate tracks (the first three rows keep their
 //! numbers, `BrowserState.tag-row` is row 1), then **My Playlists** (our folders / playlists / smart playlists from
 //! the store), **History** (one entry per day the store logged), **Tags** (categories, their tags) and **Library**
-//! (the opened source's own playlists, read-only; its "Histories" folder is among them).
+//! (the opened source's own playlists, read-only; its "Histories" folder is among them). **Library health** (heading and one row per
+//! check, [`super::health::rows`]) is added before Library when the tree is rebuilt.
 
 use openfader::{
     library::Playlist,
@@ -30,6 +31,10 @@ pub enum Entry {
     BankRoot,
     /// A Cue Bank of the store (id).
     Bank(i64),
+    /// "Stages" heading above INBOX → REVIEW → COLLECTION (the store's [`openfader::store::Stage`]s).
+    StageRoot,
+    /// A stage by id.
+    Stage(i64),
     HistoryRoot,
     /// A day of the stored play history, `YYYY-MM-DD`.
     Day(String),
@@ -43,6 +48,10 @@ pub enum Entry {
     PlaylistsAll,
     /// The CUE Analysis playlist (Preferences > View > Layout > Browser panel): tracks CUE Analysis set cues on.
     CueAnalysis,
+    /// "Library health" heading (above its checks, before Library): see [`super::health`].
+    HealthRoot,
+    /// One check of Library health.
+    Health(crate::app::library::health::Check),
     /// "Devices" heading above the mounted devices.
     DevicesRoot,
     /// An external source (a device, iTunes, library xml, Explorer) by index into the browser's sources; it opens when chosen.
@@ -62,6 +71,13 @@ pub struct SourceRows {
     pub playlists: Vec<Playlist>,
 }
 
+/// One stage as the tree shows it, with the tracks waiting in it.
+pub struct StageRow {
+    pub id: i64,
+    pub name: String,
+    pub count: usize,
+}
+
 pub struct Inputs<'a> {
     pub tag_list: usize,
     pub session: usize,
@@ -77,6 +93,8 @@ pub struct Inputs<'a> {
     pub cue_analysis: Option<usize>,
     /// The store's Cue Banks when the Media Browser shows them.
     pub banks: Option<&'a [HotCueBank]>,
+    /// INBOX → REVIEW → COLLECTION, first to last (none: no heading).
+    pub stages: &'a [StageRow],
 }
 
 fn indent(depth: usize, label: &str) -> String {
@@ -123,6 +141,15 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         rows.extend(banks.iter().map(|b| {
             let label = format!("{} ({}/{MAX_BANKS})", b.name, b.slots.len());
             (Entry::Bank(b.id), indent(1, &label))
+        }));
+    }
+    if !i.stages.is_empty() {
+        rows.push((Entry::StageRoot, tr!("▸ Stages").to_owned()));
+        rows.extend(i.stages.iter().map(|s| {
+            (
+                Entry::Stage(s.id),
+                indent(1, &format!("{} ({})", s.name, s.count)),
+            )
         }));
     }
     rows.push((Entry::HistoryRoot, tr!("▸ History").to_owned()));
@@ -255,6 +282,18 @@ mod tests {
             name: "Peak".into(),
             slots: Vec::new(),
         }];
+        let stages = [
+            StageRow {
+                id: 1,
+                name: "INBOX".into(),
+                count: 2,
+            },
+            StageRow {
+                id: 3,
+                name: "COLLECTION".into(),
+                count: 5,
+            },
+        ];
         let (entries, labels) = build(&Inputs {
             tag_list: 2,
             session: 4,
@@ -267,6 +306,7 @@ mod tests {
             all_tracks: false,
             cue_analysis: None,
             banks: Some(&banks),
+            stages: &stages,
         });
         assert_eq!(entries[TAG_ROW], Entry::Tags);
         assert_eq!(entries[HISTORY_ROW], Entry::Session);
@@ -283,6 +323,9 @@ mod tests {
                 "    House (smart)",
                 "▸ Cue Bank",
                 "    Peak (0/8)",
+                "▸ Stages",
+                "    INBOX (2)",
+                "    COLLECTION (5)",
                 "▸ History",
                 "    2026-10-13 (3)",
                 "    2026-10-12 (1)",
@@ -299,9 +342,11 @@ mod tests {
         assert_eq!(entries.len(), labels.len());
         assert_eq!(entries[6], Entry::User(2));
         assert_eq!(entries[9], Entry::Bank(7));
-        assert_eq!(entries[11], Entry::Day("2026-10-13".into()));
-        assert_eq!(entries[15], Entry::Tag(9));
-        assert_eq!(entries[20], Entry::Lib(1));
+        assert_eq!(entries[10], Entry::StageRoot);
+        assert_eq!(entries[12], Entry::Stage(3));
+        assert_eq!(entries[14], Entry::Day("2026-10-13".into()));
+        assert_eq!(entries[18], Entry::Tag(9));
+        assert_eq!(entries[23], Entry::Lib(1));
     }
 
     #[test]
@@ -318,6 +363,7 @@ mod tests {
             all_tracks: false,
             cue_analysis: None,
             banks: None,
+            stages: &[],
         });
         assert_eq!(
             e,
@@ -374,6 +420,7 @@ mod tests {
             all_tracks: true,
             cue_analysis: Some(3),
             banks: None,
+            stages: &[],
         });
         assert_eq!(l[4], "CUE Analysis (3)");
         assert_eq!(l[6], "    All Tracks");

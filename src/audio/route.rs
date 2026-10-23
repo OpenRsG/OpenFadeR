@@ -49,6 +49,9 @@ pub struct Settings {
     pub mic_gain: f32,
     pub talkover_advanced: bool,
     pub talkover_gain: f32,
+    /// AUX channel ducking: linear gain of the decks while the AUX is heard (1 = no ducking) and the seconds they take to come back.
+    pub aux_duck: f32,
+    pub aux_release: f32,
 }
 
 impl Default for Settings {
@@ -69,6 +72,8 @@ impl Default for Settings {
             mic_gain: 0.0,
             talkover_advanced: true,
             talkover_gain: 1.0,
+            aux_duck: 1.0,
+            aux_release: 0.4,
         }
     }
 }

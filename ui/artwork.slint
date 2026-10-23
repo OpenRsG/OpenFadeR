@@ -1,0 +1,70 @@
+import { Chip } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DialogFrame, Note } from "dialog.slint";
+
+/// One picture an artwork plugin offered, as the picker shows it: the thumbnail, where it comes from and its size ("600 px", "" when unknown).
+export struct ArtCandidate {
+    thumb: image,
+    source: string,
+    size: string,
+}
+
+/// FIND ARTWORK (src/app/artwork/): the picker of the pictures every enabled artwork plugin offered for a track. Rust owns it.
+export global ArtworkState {
+    in property <bool> open;
+    /// "Artist — Album" of the track asked about.
+    in property <string> title;
+    /// What is going on or why there is nothing to choose ("Asking MusicBrainz …", "No artwork found", an error).
+    in property <string> status;
+    in property <[ArtCandidate]> candidates;
+    /// A candidate was chosen and is being downloaded and saved.
+    in property <bool> saving;
+    callback choose(int);
+    callback closed();
+}
+
+/// The picker: a grid of thumbnails, a click chooses one.
+export component ArtworkPicker inherits Rectangle {
+    DialogFrame {
+        title: @tr("FIND ARTWORK");
+        card-width: min(584px, root.width - 16px);
+        card-height: min(480px, root.height - 16px);
+        body-padding: Theme.space-md;
+        closed => { ArtworkState.closed(); }
+        Text { text: ArtworkState.title; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; overflow: elide; vertical-stretch: 0; }
+        if ArtworkState.status != "": Note { text: ArtworkState.status; vertical-stretch: 0; }
+        Flickable {
+            content-width: self.width;
+            content-height: grid.preferred-height;
+            grid := VerticalLayout {
+                width: parent.content-width;
+                spacing: Theme.space-md;
+                alignment: start;
+                for r in Math.ceil(ArtworkState.candidates.length / 4): HorizontalLayout {
+                    spacing: Theme.space-md;
+                    alignment: start;
+                    for c in 4: Rectangle {
+                        property <int> k: r * 4 + c;
+                        width: 128px;
+                        height: 164px;
+                        if k < ArtworkState.candidates.length: Rectangle {
+                            background: ta.has-hover && !ArtworkState.saving ? Theme.select : Theme.panel-raised;
+                            border-radius: Theme.radius;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            Image { x: 8px; y: 8px; width: 112px; height: 112px; source: ArtworkState.candidates[k].thumb; image-fit: contain; }
+                            Text { x: 8px; y: 124px; width: 112px; text: ArtworkState.candidates[k].source; color: Theme.text; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; overflow: elide; }
+                            Text { x: 8px; y: 142px; width: 112px; text: ArtworkState.candidates[k].size; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; overflow: elide; }
+                            ta := TouchArea { enabled: !ArtworkState.saving; mouse-cursor: pointer; clicked => { ArtworkState.choose(k); } }
+                        }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            alignment: end;
+            vertical-stretch: 0;
+            Chip { text: @tr("Close"); min-width: self.fit-width; clicked => { ArtworkState.closed(); } }
+        }
+    }
+}

@@ -6,7 +6,8 @@
 //! [`decode_async`] / [`decode_track16_async`] on a worker thread), [`dsp`] (EQ + filter biquads),
 //! [`stretch`] (WSOLA key lock), [`bus`] (master / headphone routing math and knobs), [`route`] (which device channel pairs
 //! carry Master / Headphones / Booth, or the six External outputs), [`device`] (what the OS devices support), [`input`] (an
-//! input pair for REC), [`mic`] (the microphone and talkover), [`metronome`] (the grid click), [`preview`] (the browser's
+//! input pair for REC), [`mic`] (the microphone and talkover), [`auxin`] (the AUX / LINE channel: input pair, strip and ducking),
+//! [`duck`] (the ducker the mic and AUX share), [`metronome`] (the grid click), [`preview`] (the browser's
 //! preview player), [`cue`] (second output device for the headphones, `OPENFADER_CUE_DEVICE`), [`rec`] (post-master WAV
 //! recorder), [`player`] (one cpal stream shared by the mixer's `Player`s: varispeed or key-locked tempo, loop, volume, cue
 //! gain, EQ, filter, level meter, and the latency-compensated position clock), [`transport`] (key shift, reverse, slip and
@@ -18,12 +19,14 @@
 //! [`track16`] ([`Track16`]: the 16-bit track a deck's player and the browser preview keep, half the RAM of a [`Pcm`]); [`wavout`] writes a slice as a
 //! 16-bit stereo WAV.
 
+pub mod auxin;
 mod bus;
 pub mod cfx;
 mod cue;
 mod decode;
 pub mod device;
 mod dsp;
+mod duck;
 pub mod fx;
 pub mod groove;
 mod handover;
@@ -37,13 +40,14 @@ pub mod preview;
 mod rec;
 pub mod route;
 pub mod sampler;
+pub mod stemfile;
 mod stems;
 mod stretch;
 mod track16;
 mod transport;
 pub(crate) mod wavout;
 
-pub use bus::{Bus, CHANNELS, FX_SLOTS, FX_UNITS, Headphones, MAX_LEVEL, equal_power};
+pub use bus::{equal_power, Bus, Headphones, AUX, CHANNELS, FX_SLOTS, FX_UNITS, MAX_LEVEL};
 pub use decode::{
     DecodeJob, decode, decode_async, decode_cancellable, decode_track16_async,
     decode_track16_cancellable, probe_rate,
@@ -52,7 +56,7 @@ pub use dsp::{EQ_KILL_DB, EQ_MAX_DB};
 pub use player::{
     Player, Status, configure, controller, live_bus, release_controller, set_output, status,
 };
-pub use rec::{Options as RecOptions, Recorder, new_path as rec_path};
+pub use rec::{new_path as rec_path, Options as RecOptions, Recorder, Take};
 pub use stems::{
     BASS, COUNT as STEM_COUNT, DRUMS, Grid, INST, Mixed, NAMES as STEM_NAMES, Source, Stems, VOCAL,
 };

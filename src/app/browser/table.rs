@@ -20,14 +20,16 @@ use std::{
 
 /// Table column indices, in the order of the model rows read by `TrackTable` in ui/browser-table.slint.
 /// Columns 0..=7 are sortable text; `KEY_HUE` (Camelot number 1..12, "0" none), `HINTS` ("k" key compatible with the
-/// master deck, "b" BPM within ±6 %) and `PLAYED` ("1" the track played: its title is dimmed) are not shown as text.
+/// master deck, "b" BPM within ±6 %), `PLAYED` ("1" the track played: its title is dimmed) and `STEM_FILE` ("1" the file
+/// is a stem file: its title wears a badge) are not shown as text.
 pub const BPM: usize = 4;
 pub const TIME: usize = 5;
 pub const RATING: usize = 6;
 pub const KEY_HUE: usize = 8;
 pub const HINTS: usize = 9;
 pub const PLAYED: usize = 10;
-pub const COLUMNS: usize = 11;
+pub const STEM_FILE: usize = 11;
+pub const COLUMNS: usize = 12;
 pub const KEY: usize = 3;
 
 /// BPM hint window: ± this fraction of the playing deck's BPM.
@@ -148,6 +150,14 @@ fn shown_cell(t: &Track, f: &Facts, col: usize, r: &Reference, look: &Look) -> S
         KEY_HUE => f.wheel.map_or(0, |k| k.0).to_string().as_str().into(),
         HINTS => hints(f, r, look.level).into(),
         PLAYED => SharedString::new(), // filled in by [`row`]
+        STEM_FILE
+            if t.file
+                .as_deref()
+                .is_some_and(openfader::audio::stemfile::is_stem_name) =>
+        {
+            "1".into()
+        }
+        STEM_FILE => SharedString::new(),
         // A track whose file is gone is marked "[!]" (File > Display All Missing Files lists them).
         0 if t
             .file

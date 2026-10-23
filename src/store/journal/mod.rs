@@ -23,6 +23,7 @@ use super::{R, Sql, Store, exec, in_tx, query_all, query_opt, scalar};
 use rusqlite::{Connection, functions::FunctionFlags, params_from_iter, types::Value};
 use std::{
     cell::RefCell,
+    path::PathBuf,
     sync::{
         atomic::{AtomicI64, AtomicU64, Ordering},
         Arc,
@@ -39,6 +40,7 @@ const MARKERS: i64 = 1000;
 
 /// User data: the tables whose changes are journaled.
 const TABLES: &[&str] = &[
+    "artwork",
     "track",
     "cue",
     "node",
@@ -59,6 +61,8 @@ const TABLES: &[&str] = &[
     "source_node",
     "analysis_lock",
     "history",
+    "stage",
+    "inbox_move",
 ];
 
 /// Tables whose primary key starts with the track key (see [`Store::changed_since`]).
@@ -171,6 +175,7 @@ fn noun(table: &str, op: i64, old: Option<&str>, new: Option<&str>) -> &'static 
         "matching" => "matching",
         "analysis_lock" => "analysis lock",
         "phrase_edit" => "phrases",
+        "artwork" => "artwork",
         "gain" => "gain",
         "sequence" => "sampler sequence",
         "collection" | "removed" => "collection",
@@ -297,6 +302,35 @@ impl Store {
             Some((id, label)) => Some(label_of(&db, id, label)?),
             None => None,
         })
+    }
+
+    /// The file moves `(from, to)` the step that undo (`redo` false) or redo would replay recorded (`inbox_move` rows whose
+    /// file moved), already turned the way the replay goes: an undo walks them last to first, from `to` back to `from`.
+    pub(super) fn step_file_moves(&self, redo: bool) -> R<Vec<(PathBuf, PathBuf)>> {
+        let db = self.db();
+        let Some((id, _)) = step(&db, redo)? else {
+            return Ok(Vec::new());
+        };
+        let mut moves: Vec<(PathBuf, PathBuf)> = query_all(
+            &db,
+            "SELECT json_extract(new, '$.from_path'), json_extract(new, '$.to_path') FROM journal
+             WHERE action = ?1 AND tbl = 'inbox_move' AND op = 0
+               AND json_extract(new, '$.from_path') != json_extract(new, '$.to_path') ORDER BY seq",
+            [id],
+            |r| {
+                Ok((
+                    PathBuf::from(r.get::<_, String>(0)?),
+                    PathBuf::from(r.get::<_, String>(1)?),
+                ))
+            },
+        )?;
+        if !redo {
+            moves.reverse();
+            moves
+                .iter_mut()
+                .for_each(|m| *m = (m.1.clone(), m.0.clone()));
+        }
+        Ok(moves)
     }
 
     /// Undoes the latest step; its label, or `None` when there is nothing to undo.

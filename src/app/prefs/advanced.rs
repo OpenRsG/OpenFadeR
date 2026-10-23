@@ -13,6 +13,9 @@ const DEFAULT_THRESHOLD: i32 = -60;
 const DEFAULT_LOOP_HZ: u32 = 44_100;
 /// Export Loop As Wav sampling frequencies, Hz.
 const LOOP_RATES: [u32; 4] = [DEFAULT_LOOP_HZ, 48_000, 88_200, 96_000];
+/// Shortest time a track must lead the mix to get a line in a recording's cue sheet and tracklist, seconds.
+const MIN_TRACK_SECS: [u16; 8] = [0, 5, 10, 20, 30, 45, 60, 90];
+const DEFAULT_MIN_TRACK_SECS: u16 = 30;
 
 section!(
     Advanced {
@@ -31,8 +34,15 @@ section!(
         /// Automatically import a recorded file / display its tag information.
         rec_import: bool = true;
         rec_tag_window: bool = true;
+        /// Sidecar files written next to each recording: cue sheet, tracklist, control log; and the shortest track in them (one of [`MIN_TRACK_SECS`]).
+        rec_cue: bool = true;
+        rec_tracklist: bool = true;
+        rec_controls: bool = false;
+        rec_min_track_secs: u16 = DEFAULT_MIN_TRACK_SECS;
         /// Export Loop As Wav: sampling frequency in Hz, one of [`LOOP_RATES`].
         export_loop_hz: u32 = DEFAULT_LOOP_HZ;
+        /// Ask GitHub for a newer release at start, once a day (src/app/update.rs).
+        check_updates: bool = true;
     }
 );
 
@@ -66,6 +76,16 @@ impl Advanced {
             .map(PathBuf::from)
     }
 
+    /// `rec_min_track_secs` if it is one of [`MIN_TRACK_SECS`] (a hand-edited file may hold anything), else the default.
+    pub fn min_track(&self) -> std::time::Duration {
+        let s = if MIN_TRACK_SECS.contains(&self.rec_min_track_secs) {
+            self.rec_min_track_secs
+        } else {
+            DEFAULT_MIN_TRACK_SECS
+        };
+        std::time::Duration::from_secs(s as u64)
+    }
+
     /// Sampling frequency of a loop exported as WAV.
     pub fn loop_hz(&self) -> u32 {
         if LOOP_RATES.contains(&self.export_loop_hz) {
@@ -80,6 +100,10 @@ impl Advanced {
             "rec_threshold" => THRESHOLDS.get(i).map(|&v| self.rec_threshold = v).is_some(),
             "rec_split_secs" => (i < 10)
                 .then(|| self.rec_split_secs = i as u8 + 1)
+                .is_some(),
+            "rec_min_track_secs" => MIN_TRACK_SECS
+                .get(i)
+                .map(|&v| self.rec_min_track_secs = v)
                 .is_some(),
             "export_loop_hz" => LOOP_RATES
                 .get(i)
@@ -145,6 +169,31 @@ pub fn recording_rows(a: &Advanced) -> Vec<Row> {
             tr!("Automatically display the tag information of a recorded file"),
             a.rec_tag_window,
         ),
+        Row::check(
+            "rec_cue",
+            tr!("Write a cue sheet next to each recording"),
+            a.rec_cue,
+        ),
+        Row::check(
+            "rec_tracklist",
+            tr!("Write a tracklist next to each recording"),
+            a.rec_tracklist,
+        ),
+        Row::check(
+            "rec_controls",
+            tr!("Write a control log next to each recording"),
+            a.rec_controls,
+        ),
+        Row::dropdown_of(
+            "rec_min_track_secs",
+            tr!("SHORTEST TRACK LISTED"),
+            MIN_TRACK_SECS.iter().map(|s| format!("{s} s")).collect(),
+            MIN_TRACK_SECS
+                .iter()
+                .position(|&s| s as u64 == a.min_track().as_secs())
+                .unwrap_or(0),
+        )
+        .enabled(a.rec_cue || a.rec_tracklist),
     ]
 }
 
@@ -157,6 +206,7 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     let rates: Vec<String> = LOOP_RATES.iter().map(|h| format!("{h} Hz")).collect();
     // The database and browse rows bring their own headings.
     let mut rows = library::database_rows(p);
+    rows.extend(crate::app::library::inbox::rows(p));
     rows.extend(library::browse_rows(p));
     rows.push(Row::header(tr!("RECORDINGS")));
     rows.extend(recording_rows(a));
@@ -175,6 +225,8 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         ),
         Row::dropdown_of("export_loop_hz", tr!("EXPORT LOOP AS WAV"), rates, at)
             .hint(tr!("sampling frequency")),
+        Row::check("check_updates", tr!("Check for updates"), a.check_updates)
+            .hint(tr!("once a day, at start")),
     ]);
     rows
 }
@@ -185,6 +237,7 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
         || ["sync_type", "sync_half_double", "hot_cue_gate"].contains(&key)
             && p.controller.pick(key, i)
         || library::database_choose(p, key, i)
+        || crate::app::library::inbox::choose(p, key, i)
         || library::browse_choose(p, key, i)
 }
 

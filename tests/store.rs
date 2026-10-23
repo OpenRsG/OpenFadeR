@@ -158,6 +158,23 @@ fn playlists_mytags_and_history() {
     assert_eq!(s.history_day("2026-10-13").unwrap(), keys(&["x|1", "y|2"]));
 }
 
+#[test]
+fn a_grid_with_tempo_sections_comes_back_whole() {
+    let dir = temp("sections");
+    let path = dir.join("store.db");
+    // 120 BPM for four beats, then 128 BPM: each beat keeps its own tempo
+    let grid: Vec<Beat> = (0..8)
+        .map(|i| Beat {
+            bar_pos: i % 4 + 1,
+            bpm_x100: if i < 4 { 12000 } else { 12800 },
+            time_ms: if i < 4 { i as u32 * 500 } else { 2000 + (i as u32 - 4) * 469 },
+        })
+        .collect();
+    Store::open_at(&path).unwrap().set_grid("k", &grid, &grid).unwrap();
+    let s = Store::open_at(&path).unwrap();
+    assert_eq!(s.edits("k").unwrap().grid.as_deref(), Some(&grid[..]));
+}
+
 /// A library of two tracks whose own rating / comment / cues / grid the store may override.
 struct Lib(Arc<Vec<Track>>);
 

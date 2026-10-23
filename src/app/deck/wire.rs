@@ -80,6 +80,8 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
     on!(state, at decks, on_grid_halve, |d| d.grid_halve());
     on!(state, at decks, on_grid_tap, |d| d.grid_tap());
     on!(state, at decks, on_grid_reset, |d| d.grid_reset());
+    on!(state, at decks, on_grid_here, |d| d.grid_here_toggle());
+    on!(state, at decks, on_grid_merge, |d| d.grid_section_remove());
     on!(state, at decks, on_metronome, |d| d.toggle_metronome());
     on!(state, at decks, on_cue, |d| d.cue_press());
     on!(state, at decks, on_cue_released, |d| d.cue_release());
@@ -99,7 +101,10 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
     prefs::on_change(move |p| {
         for deck in &d {
             deck.refresh_key();
-            let grid = super::grid_bpm(&deck.loaded.borrow().analysis.beats);
+            let grid = {
+                let l = deck.loaded.borrow();
+                super::tempo_at(&l.analysis.beats, deck.clock(&l).0)
+            };
             deck.show(|v| v.bpm_text = super::bpm_text(grid, deck.rate.get()));
             deck.rewave();
         }

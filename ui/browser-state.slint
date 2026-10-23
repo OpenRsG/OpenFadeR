@@ -86,6 +86,11 @@ export global BrowserState {
     /// A history list is on screen (session or a stored day): the SAVE M3U8 button applies.
     in property <bool> history-view;
     callback history-save();
+    /// A Library health check is on screen: its action bar applies. `health-act` takes `ignore` (the chosen track), `ignore-all` (every
+    /// listed track), `ignored` (show what was ignored instead) and `rescan`; the other buttons call the library actions.
+    in property <bool> health-view;
+    in property <bool> health-ignored;
+    callback health-act(string);
     /// Sidebar row of the Tag List (the Rust side owns the row layout): where Area puts the tree.
     in property <int> tag-row;
     /// Browse view (VIEW / W): the layout drops the deck panels, FX / sampler and mixer, so the browser fills the window under the waveforms.
@@ -103,6 +108,11 @@ export global BrowserState {
     in property <int> preview-generation;
     callback preview-wanted(int);
     callback preview-seek(int, float);
+    /// Cover column (src/app/browser/cover.rs): one small picture per row, set by Rust when the row first shows (`cover-wanted`);
+    /// `cover-generation` changes when the rows or the covers change, so shown rows ask again.
+    in property <[image]> covers;
+    in property <int> cover-generation;
+    callback cover-wanted(int);
     /// Playlist Palette (src/app/browser/palette/): Preferences > View > Layout > Browser panel > Playlist Palette shows the
     /// toggle button. Palette 0 is the TAG LIST, 1..3 show the playlist assigned to them (`palette-names` "[blank list]"
     /// when none) with its tracks as "title — artist · BPM" lines.
@@ -132,7 +142,7 @@ export global BrowserState {
     callback palette-drop(int, data-transfer);
     // --- Sidebar management (src/app/browser/playlists.rs, tagging.rs) ---
     /// What the chosen sidebar row is: 0 read-only list, 1 My Playlists, 2 folder, 3 playlist, 4 smart playlist,
-    /// 5 Tags, 6 category, 7 tag, 8 library playlist, 9 library folder, 13 Cue Bank heading, 14 a Cue Bank.
+    /// 5 Tags, 6 category, 7 tag, 8 library playlist, 9 library folder, 13 Cue Bank heading, 14 a Cue Bank, 15 Stages heading, 16 a stage.
     in property <int> side-kind;
     /// Row Rust wants chosen after it rebuilt the tree (a create / rename moved the selection); the tree scrolls to it.
     in property <int> side-row;
@@ -172,13 +182,24 @@ export global BrowserState {
 }
 
 /// Automix (src/app/automix/): plays the shown list over both decks. The AUTOMIX button is handled by the browser
-/// (it knows the list), SKIP and the driver by Automix. `bars` (8 / 16 / 32) is the crossfade length.
+/// (it knows the list), SKIP and the driver by Automix. `bars` (8 / 16 / 32) is the transition length (LENGTH).
 export global AutomixState {
     in-out property <bool> running;
     in-out property <int> bars: 16;
     /// What Automix is doing; shown instead of the browser status while it runs.
     in property <string> status;
+    /// The automix panel (style, length, the styles RANDOM may use, the plan) is open.
+    in-out property <bool> panel-open;
+    /// Transition styles: RANDOM first, then the built-in ones and the plugins' (`"automix"` in plugin.json). `style` is the
+    /// chosen index (Rust sets it; ask with `style-chose`), `pool[i]` whether RANDOM may use `styles[i]` (`pool[0]` unused).
+    in property <[string]> styles;
+    in property <int> style;
+    in property <[bool]> pool;
+    /// One line per upcoming transition of the running list: the track and the style it is mixed in with.
+    in property <[string]> plan;
     callback toggled();
     callback skip();
+    callback style-chose(int);
+    callback pool-toggled(int);
 }
 

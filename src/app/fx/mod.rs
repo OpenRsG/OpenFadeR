@@ -43,9 +43,9 @@ use logic::{
 };
 pub(super) use logic::{pad_fx_rgb, tempo};
 use openfader::audio::{
-    Bus, FX_SLOTS, FX_UNITS,
-    fx::{Assign, BEAT_TEXT, Effect, FALLBACK_BPM},
+    fx::{Assign, Effect, BEAT_TEXT, FALLBACK_BPM},
     merge::{DEFAULT_VOLUME, PRESETS},
+    Bus, FX_SLOTS, FX_UNITS,
 };
 use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use std::{
@@ -303,7 +303,7 @@ pub fn wire(app: &App, decks: &Decks) {
     s.on_held(move |n, i, on| f.edit(n, |u| edit_slot(u, slot_index(i), |s| s.on = on)));
     let f = fx.clone();
     s.on_assign_selected(move |n, i| {
-        if let Some(a) = assignment(i, deck::active()) {
+        if let Some(a) = assignment(i, deck::active(), prefs::with(|p| p.audio.aux_on)) {
             f.edit(n, |u| u.assign = a);
         }
     });
@@ -334,7 +334,9 @@ pub fn wire(app: &App, decks: &Decks) {
                 f.merge_end(n, true);
             }
             f.edit(n, |u| {
-                if u.assign >= p.decks as i32 && u.assign < 4 {
+                if (u.assign >= p.decks as i32 && u.assign < 4)
+                    || (u.assign == 5 && !p.audio.aux_on)
+                {
                     u.assign = 4;
                 }
                 if u.part == 3 && !p.stems_four {

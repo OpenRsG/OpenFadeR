@@ -1,15 +1,17 @@
 //! Preferences > Analysis as the analysis code takes it: [`openfader::analysis::options::Options`] (parts, grid, cue
 //! options) and the worker count of Analysis Process.
 
-use crate::app::prefs::analysis::{Analysis, CueSetting, Process, TrackMode};
+use crate::app::prefs::analysis::{Analysis, CueSetting, KeyDetector, Process};
 use openfader::analysis::{
     auto::{CueMode, CueOptions, MAX_HOT, MAX_MEMORY, Tendency},
     detect::{GridOptions, Mode},
+    key::Detector,
     options::{Options, Parts},
 };
 
-/// The analysis options for `a`; `tendency` is what CUE Analysis Auto follows (`None` = it falls back to Manual).
-pub fn options(a: &Analysis, tendency: Option<Tendency>) -> Options {
+/// The analysis options for `a`; `tendency` is what CUE Analysis Auto follows (`None` = it falls back to Manual) and
+/// `neural_ready` whether the neural key detector can run now (without it NEURAL runs as CLASSIC).
+pub fn options(a: &Analysis, tendency: Option<Tendency>, neural_ready: bool) -> Options {
     Options {
         parts: Parts {
             grid: a.part_grid,
@@ -18,10 +20,10 @@ pub fn options(a: &Analysis, tendency: Option<Tendency>) -> Options {
             vocal: a.part_vocal,
         },
         grid: GridOptions {
-            mode: match a.mode() {
-                TrackMode::Normal => Mode::Normal,
-                TrackMode::Dynamic => Mode::Dynamic,
-                TrackMode::Auto => Mode::Auto,
+            mode: if a.detect_tempo_changes {
+                Mode::Auto
+            } else {
+                Mode::Normal
             },
             precision: a.high_precision,
             bpm_range: a.bpm_range.bounds(),
@@ -38,6 +40,10 @@ pub fn options(a: &Analysis, tendency: Option<Tendency>) -> Options {
             keep_existing: a.cue_keep,
             comment: a.cue_comment,
             tendency,
+        },
+        key_detector: match a.key_detector {
+            KeyDetector::Neural if neural_ready => Detector::Neural,
+            _ => Detector::Classic,
         },
     }
 }
@@ -64,7 +70,7 @@ mod tests {
     fn settings_map_onto_the_analysis_options() {
         let a = Analysis {
             high_precision: true,
-            track_mode: TrackMode::Auto,
+            detect_tempo_changes: true,
             bpm_range: BpmRange::R70,
             part_key: false,
             cue_hot: 99,
@@ -74,7 +80,7 @@ mod tests {
             cue_comment: true,
             ..Default::default()
         };
-        let o = options(&a, None);
+        let o = options(&a, None, true);
         assert_eq!(
             (o.grid.mode, o.grid.precision, o.grid.bpm_range),
             (Mode::Auto, true, (70, 140))
@@ -98,18 +104,36 @@ mod tests {
             ..a.clone()
         };
         assert_eq!(
-            options(&no_repeat, None).cue.repeat,
+            options(&no_repeat, None, true).cue.repeat,
             None,
             "the N value counts only with its checkbox"
         );
-        let no_precision = Analysis {
-            high_precision: false,
+        let steady = Analysis {
+            detect_tempo_changes: false,
             ..a
         };
         assert_eq!(
-            options(&no_precision, None).grid.mode,
+            options(&steady, None, true).grid.mode,
             Mode::Normal,
-            "Auto without high precision is Normal"
+            "no tempo-change detection, one steady grid"
+        );
+    }
+
+    #[test]
+    fn neural_runs_only_when_chosen_and_its_model_is_ready() {
+        let neural = Analysis {
+            key_detector: KeyDetector::Neural,
+            ..Default::default()
+        };
+        assert_eq!(options(&neural, None, true).key_detector, Detector::Neural);
+        assert_eq!(
+            options(&neural, None, false).key_detector,
+            Detector::Classic,
+            "no model: the classic detector, and its results are cached as classic"
+        );
+        assert_eq!(
+            options(&Analysis::default(), None, true).key_detector,
+            Detector::Classic
         );
     }
 

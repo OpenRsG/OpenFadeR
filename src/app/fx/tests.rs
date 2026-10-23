@@ -69,13 +69,27 @@ fn decks_c_and_d_lead_and_follow_too() {
 #[test]
 fn assignment_offers_only_the_shown_channels_and_master() {
     assert_eq!(
-        [0, 1, 2, 3, 4, 5, -1].map(|i| assignment(i, 4)),
-        [Some(0), Some(1), Some(2), Some(3), Some(4), None, None]
+        [0, 1, 2, 3, 4, 5, 6, -1].map(|i| assignment(i, 4, false)),
+        [
+            Some(0),
+            Some(1),
+            Some(2),
+            Some(3),
+            Some(4),
+            None,
+            None,
+            None
+        ]
     );
     assert_eq!(
-        [0, 1, 2, 3, 4].map(|i| assignment(i, 2)),
+        [0, 1, 2, 3, 4].map(|i| assignment(i, 2, false)),
         [Some(0), Some(1), None, None, Some(4)],
         "CH3 / CH4 need the 4-deck layout"
+    );
+    assert_eq!(
+        [4, 5].map(|i| assignment(i, 2, true)),
+        [Some(4), Some(5)],
+        "AUX needs the AUX input"
     );
 }
 

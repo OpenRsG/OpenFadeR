@@ -34,6 +34,8 @@ struct Entry {
     local: u64,
     /// Made on Unix with the symlink file type in its attributes (the entry's data is the link target).
     symlink: bool,
+    /// Made on Unix with an executable bit in its attributes (kept by [`Zip::unpack`] on Unix).
+    exec: bool,
 }
 
 /// The central directory of a zip, with the file to read entries from.
@@ -94,6 +96,7 @@ impl Zip {
                 size: le32(&dir, p + 24),
                 local: le32(&dir, p + 42),
                 symlink: made_by == 3 && attrs & 0o170000 == 0o120000,
+                exec: made_by == 3 && attrs & 0o100 != 0,
             });
             p += 46 + nl + xl + cl;
         }
@@ -201,6 +204,14 @@ impl Zip {
             let mut out = paths::at(File::create(&dst), &dst)?;
             self.extract(&name, &mut out)
                 .map_err(|e| format!("{name}: {e:?}"))?;
+            #[cfg(unix)]
+            if self.find(&name).is_some_and(|e| e.exec) {
+                use std::os::unix::fs::PermissionsExt;
+                paths::at(
+                    out.set_permissions(std::fs::Permissions::from_mode(0o755)),
+                    &dst,
+                )?;
+            }
         }
         Ok(())
     }

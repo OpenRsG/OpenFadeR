@@ -20,14 +20,17 @@
 //! A, B and D on B) while it runs; the user's THRU / swapped assignments are not restored.
 
 mod driver;
+mod fade;
 mod plan;
+mod rig;
+mod style;
 
 use super::{
+    deck::{active, Decks, DECKS},
     App, AutomixState, BrowserState, DeckState, MixerState,
-    deck::{DECKS, Decks, active},
 };
-use plan::Plan;
 use openfader::library::{Library, Track};
+use plan::Plan;
 use slint::{ComponentHandle, Model, Timer, TimerMode};
 use std::{
     cell::{Cell, RefCell},
@@ -77,6 +80,11 @@ struct Run {
     /// SKIP: mix at the next bar line instead of the planned point.
     asap: bool,
     stage: Stage,
+    styles: Vec<usize>,
+    fade: Option<fade::Fade<rig::Live>>,
+    clock: std::time::Instant,
+    rushed: bool,
+    plan_at: Option<usize>,
 }
 
 pub struct Automix {
@@ -100,6 +108,7 @@ pub fn wire(app: &App, decks: Decks, lib: Rc<dyn Library>) -> Rc<Automix> {
         timer: Timer::default(),
         glide: Cell::new(None),
     });
+    style::wire(app, &am);
     let a = am.clone();
     app.global::<AutomixState>().on_skip(move || a.skip());
     let weak: Weak<Automix> = Rc::downgrade(&am);
@@ -174,11 +183,18 @@ impl Automix {
         }
         m.invoke_crossfade(m.get_crossfader());
         let n = queue.len();
+        let mut styles = Vec::new();
+        style::roll(&app, &mut styles, n, 0);
         *self.run.borrow_mut() = Some(Run {
             queue,
             next: 0,
             asap: false,
             stage: Stage::OnAir { cur },
+            styles,
+            fade: None,
+            clock: std::time::Instant::now(),
+            rushed: false,
+            plan_at: None,
         });
         self.timer.restart();
         let s = app.global::<AutomixState>();
@@ -188,8 +204,11 @@ impl Automix {
 
     /// Stops the driver and hands the mixer back; the decks keep playing. `why` goes to the browser status line.
     pub fn stop(&self, why: &str) {
-        if self.run.borrow_mut().take().is_none() {
+        let Some(mut run) = self.run.borrow_mut().take() else {
             return;
+        };
+        if let Some(f) = run.fade.take() {
+            f.end();
         }
         self.timer.stop();
         if let Some(app) = self.app.upgrade() {
@@ -197,6 +216,7 @@ impl Automix {
             let s = app.global::<AutomixState>();
             s.set_running(false);
             s.set_status("".into());
+            s.set_plan(Default::default());
             app.global::<BrowserState>().set_status(why.into());
         }
     }
@@ -208,7 +228,7 @@ impl Automix {
         };
         let Some(run) = guard.as_mut() else { return };
         match run.stage {
-            Stage::Fading { out, inc, .. } => run.stage = self.finish(&app, out, inc),
+            Stage::Fading { out, inc, .. } => run.stage = self.finish(run, &app, out, inc),
             Stage::Armed {
                 cur, inc, serial, ..
             } => {
@@ -216,7 +236,7 @@ impl Automix {
                     // no bar line to mix at (no grid, or under a bar left): the next track comes in now
                     Stage::Armed { plan: None, .. } => {
                         self.decks[inc].with_player(|p| p.play());
-                        self.finish(&app, cur, inc)
+                        self.finish(run, &app, cur, inc)
                     }
                     armed => armed,
                 }
@@ -298,6 +318,11 @@ mod tests {
             queue: vec![],
             next: 0,
             asap: false,
+            styles: Vec::new(),
+            fade: None,
+            clock: std::time::Instant::now(),
+            rushed: false,
+            plan_at: None,
             stage: Stage::Armed {
                 cur: 0,
                 inc: 1,

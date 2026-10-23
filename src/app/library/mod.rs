@@ -4,7 +4,7 @@
 //!
 //! Children, one per feature: [`import`] (File > Import: tracks, folder, playlist file, a collection file through a library plugin),
 //! [`track`] (the Track menu on the chosen track), [`missing`] (Missing File Manager, relocate, auto relocate),
-//! [`dupes`] (duplicate finder + manager), [`backup`] (Backup / Restore Library), [`playlist`] (Playlist menu: files,
+//! [`dupes`] (duplicate finder + manager), [`health`] (Library health: the checks and the scan; the browser lists them), [`backup`] (Backup / Restore Library), [`playlist`] (Playlist menu: files,
 //! sort, renumber), [`export`] (Export Collection: a library plugin writes it), [`settings`] (Preferences > Advanced > Database / Browse),
 //! [`dialog`] (what the dialogs ask, the file chooser), [`undo`] (Edit > Undo / Redo over the store's change journal).
 //!
@@ -19,7 +19,9 @@ mod backup;
 mod dialog;
 pub mod dupes;
 mod export;
+pub mod health;
 mod import;
+pub mod inbox;
 pub(super) mod missing;
 mod playlist;
 pub mod settings;
@@ -336,7 +338,10 @@ fn act(c: &Rc<Ctx>, id: &str) {
         "exit" => {
             let _ = slint::quit_event_loop();
         }
+        "track-artwork" => super::artwork::find(c),
+        "track-artwork-missing" => super::artwork::fetch_missing(c),
         id if id.starts_with("track-") => track::act(c, id),
+        id if id.starts_with("health-") => health::act(c, id),
         id if id.starts_with("playlist-") => playlist::act(c, id),
         _ => c.say(&tr!("unknown menu action {}", id)),
     }
@@ -393,4 +398,6 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) {
     let k = c.clone();
     s.on_dupes_rescan(move || dupes::scan(&k));
     export::wire(app, &c);
+    inbox::wire(&c);
+    super::artwork::wire(app, &c);
 }

@@ -10,8 +10,8 @@
 use super::{Tap, device};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SampleRate, SizedSample, Stream, StreamConfig};
-use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Arc;
 
 /// Frames of slack for the recorder's writer thread, as the bus tap has.
 pub(super) const TAP_FRAMES: usize = 1 << 17;
@@ -25,6 +25,83 @@ pub struct Input {
 impl Input {
     pub fn tap(&self) -> Arc<Tap> {
         self.tap.clone()
+    }
+}
+
+/// Input frames a mixer input keeps at most (seconds); older ones are dropped so it never lags.
+const LAG_S: f64 = 0.1;
+
+/// The audio thread's read of a mixer input's [`Tap`] ring ([`super::mic`], [`super::auxin`]): the input device runs at its own
+/// rate, so frames are read at `in_rate / out_rate` steps with linear interpolation; an empty ring reads as silence.
+#[derive(Default)]
+pub(super) struct Feed {
+    prev: [f32; 2],
+    cur: [f32; 2],
+    /// Position between `prev` and `cur`, input frames.
+    phase: f64,
+}
+
+impl Feed {
+    /// Starts a buffer of `n` output frames at `rate`: drops what lags more than [`LAG_S`] and returns the step of [`Feed::next`].
+    pub fn begin(&mut self, tap: &Tap, rate: u32, n: usize) -> f64 {
+        let in_rate = tap.rate().max(1) as f64;
+        let keep = ((in_rate * LAG_S) as usize).max(n * 2);
+        for _ in 0..tap.ring.len().saturating_sub(keep) {
+            tap.ring.pop();
+        }
+        in_rate / rate as f64
+    }
+
+    /// The next output frame, `step` input frames after the last.
+    pub fn next(&mut self, tap: &Tap, step: f64) -> [f32; 2] {
+        while self.phase >= 1.0 {
+            self.prev = self.cur;
+            self.cur = tap.ring.pop().unwrap_or([0.0; 2]);
+            self.phase -= 1.0;
+        }
+        let t = self.phase as f32;
+        self.phase += step;
+        std::array::from_fn(|k| self.prev[k] + (self.cur[k] - self.prev[k]) * t)
+    }
+}
+
+/// The stream of a mixer input and the last error. A cpal stream stays on the thread that built it, so each input keeps its
+/// `Keeper` in a thread-local.
+#[derive(Default)]
+pub(super) struct Keeper {
+    open: Option<(String, u8, Input)>,
+    err: Option<String>,
+}
+
+impl Keeper {
+    /// Opens (or closes, `on` false) input pair `pair` of `device` into `tap`; a no-op when it already runs for them. A failure
+    /// is kept for [`Keeper::problem`] and the input stays off.
+    pub fn set(&mut self, on: bool, device: &str, pair: u8, tap: &Arc<Tap>) {
+        if !on {
+            *self = Keeper::default();
+            tap.on.store(false, Relaxed);
+            return;
+        }
+        if matches!(&self.open, Some((d, p, _)) if d == device && *p == pair) {
+            return;
+        }
+        self.open = None;
+        match open_into(device, pair, tap.clone()) {
+            Ok(i) => {
+                tap.on.store(true, Relaxed);
+                self.open = Some((device.to_owned(), pair, i));
+                self.err = None;
+            }
+            Err(e) => {
+                tap.on.store(false, Relaxed);
+                self.err = Some(e);
+            }
+        }
+    }
+
+    /// Why the input could not be opened, if it could not.
+    pub fn problem(&self) -> Option<String> {
+        self.err.clone()
     }
 }
 
@@ -146,5 +223,30 @@ mod tests {
         assert_eq!(indices(3, 6), [4, 5]);
         assert_eq!(indices(1, 1), [0, 0]);
         assert_eq!(indices(0, 4), [0, 1], "0 reads as pair 1");
+    }
+
+    #[test]
+    fn the_feed_interpolates_an_input_at_another_rate_and_drops_what_lags() {
+        let tap = Tap::new(24_000, 8192);
+        for i in 0..8 {
+            tap.ring.push([i as f32; 2]);
+        }
+        let mut feed = Feed::default();
+        let step = feed.begin(&tap, 48_000, 8);
+        assert_eq!(step, 0.5, "a 24 kHz input read at 48 kHz");
+        let out: Vec<f32> = (0..8).map(|_| feed.next(&tap, step)[0]).collect();
+        // The feed starts on two silent frames, then the ramp 0, 1, 2 comes through with the midpoints between.
+        assert_eq!(out, [0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.5]);
+        let tap = Tap::new(24_000, 8192);
+        for _ in 0..5000 {
+            tap.ring.push([1.0; 2]);
+        }
+        Feed::default().begin(&tap, 48_000, 512);
+        assert_eq!(tap.ring.len(), 2400, "0.1 s of the input is kept");
+        assert_eq!(
+            Feed::default().next(&Tap::new(48_000, 16), 1.0),
+            [0.0; 2],
+            "an empty ring is silence"
+        );
     }
 }

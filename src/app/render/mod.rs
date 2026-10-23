@@ -15,6 +15,9 @@
 //! - Layers: a column is three height/colour layers drawn back to front. 3-band data uses
 //!   all three (low = dark blue, mid = amber, high = white, as in the 3-band view); mono/colour data uses one.
 
+pub mod backend;
+#[cfg(test)]
+mod composition_tests;
 pub mod detail;
 mod font;
 pub mod overview;

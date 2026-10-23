@@ -4,12 +4,27 @@
 //! recording may make several files (automatic separation), the status line names them, and the writer ending by
 //! itself (silence trigger, I/O error) stops the recording on the next tick. Each finished file goes to the
 //! library ([`crate::app::library::import_recorded`]: import, show its tag information), once.
+//! Next to the files: the cue sheet and tracklist of what led the mix ([`super::sheet`]) and, with the setting on, the
+//! control log ([`super::control`]); [`Mixer::follow_rec`] feeds both on every tick of a running recording. The lead is
+//! the deck [`lead`] gives (the master while it is on air, else the first deck on air; on air = the history's rule:
+//! playing, channel fader times crossfader gain at least -20 dB), told apart by its load count.
 //! ponytail: the recorder only reports the file it is writing, so a file split off by silence is handed to the
 //! library when the next one opens (or the recording ends), not at the split.
 
-use super::Mixer;
-use crate::app::{library, prefs};
-use openfader::audio::{Recorder, input::Input, rec_path};
+use super::{
+    control::{self, Capture},
+    sheet::{self, Entry, Tracklist},
+    sides, Mixer,
+};
+use crate::app::{
+    browser::history,
+    deck::{active, lead, Decks},
+    library, prefs, App, DeckState, MixerState,
+};
+use openfader::audio::{input::Input, rec_path, Recorder};
+use openfader::plugin::{event, source};
+use serde_json::json;
+use slint::{ComponentHandle, Model};
 use std::{
     path::{Path, PathBuf},
     time::Duration,
@@ -22,6 +37,10 @@ pub(super) struct Rec {
     input: Option<Input>,
     /// The file the recorder last reported writing (`None` while armed, waiting for audio).
     seen: Option<PathBuf>,
+    /// Every track that led the mix so far, on the recorder's clock.
+    tracks: Tracklist,
+    /// The control log while the setting is on.
+    controls: Option<Capture>,
 }
 
 fn file_name(p: &Path) -> String {
@@ -32,7 +51,7 @@ fn file_name(p: &Path) -> String {
 }
 
 /// "M:SS" of an elapsed time.
-fn clock(d: Duration) -> String {
+pub(super) fn clock(d: Duration) -> String {
     let s = d.as_secs();
     format!("{}:{:02}", s / 60, s % 60)
 }
@@ -109,6 +128,8 @@ impl Mixer {
                     recorder,
                     input,
                     seen,
+                    tracks: Tracklist::default(),
+                    controls: None,
                 });
             }
             Err(e) => self.set_status(tr!("REC failed: {}", e)),
@@ -121,6 +142,8 @@ impl Mixer {
             recorder,
             input: _input,
             seen,
+            tracks,
+            controls,
         }) = self.rec.borrow_mut().take()
         else {
             return;
@@ -129,12 +152,31 @@ impl Mixer {
         let so_far = clock(recorder.elapsed());
         let text = match recorder.stop() {
             Ok(t) => {
+                let mut sidecars = Vec::new();
+                let (cue, list, min) = prefs::with(|p| {
+                    (
+                        p.advanced.rec_cue,
+                        p.advanced.rec_tracklist,
+                        p.advanced.min_track(),
+                    )
+                });
+                let mut warning = String::new();
+                if cue || list {
+                    match sheet::write(&t, tracks.entries(), min, cue, list) {
+                        Ok(made) => sidecars = made,
+                        Err(e) => warning = tr!(". Cue sheet not written: {}", e),
+                    }
+                }
+                sidecars.extend(controls.and_then(Capture::finish));
                 self.import(&t.files);
-                openfader::plugin::event::fire(
+                event::fire(
                     "recording_stopped",
-                    serde_json::json!({"files": t.files.iter().map(|f| f.to_string_lossy()).collect::<Vec<_>>()}),
+                    json!({
+                        "files": t.files.iter().map(|f| f.to_string_lossy()).collect::<Vec<_>>(),
+                        "sidecars": sidecars.iter().map(|f| f.to_string_lossy()).collect::<Vec<_>>(),
+                    }),
                 );
-                saved_text(&t.files, t.duration(), t.dropped, auto)
+                saved_text(&t.files, t.duration(), t.dropped, auto) + &warning
             }
             Err(e) => tr!(
                 "REC stopped at {}, {} may be incomplete: {}",
@@ -157,6 +199,7 @@ impl Mixer {
         }
         let (path, elapsed) = (r.recorder.path(), r.recorder.elapsed());
         let previous = (path != r.seen).then(|| std::mem::replace(&mut r.seen, path.clone()));
+        let previous_seen = previous.is_some();
         drop(guard);
         if let Some(prev) = previous {
             if let Some(done) = prev {
@@ -167,6 +210,7 @@ impl Mixer {
             }
         }
         self.edit_bus(|b| (b.rec_armed, b.rec_text) = (path.is_none(), clock(elapsed).into()));
+        self.follow_rec(elapsed, path.as_deref(), previous_seen);
     }
 
     /// Hands finished recordings to the library (import, show the tag information), each once.
@@ -181,6 +225,93 @@ impl Mixer {
                 library::import_recorded(&app, f, import, tag);
             }
         }
+    }
+
+    /// The deck that leads the mix now, with its load count ([`lead`]).
+    fn lead(&self, app: &App) -> Option<(usize, u32)> {
+        let sides = sides(app);
+        let faders = app.global::<MixerState>().get_channels();
+        let master = usize::try_from(app.global::<DeckState>().get_master()).ok();
+        lead(&self.decks, master, |d| {
+            let i = d.index();
+            let fader = faders.row_data(i)?.fader;
+            if i >= active() || !history::on_air(d.playing(), fader, sides[i]) {
+                return None;
+            }
+            Some((i, d.serial()?))
+        })
+    }
+
+    /// Once per tick of a running recording: notes the track that took over (cue sheet, tracklist, the `recording_track`
+    /// event) and, with the setting on, logs the controls; `new_file` = the recorder opened `file` since the last tick.
+    fn follow_rec(&self, elapsed: Duration, file: Option<&Path>, new_file: bool) {
+        let Some(app) = self.app.upgrade() else {
+            return;
+        };
+        let lead = self.lead(&app);
+        let state =
+            prefs::with(|p| p.advanced.rec_controls).then(|| control::sample(&app, &self.decks));
+        let mut guard = self.rec.borrow_mut();
+        let Some(r) = guard.as_mut() else { return };
+        let at = elapsed.as_millis() as u64;
+        let took_over = r
+            .tracks
+            .observe(at, lead, |at| {
+                entry(&app, &self.decks, lead.map_or(0, |l| l.0), at)
+            })
+            .cloned();
+        if let (Some(e), Some((deck, _))) = (took_over, lead) {
+            let track = self.decks[deck].with_track(source::track_json);
+            event::fire(
+                "recording_track",
+                json!({"deck": deck + 1, "position_ms": e.at_ms, "track": track}),
+            );
+        }
+        match (state, r.controls.as_mut()) {
+            (Some(s), Some(c)) => {
+                if let Some(f) = file.filter(|_| new_file) {
+                    c.file(f);
+                }
+                c.tick(s);
+            }
+            (Some(s), None) => {
+                let mut c = Capture::start();
+                if let Some(f) = file {
+                    c.file(f);
+                }
+                c.tick(s);
+                r.controls = Some(c);
+            }
+            (None, _) => r.controls = None,
+        }
+    }
+}
+
+/// The tracklist entry for what deck `d` shows now.
+fn entry(app: &App, decks: &Decks, d: usize, at_ms: u64) -> Entry {
+    let v = app
+        .global::<DeckState>()
+        .get_decks()
+        .row_data(d)
+        .unwrap_or_default();
+    let title = match v.title.as_str() {
+        "" => decks[d]
+            .with_track(|t| {
+                t.file
+                    .as_deref()
+                    .and_then(Path::file_stem)
+                    .map(|s| s.to_string_lossy().into_owned())
+            })
+            .flatten()
+            .unwrap_or_default(),
+        t => t.to_owned(),
+    };
+    Entry {
+        at_ms,
+        artist: v.artist.to_string(),
+        title,
+        bpm: f64::from(v.bpm),
+        key: v.key.to_string(),
     }
 }
 

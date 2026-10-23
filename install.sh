@@ -5,6 +5,7 @@
 #   ~/.local/share/applications/openfader.desktop   the menu entry, with its icon in ~/.local/share/icons
 # and adds the default plugin, theme and mapping repositories to PREFERENCES (GET PLUGINS / GET THEMES / GET MAPPINGS)
 # unless you already have a repository list. Run it again to update. Remove with: ./install.sh --uninstall
+# (An in-app update, Help > Check for Updates, swaps $lib for the new version and keeps the old one in $lib.prev; both modes of this script remove it.)
 set -euo pipefail
 root="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 lib="${OPENFADER_PREFIX:-$HOME/.local}/lib/openfader"
@@ -17,7 +18,7 @@ repos=(OpenRsG/OpenFadeR-Plugins OpenRsG/OpenFadeR-Themes OpenRsG/OpenFadeR-Map)
 if [ "${1:-}" = --uninstall ]; then
 	rm -f "$bin/openfader" "$apps/openfader.desktop" "$icons/openfader.png"
 	[ -d "$lib" ] && rm -r "$lib"
-	echo "removed (your settings, library edits and installed add-ons in $config stay)"
+	rm -rf "$lib.prev" "$lib.new" "$lib.swap"
 	exit
 fi
 
@@ -32,6 +33,7 @@ features=()
 cargo build --release --quiet "${features[@]}"
 
 [ -d "$lib" ] && rm -r "$lib"
+rm -rf "$lib.prev" "$lib.new" "$lib.swap" # a build installed here is newer than what an in-app update kept
 mkdir -p "$lib" "$bin" "$apps" "$icons"
 cp target/release/openfader "$lib/"
 cp -L target/release/*.so* "$lib/" 2>/dev/null || true # ONNX Runtime / WebGPU for STEMS, found next to the program

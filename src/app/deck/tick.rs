@@ -5,8 +5,8 @@
 //! display, SYNC RATE, click-on-waveform / PAD FX colour / PAD Mode Auto (pushed to `DeckState` by [`wire_view`]).
 
 use super::{
-    App, Deck, DeckState, Decks, at_end, beat_at, ending, fmt_ms, frame, grid_bpm, prefs, render,
-    sync,
+    App, Deck, DeckState, Decks, at_end, beat_at, ending, fmt_ms, frame, prefs, render, sync,
+    tempo_at,
 };
 use crate::app::prefs::view::{DrawRate, JogDisplay, PadMode};
 use openfader::analysis::{Beat, Cue};
@@ -133,14 +133,15 @@ impl Deck {
         Some((bar_phase(beats, pos)?, bar_phase(&pl.analysis.beats, ppos)?))
     }
 
-    /// SYNC RATE text: the multiple of the master's tempo this deck follows; "" when it follows nobody.
-    fn sync_rate(&self, beats: &[Beat], half_double: bool) -> &'static str {
+    /// SYNC RATE text: the multiple of the master's tempo this deck follows (the tempos are those of the sections under the
+    /// two playheads, `pos` is this deck's); "" when it follows nobody.
+    fn sync_rate(&self, beats: &[Beat], pos: f64, half_double: bool) -> &'static str {
         let Some(peer) = self.following().then(|| self.master_deck()).flatten() else {
             return "";
         };
         let pl = peer.loaded.borrow();
-        grid_bpm(beats)
-            .zip(grid_bpm(&pl.analysis.beats))
+        tempo_at(beats, pos)
+            .zip(tempo_at(&pl.analysis.beats, peer.clock(&pl).0))
             .and_then(|(g, m)| sync::target(g, m * peer.rate(), half_double))
             .map_or("", |(_, k)| rate_text(k))
     }
@@ -149,6 +150,7 @@ impl Deck {
         self.poll_decode();
         self.poll_stems();
         self.stemwave_tick();
+        self.track_tempo();
         self.follow();
         self.slicer_tick();
         let Some(app) = self.app.upgrade() else {
@@ -208,7 +210,7 @@ impl Deck {
             .flatten()
             .unwrap_or(-1.0);
         let rate = if opts.sync_rate {
-            self.sync_rate(&l.analysis.beats, opts.half_double)
+            self.sync_rate(&l.analysis.beats, pos, opts.half_double)
         } else {
             ""
         };
@@ -226,12 +228,22 @@ impl Deck {
             .flatten()
             .map(|s| s * 1000.0);
         if osize.0 > 0 && osize.1 > 0 {
-            let x = render::overview::playhead_x(osize.0, pos, l.duration_ms);
+            let gpu = render::backend::gpu();
+            let x = if gpu {
+                0
+            } else {
+                render::overview::playhead_x(osize.0, pos, l.duration_ms)
+            };
             let okey = (
                 x,
                 osize,
-                slip.map(|s| render::overview::playhead_x(osize.0, s, l.duration_ms)),
+                if gpu {
+                    None
+                } else {
+                    slip.map(|s| render::overview::playhead_x(osize.0, s, l.duration_ms))
+                },
                 l.cue_ms,
+                gpu,
             );
             if l.overview_key != Some(okey) {
                 let base = match l.overview_base.take().filter(|c| (c.w, c.h) == osize) {
@@ -253,8 +265,13 @@ impl Deck {
                         )
                     }
                 };
-                v.overview =
-                    render::overview::with_playhead(&base, pos, l.cue_ms, slip, l.duration_ms);
+                if gpu {
+                    (v.overview, v.overview_head, v.overview_ghost) =
+                        render::overview::composed(&base, l.cue_ms, l.duration_ms);
+                } else {
+                    v.overview =
+                        render::overview::with_playhead(&base, pos, l.cue_ms, slip, l.duration_ms);
+                }
                 l.overview_base = Some(base);
                 l.overview_key = Some(okey);
                 dirty = true;

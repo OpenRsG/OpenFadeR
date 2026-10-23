@@ -9,14 +9,15 @@
 //! segments), [`separate`] (one engine's loop over segments), [`cache`] (on-disk results keyed like the analysis cache, one
 //! entry per quality). The result type, [`crate::audio::Stems`], lives with the audio code that plays it.
 //!
-//! The model is open; the separation is done entirely by the model named above.
+//! The model is open; the separation is done entirely by the model named above. A stem file (`.stem.mp4`, see
+//! [`crate::audio::stemfile`]) needs none of it: [`Job::from_stem_file`] delivers its own four parts as the stems.
 
 pub mod cache;
 pub mod model;
 pub mod schedule;
 pub mod separate;
 
-use crate::audio::{Stems, Track16};
+use crate::audio::{Grid, Stems, Track16, stemfile};
 use parking_lot::Mutex;
 use schedule::Schedule;
 use std::path::PathBuf;
@@ -180,6 +181,47 @@ impl Job {
         }
     }
 
+    /// The stems of a stem file: its four parts decoded ([`stemfile::decode_parts`]) as the stems of `pcm`, its mix. No model,
+    /// no cache entry; progress is the share of the file read. The stems are delivered whole, so the job is done once
+    /// they are there.
+    pub fn from_stem_file(audio: PathBuf, pcm: Arc<Track16>, info: stemfile::Info) -> Job {
+        let progress = Arc::new(Progress {
+            phase: AtomicU8::new(Phase::Separate as u8),
+            permille: AtomicU32::new(0),
+        });
+        let frames = pcm.frames();
+        let stems = Arc::new(OnceLock::new());
+        let ctl = Arc::new(Control {
+            sched: Mutex::new(Schedule::new(
+                Grid {
+                    len: frames.max(1),
+                    overlap: 0,
+                },
+                1,
+                true,
+            )),
+            cancel: AtomicBool::new(false),
+        });
+        let (tx, rx) = channel();
+        let (p, s, c) = (progress.clone(), stems.clone(), ctl.clone());
+        std::thread::spawn(move || {
+            let cancelled = || c.cancel.load(Relaxed);
+            let result = stemfile::decode_parts(&audio, &info, frames, &cancelled, &|f| {
+                p.set(Phase::Separate, f)
+            })
+            .map(|parts| {
+                let _ = s.set(Arc::new(Stems::complete(parts)));
+            });
+            let _ = tx.send(result);
+        });
+        Job {
+            progress,
+            stems,
+            ctl,
+            rx,
+        }
+    }
+
     /// The stems once the worker has allocated them; attach them while separation continues.
     pub fn stems(&self) -> Option<&Arc<Stems>> {
         self.stems.get()
@@ -286,5 +328,29 @@ mod tests {
     fn multithread_off_is_one_thread_on_is_at_least_two() {
         assert_eq!(threads(false), 1);
         assert!(threads(true) >= 2);
+    }
+
+    #[test]
+    fn a_stem_file_job_delivers_the_parts_complete_without_a_model_or_cache() {
+        let path = std::path::PathBuf::from(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/data/four-parts.stem.mp4"
+        ));
+        let info = stemfile::read_info(&path).unwrap();
+        let (mix, _) = crate::audio::decode_track16_cancellable(&path, &|| false).unwrap();
+        let frames = mix.frames();
+        let job = Job::from_stem_file(path.clone(), Arc::new(mix), info);
+        let deadline = Instant::now() + std::time::Duration::from_secs(20);
+        let outcome = loop {
+            if let Some(r) = job.poll() {
+                break r;
+            }
+            assert!(Instant::now() < deadline, "the job never finished");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
+        assert_eq!(outcome, Ok(()));
+        let stems = job.stems().expect("stems delivered");
+        assert!(stems.is_complete() && stems.frames() == frames);
+        assert!(!cache::has(&path, Quality::Quality), "nothing was cached");
     }
 }

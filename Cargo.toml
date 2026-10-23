@@ -29,6 +29,10 @@ ort = { version = "2.0.0-rc.14", optional = true, default-features = false, feat
 ureq = "3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+ring = "0.17" # sha256 of downloaded model files (src/models.rs); already in the tree through ureq's TLS
+semver = "1" # the version compare of the update check (src/update); already in the tree
+tar = "0.4" # the Linux release archives (src/update/install.rs); already in the tree
+hmac-sha256 = "1" # SHA-256 of the downloaded update, against the digest GitHub gives the asset; already in the tree
 flate2 = "1"
 libloading = "0.8" # Beat FX plugin libraries (src/plugin/effect.rs)
 openfader-plugin = { path = "sdk", features = ["library"] } # the plugin ABIs (effects, track libraries) and the shared library types: one definition for host and plugins
@@ -51,6 +55,10 @@ cpal = { version = "0.15", features = ["oboe-shared-stdcxx"] }
 name = "stems_bench"
 required-features = ["stems"]
 
+[[example]]
+name = "key_eval"
+required-features = ["stems"]
+
 # Free space of a mount (statvfs), the macOS volume list (getfsstat) and the background priority of the analysis threads.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -58,7 +66,7 @@ libc = "0.2"
 # Removable drives (GetDriveTypeW...), ejecting them (DeviceIoControl), the analysis threads' priority and the job
 # objects that end plugin processes with the app (src/plugin/process.rs).
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_Threading"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_SystemInformation", "Win32_System_Threading"] }
 
 # The program icon in the .exe (build.rs, assets/openfader.rc).
 [target.'cfg(windows)'.build-dependencies]

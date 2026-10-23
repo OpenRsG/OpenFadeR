@@ -19,9 +19,12 @@
 //! removed / relocated source tracks, analysis locks, Tag List, re-keying), [`backup`] (zip backup / restore of the whole
 //! store), [`device`] (known devices, Sync Manager playlists, device backups, export baselines), [`device_settings`]
 //! (DJ System settings), [`bank`] (Cue Banks), [`gain`] (AUTO GAIN: analysed dB + the user's adjustment),
-//! [`phrase`] (manual phrase edits), [`sequence`] (saved sampler sequences), [`matching`] (MATCHING pairs), [`journal`] (change
-//! journal: undo / redo, [`Store::system`]); [`overlay`] applies the track data to a [`crate::library::Library`].
+//! [`phrase`] (manual phrase edits), [`sequence`] (saved sampler sequences), [`matching`] (MATCHING pairs), [`health`] (library health:
+//! ignored checks, files that failed to load), [`journal`] (change
+//! journal: undo / redo, [`Store::system`]), [`inbox`] (stages INBOX → REVIEW → COLLECTION, move batches); [`overlay`]
+//! applies the track data to a [`crate::library::Library`].
 
+mod artwork;
 mod backup;
 mod bank;
 mod collection;
@@ -29,7 +32,9 @@ pub mod connect;
 mod device;
 pub mod device_settings;
 mod gain;
+mod health;
 mod history;
+mod inbox;
 mod journal;
 mod matching;
 mod node;
@@ -40,10 +45,12 @@ mod sequence;
 mod tag;
 mod track;
 
+pub use artwork::{MISS_TTL, album_key};
 pub use backup::{Backup, MUSIC_DIR, Restored};
 pub use bank::{BankSlot, HotCueBank, collect_banks};
 pub use device::{DeviceBackup, NewBackup};
-pub use gain::{TrackGain, effective_db};
+pub use gain::{effective_db, TrackGain};
+pub use inbox::{Batch, Move, Role, Stage};
 pub use node::{Node, NodeKind};
 pub use overlay::{Overlay, apply, overlay};
 pub use sequence::{MAX_SEQUENCES, Sequence};
@@ -58,8 +65,8 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::{
-        Arc, LazyLock, OnceLock,
         atomic::{AtomicU64, Ordering},
+        Arc, LazyLock, OnceLock,
     },
 };
 
@@ -180,6 +187,26 @@ const MIGRATIONS: &[&str] = &[
      ALTER TABLE track ADD COLUMN label TEXT;",
     // v17: AUTO GAIN is capped by the track's peak now (src/audio/loudness.rs); the stored analysed values are re-measured on the next load.
     "UPDATE gain SET analysed_db = NULL;",
+    // v18: library health (src/store/health.rs): the tracks a check no longer lists, and the tracks whose audio failed to load.
+    "CREATE TABLE IF NOT EXISTS health_ignore (
+        check_id TEXT NOT NULL, track INTEGER NOT NULL REFERENCES collection(id) ON DELETE CASCADE,
+        PRIMARY KEY (check_id, track)) WITHOUT ROWID;
+     CREATE TABLE IF NOT EXISTS health_failure (
+        track INTEGER PRIMARY KEY REFERENCES collection(id) ON DELETE CASCADE, reason TEXT NOT NULL,
+        size INTEGER NOT NULL, mtime INTEGER NOT NULL, at INTEGER NOT NULL);",
+    // v19: INBOX → REVIEW → COLLECTION (src/store/inbox.rs). `stage` lists the stages in `pos` order (`role` 0 the one new files
+    // arrive in, 1 a stage between, 2 the Collection, last); `collection.stage` NULL = in the Collection, else the stage the
+    // track waits in (a staged row is a Collection row that the Collection's own list leaves out). `inbox_move` is one row per
+    // track a move batch changed (the batch is its journal action), `from_path` ≠ `to_path` when the file moved too.
+    // `inbox_seen` = watched-folder files already offered (`path|size|mtime`), `track` the Collection row a duplicate links to.
+    "CREATE TABLE IF NOT EXISTS stage (id INTEGER PRIMARY KEY, name TEXT NOT NULL, pos INTEGER NOT NULL, role INTEGER NOT NULL);
+     INSERT OR IGNORE INTO stage(id, name, pos, role) VALUES (1, 'INBOX', 0, 0), (2, 'REVIEW', 1, 1), (3, 'COLLECTION', 2, 2);
+     CREATE TABLE IF NOT EXISTS inbox_move (
+        id INTEGER PRIMARY KEY, track INTEGER NOT NULL, from_stage INTEGER NOT NULL, to_stage INTEGER NOT NULL,
+        from_path TEXT NOT NULL, to_path TEXT NOT NULL);
+     CREATE TABLE IF NOT EXISTS inbox_seen (sig TEXT PRIMARY KEY, track INTEGER) WITHOUT ROWID;",
+    // v20: cover art by album or track (src/store/artwork.rs); an empty `path` is a lookup that found nothing at `at` (unix s).
+    "CREATE TABLE IF NOT EXISTS artwork (key TEXT PRIMARY KEY, path TEXT NOT NULL, at INTEGER NOT NULL) WITHOUT ROWID;",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as
@@ -378,6 +405,22 @@ fn migrate(conn: &mut Connection) -> R<()> {
         tx.execute_batch(sql).s()?;
         tx.pragma_update(None, "user_version", i as i64 + 1).s()?;
         tx.commit().s()?;
+    }
+    // v19's `collection.stage` column: SQL cannot guard an ALTER, so it is added here when missing (a re-run of v19 keeps it).
+    if conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('collection') WHERE name = 'stage'",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+        .s()?
+        == 0
+    {
+        conn.execute_batch(
+            "ALTER TABLE collection ADD COLUMN stage INTEGER REFERENCES stage(id);
+             CREATE INDEX IF NOT EXISTS collection_stage ON collection(stage);",
+        )
+        .s()?;
     }
     Ok(())
 }

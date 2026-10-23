@@ -4,10 +4,10 @@
 use super::{Outcome, store_cues, summary};
 use openfader::{
     analysis::{
-        Analysis, Beat, Phrases, auto,
+        auto,
         cache::{self, Source},
         options::Options,
-        tag,
+        tag, Analysis, Beat, Phrases,
     },
     library::Track,
     store::Store,
@@ -16,9 +16,8 @@ use std::{
     collections::{HashMap, VecDeque},
     path::PathBuf,
     sync::{
-        Arc, LazyLock, Mutex, Weak,
         atomic::{AtomicBool, Ordering},
-        mpsc,
+        mpsc, Arc, LazyLock, Mutex, Weak,
     },
 };
 
@@ -296,15 +295,22 @@ fn deliver(subscribers: Vec<Subscriber>, result: Result<(Analysis, Source), Stri
         if sub.cancelled.load(Ordering::Relaxed) {
             continue;
         }
+        // Library health lists a file whose analysis failed as corrupt, until it analyses or loads again.
         let outcome = match &result {
-            Ok((a, source)) => Ok(finish(
-                &sub.job,
-                a,
-                copy_source(source),
-                &sub.settings,
-                &sub.store,
-            )),
-            Err(e) => Err(e.clone()),
+            Ok((a, source)) => {
+                let _ = sub.store.health_clear_failure(&sub.job.track);
+                Ok(finish(
+                    &sub.job,
+                    a,
+                    copy_source(source),
+                    &sub.settings,
+                    &sub.store,
+                ))
+            }
+            Err(e) => {
+                let _ = sub.store.health_note_failure(&sub.job.track, e);
+                Err(e.clone())
+            }
         };
         let _ = sub.tx.send((sub.job.path, outcome));
     }
