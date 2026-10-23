@@ -17,6 +17,7 @@ fn round_trips_every_field_and_keeps_unknown_keys() {
         window_h: 1000,
         fx_effect: 4,
         fx_beat: 8,
+        fx_tempo_master: true,
         decks: 4,
         stems: true,
         stems_four: false,

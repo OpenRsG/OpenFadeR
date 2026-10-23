@@ -11,6 +11,8 @@ Input callbacks queue messages in order and wake the UI event loop once per pend
 
 A controller whose tempo fader moves the tempo the wrong way (the app takes 0 at the fader's top as the + end; some report 1 there) is corrected with PREFERENCES > CONTROLLER > Deck > **Invert hardware tempo fader**. It is independent of PREFERENCES > VIEW > **Tempo fader: + at the bottom**, which only reverses the on-screen fader.
 
+**Soft takeover** (PREFERENCES > CONTROLLER > Others > MIDI CONTROLS > **Soft takeover**, on by default): a knob or fader that sends an absolute value (CC 0..127 or 14-bit) is ignored while the value on screen is somewhere else, for example after a deck layer switch, a STEM ISO / EQ switch, an edit with the mouse, a load, a remap, or SYNC letting go of the tempo. It takes over once it crosses the on-screen value or comes within about two steps of it, and then controls it directly until the value on screen changes by itself again. While a control waits and is moved, a notification says which way to turn it ("eq-low A: turn up ▲ to pick up"). It covers the mixer knobs, channel and crossfader faders, STEM ISOLATOR knobs, MASTER / HP knobs, tempo faders, Beat FX levels and the MERGE FX knobs; the tempo fader of a deck that follows a master through SYNC is ignored as before. Relative encoders, buttons, the jog wheels and the controller's state report on connect are not affected; with the setting off an absolute control jumps to its position at once.
+
 ## Install from a repository
 
 PREFERENCES > CONTROLLER > **GET MAPPINGS** lists the mapping files of your GitHub repositories, with the same repository list as GET

@@ -131,12 +131,12 @@ impl Midi {
                     r(&self.decks[d], b.arg);
                 }
             }
-            Kind::Knob(f) => {
+            Kind::Knob(_) => {
                 if b.hires {
                     self.msb.borrow_mut().insert(ev.key(), ev.d2);
                     return Some(Outcome::Half);
                 }
-                f(app, deck, ev.d2 as f32 / 127.0);
+                return self.absolute(app, ev.key(), b, ev.d2 as f32 / 127.0);
             }
             Kind::Rel { two_comp, f } => f(app, deck, ev.ticks(*two_comp)),
             Kind::Jog { two_comp, mode } => self.turn(d, *mode, ev.ticks(*two_comp)),
@@ -196,9 +196,11 @@ impl Midi {
         else {
             return Outcome::Unmapped;
         };
-        if let (Kind::Knob(f), Some(msb)) = (&ACTIONS[b.act].kind, self.msb.borrow().get(&msb_key))
+        let msb = self.msb.borrow().get(&msb_key).copied();
+        if let Some(msb) = msb
+            && let Some(waiting) = self.absolute(app, msb_key, &b, combine14(msb, ev.d2))
         {
-            f(app, b.deck, combine14(*msb, ev.d2));
+            return waiting;
         }
         Outcome::Done(b.act, b.deck)
     }

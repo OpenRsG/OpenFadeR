@@ -33,6 +33,7 @@ mod curve;
 mod map;
 mod rec;
 mod vu;
+pub(in crate::app) use channel::{iso_at, knob_at};
 
 use super::{
     App, BusView, ChannelView, DeckState, MixerState,
@@ -230,6 +231,8 @@ pub fn wire(app: &App, decks: Decks) {
     state.on_iso_toggled(move |ch| m.toggle_iso(ch as usize));
     let m = mixer.clone();
     state.on_iso_knob(move |ch, part, v| m.set_iso_knob(ch as usize, part as usize, v));
+    let m = mixer.clone();
+    state.on_iso_part(move |ch, part, v| m.set_part_level(ch as usize, part as usize, v));
     let m = mixer.clone();
     state.on_bus_knob(move |knob, v| m.set_bus_knob(knob as usize, v));
     let m = mixer.clone();

@@ -4,7 +4,9 @@
 //! * MASTER is the tempo source (any of the four decks). Auto: the first playing deck, handed over when it
 //!   stops ([`master::after_play_change`]); the MASTER button pins one. SYNC follows the master; pressing SYNC
 //!   on the master (or with none) hands the master to [`master::leader_of`]'s pick, the first other deck that
-//!   can be followed. A deck that becomes master stops following.
+//!   can be followed, a playing one before an idle one. A playing deck never follows an idle one (the only audible
+//!   deck keeps its tempo and becomes master) unless the MASTER button pinned that idle deck. A deck that becomes
+//!   master stops following.
 //! * Tempo: the follower plays at `master BPM × k`, k ∈ {1, 2, ½} whichever needs the rate closest
 //!   to 1 (87 BPM follows 174 BPM at 1×, not 2×); its own tempo fader is ignored while it can follow ([`target`], [`Deck::tracking`]).
 //! * Phase: the grids' fractional beat numbers are compared (`k` beats of the follower per master

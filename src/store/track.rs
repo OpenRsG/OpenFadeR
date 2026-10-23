@@ -177,14 +177,16 @@ impl Store {
         )
     }
 
-    /// Reload Tag: the file's tags `t` replace the Collection row and every text edit of `key` (title, artist, album, genre,
-    /// label, comment) is dropped, so the file's tags show; rating, colour, cues and grid stay. Call it inside one
-    /// [`Store::action`] so that undo brings both back.
-    pub fn reload_tags(&self, key: &str, t: &Track) -> R<()> {
-        self.run(
-            "UPDATE track SET title = NULL, artist = NULL, album = NULL, genre = NULL, label = NULL, comment = NULL WHERE key = ?1",
-            [key],
-        )?;
+    /// Reload Tag: the file's tags `t` replace the Collection row. With `keep_edits` the text edits of `key` (title, artist,
+    /// album, genre, label, comment) stay and show over the file's; without, they are dropped so the file's tags show.
+    /// Rating, colour, cues and grid stay either way. Call it inside one [`Store::action`] so that undo brings both back.
+    pub fn reload_tags(&self, key: &str, t: &Track, keep_edits: bool) -> R<()> {
+        if !keep_edits {
+            self.run(
+                "UPDATE track SET title = NULL, artist = NULL, album = NULL, genre = NULL, label = NULL, comment = NULL WHERE key = ?1",
+                [key],
+            )?;
+        }
         self.collection_put(std::slice::from_ref(t), true).map(drop)
     }
 

@@ -4,13 +4,15 @@
 //! a controller's FX SELECT picks). Each unit's values live in its
 //! `FxState.units` row; every user action edits one row and [`Fx::push`] mirrors it into that unit's
 //! [`audio::fx::Controls`] on the audio bus (`Bus::fx[unit]`; the effects themselves are in `src/audio/fx/`).
-//! A 50 ms timer picks each unit's tempo: its TAP override if there is one, else the master deck's effective
-//! BPM (the deck started last, `DeckState.master`) while it plays at a known tempo, else the other deck's; when no
-//! deck plays it keeps the tempo it had (a ringing tail does not re-time), and a unit that never had one shows "no BPM"
-//! and runs at the 120 BPM fallback. TAP (average of the last taps, see
-//! [`grid::tap`]) sets the override, AUTO clears it. RELEASE (momentary): while held the unit plays ECHO at full level, on release its feed stops and the echo
-//! tail rings out (the unit's trails); the unit then stays on ECHO / off. FX1-1's last effect and beat are saved
-//! in the settings ([`prefs`]). Slots 2 and 3 start on REVERB and FLANGER (our choice).
+//! A 50 ms timer picks each unit's tempo: its TAP override if there is one, else its source (the CH / MST chip, saved in the settings
+//! like FX1-1's beat): CH (the default) follows the effective BPM of the deck on the unit's channel, MST the master deck's
+//! (the deck started last, `DeckState.master`, else the other decks in order); a unit on MASTER follows the master deck whatever
+//! the chip says. A deck that is not playing at a known tempo gives none: the unit keeps the tempo it had (a ringing tail does not
+//! re-time), and a unit that never had one shows "no BPM" and runs at the 120 BPM fallback. The bpm text names the source in use
+//! (CH2, MST, TAP). TAP (average of the last taps, see
+//! [`grid::tap`]) sets the override; the chip clears it (a controller's AUTO does too), else it switches CH / MST. RELEASE (momentary): while held the unit plays ECHO at full level, on release its feed stops and the echo
+//! tail rings out (the unit's trails); the unit then stays on ECHO / off. FX1-1's last effect and beat, and FX1's CH / MST source,
+//! are saved in the settings ([`prefs`]; FX2 starts with the same source). Slots 2 and 3 start on REVERB and FLANGER (our choice).
 //!
 //! MERGE FX (MFX1 = deck A, MFX2 = deck B; `src/audio/merge/`): side `i` lives in `FxState.units[i]`'s `merge-*` fields and
 //! goes to `Bus::merge[i]`. GO / the controller's ON is held (release = the drop), ABORT is instant, the preset steps
@@ -36,7 +38,7 @@ use super::{
     prefs,
 };
 use logic::{
-    assignment, bpm_text, edit_slot, effective_assign, held_tempo, merge_step, next_part,
+    assignment, bpm_text, edit_slot, effective_assign, follow, held_tempo, merge_step, next_part,
     part_mask, release, release_cfx_off, set_beat, toggle_part, unit_bpm,
 };
 pub(super) use logic::{pad_fx_rgb, tempo};
@@ -73,8 +75,8 @@ struct Fx {
     start: Instant,
     /// The `FxState.view` last taken from VIEW > Effect Panel (-1 before the first).
     view: Cell<i32>,
-    /// The tempo the units followed while a deck last played.
-    last_tempo: Cell<Option<f32>>,
+    /// Per unit: the tempo it followed while its source last played.
+    last_tempo: [Cell<Option<f32>>; FX_UNITS],
 }
 
 impl Fx {
@@ -196,13 +198,14 @@ impl Fx {
                 .row_data(i)
                 .map_or((false, 0.0), |v| (v.playing, v.bpm))
         };
-        let master = held_tempo(
-            &self.last_tempo,
-            tempo(decks.get_master(), std::array::from_fn(row)),
-        );
+        let decks_now: [(bool, f32); deck::DECKS] = std::array::from_fn(row);
+        let master = tempo(decks.get_master(), decks_now);
         let units = app.global::<FxState>().get_units();
         for (i, over) in self.over.iter().map(Cell::get).enumerate() {
-            let (bpm, no_bpm) = unit_bpm(over, master);
+            let followed = units
+                .row_data(i)
+                .and_then(|u| follow(u.assign, u.master_tempo, master, decks_now));
+            let (bpm, no_bpm) = unit_bpm(over, held_tempo(&self.last_tempo[i], followed));
             if let Some(mut u) = units.row_data(i) {
                 let bpm_text = bpm_text(bpm);
                 let tapped = over.is_some();
@@ -236,6 +239,7 @@ pub fn wire(app: &App, decks: &Decks) {
             slot(Effect::Flanger.index(), beat),
         ])),
         assign: 4, // MASTER
+        master_tempo: saved.fx_tempo_master,
         no_bpm: true,
         bpm_text: bpm_text(FALLBACK_BPM),
         merge_name: PRESETS[0].name.into(),
@@ -259,7 +263,7 @@ pub fn wire(app: &App, decks: &Decks) {
         over: Default::default(),
         start: Instant::now(),
         view: Cell::new(-1),
-        last_tempo: Cell::new(None),
+        last_tempo: Default::default(),
     });
     fx.show_prefs(&saved);
     for (i, u) in rows.iter().enumerate() {
@@ -346,6 +350,17 @@ pub fn wire(app: &App, decks: &Decks) {
         let n = unit_index(n);
         f.taps.borrow_mut()[n].clear();
         f.set_over(n, None);
+    });
+    let f = fx.clone();
+    s.on_tempo_source(move |n| {
+        let mut master = false;
+        f.edit(n, |u| {
+            (u.master_tempo, master) = (!u.master_tempo, !u.master_tempo)
+        });
+        if n == 0 {
+            prefs::update(|p| p.fx_tempo_master = master);
+        }
+        f.tick();
     });
     let f = fx.clone();
     s.on_release(move |n, held| f.edit(n, |u| release(u, held)));

@@ -64,6 +64,8 @@ Grid edits (downbeat, double, halve, tap, shift) re-derive the track's phrases s
 
 SYNC follows tempo while a master deck loops. Beat-phase correction pauses when the loop does not span a whole number of follower beats, so short loops do not make other decks repeat. Phase correction resumes when the loop ends or returns to a whole-beat length.
 
+The playing deck leads the tempo. SYNC on the only playing deck keeps its tempo and makes it the master; it never retunes an audible deck to follow an idle one. An idle deck follows a playing one. A deck you made MASTER with the MASTER button is followed even when it is idle.
+
 For clearer waveforms, open PREFERENCES > VIEW > WAVEFORM. Set BEAT GRID to BOLD for outlined lines over the enlarged waveform, with wider downbeats that do not rely on colour alone. The whole-track overview keeps thin bar lines behind the audio in either setting, so track dynamics and phrases stay readable. Set HOT CUE MARKERS to LARGE for double-size flags and letters on the decks and browser previews (when preview cue markers are enabled). Memory cues are solid bars in the theme's memory-cue colour with an M flag, drawn over the grid and wider than a bold downbeat, and they grow with LARGE too. Both settings apply immediately and are saved; NORMAL keeps the original sizes.
 
 The interface is in English, French, Spanish, German, Portuguese (Brazil), Italian or Dutch: PREFERENCES > VIEW > LANGUAGE, where SYSTEM follows the computer's language. Button labels that match DJ hardware (CUE, SYNC, LOOP, BEAT FX …) stay in English in every language.
@@ -78,7 +80,7 @@ Press `D` to switch layouts. All four decks get their own pads, loops, slip, syn
 
 <p align="center"><img src="docs/media/fx.png" alt="Beat FX units with echo, reverb and flanger above the decks, and the color FX row" width="100%"></p>
 
-Beat FX has several units with three slots each, tempo taken from the deck or tapped. COLOR FX (filter, space, dub echo, sweep, noise, crush, cross-pass) sits on every channel and MERGE FX works on the whole mix. More effects arrive through effect plugins.
+Beat FX has several units with three slots each. A unit's tempo comes from the deck on its channel (CH, the default), from the master deck (MST), or from taps (TAP); a unit on MASTER follows the master deck. COLOR FX (filter, space, dub echo, sweep, noise, crush, cross-pass) sits on every channel and MERGE FX works on the whole mix. More effects arrive through effect plugins.
 
 Effect replacements are prepared outside the audio callback. While a replacement is pending, that unit passes dry audio. Turning the selected effect off keeps its tail.
 
@@ -168,6 +170,8 @@ At each start the app asks GitHub for the newest release; when it is newer than 
 Plug in a controller that has no mapping yet and the app offers the matching file from the mapping repository: one click on INSTALL and the controller works. Mapping files cover the default layer of each controller; MIDI learn and LED feedback are built in, and hot-plug detection picks controllers up while the app runs. The format is described in [docs/mappings.md](docs/mappings.md).
 
 External gear can follow the mix: name an output port in PREFERENCES > CONTROLLER > MIDI CLOCK OUT and it receives a 24 PPQN MIDI clock locked to the playing master deck's beat grid, with START on its next bar line and STOP when no deck plays. A deck without a beat grid sends no clock.
+
+Knobs and faders that send absolute values use soft takeover: after the on-screen value changed (a layer switch, a mouse edit, a load) a control is ignored until it reaches that value, and a notification shows which way to turn it. PREFERENCES > CONTROLLER > Others > Soft takeover switches it off.
 
 ## Keyboard shortcuts
 

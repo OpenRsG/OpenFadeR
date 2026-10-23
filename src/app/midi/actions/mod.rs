@@ -61,6 +61,9 @@ pub struct Action {
     pub kind: Kind,
     /// Note-off / release hook for `Press` / `Arg` (deck, arg): hot-cue pads hand back to the slip playhead.
     pub release: Option<fn(&App, i32, i32)>,
+    /// `Knob` only: the control's value on screen (deck), 0..1 as the knob sends it; `None` = no value to compare
+    /// (the deck's tempo while SYNC drives it). An action without one is applied as sent ([`super::pickup`]).
+    pub read: Option<fn(&App, i32) -> Option<f32>>,
 }
 
 impl Action {
@@ -77,12 +80,20 @@ impl Action {
             name,
             kind,
             release: None,
+            read: None,
         }
     }
 
     const fn released_by(self, release: fn(&App, i32, i32)) -> Action {
         Action {
             release: Some(release),
+            ..self
+        }
+    }
+
+    const fn read_by(self, read: fn(&App, i32) -> Option<f32>) -> Action {
+        Action {
+            read: Some(read),
             ..self
         }
     }
