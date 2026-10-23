@@ -46,11 +46,12 @@ fn shared_tail(a: &Path, b: &Path) -> usize {
         .count()
 }
 
-/// The indexed file that is `lost` under a new place, if any.
-pub fn find<'a>(index: &'a Index, lost: &Path) -> Option<&'a Path> {
+/// The indexed file that is `lost` under a new place, if any; a file `owned` by another Collection row is another track's.
+pub fn find<'a>(index: &'a Index, lost: &Path, owned: impl Fn(&Path) -> bool) -> Option<&'a Path> {
     let cands = index.get(&name(lost)?)?;
     cands
         .iter()
+        .filter(|c| !owned(c))
         .max_by_key(|c| shared_tail(c, lost))
         .map(PathBuf::as_path)
 }
@@ -160,10 +161,17 @@ mod tests {
         assert_eq!(idx.values().map(Vec::len).sum::<usize>(), 3); // `a/` was not searched
         let lost = Path::new("/gone/Album/SONG.mp3");
         assert_eq!(
-            find(&idx, lost),
+            find(&idx, lost, |_| false),
             Some(root.join("b/Album/Song.mp3").as_path())
         );
-        assert_eq!(find(&idx, Path::new("/gone/none.mp3")), None);
+        assert_eq!(find(&idx, Path::new("/gone/none.mp3"), |_| false), None);
+        // The closest file is another track's: the next one is taken, and with none left nothing is.
+        let taken = root.join("b/Album/Song.mp3");
+        assert_eq!(
+            find(&idx, lost, |p| p == taken),
+            Some(root.join("b/Other/song.MP3").as_path())
+        );
+        assert_eq!(find(&idx, lost, |_| true), None);
         assert_eq!(
             beside(&root.join("b/Album/Song.mp3"), Path::new("/gone/x.wav")),
             Some(root.join("b/Album/x.wav"))
@@ -218,7 +226,7 @@ mod tests {
         wav(&root.join("new/short.wav"), 440.0, 8); // same audio, another length: not a candidate
         wav(&root.join("new/renamed.wav"), 440.0, 3);
         let idx = index(&[root.join("new")]);
-        assert_eq!(find(&idx, &lost_file), None); // no file of that name
+        assert_eq!(find(&idx, &lost_file, |_| false), None); // no file of that name
         let found = ByAudio::new(&idx).find(&store, &lost);
         assert_eq!(found, Some(root.join("new/renamed.wav").as_path()));
         // No fingerprint, no match; a file the Collection lists is another track's.

@@ -128,7 +128,7 @@ impl Midi {
                 if on {
                     f(&self.decks[d], b.arg);
                 } else if let Some(r) = release {
-                    r(&self.decks[d]);
+                    r(&self.decks[d], b.arg);
                 }
             }
             Kind::Knob(f) => {

@@ -100,17 +100,19 @@ fn nudge_for(err_ms: f64) -> f32 {
 }
 
 /// Where a paused follower at `own_pos` starts so it sits on its nearest beat plus the master's current
-/// beat phase (called as the master crosses a beat: the phase is then a few ms).
+/// beat phase (called as the master crosses a beat: the phase is then a few ms). `ahead_ms`: track ms the follower plays
+/// before the start is heard (the output latency times its rate), which the master has moved on by as well.
 pub fn start_ms(
     own: &[Beat],
     own_pos: f64,
     master: &[Beat],
     master_pos: f64,
     k: f64,
+    ahead_ms: f64,
 ) -> Option<u32> {
     let b = beat_at(own, own_pos)?.round();
     Some(
-        ms_at(own, b + wrap(beat_at(master, master_pos)? * k))?
+        (ms_at(own, b + wrap(beat_at(master, master_pos)? * k))? + ahead_ms)
             .max(0.0)
             .round() as u32,
     )
@@ -267,12 +269,14 @@ mod tests {
     fn quantized_start_sits_on_a_beat_plus_the_masters_phase() {
         let (own, master) = (grid(100, 120, 64), grid(0, 150, 64));
         // paused at 2090 ms (beat 3.98 → beat 4 = 2100 ms); master just past a beat (1200 ms + 20 ms = phase .05)
-        assert_eq!(start_ms(&own, 2090.0, &master, 1220.0, 1.0), Some(2125));
+        assert_eq!(start_ms(&own, 2090.0, &master, 1220.0, 1.0, 0.0), Some(2125));
         // master phase .9 → 0.1 beat before the own beat
-        assert_eq!(start_ms(&own, 2090.0, &master, 1160.0, 1.0), Some(2050));
+        assert_eq!(start_ms(&own, 2090.0, &master, 1160.0, 1.0, 0.0), Some(2050));
         // never before the track start
-        assert_eq!(start_ms(&own, 0.0, &master, 1000.0, 1.0), Some(0));
-        assert_eq!(start_ms(&[], 0.0, &master, 0.0, 1.0), None);
+        assert_eq!(start_ms(&own, 0.0, &master, 1000.0, 1.0, 0.0), Some(0));
+        assert_eq!(start_ms(&[], 0.0, &master, 0.0, 1.0, 0.0), None);
+        // heard 30 ms after it is made: the start is 30 ms further on, where the master will be by then
+        assert_eq!(start_ms(&own, 2090.0, &master, 1220.0, 1.0, 30.0), Some(2155));
     }
 
     #[test]

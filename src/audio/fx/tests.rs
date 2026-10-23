@@ -399,3 +399,50 @@ fn bad_knob_values_are_safe() {
     assert_eq!(fold(1e9, 100.0), 1e9 / 2f32.powi(24));
     assert_eq!(fold(f32::NAN, 100.0), 1.0);
 }
+
+/// LEVEL is smoothed like the knob: a 0 -> 1 step while a repeat sounds is no click.
+#[test]
+fn a_level_step_is_smoothed() {
+    let (mut u, s) = warm(Effect::Delay, 0.25, 0.0);
+    let mut out = vec![];
+    for i in 0..12_000usize {
+        if i == 10_920 {
+            u.set(Settings { level: 1.0, ..s }); // the repeat of a 100 Hz sine is at its peak here
+        }
+        out.push(u.process(sine(100.0)(i))[0]);
+    }
+    let worst = |a: &[f32]| {
+        a.windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0, f32::max)
+    };
+    let (natural, at_step) = (worst(&out[..10_900]), worst(&out[10_900..10_950]));
+    assert!(
+        at_step < natural * 2.0,
+        "LEVEL 0 -> 1 steps the output by {at_step:.3} in one frame (the dry sine moves {natural:.4} per frame)"
+    );
+}
+
+/// ROLL cuts its slice at ON; stepping BEAT while it rolls captures again at the new length.
+#[test]
+fn a_beat_step_while_rolling_captures_the_new_slice() {
+    let mut u = Unit::new(RATE);
+    let s = on(Effect::Roll, 0.5, 1.0); // 12000 frames at 120 BPM
+    u.prepare(s.effect);
+    u.set(s);
+    let mut ys = vec![];
+    for i in 0..60_000usize {
+        if i == 20_000 {
+            u.set(Settings { beats: 0.125, ..s }); // 3000 frames
+        }
+        ys.push(u.process([i as f32 * 1e-4; 2])[0]);
+    }
+    let restarts: Vec<usize> = (1..ys.len())
+        .filter(|&i| ys[i] < ys[i - 1] - 0.05)
+        .collect();
+    let after: Vec<usize> = restarts.iter().copied().filter(|&i| i > 20_000).collect();
+    assert!(
+        !after.is_empty() && after.windows(2).all(|w| w[1] - w[0] == 3000),
+        "loop restarts {restarts:?}: every 3000 after BEAT 1/8"
+    );
+}

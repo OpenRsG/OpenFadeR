@@ -10,8 +10,8 @@ use std::cell::Cell;
 
 #[derive(Default)]
 pub(super) struct State {
-    /// The slot a held SAMPLER pad plays (released with the pad).
-    held: Cell<Option<i32>>,
+    /// The slot each held SAMPLER pad plays (released with its pad).
+    held: [Cell<Option<i32>>; 8],
 }
 
 /// `c` mixed 55 % towards white: a playing pad.
@@ -28,14 +28,28 @@ impl Deck {
         };
         let st = app.global::<SamplerState>();
         let slot = st.get_bank() * 8 + pad as i32;
-        self.sequencer.held.set(Some(slot));
+        self.sequencer.held[pad % 8].set(Some(slot));
         st.invoke_pad_pressed(slot);
     }
 
-    /// The pad went up: a held SAMPLER slot is released (ends a GATE slot).
+    /// Every held SAMPLER pad went up (a keyboard key, a mode change): the held slots are released (ends GATE slots).
     pub(super) fn sampler_release(&self) {
-        if let (Some(slot), Some(app)) = (self.sequencer.held.take(), self.app.upgrade()) {
+        (0..8).for_each(|pad| self.sampler_release_pad(pad));
+    }
+
+    /// SAMPLER pad `pad` went up: its slot is released.
+    fn sampler_release_pad(&self, pad: usize) {
+        if let (Some(slot), Some(app)) = (self.sequencer.held[pad % 8].take(), self.app.upgrade()) {
             app.global::<SamplerState>().invoke_pad_released(slot);
+        }
+    }
+
+    /// A controller pad went up (`pad` 0..16): in SAMPLER mode only its own slot is released, so other held pads go on playing.
+    pub fn pad_released_at(&self, pad: usize) {
+        if self.pad_mode() == PadMode::Sampler {
+            self.sampler_release_pad(pad);
+        } else {
+            self.pad_released();
         }
     }
 
@@ -55,9 +69,10 @@ impl Deck {
 
     /// Lights the SAMPLER pads: slots of the current bank in use (PREFS > CONTROLLER > Sampler > SLOT) that hold a sample.
     pub(super) fn sampler_pads(&self, v: &mut [PadView]) {
-        let (Some(app), Some(bus)) = (self.app.upgrade(), self.with_player(|p| p.bus())) else {
+        let Some(app) = self.app.upgrade() else {
             return;
         };
+        let bus = self.with_player(|p| p.bus());
         let (bank, slots) = (
             app.global::<SamplerState>().get_bank() as usize,
             prefs::with(|p| p.controller.slots()),
@@ -65,19 +80,14 @@ impl Deck {
         let rgb = pad_fx_rgb(PadFxColor::Purple);
         for (i, pad) in v.iter_mut().enumerate() {
             let slot = bank * 8 + i;
-            let on = slot < slots && bus.sampler.slice(slot).is_some();
-            pad.label = format!(
-                "{}{}",
-                slot + 1,
-                if bus.sampler.seq_muted(slot) {
-                    " M"
-                } else {
-                    ""
-                }
-            )
-            .into();
+            let on = slot < slots
+                && bus
+                    .as_ref()
+                    .is_some_and(|b| b.sampler.slice(slot).is_some());
+            let muted = bus.as_ref().is_some_and(|b| b.sampler.seq_muted(slot));
+            pad.label = format!("{}{}", slot + 1, if muted { " M" } else { "" }).into();
             pad.set = on;
-            pad.color = if on && bus.sampler.playing(slot) {
+            pad.color = if on && bus.as_ref().is_some_and(|b| b.sampler.playing(slot)) {
                 bright(rgb)
             } else {
                 Color::from_rgb_u8(rgb[0], rgb[1], rgb[2])
@@ -93,5 +103,45 @@ impl Deck {
                 pad.color = bright([230, 80, 120]);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{DECKS, sync};
+    use super::*;
+    use crate::app::{App, DeckScroll, DeckView, headless};
+    use openfader::{
+        library::{Library, own::Own},
+        store::Store,
+    };
+    use slint::VecModel;
+    use std::{cell::RefCell, rc::Rc, sync::Arc};
+
+    #[test]
+    fn a_controller_pad_releases_only_its_own_sampler_slot() {
+        headless::init();
+        let app = App::new().unwrap();
+        let model = Rc::new(VecModel::from(vec![DeckView::default(); DECKS]));
+        let scroll = Rc::new(VecModel::from(vec![DeckScroll::default(); DECKS]));
+        let lib: Rc<dyn Library> = Rc::new(Own::new(Arc::new(Store::in_memory().unwrap())));
+        let deck = Deck::new(&app, 0, model, scroll, Rc::new(sync::Link::default()), lib);
+        let log = Rc::new(RefCell::new(Vec::new()));
+        let st = app.global::<SamplerState>();
+        let l = log.clone();
+        st.on_pad_pressed(move |slot| l.borrow_mut().push(('+', slot)));
+        let l = log.clone();
+        st.on_pad_released(move |slot| l.borrow_mut().push(('-', slot)));
+        let sampler = PadMode::Sampler as i32;
+        deck.pad_hw(sampler, 0);
+        deck.pad_hw(sampler, 1); // pad 1 pressed while pad 0 is held
+        assert_eq!(*log.borrow(), [('+', 0), ('+', 1)], "pad 0 stays held");
+        deck.pad_released_at(0);
+        deck.pad_released_at(1);
+        assert_eq!(
+            *log.borrow(),
+            [('+', 0), ('+', 1), ('-', 0), ('-', 1)],
+            "each release ends its own slot"
+        );
     }
 }

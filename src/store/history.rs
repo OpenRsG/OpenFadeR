@@ -7,19 +7,22 @@ use rusqlite::params;
 const APPEND: &str = "INSERT INTO history(day, key, played_at) VALUES (?1, ?2, ?3)";
 
 impl Store {
+    /// Plays are not user edits, so never an undo step (undoing a track's removal brings its plays back, see [`Store::system`]).
     pub fn history_append(&self, day: &str, key: &str, played_at: i64) -> R<()> {
-        self.run(APPEND, params![day, key, played_at])
+        self.system(|| self.run(APPEND, params![day, key, played_at]))
     }
 
     /// [`Store::history_append`] for every `(key, played_at)` of `plays` on `day`, in one transaction (one commit instead
     /// of one per play).
     pub fn history_append_many(&self, day: &str, plays: &[(String, i64)]) -> R<()> {
-        self.write(|tx| {
-            let mut ins = tx.prepare_cached(APPEND).s()?;
-            for (key, played_at) in plays {
-                ins.execute(params![day, key, played_at]).s()?;
-            }
-            Ok(())
+        self.system(|| {
+            self.write(|tx| {
+                let mut ins = tx.prepare_cached(APPEND).s()?;
+                for (key, played_at) in plays {
+                    ins.execute(params![day, key, played_at]).s()?;
+                }
+                Ok(())
+            })
         })
     }
 

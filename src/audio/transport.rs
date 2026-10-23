@@ -34,6 +34,10 @@ pub fn pitch(st: f32, key_lock: bool, rate: f64) -> f64 {
 /// Every field starts at its all-zero bits: no shift, no reverse, no brake, slip off.
 #[derive(Default)]
 pub struct Transport {
+    /// A pending brake and the one running are cancelled (consumed by the callback).
+    unbrake: AtomicBool,
+    /// Slip goes off (callback) once the playhead is back on the shadow.
+    slip_off: AtomicBool,
     /// f32 bits, semitones.
     shift: AtomicU32,
     reverse: AtomicBool,
@@ -80,11 +84,33 @@ impl Transport {
         Some(f32::from_bits(self.brake.swap(0, Relaxed))).filter(|&s| s > 0.0)
     }
 
+    /// Drop a pending brake and the one running: the deck plays on at speed.
+    pub fn cancel_brake(&self) {
+        self.brake.store(0, Relaxed);
+        self.unbrake.store(true, Release);
+    }
+
+    /// Callback: a cancel of the running brake is due.
+    pub fn take_unbrake(&self) -> bool {
+        self.unbrake.swap(false, Acquire)
+    }
+
     /// Slip on starts with the shadow on the playhead; off drops any divergence in place.
     pub fn set_slip(&self, on: bool) {
         self.slip.store(on, Relaxed);
+        self.slip_off.store(false, Relaxed);
+        self.settle();
+    }
+
+    /// The playhead stands where the user left it (pause, CUE return): no divergence, no return owed.
+    pub fn settle(&self) {
         self.diverged.store(false, Relaxed);
         self.back.store(false, Relaxed);
+    }
+
+    /// Slip goes off when the playhead is back on the shadow (a return is already asked for by [`Transport::release`]).
+    pub fn slip_off_after_return(&self) {
+        self.slip_off.store(true, Relaxed);
     }
 
     pub fn slip(&self) -> bool {
@@ -125,13 +151,21 @@ impl Transport {
         }
         if !self.diverged.load(Acquire) {
             self.shadow.store(pos.to_bits(), Relaxed);
+            self.finish_off();
             return None;
         }
         if back {
             self.diverged.store(false, Relaxed);
+            self.finish_off();
             return Some(f64::from_bits(self.shadow.load(Relaxed)));
         }
         None
+    }
+
+    fn finish_off(&self) {
+        if self.slip_off.swap(false, Relaxed) {
+            self.slip.store(false, Relaxed);
+        }
     }
 
     /// Callback, end of a buffer: the shadow moved `by` frames (clamped to `frames`).

@@ -16,13 +16,13 @@ fn gain_ramp_endpoints() {
 
 #[test]
 fn loop_packing_roundtrips_and_rejects_empty() {
-    assert_eq!(unpack(pack(Some((0, 5)))), Some((0, 5)));
+    assert_eq!(unpack(pack(Some((0.0, 5.0)))), Some((0.0, 5.0)));
     assert_eq!(
-        unpack(pack(Some((123_456, 789_012)))),
-        Some((123_456, 789_012))
+        unpack(pack(Some((123_456.0, 789_012.0)))),
+        Some((123_456.0, 789_012.0))
     );
-    assert_eq!(unpack(pack(Some((5, 5)))), None);
-    assert_eq!(unpack(pack(Some((9, 5)))), None);
+    assert_eq!(unpack(pack(Some((5.0, 5.0)))), None);
+    assert_eq!(unpack(pack(Some((9.0, 5.0)))), None);
     assert_eq!(unpack(pack(None)), None);
 }
 
@@ -358,7 +358,7 @@ fn slip_returns_to_the_shadow_after_a_four_beat_loop() {
     sh.t.set_slip(true);
     run_buffers(&sh, &mut v, 10);
     let beat = 22050; // 0.5 s at 44.1 kHz
-    sh.set_loop(Some((117, 117 + 500))); // 1 beat loop around the playhead (5120 frames = 116 ms)
+    sh.set_loop(Some((117.0, 117.0 + 500.0))); // 1 beat loop around the playhead (5120 frames = 116 ms)
     run_buffers(&sh, &mut v, 4 * beat / 512);
     let (s, e) = (117.0 * 44.1, 617.0 * 44.1);
     let looped = f64::from_bits(sh.pos.load(Relaxed));
@@ -382,7 +382,7 @@ fn slip_returns_to_the_shadow_after_a_four_beat_loop() {
 fn slip_loop_without_slip_stays_in_the_loop() {
     let (sh, mut v) = rig(1.0, false);
     run_buffers(&sh, &mut v, 10);
-    sh.set_loop(Some((117, 617)));
+    sh.set_loop(Some((117.0, 617.0)));
     run_buffers(&sh, &mut v, 200);
     sh.set_loop(None);
     run_buffers(&sh, &mut v, 1);
@@ -409,6 +409,78 @@ fn slip_return_after_a_seek_lands_on_the_shadow() {
 }
 
 #[test]
+fn reverse_released_under_its_own_slip_returns_to_the_shadow_then_slip_goes_off() {
+    let (sh, mut v) = rig(1.0, false);
+    sh.t.set_slip(true); // QUANTIZE REVERSE: REVERSE engages slip itself
+    run_buffers(&sh, &mut v, 20);
+    sh.set_reverse(true);
+    run_buffers(&sh, &mut v, 10); // plays backwards from 20 buffers in
+    sh.set_reverse(false);
+    sh.t.slip_off_after_return();
+    run_buffers(&sh, &mut v, 1);
+    assert_eq!(pos(&sh), 31.0 * 512.0, "where forward play would be");
+    assert!(!sh.t.slip());
+}
+
+#[test]
+fn a_stopped_deck_has_no_slip_divergence_to_return_from() {
+    let slip_rig = || {
+        let (sh, mut v) = rig(1.0, false);
+        sh.t.set_slip(true);
+        run_buffers(&sh, &mut v, 10);
+        sh.set_loop(Some((117.0, 617.0))); // loop roll held
+        run_buffers(&sh, &mut v, 20);
+        (sh, v)
+    };
+    // CUE while playing: pause and back to the cue point (0), then the roll is let go.
+    let (sh, mut v) = slip_rig();
+    sh.playing.store(false, Relaxed);
+    sh.t.settle();
+    sh.seek_to(0.0);
+    run_buffers(&sh, &mut v, 1);
+    sh.set_loop(None);
+    run_buffers(&sh, &mut v, 1);
+    assert_eq!(pos(&sh), 0.0);
+    // PAUSE (brake) in the roll, then the roll is let go.
+    let (sh, mut v) = slip_rig();
+    sh.t.brake(0.05);
+    run_buffers(&sh, &mut v, 8);
+    assert!(!sh.playing.load(Relaxed));
+    let stopped = pos(&sh);
+    sh.set_loop(None);
+    run_buffers(&sh, &mut v, 1);
+    assert_eq!(pos(&sh), stopped);
+}
+
+#[test]
+fn only_the_play_button_takes_the_vinyl_start_ramp() {
+    let (sh, mut v) = rig(1.0, false);
+    sh.vinyl_release.store(0.25f32.to_bits(), Relaxed);
+    sh.playing.store(false, Relaxed);
+    sh.play(false); // hot cue / CUE / fader start / synced start
+    run_buffers(&sh, &mut v, 4);
+    assert_eq!(pos(&sh), 4.0 * 512.0, "full speed from the first buffer");
+    sh.playing.store(false, Relaxed);
+    sh.seek_to(0.0);
+    sh.play(true); // PLAY
+    run_buffers(&sh, &mut v, 4);
+    assert!(pos(&sh) < 3.0 * 512.0, "ramping up: {}", pos(&sh));
+}
+
+#[test]
+fn a_hot_cue_during_the_pause_brake_plays_on() {
+    let (sh, mut v) = rig(1.0, false);
+    run_buffers(&sh, &mut v, 4);
+    sh.t.brake(0.125); // PAUSE
+    run_buffers(&sh, &mut v, 2);
+    sh.seek_to(100_000.0); // hot cue: seek, play
+    sh.play(false);
+    run_buffers(&sh, &mut v, 40);
+    assert!(sh.playing.load(Relaxed));
+    assert_eq!(pos(&sh), 100_000.0 + 40.0 * 512.0);
+}
+
+#[test]
 fn a_phase_kept_seek_catches_up_what_played_before_it_took_effect() {
     let (sh, mut v) = rig(1.0, false);
     run_buffers(&sh, &mut v, 4); // 2048 frames written
@@ -425,6 +497,45 @@ fn a_phase_kept_seek_catches_up_what_played_before_it_took_effect() {
     sh.seek_from_heard(100_000.0, Some(60_000.0));
     run_buffers(&sh, &mut v, 1);
     assert_eq!(pos(&sh), 100_512.0);
+}
+
+/// The reference of a phase-kept seek is where the FIRST press was heard: a second press made before the first is taken only sees
+/// the first one's target as the position, and must not replace it.
+#[test]
+fn two_phase_kept_seeks_in_a_row_both_count_the_latency_once() {
+    let (sh, mut v) = rig(1.0, false);
+    run_buffers(&sh, &mut v, 4); // 2048 frames written, 1000 of them heard
+    sh.seek_from_heard(100_000.0, Some(1000.0));
+    sh.seek_from_heard(200_000.0, Some(100_000.0)); // 4 beats on from the first target, as position_ms() reports it
+    run_buffers(&sh, &mut v, 1);
+    assert_eq!(pos(&sh), 200_000.0 + 1048.0 + 512.0);
+}
+
+/// A phase-kept seek made while a loop plays catches up what played meanwhile even when the loop wrapped in between, and when it
+/// is gone by the time the callback takes the seek (a slicer pad's release clears the roll and seeks back).
+#[test]
+fn a_phase_kept_seek_counts_the_way_round_a_loop_that_wrapped_or_ended() {
+    let (sh, mut v) = rig(1.0, false);
+    sh.set_loop(Some((100.0, 200.0))); // 4410..8820 frames
+    sh.seek_to(4410.0);
+    run_buffers(&sh, &mut v, 1); // written 4922: heard 1024 frames behind = 3898, i.e. 8308 before the wrap
+    sh.seek_from_heard(100_000.0, Some(8308.0));
+    sh.set_loop(None);
+    run_buffers(&sh, &mut v, 1);
+    assert_eq!(pos(&sh), 100_000.0 + 1024.0 + 512.0);
+}
+
+/// 1 beat at 124 BPM is 483.871 ms: as whole ms (483) the loop would run 33 ms off the grid in 19 s.
+#[test]
+fn a_beat_loop_keeps_its_length_to_a_fraction_of_a_ms() {
+    let (sh, mut v) = rig(1.0, false);
+    let beat = 60_000.0 / 124.0;
+    sh.set_loop(Some((1452.0, 1452.0 + beat)));
+    sh.seek_to(1452.0 * 44.1);
+    run_buffers(&sh, &mut v, 1636);
+    let (start, len) = (1452.0 * 44.1, beat * 44.1);
+    let want = start + (1636.0 * 512.0) % len;
+    assert!((pos(&sh) - want).abs() < 5.0, "{} vs {want}", pos(&sh));
 }
 
 #[test]
@@ -457,7 +568,7 @@ fn reverse_plays_the_source_backwards_and_pauses_at_the_start() {
 #[test]
 fn reverse_loop_wraps_and_key_locked_reverse_keeps_pitch() {
     let (sh, mut v) = rig(1.0, true);
-    sh.set_loop(Some((100, 200))); // 4410..8820 frames
+    sh.set_loop(Some((100.0, 200.0))); // 4410..8820 frames
     sh.seek.store(6000f64.to_bits(), Relaxed);
     sh.set_reverse(true);
     let mut seen = vec![];
@@ -484,10 +595,10 @@ fn reverse_loop_wraps_and_key_locked_reverse_keeps_pitch() {
 #[test]
 fn a_loop_halved_behind_the_playhead_keeps_playing_inside_it() {
     let (sh, mut v) = rig(1.0, false);
-    sh.set_loop(Some((100, 300))); // 4410..13230 frames
+    sh.set_loop(Some((100.0, 300.0))); // 4410..13230 frames
     sh.seek.store(10_000f64.to_bits(), Relaxed); // second half
     run_buffers(&sh, &mut v, 1);
-    sh.set_loop(Some((100, 200))); // halved: the playhead is past the new end
+    sh.set_loop(Some((100.0, 200.0))); // halved: the playhead is past the new end
     for _ in 0..200 {
         run_buffers(&sh, &mut v, 1);
         let p = f64::from_bits(sh.pos.load(Relaxed));
@@ -662,7 +773,7 @@ fn scratch_on_a_playing_deck_resumes_at_normal_speed_direction_and_key_lock() {
 #[test]
 fn scratch_ignores_loops_and_reverse_and_never_runs_off_the_track() {
     let (sh, mut v) = ramp_rig(true);
-    sh.set_loop(Some((100, 200)));
+    sh.set_loop(Some((100.0, 200.0)));
     sh.set_reverse(true);
     sh.seek_to(9.0 * SRC);
     sh.scratch_begin();
@@ -818,7 +929,7 @@ fn stems_share_the_read_position_with_key_lock_and_loops() {
     );
     // A loop wraps the same way with stems: the playhead stays inside [1 s, 1.5 s).
     let (sh, mut v) = stem_rig(1.0, false);
-    sh.set_loop(Some((1000, 1500)));
+    sh.set_loop(Some((1000.0, 1500.0)));
     sh.seek.store((44100.0f64).to_bits(), Relaxed);
     set_stem(&sh, 0, 0.5);
     run_buffers(&sh, &mut v, 200);
@@ -1216,4 +1327,35 @@ fn a_fader_plugin_replaces_the_fader_gain_on_the_master_path_and_never_touches_t
             .zip(&src[at + off.len() - 512..])
             .all(|(&(m, _), &s)| m == s)
     );
+}
+
+#[test]
+fn steady_is_off_only_while_a_brake_or_spin_up_changes_the_speed() {
+    let (sh, mut v) = rig(1.0, false);
+    run_buffers(&sh, &mut v, 2);
+    assert!(sh.steady.load(Relaxed), "plain play");
+    sh.t.brake(0.2); // 8820 frames = 17 buffers
+    run_buffers(&sh, &mut v, 2);
+    assert!(!sh.steady.load(Relaxed), "braking");
+    run_buffers(&sh, &mut v, 40);
+    assert!(!sh.playing.load(Relaxed) && sh.steady.load(Relaxed), "stopped");
+    sh.vinyl_release.store(0.1f32.to_bits(), Relaxed); // 4410 frames = 9 buffers
+    sh.request_spin();
+    sh.playing.store(true, Relaxed);
+    run_buffers(&sh, &mut v, 2);
+    assert!(!sh.steady.load(Relaxed), "spinning up");
+    run_buffers(&sh, &mut v, 12);
+    assert!(sh.steady.load(Relaxed), "at speed");
+}
+
+#[test]
+fn a_deck_at_tempo_zero_is_silent_not_one_held_sample() {
+    for key_lock in [false, true] {
+        let (sh, mut v) = rig(1.0, key_lock);
+        run_buffers(&sh, &mut v, 40);
+        sh.rate.store(0f64.to_bits(), Relaxed); // the bottom of the WIDE tempo range
+        let out = run_buffers(&sh, &mut v, 40);
+        let peak = out[out.len() - 4096..].iter().fold(0f32, |m, y| m.max(y.abs()));
+        assert!(peak < 1e-3, "key lock {key_lock}: peak {peak}");
+    }
 }

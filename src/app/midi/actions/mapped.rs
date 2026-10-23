@@ -1,7 +1,7 @@
 //! The actions only the controller mapping files reach: not learnable, each row brings its own constant.
 
 use super::{Action, App, Kind, arg, on_deck};
-use crate::app::{BrowserState, DeckState, FxState, GrooveState, SamplerState, deck::Deck, groove};
+use crate::app::{BrowserState, DeckState, FxState, GrooveState, SamplerState, groove};
 use slint::{ComponentHandle, Model};
 
 /// `arg` calling `State::cb(deck, constant)`, no release.
@@ -60,7 +60,7 @@ pub(super) const TABLE: &[Action] = &[
     on_deck(
         "hw-pad",
         |d, a| d.pad_hw(a / 16, (a % 16) as usize),
-        Some(Deck::pad_released),
+        Some(|d, a| d.pad_released_at((a % 16) as usize)),
     ),
     on_deck("hw-pad-delete", |d, a| d.pad_delete(a as usize), None),
     on_deck("hw-pad-stop", |d, a| d.pad_stop(a as usize), None),
@@ -199,12 +199,12 @@ pub(super) const TABLE: &[Action] = &[
     on_deck(
         "hw-start-play",
         |d, _| d.fader_start(true, false),
-        Some(|d| d.fader_start(false, false)),
+        Some(|d, _| d.fader_start(false, false)),
     ),
     on_deck(
         "hw-start-cue",
         |d, _| d.fader_start(true, true),
-        Some(|d| d.fader_start(false, true)),
+        Some(|d, _| d.fader_start(false, true)),
     ),
     // MERGE FX: the deck column is the MFX side (A = MFX1, B = MFX2).
     arg(

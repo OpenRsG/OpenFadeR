@@ -30,6 +30,15 @@ impl Deck {
         }
     }
 
+    /// The master cannot be followed now (gone, still loading, no grid, tempo out of range): no nudge stays and an armed
+    /// start just starts, the DJ pressed PLAY.
+    fn stop_following(&self) {
+        if self.sync.waiting.take().is_some() && self.ready() {
+            self.with_player(|p| p.play());
+        }
+        self.set_nudge(0.0);
+    }
+
     /// Once per tick: master hand-over, tempo following, the armed start, phase correction.
     pub(in crate::app::deck) fn follow(&self) {
         self.quantize_tick();
@@ -44,27 +53,31 @@ impl Deck {
             .master_deck()
             .filter(|p| self.following() && self.ready() && p.ready())
         else {
-            self.sync.waiting.set(None);
-            return self.set_nudge(0.0);
+            return self.stop_following();
         };
         let (own, theirs) = (self.loaded.borrow(), peer.loaded.borrow());
         let (own_pos, _) = self.clock(&own);
         let (their_pos, their_playing) = peer.clock(&theirs);
         let (ob, tb) = (&own.analysis.beats[..], &theirs.analysis.beats[..]);
         let Some((g, rate, k)) = self.tempo_target(ob, tb, peer.rate.get()) else {
-            return;
+            drop((own, theirs));
+            return self.stop_following();
         };
         let master_phase = loop_preserves_phase(tb, theirs.loop_, k);
         let free = master_phase
             && !self.sync.scratching.get()
             && self.sync.bend.get() == 0.0
             && own.loop_.is_none()
-            && !self.view.borrow().reverse;
+            && !self.view.borrow().reverse
+            && !peer.sync.scratching.get()
+            && !peer.view.borrow().reverse;
         // Only the figures this tick's branch uses: each is a binary search per grid.
         let waiting = self.sync.waiting.get();
         let (start, phase) = if waiting.is_some() && master_phase {
+            // The start is heard one output latency after it is made: the master has moved on by then, and the own track with it.
+            let ahead = self.with_player(|p| p.output_latency_ms()).unwrap_or(0.0) * rate;
             (
-                start_ms(ob, own_pos, tb, their_pos, k),
+                start_ms(ob, own_pos, tb, their_pos, k, ahead),
                 wait_phase(tb, their_pos, k),
             )
         } else {
@@ -76,6 +89,8 @@ impl Deck {
             && playing
             && their_playing
             && free
+            && self.steady()
+            && peer.steady()
             && self.settled()
             && peer.settled())
         .then(|| align(ob, own_pos, tb, their_pos, k))

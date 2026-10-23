@@ -161,23 +161,24 @@ impl View {
             .or(collection)
     }
 
-    /// Undo/redo can remove an override, so restore fresh inherited values rather than overlaying old copies.
+    /// Undo/redo and Reload Tag change what the library lists for a track (an override removed, BPM, key, length read from the
+    /// file again): every copy kept here becomes the library's current one, so it stays equal to its row in the list.
     pub(super) fn reread_metadata(&mut self) {
-        let mut lists = [
+        let mut kept = [
             std::mem::take(&mut self.tags),
             std::mem::take(&mut self.history),
         ];
-        for t in lists.iter_mut().flatten() {
+        for t in kept.iter_mut().flatten() {
             if let Some(fresh) = self.fresh_track(t) {
-                crate::app::trackinfo::copy_metadata(t, &fresh);
+                *t = fresh;
             }
         }
-        let [tags, history] = lists;
+        let [tags, history] = kept;
         (self.tags, self.history) = (tags, history);
         let mut chosen = [self.selected.take(), self.related.take()];
         for t in chosen.iter_mut().flatten() {
             if let Some(fresh) = self.fresh_track(t) {
-                crate::app::trackinfo::copy_metadata(t, &fresh);
+                *t = fresh;
             }
         }
         let [selected, related] = chosen;
@@ -188,6 +189,7 @@ impl View {
             {
                 self.decks[i].refresh_metadata(&fresh);
             }
+            self.decks[i].reread_edits(&*self.lib);
         }
     }
 

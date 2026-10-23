@@ -295,4 +295,33 @@ mod tests {
         );
         assert_eq!(b.phrases, Some(mine));
     }
+
+    #[test]
+    fn reload_tag_shows_the_files_text_over_edits_and_undo_brings_the_edits_back() {
+        let s = Arc::new(Store::in_memory().unwrap());
+        let t = crate::library::Track {
+            title: "Old".into(),
+            file: Some("/m/a.mp3".into()),
+            ..Default::default()
+        };
+        s.collection_put(&[t.clone()], false).unwrap();
+        let id = s.id_of_path(t.file.as_deref().unwrap()).unwrap().unwrap();
+        let key = crate::store::id_key(id);
+        s.set_rating(&key, Some(4)).unwrap();
+        s.set_metadata(&key, "Mine", "Me", "", "", "", "note").unwrap();
+        let ov = Overlay::new(Box::new(crate::library::own::Own::new(s.clone())), s.clone());
+        let shown = || {
+            let t = ov.tracks_all().unwrap()[0].clone();
+            (t.title, t.artist, t.comment, t.rating)
+        };
+        assert_eq!(shown(), ("Mine".into(), "Me".into(), "note".into(), 4));
+        let fresh = crate::library::Track {
+            title: "From File".into(),
+            ..s.collection_track(id).unwrap().unwrap()
+        };
+        s.action("Reload Tag", || s.reload_tags(&key, &fresh)).unwrap();
+        assert_eq!(shown(), ("From File".into(), "".into(), "".into(), 4));
+        s.undo().unwrap();
+        assert_eq!(shown(), ("Mine".into(), "Me".into(), "note".into(), 4));
+    }
 }

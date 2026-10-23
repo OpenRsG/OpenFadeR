@@ -177,6 +177,17 @@ impl Store {
         )
     }
 
+    /// Reload Tag: the file's tags `t` replace the Collection row and every text edit of `key` (title, artist, album, genre,
+    /// label, comment) is dropped, so the file's tags show; rating, colour, cues and grid stay. Call it inside one
+    /// [`Store::action`] so that undo brings both back.
+    pub fn reload_tags(&self, key: &str, t: &Track) -> R<()> {
+        self.run(
+            "UPDATE track SET title = NULL, artist = NULL, album = NULL, genre = NULL, label = NULL, comment = NULL WHERE key = ?1",
+            [key],
+        )?;
+        self.collection_put(std::slice::from_ref(t), true).map(drop)
+    }
+
     /// `color`: colour id 1..=8, `None` = no colour override (values above 8 are ignored).
     pub fn set_color(&self, key: &str, color: Option<u8>) -> R<()> {
         self.set_field("color", key, color.filter(|c| (1..=8).contains(c)))

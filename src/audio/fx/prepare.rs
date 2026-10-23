@@ -17,7 +17,7 @@ pub(super) struct Prepared {
 pub(super) struct Handoff {
     pub ready: Option<Prepared>,
     pub retired: Option<Prepared>,
-    closing: Option<Prepared>,
+    closing: Vec<Prepared>,
 }
 
 pub(super) struct Exchange {
@@ -108,7 +108,7 @@ impl Worker {
                     let mut h = e.handoff.lock().unwrap();
                     drop(h.ready.take());
                     drop(h.retired.take());
-                    drop(h.closing.take());
+                    h.closing.clear();
                     false
                 });
                 if s.stop.load(Acquire) {
@@ -136,8 +136,13 @@ impl Worker {
         self.thread.as_ref().unwrap().thread().unpark();
     }
 
-    pub fn retire(&self, exchange: &Exchange, current: Option<Prepared>) {
-        exchange.handoff.lock().unwrap().closing = current;
+    pub fn retire(&self, exchange: &Exchange, current: [Option<Prepared>; 2]) {
+        exchange
+            .handoff
+            .lock()
+            .unwrap()
+            .closing
+            .extend(current.into_iter().flatten());
         exchange.alive.store(false, Release);
         self.wake();
     }

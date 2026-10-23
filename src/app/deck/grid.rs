@@ -232,6 +232,7 @@ impl Deck {
             status += &tr!(" · NOT saved: {}", e);
         }
         self.apply_grid(beats, status);
+        self.reread_siblings();
     }
 
     /// Makes `beats` the deck's grid and pushes it everywhere the grid shows or is read.
@@ -409,6 +410,7 @@ impl Deck {
         record_undo(&mut l);
         drop(l);
         self.apply_grid(beats, status);
+        self.reread_siblings();
     }
 }
 

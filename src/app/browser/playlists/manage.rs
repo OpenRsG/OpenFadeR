@@ -331,7 +331,15 @@ impl View {
     pub(in crate::app::browser) fn add_track_to(&mut self, app: &App, id: i64, t: &Track) {
         let key = store::key(t);
         let name = self.node(id).map(|n| n.name.clone()).unwrap_or_default();
+        // A playlist lists only what the Collection holds: an entry for a track of a device or an opened source would never show.
+        let known = self.cache().map(|c| c.by_key.contains_key(&key));
         let add = || -> Result<String, String> {
+            if !known? {
+                return Ok(tr!(
+                    "“{}” is not in the Collection: import it first",
+                    t.title
+                ));
+            }
             if self.store.entries(id)?.contains(&key) {
                 return Ok(tr!("“{}” is already in {}", t.title, name));
             }

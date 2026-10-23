@@ -40,8 +40,8 @@ pub(super) struct Mix {
     voices: [Voice; SLOTS],
     shared: [Arc<Shared>; SLOTS],
     bus: Arc<Bus>,
-    /// Master and headphone gain at the end of the last buffer (ramped like the channel gains).
-    applied: [f32; 2],
+    /// Master gain, headphone gain and headphone mix at the end of the last buffer (ramped like the channel gains).
+    applied: [f32; 3],
     /// Per channel and frame: (master path, cue path). Grows once to the largest buffer seen.
     /// ponytail: that first growth allocates on the audio thread; preallocate if drivers resize buffers mid-run.
     buf: [Vec<Frame>; SLOTS],
@@ -84,11 +84,11 @@ pub(super) struct Mix {
 fn mix_bus(
     buf: &[Vec<Frame>],
     n: usize,
-    applied: &mut [f32; 2],
+    applied: &mut [f32; 3],
     target: Params,
     mut put: impl FnMut(usize, bus::Out),
 ) -> f32 {
-    let [g0m, g0h] = std::mem::replace(applied, [target.master, target.headphone]);
+    let [g0m, g0h, g0x] = std::mem::replace(applied, [target.master, target.headphone, target.mix]);
     let mut peak = 0f32;
     for i in 0..n {
         let (mut m, mut c) = ([0f32; 2], [0f32; 2]);
@@ -101,6 +101,7 @@ fn mix_bus(
         let p = Params {
             master: gain_at(g0m, target.master, i, n),
             headphone: gain_at(g0h, target.headphone, i, n),
+            mix: gain_at(g0x, target.mix, i, n),
             ..target
         };
         peak = peak.max(m[0].abs() * p.master).max(m[1].abs() * p.master);
@@ -240,16 +241,20 @@ impl Mix {
                 buf[k].resize(n, ([0.0; 2], [0.0; 2]));
             }
             let b = &mut buf[k];
-            // ponytail: one stem part unit per voice. The first Beat FX slot that is ON on a part of this channel wins
-            // (else the first one ringing out); all of them win over the deck's DRUM RELEASE FX.
-            voices[k].set_part_fx(
-                bus.fx
-                    .as_flattened()
-                    .iter()
-                    .filter_map(|c| c.stem_target(k))
-                    .reduce(|a, b| if !a.1.on && b.1.on { b } else { a })
-                    .or_else(|| shared[k].groove.release_target(k)),
-            );
+            // ponytail: one stem part unit per voice. The first Beat FX slot that is ON on a part of this channel wins,
+            // then the deck's DRUM RELEASE FX while it is held; else the first Beat FX slot pointing here, or the release
+            // unit, rings out (an idle slot never shadows a held release).
+            let part = bus
+                .fx
+                .as_flattened()
+                .iter()
+                .filter_map(|c| c.stem_target(k))
+                .reduce(|a, b| if !a.1.on && b.1.on { b } else { a });
+            voices[k].set_part_fx(match (part, shared[k].groove.release_target(k)) {
+                (Some(p), _) if p.1.on => Some(p),
+                (p, Some(r)) if r.1.on || p.is_none() => Some(r),
+                (p, _) => p,
+            });
             let d = render(&shared[k], &mut voices[k], dev_rate, n, |i, m, c| {
                 b[i] = (m, c)
             });
@@ -331,7 +336,7 @@ impl Mix {
         let (b0, b1) = (std::mem::replace(booth, bus.booth()), bus.booth());
         *silent = all_zero(buf, n);
         if *silent {
-            *applied = [target.master, target.headphone]; // where `mix_bus` leaves the ramp
+            *applied = [target.master, target.headphone, target.mix]; // where `mix_bus` leaves the ramp
             out.fill(T::from_sample(0.0f32));
             for _ in 0..n {
                 if let Some(c) = cue {
@@ -378,7 +383,7 @@ impl Mix {
             voices: [(); SLOTS].map(|_| Voice::new(rate)),
             shared: shared.clone(),
             bus: bus.clone(),
-            applied: [target.master, target.headphone], // continue from the knobs, no ramp from the defaults after a device switch
+            applied: [target.master, target.headphone, target.mix], // continue from the knobs, no ramp from the defaults after a device switch
             buf: [(); SLOTS].map(|_| Vec::with_capacity(4096)),
             cue,
             plan,
@@ -453,7 +458,7 @@ mod tests {
     fn mix_bus_sums_channels_and_reports_the_post_sum_master_peak() {
         let frame = |l: f32, r: f32| ([l, r], [l, r]);
         let buf = [vec![frame(0.25, 0.25); 4], vec![frame(0.5, -0.5); 4]];
-        let mut applied = [0.5, 1.0];
+        let mut applied = [0.5, 1.0, 0.0];
         let mut out = vec![];
         let t = Params {
             master: 0.5,
@@ -466,7 +471,7 @@ mod tests {
         assert_eq!(out[3].device, [0.375, -0.125]);
         assert_eq!(out[3].master, [0.375, -0.125]);
         assert_eq!(peak, 0.375); // peak of the sum, not of either channel alone (0.25, 0.5 each)
-        assert_eq!(applied, [0.5, 1.0]);
+        assert_eq!(applied, [0.5, 1.0, 0.0]);
         // headphone feed at mix 0 = the summed cue (0.75, -0.25), stereo
         assert_eq!(out[3].phones, [0.75, -0.25]);
         // split: left = mono cue (0.25), right = mono master ((0.75 - 0.25) / 2 * 0.5); the recorder still gets the stereo master
@@ -510,7 +515,7 @@ mod tests {
             headphone: 0.5,
         };
         let mut frame = vec![0.0f32; ch];
-        mix_bus(&buf, 3, &mut [1.0, 0.5], t, |i, o| {
+        mix_bus(&buf, 3, &mut [1.0, 0.5, 0.0], t, |i, o| {
             route::place(&mut frame, plan, o.device, o.master, o.phones, 0.5);
             emit(&mut out[i * ch..(i + 1) * ch], &frame);
         });
@@ -627,7 +632,7 @@ mod tests {
             sh.rate.store((1.0 + 0.05 * k as f64).to_bits(), Relaxed);
             sh.t.set_shift(2.0);
             sh.cfx.set_knob(-0.4);
-            sh.set_loop(Some((500, 900)));
+            sh.set_loop(Some((500.0, 900.0)));
         }
         let mut mix = Mix::new(44100, 2, Plan::stereo(), None, &shared, &bus);
         let mut out = vec![0f32; 2 * 512];
@@ -756,7 +761,7 @@ mod tests {
         let target = bus.params();
         let mut want = vec![9.0f32; 2 * 512];
         let mut frame = vec![0.0f32; 2];
-        let mut applied = [target.master, target.headphone];
+        let mut applied = [target.master, target.headphone, target.mix];
         let peak = mix_bus(&buf, 512, &mut applied, target, |i, o| {
             route::place(
                 &mut frame,
@@ -834,6 +839,110 @@ mod tests {
                 .iter()
                 .all(|&(silent, audible)| silent && !audible),
             "and it stays engaged on silence"
+        );
+    }
+
+    /// A Beat FX slot that merely points at a stem part of channel A (OFF, nothing ringing) must not take the voice's
+    /// single stem-FX slot from the deck's held DRUM RELEASE FX.
+    #[test]
+    fn an_idle_beat_fx_part_does_not_shadow_the_held_drum_release_fx() {
+        use crate::audio::{Pcm, Stems, Track16};
+        let drums_range = |beat_fx_points_at_vocal: bool| -> (f32, f32) {
+            let (shared, bus, mut mix) = silent_rig();
+            let sh = &shared[0];
+            let n = 44100 * 5;
+            let tone = |hz: f64, i: usize| {
+                (0.25 * (std::f64::consts::TAU * hz * i as f64 / 44100.0).sin() * 16384.0) as i16
+                    * 2
+            };
+            let (vocal, drums): (Vec<i16>, Vec<i16>) = (0..n)
+                .flat_map(|i| [(tone(300.0, i), tone(1000.0, i)); 2])
+                .unzip();
+            let samples = vocal
+                .iter()
+                .zip(&drums)
+                .map(|(a, b)| (*a as f32 + *b as f32) / 32768.0)
+                .collect();
+            *sh.pcm.lock() = Arc::new(Track16::from(Pcm {
+                rate: 44100,
+                samples,
+            }));
+            *sh.stems.lock() = Some(Arc::new(Stems::complete([
+                vocal,
+                vec![0; 2 * n],
+                vec![0; 2 * n],
+                drums,
+            ])));
+            sh.rate.store(1f64.to_bits(), Relaxed);
+            sh.gain.store(1f32.to_bits(), Relaxed);
+            sh.gain_applied.store(1f32.to_bits(), Relaxed);
+            sh.playing.store(true, Relaxed);
+            let r = &sh.groove.release;
+            r.set_effect(fx::Effect::Trans);
+            r.set_beat(2); // 1/4 beat
+            r.set_level(1.0);
+            r.set_bpm(120.0);
+            r.set_on(true); // DRUM RELEASE FX held
+            mix.voices[0].part_fx.prepare(fx::Effect::Trans.index());
+            if beat_fx_points_at_vocal {
+                // FX1-1 on CH1, PART = VOCAL, OFF: the panel's state after the DJ once picked a part
+                bus.fx[0][0].set_assign(fx::Assign::A);
+                bus.fx[0][0].set_part(1 << crate::audio::VOCAL);
+            }
+            let mut left = vec![];
+            let mut out = vec![0f32; 2 * 512];
+            let (at, latency) = (Instant::now(), Duration::from_millis(10));
+            for _ in 0..100 {
+                mix.fill(&mut out, 44100, 2, at, latency);
+                left.extend(out.iter().step_by(2));
+            }
+            let amp = |b: &[f32]| {
+                let w = 2.0 * std::f64::consts::PI * 1000.0 / 44100.0;
+                let (s, c) = b.iter().enumerate().fold((0.0, 0.0), |(s, c), (i, y)| {
+                    (
+                        s + *y as f64 * (w * i as f64).sin(),
+                        c + *y as f64 * (w * i as f64).cos(),
+                    )
+                });
+                (2.0 / 441.0 * (s * s + c * c).sqrt()) as f32
+            };
+            left[30_000..]
+                .chunks_exact(441)
+                .map(amp)
+                .fold((f32::MAX, 0.0f32), |(lo, hi), a| (lo.min(a), hi.max(a)))
+        };
+        let (lo, hi) = drums_range(false);
+        assert!(
+            lo < 0.05 && hi > 0.2,
+            "control: DRUM RELEASE gates the drums: {lo} .. {hi}"
+        );
+        let (lo, hi) = drums_range(true);
+        assert!(
+            lo < 0.05 && hi > 0.2,
+            "an idle FX1-1 pointed at VOCAL must not shadow it: {lo} .. {hi}"
+        );
+    }
+
+    /// The HP MIX knob is ramped across the buffer like MASTER and HP LEVEL: a jump from CUE to MASTER is no step.
+    #[test]
+    fn a_headphone_mix_step_is_ramped_across_the_buffer() {
+        let buf = [vec![([0.0; 2], [0.8; 2]); 64]]; // silent master, cue 0.8
+        let t = Params {
+            master: 1.0,
+            split: false,
+            mix: 0.0,
+            headphone: 1.0,
+        };
+        let mut applied = [1.0, 1.0, 0.0];
+        let mut out = vec![];
+        mix_bus(&buf, 64, &mut applied, t, |_, o| out.push(o.phones[0]));
+        mix_bus(&buf, 64, &mut applied, Params { mix: 1.0, ..t }, |_, o| {
+            out.push(o.phones[0])
+        });
+        let step = (out[63] - out[64]).abs();
+        assert!(
+            step < 0.05,
+            "HP MIX 0 -> 1 steps the headphone feed by {step} in one frame"
         );
     }
 }

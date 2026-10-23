@@ -246,6 +246,29 @@ fn single_mode_plays_one_slot_multi_several_and_a_bank_twin_never_pairs() {
 }
 
 #[test]
+fn a_swap_keeps_the_playing_loop_until_the_new_one_starts_on_the_beat() {
+    let mut r = Rig::new(0.0);
+    r.c.load(0, Some(flat(0.8)));
+    r.c.load(2, Some(flat(0.8)));
+    r.c.press(0);
+    r.run(BEAT + 5, 1.0);
+    assert_eq!(r.c.state(0), State::Playing);
+    r.c.press(2); // waits for the next beat, 22045 frames away
+    for w in 0..43 {
+        let peak = r.run(512, 1.0).iter().fold(0f32, |m, v| m.max(v.abs()));
+        assert!(peak > 0.5, "window {w}: the old loop plays on, not a gap");
+        assert_eq!(r.c.state(0), State::Playing, "window {w}");
+        assert!(r.c.swapping(), "window {w}: the drums stay swapped");
+    }
+    r.run(1024, 1.0);
+    assert_eq!(
+        [r.c.state(0), r.c.state(2)],
+        [State::Idle, State::Playing],
+        "on the beat the new loop replaces it"
+    );
+}
+
+#[test]
 fn swapping_is_set_only_while_a_single_mode_loop_plays() {
     let mut r = Rig::new(0.0);
     r.c.load(0, Some(loop4(1)));

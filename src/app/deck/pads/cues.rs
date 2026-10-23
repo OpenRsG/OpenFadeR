@@ -50,9 +50,14 @@ fn add_memory(cues: &mut Vec<Cue>, ms: u32) -> bool {
     true
 }
 
+/// What pad `pad`'s hot cue does: a loop plays as a loop, a plain cue jumps there.
+fn hot_call(a: &openfader::analysis::Analysis, pad: usize) -> Option<Call> {
+    hot(a, pad).map(crate::app::deck::bank::call_of)
+}
+
 impl Deck {
-    /// Hot-cue mode: in delete mode it deletes a set pad; otherwise a set pad jumps to its cue and plays (kept on the
-    /// beat while playing with Q on, see `quantize`; paused with the HOT CUE gate setting it
+    /// Hot-cue mode: in delete mode it deletes a set pad; otherwise a set pad jumps to its cue (or activates its loop) and plays
+    /// (kept on the beat while playing with Q on, see `quantize`; paused with the HOT CUE gate setting it
     /// plays only while the pad is held, [`Deck::pad_released`]), an empty pad sets a cue at the (quantized) playhead.
     pub(super) fn hot_pad(&self, pad: usize) {
         let mut l = self.loaded.borrow_mut();
@@ -60,13 +65,15 @@ impl Deck {
             if delete_hot(&mut l.analysis.cues, pad) {
                 self.cues_changed(l, tr!("hot cue {} deleted", pad_label(pad)));
             }
-        } else if let Some(ms) = hot(&l.analysis, pad).map(|c| c.time_ms) {
+        } else if let Some(call) = hot_call(&l.analysis, pad) {
             drop(l);
             let paused = !self.playing();
-            if paused && prefs::with(|p| p.controller.hot_cue_gate) {
-                self.gate.set(Some(ms));
+            if let Call::Hot(ms) = call {
+                if paused && prefs::with(|p| p.controller.hot_cue_gate) {
+                    self.gate.set(Some(ms));
+                }
             }
-            self.call(Call::Hot(ms));
+            self.call(call);
         } else {
             let ms = self.mark(&l);
             set_hot(&mut l.analysis.cues, pad, ms);
@@ -129,6 +136,7 @@ impl Deck {
             v.cues = ModelRc::new(VecModel::from(cues));
             v.status = status.into();
         });
+        self.reread_siblings();
     }
 }
 
@@ -187,5 +195,16 @@ mod tests {
         assert!((0..8).all(|p| hot(&a, p).is_none()));
         // a hot cue at the same time is a different cue
         assert!(set_hot(&mut a.cues, 0, 1200) && add_memory(&mut a.cues, 4000));
+    }
+
+    #[test]
+    fn a_hot_cue_with_a_loop_end_is_a_loop_on_its_pad() {
+        let mut a = Analysis::default();
+        assert!(set_hot(&mut a.cues, 0, 1000) && set_hot(&mut a.cues, 1, 2000));
+        a.cues[1].loop_end_ms = Some(4000);
+        assert_eq!(
+            [0, 1, 2].map(|pad| hot_call(&a, pad)),
+            [Some(Call::Hot(1000)), Some(Call::Loop(2000, 4000)), None]
+        );
     }
 }

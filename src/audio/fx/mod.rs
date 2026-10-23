@@ -6,8 +6,9 @@
 //! audio thread reads), [`unit`] ([`Unit`]: engage ramp, trails, tempo slew, bypass) and one [`Stage`] each:
 //! [`echo`] (ECHO, DELAY), [`reverb`] (Freeverb), [`flanger`], [`phaser`], [`roll`] (captured slice loop),
 //! [`filter`] (LPF / HPF sweep), [`trans`] (gate). Plugin libraries add more [`Stage`]s after these nine
-//! ([`crate::plugin::effect`]): [`Effect::Plugin`] selects them. Each [`Unit`] holds only its selected stage;
-//! a shared worker prepares replacements and destroys retired stages outside the callback.
+//! ([`crate::plugin::effect`]): [`Effect::Plugin`] selects them. Each [`Unit`] holds only its selected stage (and, for 5 ms
+//! after a switch while its tail rang, the stage it replaces, faded out); a shared worker prepares replacements and destroys
+//! retired stages outside the callback.
 //!
 //! Timing: every effect's period is `beats × 60 / bpm` seconds, where `bpm` is the master deck's
 //! effective BPM, pushed by the UI via [`Controls::set_bpm`]. LFOs and the gate are phase-restarted when

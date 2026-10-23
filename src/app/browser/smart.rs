@@ -77,18 +77,21 @@ impl Cond {
             if s.is_empty() {
                 Ok(0.0)
             } else {
-                s.parse::<f64>()
+                s.replace(',', ".")
+                    .parse::<f64>()
                     .ok()
                     .filter(|v| *v >= 0.0)
                     .ok_or_else(|| tr!("“{}” is not a BPM", s))
             }
         };
         let date = |s: &str| {
-            if s.is_empty() || NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok() {
-                Ok(s.to_owned())
-            } else {
-                Err(tr!("“{}” is not a date (YYYY-MM-DD)", s))
+            if s.is_empty() {
+                return Ok(String::new());
             }
+            // stored as YYYY-MM-DD whatever was typed (2025-3-9): the match compares the text with the track's date
+            NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                .map(|d| d.format("%Y-%m-%d").to_string())
+                .map_err(|_| tr!("“{}” is not a date (YYYY-MM-DD)", s))
         };
         match kind {
             0 => match (bound(a)?, bound(b)?) {
@@ -392,6 +395,30 @@ mod tests {
         );
         assert!(
             bad(5, "", "") && bad(5, "2025-13-01", "") && bad(5, "yesterday", "") && bad(9, "", "")
+        );
+    }
+
+    #[test]
+    fn editor_takes_a_decimal_comma_and_stores_dates_zero_padded() {
+        let none = |_: &str| None;
+        assert_eq!(
+            Cond::from_fields(0, "125,5", "", none),
+            Ok(Cond::Bpm {
+                min: 125.5,
+                max: 0.0
+            })
+        );
+        let from = Cond::from_fields(5, "2025-3-9", "", none).unwrap();
+        let to = Cond::from_fields(5, "", "2025-3-9", none).unwrap();
+        assert_eq!(from.fields(|_| String::new()).1, "2025-03-09");
+        let on = |d: &str| track("", 0, d);
+        assert!(
+            from.matches(&on("2025-03-09"), 0, "", &[])
+                && from.matches(&on("2025-10-01"), 0, "", &[])
+        );
+        assert!(!from.matches(&on("2025-03-08"), 0, "", &[]));
+        assert!(
+            to.matches(&on("2025-03-09"), 0, "", &[]) && !to.matches(&on("2025-12-31"), 0, "", &[])
         );
     }
 }

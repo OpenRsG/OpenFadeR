@@ -110,7 +110,7 @@ impl Deck {
 }
 
 /// A loop plays as a loop, a plain cue jumps there.
-fn call_of(c: &Cue) -> Call {
+pub(super) fn call_of(c: &Cue) -> Call {
     c.loop_end_ms
         .filter(|&e| e > c.time_ms)
         .map_or(Call::Hot(c.time_ms), |e| Call::Loop(c.time_ms, e))

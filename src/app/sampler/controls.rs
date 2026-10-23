@@ -75,6 +75,7 @@ pub fn wire(app: &App, decks: &Decks, track: Rc<RefCell<Option<Track>>>) {
             };
             st.set_bank(bank);
             s.select(bank as usize * 8 + sel % 8);
+            s.decks.iter().for_each(|d| d.refresh_pads()); // the deck pads show the visible bank
         }
     });
     on!(st, me, on_loop_toggled, |s| s

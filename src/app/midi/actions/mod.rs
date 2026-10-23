@@ -47,8 +47,8 @@ pub enum Kind {
     Cutter,
     /// Mapping-file rows only: press with the row's constant.
     Arg(fn(&App, i32, i32)),
-    /// Mapping-file rows only: straight onto the deck (Shift layers etc.), with a release hook.
-    Deck(fn(&Deck, i32), Option<fn(&Deck)>),
+    /// Mapping-file rows only: straight onto the deck (Shift layers etc.), with a release hook that gets the row's constant too.
+    Deck(fn(&Deck, i32), Option<fn(&Deck, i32)>),
     /// Mapping-file rows: the controller selected the deck of the row ([`super::layer`]).
     Layer,
     /// Mapping-file rows only: SHIFT + DECK select, DUAL DECK of the side in the row's constant (0 left, 1 right) on / off.
@@ -104,7 +104,7 @@ const fn arg(
         ..Action::new(name, Kind::Arg(f))
     }
 }
-const fn on_deck(name: &'static str, f: fn(&Deck, i32), release: Option<fn(&Deck)>) -> Action {
+const fn on_deck(name: &'static str, f: fn(&Deck, i32), release: Option<fn(&Deck, i32)>) -> Action {
     Action::new(name, Kind::Deck(f, release))
 }
 const fn rel(name: &'static str, two_comp: bool, f: fn(&App, i32, i32)) -> Action {

@@ -136,6 +136,7 @@ impl Midi {
             Err(e) => tr!("MIDI unavailable: {}", e).into(),
         });
         let loaded = self.load_mapping(ports.as_ref().map_or(&[][..], |p| &p.names));
+        *self.request.borrow_mut() = loaded.request.clone();
         *self.ports.borrow_mut() = ports.ok();
         *self.leds.borrow_mut() = led::Leds::new(loaded.leds);
         state.set_controller(loaded.text.into());
@@ -310,6 +311,14 @@ impl Midi {
         }
         *self.dump_due.borrow_mut() = Some(req);
         link.dump = tr!("state dump requested").into();
+    }
+
+    /// Asks the controller for its state again (the layout widened: the controls of the decks it shows were ignored so far).
+    pub(super) fn request_state_again(&self) {
+        let req = self.request.borrow().clone();
+        if !req.is_empty() {
+            *self.dump_due.borrow_mut() = Some(req);
+        }
     }
 
     /// Sends the pending request and opens the reply window. Runs from the 5 ms input tick and ahead of every light update, so the

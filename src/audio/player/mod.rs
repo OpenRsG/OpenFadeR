@@ -56,14 +56,21 @@ fn gain_at(g0: f32, g1: f32, i: usize, n: usize) -> f32 {
     g0 + (g1 - g0) * ((i + 1) as f32 / n as f32)
 }
 
-/// Loop packed into one atomic (start_ms << 32 | end_ms); 0 = none (a loop has end > start, so never 0).
-fn pack(l: Option<(u32, u32)>) -> u64 {
-    l.filter(|&(s, e)| e > s)
+/// A loop's ms are kept to 1/`LOOP_STEPS` ms (4.6 hours of track fit 32 bits): a loop of whole beats keeps its exact length, whole ms
+/// would make it up to a ms per pass too long or short.
+const LOOP_STEPS: f64 = 256.0;
+
+/// Loop `(start_ms, end_ms)` packed into one atomic (start << 32 | end, in 1/`LOOP_STEPS` ms); 0 = none (a loop has end > start, so never 0).
+fn pack(l: Option<(f64, f64)>) -> u64 {
+    let steps = |ms: f64| (ms * LOOP_STEPS).round() as u32;
+    l.map(|(s, e)| (steps(s), steps(e)))
+        .filter(|&(s, e)| e > s)
         .map_or(0, |(s, e)| (s as u64) << 32 | e as u64)
 }
 
-fn unpack(v: u64) -> Option<(u32, u32)> {
-    (v != 0).then_some(((v >> 32) as u32, v as u32))
+fn unpack(v: u64) -> Option<(f64, f64)> {
+    let ms = |steps: u32| steps as f64 / LOOP_STEPS;
+    (v != 0).then_some((ms((v >> 32) as u32), ms(v as u32)))
 }
 
 struct Shared {
@@ -113,6 +120,8 @@ struct Shared {
     vinyl_touch: AtomicU32,
     vinyl_release: AtomicU32,
     spin: AtomicU32,
+    /// No brake and no spin-up ramp ran in the last buffer: the deck plays at its tempo (callback writes, [`Player::steady`]).
+    steady: AtomicBool,
 }
 
 impl Shared {
@@ -125,6 +134,7 @@ impl Shared {
             pos: AtomicU64::new(0),
             seek: AtomicU64::new(NO_SEEK),
             seek_from: AtomicU64::new(NO_SEEK),
+            steady: AtomicBool::new(true),
             playing: AtomicBool::new(false),
             rate: AtomicU64::new(1f64.to_bits()),
             nudge: AtomicU32::new(0f32.to_bits()),
@@ -161,8 +171,8 @@ impl Shared {
         load_f32(&self.level)
     }
 
-    /// Loop in track ms. Under slip, setting one diverges from the shadow, clearing the last manipulation returns to it.
-    fn set_loop(&self, l: Option<(u32, u32)>) {
+    /// Loop in track ms (to 1/[`LOOP_STEPS`] ms). Under slip, setting one diverges from the shadow, clearing the last manipulation returns to it.
+    fn set_loop(&self, l: Option<(f64, f64)>) {
         let p = pack(l);
         self.lp.store(p, Relaxed);
         if p != 0 {
@@ -187,13 +197,16 @@ impl Shared {
     }
 
     /// [`Shared::seek_to`]; with `heard` (the source frame heard when `f` was worked out) the callback lands as much past `f`
-    /// as the deck plays on before the jump: the output latency plus the wait for the next buffer.
+    /// as the deck plays on before the jump: the output latency plus the wait for the next buffer. A seek still waiting was
+    /// worked out from where the first one was heard, which stays the reference: `heard` is then its target, not what is heard.
     fn seek_from_heard(&self, f: f64, heard: Option<f64>) {
         if self.playing.load(Relaxed) {
             self.t.diverge();
         }
-        self.seek_from
-            .store(heard.map_or(NO_SEEK, f64::to_bits), Relaxed);
+        if heard.is_none() || self.seek.load(Relaxed) == NO_SEEK {
+            self.seek_from
+                .store(heard.map_or(NO_SEEK, f64::to_bits), Relaxed);
+        }
         self.seek.store(f.to_bits(), Release);
     }
 
@@ -221,6 +234,15 @@ impl Shared {
                 self.request_spin(); // the platter let go of a playing deck: it spins up again (vinyl speed adjust)
             }
         }
+    }
+
+    /// Plays; `ramp`: a stopped deck takes the start ramp ([`Shared::request_spin`]). A PAUSE brake still running is cancelled.
+    fn play(&self, ramp: bool) {
+        self.t.cancel_brake();
+        if ramp && !self.playing.load(Relaxed) {
+            self.request_spin();
+        }
+        self.playing.store(true, Relaxed);
     }
 
     /// Asks the callback to ramp the speed factor from 0 to 1 over the release time of [`Player::set_vinyl`] (no-op when it is 0).
@@ -371,7 +393,17 @@ impl Player {
         self.shared.stem.get(stem).map_or(1.0, load_f32)
     }
 
+    /// Starts playing at full speed (a hot cue, CUE, fader start, synced start); a PAUSE brake still running is cancelled.
     pub fn play(&mut self) {
+        self.launch(false);
+    }
+
+    /// The PLAY button: [`Player::play`], with the vinyl start ramp ([`Player::set_vinyl`]) when the deck was stopped.
+    pub fn start(&mut self) {
+        self.launch(true);
+    }
+
+    fn launch(&mut self, ramp: bool) {
         if self.frames == 0 {
             return;
         }
@@ -383,10 +415,7 @@ impl Player {
         } else if pos >= frames {
             self.shared.seek.store(0f64.to_bits(), Relaxed); // finished track: restart
         }
-        if !self.is_playing() {
-            self.shared.request_spin(); // vinyl speed adjust: starting from stopped ramps the speed up
-        }
-        self.shared.playing.store(true, Relaxed);
+        self.shared.play(ramp);
     }
 
     pub fn pause(&mut self) {
@@ -440,14 +469,15 @@ impl Player {
         f64::from_bits(self.shared.rate.load(Relaxed))
     }
 
-    /// Loop `[start_ms, end_ms)` in track time; the audio callback wraps sample-accurately. `None`, or
-    /// an empty/reversed range, clears it.
-    pub fn set_loop(&mut self, l: Option<(u32, u32)>) {
+    /// Loop `[start_ms, end_ms)` in track time (to 1/256 ms: a beat loop keeps its length off the whole ms); the audio callback
+    /// wraps sample-accurately. `None`, or an empty/reversed range, clears it.
+    pub fn set_loop(&mut self, l: Option<(f64, f64)>) {
         self.shared.set_loop(l);
     }
 
+    /// The loop in whole ms.
     pub fn looping(&self) -> Option<(u32, u32)> {
-        unpack(self.shared.lp.load(Relaxed))
+        unpack(self.shared.lp.load(Relaxed)).map(|(s, e)| (s.round() as u32, e.round() as u32))
     }
 
     /// Linear gain, clamped to 0.0..=`MAX_GAIN` (4.0, +12 dB; above 1.0 the device clips); ramped linearly across the next buffer.
@@ -530,6 +560,21 @@ impl Player {
         self.shared.t.slip_return();
     }
 
+    /// Slip off once the playhead is back on the shadow: for a REVERSE that engaged slip itself, after `set_reverse(false)`
+    /// asked for the return. With a loop still set nothing returns and slip goes off at once.
+    pub fn slip_off_after_return(&mut self) {
+        if self.looping().is_some() {
+            self.shared.t.set_slip(false);
+        } else {
+            self.shared.t.slip_off_after_return();
+        }
+    }
+
+    /// The playhead was put somewhere on purpose while paused (CUE, gate cue): slip has nothing to return to.
+    pub fn slip_settle(&mut self) {
+        self.shared.t.settle();
+    }
+
     /// JOG CUTTER gate: `true` cuts the channel (post-source, pre-EQ/FX, so effect tails ring on), `false` opens it.
     /// Ramps over ~1 ms per sample, so no click; the playhead keeps running.
     pub fn set_cut(&mut self, on: bool) {
@@ -610,6 +655,25 @@ impl Player {
     pub fn settled(&self) -> bool {
         self.shared.seek.load(Relaxed) == NO_SEEK
             && audible(&self.shared.clock.lock(), Instant::now())
+    }
+
+    /// No brake or spin-up ramp ran in the last buffer: the deck plays at its tempo, so its position is not changing speed.
+    pub fn steady(&self) -> bool {
+        self.shared.steady.load(Relaxed)
+    }
+
+    /// Delay (ms) from a buffer being rendered to it being heard, as the last callback saw it (0 before the first).
+    pub fn output_latency_ms(&self) -> f64 {
+        self.shared.clock.lock().latency_ms()
+    }
+
+    /// Where the next buffer starts, in track ms: [`Self::position_ms`] plus what is still on its way to the speakers. A deck of the
+    /// same track seeked here plays in step with this one.
+    pub fn written_ms(&self) -> f64 {
+        if self.src_rate == 0 {
+            return 0.0;
+        }
+        self.pos_frames().min(self.frames as f64) * 1000.0 / self.src_rate as f64
     }
 
     /// Clamped to the track length. Leaves the loop as is (see the module doc).

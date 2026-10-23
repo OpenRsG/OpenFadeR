@@ -55,6 +55,8 @@ enum Stage {
         plan: Option<Plan>,
         ra: f64,
         rb: f64,
+        /// Both tracks had a beat grid when it was planned (else it is planned again once the analysis delivers them).
+        grids: bool,
     },
     /// `inc` started at `pos0`; `aligned` once its beat phase was corrected against the outgoing deck.
     Fading {
@@ -209,7 +211,16 @@ impl Automix {
             Stage::Fading { out, inc, .. } => run.stage = self.finish(&app, out, inc),
             Stage::Armed {
                 cur, inc, serial, ..
-            } => run.stage = self.arm(run, &app, cur, inc, serial, true),
+            } => {
+                run.stage = match self.arm(run, &app, cur, inc, serial, true) {
+                    // no bar line to mix at (no grid, or under a bar left): the next track comes in now
+                    Stage::Armed { plan: None, .. } => {
+                        self.decks[inc].with_player(|p| p.play());
+                        self.finish(&app, cur, inc)
+                    }
+                    armed => armed,
+                }
+            }
             Stage::Loading { cur: Some(_), .. } => run.asap = true,
             Stage::OnAir { cur: Some(_) } if run.next < run.queue.len() => run.asap = true,
             _ => app
@@ -253,5 +264,82 @@ mod tests {
         }
         // the 2-deck layout never reaches C or D
         assert_eq!(next_deck(Some(1), 2, |d| d == 0), 0);
+    }
+
+    /// Two decks and the driver, no audio and no library store.
+    fn rig() -> (App, Decks, Rc<Automix>) {
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let lib: Rc<dyn Library> = Rc::new(openfader::library::own::Own::new(std::sync::Arc::new(
+            openfader::store::Store::in_memory().unwrap(),
+        )));
+        let decks = crate::app::deck::wire(&app, lib.clone(), Default::default());
+        let am = wire(&app, decks.clone(), lib);
+        (app, decks, am)
+    }
+
+    /// 5 min at 120 BPM, 4/4.
+    fn grid() -> openfader::analysis::Analysis {
+        let beats = (0..600)
+            .map(|i| openfader::analysis::Beat {
+                bar_pos: (i % 4 + 1) as u16,
+                bpm_x100: 12000,
+                time_ms: i * 500,
+            })
+            .collect();
+        openfader::analysis::Analysis {
+            beats,
+            ..Default::default()
+        }
+    }
+
+    fn parked(plan: Option<Plan>, grids: bool) -> Run {
+        Run {
+            queue: vec![],
+            next: 0,
+            asap: false,
+            stage: Stage::Armed {
+                cur: 0,
+                inc: 1,
+                serial: 0,
+                plan,
+                ra: 1.0,
+                rb: 1.0,
+                grids,
+            },
+        }
+    }
+
+    #[test]
+    fn a_mix_parked_before_the_analysis_arrived_is_planned_when_the_grids_are_there() {
+        let (app, decks, am) = rig();
+        decks[0].install_for_test(grid());
+        decks[1].install_for_test(grid());
+        let mut run = parked(None, false);
+        let armed = am.replanned(&mut run, &app, 0, 1, 0, false);
+        assert!(matches!(
+            armed,
+            Some(Stage::Armed {
+                plan: Some(_),
+                grids: true,
+                ..
+            })
+        ));
+        assert!(
+            am.replanned(&mut run, &app, 0, 1, 0, true).is_none(),
+            "a mix planned with its grids stays as it is"
+        );
+    }
+
+    #[test]
+    fn skip_without_a_plan_cuts_the_next_track_in_now() {
+        let (_app, _decks, am) = rig(); // nothing loaded: no grid, so no bar line to mix at
+        *am.run.borrow_mut() = Some(parked(None, false));
+        am.skip();
+        let run = am.run.borrow();
+        assert!(matches!(
+            run.as_ref().unwrap().stage,
+            Stage::OnAir { cur: Some(1) }
+        ));
     }
 }

@@ -178,6 +178,8 @@ const MIGRATIONS: &[&str] = &[
      ALTER TABLE track ADD COLUMN album TEXT;
      ALTER TABLE track ADD COLUMN genre TEXT;
      ALTER TABLE track ADD COLUMN label TEXT;",
+    // v17: AUTO GAIN is capped by the track's peak now (src/audio/loudness.rs); the stored analysed values are re-measured on the next load.
+    "UPDATE gain SET analysed_db = NULL;",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as
