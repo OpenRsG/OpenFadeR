@@ -26,7 +26,10 @@ for pair in extension/plugin:OpenFadeR-Plugins extension/skin:OpenFadeR-Themes m
 	[ -e "${pair%%:*}" ] || git clone --quiet "https://github.com/OpenRsG/${pair#*:}.git" "${pair%%:*}"
 done
 extension/plugin/build.sh --quiet
-cargo build --release --quiet
+# ONNX Runtime ships no WebGPU build for ARM Linux (Raspberry Pi): STEMS separates on the CPU there.
+features=()
+[ "$(uname -s)-$(uname -m)" = Linux-aarch64 ] && features=(--no-default-features --features app)
+cargo build --release --quiet "${features[@]}"
 
 [ -d "$lib" ] && rm -r "$lib"
 mkdir -p "$lib" "$bin" "$apps" "$icons"
