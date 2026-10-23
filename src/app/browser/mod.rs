@@ -192,6 +192,8 @@ struct View {
     reference: Reference,
     /// `detected().version()` the rows were last built for.
     detected_ver: u64,
+    /// Index into `list` of the row chosen last: tells apart the rows of a track that is listed twice.
+    sel_at: Option<usize>,
     /// Sidebar row → what it is; `entry` is the chosen one.
     entries: Vec<Entry>,
     entry: Entry,
@@ -240,9 +242,9 @@ impl View {
             )
     }
 
-    /// Visible row of `t`, if it is shown.
+    /// Visible row of `t`, if it is shown (see [`row_among`]).
     fn row_of(&self, t: &Track) -> Option<usize> {
-        self.shown.iter().position(|&i| self.list[i] == *t)
+        row_among(&self.list, &self.shown, self.sel_at, t)
     }
 
     /// The track after `t` in the visible list (Preferences > Controller > Continuous Playing); `None` at the end or when `t` is not shown.
@@ -295,6 +297,14 @@ impl View {
     }
 }
 
+/// Visible row (position in `shown`, the indices of `list` on screen) of `t`. A track listed twice (a playlist entry added twice,
+/// a track played twice) is the row that was chosen (`at`, an index into `list`) while that still holds `t`, else its first row.
+fn row_among(list: &[Track], shown: &[usize], at: Option<usize>, t: &Track) -> Option<usize> {
+    at.filter(|&at| list.get(at) == Some(t))
+        .and_then(|at| shown.iter().position(|&i| i == at))
+        .or_else(|| shown.iter().position(|&i| list[i] == *t))
+}
+
 /// The track at visible row `i`.
 fn track_at(v: &RefCell<View>, i: i32) -> Option<Track> {
     let v = v.borrow();
@@ -304,8 +314,51 @@ fn track_at(v: &RefCell<View>, i: i32) -> Option<Track> {
         .map(|&k| v.list[k].clone())
 }
 
-/// Case-insensitive substring test. ASCII on both sides (the usual case) compares bytes without allocating.
-fn contains_ignore_case(hay: &str, needle: &str) -> bool {
+/// `s` lower-cased, without combining accents (so a decomposed "é" equals "é"), with the Latin letters that carry a stroke or
+/// a diacritic written as their base letter, "ß" as "ss" and the Turkish dotless "ı" / dotted "İ" as "i".
+fn fold(s: &str) -> String {
+    const BASE: [(&str, char); 19] = [
+        ("àáâãäåāăą", 'a'),
+        ("çćĉċč", 'c'),
+        ("ďđ", 'd'),
+        ("èéêëēĕėęě", 'e'),
+        ("ĝğġģ", 'g'),
+        ("ĥħ", 'h'),
+        ("ìíîïĩīĭįı", 'i'),
+        ("ĵ", 'j'),
+        ("ķ", 'k'),
+        ("ĺļľŀł", 'l'),
+        ("ñńņňŉ", 'n'),
+        ("òóôõöøōŏő", 'o'),
+        ("ŕŗř", 'r'),
+        ("śŝşš", 's'),
+        ("ţťŧ", 't'),
+        ("ùúûüũūŭůűų", 'u'),
+        ("ŵ", 'w'),
+        ("ýÿŷ", 'y'),
+        ("źżž", 'z'),
+    ];
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars().flat_map(char::to_lowercase) {
+        match c {
+            '\u{300}'..='\u{36f}' => {}
+            'ß' => out.push_str("ss"),
+            'æ' => out.push_str("ae"),
+            'œ' => out.push_str("oe"),
+            c if c.is_ascii() => out.push(c),
+            c => out.push(
+                BASE.iter()
+                    .find(|(set, _)| set.contains(c))
+                    .map_or(c, |&(_, base)| base),
+            ),
+        }
+    }
+    out
+}
+
+/// Whether `hay` contains `needle`, which [`fold`] has already folded: letter case, accents and "ß" do not matter. ASCII on
+/// both sides (the usual case) compares bytes without allocating.
+fn contains_folded(hay: &str, needle: &str) -> bool {
     if hay.is_ascii() && needle.is_ascii() {
         let n = needle.len();
         return n == 0
@@ -314,5 +367,34 @@ fn contains_ignore_case(hay: &str, needle: &str) -> bool {
                 .windows(n)
                 .any(|w| w.eq_ignore_ascii_case(needle.as_bytes()));
     }
-    hay.to_lowercase().contains(&needle.to_lowercase())
+    fold(hay).contains(needle)
+}
+
+/// [`contains_folded`] for a needle as typed.
+fn contains_ignore_case(hay: &str, needle: &str) -> bool {
+    contains_folded(hay, &fold(needle))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_track_listed_twice_is_found_at_the_row_that_was_chosen() {
+        let t = |n: &str| Track {
+            title: n.into(),
+            ..Track::default()
+        };
+        let list = [t("A"), t("B"), t("A"), t("C")];
+        let shown = [0, 1, 2, 3];
+        assert_eq!(row_among(&list, &shown, Some(2), &list[0]), Some(2));
+        assert_eq!(row_among(&list, &shown, Some(0), &list[0]), Some(0));
+        assert_eq!(row_among(&list, &shown, None, &list[0]), Some(0));
+        // the chosen row went stale (another list, another track there): the first row of the track
+        assert_eq!(row_among(&list, &shown, Some(1), &list[0]), Some(0));
+        // filtered: only the second A is shown
+        assert_eq!(row_among(&list, &[2, 3], Some(0), &list[0]), Some(0));
+        assert_eq!(row_among(&list, &[2, 3], Some(2), &list[0]), Some(0));
+        assert_eq!(row_among(&list, &[1, 3], Some(2), &list[0]), None);
+    }
 }

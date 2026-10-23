@@ -239,12 +239,12 @@ fn run_pending() {
 }
 
 /// Explicit analysis (the track menu's ANALYZE TRACK): `tracks` are analysed again, whatever the cache holds and whether
-/// the library has their BPM and key; tracks without a file or with the analysis lock are skipped. Does nothing before
-/// [`wire`].
-pub fn request(tracks: &[Track]) {
+/// the library has their BPM and key; tracks without a file or with the analysis lock are skipped. A run that is not
+/// `explicit` (files just imported) uses the cache and leaves a key tag the file has alone. Does nothing before [`wire`].
+pub fn request(tracks: &[Track], explicit: bool) {
     let Some((app, lib)) = context() else { return };
     let refs: Vec<&Track> = tracks.iter().collect();
-    start_run(&app, jobs(&*lib, &refs, true), prefs::with(settings));
+    start_run(&app, jobs(&*lib, &refs, explicit), prefs::with(settings));
 }
 
 /// The status line's tail for an explicit ANALYZE of `t` whose shown grid stays the library's: the preference picks the
@@ -284,12 +284,24 @@ fn settings(p: &prefs::Prefs) -> Settings {
     }
 }
 
+/// `t` as the Collection lists it when it names a file the Collection has (a file just imported is handed over bare): the row
+/// carries the id that records the audio fingerprint, and the tags the job decides by.
+fn listed(store: &Store, t: &Track) -> Track {
+    let row = match (t.id, t.file.as_deref()) {
+        (None, Some(f)) => store.id_of_path(f).ok().flatten(),
+        _ => None,
+    };
+    row.and_then(|id| store.collection_track(id).ok().flatten())
+        .unwrap_or_else(|| t.clone())
+}
+
 /// The jobs for `tracks`: what the library knows about each is gathered here, on the UI thread.
 fn jobs(lib: &dyn Library, tracks: &[&Track], explicit: bool) -> Vec<Job> {
     let store = store::global();
     tracks
         .iter()
         .filter_map(|t| {
+            let t = &listed(&store, t);
             let (path, key) = (t.file.clone()?, store::key(t));
             if store.analysis_locked(&key).unwrap_or(false) {
                 return None;
@@ -396,6 +408,39 @@ mod tests {
             store.edits("b.mp3|10").unwrap().cues.is_none(),
             "other tracks are untouched"
         );
+    }
+
+    #[test]
+    fn a_file_just_imported_is_analysed_as_its_collection_row_so_its_fingerprint_is_kept() {
+        let dir = std::env::temp_dir().join(format!("openfader-listed-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("a.wav");
+        std::fs::write(&file, b"audio").unwrap();
+        let store = Store::in_memory().unwrap();
+        let row = Track {
+            title: "A".into(),
+            key: "8A".into(),
+            file: Some(file.clone()),
+            ..Track::default()
+        };
+        store.collection_put(&[row], false).unwrap();
+        let bare = Track {
+            file: Some(file),
+            ..Track::default()
+        };
+        let t = listed(&store, &bare);
+        assert!(t.id.is_some(), "the fingerprint is stored by row id");
+        assert_eq!(t.key, "8A");
+        let other = Track {
+            file: Some(dir.join("gone.wav")),
+            ..Track::default()
+        };
+        assert_eq!(
+            listed(&store, &other),
+            other,
+            "not in the Collection: as given"
+        );
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

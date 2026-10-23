@@ -67,6 +67,15 @@ impl Deck {
             .is_some()
     }
 
+    /// SYNC follows a master whose tempo this deck can match: only then its tempo fader is ignored (a deck without a grid, or
+    /// a master out of range or still loading, leaves the fader to the DJ).
+    pub(in crate::app::deck) fn tracking(&self) -> bool {
+        self.following()
+            && self
+                .master_deck()
+                .is_some_and(|p| p.ready() && self.can_follow(&p))
+    }
+
     /// SYNC button: latch on (tempo and beats follow the master) or off.
     pub fn sync_toggle(&self) {
         if !self.ready() {
@@ -297,5 +306,83 @@ mod tests {
             leader_of(None, 0, 2, [loaded, loaded, playing, playing]),
             Some(1)
         );
+    }
+
+    struct NoTracks;
+    impl openfader::library::Library for NoTracks {
+        fn kind(&self) -> &str {
+            "none"
+        }
+        fn playlists(&self) -> Result<Vec<openfader::library::Playlist>, String> {
+            Ok(Vec::new())
+        }
+        fn tracks(&self, _: Option<&str>) -> Result<Vec<openfader::library::Track>, String> {
+            Ok(Vec::new())
+        }
+    }
+
+    /// A loaded deck's grid at `bpm_x100` (a beat every 500 ms to keep the maths simple).
+    fn hold(d: &Deck, bpm_x100: u16) {
+        d.view.borrow_mut().loaded = true;
+        d.loaded.borrow_mut().analysis.beats = (0..64)
+            .map(|i| openfader::analysis::Beat {
+                bar_pos: (i % 4 + 1) as u16,
+                bpm_x100,
+                time_ms: i as u32 * 500,
+            })
+            .collect();
+    }
+
+    #[test]
+    fn the_tempo_fader_is_ignored_only_while_the_master_can_be_followed() {
+        crate::app::headless::init();
+        let app = crate::app::App::new().unwrap();
+        let model = Rc::new(slint::VecModel::from(vec![
+            crate::app::DeckView::default();
+            DECKS
+        ]));
+        let scroll = Rc::new(slint::VecModel::from(vec![
+            crate::app::DeckScroll::default();
+            DECKS
+        ]));
+        let link = Rc::new(crate::app::deck::sync::Link::default());
+        let decks: [Rc<Deck>; DECKS] = std::array::from_fn(|i| {
+            Deck::new(
+                &app,
+                i,
+                model.clone(),
+                scroll.clone(),
+                link.clone(),
+                Rc::new(NoTracks),
+            )
+        });
+        crate::app::deck::sync::connect(&decks);
+        let (master, b) = (&decks[0], &decks[1]);
+        hold(master, 12000);
+        master.set_master(Some(0));
+        b.sync.synced.set(true);
+        // a track without a grid cannot follow anything: the fader is the DJ's
+        hold(b, 0);
+        assert!(b.following() && !b.tracking());
+        b.tempo(1.0);
+        assert!(
+            b.rate() > 1.0,
+            "the fader of a gridless synced deck is dead"
+        );
+        // a master at 20 BPM against 120 is outside 0.5 to 2× (also doubled): the same
+        hold(b, 12000);
+        hold(master, 2000);
+        assert!(!b.tracking());
+        b.tempo(0.0);
+        assert!(
+            b.rate() < 1.0,
+            "the fader is dead while the master is out of range"
+        );
+        // a master it can follow takes the fader over
+        hold(master, 12000);
+        assert!(b.tracking());
+        let rate = b.rate();
+        b.tempo(1.0);
+        assert_eq!(b.rate(), rate);
     }
 }

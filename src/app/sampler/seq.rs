@@ -233,6 +233,7 @@ impl Sampler {
             let st = app.global::<SamplerState>();
             st.set_bank(bank);
             self.select(bank as usize * 8 + st.get_selected() as usize % 8);
+            self.decks.iter().for_each(|d| d.refresh_pads()); // the deck pads show the visible bank
         }
         true
     }

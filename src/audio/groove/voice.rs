@@ -152,11 +152,8 @@ impl Voice {
                     v.stop(len);
                 } else if v.drum.is_some() {
                     v.st = St::Wait;
-                    // The twin slot of the other bank never plays together with this one; SINGLE mode lets one slot play at all.
-                    let twin = (k + super::PER_BANK) % SLOTS;
-                    for j in (0..SLOTS).filter(|&j| j != k && (!multi || j == twin)) {
-                        self.slots[j].stop(len);
-                    }
+                    // Rivals that still wait for the beat are dropped now; the ones that play go when this loop starts.
+                    self.rivals(k, len, true);
                 }
             }
         }
@@ -181,6 +178,17 @@ impl Voice {
             self.fx.set(c.release.settings());
         } else {
             self.fx.release();
+        }
+    }
+
+    /// Stops the slots that must not play together with slot `k`: in SINGLE mode every other one, in MULTI mode its twin of the other
+    /// bank. `waiting`: only those that still wait for their beat.
+    fn rivals(&mut self, k: usize, len: u32, waiting: bool) {
+        let twin = (k + super::PER_BANK) % SLOTS;
+        for j in (0..SLOTS).filter(|&j| j != k && (self.single || j == twin)) {
+            if !waiting || self.slots[j].st == St::Wait {
+                self.slots[j].stop(len);
+            }
         }
     }
 
@@ -209,6 +217,14 @@ impl Voice {
                 None
             }
         };
+        if tk.is_some_and(|t| t.crossed) {
+            // A loop is about to start on this beat: the ones it replaces stop now, not when it was pressed.
+            for k in 0..SLOTS {
+                if self.slots[k].st == St::Wait {
+                    self.rivals(k, len, false);
+                }
+            }
+        }
         let delta = tk.map_or(self.delta, |t| t.delta);
         self.delta = delta;
         let mut out = [0f32; 2];

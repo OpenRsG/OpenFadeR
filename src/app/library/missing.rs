@@ -204,7 +204,15 @@ pub fn auto(c: &Rc<Ctx>, tracks: Vec<Track>) {
                 let new = t
                     .file
                     .as_deref()
-                    .and_then(|f| relocate::find(&idx, f))
+                    .and_then(|f| {
+                        relocate::find(&idx, f, |p| {
+                            store
+                                .id_of_path(p)
+                                .ok()
+                                .flatten()
+                                .is_some_and(|o| Some(o) != t.id)
+                        })
+                    })
                     .or_else(|| by_audio.find(&store, t))
                     .map(Path::to_path_buf);
                 if let Some(new) = new {

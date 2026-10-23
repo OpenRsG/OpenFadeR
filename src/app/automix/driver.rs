@@ -97,7 +97,30 @@ impl Automix {
             plan,
             ra,
             rb,
+            grids: self.grids(cur, inc),
         }
+    }
+
+    /// Both decks hold a track with a beat grid.
+    fn grids(&self, cur: usize, inc: usize) -> bool {
+        let has = |d: usize| {
+            self.decks[d].with_analysis(|a, _| crate::app::deck::grid_bpm(&a.beats).is_some())
+        };
+        has(cur) && has(inc)
+    }
+
+    /// An `Armed` mix that was parked before the analysis of its tracks arrived (so with no plan and the tempo unmatched) is
+    /// planned again once both grids are there; `None` while nothing changed.
+    pub(super) fn replanned(
+        &self,
+        run: &mut Run,
+        app: &App,
+        cur: usize,
+        inc: usize,
+        serial: u32,
+        grids: bool,
+    ) -> Option<Stage> {
+        (!grids && self.grids(cur, inc)).then(|| self.arm(run, app, cur, inc, serial, false))
     }
 
     fn tempo_for(&self, cur: usize, inc: usize) -> Option<f64> {
@@ -180,9 +203,14 @@ impl Automix {
                 plan,
                 ra,
                 rb,
+                grids,
             } => {
                 if self.decks[inc].serial() != Some(serial) {
                     return Some(tr!("AUTOMIX stopped: a deck was loaded by hand").into());
+                }
+                if let Some(armed) = self.replanned(run, app, cur, inc, serial, grids) {
+                    run.stage = armed;
+                    return None;
                 }
                 let (pos, playing, dur) = self.pos(cur);
                 let ra_now = self.decks[cur].rate();
@@ -197,6 +225,7 @@ impl Automix {
                         plan,
                         ra: ra_now,
                         rb,
+                        grids,
                     };
                     return None;
                 }

@@ -185,7 +185,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
                     tr!("this track has an Analysis Lock: unlock it first").to_owned()
                 }
                 Some((_, t)) => {
-                    analyze::request(std::slice::from_ref(&t));
+                    analyze::request(std::slice::from_ref(&t), true);
                     tr!(
                         "analysing “{}”…{}",
                         t.title,

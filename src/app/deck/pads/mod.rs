@@ -334,9 +334,12 @@ impl Deck {
         if mode == PadMode::Stems as i32 && !prefs::with(|p| p.stems) {
             mode = (mode + 1).rem_euclid(PadMode::count()); // STEMS is off: the cycle goes on to the plugin modes or HOT CUE
         }
-        let keep = keep_page && self.view.borrow().pad_mode == mode;
+        let same = self.view.borrow().pad_mode == mode;
+        let keep = keep_page && same;
         self.slicer_switch(self.pad_mode(), PadMode::from_index(mode));
-        self.sampler_release();
+        if !same {
+            self.sampler_release(); // a pad of the same mode pressed next to a held one leaves it held
+        }
         self.pad_fx_off();
         if !keep {
             self.pad_page.set(0);
@@ -459,6 +462,12 @@ impl Deck {
             "track_unloaded",
             serde_json::json!({"deck": self.index + 1}),
         );
+    }
+
+    /// A deck holding a track with analysis `a` and no audio, without touching the library store.
+    #[cfg(test)]
+    pub(in crate::app) fn install_for_test(&self, a: Analysis) {
+        self.install(&Track::default(), a, vec![], Some(audio::Pcm::default()));
     }
 }
 

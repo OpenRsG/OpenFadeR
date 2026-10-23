@@ -186,7 +186,7 @@ impl Ctx {
     /// Analysis > Auto Analysis is on; `force` (the Analyze Track action) always.
     pub fn analyze(&self, tracks: Vec<Track>, force: bool) {
         if force || prefs::with(|p| p.analysis.auto_analysis) {
-            analyze::request(&tracks);
+            analyze::request(&tracks, force);
         }
     }
 }

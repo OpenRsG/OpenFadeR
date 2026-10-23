@@ -90,6 +90,7 @@ pub fn wire(
         selected: None,
         reference: Reference::default(),
         detected_ver: detected().version(),
+        sel_at: None,
         entries: Vec::new(),
         entry: Entry::All,
         lib_playlists,
@@ -301,6 +302,7 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
             .and_then(|n| v.shown.get(n))
             .copied();
         if let (Some(a), Some(o)) = (v.cursor(&app), other) {
+            v.sel_at = Some(o); // the chosen entry lands where the neighbour was
             v.move_entry(&app, a, o);
         }
     });
@@ -331,6 +333,11 @@ fn wire_selection(
             return;
         }
         // The neighbour inherits the selection so the arrow keys keep working down the queue.
+        v.sel_at = Some(if pos < v.list.len() {
+            pos
+        } else {
+            pos.saturating_sub(1)
+        });
         v.selected = v
             .list
             .get(pos)
@@ -347,7 +354,13 @@ fn wire_selection(
     state.on_track_selected(move |i| {
         if let Some(t) = track_at(&v, i) {
             let app = weak.unwrap();
-            v.borrow_mut().selected = Some(t.clone());
+            {
+                let mut view = v.borrow_mut();
+                view.sel_at = usize::try_from(i)
+                    .ok()
+                    .and_then(|i| view.shown.get(i).copied());
+                view.selected = Some(t.clone());
+            }
             v.borrow().suggest_selected(&app);
             trackinfo::show(&app, &t);
             on_selected(&t);

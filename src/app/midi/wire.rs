@@ -83,6 +83,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         link: RefCell::new(None),
         dump: Cell::new(None),
         dump_due: RefCell::default(),
+        request: RefCell::default(),
         held: RefCell::default(),
         pending: RefCell::default(),
         lights: Timer::default(),
@@ -104,10 +105,11 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
     crate::app::prefs::with(|p| midi.clock_port(&p.controller.midi_clock_port));
 
     // PREFS: the jog speed, and "Use controller audio when connected" switched while a controller is connected.
-    let (weak_midi, weak_app, was) = (
+    let (weak_midi, weak_app, was, shown) = (
         Rc::downgrade(&midi),
         app.as_weak(),
         Cell::new(prefs_audio()),
+        Cell::new(crate::app::deck::active()),
     );
     crate::app::prefs::on_change(move |p| {
         let Some(m) = weak_midi.upgrade() else { return };
@@ -117,6 +119,10 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
             if let Some(app) = weak_app.upgrade() {
                 m.audio_pref_changed(&app);
             }
+        }
+        // The controls of the decks a wider layout shows were ignored until now: ask where they are.
+        if crate::app::deck::active() > shown.replace(crate::app::deck::active()) {
+            m.request_state_again();
         }
     });
 

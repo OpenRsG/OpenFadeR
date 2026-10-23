@@ -208,11 +208,24 @@ impl Deck {
         };
         self.apply_loop(l, range);
         self.with_player(|p| {
-            if !h.playing {
+            if h.playing {
+                // `at` is where the track is now: heard now is inside the roll, and the seek is heard a latency later
+                p.seek_in_phase(at.round() as u32, p.position_ms());
+            } else {
                 p.pause();
+                p.seek(at.round() as u32);
             }
-            p.seek(at.round() as u32);
         });
+    }
+
+    /// A track was loaded: its ranges are anchored again when a slicer mode is chosen (loading cleared the player's loop).
+    pub(super) fn slicer_reset(&self) {
+        let s = &self.slicer;
+        s.looped.set(None);
+        s.origin.set(0.0);
+        s.shift.set(0);
+        s.held.set(None);
+        s.lit.set(None);
     }
 
     /// ◀ (−1) / ▶ (+1): the range moves by its LENGTH; SLICE LOOP loops the new range from its start.

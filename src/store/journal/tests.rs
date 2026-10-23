@@ -214,3 +214,35 @@ fn pruning_keeps_what_a_two_way_connection_has_not_written_back() {
     .unwrap();
     assert!(n <= KEEP + 1);
 }
+
+#[test]
+fn removing_a_track_is_undone_with_its_plays_and_analysis_lock() {
+    let dir = std::env::temp_dir().join(format!("openfader-jplays-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("a.mp3"), b"abc").unwrap();
+    let t = Track {
+        file: Some(dir.join("a.mp3")),
+        ..Default::default()
+    };
+    let s = Store::in_memory().unwrap();
+    let id = s.collection_upsert(&t, None).unwrap();
+    let key = super::super::id_key(id);
+    s.set_rating(&key, Some(4)).unwrap();
+    s.set_analysis_lock(&key, true).unwrap();
+    s.history_append("2026-10-22", &key, 100).unwrap();
+    assert_eq!(
+        s.undo_label().unwrap().as_deref(),
+        Some("Edit analysis lock"),
+        "a play is not an undo step"
+    );
+    s.action("Remove from Collection", || {
+        s.collection_remove(&s.collection_track(id).unwrap().unwrap())
+    })
+    .unwrap();
+    assert!(s.history_day("2026-10-22").unwrap().is_empty());
+    assert!(!s.analysis_locked(&key).unwrap());
+    assert_eq!(s.undo().unwrap().as_deref(), Some("Remove from Collection"));
+    assert_eq!(s.history_day("2026-10-22").unwrap(), [key.clone()]);
+    assert!(s.analysis_locked(&key).unwrap());
+    assert_eq!(rating(&s, &key), Some(4));
+}

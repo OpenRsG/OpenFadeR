@@ -2,9 +2,10 @@
 //! [`Track`]s and the master deck's [`Reference`].
 
 use super::super::camelot::{self, related as key_related};
-use super::contains_ignore_case;
-use super::table::{bpm_close, cell_of, Facts, Look, Reference, BPM, RATING, TIME};
+use super::table::{bpm_close, cell_of, Facts, Look, Reference, BPM, KEY, RATING, TIME};
+use super::{contains_folded, fold};
 use openfader::{library::Track, store};
+use std::cmp::Ordering;
 
 /// The filter bar's state. Combines (AND) with the search box.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -51,14 +52,18 @@ pub fn passes(t: &Track, x: &Facts, f: &Filter, r: &Reference, look: &Look) -> b
             .is_some_and(|k| !x.wheel.is_some_and(|c| key_related(k, c, look.level))))
 }
 
-/// Whether the lowercase search `q` (empty = everything) is in `t`'s title, artist, genre, comment or key, the key as named
-/// and as shown in the chosen notation.
-fn matches(t: &Track, x: &Facts, q: &str, look: &Look) -> bool {
-    q.is_empty()
-        || [&t.title, &t.artist, &t.genre, &x.key, &t.comment]
-            .iter()
-            .any(|f| contains_ignore_case(f, q))
-        || contains_ignore_case(&camelot::display(&x.key, look.notation), q)
+/// Whether every word of the search `q` (lowercase; empty = everything) is in `t`'s title, artist, genre, comment or key (the
+/// key as named and as shown in the chosen notation), in any of them: "daft around" finds artist Daft Punk's "Around the World".
+/// Case, accents and "ß" do not matter ([`super::fold`]).
+fn matches(t: &Track, x: &Facts, words: &[String], look: &Look) -> bool {
+    let shown_key = camelot::display(&x.key, look.notation);
+    words.iter().all(|w| {
+        [
+            &t.title, &t.artist, &t.genre, &x.key, &t.comment, &shown_key,
+        ]
+        .iter()
+        .any(|f| contains_folded(f, w))
+    })
 }
 
 /// The indices of `list` (whose [`Facts`] are `facts`) that match the search `q` and pass the filter bar and `tags` (the tag
@@ -72,17 +77,18 @@ pub fn shown(
     look: &Look,
     tags: impl Fn(&Track) -> bool,
 ) -> Vec<usize> {
+    let words: Vec<String> = fold(q).split_whitespace().map(str::to_owned).collect();
     (0..list.len())
         .filter(|&i| {
-            matches(&list[i], &facts[i], q, look)
+            matches(&list[i], &facts[i], &words, look)
                 && passes(&list[i], &facts[i], f, r, look)
                 && tags(&list[i])
         })
         .collect()
 }
 
-/// Orders `shown` (indices of `list`) by column `col`, descending unless `asc`. A key sorts as text ("10A" < "2A"), not by
-/// Camelot number.
+/// Orders `shown` (indices of `list`) by column `col`, descending unless `asc`; rows that tie keep their list order either
+/// way. A key sorts on the Camelot wheel (1A, 1B, 2A … 12B, keys that are none last), text without regard to case and accents.
 pub fn sort(
     shown: &mut [usize],
     list: &[Track],
@@ -91,14 +97,25 @@ pub fn sort(
     asc: bool,
     look: &Look,
 ) {
+    let by = |o: Ordering| if asc { o } else { o.reverse() };
     match col {
-        BPM => shown.sort_by_key(|&i| facts[i].bpm_x100),
-        TIME => shown.sort_by_key(|&i| list[i].length_s),
-        RATING => shown.sort_by_key(|&i| list[i].rating),
-        _ => shown.sort_by_cached_key(|&i| cell_of(&list[i], &facts[i], col, look).to_lowercase()),
-    }
-    if !asc {
-        shown.reverse();
+        BPM => shown.sort_by(|&a, &b| by(facts[a].bpm_x100.cmp(&facts[b].bpm_x100))),
+        TIME => shown.sort_by(|&a, &b| by(list[a].length_s.cmp(&list[b].length_s))),
+        RATING => shown.sort_by(|&a, &b| by(list[a].rating.cmp(&list[b].rating))),
+        KEY => shown.sort_by(|&a, &b| match (facts[a].wheel, facts[b].wheel) {
+            (Some(x), Some(y)) => by(x.cmp(&y)),
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (None, None) => Ordering::Equal,
+        }),
+        _ => {
+            let mut keyed: Vec<(String, usize)> = shown
+                .iter()
+                .map(|&i| (fold(&cell_of(&list[i], &facts[i], col, look)), i))
+                .collect();
+            keyed.sort_by(|a, b| by(a.0.cmp(&b.0)));
+            shown.iter_mut().zip(keyed).for_each(|(s, (_, i))| *s = i);
+        }
     }
 }
 
@@ -346,9 +363,66 @@ mod tests {
         assert_eq!(order(BPM, true), [0, 2, 1]);
         assert_eq!(
             order(super::super::table::KEY, true),
-            [0, 2, 1],
-            "a key sorts as text"
+            [2, 1, 0],
+            "a key sorts on the Camelot wheel: 1B, 2A, 10A"
         );
+    }
+
+    #[test]
+    fn sort_puts_keys_in_wheel_order_accents_with_their_letter_and_ties_in_list_order() {
+        use super::super::table::{KEY, RATING};
+        let mut list: Vec<Track> = ["9A", "10A", "2B", "2A", "", "12B", "1A"]
+            .iter()
+            .map(|k| track(k, k, 120.0, 3))
+            .collect();
+        list[4].key = String::new();
+        let facts: Vec<Facts> = list.iter().map(Facts::of).collect();
+        let order = |col, asc| {
+            let mut s: Vec<usize> = (0..list.len()).collect();
+            sort(&mut s, &list, &facts, col, asc, &Look::now());
+            s.into_iter()
+                .map(|i| list[i].title.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(order(KEY, true), ["1A", "2A", "2B", "9A", "10A", "12B", ""]);
+        assert_eq!(
+            order(KEY, false),
+            ["12B", "10A", "9A", "2B", "2A", "1A", ""]
+        );
+        assert_eq!(
+            order(RATING, false),
+            ["9A", "10A", "2B", "2A", "", "12B", "1A"]
+        );
+        let names = ["Zed", "Étienne", "Adele", "Özdemir", "Bob"].map(|n| track(n, "", 0.0, 0));
+        let facts: Vec<Facts> = names.iter().map(Facts::of).collect();
+        let mut s: Vec<usize> = (0..names.len()).collect();
+        sort(&mut s, &names, &facts, 0, true, &Look::now());
+        let sorted: Vec<&str> = s.iter().map(|&i| names[i].title.as_str()).collect();
+        assert_eq!(sorted, ["Adele", "Bob", "Étienne", "Özdemir", "Zed"]);
+    }
+
+    #[test]
+    fn search_needs_every_word_in_some_field_and_ignores_case_accents_and_sharp_s() {
+        let mut daft = track("Around the World", "8A", 120.0, 0);
+        daft.artist = "Daft Punk".into();
+        let mut bjork = track("Jóga", "", 0.0, 0);
+        bjork.artist = "Bj\u{f6}rk".into(); // precomposed ö
+        let mut cafe = track("Cafe\u{301} del Mar", "", 0.0, 0); // decomposed é
+        cafe.comment = "Straße".into();
+        let turkish = track("İstanbul", "", 0.0, 0);
+        let list = [daft, bjork, cafe, turkish];
+        let f = Filter::default();
+        assert_eq!(listed(&list, "daft punk around", &f), ["Around the World"]);
+        assert_eq!(listed(&list, "around 8a", &f), ["Around the World"]);
+        assert!(listed(&list, "daft jóga", &f).is_empty());
+        assert_eq!(listed(&list, "bjork", &f), ["Jóga"]);
+        assert_eq!(listed(&list, "joga bjork", &f), ["Jóga"]);
+        assert_eq!(listed(&list, "café", &f), ["Cafe\u{301} del Mar"]);
+        assert_eq!(listed(&list, "cafe\u{301}", &f), ["Cafe\u{301} del Mar"]);
+        assert_eq!(listed(&list, "strasse", &f), ["Cafe\u{301} del Mar"]);
+        assert_eq!(listed(&list, "straße", &f), ["Cafe\u{301} del Mar"]);
+        assert_eq!(listed(&list, "istanbul", &f), ["İstanbul"]);
+        assert_eq!(listed(&list, "ıstanbul", &f), ["İstanbul"]);
     }
 
     /// `cargo test --release --lib bench_search -- --ignored --nocapture`: the passes `View::refresh` runs per keystroke.

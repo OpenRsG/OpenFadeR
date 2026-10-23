@@ -9,6 +9,22 @@ use openfader::{
 use slint::{ModelRc, VecModel};
 
 impl Deck {
+    /// The cues or grid of the loaded track were just stored: every other deck holding the same track shows what the store
+    /// holds now, so the next edit made there does not write its stale list over this one.
+    pub(in crate::app) fn reread_siblings(&self) {
+        let Some(key) = self.with_track(store::key) else {
+            return;
+        };
+        for d in (0..super::DECKS)
+            .filter(|&i| i != self.index)
+            .filter_map(|i| self.deck_at(i))
+        {
+            if d.with_track(store::key).is_some_and(|k| k == key) {
+                d.reread_edits(&*d.lib);
+            }
+        }
+    }
+
     /// Re-reads the stored cues and grid of the loaded track and shows them (nothing is written back: this is the store's
     /// state coming in). A track without stored edits gets the library's values; no cues at all get the automatic ones
     /// again, as a LOAD does.

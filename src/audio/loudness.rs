@@ -3,8 +3,9 @@
 //! BS.1770-style gating on plain RMS: mean squares over non-overlapping 400 ms blocks, blocks under
 //! [`ABSOLUTE_GATE_DB`] dropped, then blocks more than [`RELATIVE_GATE_DB`] below the mean of the rest dropped,
 //! so silence and quiet intros do not drag a track's loudness down. The gain brings that loudness to
-//! [`TARGET_LUFS`], clamped to +-[`MAX_GAIN_DB`]. ponytail: no K-weighting filter, so this is LUFS-ish (within a
-//! couple of dB on music); add the two biquads if exact LUFS ever matters.
+//! [`TARGET_LUFS`], clamped to +-[`MAX_GAIN_DB`]; a boost stops where the loudest sample would reach full scale (minus
+//! [`PEAK_MARGIN_DB`]), so a quiet but peaky track is not clipped. ponytail: no K-weighting filter, so this is LUFS-ish
+//! (within a couple of dB on music); add the two biquads if exact LUFS ever matters.
 
 use super::Frames;
 
@@ -15,6 +16,8 @@ pub const MAX_GAIN_DB: f32 = 12.0;
 const BLOCK_S: f32 = 0.4;
 const ABSOLUTE_GATE_DB: f32 = -70.0;
 const RELATIVE_GATE_DB: f32 = -10.0;
+/// Headroom a boost leaves under full scale, dB.
+const PEAK_MARGIN_DB: f32 = 0.5;
 
 /// Mean-square power as loudness: dB with the BS.1770 -0.691 offset (power floored at 1e-12).
 fn db(power: f64) -> f32 {
@@ -48,7 +51,16 @@ pub fn auto_gain_db<S: Frames + ?Sized>(audio: &S, rate: u32) -> f32 {
     let mean = |b: &[f64]| b.iter().sum::<f64>() / b.len() as f64;
     let floor = db(mean(&blocks)) + RELATIVE_GATE_DB;
     blocks.retain(|&p| db(p) > floor);
-    (TARGET_LUFS - db(mean(&blocks))).clamp(-MAX_GAIN_DB, MAX_GAIN_DB)
+    let gain = (TARGET_LUFS - db(mean(&blocks))).clamp(-MAX_GAIN_DB, MAX_GAIN_DB);
+    if gain <= 0.0 {
+        return gain;
+    }
+    // a boost never takes the loudest sample (non-zero here: a block was above the gate) past full scale
+    let peak = audio
+        .frames_in(0..n)
+        .flatten()
+        .fold(0.0f32, |m, s| m.max(s.abs()));
+    gain.min((-20.0 * peak.log10() - PEAK_MARGIN_DB).max(0.0))
 }
 
 #[cfg(test)]
@@ -111,5 +123,20 @@ mod tests {
         let gated = gain(samples);
         let body = gain(tone(4.0, 0.3));
         assert!((gated - body).abs() < 0.1, "{gated} vs {body}");
+    }
+
+    /// A quiet but peaky track is boosted only as far as its loudest sample allows (it used to go past full scale).
+    #[test]
+    fn a_boost_stops_short_of_full_scale() {
+        // 3 s of a 0.05 tone with a 3-sample click of 0.8 every 100 ms: peak 0.8, about -22 LUFS, so +12 dB is asked
+        let mut s = tone(3.0, 0.05);
+        for k in 0..30 {
+            for j in 0..3 {
+                s[2 * (800 * k + j)] = 0.8;
+                s[2 * (800 * k + j) + 1] = 0.8;
+            }
+        }
+        let out = 0.8 * 10f32.powf(gain(s) / 20.0);
+        assert!(out <= 1.0 && out > 0.9, "the peak ends at {out}");
     }
 }

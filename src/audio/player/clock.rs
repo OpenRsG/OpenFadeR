@@ -59,6 +59,13 @@ impl Clock {
             self.anchors.pop_front();
         }
     }
+
+    /// Output latency (ms) of the newest recorded buffer; 0 before the first.
+    pub(super) fn latency_ms(&self) -> f64 {
+        self.anchors
+            .back()
+            .map_or(0.0, |a| a.latency.as_secs_f64() * 1000.0)
+    }
 }
 
 /// Source-frame position audible at `now`, clamped to `0..=frames`; frozen at the last anchor when paused.
@@ -184,6 +191,36 @@ mod tests {
         let lp = Some((1000.0, 2000.0));
         let h = run(1500.0, lp, 30, 600, |t| if t < 300 { 0.92 } else { 1.08 });
         assert!(h.iter().all(|&(_, f)| (1000.0..2000.0).contains(&f)));
+    }
+
+    #[test]
+    fn latency_is_the_newest_buffers() {
+        let t0 = Instant::now();
+        let mut c = clock();
+        assert_eq!(c.latency_ms(), 0.0);
+        c.push(
+            Anchor {
+                at: t0,
+                pos: 0.0,
+                latency: MS(40),
+                fps: SRC,
+                lp: None,
+            },
+            true,
+            true,
+        );
+        c.push(
+            Anchor {
+                at: t0 + MS(10),
+                pos: 441.0,
+                latency: MS(25),
+                fps: SRC,
+                lp: None,
+            },
+            true,
+            false,
+        );
+        assert_eq!(c.latency_ms(), 25.0);
     }
 
     #[test]

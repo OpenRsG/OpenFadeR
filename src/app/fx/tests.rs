@@ -29,6 +29,19 @@ fn falls_back_to_the_other_playing_deck_then_to_nothing() {
 }
 
 #[test]
+fn the_last_tempo_is_kept_while_no_deck_plays() {
+    let last = Cell::new(None);
+    assert_eq!(held_tempo(&last, None), None, "nothing has played yet");
+    assert_eq!(held_tempo(&last, Some(128.0)), Some(128.0));
+    assert_eq!(
+        held_tempo(&last, None),
+        Some(128.0),
+        "the last deck paused: the tail rings on at 128, not at 120"
+    );
+    assert_eq!(held_tempo(&last, Some(140.0)), Some(140.0));
+}
+
+#[test]
 fn decks_c_and_d_lead_and_follow_too() {
     let on = [(true, 120.0), (true, 124.0), (true, 128.0), (true, 132.0)];
     assert_eq!(

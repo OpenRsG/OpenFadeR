@@ -32,7 +32,7 @@ pub const MAX_EVENTS: usize = 256;
 /// Triggers one buffer can carry (more are dropped).
 pub const PER_BUFFER: usize = 32;
 /// Recorded hits this pass of the pattern that must not also play back in it.
-const FRESH: usize = 8;
+const FRESH: usize = MAX_EVENTS;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
@@ -262,6 +262,7 @@ impl State {
         if restart != self.restart {
             (self.restart, self.phase, self.n_fresh) = (restart, 0.0, 0);
         }
+        self.phase %= len_ticks(c.seq_bars()) as f64; // the pattern may have been shortened under the clock
         for (i, s) in c.slots.iter().enumerate() {
             let t = s.trig.load(Acquire);
             if t != self.seen[i] {
@@ -281,15 +282,16 @@ impl State {
                 let e = cell.load(Relaxed);
                 let Some((slot, t)) = unpack(e) else { continue };
                 let t = t as f64;
-                // `again`: the event lies past the wrap, in the next pass, where a hit recorded in this one plays too
-                let (ticks, again) = if t >= from && t < to {
-                    (t - from, false)
+                // an event past the wrap lies in the next pass
+                let ticks = if t >= from && t < to {
+                    t - from
                 } else if to > len && t < to - len {
-                    (t + len - from, true)
+                    t + len - from
                 } else {
                     continue;
                 };
-                if muted & 1 << slot == 0 && (again || !self.fresh[..self.n_fresh].contains(&e)) {
+                let in_use = slot < c.used.load(Relaxed) as usize;
+                if in_use && muted & 1 << slot == 0 && !self.fresh[..self.n_fresh].contains(&e) {
                     let at = (ticks / adv * frames as f64).round() as usize;
                     out.push(at.min(frames - 1), slot);
                 }
@@ -330,7 +332,9 @@ impl State {
         }
         if let Some(free) = ctl.events.iter().find(|x| x.load(Relaxed) == 0) {
             free.store(e, Relaxed);
-            if self.n_fresh < FRESH {
+            // A hit stored ahead of the clock (rounded up, also into the next pass) is not played again when the clock gets there.
+            let (raw, len) = (self.phase as u32, len_ticks(c.seq_bars()));
+            if (tick > raw || tick + len / 2 < raw) && self.n_fresh < FRESH {
                 self.fresh[self.n_fresh] = e;
                 self.n_fresh += 1;
             }
@@ -489,5 +493,62 @@ mod tests {
         c.press(0);
         render(&mut s, &c, 10, 10);
         assert_eq!(c.seq_events(), [pack(1, 7)], "loop slots are not recorded");
+    }
+
+    #[test]
+    fn shortening_the_pattern_under_the_clock_does_not_fire_its_events_at_once() {
+        let (mut s, c) = setup();
+        c.seq_set(4, &[pack(0, 5), pack(1, 100), pack(0, 300)]);
+        c.set_seq_mode(Mode::Play);
+        render(&mut s, &c, BEAT * 1000 / TICKS as usize, 64); // the clock is at tick 1000 of 1536
+        c.set_seq_bars(1); // 1 BAR: the clock is past the new end, and the next event (tick 300) is ~2800 frames away
+        let out = render(&mut s, &c, 3 * 64, 64);
+        assert!(out.iter().all(|&x| x == 0.0), "nothing is due yet");
+    }
+
+    #[test]
+    fn quantised_hits_sound_once_however_many_a_pass_holds() {
+        let (mut s, c) = setup();
+        c.set_seq_bars(4);
+        c.set_seq_step(TICKS); // whole beats: a hit at 0.6 beat is stored on the next beat, ahead of the clock
+        c.set_seq_mode(Mode::Rec);
+        let mut out = render(&mut s, &c, 2_400, 50);
+        for _ in 0..11 {
+            c.press(0);
+            out.extend(render(&mut s, &c, BEAT, 50));
+        }
+        assert_eq!(
+            starts(&out).len(),
+            11,
+            "one sound per tap, not a second one on the stored beat"
+        );
+    }
+
+    #[test]
+    fn a_downbeat_hit_tapped_early_sounds_once_in_the_pass_it_was_played() {
+        let (mut s, c) = setup();
+        c.set_seq_step(TICKS / 4);
+        c.set_seq_mode(Mode::Rec);
+        render(&mut s, &c, 15_500, 64); // tick 372 of 384, a 1/32 note before the pass ends
+        c.press(0); // stored on tick 0 of the next pass
+        let out = render(&mut s, &c, 1_000, 64);
+        assert_eq!(c.seq_events(), [pack(0, 0)]);
+        assert_eq!(
+            starts(&out),
+            [0],
+            "the stored copy does not flam 62 ms later"
+        );
+        let out = render(&mut s, &c, 4 * BEAT, 64);
+        assert_eq!(starts(&out).len(), 1, "it plays on the next pass");
+    }
+
+    #[test]
+    fn the_pattern_does_not_play_slots_that_are_no_longer_in_use() {
+        let (mut s, c) = setup();
+        c.seq_set(1, &[pack(0, 0), pack(1, 0)]);
+        c.set_seq_mode(Mode::Play);
+        c.set_used(1); // CONTROLLER > Sampler > SLOT: only slot 1 (index 0) is left
+        let out = render(&mut s, &c, 100, 100);
+        assert_eq!(out[0], 0.5, "slot 2 stays silent");
     }
 }

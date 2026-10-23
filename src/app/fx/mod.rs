@@ -5,8 +5,9 @@
 //! `FxState.units` row; every user action edits one row and [`Fx::push`] mirrors it into that unit's
 //! [`audio::fx::Controls`] on the audio bus (`Bus::fx[unit]`; the effects themselves are in `src/audio/fx/`).
 //! A 50 ms timer picks each unit's tempo: its TAP override if there is one, else the master deck's effective
-//! BPM (the deck started last, `DeckState.master`) while it plays at a known tempo, else the other deck's; with
-//! neither the unit shows "no BPM" and runs at the 120 BPM fallback. TAP (average of the last taps, see
+//! BPM (the deck started last, `DeckState.master`) while it plays at a known tempo, else the other deck's; when no
+//! deck plays it keeps the tempo it had (a ringing tail does not re-time), and a unit that never had one shows "no BPM"
+//! and runs at the 120 BPM fallback. TAP (average of the last taps, see
 //! [`grid::tap`]) sets the override, AUTO clears it. RELEASE (momentary): while held the unit plays ECHO at full level, on release its feed stops and the echo
 //! tail rings out (the unit's trails); the unit then stays on ECHO / off. FX1-1's last effect and beat are saved
 //! in the settings ([`prefs`]). Slots 2 and 3 start on REVERB and FLANGER (our choice).
@@ -35,8 +36,8 @@ use super::{
     prefs,
 };
 use logic::{
-    assignment, bpm_text, edit_slot, effective_assign, merge_step, next_part, part_mask, release,
-    release_cfx_off, set_beat, toggle_part, unit_bpm,
+    assignment, bpm_text, edit_slot, effective_assign, held_tempo, merge_step, next_part,
+    part_mask, release, release_cfx_off, set_beat, toggle_part, unit_bpm,
 };
 pub(super) use logic::{pad_fx_rgb, tempo};
 use openfader::audio::{
@@ -72,6 +73,8 @@ struct Fx {
     start: Instant,
     /// The `FxState.view` last taken from VIEW > Effect Panel (-1 before the first).
     view: Cell<i32>,
+    /// The tempo the units followed while a deck last played.
+    last_tempo: Cell<Option<f32>>,
 }
 
 impl Fx {
@@ -193,7 +196,10 @@ impl Fx {
                 .row_data(i)
                 .map_or((false, 0.0), |v| (v.playing, v.bpm))
         };
-        let master = tempo(decks.get_master(), std::array::from_fn(row));
+        let master = held_tempo(
+            &self.last_tempo,
+            tempo(decks.get_master(), std::array::from_fn(row)),
+        );
         let units = app.global::<FxState>().get_units();
         for (i, over) in self.over.iter().map(Cell::get).enumerate() {
             let (bpm, no_bpm) = unit_bpm(over, master);
@@ -253,6 +259,7 @@ pub fn wire(app: &App, decks: &Decks) {
         over: Default::default(),
         start: Instant::now(),
         view: Cell::new(-1),
+        last_tempo: Cell::new(None),
     });
     fx.show_prefs(&saved);
     for (i, u) in rows.iter().enumerate() {

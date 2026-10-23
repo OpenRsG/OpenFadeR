@@ -43,6 +43,24 @@ fn decode(bytes: &[u8]) -> String {
     }
 }
 
+/// `p` without `.` components and with `a/..` pairs folded, so the path equals the one the Collection lists the same file under.
+fn clean(p: PathBuf) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir
+                if matches!(out.components().next_back(), Some(Component::Normal(_))) =>
+            {
+                out.pop();
+            }
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 /// One playlist line → a path (`dir` completes a relative one).
 fn resolve(entry: &str, dir: &Path, map: &PathMap) -> Option<PathBuf> {
     let entry = entry.trim();
@@ -59,7 +77,7 @@ fn resolve(entry: &str, dir: &Path, map: &PathMap) -> Option<PathBuf> {
         entry.replace('\\', "/")
     };
     let p = PathBuf::from(p);
-    Some(if p.is_absolute() { p } else { dir.join(p) })
+    Some(clean(if p.is_absolute() { p } else { dir.join(p) }))
 }
 
 /// The paths a playlist text lists; `pls` picks the PLS reader, else M3U.
@@ -250,6 +268,20 @@ mod tests {
         assert_eq!(
             parse(text, true, Path::new("/"), &Vec::new()),
             ["/m/a.mp3", "/m/b.mp3"].map(PathBuf::from)
+        );
+    }
+
+    #[test]
+    fn dot_and_dotdot_entries_name_the_path_the_collection_lists() {
+        let got = parse(
+            "../Music/a.mp3\r\n./b.mp3\r\nsub/../../c.mp3\r\n/m/./x/../d.mp3\r\n",
+            false,
+            Path::new("/lists"),
+            &Vec::new(),
+        );
+        assert_eq!(
+            got,
+            ["/Music/a.mp3", "/lists/b.mp3", "/c.mp3", "/m/d.mp3"].map(PathBuf::from)
         );
     }
 

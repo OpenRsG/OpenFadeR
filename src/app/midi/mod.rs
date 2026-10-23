@@ -327,6 +327,8 @@ struct Midi {
     dump: Cell<Option<dump::Window>>,
     /// The request waiting for the first tick ([`Midi::start_dump`]).
     dump_due: RefCell<Option<Vec<u8>>>,
+    /// The mapping file's state request, kept to ask again when the layout widens (empty = none).
+    request: RefCell<Vec<u8>>,
     /// Note-ons not yet released: on unplug they are released for the controller.
     held: RefCell<HashSet<(u8, u8)>>,
     /// Toasts waiting for the next tick ([`Midi::notify`]).
@@ -430,5 +432,30 @@ mod tests {
     fn describe_names_the_control() {
         assert_eq!(describe((0xB0, 7)), "CC 7 ch 1");
         assert_eq!(describe((0x91, 36)), "Note 36 ch 2");
+    }
+
+    #[test]
+    fn a_wider_layout_asks_the_controller_for_its_state_again() {
+        use crate::app::prefs::set_for_test;
+        use openfader::{
+            library::{Library, own::Own},
+            store::Store,
+        };
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let lib: Rc<dyn Library> =
+            Rc::new(Own::new(std::sync::Arc::new(Store::in_memory().unwrap())));
+        let decks = crate::app::deck::wire(&app, lib, Default::default());
+        set_for_test(|p| p.decks = 2);
+        let guard = wire(&app, decks);
+        let request = vec![0xF0, 0x7D, 0xF7];
+        *guard.midi.request.borrow_mut() = request.clone();
+        *guard.midi.dump_due.borrow_mut() = None;
+        set_for_test(|p| p.decks = 4);
+        assert_eq!(
+            *guard.midi.dump_due.borrow(),
+            Some(request),
+            "the controls of decks C and D were ignored while they were hidden"
+        );
     }
 }

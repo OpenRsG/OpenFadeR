@@ -5,7 +5,7 @@ Two things are documented here, so other tools can read and write a collection w
 1. the **open export** (File > Export Collection): a JSON file, a CSV table and an M3U8 playlist;
 2. the **library database** `store.db`, the SQLite file that holds the Collection itself.
 
-The export is the stable interface. The database is documented as it is today (schema version 16); it can only grow:
+The export is the stable interface. The database is documented as it is today (schema version 17); it can only grow:
 migrations append columns and tables, they never rename or reuse one.
 
 ## 1. Open export

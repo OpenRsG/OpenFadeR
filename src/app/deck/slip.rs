@@ -35,7 +35,7 @@ impl Deck {
                 }
                 p.set_reverse(on);
                 if !on && self.rev_slip.take() {
-                    p.set_slip(false);
+                    p.slip_off_after_return();
                 }
                 p.reverse()
             })

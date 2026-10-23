@@ -114,8 +114,15 @@ fn reload_tag(c: &Rc<Ctx>, t: &Track) {
     let Some(file) = t.file.as_deref().filter(|f| f.is_file()) else {
         return c.say(tr!("the file is missing: relocate it first"));
     };
-    let merged = retagged(t, folder::read_track(file));
-    match c.store.collection_put(&[merged], true) {
+    // The row's own values are the base: what the user edited (the overrides, dropped below) is not the file's.
+    let row =
+        t.id.and_then(|id| c.store.collection_track(id).ok().flatten());
+    let merged = retagged(row.as_ref().unwrap_or(t), folder::read_track(file));
+    let key = c.store.key_of(t);
+    match c
+        .store
+        .action(tr!("Reload Tag"), || c.store.reload_tags(&key, &merged))
+    {
         Ok(_) => {
             c.say(&tr!("tags of “{}” reloaded", t.title));
             c.reload(None);

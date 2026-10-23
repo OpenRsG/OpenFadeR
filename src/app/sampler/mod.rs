@@ -165,6 +165,7 @@ impl Sampler {
             self.select(0);
         }
         if let Some(bus) = &self.bus {
+            bus.sampler.set_used(n);
             (n..SLOTS).for_each(|i| bus.sampler.stop(i));
         }
         self.refresh();
@@ -195,9 +196,10 @@ impl Sampler {
         self.decks.iter().for_each(|d| d.refresh_pads()); // S.SCRATCH pads light per filled slot
     }
 
-    /// Pads' loaded / playing / loop flags (a slot past the ones in use shows as empty).
+    /// Pads' loaded / playing / loop flags (a slot past the ones in use shows as empty); the deck pads follow a change.
     fn refresh(&self) {
         let cfg = self.cfg.borrow();
+        let mut changed = false;
         for (i, c) in cfg.iter().enumerate() {
             let v = SlotView {
                 loaded: c.loaded && i < self.used.get(),
@@ -208,7 +210,12 @@ impl Sampler {
             };
             if self.model.row_data(i).as_ref() != Some(&v) {
                 self.model.set_row_data(i, v);
+                changed = true;
             }
+        }
+        drop(cfg);
+        if changed {
+            self.decks.iter().for_each(|d| d.refresh_pads());
         }
     }
 
@@ -385,5 +392,29 @@ mod tests {
             usable(2, 16, true, false).is_ok() && usable(2, 16, false, true).is_ok(),
             "an empty slot loads; a filled one too when the setting is off"
         );
+    }
+
+    #[test]
+    fn the_deck_pads_show_the_bank_the_sampler_switched_to() {
+        use openfader::{
+            library::{Library, own::Own},
+            store::Store,
+        };
+        use slint::Model;
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let lib: std::rc::Rc<dyn Library> =
+            std::rc::Rc::new(Own::new(std::sync::Arc::new(Store::in_memory().unwrap())));
+        let decks = crate::app::deck::wire(&app, lib, Default::default());
+        wire(&app, &decks, Default::default());
+        let state = app.global::<DeckState>();
+        state.invoke_pad_mode(0, crate::app::deck::PadMode::Sampler as i32);
+        let first_pad = || {
+            let deck = state.get_decks().row_data(0).unwrap();
+            deck.pads.row_data(0).unwrap().label.to_string()
+        };
+        assert_eq!(first_pad(), "1");
+        app.global::<SamplerState>().invoke_bank_toggled();
+        assert_eq!(first_pad(), "9", "pad 1 of bank 2 is slot 9");
     }
 }

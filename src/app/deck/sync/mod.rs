@@ -6,13 +6,15 @@
 //!   on the master (or with none) hands the master to [`master::leader_of`]'s pick, the first other deck that
 //!   can be followed. A deck that becomes master stops following.
 //! * Tempo: the follower plays at `master BPM × k`, k ∈ {1, 2, ½} whichever needs the rate closest
-//!   to 1 (87 BPM follows 174 BPM at 1×, not 2×); its own tempo fader is ignored ([`target`]).
+//!   to 1 (87 BPM follows 174 BPM at 1×, not 2×); its own tempo fader is ignored while it can follow ([`target`], [`Deck::tracking`]).
 //! * Phase: the grids' fractional beat numbers are compared (`k` beats of the follower per master
 //!   beat). Drift above 1 ms is pulled in with a tiny `Player::nudge`, never a seek; an
 //!   error above 25 ms (SYNC pressed while playing, a hot-cue jump) re-seeks once to the aligned spot, in phase with what is
-//!   heard ([`correct`]). Nothing is measured while a seek or start is still on its way to the speakers. No correction while scratching, bending, looping or reversing, or when the master's loop
-//!   cannot preserve the follower's beat phase. Tempo following continues through those loops.
-//! * PLAY on a paused synced deck waits for the master's next beat, unless its loop cannot preserve that phase.
+//!   heard ([`correct`]). Nothing is measured while a seek or start is still on its way to the speakers, or while either deck brakes
+//!   or spins up. No correction while scratching, bending, looping or reversing (the master's scratch and reverse count), or when the
+//!   master's loop cannot preserve the follower's beat phase. Tempo following continues through those loops.
+//! * PLAY on a paused synced deck waits for the master's next beat and starts one output latency ahead, so it is heard on the beat,
+//!   unless its loop cannot preserve that phase. A master that cannot be followed any more (unloaded, out of range) starts it at once.
 //!
 //! Base: [`Link`] and [`State`] (the master and each deck's SYNC state), the nudge plumbing. Children:
 //! [`phase`] (tempo and phase maths, pure), [`master`] (hand-over rules, SYNC / MASTER buttons), [`follow`] (the
@@ -20,7 +22,7 @@
 //!
 //! ponytail: the grids are read as constant-tempo from the first beat (a variable grid would need the
 //! tempo at the playhead); beat phase only, not bar phase; a master tempo outside 0.5 to 2× of the
-//! follower's grid leaves the follower at its last rate without a message.
+//! follower's grid leaves the follower at its last rate without a message, and its tempo fader free.
 
 mod follow;
 mod master;
@@ -196,6 +198,11 @@ impl Deck {
     /// The player's position is what is being heard (see `Player::settled`); true without a player.
     fn settled(&self) -> bool {
         self.with_player(|p| p.settled()).unwrap_or(true)
+    }
+
+    /// No brake or spin-up ramp is changing the deck's speed (see `Player::steady`); true without a player.
+    fn steady(&self) -> bool {
+        self.with_player(|p| p.steady()).unwrap_or(true)
     }
 
     /// A LOAD starts clean: no bend, nudge or armed start.

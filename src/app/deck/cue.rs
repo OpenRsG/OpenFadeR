@@ -7,7 +7,7 @@
 //!
 //! The cue point is chosen at LOAD ([`autocue`](super::autocue): nearest cue, first sound, first memory cue) until the user sets another (session only).
 
-use super::{Deck, fmt_ms};
+use super::{Deck, at_end, fmt_ms};
 
 /// A paused playhead this close to the cue point counts as being on it.
 const AT_CUE_MS: f64 = 30.0;
@@ -32,11 +32,12 @@ pub enum Press {
     Preview { set: Option<u32> },
 }
 
-/// `mark_ms` is where a new cue point would go (the playhead, snapped when quantize is on).
-pub fn press(playing: bool, pos_ms: f64, cue_ms: u32, mark_ms: u32) -> Press {
+/// `mark_ms` is where a new cue point would go (the playhead, snapped when quantize is on); a playhead at the end of the
+/// track (`duration_ms`) is no place for one: the press previews the cue point that is there.
+pub fn press(playing: bool, pos_ms: f64, cue_ms: u32, mark_ms: u32, duration_ms: u32) -> Press {
     if playing {
         Press::Return
-    } else if at_cue(pos_ms, cue_ms) {
+    } else if at_cue(pos_ms, cue_ms) || at_end(pos_ms, duration_ms) {
         Press::Preview { set: None }
     } else {
         Press::Preview { set: Some(mark_ms) }
@@ -72,7 +73,8 @@ impl Deck {
         let (act, cue) = {
             let l = self.loaded.borrow();
             let (pos, playing) = self.clock(&l);
-            (press(playing, pos, l.cue_ms, self.mark(&l)), l.cue_ms)
+            let mark = self.mark(&l);
+            (press(playing, pos, l.cue_ms, mark, l.duration_ms), l.cue_ms)
         };
         let at = match act {
             Press::Preview { set: Some(ms) } => {
@@ -129,13 +131,13 @@ mod tests {
 
     #[test]
     fn playing_returns_to_the_cue_point() {
-        assert_eq!(press(true, 5000.0, 1000, 5000), Press::Return);
+        assert_eq!(press(true, 5000.0, 1000, 5000, 100_000), Press::Return);
     }
 
     #[test]
     fn paused_on_the_cue_point_previews_it() {
         assert_eq!(
-            press(false, 1010.0, 1000, 1010),
+            press(false, 1010.0, 1000, 1010, 100_000),
             Press::Preview { set: None }
         );
     }
@@ -143,13 +145,21 @@ mod tests {
     #[test]
     fn paused_elsewhere_sets_a_new_cue_point_at_the_mark() {
         assert_eq!(
-            press(false, 4990.0, 1000, 5000),
+            press(false, 4990.0, 1000, 5000, 100_000),
             Press::Preview { set: Some(5000) }
         );
         assert_eq!(
-            press(false, 1031.0, 1000, 1031),
+            press(false, 1031.0, 1000, 1031, 100_000),
             Press::Preview { set: Some(1031) },
             "outside the tolerance"
+        );
+    }
+
+    #[test]
+    fn paused_at_the_end_of_the_track_keeps_the_cue_point() {
+        assert_eq!(
+            press(false, 100_000.0, 1000, 100_000, 100_000),
+            Press::Preview { set: None }
         );
     }
 

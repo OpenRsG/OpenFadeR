@@ -24,8 +24,8 @@ use rusqlite::{Connection, functions::FunctionFlags, params_from_iter, types::Va
 use std::{
     cell::RefCell,
     sync::{
-        Arc,
         atomic::{AtomicI64, AtomicU64, Ordering},
+        Arc,
     },
 };
 
@@ -57,6 +57,8 @@ const TABLES: &[&str] = &[
     "taglist",
     "source_map",
     "source_node",
+    "analysis_lock",
+    "history",
 ];
 
 /// Tables whose primary key starts with the track key (see [`Store::changed_since`]).
@@ -167,6 +169,7 @@ fn noun(table: &str, op: i64, old: Option<&str>, new: Option<&str>) -> &'static 
         "mytag_category" | "mytag" | "track_mytag" => "tags",
         "hotcue_bank" | "hotcue_bank_cue" => "cue banks",
         "matching" => "matching",
+        "analysis_lock" => "analysis lock",
         "phrase_edit" => "phrases",
         "gain" => "gain",
         "sequence" => "sampler sequence",

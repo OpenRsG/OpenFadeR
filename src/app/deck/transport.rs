@@ -57,6 +57,7 @@ impl Deck {
     pub(super) fn pause_at(&self, ms: u32) {
         self.with_player(|p| {
             p.pause();
+            p.slip_settle();
             p.seek(ms);
         });
     }
@@ -72,7 +73,7 @@ impl Deck {
             let s = prefs::with(|p| p.controller.vinyl_seconds().0) / 8.0;
             self.with_player(|p| p.brake(s));
         } else if !self.play_quantized() {
-            self.with_player(|p| p.play());
+            self.with_player(|p| p.start());
         }
     }
 
@@ -113,7 +114,10 @@ impl Deck {
     /// Jog search (shift + jog): the playhead moves by `ms` ([`Deck::needle_free`]).
     pub fn search(&self, ms: f64) {
         if self.needle_free() {
-            self.with_player(|p| p.seek((p.position_ms() + ms).max(0.0) as u32));
+            self.with_player(|p| {
+                let heard = p.position_ms();
+                p.seek_in_phase((heard + ms).max(0.0) as u32, heard);
+            });
         }
     }
 
@@ -126,9 +130,9 @@ impl Deck {
         !locked
     }
 
-    /// Fader moved to `pos` (0..1); ignored while SYNC makes this deck follow the master.
+    /// Fader moved to `pos` (0..1); ignored while SYNC makes this deck follow the master's tempo.
     pub fn tempo(&self, pos: f32) {
-        if !self.following() {
+        if !self.tracking() {
             self.set_rate(rate_at(pos, RANGES[self.range.get()].0));
         }
     }
@@ -157,7 +161,7 @@ impl Deck {
     pub fn cycle_range(&self) {
         let next = (self.range.get() + 1) % RANGES.len();
         self.range.set(next);
-        if self.following() {
+        if self.tracking() {
             self.set_rate(self.rate.get());
         } else {
             let pos = self.view.borrow().tempo;
@@ -250,7 +254,7 @@ impl Deck {
                 Some(lp) => {
                     let at = (pos + lp.0 as f64 - cur.0 as f64).max(0.0) as u32;
                     self.apply_loop(l, Some(lp));
-                    self.with_player(|p| p.seek(at));
+                    self.with_player(|p| p.seek_in_phase(at, pos));
                 }
                 None => self.say(tr!("loop cannot move that far")),
             }
@@ -260,7 +264,7 @@ impl Deck {
         drop(l);
         match target {
             Some(ms) => {
-                self.with_player(|p| p.seek(ms));
+                self.with_player(|p| p.seek_in_phase(ms, pos));
             }
             None => self.say(tr!("beat jump needs a beat grid")),
         }

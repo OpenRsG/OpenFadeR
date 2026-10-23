@@ -16,9 +16,10 @@ use crate::app::prefs::{self, KeyNotation};
 /// Largest manual shift either way (the player's own limit).
 pub const MAX_ST: i32 = 12;
 
-/// Pitch change of varispeed playback at `rate` in semitones; 0 with key lock on.
+/// Pitch change of varispeed playback at `rate` in semitones; 0 with key lock on. A stopped deck (rate 0, the bottom of WIDE) reads as the
+/// pitch at 1/1000 speed, not -inf.
 fn tempo_st(rate: f64, lock: bool) -> f64 {
-    if lock { 0.0 } else { 12.0 * rate.log2() }
+    if lock { 0.0 } else { 12.0 * rate.max(1e-3).log2() }
 }
 
 /// Whole semitones the key moves in total.
@@ -165,6 +166,14 @@ mod tests {
         assert_eq!(shift_text(0, 1.04, false), "+0.7 st");
         assert_eq!(shift_text(1, 2f64.powf(1.0 / 12.0), false), "+2.0 st");
         assert_eq!(shift_text(0, 0.5, false), "-12.0 st");
+    }
+
+    #[test]
+    fn a_stopped_deck_at_the_bottom_of_wide_has_a_finite_key_readout() {
+        // rate 0 is the WIDE fader's bottom: the pitch is not -inf and a manual shift on top cannot overflow
+        assert_eq!(shift_text(0, 0.0, false), "-119.6 st");
+        assert_eq!(shift_text(0, 0.0, true), "");
+        assert!(!shown("8A", -2, 0.0, false, KeyNotation::Camelot).is_empty());
     }
 
     #[test]

@@ -1,6 +1,7 @@
 //! The selected effect's audio-thread state: engage ramp, tempo slew, knob smoothing, trails and idle detection.
 //! Stage replacements are prepared by one shared worker and exchanged without waiting in [`Unit::set`].
-//! A pending selection passes audio through until its stage is ready; the old selection is never activated.
+//! A pending selection lets an audible trail of the old effect ring on (its input closed; dry when it had none) until the new
+//! stage is ready, and the old stage is then faded out beside it; the old selection is never activated.
 
 use super::prepare::{Exchange, Prepared, Worker};
 use super::{
@@ -46,9 +47,16 @@ pub struct Unit {
     period: f32,
     target: f32,
     slew: f32,
-    /// Smoothed knob and its one-pole coefficient.
+    /// Smoothed knob and LEVEL and their one-pole coefficient.
     knob: f32,
+    level: f32,
     knob_k: f32,
+    /// The stage a switch replaced while its trail was audible: it rings on beside the new one with its input closed, faded
+    /// out by `fade` (1 -> 0, over the engage ramp; 0 = none), then goes to the worker.
+    fading: Option<Prepared>,
+    fade: f32,
+    /// A selection is pending and the old stage's trail is carried across it.
+    tail: bool,
     /// Consecutive silent frames while off, and how many make the unit idle.
     quiet: u32,
     hold: u32,
@@ -111,6 +119,10 @@ impl Unit {
             slew: 1.0 - (-1.0 / (TEMPO_SLEW_S * r)).exp(),
             knob: 0.5,
             knob_k: 1.0 - (-1.0 / (KNOB_S * r)).exp(),
+            level: 0.5,
+            fading: None,
+            fade: 0.0,
+            tail: false,
             quiet: u32::MAX,
             hold: 0,
         }
@@ -149,7 +161,7 @@ impl Unit {
 
     /// Off, faded out and every trail below [`QUIET`]: [`Unit::process`] would return its input unchanged.
     pub fn idle(&self) -> bool {
-        !self.s.on && self.g == 0.0 && self.quiet >= self.hold
+        !self.s.on && self.g == 0.0 && self.quiet >= self.hold && self.fade == 0.0
     }
 
     /// Takes the knob values for the next frames: effect switch, ON edge, tempo.
@@ -162,11 +174,29 @@ impl Unit {
             self.worker.wake();
         }
         let mut installed = false;
+        let was_pending = self.pending;
         self.pending = self.stage.as_ref().is_none_or(|p| p.index != desired);
-        if self.pending {
+        if self.pending && !was_pending {
+            self.tail = !self.idle(); // an audible trail rings on, input closed, until the new stage is ready
+        }
+        if self.pending || self.fading.is_some() {
             if let Ok(mut h) = self.exchange.handoff.try_lock() {
-                if h.retired.is_none() && h.ready.as_ref().is_some_and(|p| p.index == desired) {
-                    h.retired = self.stage.take();
+                if self.fade == 0.0 && self.fading.is_some() && h.retired.is_none() {
+                    h.retired = self.fading.take(); // faded out: the worker destroys it
+                    self.worker.wake();
+                }
+                if self.pending
+                    && h.retired.is_none()
+                    && h.ready.as_ref().is_some_and(|p| p.index == desired)
+                {
+                    let old = self.stage.take();
+                    if self.tail {
+                        // the trail goes on beside the new stage and is faded out (an earlier one still fading is cut)
+                        h.retired = std::mem::replace(&mut self.fading, old);
+                        self.fade = 1.0;
+                    } else {
+                        h.retired = old;
+                    }
                     self.stage = h.ready.take();
                     self.exchange.active.store(desired, Release);
                     self.pending = false;
@@ -193,9 +223,13 @@ impl Unit {
         if changed || idle {
             self.period = self.target;
             self.knob = s.knob;
+            self.level = s.level;
         }
         self.hold = (self.target.min(MAX_DELAY_S * self.rate) + 0.05 * self.rate) as u32;
         self.s = s;
+        if !self.pending {
+            self.tail = false;
+        }
     }
 
     /// Switch the effect OFF: it fades out and its trails ring out ([`Unit::idle`] says when it is done).
@@ -213,12 +247,13 @@ impl Unit {
         }
         self.s.on = false;
         self.g = 0.0;
+        self.fade = 0.0;
         self.quiet = u32::MAX;
     }
 
     /// One frame through the current effect (the voice's stem-part path calls it per frame).
     pub fn process(&mut self, x: Frame) -> Frame {
-        if self.pending {
+        if self.pending && !self.tail {
             return x;
         }
         let Some(selected) = &mut self.stage else {
@@ -226,15 +261,17 @@ impl Unit {
         };
         let st = &mut selected.stage;
         let s = self.s;
-        let want = if s.on { 1.0 } else { 0.0 };
+        // A pending selection never engages the old effect: its trail just rings on.
+        let want = if s.on && !self.pending { 1.0 } else { 0.0 };
         self.g = ramp(self.g, want, self.ramp);
         self.period += (self.target - self.period) * self.slew;
         self.knob += (s.knob - self.knob) * self.knob_k;
+        self.level += (s.level - self.level) * self.knob_k;
         let c = Ctx {
             rate: self.rate,
             period: self.period,
             beats: s.beats,
-            level: s.level,
+            level: self.level,
             g: self.g,
             knob: self.knob,
         };
@@ -247,6 +284,17 @@ impl Unit {
             self.quiet = 0;
         } else {
             self.quiet = self.quiet.saturating_add(1);
+        }
+        if let Some(old) = &mut self.fading {
+            self.fade = ramp(self.fade, 0.0, self.ramp);
+            if self.fade > 0.0 {
+                let z = old.stage.tick(x, &Ctx { g: 0.0, ..c });
+                if finite(z) {
+                    y = [0, 1].map(|k| y[k] + (z[k] - x[k]) * self.fade);
+                } else {
+                    old.stage.reset();
+                }
+            }
         }
         y
     }
@@ -290,7 +338,8 @@ impl Unit {
 
 impl Drop for Unit {
     fn drop(&mut self) {
-        self.worker.retire(&self.exchange, self.stage.take());
+        self.worker
+            .retire(&self.exchange, [self.stage.take(), self.fading.take()]);
     }
 }
 
@@ -376,5 +425,65 @@ mod tests {
                 "retired stages are destroyed by the worker"
             );
         }
+    }
+
+    /// Picking another effect while ECHO repeats ring cuts them neither when the selection is asked for (the new stage is
+    /// still being built) nor when it arrives: the tail rings on, then fades out beside the new stage.
+    #[test]
+    fn a_switch_fades_a_ringing_tail_instead_of_cutting_it() {
+        let mut u = Unit::new(48_000);
+        let s = Settings {
+            effect: Effect::Echo.index(),
+            beats: 0.25, // a repeat every 6000 frames at 120 BPM
+            level: 1.0,
+            knob: 0.5,
+            on: true,
+            bpm: 120.0,
+        };
+        u.prepare(s.effect);
+        u.set(s);
+        let reverb = Settings {
+            effect: Effect::Reverb.index(),
+            on: false,
+            ..s
+        };
+        let exchange = u.exchange.clone();
+        let mut building = None;
+        let mut out = vec![];
+        for i in 0..12_000usize {
+            match i {
+                6_500 => u.set(Settings { on: false, ..s }),
+                9_000 => {
+                    building = Some(exchange.handoff.lock().unwrap()); // the worker cannot deliver the new stage yet
+                    u.set(reverb);
+                }
+                9_500 => {
+                    drop(building.take());
+                    u.prepare(reverb.effect);
+                    u.set(reverb);
+                }
+                _ => {}
+            }
+            // 6000 frames of a 100 Hz sine, then silence: its repeat peaks at frame 9000
+            let x = if i < 6_000 {
+                [(i as f32 * 0.01309).sin(); 2]
+            } else {
+                [0.0; 2]
+            };
+            out.push(u.process(x)[0]);
+        }
+        let worst = out[8_900..]
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0, f32::max);
+        assert!(
+            worst < 0.05,
+            "the repeats vanish in one frame: step {worst:.3}"
+        );
+        let ringing = out[9_100..9_400].iter().fold(0.0f32, |m, y| m.max(y.abs()));
+        assert!(
+            ringing > 0.3,
+            "the tail rings on while the new stage is built: {ringing:.3}"
+        );
     }
 }

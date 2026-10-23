@@ -201,8 +201,8 @@ pub struct Deck {
     stemwave: RefCell<stemwave::State>,
     /// Part of a pending STEM INSTANT DOUBLES: waits for this deck's stems ([`stemdouble`]).
     double: RefCell<Option<stemdouble::Pending>>,
-    /// Quantize NEXT BEAT: the hot cue / loop waiting for its boundary (ms) ([`quantize`]).
-    pending: Cell<Option<(f64, quantize::Call)>>,
+    /// Quantize NEXT BEAT: the hot cue / loop waiting for its boundary (ms) and the playhead at the last tick ([`quantize`]).
+    pending: Cell<Option<(f64, f64, quantize::Call)>>,
     /// HOT CUE gate: the cue a held pad returns to when released ([`pads`]).
     gate: Cell<Option<u32>>,
     /// The plugin pad mode and pad held now, whose `release` steps run when it lets go ([`pads`]).

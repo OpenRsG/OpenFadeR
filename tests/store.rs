@@ -366,6 +366,26 @@ fn metadata_upgrade_preserves_old_edits_and_failed_updates_are_atomic() {
 }
 
 #[test]
+fn the_peak_cap_upgrade_drops_old_analysed_gains_and_keeps_the_adjustment() {
+    let dir = temp("gain-migration");
+    let path = dir.join("store.db");
+    {
+        let s = Store::open_at(&path).unwrap();
+        s.set_gain_analysed("t1", 9.0).unwrap();
+        s.set_gain_adjust("t1", -1.5).unwrap();
+    }
+    {
+        let db = rusqlite::Connection::open(&path).unwrap();
+        db.execute_batch("PRAGMA user_version = 16;").unwrap();
+    }
+    let s = Store::open_at(&path).unwrap();
+    let g = s.gain("t1").unwrap().unwrap();
+    assert_eq!((g.analysed_db, g.adjust_db), (None, -1.5));
+    drop(s);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn metadata_follows_legacy_adoption_copies_and_rekey() {
     let dir = temp("metadata-adoption");
     let mut tracks = Vec::new();

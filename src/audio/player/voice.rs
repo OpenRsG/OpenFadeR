@@ -171,9 +171,16 @@ pub(super) fn render(
     let s = sh.seek.swap(NO_SEEK, Acquire);
     if s != NO_SEEK {
         // A phase-kept seek moves on by what the deck played since the press was heard (latency + the wait for this buffer).
-        // Forward only and within CATCH_UP: anything else (a loop wrap, reverse) means the press time no longer applies.
+        // Forward only and within CATCH_UP: anything else (reverse, an older press time) does not apply. Inside the loop of the last
+        // buffer that is the way round it, wrapped or not (a lap shorter than the latency is lost); the loop may be gone by now.
         let from = sh.seek_from.swap(NO_SEEK, Relaxed);
-        let played = f64::from_bits(sh.pos.load(Relaxed)) - f64::from_bits(from);
+        let (written, heard) = (f64::from_bits(sh.pos.load(Relaxed)), f64::from_bits(from));
+        let played = match v.lp_was {
+            Some((ls, le)) if (ls..le).contains(&written) && (ls..le).contains(&heard) => {
+                (written - heard).rem_euclid(le - ls)
+            }
+            _ => written - heard,
+        };
         let s = if from != NO_SEEK && (0.0..CATCH_UP).contains(&played) && !sh.t.reverse() {
             (f64::from_bits(s) + played).to_bits()
         } else {
@@ -215,12 +222,8 @@ pub(super) fn render(
     }
     let stem_step = 1.0 / (STEM_RAMP_S * dev_rate as f32);
     let lp: Loop = guard.as_ref().filter(|_| !scratching).and_then(|p| {
-        unpack(sh.lp.load(Relaxed)).map(|(s, e)| {
-            (
-                s as f64 * p.rate as f64 / 1000.0,
-                e as f64 * p.rate as f64 / 1000.0,
-            )
-        })
+        unpack(sh.lp.load(Relaxed))
+            .map(|(s, e)| (s * p.rate as f64 / 1000.0, e * p.rate as f64 / 1000.0))
     });
     let reverse = t.reverse() && !scratching;
     if reverse && playing {
@@ -258,6 +261,9 @@ pub(super) fn render(
     v.scr.on = scratching;
     let mut pos = start;
     let key_lock = sh.key_lock.load(Relaxed);
+    if t.take_unbrake() {
+        v.brake.clear(); // PLAY / a hot cue during the PAUSE brake: the deck plays on
+    }
     let request = t.take_brake();
     match request {
         _ if !playing || scratching => v.brake.clear(),
@@ -419,7 +425,7 @@ pub(super) fn render(
             (pos, gs) = v.scr.step(moved, (frames - 1.0).max(0.0), nominal, kr);
         } else {
             pos = advance(pos, kr * f as f64, lp);
-            gs = (sp / SPIN_GATE).min(1.0); // a speed near 0 is silent, not one held sample
+            gs = (sp * rate.abs() as f32 / SPIN_GATE).min(1.0); // a speed near 0 (a stopped tempo fader too) is silent, not one held sample
         }
         played += 1;
         if braking || spinning {
@@ -428,6 +434,7 @@ pub(super) fn render(
         if f == 0.0 || (reverse && pos < 0.0) {
             ended = true; // brake done / start of the track reached going backwards: stop here
             sh.playing.store(false, Relaxed);
+            t.settle(); // stopped where it stands: no return to a shadow that stopped with it
             v.brake.clear();
         }
         if v.fade > 0 {
@@ -461,6 +468,7 @@ pub(super) fn render(
     }
     sh.level.store(peak.to_bits(), Relaxed);
     sh.pos.store(pos.max(0.0).to_bits(), Relaxed); // a seek racing in here is still pending and wins next callback
+    sh.steady.store(!(braking || spinning), Relaxed);
     let speed = if braking || spinning {
         fsum / n as f64
     } else {

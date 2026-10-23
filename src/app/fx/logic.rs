@@ -8,6 +8,7 @@ use openfader::audio::{
     merge::PRESETS,
 };
 use slint::Model;
+use std::cell::Cell;
 
 /// A unit's assignment from a selector index (0..3 = CH1..CH4, 4 = MASTER): a channel the layout shows (the first
 /// `decks`) or MASTER, else `None`.
@@ -102,6 +103,14 @@ pub(in crate::app) fn tempo(master: i32, decks: [(bool, f32); DECKS]) -> Option<
         .map(|i| decks[i])
         .find(|&(playing, bpm)| playing && bpm > 0.0)
         .map(|(_, bpm)| bpm)
+}
+
+/// What the units follow now: the playing decks' tempo, else (the last deck paused) the one they had, so a tail keeps ringing
+/// at the tempo it started at. Only a unit that never had a tempo runs at the 120 BPM fallback.
+pub(super) fn held_tempo(last: &Cell<Option<f32>>, playing: Option<f32>) -> Option<f32> {
+    let t = playing.or(last.get());
+    last.set(t);
+    t
 }
 
 /// The PAD FX pads' colour (VIEW > Color): the RGB of the `Theme` token (accent, play, cue, danger, sampler) so the pads and the panels agree.

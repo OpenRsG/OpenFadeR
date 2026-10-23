@@ -77,6 +77,8 @@ impl Slot {
 /// Everything the UI sets (all lock-free except the slice handover); read by the audio thread each buffer.
 pub struct Controls {
     slots: [Slot; SLOTS],
+    /// Slots in use (the sequencer plays no others).
+    used: AtomicU32,
     master: AtomicU32,
     cue: AtomicBool,
     bpm: AtomicU32,
@@ -87,6 +89,7 @@ impl Default for Controls {
     fn default() -> Controls {
         Controls {
             slots: std::array::from_fn(|_| Slot::new()),
+            used: AtomicU32::new(SLOTS as u32),
             master: AtomicU32::new(1f32.to_bits()),
             cue: AtomicBool::new(false),
             bpm: AtomicU32::new(0),
@@ -122,6 +125,11 @@ impl Controls {
 
     pub fn clear(&self, i: usize) {
         self.load(i, Pcm::default(), 0.0);
+    }
+
+    /// How many slots are in use (the first `n`): the sequencer skips the events of the others.
+    pub fn set_used(&self, n: usize) {
+        self.used.store(n.min(SLOTS) as u32, Relaxed);
     }
 
     /// Pad pressed: see the module doc for what that does per mode.

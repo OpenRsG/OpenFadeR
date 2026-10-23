@@ -115,8 +115,10 @@ impl Deck {
             return self.say(tr!("instant doubles: the other deck changed track"));
         }
         let k = pending.part;
+        // Where the source's next buffer starts, not what is heard (one output latency earlier): both decks are rendered in the same
+        // callback, so this one then plays in step with it.
         let (pos, playing, key_lock) = from
-            .with_player(|p| (p.position_ms(), p.is_playing(), p.key_lock()))
+            .with_player(|p| (p.written_ms(), p.is_playing(), p.key_lock()))
             .unwrap_or_default();
         self.set_rate(from.rate());
         self.with_player(|p| p.set_key_lock(key_lock));
