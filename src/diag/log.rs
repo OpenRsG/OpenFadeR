@@ -236,10 +236,13 @@ pub fn tee(err: bool, log: &'static Mutex<Option<Log>>) -> io::Result<Tee> {
         if err { "err" } else { "out" },
         log,
     )?;
+    let old = old as isize; // a HANDLE is a pointer: kept as a number so the closure is Send
     let restore = Box::new(move || {
         // SAFETY: the original handle goes back; the pipe's writer closes with `w`.
-        unsafe { SetStdHandle(which, old) };
-        drop((w, orig));
+        unsafe { SetStdHandle(which, old as _) };
+        drop(w);
+        // `orig` wraps that original handle itself, which is the process's again: it must stay open.
+        std::mem::forget(orig);
     });
     Ok(Tee { restore, done })
 }
