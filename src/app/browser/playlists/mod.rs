@@ -13,7 +13,7 @@ mod lists;
 mod manage;
 mod tree;
 
-use super::{App, BrowserState, View, hotcuebank, sidebar::Entry};
+use super::{hotcuebank, sidebar::Entry, stages, App, BrowserState, View};
 use openfader::store::{self, NodeKind};
 use slint::{ComponentHandle, StandardListViewItem};
 use std::{cell::RefCell, fmt::Display, rc::Rc};
@@ -30,6 +30,7 @@ pub enum Ask {
     NewCategory,
     NewTag(i64),
     NewBank,
+    NewStage,
 }
 
 /// The picker panel on the table's right edge; each row's id is a playlist node or a tag (`None`: a heading).
@@ -46,6 +47,10 @@ pub enum Panel {
     More(Vec<Act>),
     /// What MORE can do with the chosen Cue Bank.
     Bank(Vec<hotcuebank::Act>),
+    /// What MORE can do on a stage: the moves it offers, and the list of recent moves.
+    Stage(Vec<stages::Act>),
+    /// The recent move batches (journal actions), newest first: a row undoes one.
+    Moves(Vec<i64>),
 }
 
 /// One entry of the MORE panel.
@@ -64,7 +69,7 @@ pub enum Act {
 fn is_named(e: &Entry) -> bool {
     matches!(
         e,
-        Entry::User(_) | Entry::Category(_) | Entry::Tag(_) | Entry::Bank(_)
+        Entry::User(_) | Entry::Category(_) | Entry::Tag(_) | Entry::Bank(_) | Entry::Stage(_)
     )
 }
 
@@ -120,6 +125,7 @@ impl View {
                 .iter()
                 .find(|b| b.id == *id)
                 .map(|b| b.name.clone()),
+            Entry::Stage(id) => self.stage(*id).map(|s| s.name.clone()),
             _ => None,
         }
         .unwrap_or_default()
@@ -176,6 +182,8 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
                 | (Panel::New(_), 3)
                 | (Panel::More(_), 4)
                 | (Panel::Bank(_), 4)
+                | (Panel::Stage(_), 4)
+                | (Panel::Moves(_), 4)
         );
         if same {
             return v.close_panel(&app);
@@ -192,6 +200,22 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
     state.on_panel_row(move |i| {
         let (app, mut v) = (weak.unwrap(), v.borrow_mut());
         let Ok(i) = usize::try_from(i) else { return };
+        if let Panel::Stage(acts) = &v.panel {
+            let act = acts.get(i).copied();
+            v.close_panel(&app);
+            if let Some(act) = act {
+                v.stage_act(&app, act);
+            }
+            return;
+        }
+        if let Panel::Moves(ids) = &v.panel {
+            let id = ids.get(i).copied();
+            v.close_panel(&app);
+            if let Some(id) = id {
+                v.undo_move(&app, id);
+            }
+            return;
+        }
         if let Panel::Bank(acts) = &v.panel {
             let act = acts.get(i).cloned();
             v.close_panel(&app);
@@ -212,7 +236,9 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
             Panel::AddTo(ids) | Panel::New(ids) | Panel::Assign(ids) | Panel::Filter(ids) => {
                 ids.get(i).copied().flatten()
             }
-            Panel::Closed | Panel::More(_) | Panel::Bank(_) => None,
+            Panel::Closed | Panel::More(_) | Panel::Bank(_) | Panel::Stage(_) | Panel::Moves(_) => {
+                None
+            }
         };
         let Some(id) = id else { return };
         match v.panel {

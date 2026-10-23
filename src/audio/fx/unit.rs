@@ -9,8 +9,8 @@ use super::{
     Stage, echo, filter, finite, flanger, moved, phaser, ramp, reverb, roll, trans,
 };
 use crate::plugin::effect::{Effect as PluginEffect, Slot};
-use std::sync::Arc;
 use std::sync::atomic::Ordering::Release;
+use std::sync::Arc;
 
 const ENGAGE_S: f32 = 0.005;
 const TEMPO_SLEW_S: f32 = 0.03;
@@ -300,7 +300,8 @@ impl Unit {
     }
 
     /// Runs the unit over the first `n` frames of the channels' master paths (`.0` of each pair; the cue
-    /// path is never touched): in place on one channel (A to D), or on the sum of all four, where the difference the effect
+    /// path is never touched): in place on one channel (A to D) or on the AUX channel (the buffers' last slot, [`crate::audio::AUX`]),
+    /// or on the sum of all of them, where the difference the effect
     /// makes is added back to channel A so the mixer's own sum stays the only sum. Idle = no work, no change.
     pub fn apply(&mut self, c: &Controls, buf: &mut [Vec<(Frame, Frame)>], n: usize) {
         if c.part() != 0 && c.assign() != Assign::Master {
@@ -322,6 +323,13 @@ impl Unit {
                     let wet = self.process(dry);
                     for k in 0..2 {
                         buf[0][i].0[k] += wet[k] - dry[k];
+                    }
+                }
+            }
+            Assign::Aux => {
+                if let Some(b) = buf.get_mut(crate::audio::AUX) {
+                    for f in &mut b[..n] {
+                        f.0 = self.process(f.0);
                     }
                 }
             }

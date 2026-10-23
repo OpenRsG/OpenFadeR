@@ -26,7 +26,7 @@ impl Palette {
         matches!(Drag::parse(text), Some(Drag::Track(_) | Drag::Palette(..)))
     }
 
-    /// Whether tree row `row` takes the track drag `text`: a plain playlist of My Playlists, the Tag List, a tag.
+    /// Whether tree row `row` takes the track drag `text`: a plain playlist of My Playlists, the Tag List, a tag, a stage.
     pub(super) fn accepts_tree(&self, row: usize, text: &str) -> bool {
         if !Self::accepts_deck(text) {
             return false;
@@ -36,6 +36,7 @@ impl Palette {
         };
         match v.entries.get(row) {
             Some(Entry::Tags | Entry::Tag(_)) => true,
+            Some(Entry::Stage(_)) => true,
             Some(e) => Self::playlist_of(&v, e).is_some(),
             None => false,
         }
@@ -74,6 +75,7 @@ impl Palette {
         match v.entries.get(row).cloned() {
             Some(Entry::Tags) => self.add_track(app, &mut v, 0, &t),
             Some(Entry::Tag(id)) => v.tag_track(app, &t, id),
+            Some(Entry::Stage(id)) => v.move_to_stage(app, &[t], id),
             Some(e) => match Self::playlist_of(&v, &e) {
                 Some(id) => v.add_track_to(app, id, &t),
                 None => v.say(

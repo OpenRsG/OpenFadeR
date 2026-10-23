@@ -21,6 +21,8 @@ export struct ChannelView {
     /// AUTO GAIN knob position (0.5 = no adjustment) and the gain the loaded track plays with ("+1.5 dB"), set by Rust from the deck.
     auto-gain: float,
     auto-gain-text: string,
+    /// AUX strip only (`MixerState.channels[4]`): the ON switch. Its knobs are TRIM, HIGH, MID, LOW, FILTER and its fader is the LEVEL.
+    on: bool,
 }
 
 /// Master / headphone section. Knob positions are 0..1 in the order MASTER, HP MIX (0 = CUE, 1 = MASTER),
@@ -55,13 +57,14 @@ export global MixerState {
     in property <[string]> cfx-names;
     /// COLOR FX KNOB mode's stop (0..1, a position one drag cannot pass, e.g. 0.5 = CENTER LOCK); negative = NORMAL.
     in property <float> cfx-stop: -1;
-    /// Automix transition in progress: constant-power gains whatever the curve; bit i set = channel i's LOW band is killed (bass swap).
+    /// Automix transition in progress: constant-power gains whatever the curve.
     in property <bool> auto-fade;
-    in property <int> auto-low-cut;
     /// RELEASE FX is held (set by the FX panel): with "Apply RELEASE FX on CFX" the COLOR FX knobs act as centre meanwhile.
     in-out property <bool> release-held;
     /// The STEM ISO chip is shown (Preferences > Extensions > STEM ISO display; Rust mirrors the setting).
     in property <bool> iso-shown: true;
+    /// The AUX strip is shown (Preferences > Audio > AUX input; Rust mirrors the setting): `channels[4]` is its row.
+    in property <bool> aux-shown;
     callback curve-cycled();
     /// (channel, side 0 = A / 2 = B) click on that side's assignment grid: to that side, or to THRU (1) when already there.
     callback xf-assigned(int, int);
@@ -79,6 +82,8 @@ export global MixerState {
     callback fader(int, float);
     callback crossfade(float);
     callback cue-toggled(int);
+    /// The AUX strip's ON switch.
+    callback aux-toggled();
     /// (bus knob index, position)
     callback bus-knob(int, float);
     callback split-toggled();
@@ -92,7 +97,8 @@ export global MixerState {
 component Channel inherits Rectangle {
     in property <int> index;
     property <ChannelView> ch: MixerState.channels[root.index];
-    property <bool> stems: DeckState.decks[root.index].stems && MixerState.iso-shown;
+    property <bool> aux: root.index >= 4;
+    property <bool> stems: !root.aux && DeckState.decks[root.index].stems && MixerState.iso-shown;
     /// CUE and STEM side by side at 2 decks (52–60 wide); stacked in the 44-wide 4-deck strips.
     property <bool> wide: DeckState.count != 4;
     /// One knob and its label (18 + 1 + 10) with a 2 px gap to the next knob; more when a skin makes the strip taller.
@@ -121,15 +127,15 @@ component Channel inherits Rectangle {
                             height: 18px;
                             detent: !is-iso;
                             reset: is-iso ? 1.0 : 0.5;
-                            arc-color: is-iso ? [Theme.accent, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums][p] : p == 4 ? Theme.cue : Theme.accent;
+                            arc-color: is-iso ? [Theme.accent, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums][p] : p == 4 && !root.aux ? Theme.cue : Theme.accent;
                             value: is-iso ? root.ch.iso-knobs[p - 1] : root.ch.knobs[p];
-                            stop: p == 4 ? MixerState.cfx-stop : -1;
+                            stop: p == 4 && !root.aux ? MixerState.cfx-stop : -1;
                             edited(v) => { MixerState.knob(root.index, p, v); }
                         }
                     }
                     Text {
                         // STEM mode: the HIGH / MID / LOW knobs become INST / VOCAL / DRUMS (top to bottom).
-                        text: is-iso ? ["", @tr("INST"), @tr("VOCAL"), @tr("DRUMS")][p] : p == 4 ? MixerState.cfx-names[MixerState.cfx-type] : label;
+                        text: is-iso ? ["", @tr("INST"), @tr("VOCAL"), @tr("DRUMS")][p] : p == 4 ? (root.aux ? @tr("FILTER") : MixerState.cfx-names[MixerState.cfx-type]) : label;
                         color: is-iso ? [Theme.text, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums][p] : Theme.text-dim;
                         font-family: Theme.font;
                         font-size: Theme.font-xs;
@@ -149,10 +155,13 @@ component Channel inherits Rectangle {
             spacing: 2px;
             Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.cue; tooltip: @tr("Headphone CUE"); clicked => { MixerState.cue-toggled(root.index); } }
             if root.stems: Chip { text: @tr("STEM"); icon: Icon.stems; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.iso; tooltip: @tr("STEM mode: INST / VOCAL / DRUMS levels"); clicked => { MixerState.iso-toggled(root.index); } }
+            if root.aux: Chip { text: @tr("AUX"); font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.on; tooltip: @tr("AUX input on / off"); clicked => { MixerState.aux-toggled(); } }
         }
         if !root.wide: Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; height: 18px; min-width: 0px; active: root.ch.cue; tooltip: @tr("Headphone CUE"); clicked => { MixerState.cue-toggled(root.index); } }
         if !root.wide && root.stems: Rectangle { height: 2px; }
         if !root.wide && root.stems: Chip { text: @tr("STEM"); icon: Icon.stems; font-size: Theme.font-xs; height: 16px; min-width: 0px; active: root.ch.iso; tooltip: @tr("STEM mode: INST / VOCAL / DRUMS levels"); clicked => { MixerState.iso-toggled(root.index); } }
+        if !root.wide && root.aux: Rectangle { height: 2px; }
+        if !root.wide && root.aux: Chip { text: @tr("AUX"); font-size: Theme.font-xs; height: 16px; min-width: 0px; active: root.ch.on; tooltip: @tr("AUX input on / off"); clicked => { MixerState.aux-toggled(); } }
         Rectangle { height: 6px; }
         // Takes what the rows above leave.
         holder := Rectangle {
@@ -179,6 +188,7 @@ export component Mixer inherits Rectangle {
         if DeckState.count == 4: Channel { index: 2; }
         Channel { index: 1; }
         if DeckState.count == 4: Channel { index: 3; }
+        if MixerState.aux-shown: Channel { index: 4; }
     }
 }
 

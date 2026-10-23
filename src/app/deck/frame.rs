@@ -54,8 +54,21 @@ impl Deck {
         let mut row = DeckScroll {
             slip_x: -1.0,
             jog_angle: jog_angle(pos),
+            overview_slip_x: -1.0,
             ..Default::default()
         };
+        if render::backend::gpu() {
+            let ow = (self.overview_size.get().0 * scale).round() as usize;
+            if ow > 0 && l.duration_ms > 0 {
+                row.overview_x =
+                    (render::overview::playhead_x(ow, pos, l.duration_ms) - 1) as f32 / scale;
+                if let Some(slip) = self.with_player(|p| p.slip_position()).flatten() {
+                    row.overview_slip_x =
+                        render::overview::playhead_x(ow, slip * 1000.0, l.duration_ms) as f32
+                            / scale;
+                }
+            }
+        }
         if w > 0 && h > 0 {
             // A fixed stretch of *playing* time: at rate r the view covers r × the zoom in track time, so synced decks at
             // different pitches draw their beats the same distance apart.
@@ -157,7 +170,14 @@ pub(super) fn wire(app: &App, decks: &Decks) {
     let timer = Rc::new(Timer::default());
     let set = app
         .window()
-        .set_rendering_notifier(move |state, _| match state {
+        .set_rendering_notifier(move |state, api| match state {
+            RenderingState::RenderingSetup => {
+                crate::app::diag::graphics(api);
+                if let Some(app) = weak.upgrade() {
+                    render::backend::setup(api, &app);
+                }
+            }
+            RenderingState::RenderingTeardown => render::backend::teardown(),
             RenderingState::BeforeRendering => {
                 started.set(Instant::now());
                 moving.set(decks[..active()].iter().fold(false, |m, d| d.frame() | m));
@@ -181,8 +201,17 @@ pub(super) fn wire(app: &App, decks: &Decks) {
         });
     FRAME_DRIVEN.set(set.is_ok());
     if let Err(e) = set {
-        eprintln!("waveform frames: {e:?} (the deck tick draws them instead)");
+        eprintln!(
+            "Slint renderer: software / no graphics notifier ({e:?}); waveform renderer: CPU"
+        );
+        crate::app::diag::software(&format!("{e:?}"));
     }
+    let weak = app.as_weak();
+    prefs::on_change(move |_| {
+        if let Some(app) = weak.upgrade() {
+            render::backend::apply(&app);
+        }
+    });
 }
 
 #[cfg(test)]

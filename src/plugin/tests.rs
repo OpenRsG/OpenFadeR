@@ -158,6 +158,39 @@ fn knob_and_pad_modes_parse_without_a_command_and_bad_ones_reject_the_plugin() {
 }
 
 #[test]
+fn automix_styles_parse_without_a_command_and_bad_ones_reject_the_plugin() {
+    let d = temp("automix");
+    let write = |n: &str, m: serde_json::Value| {
+        fs::create_dir_all(d.join(n)).unwrap();
+        fs::write(d.join(n).join("plugin.json"), m.to_string()).unwrap();
+    };
+    let slam = json!({"name": "SLAM", "bars": 2, "steps": [
+        {"at": 0, "over": "50%", "crossfader": 1},
+        {"at": 0, "deck": "out", "fx": {"effect": "echo", "level": 0.5}}]});
+    write("ok", json!({"name": "ok", "automix": [slam]}));
+    write(
+        "noname",
+        json!({"name": "n", "automix": [{"name": "", "steps": [{"at": 0, "crossfader": 1}]}]}),
+    );
+    write(
+        "taken",
+        json!({"name": "t", "automix": [{"name": "CUT", "steps": [{"at": 0, "crossfader": 1}]}]}),
+    );
+    write(
+        "nodeck",
+        json!({"name": "d", "automix": [{"name": "X", "steps": [{"at": 0, "low": 0}]}]}),
+    );
+    let r = discover(&[d]);
+    assert_eq!(r.errors.len(), 3, "{:?}", r.errors);
+    let styles: Vec<_> = r.automix_styles().collect();
+    assert_eq!(
+        (styles.len(), styles[0].name.as_str(), styles[0].bars),
+        (1, "SLAM", Some(2))
+    );
+    assert_eq!(styles[0].timeline(8.0).at(4.0).crossfader, 1.0);
+}
+
+#[test]
 fn call_sends_the_request_on_stdin_and_reads_the_reply() {
     let d = temp("call");
     let p = plugin(&d, "echo", "read line; printf '{\"got\":%s}' \"$line\"");

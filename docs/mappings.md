@@ -7,6 +7,10 @@ message lights which light. The format is documented at the top of `src/app/midi
 the executable; a file in an earlier folder replaces one of the same name in a later one. When a controller connects, the file whose
 `<port>` is the longest one found inside a MIDI input port name (case-insensitive) is loaded.
 
+A controller that has no mapping here can also be driven by a **controller plugin** (PREFERENCES > CONTROLLER > CONTROLLER PLUGINS):
+the plugin claims the port and our mapping file for it is not read. The bundled `mixxx` plugin runs Mixxx's own `.midi.xml` mappings
+and their scripts on top of the action names of this page; see [`docs/plugins.md`](plugins.md#controller-plugins).
+
 Input callbacks queue messages in order and wake the UI event loop once per pending batch. Each UI turn dispatches at most 256 messages, then yields without dropping or merging controls. The 5 ms timer remains for jog decay and session housekeeping, not as the normal input-delivery clock. Audio buffers and the output device add separate control-to-sound latency.
 
 A controller whose tempo fader moves the tempo the wrong way (the app takes 0 at the fader's top as the + end; some report 1 there) is corrected with PREFERENCES > CONTROLLER > Deck > **Invert hardware tempo fader**. It is independent of PREFERENCES > VIEW > **Tempo fader: + at the bottom**, which only reverses the on-screen fader.

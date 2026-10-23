@@ -2,8 +2,8 @@
 
 use super::Act;
 use crate::app::browser::{
-    App, BrowserState, Home, View,
     sidebar::{self, Entry, Inputs},
+    App, BrowserState, Home, View,
 };
 use openfader::store::{self, NodeKind};
 use slint::{ComponentHandle, StandardListViewItem};
@@ -93,6 +93,8 @@ impl View {
             Entry::TagsRoot => 5,
             Entry::BankRoot => 13,
             Entry::Bank(_) => 14,
+            Entry::StageRoot => 15,
+            Entry::Stage(_) => 16,
             Entry::Category(_) => 6,
             Entry::Tag(_) => 7,
             Entry::Lib(i) => {
@@ -112,6 +114,7 @@ impl View {
             Entry::Tags => Home::Tags,
             Entry::Session => Home::History,
             Entry::Dupes => Home::Dupes,
+            Entry::Health(c) => Home::Health(*c),
             Entry::CueAnalysis => Home::CueAnalysis,
             Entry::User(id) => match self.node(*id).map(|n| n.kind) {
                 Some(NodeKind::Playlist) => Home::User(*id),
@@ -121,6 +124,7 @@ impl View {
             Entry::Day(d) => Home::Day(d.clone()),
             Entry::Tag(id) => Home::Tag(*id),
             Entry::Bank(id) => Home::Bank(*id),
+            Entry::Stage(id) => self.stage_home(*id),
             Entry::Lib(i) if !self.lib_playlists[*i].is_folder => {
                 Home::Playlist(Some(self.lib_playlists[*i].id.clone()))
             }
@@ -131,6 +135,7 @@ impl View {
     /// What the status line says for an entry that lists no tracks.
     pub(in crate::app::browser) fn entry_hint(&self) -> &'static str {
         match self.entry {
+            Entry::HealthRoot => crate::app::browser::health::root_hint(),
             Entry::UserRoot => {
                 tr!(
                     "My Playlists: + NEW makes a playlist, folder or smart playlist; ADD TO PLAYLIST puts the chosen track in a playlist"
@@ -138,6 +143,11 @@ impl View {
             }
             Entry::HistoryRoot => {
                 tr!("History: tracks that stayed on air for 60 s, one list per day")
+            }
+            Entry::StageRoot => {
+                tr!(
+                    "Stages: new music from the watched folders waits in INBOX; drag a track onto the next stage or use MORE; + NEW adds a stage before COLLECTION"
+                )
             }
             Entry::BankRoot => {
                 tr!(
@@ -172,6 +182,7 @@ impl View {
         self.cats = self.ok(app, store.mytag_categories(), Vec::new());
         self.mytags = self.ok(app, store.mytags(), Vec::new());
         self.banks = self.ok(app, store.banks(), Vec::new());
+        self.read_stages(app);
         let days = self.ok(app, store.history_days(), Vec::new());
         let days: Vec<(String, usize)> = days
             .into_iter()
@@ -191,7 +202,8 @@ impl View {
         } else {
             None
         };
-        let (entries, labels) = sidebar::build(&Inputs {
+        let stage_rows = self.stage_rows();
+        let (mut entries, mut labels) = sidebar::build(&Inputs {
             tag_list: self.tags.len(),
             session: self.history.len(),
             lib: &self.lib_playlists,
@@ -203,7 +215,9 @@ impl View {
             all_tracks,
             cue_analysis,
             banks: banks_on.then_some(&self.banks[..]),
+            stages: &stage_rows,
         });
+        self.health_insert(&mut entries, &mut labels);
         self.entries = entries;
         self.sidebar.set_vec(
             labels
@@ -226,6 +240,9 @@ impl View {
     pub(in crate::app::browser) fn select(&mut self, app: &App, row: usize) {
         if let Some(e) = self.entries.get(row).cloned() {
             self.entry = e;
+            if self.entry == Entry::HealthRoot {
+                self.health.rescan();
+            }
             if let Entry::Source(i) = self.entry {
                 self.open_source(app, i);
             }
@@ -263,6 +280,8 @@ impl View {
             Entry::Tags => "Tag List".to_owned(),
             Entry::Session => "Session history".to_owned(),
             Entry::Dupes => "Duplicate tracks".to_owned(),
+            Entry::HealthRoot => "Library health".to_owned(),
+            Entry::Health(c) => c.label().to_owned(),
             Entry::CueAnalysis => "CUE Analysis".to_owned(),
             _ => "Tracks".to_owned(),
         }

@@ -34,32 +34,13 @@ pub struct Plan {
     pub fade_ms: f64,
 }
 
-/// Fade state at progress `x` (0 = fade start, 1 = done).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Mix {
-    /// Crossfader travel from the outgoing deck (0) to the incoming one (1).
-    pub travel: f32,
-    /// Bass swap: the incoming LOW band stays cut until halfway, then the outgoing one is cut.
-    pub low_cut_in: bool,
-    pub low_cut_out: bool,
-}
-
-pub fn mix_at(x: f64) -> Mix {
-    let x = x.clamp(0.0, 1.0);
-    Mix {
-        travel: x as f32,
-        low_cut_in: x < 0.5,
-        low_cut_out: x >= 0.5,
-    }
-}
-
 /// Beat number (fractional index) of the first downbeat.
 fn first_downbeat(beats: &[Beat]) -> f64 {
     beats.iter().position(|b| b.bar_pos == 1).unwrap_or(0) as f64
 }
 
 /// Where the incoming track enters: first phrase start, else first downbeat.
-fn anchor(a: &Analysis) -> Option<f64> {
+pub(super) fn anchor(a: &Analysis) -> Option<f64> {
     match a.phrases.as_ref().and_then(|p| p.list.first()) {
         Some(p) => Some(p.span_ms(&a.beats).0),
         None => ms_at(&a.beats, first_downbeat(&a.beats)),
@@ -116,10 +97,13 @@ pub fn plan(
     })
 }
 
-/// Playback rate that makes `inc` run at `out`'s effective tempo (`out` at `rate_out`); half or double
-/// time when that is closer to 1. `None` without a grid or outside 0.5 to 2×.
-pub fn rate_for(out: &[Beat], rate_out: f64, inc: &[Beat]) -> Option<f64> {
-    let r = grid_bpm(out)? * rate_out / grid_bpm(inc)?;
+/// Playback rate that makes a deck at tempo `inc_bpm` run at `out_bpm × rate_out`; half or double time when that is closer
+/// to 1. `None` without either tempo or outside 0.5 to 2×.
+pub fn rate_for(out_bpm: f64, rate_out: f64, inc_bpm: f64) -> Option<f64> {
+    if out_bpm <= 0.0 || inc_bpm <= 0.0 {
+        return None;
+    }
+    let r = out_bpm * rate_out / inc_bpm;
     [r, r / 2.0, r * 2.0]
         .into_iter()
         .filter(|r| (0.5..=2.0).contains(r))
@@ -269,59 +253,10 @@ mod tests {
 
     #[test]
     fn tempo_matches_with_half_or_double_time_and_the_player_range() {
-        let g = |bpm_x100: u16| {
-            vec![
-                Beat {
-                    bar_pos: 1,
-                    bpm_x100,
-                    time_ms: 0,
-                },
-                Beat {
-                    bar_pos: 2,
-                    bpm_x100,
-                    time_ms: 400,
-                },
-            ]
-        };
-        assert!((rate_for(&g(12800), 1.0, &g(12000)).unwrap() - 128.0 / 120.0).abs() < 1e-9);
-        assert!((rate_for(&g(12800), 1.04, &g(12800)).unwrap() - 1.04).abs() < 1e-9); // follows the outgoing deck's tempo fader
-        assert!((rate_for(&g(17000), 1.0, &g(8500)).unwrap() - 1.0).abs() < 1e-9); // 170 vs 85 BPM: run in double time
-        assert!(rate_for(&g(12800), 1.0, &[]).is_none() && rate_for(&[], 1.0, &g(12800)).is_none());
-    }
-
-    #[test]
-    fn fade_runs_the_crossfader_across_and_swaps_the_bass_at_the_middle() {
-        assert_eq!(
-            mix_at(0.0),
-            Mix {
-                travel: 0.0,
-                low_cut_in: true,
-                low_cut_out: false
-            }
-        );
-        assert_eq!(
-            mix_at(0.49),
-            Mix {
-                travel: 0.49,
-                low_cut_in: true,
-                low_cut_out: false
-            }
-        );
-        assert_eq!(
-            mix_at(0.5),
-            Mix {
-                travel: 0.5,
-                low_cut_in: false,
-                low_cut_out: true
-            }
-        );
-        assert_eq!(mix_at(1.0).travel, 1.0);
-        assert_eq!((mix_at(-1.0).travel, mix_at(2.0).travel), (0.0, 1.0));
-        // never both cut, never neither (bass is always carried by exactly one deck)
-        for i in 0..=100 {
-            let m = mix_at(i as f64 / 100.0);
-            assert!(m.low_cut_in != m.low_cut_out);
-        }
+        assert!((rate_for(128.0, 1.0, 120.0).unwrap() - 128.0 / 120.0).abs() < 1e-9);
+        assert!((rate_for(128.0, 1.04, 128.0).unwrap() - 1.04).abs() < 1e-9); // follows the outgoing deck's tempo fader
+        assert!((rate_for(170.0, 1.0, 85.0).unwrap() - 1.0).abs() < 1e-9); // 170 vs 85 BPM: run in double time
+        assert!(rate_for(128.0, 1.0, 0.0).is_none() && rate_for(0.0, 1.0, 128.0).is_none());
     }
 
     #[test]

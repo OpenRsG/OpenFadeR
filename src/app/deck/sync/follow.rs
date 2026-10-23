@@ -16,7 +16,7 @@ impl Deck {
         let (own, theirs) = (self.loaded.borrow(), peer.loaded.borrow());
         let (their_pos, their_playing) = peer.clock(&theirs);
         let phase = self
-            .tempo_target(&own.analysis.beats, &theirs.analysis.beats, peer.rate.get())
+            .tempo_target(&own, &peer, &theirs)
             .filter(|(_, _, k)| loop_preserves_phase(&theirs.analysis.beats, theirs.loop_, *k))
             .and_then(|(_, _, k)| wait_phase(&theirs.analysis.beats, their_pos, k));
         drop((own, theirs));
@@ -59,7 +59,7 @@ impl Deck {
         let (own_pos, _) = self.clock(&own);
         let (their_pos, their_playing) = peer.clock(&theirs);
         let (ob, tb) = (&own.analysis.beats[..], &theirs.analysis.beats[..]);
-        let Some((g, rate, k)) = self.tempo_target(ob, tb, peer.rate.get()) else {
+        let Some((g, rate, k)) = self.tempo_target(&own, &peer, &theirs) else {
             drop((own, theirs));
             return self.stop_following();
         };

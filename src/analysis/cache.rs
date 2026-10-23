@@ -14,9 +14,9 @@
 //! [`migrate`] moves those of the Collection's tracks here once.
 
 use super::{
-    Analysis, Beat,
     detect::VocalRegion,
     options::{self, Options, Profile},
+    Analysis, Beat,
 };
 use crate::{audio::Frames, library::Track, paths::at, store};
 use std::path::{Path, PathBuf};
@@ -244,6 +244,64 @@ fn data_dir() -> Result<PathBuf, String> {
 /// ignored (report it, then recompute and [`store`] over it).
 pub fn load(t: &Track) -> Result<Option<Analysis>, String> {
     Ok(load_from(&data_dir()?, t)?.map(|x| x.0))
+}
+
+/// What a stored analysis says about its track: the tempo of the first beat (0 = the analysis found no beats) and the key.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Glance {
+    pub bpm_x100: i64,
+    pub key: Option<String>,
+}
+
+/// Bytes of an entry up to its first beat: magic, version, size, profile, key (at most 255 bytes), beat count, first beat.
+const PEEK: usize = 4 + 4 + 8 + 8 + 1 + 255 + 4 + 8;
+
+/// The audio size an entry was made for and its [`Glance`], from the first [`PEEK`] bytes of it.
+fn peek(b: &[u8]) -> Result<(u64, Glance), String> {
+    let mut c = Cur(b);
+    if c.take(4)? != MAGIC {
+        return Err("not an analysis cache file".into());
+    }
+    let v = c.u32()?;
+    if v != VERSION {
+        return Err(format!("cache version {v}, expected {VERSION}"));
+    }
+    let size = c.u64()?;
+    c.u64()?; // the profile
+    let n = c.take(1)?[0] as usize;
+    let key = std::str::from_utf8(c.take(n)?).map_err(|_| "bad key text")?;
+    let bpm_x100 = if c.u32()? > 0 {
+        let first = c.take(8)?; // bar_pos u16, bpm_x100 u16, time_ms u32
+        i64::from(u16::from_le_bytes([first[2], first[3]]))
+    } else {
+        0
+    };
+    Ok((
+        size,
+        Glance {
+            bpm_x100,
+            key: (n > 0).then(|| key.to_owned()),
+        },
+    ))
+}
+
+/// [`load`] for a bulk scan: whether `t` has an up-to-date entry in the analysis cache, and what it says, without reading the
+/// whole entry. `None`: not analysed (no entry, a stale or old one, an unreadable one).
+pub fn glance(t: &Track) -> Option<Glance> {
+    glance_from(&data_dir().ok()?, t)
+}
+
+fn glance_from(dir: &Path, t: &Track) -> Option<Glance> {
+    use std::io::Read;
+    let size = audio_size(t).ok()?;
+    let mut head = Vec::with_capacity(PEEK);
+    std::fs::File::open(dir.join(file_name(t)))
+        .ok()?
+        .take(PEEK as u64)
+        .read_to_end(&mut head)
+        .ok()?;
+    let (made_for, g) = peek(&head).ok()?;
+    (made_for == size).then_some(g)
 }
 
 /// The vocal regions the analysis cache holds for `t` ([`super::detect::vocal_regions`], an inferred heuristic);
@@ -604,6 +662,32 @@ mod tests {
         // A changed file (size) makes the entry stale, not an error.
         std::fs::write(t2.file.as_ref().unwrap(), b"audio, edited").unwrap();
         assert!(load_from(&dir, &t2).unwrap().is_none());
+        std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_glance_reads_the_first_tempo_and_key_and_only_of_a_current_entry() {
+        let (dir, t) = fixture("glance");
+        assert_eq!(glance_from(&dir, &t), None, "no entry: not analysed");
+        store_in(&dir, &t, &sample(), profile()).unwrap();
+        let want = Glance {
+            bpm_x100: 12800,
+            key: Some("8A".into()),
+        };
+        assert_eq!(glance_from(&dir, &t), Some(want));
+        let bare = Analysis {
+            beats: vec![],
+            key: None,
+            ..sample()
+        };
+        store_in(&dir, &t, &bare, profile()).unwrap();
+        let g = glance_from(&dir, &t).unwrap();
+        assert_eq!((g.bpm_x100, g.key), (0, None), "analysed, but no beats and no key");
+        std::fs::write(dir.join(file_name(&t)), b"junk").unwrap();
+        assert_eq!(glance_from(&dir, &t), None, "an unreadable entry is not an analysis");
+        store_in(&dir, &t, &sample(), profile()).unwrap();
+        std::fs::write(t.file.as_ref().unwrap(), b"audio, edited").unwrap();
+        assert_eq!(glance_from(&dir, &t), None, "the audio changed since");
         std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
     }
 

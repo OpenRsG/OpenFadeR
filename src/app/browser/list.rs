@@ -32,7 +32,9 @@ impl View {
             (None, Home::Day(day)) => self.day_list(day),
             (None, Home::Tag(id)) => self.mytag_list(*id),
             (None, Home::Dupes) => self.dupes_list(),
+            (None, Home::Health(c)) => self.health_list(*c),
             (None, Home::Bank(id)) => self.bank_list(*id),
+            (None, Home::Stage(id)) => self.store.stage_tracks(*id),
             (None, Home::CueAnalysis) => self.cue_analysis_list(),
             (None, Home::Source(s, id)) => self
                 .sources
@@ -48,6 +50,7 @@ impl View {
         state.set_tag_view(editing && matches!(home, Home::Tags));
         state.set_user_view(editing && matches!(home, Home::User(_) | Home::Bank(_)));
         state.set_history_view(editing && matches!(home, Home::History | Home::Day(_)));
+        state.set_health_view(editing && matches!(home, Home::Health(_)));
         state.set_remote_search(self.search_entry().is_some());
         match list {
             Ok(list) => {
@@ -91,6 +94,7 @@ impl View {
         self.shown = shown;
         if self.rows.update(&self.shown, look, self.reference.clone()) {
             self.strips.reset(app, self.shown.len());
+            self.covers.reset(app, self.shown.len());
         }
         let state = app.global::<BrowserState>();
         // The selection follows the track, not the row index.
@@ -108,11 +112,17 @@ impl View {
                 "{} of 8 banks, A first · MORE adds a cue from a deck or the chosen track, loads the list onto a deck",
                 self.list.len()
             ),
+            (None, Home::Stage(_), _) => tr!(
+                "{} of {} tracks waiting · drag one onto the next stage, or MORE moves the chosen or all shown tracks",
+                self.shown.len(),
+                self.list.len()
+            ),
             (None, Home::Dupes, _) => tr!(
                 "{} tracks share title, artist and length (±1 s) with another one, in {} groups",
                 self.list.len(),
                 self.dupe_groups
             ),
+            (None, Home::Health(c), _) => self.health_status(*c),
             (None, ..) => tr!("{} of {} tracks", self.shown.len(), self.list.len()),
         };
         if self.filter.ignored(&self.reference) {

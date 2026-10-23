@@ -66,10 +66,7 @@ impl Steps for Deck {
     }
 
     fn loop_off(&self) {
-        let active = self.loaded.borrow().loop_.is_some();
-        if active {
-            self.reloop(); // with a loop active RELOOP exits it
-        }
+        Deck::loop_off(self);
     }
 }
 

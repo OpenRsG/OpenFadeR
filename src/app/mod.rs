@@ -12,7 +12,8 @@
 //! VIDEO ([`video`]) full-window views; [`split`] opens the browser in a window of its own (split screen, status bar / View menu);
 //! [`skin`] restyles the `Theme` global of every window from skin files (VIEW > Color > Skin, applied by [`prefs`]);
 //! [`plugins`] is the Plugins menu and what plugin actions answer with (the plugin track sources join the library in [`run`]);
-//! [`about`] is Help > About; [`welcome`] the first-start window (also Help > Welcome); [`stems_model`] the STEMS model download.
+//! [`about`] is Help > About; [`diag`] Help > Report a Problem (with the crash offer at start); [`welcome`] the first-start window (also Help > Welcome); [`stems_model`] the STEMS model download;
+//! [`update`] the update check and one-click update (Help > Check for Updates).
 
 /// Wires one callback of a Slint global: `on!(state, owner, on_x, |o, args..| body)` moves a clone of `owner` into the
 /// closure and binds it as `o`. The first word of the owner picks a variant:
@@ -60,6 +61,7 @@ fn gain(v: f32) -> f32 {
 pub mod i18n;
 mod about;
 mod analyze;
+mod artwork;
 mod automix;
 mod browser;
 mod camelot;
@@ -67,6 +69,7 @@ mod catalog;
 mod connect;
 mod deck;
 mod device;
+mod diag;
 mod drop;
 mod edit;
 mod exportmode;
@@ -87,8 +90,10 @@ mod sampler;
 mod skin;
 mod split;
 mod stems_model;
+mod studio;
 mod toast;
 mod trackinfo;
+mod update;
 mod video;
 mod welcome;
 
@@ -98,11 +103,24 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 /// Set by [`restart`]: `main` starts the app again once the window has closed.
 static RESTART: AtomicBool = AtomicBool::new(false);
+static RESTART_EXE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
 /// Closes the window and has `main` start the app again (plugin manager: RESTART NOW).
 pub fn restart() {
     RESTART.store(true, Ordering::Relaxed);
     let _ = slint::quit_event_loop();
+}
+
+/// [`restart`] into `exe` rather than the running executable: an update moved the install, so what the OS reports as the
+/// running executable is its `.prev` copy.
+pub fn restart_as(exe: PathBuf) {
+    let _ = RESTART_EXE.set(exe);
+    restart();
+}
+
+/// The executable [`restart_as`] chose.
+pub fn restart_exe() -> Option<&'static PathBuf> {
+    RESTART_EXE.get()
 }
 
 /// Whether the app asked to be started again ([`restart`]).
@@ -145,7 +163,9 @@ pub fn run(
         }
     });
     stems_model::wire(&app);
+    update::wire(&app); // the update check (a setting, read after prefs::wire) and Help > Check for Updates
     let _skin = skin::wire(&app); // PREFS > THEMES and the skin folder watcher; the guard holds the watcher's timer
+    let _studio = studio::wire(&app); // the studio workspace's clock; the timer lives until the window closes
     catalog::wire(&app); // GET PLUGINS / THEMES / MAPPINGS; before the controller session, which asks it about a controller with no mapping
                          // plugin effects join every FX unit, so they load before the engine makes its units; the count is what the smoke test reads
     let r = openfader::plugin::registry();
@@ -155,6 +175,7 @@ pub fn run(
         r.plugins.len()
     );
     prefs::audio::wire(); // hands the AUDIO settings to the engine before the decks open the output
+    let _diag = diag::wire(&app); // Help > Report a Problem and the crash offer; the guard holds the timer that reads the audio facts
     let lib: Rc<dyn Library> = openfader::plugin::source::wrap(inner, plugins::notify(&app)).into(); // plugin sources join the tree, outside the store's overlay
     app.set_window_title("OpenFadeR".into());
     let selected = Rc::new(RefCell::new(None));
@@ -182,6 +203,7 @@ pub fn run(
     let _analyzer = analyze::wire(&app, lib.clone()); // dropping it cancels the worker: lives until the window closes
     connect::wire(&app); // live sync of the connected libraries; after the browser, which it asks to reload
     app.run()?;
+    update::quit(); // a clean exit shows that the version just installed starts
     openfader::plugin::event::fire("app_quit", serde_json::json!({}));
     openfader::plugin::process::stop_all(); // closes their stdin, kills what has not exited within a second
     Ok(())

@@ -108,7 +108,7 @@ impl Strips {
 }
 
 #[derive(Default)]
-struct StripRows {
+pub(super) struct StripRows {
     count: Cell<usize>,
     images: RefCell<HashMap<usize, Image>>,
     generation: Cell<i32>,
@@ -116,7 +116,7 @@ struct StripRows {
 }
 
 impl StripRows {
-    fn reset(&self, rows: usize) -> i32 {
+    pub(super) fn reset(&self, rows: usize) -> i32 {
         self.images.borrow_mut().clear();
         self.count.set(rows);
         let generation = self.generation.get().wrapping_add(1);

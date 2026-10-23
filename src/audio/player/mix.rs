@@ -23,14 +23,14 @@
 //! channel state is read through atomics and `try_lock`s ([`render`]), the clock through `try_lock` too.
 
 use super::super::bus::{self, Bus, Params};
-use super::super::route::{self, EXTERNAL, Plan};
-use super::super::{Ring, fx, merge, metronome, mic, preview, sampler};
+use super::super::route::{self, Plan, EXTERNAL};
+use super::super::{auxin, fx, merge, metronome, mic, preview, sampler, Ring};
 use super::engine::SLOTS;
 use super::{Anchor, Shared, Voice, gain_at, render};
 use cpal::{FromSample, SizedSample};
 use openfader_plugin::Slot;
-use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 type Frame = ([f32; 2], [f32; 2]);
@@ -42,9 +42,10 @@ pub(super) struct Mix {
     bus: Arc<Bus>,
     /// Master gain, headphone gain and headphone mix at the end of the last buffer (ramped like the channel gains).
     applied: [f32; 3],
-    /// Per channel and frame: (master path, cue path). Grows once to the largest buffer seen.
+    /// Per channel and frame: (master path, cue path), the four decks then the AUX channel ([`bus::AUX`]). Grows once to the
+    /// largest buffer seen.
     /// ponytail: that first growth allocates on the audio thread; preallocate if drivers resize buffers mid-run.
-    buf: [Vec<Frame>; SLOTS],
+    buf: [Vec<Frame>; SLOTS + 1],
     /// Headphone ring of the second device, if one is open.
     cue: Option<Arc<Ring>>,
     /// Which device channels carry what.
@@ -71,6 +72,8 @@ pub(super) struct Mix {
     preview: preview::Voice,
     /// Microphone ([`mic`]): added to the summed master after the sampler, ducking the rest while it talks.
     mic: mic::Voice,
+    /// AUX / LINE channel ([`auxin`]): rendered into `buf`'s last channel before the Beat FX, ducking the decks while it plays.
+    aux: auxin::Voice,
     /// SEND FX rack ([`Slot::Send`]): fed by the channels' send knobs, its return joins channel A's master path.
     send: fx::Unit,
     /// LEVER FX rack ([`Slot::Lever`]) on the master sum.
@@ -227,6 +230,7 @@ impl Mix {
             metro,
             preview,
             mic,
+            aux,
             send,
             lever,
             silent,
@@ -236,6 +240,9 @@ impl Mix {
             side.resize(n, ([0.0; 2], [0.0; 2]));
         }
         let mut hits = [metronome::Hits::NONE; SLOTS];
+        if buf[bus::AUX].len() < n {
+            buf[bus::AUX].resize(n, ([0.0; 2], [0.0; 2]));
+        }
         for k in 0..SLOTS {
             if buf[k].len() < n {
                 buf[k].resize(n, ([0.0; 2], [0.0; 2]));
@@ -278,6 +285,14 @@ impl Mix {
             );
         }
         let external = plan.external;
+        {
+            let (decks, rest) = buf.split_at_mut(bus::AUX);
+            if external {
+                rest[0][..n].fill(([0.0; 2], [0.0; 2])); // nothing is mixed in External mode
+            } else {
+                aux.render(&bus.aux, dev_rate, decks, &mut rest[0][..n], n);
+            }
+        }
         if !external {
             for (u, c) in fx.as_flattened_mut().iter_mut().zip(bus.fx.as_flattened()) {
                 u.apply(c, buf, n);
@@ -384,7 +399,7 @@ impl Mix {
             shared: shared.clone(),
             bus: bus.clone(),
             applied: [target.master, target.headphone, target.mix], // continue from the knobs, no ramp from the defaults after a device switch
-            buf: [(); SLOTS].map(|_| Vec::with_capacity(4096)),
+            buf: [(); SLOTS + 1].map(|_| Vec::with_capacity(4096)),
             cue,
             plan,
             frame: vec![0.0; ch],
@@ -398,6 +413,7 @@ impl Mix {
             metro: [(); SLOTS].map(|_| metronome::Voice::default()),
             preview: preview::Voice::new(),
             mic: mic::Voice::new(rate),
+            aux: auxin::Voice::new(),
             send: fx::Unit::rack(Slot::Send, rate),
             lever: fx::Unit::rack(Slot::Lever, rate),
             silent: false,
@@ -944,5 +960,123 @@ mod tests {
             step < 0.05,
             "HP MIX 0 -> 1 steps the headphone feed by {step} in one frame"
         );
+    }
+
+    /// A stereo `Mix` over a bus with its own AUX controls (the process-wide ones are shared by every test).
+    fn aux_rig() -> (Arc<Bus>, Mix, Arc<auxin::Controls>) {
+        let shared = [(); SLOTS].map(|_| Arc::new(Shared::new()));
+        let mut bus = Bus::new(44100, bus::Headphones::Split);
+        let aux = Arc::new(auxin::Controls::new());
+        aux.tap.set_rate(44100);
+        bus.aux = aux.clone();
+        let bus = Arc::new(bus);
+        let mix = Mix::new(44100, 2, Plan::stereo(), None, &shared, &bus);
+        (bus, mix, aux)
+    }
+
+    /// `buffers` output buffers of 512 frames with `aux_in` waiting in the AUX ring for each; the left output of all of them.
+    fn aux_run(mix: &mut Mix, aux: &auxin::Controls, aux_in: f32, buffers: usize) -> Vec<f32> {
+        let (mut out, mut left) = (vec![0f32; 2 * 512], vec![]);
+        for _ in 0..buffers {
+            for _ in 0..512 {
+                aux.tap.ring.push([aux_in; 2]);
+            }
+            let (at, latency) = (Instant::now(), Duration::from_millis(10));
+            mix.fill(&mut out, 44100, 2, at, latency);
+            left.extend(out.iter().step_by(2));
+            std::thread::sleep(Duration::from_millis(1)); // a Beat FX stage is built on its worker
+        }
+        left
+    }
+
+    #[test]
+    fn the_aux_input_reaches_the_output_through_its_level_and_the_master() {
+        let (bus, mut mix, aux) = aux_rig();
+        aux.set_on(true);
+        aux.set_strip(1.0, [0.0; 3], 0.0, 0.5);
+        let left = aux_run(&mut mix, &aux, 0.4, 12);
+        assert!(!mix.silent);
+        let end = left[left.len() - 1];
+        assert!(
+            (end - 0.2).abs() < 1e-3,
+            "0.4 in at LEVEL 0.5 is 0.2 out: {end}"
+        );
+        assert!((bus.master_level() - 0.2).abs() < 1e-3, "the master meter");
+        bus.set_master(0.5);
+        let left = aux_run(&mut mix, &aux, 0.4, 12);
+        let end = left[left.len() - 1];
+        assert!((end - 0.1).abs() < 1e-3, "the master gain applies: {end}");
+        aux.set_on(false);
+        let left = aux_run(&mut mix, &aux, 0.4, 12);
+        assert!(
+            left[left.len() - 512..].iter().all(|&s| s == 0.0),
+            "ON off: silent"
+        );
+        assert!(mix.silent, "and the silent path is back");
+    }
+
+    #[test]
+    fn the_aux_cue_reaches_the_headphone_side_of_split() {
+        let (bus, mut mix, aux) = aux_rig();
+        bus.set_split(true); // left = mono cue, right = mono master
+        aux.set_on(true);
+        aux.set_strip(1.0, [0.0; 3], 0.0, 0.0); // LEVEL down: nothing on the master
+        let left = aux_run(&mut mix, &aux, 0.4, 12);
+        assert!(
+            left.iter().all(|&s| s == 0.0),
+            "CUE off: nothing in the headphones"
+        );
+        aux.set_cue(true);
+        let left = aux_run(&mut mix, &aux, 0.4, 12);
+        let end = left[left.len() - 1];
+        assert!(
+            (end - 0.4).abs() < 1e-3,
+            "CUE on: the pre-level signal, mono: {end}"
+        );
+        assert_eq!(bus.master_level(), 0.0, "the master stays silent");
+    }
+
+    #[test]
+    fn a_beat_fx_assigned_to_aux_gates_the_aux_in_the_mix() {
+        let (bus, mut mix, aux) = aux_rig();
+        aux.set_on(true);
+        aux.set_strip(1.0, [0.0; 3], 0.0, 1.0);
+        let c = &bus.fx[0][0];
+        c.set_effect(fx::Effect::Trans);
+        c.set_beat(2);
+        c.set_level(1.0);
+        c.set_assign(fx::Assign::Aux);
+        c.set_on(true);
+        let seen = aux_run(&mut mix, &aux, 0.4, 200);
+        let (lo, hi) = seen[seen.len() / 2..]
+            .iter()
+            .fold((f32::MAX, 0f32), |(lo, hi), &s| (lo.min(s), hi.max(s)));
+        assert!(
+            lo < 0.05 && hi > 0.3,
+            "the gate opens and shuts on the AUX: {lo} .. {hi}"
+        );
+    }
+
+    #[test]
+    fn the_aux_strip_and_ducking_allocate_and_destroy_nothing_in_the_callback() {
+        let (_, mut mix, aux) = aux_rig();
+        let mut out = vec![0f32; 1024];
+        let (at, latency) = (Instant::now(), Duration::from_millis(10));
+        for i in 0..80 {
+            aux.set_on(i < 60);
+            aux.set_cue(i % 2 == 0);
+            aux.set_strip(1.2, [-6.0, 3.0, -3.0], -0.4, 0.6);
+            aux.set_duck(0.25, 0.4);
+            for _ in 0..512 {
+                aux.tap.ring.push([0.4; 2]);
+            }
+            let before = (ALLOCS.with(|c| c.get()), DEALLOCS.with(|c| c.get()));
+            mix.fill(&mut out, 44100, 2, at, latency);
+            assert_eq!(
+                (ALLOCS.with(|c| c.get()), DEALLOCS.with(|c| c.get())),
+                before,
+                "AUX strip/ducking touched the allocator"
+            );
+        }
     }
 }

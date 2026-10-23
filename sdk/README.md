@@ -177,3 +177,12 @@ library plugins of `extension/plugin/` (one Cargo workspace; `build.sh` builds t
 
 From C, build the requests and parse the answers with any JSON library; `openfader_plugin.h` has the table layout (`RkLibraryApi`,
 `RkBuf`). One library may export both entry points (effects and a track library). The library is never unloaded while the app runs.
+
+## Controller plugins
+
+`openfader_plugin::controller` is the SDK of **controller plugins**: a native library that claims a MIDI port and drives it through
+the host's controls (`docs/plugins.md`, Controller plugins, has the control table). Implement `ControllerPlugin` (`probe`, `open`) and
+`Controller` (`midi`, `changed`, `timer`, `close`), call `export_controller!`, and use `controller::host` (`get`, `set`, `midi_out`,
+`timer`, `watch`, `takeover`, `label`, `log`, `settings`) inside those calls. The host makes every call from its UI thread, one at a
+time. `openfader_controller_v1() -> *const ControllerApi` is the only exported symbol (`CONTROLLER_ABI` = 1, checked first); the
+plugin's `plugin.json` names the library under `"controller": {"lib": …}`. `extension/plugin/mixxx` is an example.

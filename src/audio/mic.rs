@@ -3,29 +3,24 @@
 //!
 //! The mic is one input pair ([`input::open_into`]) whose frames land in [`Controls`]' tap; the audio thread ([`Voice`])
 //! mixes them into channel A's master path, resampling by linear interpolation when the input device runs at another
-//! rate than the output. Talkover (as hardware mixers do it): while the mic
-//! is louder than [`THRESHOLD`] the other channels are ducked to the talkover level, attack [`ATTACK_S`], release
-//! [`RELEASE_S`]. Normal ducks the whole signal; Advanced only the mid range ([`BAND`] Hz, a difference of two
+//! rate than the output. Talkover (as hardware mixers do it): while the mic is louder than the ducking threshold
+//! ([`super::duck`]) the other channels are ducked to the talkover level, release [`RELEASE_S`]. Normal ducks the whole
+//! signal; Advanced only the mid range ([`BAND`] Hz, a difference of two
 //! one-pole low-passes), so the bass and the highs of the music keep playing under the voice. Not in External mixer mode
 //! (nothing is mixed there). A talkover gain of 1 (0 dB) means no ducking.
 
-use super::{Tap, input};
+use super::duck::{Duck, Rates};
+use super::input::{self, Feed, Keeper};
+use super::Tap;
 use openfader_plugin::Slot;
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering::Relaxed};
 use std::sync::{Arc, LazyLock};
 
-/// Mic loudness (linear peak, after the mic level) above which talkover ducks: -40 dBFS.
-const THRESHOLD: f32 = 0.01;
-/// Seconds to duck / to come back.
-const ATTACK_S: f32 = 0.02;
+/// Seconds the other channels take to come back.
 const RELEASE_S: f32 = 0.4;
-/// Time constant of the loudness follower, seconds.
-const FOLLOW_S: f32 = 0.008;
 /// Mid range ducked by Advanced talkover, Hz.
 const BAND: [f32; 2] = [300.0, 3000.0];
-/// Input frames kept at most (seconds); older ones are dropped so the mic never lags.
-const LAG_S: f64 = 0.1;
 
 /// The mic's knobs and its frames, shared by the Preferences (UI thread) and the callback.
 pub struct Controls {
@@ -69,46 +64,20 @@ pub fn controls() -> Arc<Controls> {
     MIC.clone()
 }
 
-/// What the open stream was opened for, and the last error.
-type Open = (Option<(String, u8, input::Input)>, Option<String>);
-
 thread_local! {
     /// The open input stream (a cpal stream stays on the thread that built it).
-    static OPEN: RefCell<Open> = const { RefCell::new((None, None)) };
+    static OPEN: RefCell<Keeper> = RefCell::new(Keeper::default());
 }
 
 /// Opens (or closes, `on` false) the mic's input pair; a no-op when it already runs for `device` / `pair`. A failure is kept
 /// for [`problem`] and the mic stays off.
 pub fn open(on: bool, device: &str, pair: u8) {
-    OPEN.with_borrow_mut(|(stream, err)| {
-        let c = controls();
-        if !on {
-            *stream = None;
-            *err = None;
-            c.tap.on.store(false, Relaxed);
-            return;
-        }
-        if matches!(stream, Some((d, p, _)) if d == device && *p == pair) {
-            return;
-        }
-        *stream = None;
-        match input::open_into(device, pair, c.tap.clone()) {
-            Ok(i) => {
-                c.tap.on.store(true, Relaxed);
-                *stream = Some((device.to_owned(), pair, i));
-                *err = None;
-            }
-            Err(e) => {
-                c.tap.on.store(false, Relaxed);
-                *err = Some(e);
-            }
-        }
-    });
+    OPEN.with_borrow_mut(|k| k.set(on, device, pair, &controls().tap));
 }
 
 /// Why the mic could not be opened, if it could not.
 pub fn problem() -> Option<String> {
-    OPEN.with_borrow(|(_, e)| e.clone())
+    OPEN.with_borrow(Keeper::problem)
 }
 
 /// One-pole low-pass coefficient for `hz` at `rate`.
@@ -116,21 +85,11 @@ fn pole(hz: f32, rate: f32) -> f32 {
     1.0 - (-std::f32::consts::TAU * hz / rate).exp()
 }
 
-/// One-pole coefficient with time constant `s` seconds at `rate`.
-fn tau(s: f32, rate: f32) -> f32 {
-    1.0 - (-1.0 / (s * rate)).exp()
-}
-
 /// Audio-thread state of the mic.
 pub struct Voice {
-    prev: [f32; 2],
-    cur: [f32; 2],
-    /// Position between `prev` and `cur`, input frames.
-    phase: f64,
-    /// Peak follower of the mic.
-    env: f32,
-    /// Gain of the other channels now (1 = untouched).
-    duck: f32,
+    feed: Feed,
+    /// Talkover: peak follower of the mic and the gain of the other channels.
+    duck: Duck,
     /// Low-pass states of the summed music at [`BAND`]`[1]` and `[0]`, per side.
     hi: [f32; 2],
     lo: [f32; 2],
@@ -145,11 +104,8 @@ impl Voice {
 
     fn with_fx(fx: super::fx::Unit) -> Voice {
         Voice {
-            prev: [0.0; 2],
-            cur: [0.0; 2],
-            phase: 0.0,
-            env: 0.0,
-            duck: 1.0,
+            feed: Feed::default(),
+            duck: Duck::new(),
             hi: [0.0; 2],
             lo: [0.0; 2],
             fx,
@@ -168,40 +124,17 @@ impl Voice {
         self.fx.set(fx.settings());
         let gain = c.gain();
         if gain == 0.0 {
-            self.duck = 1.0;
+            self.duck.reset();
             return;
         }
-        let (rate_f, ring) = (rate as f32, &c.tap.ring);
-        let in_rate = c.tap.rate().max(1) as f64;
-        let step = in_rate / rate as f64;
-        let keep = ((in_rate * LAG_S) as usize).max(n * 2);
-        for _ in 0..ring.len().saturating_sub(keep) {
-            ring.pop();
-        }
+        let step = self.feed.begin(&c.tap, rate, n);
         let (target, advanced) = (c.duck(), c.advanced.load(Relaxed));
-        let (att, rel) = (tau(ATTACK_S, rate_f), tau(RELEASE_S, rate_f));
-        let (a_hi, a_lo) = (pole(BAND[1], rate_f), pole(BAND[0], rate_f));
-        let decay = 1.0 - tau(FOLLOW_S, rate_f);
+        let rates = Rates::new(rate, RELEASE_S);
+        let (a_hi, a_lo) = (pole(BAND[1], rate as f32), pole(BAND[0], rate as f32));
         for i in 0..n {
-            while self.phase >= 1.0 {
-                self.prev = self.cur;
-                self.cur = ring.pop().unwrap_or([0.0; 2]);
-                self.phase -= 1.0;
-            }
-            let t = self.phase as f32;
-            self.phase += step;
-            let dry: [f32; 2] =
-                std::array::from_fn(|k| (self.prev[k] + (self.cur[k] - self.prev[k]) * t) * gain);
+            let dry = self.feed.next(&c.tap, step).map(|x| x * gain);
             let m = self.fx.process(dry); // talkover follows the voice as heard, effect included
-            let peak = m[0].abs().max(m[1].abs());
-            self.env = if peak > self.env {
-                peak
-            } else {
-                self.env * decay
-            };
-            let want = if self.env > THRESHOLD { target } else { 1.0 };
-            self.duck += (want - self.duck) * if want < self.duck { att } else { rel };
-            let cut = 1.0 - self.duck;
+            let cut = 1.0 - self.duck.tick(m[0].abs().max(m[1].abs()), target, &rates);
             for k in 0..2 {
                 let sum: f32 = buf.iter().map(|b| b[i].0[k]).sum();
                 self.hi[k] += (sum - self.hi[k]) * a_hi;

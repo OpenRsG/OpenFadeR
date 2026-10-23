@@ -5,7 +5,7 @@
 //! options so later preference changes cannot alter queued work. Tests use the `*_with` functions without changing
 //! the global.
 
-use super::{Analysis, auto::CueOptions, detect::GridOptions, detect::Mode};
+use super::{auto::CueOptions, detect::GridOptions, detect::Mode, key::Detector, Analysis};
 use std::sync::RwLock;
 
 /// Track Analysis Setting: the parts of an analysis that run; a disabled part is left empty.
@@ -37,6 +37,9 @@ pub struct Options {
     pub parts: Parts,
     pub grid: GridOptions,
     pub cue: CueOptions,
+    /// What the key part runs. The caller sets what can run: a [`Detector::Neural`] whose model is missing is asked as
+    /// [`Detector::Classic`] ([`super::key::neural_ready`]).
+    pub key_detector: Detector,
 }
 
 /// What a stored analysis was made with: which parts it has and (when it has a grid) the grid detector's settings.
@@ -47,6 +50,8 @@ pub struct Profile(pub u64);
 const GRID: u64 = 1;
 const KEY: u64 = 2;
 const VOCAL: u64 = 4;
+/// With KEY: the key came from the neural detector. A result of one detector never answers a request for the other.
+const NEURAL: u64 = 8;
 const PARTS: u64 = 0xff;
 
 impl Options {
@@ -56,9 +61,12 @@ impl Options {
             .iter()
             .filter(|x| x.0)
             .fold(0, |a, x| a | x.1);
+        if p.key && self.key_detector == Detector::Neural {
+            bits |= NEURAL;
+        }
         if p.grid {
             let g = &self.grid;
-            let mode = match g.effective_mode() {
+            let mode = match g.mode {
                 Mode::Normal => 0,
                 Mode::Dynamic => 1,
                 Mode::Auto => 2,
@@ -94,7 +102,9 @@ impl Profile {
     /// the grid detector, it ran it with the same settings.
     pub fn covers(self, want: Profile) -> bool {
         let (have, ask) = (self.0, want.0);
-        ask & PARTS & !have == 0 && (ask >> 8 == 0 || ask >> 8 == have >> 8)
+        ask & PARTS & !have == 0
+            && (ask & KEY == 0 || ask & NEURAL == have & NEURAL)
+            && (ask >> 8 == 0 || ask >> 8 == have >> 8)
     }
 }
 
@@ -165,15 +175,46 @@ mod tests {
             "a request without the grid ignores grid settings"
         );
         assert!(!no_grid.profile().covers(all.profile()));
-        // Auto without high precision is Normal: the same grid
-        let auto = Options {
+        // a grid made without tempo-change detection is not the grid detection would make
+        let steady = Options {
             grid: GridOptions {
-                mode: Mode::Auto,
+                mode: Mode::Normal,
                 ..all.grid
             },
             ..all
         };
-        assert_eq!(auto.profile(), all.profile());
+        assert!(!steady.profile().covers(all.profile()) && !all.profile().covers(steady.profile()));
+    }
+
+    #[test]
+    fn a_key_of_one_detector_never_answers_a_request_for_the_other() {
+        let classic = Options::default();
+        let neural = Options {
+            key_detector: Detector::Neural,
+            ..classic
+        };
+        assert!(!classic.profile().covers(neural.profile()));
+        assert!(!neural.profile().covers(classic.profile()));
+        assert!(neural.profile().covers(neural.profile()));
+        let no_key = Options {
+            parts: Parts {
+                key: false,
+                ..Parts::default()
+            },
+            ..neural
+        };
+        assert_eq!(
+            no_key.profile(),
+            Options {
+                key_detector: Detector::Classic,
+                ..no_key
+            }
+            .profile(),
+            "without the key part the detector is no part of the request"
+        );
+        assert!(
+            classic.profile().covers(no_key.profile()) && neural.profile().covers(no_key.profile())
+        );
     }
 
     #[test]

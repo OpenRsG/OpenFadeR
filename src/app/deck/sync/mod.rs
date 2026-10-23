@@ -22,17 +22,17 @@
 //! [`phase`] (tempo and phase maths, pure), [`master`] (hand-over rules, SYNC / MASTER buttons), [`follow`] (the
 //! per-tick follower).
 //!
-//! ponytail: the grids are read as constant-tempo from the first beat (a variable grid would need the
-//! tempo at the playhead); beat phase only, not bar phase; a master tempo outside 0.5 to 2× of the
-//! follower's grid leaves the follower at its last rate without a message, and its tempo fader free.
+//! Tempo sections: the follower's rate comes from its own section's tempo at its playhead and the master's at the master's,
+//! read again every tick, so a deck follows through a tempo change of either grid (the phase stays on the beat numbers, which
+//! run on through a section change). Beat phase only, not bar phase; a master tempo outside 0.5 to 2× of the follower's
+//! section leaves the follower at its last rate without a message, and its tempo fader free.
 
 mod follow;
 mod master;
 mod phase;
 
-use super::{DECKS, Deck, grid_bpm};
+use super::{DECKS, Deck, Loaded, tempo_at};
 use crate::app::prefs::controller::{Controller, SyncType};
-use openfader::analysis::Beat;
 pub use phase::target;
 use phase::{Fix, align, correct, error_ms, start_ms, wait_phase};
 use std::{
@@ -167,16 +167,12 @@ impl Deck {
         self.is_synced() && self.sync.link.master.get().is_some_and(|m| m != self.index)
     }
 
-    /// Grid tempo, the rate and the multiple `k` of the master's tempo this deck (grid `own`) plays at to follow
-    /// a peer (grid `theirs`, playing at `peer_rate`); `None` without grids or in range.
-    fn tempo_target(
-        &self,
-        own: &[Beat],
-        theirs: &[Beat],
-        peer_rate: f64,
-    ) -> Option<(f64, f64, f64)> {
-        let (g, m) = (grid_bpm(own)?, grid_bpm(theirs)?);
-        let (rate, k) = target(g, m * peer_rate, self.sync.half_double.get())?;
+    /// Section tempo, the rate and the multiple `k` of the master's tempo this deck (`own`) plays at to follow a peer
+    /// (`theirs`, playing at its rate): each tempo is that of the section under its playhead. `None` without grids or in range.
+    fn tempo_target(&self, own: &Loaded, peer: &Deck, theirs: &Loaded) -> Option<(f64, f64, f64)> {
+        let g = tempo_at(&own.analysis.beats, self.clock(own).0)?;
+        let m = tempo_at(&theirs.analysis.beats, peer.clock(theirs).0)?;
+        let (rate, k) = target(g, m * peer.rate.get(), self.sync.half_double.get())?;
         Some((g, rate, k))
     }
 

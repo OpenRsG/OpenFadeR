@@ -1,0 +1,308 @@
+[
+  {
+    "name": "SMOOTH",
+    "steps": [
+      {
+        "at": 0,
+        "over": "100%",
+        "crossfader": 1
+      },
+      {
+        "at": 0,
+        "deck": "in",
+        "low": 0
+      },
+      {
+        "at": "50%",
+        "deck": "in",
+        "low": 0.5
+      },
+      {
+        "at": "50%",
+        "deck": "out",
+        "low": 0
+      }
+    ]
+  },
+  {
+    "name": "BASS SWAP",
+    "steps": [
+      {
+        "at": 0,
+        "over": "12.5%",
+        "crossfader": 0.5
+      },
+      {
+        "at": 0,
+        "deck": "in",
+        "low": 0
+      },
+      {
+        "at": "50%",
+        "deck": "in",
+        "low": 0.5
+      },
+      {
+        "at": "50%",
+        "deck": "out",
+        "low": 0
+      },
+      {
+        "at": "87.5%",
+        "over": "12.5%",
+        "crossfader": 1
+      }
+    ]
+  },
+  {
+    "name": "FILTER",
+    "steps": [
+      {
+        "at": 0,
+        "over": "75%",
+        "deck": "out",
+        "filter": 1
+      },
+      {
+        "at": "25%",
+        "over": "75%",
+        "crossfader": 1
+      },
+      {
+        "at": 0,
+        "deck": "in",
+        "low": 0
+      },
+      {
+        "at": "50%",
+        "deck": "in",
+        "low": 0.5
+      }
+    ]
+  },
+  {
+    "name": "FILTER IN",
+    "steps": [
+      {
+        "at": 0,
+        "deck": "in",
+        "filter": -1
+      },
+      {
+        "at": 0,
+        "over": "70%",
+        "deck": "in",
+        "filter": 0
+      },
+      {
+        "at": 0,
+        "over": "100%",
+        "crossfader": 1
+      },
+      {
+        "at": 0,
+        "deck": "in",
+        "low": 0
+      },
+      {
+        "at": "50%",
+        "deck": "in",
+        "low": 0.5
+      },
+      {
+        "at": "50%",
+        "deck": "out",
+        "low": 0
+      }
+    ]
+  },
+  {
+    "name": "ECHO OUT",
+    "bars": 4,
+    "steps": [
+      {
+        "at": 0,
+        "deck": "out",
+        "fx": {
+          "effect": "echo",
+          "level": 0.6,
+          "beat": 0.5
+        }
+      },
+      {
+        "at": 0,
+        "deck": "in",
+        "low": 0
+      },
+      {
+        "at": 4,
+        "deck": "in",
+        "low": 0.5
+      },
+      {
+        "at": 0.5,
+        "crossfader": 1
+      },
+      {
+        "at": "75%",
+        "deck": "out",
+        "fx": {
+          "on": false
+        }
+      }
+    ]
+  },
+  {
+    "name": "REVERB OUT",
+    "bars": 4,
+    "steps": [
+      {
+        "at": 0,
+        "deck": "out",
+        "fx": {
+          "effect": "reverb",
+          "level": 0.8
+        }
+      },
+      {
+        "at": 0,
+        "deck": "in",
+        "low": 0
+      },
+      {
+        "at": 4,
+        "deck": "in",
+        "low": 0.5
+      },
+      {
+        "at": 1,
+        "crossfader": 1
+      },
+      {
+        "at": "75%",
+        "deck": "out",
+        "fx": {
+          "on": false
+        }
+      }
+    ]
+  },
+  {
+    "name": "CUT",
+    "bars": 1,
+    "steps": [
+      {
+        "at": 0,
+        "crossfader": 1
+      }
+    ]
+  },
+  {
+    "name": "BRAKE",
+    "bars": 2,
+    "steps": [
+      {
+        "at": 0,
+        "deck": "out",
+        "brake": 3
+      },
+      {
+        "at": 1,
+        "over": 3,
+        "crossfader": 1
+      },
+      {
+        "at": 0,
+        "deck": "in",
+        "low": 0
+      },
+      {
+        "at": 4,
+        "deck": "in",
+        "low": 0.5
+      }
+    ]
+  },
+  {
+    "name": "LOOP OUT",
+    "steps": [
+      {
+        "at": 0,
+        "deck": "out",
+        "loop": 4
+      },
+      {
+        "at": 0,
+        "over": "100%",
+        "deck": "out",
+        "filter": -0.7
+      },
+      {
+        "at": 0,
+        "over": "100%",
+        "crossfader": 1
+      },
+      {
+        "at": 0,
+        "deck": "in",
+        "low": 0
+      },
+      {
+        "at": "50%",
+        "deck": "in",
+        "low": 0.5
+      },
+      {
+        "at": "50%",
+        "deck": "out",
+        "low": 0
+      }
+    ]
+  },
+  {
+    "name": "EQ BLEND",
+    "steps": [
+      {
+        "at": 0,
+        "over": "5%",
+        "crossfader": 0.5
+      },
+      {
+        "at": 0,
+        "deck": "in",
+        "low": 0,
+        "mid": 0,
+        "high": 0
+      },
+      {
+        "at": 0,
+        "over": "30%",
+        "deck": "in",
+        "mid": 0.5,
+        "high": 0.5
+      },
+      {
+        "at": "30%",
+        "over": "30%",
+        "deck": "out",
+        "mid": 0,
+        "high": 0
+      },
+      {
+        "at": "70%",
+        "deck": "in",
+        "low": 0.5
+      },
+      {
+        "at": "70%",
+        "deck": "out",
+        "low": 0
+      },
+      {
+        "at": "90%",
+        "over": "10%",
+        "crossfader": 1
+      }
+    ]
+  }
+]

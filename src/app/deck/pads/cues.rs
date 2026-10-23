@@ -60,6 +60,10 @@ impl Deck {
     /// (kept on the beat while playing with Q on, see `quantize`; paused with the HOT CUE gate setting it
     /// plays only while the pad is held, [`Deck::pad_released`]), an empty pad sets a cue at the (quantized) playhead.
     pub(super) fn hot_pad(&self, pad: usize) {
+        crate::app::mixer::note(
+            format!("deck{}.hotcue", self.index + 1),
+            pad_label(pad).to_string(),
+        );
         let mut l = self.loaded.borrow_mut();
         if self.view.borrow().delete_mode {
             if delete_hot(&mut l.analysis.cues, pad) {

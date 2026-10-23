@@ -11,9 +11,9 @@
 //! three pieces of evidence: low-band accent, spectral change from the previous beat, and the start of
 //! the music ([`downbeat`], [`phase_scores`]).
 //!
-//! Tempo changes (Track Analysis Mode; [`dynamic`]): tempo is also estimated per 8 s window. Normal never
-//! tracks: one steady tempo. Dynamic always tracks the beats and merges them into segments of one tempo each.
-//! Auto (needs high precision) tracks when a constant grid does not fit a quarter of the periodic windows.
+//! Tempo changes ([`GridOptions::mode`]; [`dynamic`]): tempo is also estimated per 8 s window. Auto (the default) tracks the
+//! beats and merges them into sections of one tempo each when a constant grid does not fit a quarter of the periodic windows;
+//! a steady track keeps one constant grid. Dynamic always tracks. Normal never does: one steady tempo.
 //!
 //! Measured on the 24-track test USB (tests/detect_usb.rs) with the mid-band kick phase used before: tempo equals the stored
 //! library grid's in 24/24 and every grid is constant, like the stored ones. The first beat landed within 3 ms of a stored
@@ -42,15 +42,15 @@ use super::{FLUX_HZ, PRECISE_FLUX_HZ, hops};
 use crate::analysis::Beat;
 use crate::audio::Frames;
 
-/// Track Analysis Mode.
+/// Whether and when the beats are tracked into tempo sections.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Mode {
     /// One steady tempo and a fixed grid.
-    #[default]
     Normal,
     /// Tempo-varying grid: segments of one tempo each.
     Dynamic,
-    /// Dynamic when the tempo drifts, else Normal; exists only with high precision.
+    /// Dynamic when the tempo drifts or changes, else Normal.
+    #[default]
     Auto,
 }
 
@@ -67,7 +67,7 @@ pub struct GridOptions {
 impl Default for GridOptions {
     fn default() -> Self {
         GridOptions {
-            mode: Mode::Normal,
+            mode: Mode::Auto,
             precision: false,
             bpm_range: (85, 175),
         }
@@ -75,18 +75,9 @@ impl Default for GridOptions {
 }
 
 impl GridOptions {
-    /// Auto exists only with high precision; a stored Auto without it reads as Normal.
-    pub fn effective_mode(&self) -> Mode {
-        if self.mode == Mode::Auto && !self.precision {
-            Mode::Normal
-        } else {
-            self.mode
-        }
-    }
-
     /// Whether the beats are tracked into tempo segments, given whether the windows show drift ([`dynamic::drifts`]).
     fn tracks(&self, drifts: bool) -> bool {
-        match self.effective_mode() {
+        match self.mode {
             Mode::Normal => false,
             Mode::Dynamic => true,
             Mode::Auto => drifts,
@@ -631,7 +622,7 @@ pub(super) fn from_hops_cancellable(
         return None;
     }
 
-    if opt.effective_mode() != Mode::Normal {
+    if opt.mode != Mode::Normal {
         if let Some((times, bpm)) =
             dynamic::tracked(&f, low, &onsets, p, fr, |drifts| opt.tracks(drifts))
         {

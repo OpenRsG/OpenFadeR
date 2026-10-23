@@ -25,6 +25,7 @@ fn kind(m: &Manifest) -> &'static str {
     match &m.library {
         Some(l) if l.device => tr!("LIBRARY + DEVICES"),
         Some(_) => tr!("LIBRARY"),
+        None if m.controller.is_some() => tr!("CONTROLLER"),
         None if m.effects.is_some() => tr!("EFFECTS"),
         None if !m.pad_modes.is_empty() => tr!("PAD MODE"),
         None if !m.knob_modes.is_empty() => tr!("KNOB MODE"),

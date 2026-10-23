@@ -60,7 +60,7 @@ pub fn decode_track16_async(path: PathBuf) -> DecodeJob<(Track16, String)> {
 }
 
 /// Probes `path` for its container (the part of decoding that is cheap).
-fn open_format(path: &Path) -> Result<Box<dyn FormatReader>, String> {
+pub(super) fn open_format(path: &Path) -> Result<Box<dyn FormatReader>, String> {
     let file = crate::paths::at(std::fs::File::open(path), path)?;
     let mut hint = Hint::new();
     if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
@@ -178,7 +178,7 @@ fn open_native(path: &Path) -> Result<Native, String> {
 }
 
 /// The stereo frames of `samples`, `ch` interleaved channels: mono duplicated, channels past the second dropped.
-fn stereo(samples: &[f32], ch: usize) -> impl Iterator<Item = [f32; 2]> {
+pub(super) fn stereo(samples: &[f32], ch: usize) -> impl Iterator<Item = [f32; 2]> {
     samples
         .chunks_exact(ch.max(1))
         .map(move |f| [f[0], f[1.min(ch.saturating_sub(1))]])

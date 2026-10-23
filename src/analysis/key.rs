@@ -12,6 +12,11 @@
 use super::Stft;
 use crate::audio::Frames;
 
+#[cfg(feature = "stems")]
+pub mod cqt;
+#[cfg(feature = "stems")]
+pub mod neural;
+
 /// Krumhansl-Kessler probe-tone ratings, tonic first.
 const KK_MAJOR: [f32; 12] = [
     6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
@@ -182,6 +187,51 @@ pub(crate) fn detect_cancellable<S: Frames + ?Sized>(
     Some(from_chroma(&chroma_cancellable(samples, rate, cancelled)?))
 }
 
+/// Which detector turns audio into a key: [`Detector::Classic`] is the chroma/profile method above, [`Detector::Neural`] a
+/// small convolutional network ([`neural`], needs the `stems` build and its downloaded model).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Detector {
+    #[default]
+    Classic,
+    Neural,
+}
+
+/// Whether [`Detector::Neural`] can run now: this build has ONNX Runtime and the model is in place.
+pub fn neural_ready() -> bool {
+    #[cfg(feature = "stems")]
+    return neural::ready();
+    #[cfg(not(feature = "stems"))]
+    false
+}
+
+/// [`detect_cancellable`] by `detector`; [`Detector::Neural`] without a usable model, or a neural run that fails (the model
+/// cannot be opened or run: logged, and [`neural_ready`] is false from then on), is the classic detector.
+pub(crate) fn detect_by<S: Frames + ?Sized>(
+    detector: Detector,
+    samples: &S,
+    rate: u32,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Option<String>> {
+    #[cfg(feature = "stems")]
+    if detector == Detector::Neural && neural::ready() {
+        match neural::detect_cancellable(samples, rate, cancelled)? {
+            Ok(key) => return Some(key),
+            Err(e) => eprintln!("key: neural detector failed ({e}); using the classic one"),
+        }
+    }
+    let _ = detector;
+    detect_cancellable(samples, rate, cancelled)
+}
+
+/// [`detect`] by `detector` (see [`detect_by`]).
+pub fn detect_with<S: Frames + ?Sized>(
+    detector: Detector,
+    samples: &S,
+    rate: u32,
+) -> Option<String> {
+    detect_by(detector, samples, rate, &|| false).unwrap()
+}
+
 /// A key as `(Camelot number 1..=12, major)`: "A" = minor = `false`, "B" = major = `true`.
 pub type Key = (u8, bool);
 
@@ -308,6 +358,33 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Needs the model (`OPENFADER_KEY_MODEL`, or the downloaded one in the models cache): skipped without it.
+    #[cfg(feature = "stems")]
+    #[test]
+    fn neural_names_the_key_of_synthetic_progressions() {
+        if !neural::present() {
+            eprintln!("skipped: no NEURAL key model (set OPENFADER_KEY_MODEL)");
+            return;
+        }
+        for (tonic, minor, want) in [(0, false, "8B"), (9, true, "8A")] {
+            assert_eq!(
+                detect_with(Detector::Neural, &song(tonic, minor, 0.0), RATE).as_deref(),
+                Some(want),
+                "tonic {tonic} minor {minor}"
+            );
+        }
+        assert_eq!(
+            detect_with(Detector::Neural, &vec![0.0; RATE as usize * 20], RATE),
+            None,
+            "silence has no key"
+        );
+        assert_eq!(
+            detect_by(Detector::Neural, &song(9, true, 0.0), RATE, &|| true),
+            None,
+            "cancelled"
+        );
     }
 
     #[test]

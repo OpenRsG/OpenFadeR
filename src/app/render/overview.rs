@@ -140,6 +140,42 @@ pub fn playhead_x(w: usize, pos_ms: f64, duration_ms: u32) -> i64 {
     axis(w, duration_ms).x(pos_ms).round().clamp(1.0, w as f64) as i64
 }
 
+/// Cached cue and two tiny textures: moving them never copies or uploads the whole overview.
+pub fn composed(
+    base: &Canvas,
+    cue_ms: u32,
+    duration_ms: u32,
+) -> (slint::Image, slint::Image, slint::Image) {
+    let mut c = base.clone();
+    if duration_ms > 0 {
+        let x = axis(c.w, duration_ms).col(cue_ms as f64);
+        let size = (c.h / 3).clamp(3, 8);
+        super::cue_marker(&mut c, x, size);
+    }
+    let (head, ghost) = marker_buffers(c.h);
+    (
+        c.image(),
+        slint::Image::from_rgba8(head),
+        slint::Image::from_rgba8(ghost),
+    )
+}
+
+fn marker_buffers(
+    h: usize,
+) -> (
+    slint::SharedPixelBuffer<slint::Rgba8Pixel>,
+    slint::SharedPixelBuffer<slint::Rgba8Pixel>,
+) {
+    let mut head = slint::SharedPixelBuffer::new(2, h as u32);
+    head.make_mut_slice()
+        .fill(slint::Rgba8Pixel::new(255, 255, 255, 255));
+    let mut ghost = slint::SharedPixelBuffer::new(1, h as u32);
+    for y in (0..h).step_by(2) {
+        ghost.make_mut_slice()[y] = slint::Rgba8Pixel::new(60, 220, 255, 255);
+    }
+    (head, ghost)
+}
+
 /// `slip_ms`: the slip shadow playhead, drawn as a ghost line under the playhead.
 pub fn with_playhead(
     base: &Canvas,

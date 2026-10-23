@@ -1,0 +1,186 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, Dropdown, Icon, IconButton } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { AutomixState, BrowserState } from "../browser-state.slint";
+import { DeckState } from "../deck-state.slint";
+import { MixPointState } from "../mixpoint-state.slint";
+import { PrefsState } from "../prefs-state.slint";
+import { StudioState } from "../studio-state.slint";
+import { Caption, PillTabs } from "parts.slint";
+
+/// The tracks AUTOMIX will play, in order: the visible list from the chosen track on (the rows above it are dimmed). A click on a
+/// row makes it the first one.
+component Queue inherits Rectangle {
+    property <int> start: max(0, BrowserState.current-row);
+    property <length> row-h: 34px;
+    changed start => { list.content-y = min(0px, max(list.height - BrowserState.tracks.length * root.row-h, -root.start * root.row-h)); }
+    background: Theme.bg-deep;
+    border-radius: Theme.studio-radius-ctl;
+    clip: true;
+    list := ListView {
+        for cells[i] in BrowserState.tracks: Rectangle {
+            height: root.row-h;
+            property <bool> next: i == root.start;
+            property <bool> on-deck: cells[0].text != "" && (DeckState.decks[0].title == cells[0].text || DeckState.decks[1].title == cells[0].text);
+            background: next ? Theme.select : ta.has-hover ? Theme.hover-row : transparent;
+            opacity: i < root.start ? 0.45 : 1;
+            Rectangle { x: 0px; width: 3px; background: on-deck ? Theme.accent : transparent; }
+            Text { x: 8px; width: 22px; text: next ? "▶" : "\{i + 1}"; vertical-alignment: center; color: next ? Theme.accent-hi : Theme.text-faint; font-family: Theme.font; font-size: Theme.font-sm; }
+            VerticalLayout {
+                x: 32px;
+                width: parent.width - 38px;
+                alignment: center;
+                Text { text: cells[0].text; overflow: elide; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-size; font-weight: Theme.weight-semi; }
+                Text { text: cells[1].text + (cells[5].text != "" ? " · " + cells[5].text : ""); overflow: elide; color: Theme.row-dim; font-family: Theme.font; font-size: Theme.font-xs; }
+            }
+            ta := TouchArea { clicked => { BrowserState.current-row = i; BrowserState.track-selected(i); } }
+        }
+    }
+    if BrowserState.tracks.length == 0: Text { text: @tr("The list is empty"); horizontal-alignment: center; vertical-alignment: center; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-size; }
+}
+
+/// The AUTOMIX tab: the AUTOMIX and SKIP buttons, the LENGTH of a transition (8, 16 or 32 bars), the mix STYLE (when the build offers
+/// styles) and the queue.
+component AutomixPage inherits VerticalLayout {
+    spacing: Theme.space-lg;
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        Chip {
+            text: AutomixState.running ? @tr("AUTOMIX ON") : @tr("AUTOMIX");
+            height: 32px;
+            font-size: Theme.font-md;
+            active: AutomixState.running;
+            active-color: Theme.play;
+            tooltip: @tr("Play the list from the chosen track on, mixing from one track into the next");
+            clicked => { AutomixState.toggled(); }
+        }
+        Chip { text: @tr("SKIP"); height: 32px; width: 64px; horizontal-stretch: 0; enabled: AutomixState.running; tooltip: @tr("Mix the next track in at the next bar line"); clicked => { AutomixState.skip(); } }
+    }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        Caption { text: @tr("LENGTH"); width: 52px; horizontal-stretch: 0; }
+        Dropdown {
+            options: [@tr("{} BARS", 8), @tr("{} BARS", 16), @tr("{} BARS", 32)];
+            current: AutomixState.bars == 8 ? 0 : AutomixState.bars == 16 ? 1 : 2;
+            chose(n) => { AutomixState.bars = [8, 16, 32][n]; }
+        }
+    }
+    if AutomixState.styles.length > 0: HorizontalLayout {
+        spacing: Theme.space-md;
+        Caption { text: @tr("STYLE"); width: 52px; horizontal-stretch: 0; }
+        Dropdown { options: AutomixState.styles; current: AutomixState.style; chose(n) => { AutomixState.style-chose(n); } }
+    }
+    Text { text: AutomixState.running ? AutomixState.status : ""; height: AutomixState.running ? 14px : 0px; overflow: elide; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; }
+    Queue { vertical-stretch: 1; }
+}
+
+/// The SIDELIST tab: the Tag List, the tracks marked to play later. ADD takes the chosen track, a click chooses a line, a double
+/// click loads it, the bin removes it.
+component SidelistPage inherits VerticalLayout {
+    spacing: Theme.space-lg;
+    Chip { text: @tr("ADD CHOSEN TRACK"); height: 32px; font-size: Theme.font-md; tooltip: @tr("Add the chosen track to the Tag List (T)"); clicked => { BrowserState.tag-add(); } }
+    Rectangle {
+        vertical-stretch: 1;
+        background: Theme.bg-deep;
+        border-radius: Theme.studio-radius-ctl;
+        clip: true;
+        ListView {
+            for line[i] in BrowserState.palette-tracks.length > 0 ? BrowserState.palette-tracks[0] : []: Rectangle {
+                height: 30px;
+                background: ta.has-hover ? Theme.hover-row : transparent;
+                Text { x: 8px; width: parent.width - 40px; text: line; vertical-alignment: center; overflow: elide; color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
+                ta := TouchArea {
+                    clicked => { BrowserState.palette-track-selected(0, i); }
+                    double-clicked => { BrowserState.palette-track-load(0, i); }
+                }
+                IconButton { x: parent.width - self.width - 4px; y: (parent.height - self.height) / 2; width: 24px; height: 24px; icon: Icon.trash; icon-size: 12px; tooltip: @tr("Remove from the list"); clicked => { BrowserState.palette-track-remove(0, i); } }
+            }
+        }
+        if BrowserState.palette-tracks.length == 0 || BrowserState.palette-tracks[0].length == 0: Text {
+            text: @tr("The Tag List is empty");
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            color: Theme.text-faint;
+            font-family: Theme.font;
+            font-size: Theme.font-size;
+        }
+    }
+}
+
+/// The LINKED tab: MIX POINT LINK (the MIX OUT / MIX IN points of two decks, LINK, SILENT) and the related tracks of the chosen
+/// track. Without MIX POINT LINK switched on in PREFERENCES it offers to switch it on.
+component LinkedPage inherits VerticalLayout {
+    spacing: Theme.space-lg;
+    Chip {
+        text: BrowserState.related ? @tr("RELATED TRACKS ON") : @tr("RELATED TRACKS");
+        height: 32px;
+        font-size: Theme.font-md;
+        active: BrowserState.related;
+        tooltip: @tr("The track list shows the tracks that mix with the chosen one: compatible key, BPM within 6%");
+        clicked => { BrowserState.related-toggled(!BrowserState.related); }
+    }
+    if !MixPointState.enabled: VerticalLayout {
+        vertical-stretch: 1;
+        alignment: center;
+        spacing: Theme.space-lg;
+        Text { text: @tr("MIX POINT LINK starts the MIX IN deck by itself at the MIX POINT of the MIX OUT deck."); wrap: word-wrap; horizontal-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; }
+        Chip { text: @tr("SWITCH ON MIX POINT LINK"); height: 32px; clicked => { PrefsState.chose("mix_point_link", 1); } }
+    }
+    if MixPointState.enabled: VerticalLayout {
+        vertical-stretch: 1;
+        spacing: Theme.space-md;
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            for label[i] in [@tr("MIX IN"), @tr("MIX OUT")]: Chip { text: label; active: MixPointState.mode == i; clicked => { MixPointState.set-mode(i); } }
+            Chip { text: @tr("SELECT"); tooltip: @tr("MIX POINT SELECT: the next Hot Cue / memory cue (the current cue without any)"); clicked => { MixPointState.pick-cue(); } }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            for i in 2: Chip {
+                property <int> state: MixPointState.decks[i].state;
+                text: ["A", "B"][i] + (self.state == 0 ? "" : (self.state == 1 || self.state == 3 ? " " + @tr("OUT") : " " + @tr("IN")) + (self.state >= 3 ? "⇄" : ""));
+                active: MixPointState.decks[i].sel-out || MixPointState.decks[i].sel-in;
+                enabled: MixPointState.decks[i].loaded;
+                tooltip: @tr("Choose this deck for the mode, or clear its MIX POINT");
+                clicked => { MixPointState.select-deck(i); }
+            }
+            Chip {
+                text: MixPointState.link-state == 2 ? @tr("LINKED") : @tr("LINK");
+                enabled: MixPointState.link-state != 0;
+                active: MixPointState.link-state == 2;
+                tooltip: @tr("MIX POINT LINK: the MIX IN deck starts by itself at the MIX POINT");
+                clicked => { MixPointState.link(); }
+            }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            Chip { text: @tr("SILENT"); active: MixPointState.silent; tooltip: @tr("SILENT: mute the MIX IN deck from the start of its track to the silent end"); clicked => { MixPointState.silent-toggled(); } }
+            Chip { text: @tr("EDIT"); active: MixPointState.silent-edit; tooltip: @tr("SILENT EDIT: click the MIX IN waveform to move the silent end"); clicked => { MixPointState.silent-edit-toggled(); } }
+        }
+        for t[i] in [MixPointState.out-text, MixPointState.in-text]: HorizontalLayout {
+            height: 22px;
+            spacing: Theme.space-md;
+            Caption { text: [@tr("OUT"), @tr("IN")][i]; width: 30px; horizontal-stretch: 0; }
+            Text { text: t == "" ? @tr("not set") : t; vertical-alignment: center; color: t == "" ? Theme.text-faint : Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
+            if t != "": IconButton { icon: Icon.close; icon-size: 10px; width: 22px; height: 22px; tooltip: @tr("Clear this MIX POINT"); clicked => { MixPointState.clear(i == 0 ? 1 : 0); } }
+        }
+        Rectangle { vertical-stretch: 1; }
+    }
+}
+
+/// The AUTOMIX panel on the right of the library: Automix / Sidelist / Linked tabs.
+export component StudioAutomix inherits Rectangle {
+    property <int> tab;
+    changed tab => { StudioState.linked-open = root.tab == 2; }
+    init => { StudioState.linked-open = false; }
+    background: Theme.panel;
+    border-radius: Theme.studio-radius;
+    VerticalLayout {
+        padding: Theme.studio-gap;
+        spacing: Theme.space-lg;
+        PillTabs { options: [@tr("Automix"), @tr("Sidelist"), @tr("Linked")]; current: root.tab; chose(i) => { root.tab = i; } }
+        if root.tab == 0: AutomixPage { vertical-stretch: 1; }
+        if root.tab == 1: SidelistPage { vertical-stretch: 1; }
+        if root.tab == 2: LinkedPage { vertical-stretch: 1; }
+    }
+}

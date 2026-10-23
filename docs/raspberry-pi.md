@@ -19,6 +19,11 @@ BuildKit cache mounts, so the next build only recompiles what changed.
 To build on the Pi itself, with the menu entry and the `openfader` command, run `./install.sh` from a checkout. On ARM Linux it
 builds without the GPU STEMS engine; a plain `cargo build` needs `--no-default-features --features app` there.
 
+The Pi archive updates itself too: Help > Check for Updates (and the daily check at start) offers a newer release's
+`openfader-<version>-linux-aarch64-pi.tar.gz`, checks its SHA-256 and swaps it in next to the old version (kept in
+`<folder>.prev`). Untick PREFERENCES > ADVANCED > Check for updates to stop the daily request; the update needs no GPU and no
+extra software.
+
 ## What the build changes
 
 - Profile `pi` (`Cargo.toml`): the `dist` profile with whole-program LTO and no symbol table (an 82 MB program instead of 104 MB).
@@ -50,7 +55,41 @@ larger.
 
 ## Speed
 
-With two decks playing, the software renderer drew 62 frames per second using 16 % of one x86_64 core. The `Dockerfile.pi`
+PREFS > VIEW > WAVEFORM > RENDERER selects AUTO (default), GPU or CPU without restarting playback.
+AUTO uses hardware image composition when the window exposes an accelerated graphics API. The startup log reports
+the API and OpenGL `GL_RENDERER`: V3D is hardware, while `llvmpipe` / `softpipe` are CPU emulation and AUTO keeps
+the CPU waveform fallback. GPU explicitly permits emulated GL for diagnosis; it still falls back to CPU when
+the window has no graphics API (for example `winit-software`). This setting does not replace the window's renderer.
+If the log says llvmpipe on a Pi, fix the graphics driver or use `SLINT_BACKEND=winit-software`; forcing GPU does
+not turn an emulated renderer into hardware.
+
+The image-composition path keeps the enlarged strip in a texture and changes its source rectangle, rather than
+moving a three-view-wide item. It also keeps each overview and its cue marker in a texture: the playhead and dashed
+slip ghost are tiny separate textures. The CPU prepares waveform pixels only when the cached strip or overview
+changes (load, zoom, size, palette, grid, cues, loops or stem data), not on each playhead step. The existing detail
+strip cache is retained; no shader duplicates the CPU painter's palette, grid or cue rules.
+
+Measured on x86_64 with an NVIDIA RTX 3090, a private headless Wayland compositor and its Xwayland display,
+at 1500×950, 60 fps selected, with the same two generated four-minute WAVs playing (30-second samples):
+
+| Path | Idle loaded | Both playing |
+|---|---:|---:|
+| Before: cached detail, CPU overview overlays | 1.4% | 31.2% |
+| After: GPU source clipping and cached overview composition | 1.0% | 26.6% |
+
+Percentages are process CPU, where 100% is one core, not GPU usage. The total reduction here was about 15%;
+it is not a Pi measurement or a promise of the same reduction there. The detail strip was already cached before
+this change, so it was not rasterized every frame. A release microbenchmark at 680×50 measured 10.756 µs per CPU
+overview-overlay update versus 0.002 µs for cached marker placement; the latter excludes Slint composition and GPU
+time. CPU fallback with the software renderer remained usable in the two-deck smoke test. Native Wayland and X11
+use the same images and painter; no GL-only waveform shader is required.
+
+For the same scene under Xvfb with `SLINT_BACKEND=winit-software`, CPU fallback measured 29.8% before and 20.2%
+after (idle loaded: 0.9% and 0.6%). These are single-run whole-process samples, including the rest of the UI and
+scheduling variation; they do not isolate the GPU optimization. Forcing GPU on that software renderer correctly
+logged a CPU fallback and kept both decks playing.
+
+An earlier software-renderer measurement with two decks playing drew 62 frames per second using 16 % of one x86_64 core. The `Dockerfile.pi`
 build, run under qemu-user emulation in a container limited to 4 cores and 1 GB, loaded, analysed and played the same two
 tracks at 31 to 34 frames per second; the tracks added 135 MB over idle, as on x86_64 (qemu's own translator adds about
 130 MB, so its totals are not the Pi's). A Pi core is several times slower than an x86_64 one: on a Pi 3, or at 1920×1080,

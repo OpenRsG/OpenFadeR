@@ -3,8 +3,8 @@
 use super::{Action, App, JogMode, Kind, jog, knob, press, rel};
 use crate::app::prefs;
 use crate::app::{
+    mixer::{iso_at, knob_at, AUX_CH},
     BrowserState, DeckState, FxSlot, FxState, GrooveState, KeysState, MixerState,
-    mixer::{iso_at, knob_at},
 };
 use openfader::audio::fx::BEATS;
 use slint::{ComponentHandle, Model};
@@ -229,6 +229,17 @@ pub(super) const TABLE: &[Action] = &[
     knob("master", bus_knob::<0>).read_by(bus_knob_at::<0>),
     knob("hp-mix", bus_knob::<1>).read_by(bus_knob_at::<1>),
     knob("hp-level", bus_knob::<2>).read_by(bus_knob_at::<2>),
+    // The AUX strip (the deck column is ignored): its LEVEL fader, headphone CUE and ON switch.
+    knob("aux-level", |a, _, v| {
+        a.global::<MixerState>().invoke_fader(AUX_CH as i32, v)
+    })
+    .read_by(|a, _| fader_at(a, AUX_CH as i32)),
+    press("aux-cue", |a, _| {
+        a.global::<MixerState>().invoke_cue_toggled(AUX_CH as i32)
+    }),
+    press("aux-on", |a, _| {
+        a.global::<MixerState>().invoke_aux_toggled()
+    }),
     knob("fx-level", |a, u, v| {
         a.global::<FxState>()
             .invoke_level_edited(u, fx_target(a, u), v)

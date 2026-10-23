@@ -238,6 +238,14 @@ impl Deck {
         }
     }
 
+    /// Exits the active loop; nothing without one (RELOOP would re-enter the last).
+    pub(in crate::app) fn loop_off(&self) {
+        let active = self.loaded.borrow().loop_.is_some();
+        if active {
+            self.reloop();
+        }
+    }
+
     pub fn loop_halve(&self) {
         self.resize_loop(
             |beats, lp, _| halve(beats, lp),

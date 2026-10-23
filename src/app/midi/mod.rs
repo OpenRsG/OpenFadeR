@@ -42,8 +42,12 @@
 //! input wakes and jog/housekeeping timer). They add methods to
 //! [`Midi`]; the types they share live here. [`get`] is the way in for the repository catalog
 //! (`app/catalog`): mapping files read, installed into the config folder, and the session opened again with one.
+//!
+//! Controller plugins ([`claim`]): a port that a controller plugin drives (PREFS > CONTROLLER > CONTROLLER PLUGINS) bypasses the
+//! mapping files above. The plugin gets its raw messages and works the same actions through the control namespace of `claim/control.rs`.
 
 mod actions;
+mod claim;
 mod clock;
 mod dump;
 pub mod get;
@@ -83,6 +87,7 @@ use std::{
 type Msg = (u8, u8);
 
 pub use wire::wire;
+pub use claim::ports;
 
 /// PREFS "Use controller audio when connected".
 fn prefs_audio() -> bool {
@@ -336,6 +341,8 @@ struct Midi {
     watcher: RefCell<Option<hotplug::Watcher>>,
     /// The connected controller that has a mapping file, if any ([`session`]).
     link: RefCell<Option<session::Link>>,
+    /// The ports a controller plugin drives instead of our mapping ([`claim`]).
+    claimed: RefCell<claim::Claims>,
     /// The state dump's reply in progress ([`dump`]).
     dump: Cell<Option<dump::Window>>,
     /// The request waiting for the first tick ([`Midi::start_dump`]).

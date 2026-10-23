@@ -10,6 +10,9 @@
 //! touched. Every write rebuilds the file beside the original and renames it over it, keeps the file's permissions,
 //! keeps every other frame / comment, and does nothing when the file already holds the same key. ID3v2.2, unsynchronised,
 //! extended-header and footer tags are refused rather than risk damaging them.
+//!
+//! [`write_cover`] puts a cover picture into the same tags (an ID3v2 `APIC` frame for MP3, WAV and AIFF, a `PICTURE` block for
+//! FLAC) under the same rules; the artwork feature calls it only when "Write fetched artwork into the file's tags" is on.
 
 mod chunked;
 mod flac;
@@ -53,6 +56,34 @@ pub fn write_key(path: &Path, key: &str) -> Result<bool, String> {
         Format::Riff => chunked::write(&b, true, key)?,
         Format::Aiff => chunked::write(&b, false, key)?,
         Format::Flac => flac::write(&b, key)?,
+    };
+    let Some(new) = new_if_changed(&b, new) else {
+        return Ok(false);
+    };
+    replace(path, &new).map(|()| true)
+}
+
+/// Puts `picture` (a JPEG or PNG file's bytes, media type `mime`) into the file's tag as its front cover, replacing the
+/// front cover it had; every other frame, comment and picture stays. `Ok(false)` = the file already had exactly that, `Err` =
+/// the file is not touched (a format without picture support here, an unusual tag, I/O error). MP3, WAV and AIFF carry it in
+/// an ID3v2 `APIC` frame, FLAC in a `PICTURE` block ([`flac`]). Anything else (AAC / M4A) is refused.
+pub fn write_cover(path: &Path, picture: &[u8], mime: &str) -> Result<bool, String> {
+    let format = format_of(path).ok_or_else(|| {
+        format!(
+            "{}: this format has no cover support (MP3, WAV, AIFF and FLAC do)",
+            path.display()
+        )
+    })?;
+    let b = at(fs::read(path), path)?;
+    let new = match format {
+        Format::Mp3 => {
+            let tag = parse_id3(&b)?;
+            let skip = tag.as_ref().map_or(0, |t| t.len);
+            [with_picture(tag, picture, mime), b[skip..].to_vec()].concat()
+        }
+        Format::Riff => chunked::write_with(&b, true, |tag| with_picture(tag, picture, mime))?,
+        Format::Aiff => chunked::write_with(&b, false, |tag| with_picture(tag, picture, mime))?,
+        Format::Flac => flac::write_picture(&b, picture, mime)?,
     };
     let Some(new) = new_if_changed(&b, new) else {
         return Ok(false);
@@ -198,26 +229,66 @@ fn key_of_tag(t: &Id3) -> Option<String> {
 
 /// The tag bytes of `tag` (a new ID3v2.3 tag when `None`) with its `TKEY` set to `key`, every other frame kept.
 fn with_key(tag: Option<Id3>, key: &str) -> Vec<u8> {
+    with_frame(
+        tag,
+        |f| &f.id != b"TKEY",
+        |version| {
+            let body = if key.is_ascii() {
+                [&[0u8][..], key.as_bytes()].concat()
+            } else if version == 4 {
+                [&[3u8][..], key.as_bytes()].concat()
+            } else {
+                [
+                    &[1u8, 0xff, 0xfe][..],
+                    &key.encode_utf16()
+                        .flat_map(u16::to_le_bytes)
+                        .collect::<Vec<u8>>(),
+                ]
+                .concat()
+            };
+            Frame {
+                id: *b"TKEY",
+                flags: [0, 0],
+                body,
+            }
+        },
+    )
+}
+
+/// `APIC` picture type "front cover" (ID3v2 informal standard, attached picture frame).
+const FRONT_COVER: u8 = 3;
+
+/// The picture type of an `APIC` body: encoding byte, media type and a 0 byte, then the type byte.
+fn picture_type(body: &[u8]) -> Option<u8> {
+    let nul = body.get(1..)?.iter().position(|&b| b == 0)?;
+    body.get(nul + 2).copied()
+}
+
+/// The tag bytes of `tag` (a new ID3v2.3 tag when `None`) with `picture` (media type `mime`) as its front cover, every other
+/// frame and picture kept.
+fn with_picture(tag: Option<Id3>, picture: &[u8], mime: &str) -> Vec<u8> {
+    with_frame(
+        tag,
+        |f| !(&f.id == b"APIC" && picture_type(&f.body) == Some(FRONT_COVER)),
+        |_| Frame {
+            id: *b"APIC",
+            flags: [0, 0],
+            // encoding 0 (ISO-8859-1), media type, picture type, empty description
+            body: [&[0u8][..], mime.as_bytes(), &[0, FRONT_COVER, 0], picture].concat(),
+        },
+    )
+}
+
+/// The tag bytes of `tag` (a new ID3v2.3 tag when `None`): the frames `keep` accepts, then the frame `new` makes (given
+/// the tag's version).
+fn with_frame(
+    tag: Option<Id3>,
+    keep: impl Fn(&Frame) -> bool,
+    new: impl FnOnce(u8) -> Frame,
+) -> Vec<u8> {
     let (version, mut frames) = tag.map_or((3, Vec::new()), |t| (t.version, t.frames));
-    frames.retain(|f| &f.id != b"TKEY");
-    let body = if key.is_ascii() {
-        [&[0u8][..], key.as_bytes()].concat()
-    } else if version == 4 {
-        [&[3u8][..], key.as_bytes()].concat()
-    } else {
-        [
-            &[1u8, 0xff, 0xfe][..],
-            &key.encode_utf16()
-                .flat_map(u16::to_le_bytes)
-                .collect::<Vec<u8>>(),
-        ]
-        .concat()
-    };
-    frames.push(Frame {
-        id: *b"TKEY",
-        flags: [0, 0],
-        body,
-    });
+    frames.retain(keep);
+    frames.push(new(version));
     let size: usize = frames.iter().map(|f| 10 + f.body.len()).sum();
     let mut out = [b"ID3".as_slice(), &[version, 0, 0], &to_synchsafe(size)].concat();
     for f in &frames {
@@ -398,6 +469,125 @@ mod tests {
             2,
             "no temp files are left"
         );
+    }
+
+    /// An `APIC` frame of the given picture type.
+    fn apic(kind: u8, data: &[u8]) -> Vec<u8> {
+        let body = [&[0u8][..], b"image/png", &[0, kind, 0], data].concat();
+        [
+            b"APIC".as_slice(),
+            &(body.len() as u32).to_be_bytes(),
+            &[0, 0],
+            &body,
+        ]
+        .concat()
+    }
+
+    #[test]
+    fn a_cover_replaces_only_the_front_cover_in_mp3_flac_and_wav_and_m4a_is_refused() {
+        let d = Dir::new("cover");
+        let new = b"\x89PNG\r\n\x1a\nNEW";
+        // MP3: the front cover is replaced, the other picture and frames stay.
+        let old = tag(
+            3,
+            &[
+                frame(b"TIT2", "Title", 3),
+                apic(3, b"OLD"),
+                apic(4, b"BACK"),
+            ],
+        );
+        let mp3 = d.file("a.mp3", &[old, AUDIO.to_vec()].concat());
+        assert_eq!(write_cover(&mp3, new, "image/png"), Ok(true));
+        let b = fs::read(&mp3).unwrap();
+        let t = parse_id3(&b).unwrap().unwrap();
+        let pictures: Vec<_> = t
+            .frames
+            .iter()
+            .filter(|f| &f.id == b"APIC")
+            .map(|f| {
+                (
+                    picture_type(&f.body),
+                    f.body.ends_with(b"BACK"),
+                    f.body.ends_with(b"NEW"),
+                )
+            })
+            .collect();
+        assert_eq!(pictures, [(Some(4), true, false), (Some(3), false, true)]);
+        assert!(t.frames.iter().any(|f| &f.id == b"TIT2"));
+        assert!(b.ends_with(AUDIO));
+        assert_eq!(
+            write_cover(&mp3, new, "image/png"),
+            Ok(false),
+            "the same cover is not written twice"
+        );
+        // WAV: in the ID3 chunk.
+        let wav = d.file(
+            "a.wav",
+            &[
+                b"RIFF\x1c\x00\x00\x00WAVE".as_slice(),
+                b"data\x08\x00\x00\x00abcdefgh",
+            ]
+            .concat(),
+        );
+        assert_eq!(write_cover(&wav, new, "image/png"), Ok(true));
+        assert!(fs::read(&wav).unwrap().windows(4).any(|w| w == b"APIC"));
+        assert_eq!(write_cover(&wav, new, "image/png"), Ok(false));
+        // FLAC: PICTURE blocks of other types stay, the audio stays.
+        let block = |ty: u8, last: bool, data: &[u8]| {
+            [
+                &[ty | if last { 0x80 } else { 0 }][..],
+                &(data.len() as u32).to_be_bytes()[1..],
+                data,
+            ]
+            .concat()
+        };
+        let picture = |kind: u32, data: &[u8]| {
+            [
+                &kind.to_be_bytes()[..],
+                &[0, 0, 0, 0],
+                &[0, 0, 0, 0],
+                &[0; 16],
+                &(data.len() as u32).to_be_bytes(),
+                data,
+            ]
+            .concat()
+        };
+        let flac = d.file(
+            "a.flac",
+            &[
+                b"fLaC".to_vec(),
+                block(0, false, &[0; 34]),
+                block(6, false, &picture(3, b"OLD")),
+                block(6, true, &picture(4, b"BACK")),
+                AUDIO.to_vec(),
+            ]
+            .concat(),
+        );
+        assert_eq!(write_cover(&flac, new, "image/png"), Ok(true));
+        let b = fs::read(&flac).unwrap();
+        let (blocks, audio) = flac::blocks(&b).unwrap();
+        let kinds: Vec<_> = blocks
+            .iter()
+            .map(|x| {
+                (
+                    x.ty,
+                    b[x.data.clone()].windows(4).any(|w| w == b"BACK"),
+                    b[x.data.clone()].ends_with(b"NEW"),
+                )
+            })
+            .collect();
+        assert_eq!(
+            kinds,
+            [(0, false, false), (6, true, false), (6, false, true)]
+        );
+        assert_eq!(&b[audio..], AUDIO);
+        assert_eq!(write_cover(&flac, new, "image/png"), Ok(false));
+        // Not touched.
+        let m4a = d.file("a.m4a", b"....ftypM4A ");
+        assert!(write_cover(&m4a, new, "image/png")
+            .unwrap_err()
+            .contains("no cover support"));
+        assert_eq!(fs::read(&m4a).unwrap(), b"....ftypM4A ");
     }
 
     #[test]

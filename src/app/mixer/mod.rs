@@ -20,30 +20,39 @@
 //! CFX: knob 4 of each channel (`MixerState.invoke_knob(ch, 4, v)`) and the type chips (`invoke_cfx_selected(i)`, index into
 //! `audio::cfx::names()`: the `Kind`s, then the COLOR plugin effects) go to `Player::cfx()`; the knob is the player's filter while the type is FILTER. The tempo of the
 //! tempo-synced types is the channel's own deck's effective BPM, pushed on every tick. Automix drives the crossfader position
-//! itself and sets `MixerState.auto-fade` (constant-power gains whatever the curve) and `MixerState.auto-low-cut` (bit per
-//! channel: its LOW band is killed, the bass swap).
+//! itself and sets `MixerState.auto-fade` (constant-power gains whatever the curve); its styles move the strips' fader, EQ and COLOR FX
+//! knobs through the channel rows (`automix::rig`), so the strips show them moving, and put the DJ's own values back afterwards.
 //!
-//! Children: [`channel`] (one strip: knobs, EQ / STEM mode, CFX, CUE, assignment), [`bus`] (master / headphone knobs), [`map`] (knob
-//! position ↔ dB / CFX value), [`vu`] (meter ballistics), [`curve`] (crossfader and channel fader curves), [`cfg`], [`rec`].
+//! AUX: the strip after the decks (`MixerState.channels[`[`AUX_CH`]`]`, shown while PREFS > AUDIO > "Enable AUX input" is on) has the
+//! deck strip's TRIM, HIGH / MID / LOW, FILTER, LEVEL fader, CUE and meter, plus ON ([`auxin`]); it drives [`openfader::audio::auxin`].
+//!
+//! Children: [`channel`] (one strip: knobs, EQ / STEM mode, CFX, CUE, assignment), [`auxin`] (the AUX strip), [`bus`] (master / headphone knobs), [`map`] (knob
+//! position ↔ dB / CFX value), [`vu`] (meter ballistics), [`curve`] (crossfader and channel fader curves), [`cfg`], [`rec`] (the REC
+//! button), [`sheet`] and [`control`] (the cue sheet, tracklist and control log REC writes next to a recording).
 
+mod auxin;
 mod bus;
 mod cfg;
 mod channel;
+mod control;
 mod curve;
 mod map;
 mod rec;
+mod sheet;
 mod vu;
 pub(in crate::app) use channel::{iso_at, knob_at};
+pub(in crate::app) use control::note;
+pub(in crate::app) use map::{CFX, HI, LOW, MID};
 
 use super::{
-    App, BusView, ChannelView, DeckState, MixerState,
-    deck::{DECKS, Decks},
+    deck::{Decks, DECKS},
     prefs::{self, CrossfaderCurve},
+    App, BusView, ChannelView, DeckState, MixerState,
 };
 use cfg::{Cfg, auto_db};
 use openfader::audio::{
-    Bus, Headphones,
     cfx::{self, Kind},
+    Bus, Headphones,
 };
 use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use std::{
@@ -53,6 +62,9 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+
+/// The AUX strip's row in `MixerState.channels`, after the decks.
+pub(in crate::app) const AUX_CH: usize = DECKS;
 
 /// Linear cue-feed gain of one channel: trim while CUE is on (pre-fader, pre-crossfade), else silent.
 fn cue_gain(trim_db: f32, on: bool) -> f32 {
@@ -103,6 +115,10 @@ struct Mixer {
     /// The (bar, peak) heights last written to each channel row / the bus, so a still meter costs no model write.
     shown_levels: [Cell<(f32, f32)>; DECKS],
     shown_master: Cell<(f32, f32)>,
+    /// The AUX strip's meter, the last (bar, peak) written to its row, and the problem its input last reported.
+    aux_vu: RefCell<vu::Vu>,
+    shown_aux: Cell<(f32, f32)>,
+    aux_err: RefCell<Option<String>>,
     last_tick: Cell<Instant>,
     cfg: Cell<Cfg>,
     /// The RELEASE-held state `apply` last used, and the auto-gain dB of each channel (the tick re-applies on a change).
@@ -134,7 +150,7 @@ pub fn wire(app: &App, decks: Decks) {
         auto_gain_text: map::auto_readout(0.0).into(),
         ..Default::default()
     };
-    let model = Rc::new(VecModel::from((0..DECKS).map(channel).collect::<Vec<_>>()));
+    let model = Rc::new(VecModel::from((0..=DECKS).map(channel).collect::<Vec<_>>()));
     let state = app.global::<MixerState>();
     state.set_channels(ModelRc::from(model.clone()));
     state.set_cfx_names(ModelRc::new(VecModel::from(
@@ -173,6 +189,9 @@ pub fn wire(app: &App, decks: Decks) {
         master_vu: RefCell::new(vu::Vu::new()),
         shown_levels: std::array::from_fn(|_| Cell::new((0.0, 0.0))),
         shown_master: Cell::new((0.0, 0.0)),
+        aux_vu: RefCell::new(vu::Vu::new()),
+        shown_aux: Cell::new((0.0, 0.0)),
+        aux_err: RefCell::new(None),
         last_tick: Cell::new(Instant::now()),
         cfg: Cell::new(cfg),
         release: Cell::new(false),
@@ -186,6 +205,7 @@ pub fn wire(app: &App, decks: Decks) {
     state.set_iso_shown(cfg.iso_shown);
     state.set_cfx_stop(cfg.cfx_stop());
     mixer.apply_all(); // the crossfader starts in the middle: A and B sides at -3 dB
+    prefs::with(|p| mixer.sync_aux(p));
 
     let m = mixer.clone();
     state.on_knob(move |ch, knob, v| m.set_knob(ch as usize, knob as usize, v));
@@ -222,9 +242,12 @@ pub fn wire(app: &App, decks: Decks) {
             (0..DECKS).for_each(|ch| m.show_eq(ch));
         }
         m.apply_all();
+        m.sync_aux(p);
     });
     let m = mixer.clone();
     state.on_cue_toggled(move |ch| m.toggle_cue(ch as usize));
+    let m = mixer.clone();
+    state.on_aux_toggled(move || m.toggle_aux());
     let m = mixer.clone();
     state.on_xf_assigned(move |ch, side| m.assign_xf(ch as usize, side));
     let m = mixer.clone();
@@ -325,6 +348,7 @@ impl Mixer {
         if self.shown_master.replace(shown) != shown {
             self.edit_bus(|b| (b.level, b.peak) = shown);
         }
+        self.tick_aux(dt);
     }
 }
 

@@ -1,0 +1,106 @@
+import { Theme } from "../theme.slint";
+import { AutomixState, BrowserState } from "../browser-state.slint";
+import { DeckDetail } from "../deck-wave.slint";
+import { DeckState } from "../deck-state.slint";
+import { DeviceProgress } from "../device.slint";
+import { DragTracker } from "../dnd.slint";
+import { KeysState } from "../help.slint";
+import { PrefsState } from "../prefs-state.slint";
+import { StudioState } from "../studio-state.slint";
+import { TrackInfoState } from "../trackinfo.slint";
+import { Glyph, Icon } from "../widgets.slint";
+import { StudioAutomix } from "automix.slint";
+import { StudioBar } from "bar.slint";
+import { StudioDeck } from "deck.slint";
+import { StudioLibrary } from "library.slint";
+import { StudioMixer } from "mixer.slint";
+
+/// The studio presentation (`Theme.layout-profile` 2) of the PERFORMANCE mode with two decks: one window, nothing floating.
+/// Top bar; both decks' scrolling waveforms stacked full width; under them a deck panel per side (cover, title, key, remaining
+/// time, overview; FX slots, loop, jog, tempo, PLAY / CUE / SYNC, pads) round the mixer; the library, its folder sidebar and the
+/// AUTOMIX panel at the bottom; a status line. It drives the same globals as the desktop workspace, so switching profiles keeps
+/// every setting and the playing decks. Every big part is its own permanent `if true` item tree (docs/code-structure.md).
+export component StudioWorkspace inherits Rectangle {
+    property <length> g: Theme.studio-gap;
+    /// Windows from 900 px high get the roomy sizes of the tokens; shorter ones shrink the cover, the overview and the waveforms.
+    property <bool> roomy: root.height >= 900px;
+    /// The browse view (W): the library takes the window under the bar.
+    property <bool> browse: BrowserState.browse-max;
+    property <length> bar-h: max(Theme.h-bar, 36px);
+    property <length> wave-h: root.roomy ? Theme.h-wave-2 : max(40px, Theme.h-wave-2 * 0.75);
+    property <length> cover: root.roomy ? Theme.studio-cover : min(Theme.studio-cover, 52px);
+    property <length> ov-h: root.roomy ? Theme.h-overview + Theme.h-phrase : min(Theme.h-overview + Theme.h-phrase, 30px);
+    property <length> head-h: 2 * root.g + root.cover + Theme.space-md + root.ov-h;
+    property <length> status-h: Theme.h-status;
+    property <length> lib-h: root.browse ? root.height - root.bar-h - root.g - root.status-h : root.roomy ? max(300px, root.height * 0.31) : max(200px, root.height * 0.25);
+    property <length> y-lib: root.height - root.status-h - root.lib-h;
+    property <length> y-waves: root.bar-h + root.g;
+    property <length> y-deck: root.y-waves + 2 * root.wave-h + 4px + root.g;
+    property <length> deck-h: root.y-lib - root.g - root.y-deck;
+    property <length> mixer-w: clamp(root.width * 0.19, 236px, 330px);
+    property <length> deck-w: (root.width - 4 * root.g - root.mixer-w) / 2;
+    property <length> side-w: clamp(root.width * 0.18, 240px, 320px);
+    background: Theme.bg;
+    DragTracker { x: 0px; y: 0px; width: root.width; height: root.height; }
+    FocusScope {
+        init => { self.focus(); }
+        key-pressed(e) => {
+            // Arrows reach here only when neither the search box nor the track list has focus.
+            if (e.text == Key.UpArrow || e.text == Key.DownArrow) {
+                StudioState.browse(e.text == Key.DownArrow ? 1 : -1);
+                return accept;
+            }
+            // Held keys repeat; a shortcut fires once per press.
+            if (!e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+        }
+        key-released(e) => {
+            if (KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+        }
+        if true: StudioBar { x: 0px; y: 0px; width: root.width; height: root.bar-h; }
+        for i in root.browse ? 0 : 2: Rectangle {
+            x: root.g;
+            y: root.y-waves + i * (root.wave-h + 4px);
+            width: root.width - 2 * root.g;
+            height: root.wave-h;
+            border-radius: Theme.studio-radius-ctl;
+            clip: true;
+            DeckDetail { index: PrefsState.wave-order[i]; width: parent.width; height: parent.height; }
+        }
+        if !root.browse: StudioDeck { index: 0; x: root.g; y: root.y-deck; width: root.deck-w; height: root.deck-h; head-h: root.head-h; cover: root.cover; }
+        if !root.browse: StudioMixer { x: 2 * root.g + root.deck-w; y: root.y-deck; width: root.mixer-w; height: root.deck-h; }
+        if !root.browse: StudioDeck { index: 1; x: 3 * root.g + root.deck-w + root.mixer-w; y: root.y-deck; width: root.deck-w; height: root.deck-h; head-h: root.head-h; cover: root.cover; }
+        if true: StudioLibrary { x: root.g; y: root.y-lib; width: root.width - 3 * root.g - root.side-w; height: root.lib-h; }
+        if true: StudioAutomix { x: root.width - root.g - root.side-w; y: root.y-lib; width: root.side-w; height: root.lib-h; }
+        // Status line: a device loading, a track being analysed, a device job; the browser's own messages are over the track list.
+        Rectangle {
+            x: 0px;
+            y: root.height - root.status-h;
+            width: root.width;
+            height: root.status-h;
+            background: Theme.bg-deep;
+            Text { x: root.g; width: 70px; height: parent.height; text: "OpenFadeR"; vertical-alignment: center; color: Theme.text-dim; font-size: Theme.font-size; font-weight: Theme.weight-bold; }
+            if BrowserState.load-progress >= 0: Rectangle {
+                x: 90px;
+                y: (parent.height - self.height) / 2;
+                width: 160px;
+                height: 10px;
+                background: Theme.panel-raised;
+                border-radius: self.height / 2;
+                Rectangle { width: parent.width * BrowserState.load-progress; background: Theme.accent; border-radius: parent.border-radius; }
+            }
+            Text {
+                x: BrowserState.load-progress >= 0 ? 260px : 90px;
+                width: parent.width - self.x - prog.width - 120px;
+                height: parent.height;
+                text: BrowserState.load-progress >= 0 ? BrowserState.load-text : AutomixState.running ? AutomixState.status : "";
+                vertical-alignment: center;
+                overflow: elide;
+                color: Theme.text-bright;
+                font-size: Theme.font-size;
+            }
+            if TrackInfoState.progress != "": Glyph { x: parent.width - prog.width - 28px - root.g; y: (parent.height - self.height) / 2; width: 14px; height: 14px; icon: Icon.info; tint: Theme.accent; }
+            prog := Text { x: parent.width - self.width - root.g; height: parent.height; text: TrackInfoState.progress; vertical-alignment: center; color: Theme.accent; font-size: Theme.font-size; }
+            DeviceProgress { x: parent.width - self.width - prog.width - 60px; y: (parent.height - self.height) / 2; }
+        }
+    }
+}

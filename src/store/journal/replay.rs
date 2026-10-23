@@ -93,7 +93,18 @@ fn update_row(db: &Connection, table: &str, cols: &[Col], set: &str, key: &str) 
 }
 
 impl Store {
+    /// One undo / redo step. The files the step moved ([`Store::step_file_moves`]) move first, all or none; the rows follow, and
+    /// when they fail the files go back.
     pub(super) fn replay(&self, redo: bool) -> R<Option<String>> {
+        let done = crate::paths::move_files(&self.step_file_moves(redo)?)?;
+        let r = self.replay_rows(redo);
+        if r.is_err() {
+            crate::paths::move_back(&done);
+        }
+        r
+    }
+
+    fn replay_rows(&self, redo: bool) -> R<Option<String>> {
         let _g = system_scope();
         in_tx(&mut self.db(), true, |db| {
             let Some((id, label)) = step(db, redo)? else {

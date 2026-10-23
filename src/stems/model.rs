@@ -13,7 +13,6 @@
 use crate::analysis::cache;
 use ort::{environment::Environment, ep, logging::LogLevel, session::Session, value::Tensor};
 use parking_lot::Mutex;
-use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
@@ -99,31 +98,11 @@ pub fn fetch(progress: &dyn Fn(f32)) -> Result<(), String> {
             dest.display()
         )
     };
-    std::fs::create_dir_all(dest.parent().ok_or("model path has no folder")?)
-        .map_err(|e| hand(e.to_string()))?;
-    let resp = ureq::get(URL).call().map_err(|e| hand(e.to_string()))?;
-    let mut body = resp.into_body().into_reader();
-    let part = dest.with_extension("onnx.part");
-    let mut out =
-        std::io::BufWriter::new(std::fs::File::create(&part).map_err(|e| hand(e.to_string()))?);
-    let (mut buf, mut got) = (vec![0u8; 1 << 16], 0u64);
-    loop {
-        let n = body.read(&mut buf).map_err(|e| hand(e.to_string()))?;
-        if n == 0 {
-            break;
-        }
-        out.write_all(&buf[..n]).map_err(|e| hand(e.to_string()))?;
-        got += n as u64;
+    crate::models::download(URL, &dest, SIZE, None, &|got| {
         GOT.store(got, Relaxed);
         progress((got as f32 / SIZE as f32).min(1.0));
-    }
-    out.flush().map_err(|e| hand(e.to_string()))?;
-    drop(out);
-    if got != SIZE {
-        let _ = std::fs::remove_file(&part);
-        return Err(hand(format!("got {got} of {SIZE} bytes")));
-    }
-    std::fs::rename(&part, &dest).map_err(|e| hand(e.to_string()))
+    })
+    .map_err(hand)
 }
 
 /// ONNX Runtime allows one environment per process. Its log goes through [`ort_log`].
@@ -147,7 +126,7 @@ fn ort_log(level: LogLevel, _category: &str, _id: &str, at: &str, msg: &str) {
     }
 }
 
-fn environment() -> Result<&'static Environment, String> {
+pub(crate) fn environment() -> Result<&'static Environment, String> {
     ENV.as_ref().map_err(Clone::clone)
 }
 

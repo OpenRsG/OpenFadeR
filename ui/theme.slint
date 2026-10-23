@@ -207,7 +207,7 @@ export global Theme {
     in-out property <int> weight-semi: 600;
 
     // @group Sizes
-    /// Presentation profile: 0 desktop workspace, 1 touch workspace with the same application features.
+    /// Presentation profile: 0 desktop workspace, 1 touch workspace, 2 studio workspace (one window: stacked waveforms, a deck panel per side, a central mixer, the library and AUTOMIX under them), all with the same application features.
     in-out property <int> layout-profile: 0;
     /// Width below which the touch workspace presents one selected deck instead of two columns.
     in-out property <length> touch-breakpoint: 760px;
@@ -281,6 +281,18 @@ export global Theme {
     in-out property <length> jog: 112px;
     /// Diameter of the CUE and PLAY buttons.
     in-out property <length> ring: 36px;
+    /// Corner radius of the studio workspace's panels (layout-profile 2).
+    in-out property <length> studio-radius: 12px;
+    /// Corner radius of the studio workspace's big buttons, pads, tabs and fields.
+    in-out property <length> studio-radius-ctl: 8px;
+    /// Height of the studio workspace's big PLAY, CUE and SYNC buttons.
+    in-out property <length> studio-button: 48px;
+    /// Spacing between the studio workspace's panels.
+    in-out property <length> studio-gap: 8px;
+    /// Side of the cover art in the studio workspace's deck panels.
+    in-out property <length> studio-cover: 72px;
+    /// Row height of the studio workspace's track list (a row carries a thumbnail).
+    in-out property <length> studio-row: 36px;
 
     public pure function target-size(size: length) -> length {
         return root.layout-profile == 1 ? max(size, root.touch-target) : size;

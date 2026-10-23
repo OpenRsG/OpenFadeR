@@ -87,8 +87,9 @@ impl Effect {
     }
 }
 
-/// Where the unit sits: before the fader sum of one channel (A to D = decks 1 to 4), or on the sum of all of them.
-/// The discriminants of A to D are the channel indices ([`super::Unit::apply`] indexes the buffers with them).
+/// Where the unit sits: before the fader sum of one channel (A to D = decks 1 to 4), on the AUX channel, or on the sum of all of them.
+/// The discriminants of A to D are the channel indices ([`super::Unit::apply`] indexes the buffers with them); the AUX
+/// channel's buffer is [`crate::audio::AUX`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Assign {
     A,
@@ -96,12 +97,20 @@ pub enum Assign {
     C,
     D,
     Master,
+    Aux,
 }
 
 impl Assign {
-    /// Selector order CH1..CH4, MASTER; out-of-range indices give MASTER.
+    /// Selector order CH1..CH4, MASTER, AUX; out-of-range indices give MASTER.
     pub fn from_index(i: usize) -> Assign {
-        [Assign::A, Assign::B, Assign::C, Assign::D, Assign::Master][i.min(4)]
+        match i {
+            0 => Assign::A,
+            1 => Assign::B,
+            2 => Assign::C,
+            3 => Assign::D,
+            5 => Assign::Aux,
+            _ => Assign::Master,
+        }
     }
 }
 /// A deck's effective BPM (`f32` as bits); anything not finite and positive means [`FALLBACK_BPM`].

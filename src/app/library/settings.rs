@@ -9,6 +9,8 @@
 //! | `lib_dropdown` | Drop-down menu | holding a track for 1 s opens its menu |
 //! | `lib_taglist_load`, `lib_taglist_quit` | Tag List | removal on load / on quit |
 //! | `lib_protect`, `lib_edit` | Library Protection / Edit Library | no accidental deletion / rename by double click |
+//! | `lib_health_long`, `lib_health_kbps` | Library health | minutes from which a track is "very long", kbps below which it is "low bitrate" (0 = off, [`super::health`]) |
+//! | `lib_artwork_embed` | Write fetched artwork into the file's tags | [`crate::app::artwork`] also writes a found cover into the track's tag |
 //!
 //! The settings of the library formats (the library file of a Media Browser source, path maps, what an export writes) belong
 //! to the library plugins: Preferences > Extensions.
@@ -31,6 +33,8 @@ pub struct Lib {
     pub taglist_quit: bool,
     pub protect: bool,
     pub edit: bool,
+    pub health: super::health::Limits,
+    pub artwork_embed: bool,
 }
 
 impl Lib {
@@ -51,6 +55,8 @@ impl Lib {
             taglist_quit: p.extra_bool("lib_taglist_quit", false),
             protect: p.extra_bool("lib_protect", false),
             edit: p.extra_bool("lib_edit", true),
+            health: health_limits(p),
+            artwork_embed: p.extra_bool("lib_artwork_embed", false),
         }
     }
 }
@@ -58,6 +64,16 @@ impl Lib {
 /// The current settings.
 pub fn get() -> Lib {
     prefs::with(Lib::of)
+}
+
+/// The Library health thresholds (a value that is not a whole number keeps the default).
+pub fn health_limits(p: &Prefs) -> super::health::Limits {
+    let at = |k: &str, default| p.extra(k).and_then(|v| v.parse().ok()).unwrap_or(default);
+    let d = super::health::Limits::default();
+    super::health::Limits {
+        long_min: at("lib_health_long", d.long_min),
+        low_kbps: at("lib_health_kbps", d.low_kbps),
+    }
 }
 
 /// The user's Music folder: `XDG_MUSIC_DIR`, else `~/Music`.
@@ -85,6 +101,13 @@ pub fn database_path() -> Option<PathBuf> {
 pub fn wire() {
     for key in ["lib_search", "lib_db"] {
         prefs::on_text(key, move |v| prefs::update(|p| p.set_extra(key, v.trim())));
+    }
+    for key in ["lib_health_long", "lib_health_kbps"] {
+        prefs::on_text(key, move |v| {
+            if let Ok(n) = v.trim().parse::<u32>() {
+                prefs::update(|p| p.set_extra(key, n));
+            }
+        });
     }
 }
 
@@ -142,10 +165,30 @@ pub fn browse_rows(p: &Prefs) -> Vec<Row> {
             tr!("Delete all tracks from the Tag List when quitting"),
             l.taglist_quit,
         ),
+        Row::header(tr!("COVER ART")),
+        Row::check(
+            "lib_artwork_embed",
+            tr!("Write fetched artwork into the file's tags"),
+            l.artwork_embed,
+        )
+        .hint(tr!("MP3, WAV, AIFF and FLAC files")),
         Row::header(tr!("LIBRARY")),
         Row::check("lib_protect", tr!("Library Protection"), l.protect)
             .hint(tr!("no accidental edit / delete")),
         Row::check("lib_edit", tr!("Edit Library"), l.edit).hint(tr!("rename by double click")),
+        Row::header(tr!("LIBRARY HEALTH")),
+        Row::text(
+            "lib_health_long",
+            tr!("VERY LONG FROM (MINUTES)"),
+            &l.health.long_min.to_string(),
+        )
+        .hint(tr!("a mix or a podcast; 0 = off")),
+        Row::text(
+            "lib_health_kbps",
+            tr!("LOW BITRATE BELOW (KBPS)"),
+            &l.health.low_kbps.to_string(),
+        )
+        .hint(tr!("0 = off")),
     ]
 }
 
@@ -161,6 +204,7 @@ pub fn browse_choose(p: &mut Prefs, key: &str, i: usize) -> bool {
             "lib_taglist_quit",
             "lib_protect",
             "lib_edit",
+            "lib_artwork_embed",
         ],
     )
 }
@@ -193,11 +237,32 @@ mod tests {
     }
 
     #[test]
+    fn health_limits_default_and_follow_the_settings_and_a_bad_value_keeps_the_default() {
+        let mut p = Prefs::default();
+        assert_eq!(Lib::of(&p).health, super::super::health::Limits::default());
+        p.set_extra("lib_health_long", 45);
+        p.set_extra("lib_health_kbps", 0);
+        let l = Lib::of(&p).health;
+        assert_eq!((l.long_min, l.low_kbps), (45, 0));
+        p.set_extra("lib_health_long", "soon");
+        assert_eq!(Lib::of(&p).health.long_min, 20);
+        let rows = browse_rows(&p);
+        assert!(["lib_health_long", "lib_health_kbps"]
+            .iter()
+            .all(|k| rows.iter().any(|r| r.key == *k)));
+    }
+
+    #[test]
     fn checks_write_through_and_foreign_keys_are_left_alone() {
         let mut p = Prefs::default();
         assert!(browse_choose(&mut p, "lib_protect", 1) && Lib::of(&p).protect);
         assert!(browse_choose(&mut p, "lib_protect", 0) && !Lib::of(&p).protect);
         assert!(!browse_choose(&mut p, "lib_search_user", 0)); // a Database key is not a Browse key
+        assert!(
+            !Lib::of(&p).artwork_embed,
+            "writing into the files is opt-in"
+        );
+        assert!(browse_choose(&mut p, "lib_artwork_embed", 1) && Lib::of(&p).artwork_embed);
         assert!(database_choose(&mut p, "lib_search_user", 0) && !Lib::of(&p).search_user);
         assert!(!database_choose(&mut p, "nope", 1));
         assert!(

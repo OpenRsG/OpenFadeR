@@ -17,7 +17,7 @@ fn kind(p: &Plugin) -> &'static str {
     match (m.command.is_empty(), m.script.as_deref()) {
         (true, Some(s)) if s.ends_with(".lua") => "LUA",
         (true, Some(s)) if s.ends_with(".py") => "PYTHON",
-        (true, None) if m.library.is_some() => tr!("NATIVE"),
+        (true, None) if m.library.is_some() || m.controller.is_some() => tr!("NATIVE"),
         (true, None) => "JSON",
         _ => tr!("PROGRAM"),
     }
@@ -35,6 +35,11 @@ fn provides(p: &Plugin) -> String {
     };
     let lib = usize::from(m.library.is_some());
     count(lib, tr_n!("{n} track library", "{n} track libraries", lib));
+    let driver = usize::from(m.controller.is_some());
+    count(
+        driver,
+        tr_n!("{n} controller driver", "{n} controller drivers", driver),
+    );
     count(
         m.sources.len(),
         tr_n!("{n} source", "{n} sources", m.sources.len()),
@@ -54,6 +59,10 @@ fn provides(p: &Plugin) -> String {
     count(
         m.pad_modes.len(),
         tr_n!("{n} pad mode", "{n} pad modes", m.pad_modes.len()),
+    );
+    count(
+        m.automix.len(),
+        tr_n!("{n} automix style", "{n} automix styles", m.automix.len()),
     );
     count(
         m.settings.len(),

@@ -27,6 +27,7 @@ editable grid-tempo field keep their original precision.
 | So Pro | dark | near-black greys, a bright blue accent, a white platter, eight coloured pads in a 4 × 2 grid, the vertical 2-deck layout |
 | Ocean, High Contrast | dark | small examples that list only a few tokens |
 | Pocket | dark | the full Linux app with a touch workspace, focused/paired decks, persistent transport and mixer controls, and all desktop modes and commands |
+| Studio | dark | the studio layout (`layout-profile` 2): one window with both waveforms stacked across the top, a deck panel on each side of a central mixer, the library and AUTOMIX under them; near-black panels, rounded controls, an orange-to-red waveform |
 
 Except the two built-ins, they are the files of the [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) repository:
 copy them into `~/.config/openfader/extension/skin/`, or point `OPENFADER_SKINS` at a checkout of it.
@@ -132,7 +133,7 @@ Sizes of the regions (deck height, waveform heights, the jog, the mixer channel)
 
 ### Structural presentation
 
-Themes can select a different presentation, not just recolor the desktop. The `layout-profile` token is `0` for the desktop workspace and `1` for the touch workspace. These use the same Linux application, engine, Collection, plugins and callbacks; `mobile/` is the separate Android frontend and is not the Linux phone application.
+Themes can select a different presentation, not just recolor the desktop. The `layout-profile` token is `0` for the desktop workspace, `1` for the touch workspace and `2` for the studio workspace. These use the same Linux application, engine, Collection, plugins and callbacks; `mobile/` is the separate Android frontend and is not the Linux phone application.
 
 Pocket (`extension/skin/pocket.json`) selects the touch presentation. Its workspace selector exposes decks/export players, Library, mixer/output, effects, sampler, Mix Point Link, Beat Lab and all commands. EDIT, LIGHTING and VIDEO use the same mode selector as desktop; optional features retain their normal preference/extension switches. Two or four decks are available. Below `touch-breakpoint`, select a deck; wider windows show a pair. All eight pads and all desktop pad modes, cue/loop editing and grid tools remain available.
 
@@ -141,6 +142,21 @@ Play/pause, transport CUE, channel levels, headphone cues and the crossfader rem
 Library → Actions includes every browser sort column, direction and a headphone-preview waveform that seeks without loading a deck. Mix Point Link keeps a selected deck's editable waveform in the same workspace as MIX IN/OUT and SILENT, with separate touch buttons for deck and linked-lane zoom.
 
 `touch-target` sizes primary touch controls; `icon-size` sizes their centered glyphs independently. Shared Slint controls use `Theme.target-size(base)` to retain their desktop size in profile `0` and enforce the touch target in profile `1`. The existing font, spacing and region tokens still apply. Switching to a desktop theme restores the desktop presentation without changing or copying library data. These tokens are editable and saved by the existing theme editor.
+
+### Studio workspace (`layout-profile` 2)
+
+Studio (`extension/skin/studio.json`) selects a modern single-window performance layout, built in `ui/studio/*.slint` from the shared widgets and driving the same globals as the desktop workspace (`DeckState`, `MixerState`, `FxState`, `PadsState`, `BrowserState`, `AutomixState`, `MixPointState`), so every control changes the real deck, mixer, effect, pad, library or AUTOMIX state:
+
+* **Top bar**: the mode buttons (EXPORT, PERFORM, EDIT, and LIGHTING / VIDEO when their extensions are on), the logo in the middle, the MASTER meter, REC, the MIDI and DEVICES buttons, the clock and the gear that opens PREFERENCES.
+* **Waveforms**: both decks' scrolling waveforms stacked across the full width, with the centre playhead (the desktop's `DeckDetail`: drag to scratch, the zoom column on the right).
+* **Deck panels**, mirrored for deck 2: the cover art, title, artist, BPM, the key with its − / + shift (a click on the key returns to the track's key) and MT (key lock), the big remaining time with the track length under it, and the overview waveform. Under it: three Beat FX slots (ON, effect drop-down, level knob; deck 1 drives FX1, deck 2 FX2, the CH chip switches the unit between this deck and the master) with BEAT ◀ ▶; the LOOP block (◀ halves, ▶ doubles, the number starts or leaves a loop, IN, OUT, RELOOP); the round jog with ± tempo, BPM, elapsed and remaining time (drag it to scratch); the tempo fader with − and + and the range chip; the big PLAY, CUE (hold to preview) and SYNC buttons; and the pads with the tabs HOT CUES / PAD FX / BEAT JUMP / SAMPLER (MORE reaches every other pad mode, × deletes a hot cue; the mode's option chips show under the pads).
+* **Mixer**, the centre column: MIXER and SETTINGS tabs and the EQ menu (EQ or STEM ISO on both channels, when STEMS is on). MIXER: GAIN, HIGH, MID, LOW and FILTER knobs per channel, the channel faders with their meters between them, headphone CUE buttons, the PHONES, MIX and MASTER knobs and the crossfader. SETTINGS: the COLOR FX of the FILTER knobs, the crossfader curve, each channel's side of the crossfader, SPLIT and REC.
+* **Library**: a sidebar (icon strip: folders = all tracks, favourites = the Tag List, session history, duplicates, related tracks, one icon per device; and the folder tree with My Playlists, the stored history days, Tags and the library's own lists), the search field, and the track list: thumbnail, rating, title, artist, length, BPM, key in its Camelot colour and genre; the chosen row is lit, the column titles sort, a right click opens the track menu, rows drag onto the decks.
+* **AUTOMIX panel** with the tabs Automix (the AUTOMIX and SKIP buttons, the LENGTH of a transition, the mix STYLE when the build has styles, and the queue: the list from the chosen track on), Sidelist (the Tag List) and Linked (MIX POINT LINK: modes, SELECT, LINK, SILENT, the OUT and IN points; and the related tracks of the chosen track).
+
+The studio workspace is the two-deck PERFORMANCE mode. The 4-deck layouts, EXPORT, EDIT, LIGHTING and VIDEO keep the desktop workspace, with its own global bar whose mode selector comes back to the studio. The window grows to at least 1100 × 720 px. Switching between desktop, touch and studio changes only how the same state is drawn: the library, the playing decks, the mixer and the effects keep their values. The browse view (W) gives the library the whole window under the top bar. The studio's panels are separate item trees, as docs/code-structure.md asks, so the 1 MiB start-up stack is not exceeded. BEAT LAB, the SAMPLER panel and the grid-editing, slip and reverse controls are in the desktop layout; the SAMPLER pad tab and the MORE pad modes cover the sampler's pads and the other pad functions.
+
+The studio tokens are `studio-radius` (panel corners), `studio-radius-ctl` (big buttons, pads, tabs, fields), `studio-button` (height of PLAY / CUE / SYNC), `studio-gap` (spacing between panels), `studio-cover` (side of the cover art) and `studio-row` (height of a track-list row); the usual colour, font and region tokens (`h-bar`, `h-wave-2`, `h-overview`, `radius`, `pad-style`, …) apply as well. Windows under 900 px high shrink the cover, the overview and the waveforms. Pick Studio (or any theme with `layout-profile` 2) in PREFERENCES > THEMES, and Catppuccin Mocha or any other theme to go back to the desktop layout.
 
 For the full Linux app's viewport check (Xvfb, Openbox, xdotool and ImageMagick required):
 
@@ -320,7 +336,7 @@ and brightness of the key column's colours, whose hue is the key's.
 
 | Token | Type | Default |
 |---|---|---|
-| `layout-profile` | int | `0` (desktop), `1` selects touch |
+| `layout-profile` | int | `0` (desktop), `1` selects touch, `2` the studio workspace |
 | `touch-breakpoint` | length | `760px` |
 | `touch-target` | length | `44px` |
 | `icon-size` | length | `14px` |
@@ -353,6 +369,12 @@ and brightness of the key column's colours, whose hue is the key's.
 | `w-channel` | length | `52px` |
 | `jog` | length | `112px` |
 | `ring` | length | `36px` |
+| `studio-radius` | length | `12px` |
+| `studio-radius-ctl` | length | `8px` |
+| `studio-button` | length | `48px` |
+| `studio-gap` | length | `8px` |
+| `studio-cover` | length | `72px` |
+| `studio-row` | length | `36px` |
 
 ### Motion
 

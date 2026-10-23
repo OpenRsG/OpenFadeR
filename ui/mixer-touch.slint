@@ -31,28 +31,31 @@ export component TouchTransport inherits Rectangle {
 component TouchChannel inherits Rectangle {
     in property <int> index;
     property <ChannelView> ch: MixerState.channels[root.index];
+    /// Channel 4 is the AUX strip: no crossfader or STEM ISO, the CFX knob is its FILTER and the ON switch takes STEM ISO's place.
+    property <bool> aux: root.index >= 4;
     height: controls.preferred-height + 16px;
     background: Theme.panel;
     controls := VerticalLayout {
         x: 8px; y: 8px; width: parent.width - 16px; height: self.preferred-height;
         spacing: 8px; alignment: start;
-        Text { text: @tr("Deck {}", ["A", "B", "C", "D"][root.index]); color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; }
+        Text { text: root.aux ? @tr("AUX") : @tr("Deck {}", ["A", "B", "C", "D"][root.index]); color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; }
         HorizontalLayout {
             height: 80px; spacing: 8px;
-            for label[p] in [@tr("Trim"), @tr("High"), @tr("Mid"), @tr("Low"), @tr("CFX")]: VerticalLayout {
+            for label[p] in [@tr("Trim"), @tr("High"), @tr("Mid"), @tr("Low"), root.aux ? @tr("Filter") : @tr("CFX")]: VerticalLayout {
                 spacing: 4px; alignment: center;
                 Text { height: 20px; text: root.ch.iso && p >= 1 && p <= 3 ? ["", @tr("Inst"), @tr("Vocal"), @tr("Drums")][p] : label; color: Theme.text; font-size: Theme.font-sm; horizontal-alignment: center; overflow: elide; }
                 HorizontalLayout {
                     height: 48px; alignment: center;
-                    Knob { width: 48px; height: 48px; horizontal-stretch: 0; value: root.ch.iso && p >= 1 && p <= 3 ? root.ch.iso-knobs[p - 1] : root.ch.knobs[p]; detent: true; stop: p == 4 ? MixerState.cfx-stop : -1; edited(v) => { MixerState.knob(root.index, p, v); } }
+                    Knob { width: 48px; height: 48px; horizontal-stretch: 0; value: root.ch.iso && p >= 1 && p <= 3 ? root.ch.iso-knobs[p - 1] : root.ch.knobs[p]; detent: true; stop: p == 4 && !root.aux ? MixerState.cfx-stop : -1; edited(v) => { MixerState.knob(root.index, p, v); } }
                 }
             }
         }
         HorizontalLayout {
             Chip { text: @tr("CUE"); active: root.ch.cue; clicked => { MixerState.cue-toggled(root.index); } }
-            Chip { text: @tr("STEM ISO"); active: root.ch.iso; enabled: DeckState.decks[root.index].stems; clicked => { MixerState.iso-toggled(root.index); } }
+            if !root.aux: Chip { text: @tr("STEM ISO"); active: root.ch.iso; enabled: DeckState.decks[root.index].stems; clicked => { MixerState.iso-toggled(root.index); } }
+            if root.aux: Chip { text: @tr("AUX ON"); active: root.ch.on; clicked => { MixerState.aux-toggled(); } }
         }
-        Dropdown { options: [@tr("Crossfader A"), @tr("Through"), @tr("Crossfader B")]; current: root.ch.xf; chose(n) => { if n != root.ch.xf { MixerState.xf-assigned(root.index, n == 1 ? root.ch.xf : n); } } }
+        if !root.aux: Dropdown { options: [@tr("Crossfader A"), @tr("Through"), @tr("Crossfader B")]; current: root.ch.xf; chose(n) => { if n != root.ch.xf { MixerState.xf-assigned(root.index, n == 1 ? root.ch.xf : n); } } }
         Fader { height: Theme.touch-target; value: root.ch.fader; edited(v) => { MixerState.fader(root.index, v); } }
         Meter { level: root.ch.level; peak: root.ch.peak; height: 8px; }
     }
@@ -61,7 +64,9 @@ component TouchChannel inherits Rectangle {
 export component TouchMixer inherits Rectangle {
     property <int> channel;
     property <int> channel-count: DeckState.count;
-    changed channel-count => { root.channel = min(root.channel, root.channel-count - 1); }
+    changed channel-count => { if root.channel < 4 { root.channel = min(root.channel, root.channel-count - 1); } }
+    changed aux-shown => { if !MixerState.aux-shown && root.channel >= 4 { root.channel = 0; } }
+    property <bool> aux-shown: MixerState.aux-shown;
     height: body.preferred-height + 16px;
     background: Theme.bg;
     body := VerticalLayout {
@@ -69,8 +74,9 @@ export component TouchMixer inherits Rectangle {
         Dropdown { options: MixerState.cfx-names; current: MixerState.cfx-type; chose(n) => { MixerState.cfx-selected(n); } }
         HorizontalLayout {
             for i in DeckState.count: Chip { text: @tr("Deck {}", ["A", "B", "C", "D"][i]); active: root.channel == i; clicked => { root.channel = i; } }
+            if MixerState.aux-shown: Chip { text: @tr("AUX"); active: root.channel >= 4; clicked => { root.channel = 4; } }
         }
-        TouchChannel { index: min(root.channel, DeckState.count - 1); }
+        TouchChannel { index: root.channel >= 4 ? 4 : min(root.channel, DeckState.count - 1); }
         HorizontalLayout {
             height: 104px; spacing: 8px;
             for label[p] in [@tr("Master"), @tr("Headphone mix"), @tr("Headphone level")]: VerticalLayout {

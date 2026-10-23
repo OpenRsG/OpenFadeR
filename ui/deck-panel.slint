@@ -28,7 +28,9 @@ export component GridEdit inherits GridLayout {
         Chip { text: @tr("RESET"); enabled: root.en; clicked => { DeckState.grid-reset(root.index); } }
     }
     Row {
-        Chip { text: @tr("METRO"); tooltip: @tr("Metronome: click on every beat of the grid"); active: DeckState.decks[root.index].metronome; enabled: root.en; colspan: 3; clicked => { DeckState.metronome(root.index); } }
+        Chip { text: @tr("METRO"); tooltip: @tr("Metronome: click on every beat of the grid"); active: DeckState.decks[root.index].metronome; enabled: root.en; clicked => { DeckState.metronome(root.index); } }
+        Chip { text: @tr("HERE"); tooltip: @tr("Tempo change here: TAP, ×2, ÷2 change only the tempo section from the playhead on"); active: DeckState.decks[root.index].grid-here; enabled: root.en; clicked => { DeckState.grid-here(root.index); } }
+        Chip { text: @tr("MERGE"); tooltip: @tr("Remove the tempo section at the playhead"); enabled: root.en; clicked => { DeckState.grid-merge(root.index); } }
     }
 }
 

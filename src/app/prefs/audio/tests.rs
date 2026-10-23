@@ -56,6 +56,37 @@ fn the_microphone_reaches_the_engine_only_when_on() {
 }
 
 #[test]
+fn the_aux_ducking_and_input_reach_the_engine_and_the_pair_follows_the_input_device() {
+    let mut p = Prefs::default();
+    let s = p.audio.settings();
+    assert_eq!(
+        (s.aux_duck, s.aux_release),
+        (1.0, 0.4),
+        "no ducking until asked"
+    );
+    assert!(choose(&mut p, "aux_duck", 2) && choose(&mut p, "aux_release", 3));
+    let s = p.audio.settings();
+    assert!(
+        (s.aux_duck - 0.251).abs() < 0.001 && s.aux_release == 1.5,
+        "{s:?}"
+    );
+    p.audio.input_device = "interface".into();
+    assert!(choose(&mut p, "aux_pair", 1));
+    assert_eq!(
+        p.audio.aux_source(),
+        ("interface", 2),
+        "no AUX device of its own: the input device"
+    );
+    p.audio.aux_device = "line".into();
+    assert_eq!(p.audio.aux_source(), ("line", 2));
+    assert!(
+        choose(&mut p, "aux_device", 0),
+        "the first entry is the input device again"
+    );
+    assert_eq!(p.audio.aux_source(), ("interface", 2));
+}
+
+#[test]
 fn db_steps_convert_and_round_trip_through_the_labels() {
     assert_eq!((db_gain(0), db_gain(-99)), (1.0, 0.0));
     assert!((db_gain(6) - 1.995).abs() < 0.001);

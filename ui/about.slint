@@ -8,9 +8,6 @@ export global AboutState {
     in property <string> version;
     /// Opens a web address in the browser.
     callback open(string);
-    /// A newer release found at launch (src/app/about.rs): its version and page. Empty: none.
-    in-out property <string> update;
-    in property <string> update-url;
 }
 
 /// One "label   link" row; the link opens `url`.
@@ -60,27 +57,4 @@ export component AboutOverlay inherits DialogFrame {
         Link { label: @tr("LICENSE"); text: "GNU AGPL v3"; url: "https://github.com/OpenRsG/OpenFadeR/blob/main/LICENSE"; }
     }
     Note { text: @tr("Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."); wrap: word-wrap; horizontal-alignment: center; }
-}
-
-/// Shown at launch when GitHub has a newer release: DOWNLOAD opens its page, LATER closes until the next launch.
-export component UpdateOverlay inherits DialogFrame {
-    visible: AboutState.update != "";
-    title: @tr("Update available");
-    card-width: 420px;
-    closed => { AboutState.update = ""; }
-    HorizontalLayout {
-        alignment: center;
-        Image { source: @image-url("../assets/icon.png"); width: 72px; height: 72px; }
-    }
-    VerticalLayout {
-        spacing: Theme.space-xs;
-        Text { text: "OpenFadeR " + AboutState.update + " is out"; horizontal-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-xl; font-weight: Theme.weight-bold; }
-        Text { text: "You have version " + AboutState.version + "."; horizontal-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-md; }
-    }
-    HorizontalLayout {
-        alignment: end;
-        spacing: Theme.space-sm;
-        Chip { text: @tr("LATER"); width: 80px; horizontal-stretch: 0; clicked => { AboutState.update = ""; } }
-        Chip { text: @tr("DOWNLOAD"); width: 110px; horizontal-stretch: 0; active: true; clicked => { AboutState.open(AboutState.update-url); AboutState.update = ""; } }
-    }
 }

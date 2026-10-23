@@ -76,8 +76,7 @@ impl Deck {
     /// The tempo this deck could follow `peer` at.
     fn can_follow(&self, peer: &Deck) -> bool {
         let (own, theirs) = (self.loaded.borrow(), peer.loaded.borrow());
-        self.tempo_target(&own.analysis.beats, &theirs.analysis.beats, peer.rate.get())
-            .is_some()
+        self.tempo_target(&own, peer, &theirs).is_some()
     }
 
     /// SYNC follows a master whose tempo this deck can match: only then its tempo fader is ignored (a deck without a grid, or

@@ -6,10 +6,13 @@
 //! the store ([`openfader::store`], with the grid it replaced for RESET) and comes back on the next
 //! LOAD; the library's files are never written. Export XML writes the edit.
 //!
-//! ponytail: bar length is the grid's largest bar position (4/4 and 3/4 keep their length); no
-//! per-segment tempo edit, a TAP replaces the whole grid with a constant-tempo one.
+//! Tempo sections: with the range on FROM HERE (the HERE chip) TAP, ×2, ÷2, a typed BPM and widen / narrow change only the
+//! section from the playhead up to the next tempo change, the later sections keep their place; [`merge_section`] removes one.
+//! On WHOLE a TAP replaces the whole grid with a constant-tempo one.
+//!
+//! ponytail: bar length is the grid's largest bar position (4/4 and 3/4 keep their length).
 
-use super::{Deck, Loaded, exportedit, fmt_ms, grid_bpm, loops};
+use super::{Deck, Loaded, beatmath::sections, exportedit, fmt_ms, grid_bpm, loops, tempo_at};
 use openfader::{analysis::Beat, store};
 use std::{
     sync::{Arc, LazyLock},
@@ -164,6 +167,19 @@ pub fn retempo(
     )
 }
 
+/// The grid without the tempo section under `pos_ms`: the section before it runs on to where the next one begins (or
+/// `end_ms`) at its own tempo, the later sections stay in place. `None` for the first section (nothing before it to merge into).
+pub fn merge_section(beats: &[Beat], pos_ms: f64, end_ms: u32) -> Option<Vec<Beat>> {
+    let at = beats.partition_point(|b| f64::from(b.time_ms) <= pos_ms).saturating_sub(1);
+    let start = sections(beats).find(|r| r.contains(&at))?.start;
+    let (head, tail) = beats.split_at(start);
+    let rest = &tail[exportedit::section_len(tail)..];
+    let p = head.last()?;
+    let end = rest.first().map_or(end_ms.max(p.time_ms), |b| b.time_ms);
+    let v = retempo(f64::from(p.time_ms), p.bar_pos, per_bar(beats), f64::from(p.bpm_x100) / 100.0, f64::from(end))?;
+    Some(exportedit::splice(head, v, rest, per_bar(beats)))
+}
+
 /// Tap series of a deck: the tap times and the beat the new grid hangs on (fixed at the first tap).
 #[derive(Default)]
 pub struct Tap {
@@ -238,7 +254,7 @@ impl Deck {
     /// Makes `beats` the deck's grid and pushes it everywhere the grid shows or is read.
     pub(super) fn apply_grid(&self, beats: Vec<Beat>, status: String) {
         let mut l = self.loaded.borrow_mut();
-        let grid = grid_bpm(&beats);
+        let grid = tempo_at(&beats, self.clock(&l).0);
         l.base_bpm = grid.unwrap_or(l.lib_bpm);
         l.analysis.beats = beats;
         // phrases are numbered by beat: derive ours again unless the user edited them
@@ -283,9 +299,16 @@ impl Deck {
         let l = self.loaded.borrow();
         let (pos, _) = self.clock(&l);
         let per = per_bar(&l.analysis.beats);
-        let (head, tail) =
-            exportedit::split(&l.analysis.beats, pos, ranged && l.grid_hist.from_here);
-        let r = edit(tail, pos).map(|(b, s)| (exportedit::join(head, b, per), s));
+        let from_here = ranged && l.grid_hist.from_here;
+        let (head, tail) = exportedit::split(&l.analysis.beats, pos, from_here);
+        // from the playhead on means up to the next tempo change: the later sections stay as they are
+        let n = if from_here {
+            exportedit::section_len(tail)
+        } else {
+            tail.len()
+        };
+        let r =
+            edit(&tail[..n], pos).map(|(b, s)| (exportedit::splice(head, b, &tail[n..], per), s));
         drop(l);
         match r {
             Some((beats, status)) => self.set_grid(beats, status),
@@ -363,23 +386,50 @@ impl Deck {
     pub(super) fn regrid(&self, (anchor, bar): (f64, u16), bpm: f64, label: &str) {
         let l = self.loaded.borrow();
         let per = per_bar(&l.analysis.beats);
-        let end = l
-            .duration_ms
-            .max(l.analysis.beats.last().map_or(0, |b| b.time_ms)) as f64;
         let from = anchor.round() as u32;
+        let from_here = l.grid_hist.from_here;
+        let (head, tail) = exportedit::split(&l.analysis.beats, f64::from(from), from_here);
+        // a section edit ends where the next tempo change begins
+        let rest = if from_here {
+            &tail[exportedit::section_len(tail)..]
+        } else {
+            &[]
+        };
+        let end = rest.first().map_or_else(
+            || {
+                l.duration_ms
+                    .max(l.analysis.beats.last().map_or(0, |b| b.time_ms)) as f64
+            },
+            |b| f64::from(b.time_ms),
+        );
         let grid = retempo(anchor, bar, per, bpm, end).map(|mut v| {
-            let (head, _) =
-                exportedit::split(&l.analysis.beats, f64::from(from), l.grid_hist.from_here);
-            if head.is_empty() {
-                return v;
+            if !head.is_empty() {
+                v.retain(|b| b.time_ms >= from);
             }
-            v.retain(|b| b.time_ms >= from);
-            exportedit::join(head, v, per)
+            exportedit::splice(head, v, rest, per)
         });
         drop(l);
         match grid {
             Some(v) => self.set_grid(v, tr!("{} · {} BPM", label, format!("{bpm:.2}"))),
             None => self.say(tr!("{}: tempo does not fit the grid", label)),
+        }
+    }
+
+    /// MERGE: the tempo section under the playhead is removed, the section before it runs on to where the next one begins
+    /// (at its own tempo). The first section has none before it.
+    pub fn grid_section_remove(&self) {
+        if !self.ready() || self.grid_refused() {
+            return;
+        }
+        let merged = {
+            let l = self.loaded.borrow();
+            merge_section(&l.analysis.beats, self.clock(&l).0, l.duration_ms)
+        };
+        match merged {
+            Some(v) => self.set_grid(v, tr!("tempo section removed").into()),
+            None => self.say(tr!(
+                "grid: the first tempo section has none before it to merge into"
+            )),
         }
     }
 
@@ -435,6 +485,38 @@ mod tests {
 
     fn bars(b: &[Beat]) -> Vec<u16> {
         b.iter().map(|b| b.bar_pos).collect()
+    }
+
+    /// 120 BPM beats 0..3500, then 128 BPM from 4000 (a tempo change after bar 2), 8 beats each.
+    fn two_tempos() -> Vec<Beat> {
+        let mut g = grid(0, 8, 1);
+        g.extend((0..8).map(|i| Beat {
+            bar_pos: (i % 4 + 1) as u16,
+            bpm_x100: 12800,
+            time_ms: (4000.0 + i as f64 * 468.75).round() as u32,
+        }));
+        g
+    }
+
+    #[test]
+    fn merging_a_section_extends_the_one_before_and_the_first_has_none() {
+        let g = two_tempos();
+        let m = merge_section(&g, 5000.0, 8000).unwrap();
+        assert!(m.iter().all(|b| b.bpm_x100 == 12000));
+        assert_eq!(times(&m), (0..=16).map(|i| i * 500).collect::<Vec<_>>());
+        assert_eq!(bars(&m)[..9], [1, 2, 3, 4, 1, 2, 3, 4, 1]);
+        assert!(merge_section(&g, 1000.0, 8000).is_none());
+    }
+
+    #[test]
+    fn merging_a_middle_section_leaves_the_later_one_in_place() {
+        let mut g = two_tempos();
+        let last = g.len();
+        g.extend(grid(8000, 4, 1)); // 120 again from 8000
+        let m = merge_section(&g, 5000.0, 9500).unwrap();
+        // the 128 section is gone: 120 BPM runs to 8000 and the last section starts where it did
+        assert_eq!(times(&m)[..17], (0..=16).map(|i| i * 500).collect::<Vec<_>>()[..]);
+        assert_eq!(m[16..].iter().map(|b| b.time_ms).collect::<Vec<_>>(), times(&g[last..]));
     }
 
     #[test]

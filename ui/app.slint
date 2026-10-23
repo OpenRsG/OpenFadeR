@@ -4,9 +4,12 @@ import { FxPanel, FxSlot, FxState, FxUnit } from "fx.slint";
 import { FxRackState, RackView } from "fxrack.slint";
 import { Mixer, MixerBar, MixerState, ChannelView, BusView } from "mixer.slint";
 import { TrackInfoState } from "trackinfo.slint";
+import { ArtCandidate, ArtworkState } from "artwork.slint";
 import { CueRowView, PadOpt, PadView, PadsState } from "pads.slint";
 import { HelpOverlay, HelpLine, KeysState } from "help.slint";
-import { AboutOverlay, AboutState, UpdateOverlay } from "about.slint";
+import { AboutOverlay, AboutState } from "about.slint";
+import { UpdateOverlay, UpdateState } from "update.slint";
+import { ReportOverlay, ReportState } from "report.slint";
 import { WelcomeOverlay, WelcomeState, SuggestView } from "welcome.slint";
 import { StemsModelCard, StemsModelState } from "stems-model.slint";
 import { MidiChip, MidiOverlay, MidiState } from "midi.slint";
@@ -34,16 +37,22 @@ import { Palette } from "std-widgets.slint";
 import { ThemeCard, ThemeState, TokenRow } from "themes.slint";
 import { CatalogState, GetMapping, GetPlugin, GetTheme, OfferBanner, RepoView } from "catalog.slint";
 import { TouchWorkspace } from "touch.slint";
+import { StudioState } from "studio-state.slint";
+import { StudioWorkspace } from "studio/workspace.slint";
 // Re-exported so Rust can reach them via `app.global::<…>()` and by name.
 export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowView, DeckState, DeckView, DeviceItem, DeviceState, DjEditor, DjItem, DjSystemState, DragState, DupeRow, EditState, ExportDeck, ExportModeState, FixtureView, FxState, FxUnit, HelpLine, KeymapState, KeysState, LayoutState, LibraryState, LightingState, MidiState, MissingRow, MixDeckView, MixPointState, MixerState, PadOpt, PadView, PadsState, PaneState, PluginState, PrefRowData, PrefsState, SamplerState, SlotView, SplitWindow, Theme, ToastState, TrackInfoState, VideoDeckView, VideoItem, VideoState, VideoWindow }
 export { DrumSlotView, GrooveDeckView, GrooveState, HotCue, PhraseSeg }
 export { FxRackState, RackView, FxSlot }
 export { ActionItem, FormatItem, FormatOption }
+export { ArtCandidate, ArtworkState } // FIND ARTWORK (ui/artwork.slint, src/app/artwork)
 export { Palette } // the std widgets' colour scheme follows the skin's base (src/app/skin)
 export { FileDropState } // files dragged in from the desktop (src/app/drop)
 export { ThemeCard, ThemeState, TokenRow } // PREFS > THEMES (ui/themes.slint, src/app/skin/page.rs)
+export { StudioState } // the studio workspace's clock (ui/studio/, src/app/studio.rs)
 export { CatalogState, GetMapping, GetPlugin, GetTheme, RepoView } // GET PLUGINS / THEMES / MAPPINGS (ui/catalog.slint, src/app/catalog)
-export { AboutState } // Help > About and the update check (ui/about.slint, src/app/about.rs)
+export { AboutState } // Help > About (ui/about.slint, src/app/about.rs)
+export { UpdateState } // the update check and one-click update (ui/update.slint, src/app/update.rs)
+export { ReportState } // Help > Report a Problem and the crash offer (ui/report.slint, src/app/diag.rs)
 export { WelcomeState, SuggestView } // first start and Help > Welcome (ui/welcome.slint, src/app/welcome.rs)
 export { StemsModelState } // STEMS model download (ui/stems-model.slint, src/app/stems_model.rs)
 
@@ -59,13 +68,18 @@ export component App inherits Window {
     icon: @image-url("../assets/icon.png");
     preferred-width: 1100px;
     preferred-height: 960px;
-    min-width: root.touch ? 320px + root.safe-area-insets.left + root.safe-area-insets.right : root.vert ? 1100px : 1000px;
-    min-height: root.touch ? max(320px, touch-workspace.required-height + root.safe-area-insets.top + root.safe-area-insets.bottom) : root.y-browser + root.browser-min + Theme.h-status;
+    min-width: root.touch ? 320px + root.safe-area-insets.left + root.safe-area-insets.right : root.studio ? 1100px : root.vert ? 1100px : 1000px;
+    min-height: root.touch ? max(320px, touch-workspace.required-height + root.safe-area-insets.top + root.safe-area-insets.bottom) : root.studio ? 720px : root.y-browser + root.browser-min + Theme.h-status;
     background: Theme.bg;
     default-font-family: Theme.font;
     default-font-size: Theme.font-size;
 
     property <bool> touch: Theme.layout-profile == 1;
+    /// The studio workspace (ui/studio/, `layout-profile` 2) takes the PERFORMANCE mode with two decks; every other mode and the
+    /// 4-deck layouts keep the desktop workspace, with its own global bar to come back by.
+    property <bool> studio: Theme.layout-profile == 2 && root.mode == 1 && DeckState.count == 2;
+    /// Touch or studio: the desktop layout below builds none of its decks, waveforms or panels.
+    property <bool> flat: root.touch || root.studio;
     property <length> browser-min: Theme.h-tab + Theme.h-toolbar + Theme.h-header + 6 * Theme.h-row;
     property <bool> four: DeckState.count == 4;
     property <bool> browse-on: BrowserState.browse-max;
@@ -75,7 +89,7 @@ export component App inherits Window {
     /// deck's waveform image has one size.
     property <bool> stage: !ExportModeState.visible;
     /// Panel toggles of the global bar (the sampler's is `SamplerState.open`, shared with the keyboard and MIDI).
-    property <bool> show-fx: !root.touch && FxState.open && root.stage;
+    property <bool> show-fx: !root.flat && FxState.open && root.stage;
     /// The mixer column and strip (VIEW > Mixer, the View menu and the global bar's MIXER button flip `PrefsState.show-mixer`; a theme's layout may hide it).
     property <bool> show-mixer: PrefsState.show-mixer;
     /// 2Deck / 4Deck Vertical (`PrefsState.vertical`, the VIEW setting); the Browse layout and EXPORT mode use the horizontal stack.
@@ -89,7 +103,7 @@ export component App inherits Window {
     /// Horizontal waveform strips on screen.
     property <int> waves-n: root.vert || !root.stage ? 0 : root.decks-n;
     property <length> deck-h: root.four ? 2 * Theme.h-deck-4 + Theme.gap : Theme.h-deck-2;
-    property <length> mixer-w: !root.show-mixer ? 0px : root.four ? 4 * 44px : root.width >= 1400px ? 120px : 2 * Theme.w-channel;
+    property <length> mixer-w: !root.show-mixer ? 0px : (root.four ? 4 * 44px : root.width >= 1400px ? 120px : 2 * Theme.w-channel) * (MixerState.aux-shown ? (root.four ? 1.25 : 1.5) : 1.0);
     property <length> mid-w: root.show-mixer ? root.mixer-w + 2 * Theme.gap : Theme.gap;
     property <length> panel-w: (root.width - root.mid-w) / 2;
     property <length> col-r: root.panel-w + root.mid-w;
@@ -106,7 +120,7 @@ export component App inherits Window {
     // The vertical stack, top to bottom.
     property <length> y-fx: Theme.h-bar + Theme.gap;
     /// The MIX POINT LINK panel (global-bar button, PREFS > Controller > MIX POINT LINK > Enable); it needs a deck layout, not Browse.
-    property <bool> show-mix: root.touch ? touch-workspace.mix-active : MixPointState.enabled && MixPointState.open && !root.browse-on && root.stage;
+    property <bool> show-mix: root.touch ? touch-workspace.mix-active : root.studio ? StudioState.linked-open && MixPointState.enabled : MixPointState.enabled && MixPointState.open && !root.browse-on && root.stage;
     changed show-mix => { MixPointState.active = root.show-mix; }
     /// EXPORT layout (1 PLAYER … FULL BROWSER, `PrefsState.export-layout`): exportmode.slint draws the players for it.
     property <int> export-layout: PrefsState.export-layout;
@@ -136,20 +150,27 @@ export component App inherits Window {
     /// The border is draggable in PERFORMANCE and EXPORT (the other modes cover the window with their own view) when something can move.
     property <bool> split-on: (root.mode == 1 || root.mode == 0) && (root.stage || ExportModeState.panel-h > 100px);
     /// Track rows the browser has room for (0.5 px of slack for the rounding): at least `PaneState.min-rows`, however far the border is dragged.
-    out property <int> browser-rows: root.touch ? touch-workspace.browser-rows : Math.floor((root.height - root.y-browser - root.bx - Theme.h-status - PaneState.browser-h(0) + 0.5px) / Theme.h-row);
+    out property <int> browser-rows: root.touch ? touch-workspace.browser-rows : root.studio ? StudioState.rows : Math.floor((root.height - root.y-browser - root.bx - Theme.h-status - PaneState.browser-h(0) + 0.5px) / Theme.h-row);
 
     /// Ctrl+F (src/app/keys.rs).
-    public function focus-search() { if root.touch { touch-workspace.focus-search(); } else { browser.focus-search(); } }
+    public function focus-search() { if root.touch { touch-workspace.focus-search(); } else if root.studio { StudioState.focus(0); } else { browser.focus-search(); } }
     /// MIDI browse encoder (src/app/midi): move the track selection by `d` rows.
-    public function browse(d: int) { if root.touch { touch-workspace.browse(d); } else { browser.select-delta(d); } }
+    public function browse(d: int) { if root.touch { touch-workspace.browse(d); } else if root.studio { StudioState.browse(d); } else { browser.select-delta(d); } }
     /// MIDI BACK / browse push / sort buttons (see Browser).
-    public function browse-back() { if root.touch { touch-workspace.browse-back(); } else { browser.browse-back(); } }
-    public function browse-push() -> bool { return root.touch ? touch-workspace.browse-push() : browser.browse-push(); }
-    public function sort-by(col: int) { if root.touch { touch-workspace.sort-by(col); } else { browser.sort-by(col); } }
+    public function browse-back() { if root.touch { touch-workspace.browse-back(); } else if root.studio { StudioState.focus(1); } else { browser.browse-back(); } }
+    public function browse-push() -> bool {
+        if root.touch { return touch-workspace.browse-push(); }
+        if root.studio {
+            if StudioState.tree-focus { StudioState.focus(2); return false; }
+            return true;
+        }
+        return browser.browse-push();
+    }
+    public function sort-by(col: int) { if root.touch { touch-workspace.sort-by(col); } else if root.studio { StudioState.sort-by(col); } else { browser.sort-by(col); } }
     /// MIDI VIEW (SwitchActiveWindow) / W: browse view on / off.
     public function browse-view() { if root.touch { touch-workspace.browse-view(); } else { BrowserState.browse-max = !BrowserState.browse-max; } }
     /// MIDI Area (Back+Shift) / Shift+W: the browser focus moves on, tree → Tag List → track list → related → tree.
-    public function browse-area() { if root.touch { touch-workspace.browse-area(); } else { browser.cycle-area(); } }
+    public function browse-area() { if root.touch { touch-workspace.browse-area(); } else if root.studio { StudioState.focus(StudioState.tree-focus ? 2 : 1); } else { browser.cycle-area(); } }
     /// Mode selector: 0 EXPORT, 1 PERFORMANCE, 2 EDIT, 3 LIGHTING, 4 VIDEO. Each mode shows while its state is `visible` (PERFORMANCE
     /// while none is); one at a time.
     function set-mode(n: int) {
@@ -193,7 +214,7 @@ export component App inherits Window {
                 for label[i] in LibraryState.export-writers: MenuItem { title: label; activated => { LibraryState.action("export-collection:" + i); } }
             }
             MenuSeparator {}
-            MenuItem { title: @tr("Preferences…"); activated => { PrefsState.visible = true; } }
+            MenuItem { title: @tr("Preferences…"); shortcut: @keys(Control + ","); activated => { PrefsState.visible = true; } } // Control is Cmd on macOS: the app menu's Settings… key
             MenuItem { title: @tr("Exit"); activated => { LibraryState.action("exit"); } }
         }
         Menu {
@@ -209,6 +230,8 @@ export component App inherits Window {
             MenuItem { title: @tr("Analysis Lock"); activated => { LibraryState.action("track-lock"); } }
             MenuItem { title: @tr("Reload Tag"); activated => { LibraryState.action("track-reload-tag"); } }
             MenuItem { title: @tr("Reload Tag (discard edits)"); activated => { LibraryState.action("track-reload-tag-discard"); } }
+            MenuItem { title: @tr("Find Artwork…"); activated => { LibraryState.action("track-artwork"); } }
+            MenuItem { title: @tr("Fetch Missing Artwork"); activated => { LibraryState.action("track-artwork-missing"); } }
             MenuItem { title: @tr("Show in File Manager"); activated => { LibraryState.action("track-show"); } }
             MenuSeparator {}
             MenuItem { title: @tr("Relocate…"); activated => { LibraryState.action("track-relocate"); } }
@@ -281,16 +304,19 @@ export component App inherits Window {
             title: @tr("Help");
             MenuItem { title: @tr("Keyboard Shortcuts"); activated => { KeysState.help-visible = !KeysState.help-visible; } }
             MenuItem { title: @tr("Welcome"); activated => { WelcomeState.show(); } }
+            MenuItem { title: UpdateState.version != "" ? @tr("Update to {}…", UpdateState.version) : @tr("Check for Updates"); activated => { UpdateState.open(); } }
+            if UpdateState.rollback != "": MenuItem { title: @tr("Roll Back to {}…", UpdateState.rollback); activated => { UpdateState.open(); } }
+            MenuItem { title: @tr("Report a Problem…"); activated => { ReportState.show(); } }
             MenuItem { title: @tr("About OpenFadeR"); activated => { AboutState.visible = true; } }
         }
     }
 
     /// What the stage draws: the deck panels and the mixer (not in Browse or EXPORT), the vertical waveform columns.
-    property <bool> decks-on: !root.touch && root.stage && !root.browse-on;
-    property <int> vwaves-n: !root.touch && root.vert ? root.decks-n : 0;
+    property <bool> decks-on: !root.flat && root.stage && !root.browse-on;
+    property <int> vwaves-n: !root.flat && root.vert ? root.decks-n : 0;
     // Reports the cursor of a drag where no drop target takes it (dnd.slint); under everything.
     Rectangle {
-    visible: !root.touch;
+    visible: !root.flat;
     width: root.width; height: root.height;
     DragTracker { x: 0; y: 0; width: root.width; height: root.height; }
     FocusScope {
@@ -309,8 +335,8 @@ export component App inherits Window {
         }
 
         if root.show-fx: FxPanel { x: 0; y: root.y-fx; width: root.width; height: root.h-fx; }
-        if root.show-mix: MixPointPanel { x: 0; y: root.y-mix; width: root.width; height: Theme.h-mixpoint; }
-        for i in root.touch ? 0 : root.waves-n: DeckDetail {
+        if root.show-mix && !root.studio: MixPointPanel { x: 0; y: root.y-mix; width: root.width; height: Theme.h-mixpoint; }
+        for i in root.flat ? 0 : root.waves-n: DeckDetail {
             index: PrefsState.wave-order[i];
             x: 0;
             y: root.y-wave + i * (root.wave-hx + Theme.gap);
@@ -499,6 +525,8 @@ export component App inherits Window {
         }
     }
     }
+    // The studio presentation (layout-profile 2): its panels are built while it shows.
+    if root.studio: StudioWorkspace { x: 0px; y: 0px; width: root.width; height: root.height; }
     touch-workspace := TouchWorkspace {
         visible: root.touch;
         x: root.safe-area-insets.left; y: root.safe-area-insets.top;
@@ -520,6 +548,7 @@ export component App inherits Window {
     width: root.width; height: root.height;
     HelpOverlay {}
     AboutOverlay {}
+    ReportOverlay {}
     UpdateOverlay {}
     WelcomeOverlay {}
     StemsModelCard { x: root.width - self.width - Theme.space-xl; y: root.height - self.height - Theme.h-bar - Theme.space-xl; } // above the dialogs: it runs on while they are open

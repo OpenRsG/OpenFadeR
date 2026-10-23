@@ -1,17 +1,23 @@
 //! OpenFadeR core: everything except the Slint UI (which lives in the binary, `src/app/`).
 pub mod analysis;
+pub mod artwork;
 pub mod audio;
 pub mod catalog;
 #[cfg(not(target_os = "android"))]
 pub mod device;
+pub mod diag;
 pub mod edit;
+pub mod inbox;
 pub mod library;
 pub mod lighting;
 pub mod locale;
+pub mod mixstyle;
+pub mod models;
 pub mod paths;
 pub mod plugin;
 #[cfg(feature = "stems")]
 pub mod stems;
 pub mod store;
+pub mod update;
 pub mod video;
 pub mod zip;

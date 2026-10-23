@@ -1,0 +1,64 @@
+import { Theme } from "theme.slint";
+import { Chip } from "widgets.slint";
+import { DialogFrame, Note } from "dialog.slint";
+
+/// Help > Report a Problem, and the offer at start after a crash (src/app/diag.rs, docs/diagnostics.md).
+export global ReportState {
+    in-out property <bool> visible;
+    /// The report is the one an earlier run left behind: the dialog asks whether to send it.
+    in property <bool> crashed;
+    in property <string> report;
+    /// Rust builds the report of this session and shows the dialog.
+    callback show();
+    /// The text is on the clipboard.
+    callback copied();
+    callback open-logs();
+    /// Opens the prefilled GitHub issue (the report is on the clipboard by then).
+    callback open-issue();
+    /// The dialog was closed.
+    callback dismissed();
+}
+
+export component ReportOverlay inherits DialogFrame {
+    visible: ReportState.visible;
+    title: ReportState.crashed ? @tr("OpenFadeR closed unexpectedly. Report it?") : @tr("REPORT A PROBLEM");
+    card-width: 780px;
+    card-height: 620px;
+    closed => { ReportState.dismissed(); }
+    Note {
+        text: ReportState.crashed
+            ? @tr("The crash report below was saved when it happened. OPEN GITHUB ISSUE copies it and opens a new issue: paste it there. Paths and passwords are removed; read it first.")
+            : @tr("This report describes this session. OPEN GITHUB ISSUE copies it and opens a new issue: paste it there. Paths and passwords are removed; read it first.");
+    }
+    Rectangle {
+        vertical-stretch: 1;
+        background: Theme.bg-deep;
+        border-color: Theme.line;
+        border-width: 1px;
+        border-radius: Theme.radius;
+        clip: true;
+        Flickable {
+            content-width: max(self.width, report-text.preferred-width + 2 * Theme.space-md);
+            content-height: max(self.height, report-text.preferred-height + 2 * Theme.space-md);
+            report-text := TextInput {
+                x: Theme.space-md;
+                y: Theme.space-md;
+                width: self.preferred-width;
+                height: self.preferred-height;
+                read-only: true;
+                wrap: no-wrap;
+                text: ReportState.report;
+                color: Theme.text;
+                font-family: "monospace";
+                font-size: Theme.font-sm;
+            }
+        }
+    }
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.space-sm;
+        Chip { text: @tr("COPY REPORT"); width: 120px; horizontal-stretch: 0; clicked => { report-text.select-all(); report-text.copy(); ReportState.copied(); } }
+        Chip { text: @tr("OPEN LOGS FOLDER"); width: 150px; horizontal-stretch: 0; clicked => { ReportState.open-logs(); } }
+        Chip { text: @tr("OPEN GITHUB ISSUE"); width: 170px; horizontal-stretch: 0; active: true; clicked => { report-text.select-all(); report-text.copy(); ReportState.open-issue(); } }
+    }
+}

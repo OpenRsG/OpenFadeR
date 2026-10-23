@@ -10,7 +10,9 @@ A plugin adds to OpenFadeR without touching its code:
 | **Effects** for six places in the mixer: Beat FX, COLOR FX, MIC FX, SEND FX, LEVER FX, channel fader curves | a chain of the host's DSP blocks written in JSON (no code, no compiling), or a native library (`.so`) | each place's selector; see [Effects](#effects) and [`sdk/README.md`](../sdk/README.md) |
 | **COLOR FX knob modes** (e.g. Center Lock) | two lines of JSON, no code | PREFERENCES > CONTROLLER > Mixer > COLOR FX KNOB |
 | **Pad modes** (e.g. Gate Cue) | a list of deck steps in JSON, no code | a mode button of the performance pads |
+| **Cover art** (online lookup: MusicBrainz, iTunes, …) | `"artwork": true` and a script answering `artwork` requests | Track > Find Artwork…, Fetch Missing Artwork, the track info; see [Artwork](#artwork) |
 | **Track library formats** (a collection file, a media player's library) | a native library (`.so`) built against the `library` interface of `sdk/` | File > Import / Export, the Media Browser, and whatever path the app opens; see [Library plugins](#library-plugins) |
+| **Controller drivers** (a controller's own mapping format: Mixxx `.midi.xml` + JS, a manufacturer SDK, …) | a native library (`.so`) built against the `controller` interface of `sdk/` | claims a MIDI port instead of our mapping files; PREFERENCES > CONTROLLER > CONTROLLER PLUGINS; see [Controller plugins](#controller-plugins) |
 | **Settings** of a plugin | a list in JSON | the plugin's card in PREFERENCES > EXTENSIONS; every request carries their values |
 | **Themes** (not a plugin: one JSON file) | see [`docs/skins.md`](skins.md) | PREFERENCES > THEMES |
 
@@ -61,6 +63,11 @@ or without `.git`) and **ADD**; **REFRESH** downloads the repositories again (th
 so the page opens without the network). Every plugin found shows as a card (name, version, description, repository) with one button:
 **INSTALL**, **UPDATE** (the repository's `version` differs from the installed one) or **INSTALLED**; **INSTALL ALL** does the rest. It
 goes through the same checks and the same copy as a drop, then shows the manager's **RESTART NOW** banner when the plugin needs one.
+
+**Plugin updates are announced.** The app's update check (README, Updates: at start, once a day, PREFERENCES > ADVANCED > Check for
+updates; also Help > Check for Updates) reads these repositories again and counts the installed plugins whose repository `version`
+differs, as the **UPDATE** button does. A notice and the update window name them; GET PLUGINS installs them. So a plugin author only
+has to raise `version` in `plugin.json`. Themes and mappings carry no version and are not counted.
 
 What a repository must look like: its default branch holds the plugin folders, each with a `plugin.json`, at the top or at most two
 folders deep (`<repo>/<plugin>/plugin.json`, `<repo>/<group>/<plugin>/plugin.json`). The app downloads
@@ -123,6 +130,7 @@ that asset for the user's platform nothing is installed and the page says `no pr
 | `library` | A native library plugin for a format of track libraries (see [Library plugins](#library-plugins)). |
 | `knob_modes` | COLOR FX knob behaviours (see [Knob modes](#knob-modes)). |
 | `pad_modes` | Performance-pad modes (see [Pad modes](#pad-modes)). |
+| `automix` | Declarative beat-timed transition styles (see [Automix styles](#automix-styles)). |
 
 ### Languages
 
@@ -371,6 +379,39 @@ Ids of `key`: `app.<name>` or `deck.<name>.<A-D>`. Names: deck actions `play_pau
 overlay lists them; `deck.cue.A` and `deck.cue.B` do, `deck.cue.C` too); an id that matches no row is reported. Which key a row
 is bound to does not matter, a cleared binding still runs.
 
+### Artwork
+
+A plugin with `"artwork": true` (and a `script` or `command`) is asked for cover pictures. The app asks every enabled artwork
+plugin, one request at a time, and at least a second apart for one plugin.
+
+```json
+{"op": "artwork", "artist": "Daft Punk", "album": "Discovery", "title": "One More Time", "duration": 320, "settings": {}}
+→ {"candidates": [{"url": "https://…/front.jpg", "thumb": "https://…/front-250.jpg", "size": 1000, "source": "MusicBrainz"}]}
+```
+
+| Key | Meaning |
+|---|---|
+| `artist`, `album`, `title` | The track's tags (empty when it has none). |
+| `duration` | Whole seconds, 0 when unknown. |
+| `url` | An `http` or `https` address of the picture. |
+| `data` | Instead of `url`: the picture itself, base64 (PNG, JPEG, GIF, WebP, BMP). |
+| `thumb` | Optional address of a small picture for the picker. |
+| `size` | Optional pixels on the longer side, shown in the picker. |
+| `source` | Optional label shown under the picture; the plugin's name when left out. |
+
+Candidates without a usable `url` or `data` are dropped and at most eight are taken from one plugin, best first. A plugin that
+fails (no network) only reports its error; a lookup that every plugin answered with nothing is remembered for 30 days.
+
+**Find Artwork…** (Track menu, right-click menu, FIND ARTWORK in the track info) shows the candidates with thumbnails; a click
+keeps one, for the track's whole album (one undo step). **Fetch Missing Artwork** does that for every album of the list on screen
+that has no cover, taking the first candidate. A folder image beside the file (`cover.jpg`, `folder.jpg`, `front.png`, …) counts
+without any plugin. With PREFERENCES > ADVANCED > BROWSE > Write fetched artwork into the file's tags the picture is also
+written into the tags of the album's tracks (MP3, WAV, AIFF with an ID3v2 `APIC` frame, FLAC with a `PICTURE` block; off by default). The pictures are shown in the browser's
+Cover column, on the decks and in the track info.
+
+[`cover-art`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/cover-art) (Python) answers from MusicBrainz with the Cover
+Art Archive and from the iTunes Search API; with a Discogs personal access token in its settings it asks Discogs too.
+
 ### Events
 
 A plugin that lists an event in `events` is told when it happens. Every event is one request of its own, so a slow plugin delays
@@ -391,7 +432,11 @@ mix (load the next track when one ends, pause a deck, change tempo, …). A fail
 | `track_ended` | A deck stopped at the end of its track | `{"deck": 1, "track": {…}}` |
 | `track_played` | A track stayed on air for the time the play history needs (the entry in History > today) | `{"track": {…}}` |
 | `master_changed` | Another deck became the tempo master (0 = none) | `{"deck": 2}` |
+| `recording_started`, `recording_stopped` | REC started / stopped (the files it wrote, and the cue sheets, tracklists and control log written next to them) | `{}` / `{"files": ["/m/rec.wav"], "sidecars": ["/m/rec.cue", "/m/rec.tracklist.txt"]}` |
+| `recording_track` | During REC, another deck took over the mix (the master while it is on air, else the first deck on air); the moment is the recorder's clock, the same time the cue sheet gets | `{"deck": 2, "position_ms": 61234, "track": {…}}` |
 | `recording_started`, `recording_stopped` | REC started / stopped (the files it wrote) | `{}` / `{"files": ["/m/rec.wav"]}` |
+| `inbox_added` | New music from a watched folder joined INBOX (Preferences > Advanced > Database > Inbox): a plugin can tag it, convert it, tell a phone … | `{"files": ["/m/Downloads/a.mp3"]}` |
+| `inbox_moved` | Tracks moved to another stage (INBOX → REVIEW → COLLECTION, by drag or MORE); `files` are where the files are now | `{"stage": "REVIEW", "files": ["/m/Review/a.mp3"]}` |
 | `timer` | Every `timer` seconds of the manifest | `{}` |
 
 `track` has the fields listed under Actions.
@@ -404,7 +449,7 @@ a **native library** (see [Native libraries](#native-libraries)). Every effect n
 
 | Slot | Where you pick it | What the effect gets and gives |
 |---|---|---|
-| `beat` | FX panel, BEAT tab, after the built-in effects | a channel or the master; LEVEL, beat, ON |
+| `beat` | FX panel, BEAT tab, after the built-in effects | a channel (CH 1 to 4, or the AUX input's channel, see the README) or the master; LEVEL, beat, ON |
 | `color` | COLOR FX type chips, after FILTER … CRUSH | a channel after its EQ; the COLOR knob as -1 to 1 |
 | `mic` | FX panel, MIC tab | the microphone; LEVEL, PARAM, ON |
 | `send` | FX panel, SEND tab | the sum of each channel's SEND knob; gives the return, added to the master |
@@ -742,6 +787,121 @@ sampler after File > Import). Crates for what they share sit beside them. They n
 the workspace in release mode and copies each library next to its `plugin.json` (`start.sh` runs it first). Their settings are on their
 cards in PREFERENCES > EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
 
+## Controller plugins
+
+A controller plugin **drives a MIDI port** instead of our mapping files: it reads the controller's messages, works the app's
+controls and lights the controller's lights. It is for what a mapping file cannot say (a script, a manufacturer's protocol) and
+for the mapping formats of other software. The bundled `mixxx` plugin runs Mixxx's mapping files ([below](#the-mixxx-plugin)).
+
+```json
+{"name": "mixxx", "controller": {"lib": {"linux": "libmixxx.so", "windows": "mixxx.dll", "macos": "libmixxx.dylib"}}}
+```
+
+PREFERENCES > CONTROLLER > **CONTROLLER PLUGINS** has one row per MIDI input port: **AUTO** (every enabled controller plugin is asked
+how sure it is about the port, `probe`; the best one drives it, a port nobody knows keeps our mapping files), **OPENFADER MAPPING**
+(the plugins are skipped) or one plugin by name (it drives the port even when it would not have recognised it). The choice is kept
+per port name in `controller_plugins` of `settings.conf`, without the ALSA numbers. A claimed port **bypasses our XML mapping**: its
+messages, whole, go to the plugin only. A plugin whose `open` fails says why in a notification and the port keeps our mapping. The
+plugin's soft takeover has a table of its own per session.
+
+### The interface
+
+The library exports `openfader_controller_v1`, returning a static table (`ControllerApi`, `CONTROLLER_ABI` = 1) of `probe`, `open`,
+`midi`, `changed`, `timer` and `close`. Every call carries the host's callback table (`Host`), valid until the call returns:
+`get` / `set` a control, `midi_out`, `timer` / `cancel`, `watch` a control (its changes come back as `changed`), `takeover`,
+`label`, `log` and `settings` (the plugin's settings of `plugin.json` as one JSON object). The host makes every call of a
+session from one thread, one at a time, **never from the audio thread** (it is the UI thread: return quickly); the callbacks
+never re-enter the plugin, a control it sets is reported back by a later `changed`. Messages arrive complete (sysex as
+`F0 … F7`; clock and active sensing are dropped), and MIDI out is paced by the host.
+
+In Rust depend on `openfader-plugin`, build a `cdylib` (keep `panic = "unwind"`), implement `ControllerPlugin` and `Controller` and
+call `openfader_plugin::export_controller!(MyDriver)`; `openfader_plugin::controller::host` has the callbacks as functions. A
+panic in a call is logged and the session lives on.
+
+### The controls
+
+A control is a key `name[/col[/arg]]`. `name` is one of the actions of the mapping files (`docs/mappings.md`) or a value below;
+`col` counts from 1 and is the deck (the Beat FX unit or MERGE side for the FX actions); `crossfader`, `master` and `browse` take
+none; `arg` is the constant of the action's mapping row (`hw-fx-on/1/2`, `hw-pad-delete/2/0`). A key that does not exist, or whose
+deck is not in the layout, answers NaN and sets nothing.
+
+| Setting a control | Value |
+|---|---|
+| a button (`play`, `cue`, `sync`, `pad1`…, `hw-*`) | 0.5 and up presses, below releases (a hot cue pad releases to the slip playhead, `hw-fx-hold` lets go); `play` and the like toggle on a press |
+| a knob or fader (`fader`, `trim`, `eq-hi`, `eq-mid`, `eq-low`, `filter`, `crossfader`, `master`, `hp-mix`, `hp-level`, `tempo`, `fx-level`, `merge-knob`…) | 0 to 1; through soft takeover when the plugin asked for it with `takeover` and PREFERENCES > CONTROLLER > Others > Soft takeover is on |
+| an encoder or jog (`jog`, `jog-bend`, `jog-search`, `jog-cut`, `browse`, `fx-beat-rel`, `zoom-rot`) | signed ticks (a jog turns the platter as its mapping row would) |
+| `jog-touch` | 0.5 and up: the platter is touched |
+| `position`, `position-ms` | the playhead as 0 to 1 of the track, or in ms (seeks) |
+
+| Reading a control | Value |
+|---|---|
+| `loaded`, `playing`, `at-cue`, `synced`, `deck-master`, `loop-active`, `key-lock`, `quantize`, `slip`, `reverse`, `cue-monitor`, `vinyl`, `jog-cutter` | 0 or 1 |
+| `pad1` … `pad8` | 1 when that hot cue is set |
+| `fx-on/<unit>/<slot>` | 1 when the FX slot (0 to 2) is on |
+| `fx-assign`, `loop-beats`, `pad-mode` | the number the panel shows |
+| `bpm`, `level`, `position`, `position-ms`, `duration-ms`, `rate` | the number (`level` 0 to 1) |
+| any knob or fader | its position on screen, 0 to 1 |
+
+The action names are the ones of `docs/mappings.md`; the layer keys of a controller (`hw-deck-select`, `hw-dual`) cannot be set: a
+plugin addresses decks directly. `watch` reports a change at most every 10 ms (and once when it starts, so the lights begin right).
+
+### The `mixxx` plugin
+
+It runs **Mixxx controller mappings** as Mixxx's manual documents them: a `*.midi.xml` file and the JavaScript files it lists. No
+mapping file is bundled; they are read from your own Mixxx folders: the plugin's **Mapping folder** setting first, then
+`~/.mixxx/controllers`, the Flatpak and macOS user folders, `%LOCALAPPDATA%\Mixxx\controllers`, and the install folders
+(`/usr/share/mixxx/controllers`, `/usr/local/share/mixxx/controllers`, `C:\Program Files\Mixxx\controllers`, the macOS app bundle).
+A mapping's scripts are looked up beside its XML, then in the other folders.
+
+The mapping for a port is the one whose controller name (`<controller id>`, `<info><name>`) or file name is most like the port's
+name (all of its words in the port's name, or its model number and half of its words; the plugin's **Mapping** setting names one,
+for a port you assigned to the plugin by hand). `probe` reports 60 to 100.
+
+**Controls and outputs.** `<options>` understood: `script-binding` (the key `Prefix.func` is called as
+`func(channel, control, value, status, group)`, a sysex one as `func(data, length)`), `normal`, `invert`, `diff`, `selectknob`,
+`hercjog` (two's complement steps), `spread64`, `rot64`, `rot64inv` (centred on 64), `button`, `switch`, `soft-takeover`, and
+`fourteen-bit-msb` / `fourteen-bit-lsb` (the two halves of one control). A note-off a mapping did not list goes to its note-on with 0.
+An `<output>` sends `status midino on|off` when its control changes (on from `minimum` to `maximum`; with no `minimum` above 0).
+Scripts are loaded in the order listed, then every `functionprefix.init(controllerId, debugging)` runs; `functionprefix.shutdown()`
+runs when the port is released.
+
+**Script API** (Boa, a pure-Rust JavaScript engine, ES2023): `engine.getValue`, `setValue`, `getParameter`, `setParameter`,
+`getParameterForValue`, `makeConnection` (and `makeUnbufferedConnection`, `connectControl`; the connection has `disconnect`,
+`trigger`), `trigger`, `beginTimer` (at least 20 ms, `once` as Mixxx's `oneShot`), `stopTimer`, `softTakeover`,
+`scratchEnable` / `scratchTick` / `scratchDisable` / `isScratching` (touch and ticks of the jog), `brake`, `spinback`, `softStart`,
+`log`; `midi.sendShortMsg`, `midi.sendSysexMsg`; `print`, `console.*`; `script.deckFromGroup`, `midiDebug`, `toggleControl`,
+`triggerControl`, `absoluteLin`, `absoluteLinInverse`, `absoluteNonLin`, `absoluteNonLinInverse`, `midiPitch`, `spinback`, `brake`,
+`softStart`, the `*RegEx` patterns; `bpm.tapButton`. The plugin's own versions are loaded before the mapping, so a mapping that lists
+Mixxx's own `common-controller-scripts.js` or `midi-components-0.0.js` (the library is in your Mixxx folder) runs on them.
+
+**Mixxx controls** are translated to ours (a value in Mixxx's range, `setParameter` / `getParameter` the 0 to 1 knob position); one
+not listed has no counterpart: reading it answers 0, setting it does nothing, the log says so once.
+
+| Mixxx `[group]` `item` | OpenFadeR control |
+|---|---|
+| `[ChannelN]` `play` (toggle), `play_indicator` | `play/N`, `playing/N` |
+| `cue_default`, `cue_gotoandplay`, `cue_gotoandstop`, `cue_preview`, `cue_indicator` | `cue/N`, `at-cue/N` |
+| `sync_enabled`, `beatsync`, `keylock`, `quantize`, `slip_enabled`, `reverse`, `pfl` | `sync/N`, `key-lock/N`, `quantize/N`, `slip/N`, `reverse/N`, `cue-monitor/N` |
+| `loop_enabled`, `reloop_toggle`, `loop_in`, `loop_out`, `loop_halve`, `loop_double` | `loop-active/N`, `reloop/N`, `loop-in/N`, `loop-out/N`, `loop-halve/N`, `loop-double/N` |
+| `beatloop_{1,2,4,8,16}_toggle` (and `_activate`), `beatjump_{1,4}_forward` / `_backward` | `loop-X/N`, `jump-fwd-X/N`, `jump-back-X/N` |
+| `hotcue_{1..8}_activate` (`gotoandplay`, `gotoandstop`), `_enabled`, `_clear` | `padX/N`, `padX/N` (read), `hw-pad-delete/N/(X-1)` |
+| `LoadSelectedTrack`, `eject`, `track_loaded`, `bpm`, `bpm_tap` | `load/N`, `hw-pad-unload/N`, `loaded/N`, `bpm/N`, `grid-tap/N` |
+| `volume`, `pregain` (0 to 4), `filterHigh` / `filterMid` / `filterLow` (0 to 4) | `fader/N`, `trim/N`, `eq-hi/N`, `eq-mid/N`, `eq-low/N` |
+| `rate` (-1 to 1) | `tempo/N` (the same 0 to 1 of the knob: 0 is the + end) |
+| `playposition` | `position/N` |
+| `jog`, `wheel`, `scratch2` | `jog-bend/N`, `jog-bend/N`, `jog/N` (ticks) |
+| `[EqualizerRack1_[ChannelN]_Effect1]` `parameter1` / `2` / `3` | `eq-low/N`, `eq-mid/N`, `eq-hi/N` |
+| `[QuickEffectRack1_[ChannelN]]` `super1` | `filter/N` |
+| `[EffectRack1_EffectUnitU]` `mix`, `group_[ChannelN]_enable` | `fx-level/U`, `hw-fx-assign/U/(N-1)` |
+| `[EffectRack1_EffectUnitU_EffectV]` `enabled` | `fx-on/U/(V-1)` (read), `hw-fx-on/U/(V-1)` |
+| `[Master]` `crossfader` (-1 to 1), `gain`, `headGain`, `headMix` (-1 to 1) | `crossfader`, `master`, `hp-level`, `hp-mix` |
+| `[Library]` `MoveVertical`, `ScrollVertical`, `GoToItem`, `MoveFocusForward`, `MoveFocusBackward` | `browse`, `browse-push`, `browse-back` |
+
+Limits: no samplers, vinyl-control, `engine.softTakeoverIgnoreNextValue` (nothing to do), `script.crossfaderCurve`, HID or
+bulk controllers (only MIDI ports), and no mapping settings (`<settings>`); `engine.brake` / `spinback` run our BRAKE (its length is
+ours). A pitch bend arrives as control 0 with its 14-bit value (inferred from the manual); a script that never returns stalls the UI
+thread, as in a call that is slow.
+
 ## Knob modes
 
 `"knob_modes": [{"name": "CENTER LOCK", "stop": 0.5}]` adds CENTER LOCK to PREFERENCES > CONTROLLER > Mixer > COLOR FX KNOB. `stop`
@@ -765,6 +925,61 @@ the `press` steps on that deck, letting it go runs the `release` steps:
 GATE CUE (`gate-cue` in the plugins repository) is `"press": ["jump", "play"], "release": ["pause", "jump"]`: the deck plays
 from the cue while the pad is held and is back on it, paused, when you let go. An unknown step makes the whole `plugin.json`
 invalid (PREFS lists why).
+
+## Automix styles
+
+`automix` adds styles to the AUTOMIX panel's STYLE selector and RANDOM pool. No script, model, network or GPU is needed.
+Restart after installing or editing a style, as with knob and pad modes. Built-ins use the same recipe engine.
+
+```json
+{
+  "name": "transition-recipes",
+  "automix": [{
+    "name": "FILTER THROW",
+    "steps": [
+      {"at": 0, "over": "75%", "deck": "out", "filter": 1},
+      {"at": 0, "over": "100%", "crossfader": 1},
+      {"at": 0, "deck": "in", "low": 0},
+      {"at": "50%", "deck": "in", "low": 0.5},
+      {"at": -4, "deck": "out", "fx": {"effect": "echo", "beat": 0.5, "level": 0.6}},
+      {"at": "100%", "deck": "out", "fx": {"on": false}}
+    ]
+  }]
+}
+```
+
+Names are unique (including the built-ins), 1–16 characters, without commas. Optional `bars` (1–64) fixes the style's length;
+otherwise LENGTH supplies it. The usual planner may shorten a transition when less track remains. Steps outside its length
+are not played. `at` is beats from the transition's start, negative beats from its end, or a percentage string such as `"50%"`.
+`over` (default zero) ramps continuous controls over that many beats or that percentage of the transition. A ramp begins at
+the preceding step's current value; simultaneous steps are applied in JSON order. One-shot commands ignore `over`.
+
+| Step field | Values and meaning |
+|---|---|
+| `deck` | `"out"` or `"in"`; required for everything except `crossfader` |
+| `crossfader` | 0–1 travel from outgoing to incoming side, constant-power curve |
+| `fader` | 0–1 times the DJ's channel fader |
+| `low`, `mid`, `high` | EQ knob positions: 0 minimum, 0.5 flat, 1 maximum; EQ/ISOLATOR setting still applies |
+| `filter` | −1 closed low-pass, 0 off, +1 closed high-pass; borrows FILTER COLOR FX |
+| `fx` | FX2 slot 1 on the step's channel: `effect` (Beat FX selector name, any case), `beat` (nearest supported beat fraction), `level` (0–1), `on` (default true); omitted parameters keep their current values |
+| `loop` | 1/8–32 beats from the current beat; 0 exits the loop |
+| `brake` | Vinyl stop over more than 0 and at most 16 beats |
+
+The controls and FX panel show the moves. Finishing, SKIP during a transition, or stopping restores the borrowed knobs,
+faders, COLOR FX type and FX2 slot. The crossfader stays on the incoming deck; the outgoing deck pauses. A style-created loop
+is cleared. Do not operate borrowed controls during a transition: automation owns them until release. Aim to finish with the
+incoming EQ flat, its filter off and its fader multiplier at 1; the saved DJ values are restored afterwards.
+Without grids or enough room, the existing end-of-track cut rule takes priority; late grid analysis replans the same chosen
+style. RANDOM draws only from the checked styles and excludes the preceding pick; the panel keeps at least two enabled.
+
+## In the studio theme
+
+A theme that selects the studio workspace (`layout-profile` 2, [docs/skins.md](skins.md); the bundled Studio theme) shows every one of these
+extension points without a line of theme code: the effects of plugins are in the effect drop-downs of the deck panels' three FX
+slots, the pad modes are in the MORE menu of the pad tabs, the COLOR FX effects and knob modes in the SETTINGS tab of the mixer, a
+plugin's source in the sidebar's tree, and its actions in the Plugins menu of the window's menu bar. The drop-downs read the same
+lists as the desktop panels (`FxState.effects`, `DeckState.pad-mode-names`, `MixerState.cfx-names`), so a plugin installed or
+removed changes all layouts alike.
 
 ## A first plugin
 

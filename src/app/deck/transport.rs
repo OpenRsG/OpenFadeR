@@ -2,7 +2,7 @@
 //! zoom (CUE is in [`cue`](super::cue), SYNC in [`sync`](super::sync)). Each acts on the player and
 //! mirrors the result into the deck's `DeckView`.
 
-use super::{Deck, beat_at, cue::at_cue, grid_bpm, ms_at, prefs};
+use super::{Deck, beat_at, cue::at_cue, ms_at, prefs, tempo_at};
 use openfader::{analysis::Beat, audio::Player};
 
 /// Tempo fader travel per range step: ± this fraction, label shown on the button. ±6/±10/±16/WIDE
@@ -144,7 +144,7 @@ impl Deck {
         self.with_player(|p| p.set_rate(rate));
         let (grid, base) = {
             let l = self.loaded.borrow();
-            (grid_bpm(&l.analysis.beats), l.base_bpm)
+            (tempo_at(&l.analysis.beats, self.clock(&l).0), l.base_bpm)
         };
         let range = RANGES[self.range.get()].0;
         self.show(|v| {
@@ -154,6 +154,24 @@ impl Deck {
             v.bpm = (base * rate) as f32;
         });
         self.refresh_key();
+    }
+
+    /// The tempo the deck shows and feeds (readout, BEAT FX, MIDI clock, automix) is that of the grid section under the
+    /// playhead: once per tick, a new section makes it follow.
+    pub(super) fn track_tempo(&self) {
+        let moved = {
+            let mut l = self.loaded.borrow_mut();
+            let here = l
+                .ready
+                .then(|| tempo_at(&l.analysis.beats, self.clock(&l).0))
+                .flatten();
+            here.filter(|b| (b - l.base_bpm).abs() > 1e-9)
+                .inspect(|&b| l.base_bpm = b)
+                .is_some()
+        };
+        if moved {
+            self.set_rate(self.rate.get());
+        }
     }
 
     /// Next tempo range. The fader keeps its position, so the rate scales with the new range (a
@@ -340,5 +358,19 @@ mod tests {
         assert_eq!(shift_loop(&g, (3000, 5000), 4, 6000), None);
         assert_eq!(shift_loop(&g, (0, 1000), -4, 6000), None);
         assert_eq!(shift_loop(&[], (0, 1000), 4, 6000), None);
+    }
+
+    #[test]
+    fn jump_across_a_tempo_change_counts_beats_not_milliseconds() {
+        // 120 BPM (500 ms beats) up to beat 7 at 3500 ms, then 150 BPM (400 ms beats) from beat 8 at 4000 ms
+        let mut g = grid(0, 8);
+        g.extend((0..8).map(|i| Beat {
+            bar_pos: (i % 4 + 1) as u16,
+            bpm_x100: 15000,
+            time_ms: 4000 + i * 400,
+        }));
+        assert_eq!(jump(&g, 3750.0, 2), Some(4600)); // beat 7.5 → 9.5
+        assert_eq!(jump(&g, 4600.0, -2), Some(3750));
+        assert_eq!(jump(&g, 3750.0, 4), Some(5400)); // beat 11.5
     }
 }

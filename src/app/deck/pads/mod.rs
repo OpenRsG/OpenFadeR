@@ -21,7 +21,7 @@ mod cues;
 mod layout;
 mod plugin;
 
-use super::{beats_between, grid_bpm, Deck, Loaded};
+use super::{Deck, Loaded, beats_between, tempo_at};
 use crate::app::{
     fx::pad_fx_rgb,
     prefs,
@@ -207,9 +207,11 @@ impl Deck {
     /// pad's effect and beat at this deck's tempo; the Beat FX panel's unit and the other deck's are untouched.
     fn pad_fx_on(&self, pad: usize) {
         let (name, effect, beat) = PAD_FX[pad];
-        let bpm = self
-            .with_analysis(|a, _| grid_bpm(&a.beats))
-            .map_or(0.0, |g| (g * self.rate()) as f32);
+        let bpm = {
+            let l = self.loaded.borrow();
+            tempo_at(&l.analysis.beats, self.clock(&l).0)
+        }
+        .map_or(0.0, |g| (g * self.rate()) as f32);
         let index = self.index;
         self.with_player(|p| {
             let c = &p.bus().pad_fx[index];

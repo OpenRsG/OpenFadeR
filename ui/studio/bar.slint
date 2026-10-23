@@ -1,0 +1,84 @@
+import { Chip, Icon, IconButton, Meter } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { MixerState } from "../mixer.slint";
+import { PrefsState } from "../prefs-state.slint";
+import { MidiChip } from "../midi.slint";
+import { DeviceChip } from "../device.slint";
+import { ExportModeState } from "../exportmode-state.slint";
+import { EditState } from "../edit.slint";
+import { LightingState } from "../lighting.slint";
+import { VideoState } from "../video.slint";
+import { StudioState } from "../studio-state.slint";
+import { Caption } from "parts.slint";
+
+/// The top bar: the mode buttons (PERFORM is this workspace; the others open their own full-window views), the logo in the middle, and
+/// on the right the master meter, REC, the controller and device buttons, the clock and the gear that opens PREFERENCES.
+export component StudioBar inherits Rectangle {
+    property <length> g: Theme.studio-gap;
+    function set-mode(n: int) {
+        ExportModeState.visible = n == 0;
+        EditState.visible = n == 2;
+        LightingState.visible = n == 3;
+        VideoState.visible = n == 4;
+    }
+    background: Theme.panel;
+    HorizontalLayout {
+        padding-left: root.g;
+        padding-right: root.g;
+        padding-top: Theme.space-sm;
+        padding-bottom: Theme.space-sm;
+        spacing: Theme.space-md;
+        HorizontalLayout {
+            horizontal-stretch: 0;
+            spacing: Theme.space-sm;
+            for label[i] in [@tr("EXPORT"), @tr("PERFORM"), @tr("EDIT")]: Chip {
+                text: label;
+                width: max(64px, self.fit-width);
+                horizontal-stretch: 0;
+                active: i == 1;
+                tooltip: i == 1 ? @tr("The performance workspace: decks, mixer, effects and library") : @tr("Open this mode");
+                clicked => { root.set-mode(i); }
+            }
+            if LightingState.enabled: Chip { text: @tr("LIGHTING"); width: max(64px, self.fit-width); horizontal-stretch: 0; tooltip: @tr("Open this mode"); clicked => { root.set-mode(3); } }
+            if VideoState.enabled: Chip { text: @tr("VIDEO"); width: max(64px, self.fit-width); horizontal-stretch: 0; tooltip: @tr("Open this mode"); clicked => { root.set-mode(4); } }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Caption { text: @tr("MASTER"); width: 50px; horizontal-stretch: 0; horizontal-alignment: right; }
+        Rectangle {
+            width: 120px;
+            horizontal-stretch: 0;
+            Meter { y: (parent.height - self.height) / 2; width: parent.width; height: 8px; level: MixerState.bus.level; peak: MixerState.bus.peak; }
+        }
+        IconButton {
+            icon: Icon.rec;
+            solid: true;
+            active: MixerState.bus.rec;
+            active-color: Theme.rec;
+            tooltip: @tr("REC (master out)");
+            clicked => { MixerState.rec-toggled(); }
+        }
+        if MixerState.bus.rec: Text { text: MixerState.bus.rec-text; vertical-alignment: center; horizontal-stretch: 0; color: Theme.rec.brighter(0.4); font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+        MidiChip { width: 48px; height: Theme.h-ctl; horizontal-stretch: 0; }
+        DeviceChip { width: 78px; height: Theme.h-ctl; horizontal-stretch: 0; }
+        Text {
+            text: StudioState.clock;
+            width: 52px;
+            horizontal-stretch: 0;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.font-lg;
+            font-weight: Theme.weight-bold;
+        }
+        IconButton { icon: Icon.gear; icon-size: 18px; solid: true; tooltip: @tr("PREFERENCES"); clicked => { PrefsState.visible = true; } }
+    }
+    HorizontalLayout {
+        x: (root.width - self.width) / 2;
+        width: self.preferred-width;
+        padding: Theme.space-sm;
+        spacing: Theme.space-md;
+        Image { source: @image-url("../../assets/icon.png"); width: root.height - 14px; height: self.width; y: 3px; horizontal-stretch: 0; image-fit: contain; }
+        Text { text: "OpenFadeR"; vertical-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-xl; font-weight: Theme.weight-bold; }
+    }
+}

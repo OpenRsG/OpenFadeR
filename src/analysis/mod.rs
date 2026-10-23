@@ -63,7 +63,7 @@ pub fn analyze_cancellable<S: Frames + ?Sized>(
     }
     let key = || {
         if o.parts.key {
-            key::detect_cancellable(samples, rate, cancelled)
+            key::detect_by(o.key_detector, samples, rate, cancelled)
         } else {
             Some(None)
         }
@@ -365,27 +365,23 @@ mod execution_tests {
         for stop in 0..=6 {
             let calls = AtomicUsize::new(0);
             let cancelled = || calls.fetch_add(1, Ordering::Relaxed) >= stop;
-            assert!(
-                analyze_cancellable(
-                    &samples,
-                    8000,
-                    &options::Options::default(),
-                    Execution::Bulk,
-                    &cancelled
-                )
-                .is_none()
-            );
-        }
-        assert!(
-            analyze_cancellable(
+            assert!(analyze_cancellable(
                 &samples,
                 8000,
                 &options::Options::default(),
-                Execution::Interactive,
-                &|| true
+                Execution::Bulk,
+                &cancelled
             )
-            .is_none()
-        );
+            .is_none());
+        }
+        assert!(analyze_cancellable(
+            &samples,
+            8000,
+            &options::Options::default(),
+            Execution::Interactive,
+            &|| true
+        )
+        .is_none());
     }
 
     #[test]

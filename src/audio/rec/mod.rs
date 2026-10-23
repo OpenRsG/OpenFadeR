@@ -42,6 +42,8 @@ pub struct Take {
     pub dropped: u64,
     /// The files written, in order (auto-separation makes more than one; none when no audio came).
     pub files: Vec<PathBuf>,
+    /// Where each of `files` begins on the recording's own clock, in frames (the first is 0): the frames written before it.
+    pub starts: Vec<u64>,
 }
 
 impl Take {
@@ -53,6 +55,9 @@ impl Take {
 /// Chooses the path of the next file; it must not exist.
 pub type NewPath = Box<dyn FnMut() -> io::Result<PathBuf> + Send>;
 
+/// What the writer thread returns: the frames written, the files and where each began.
+type Done = (u64, Vec<PathBuf>, Vec<u64>);
+
 /// The files of one recording: opens them on demand, patches the header, optimises on close.
 struct Writer {
     rate: u32,
@@ -60,6 +65,9 @@ struct Writer {
     optimise: bool,
     open: Option<(Wav<BufWriter<File>>, PathBuf)>,
     files: Vec<PathBuf>,
+    /// The frame count when each of `files` was opened.
+    starts: Vec<u64>,
+    opened_at: u64,
     frames: u64,
     /// The file being written, for [`Recorder::path`].
     current: Arc<Mutex<Option<PathBuf>>>,
@@ -74,6 +82,7 @@ impl Writer {
             .open(&path)?;
         let mut wav = Wav::new(BufWriter::new(file), self.rate)?;
         wav.sync()?;
+        self.opened_at = self.frames;
         *self.current.lock().expect("path lock") = Some(path.clone());
         self.open = Some((wav, path));
         Ok(())
@@ -101,6 +110,7 @@ impl Writer {
                 optimise::optimise(&path)?;
             }
             self.files.push(path);
+            self.starts.push(self.opened_at);
         }
         Ok(())
     }
@@ -112,7 +122,7 @@ pub struct Recorder {
     written: Arc<AtomicU64>,
     current: Arc<Mutex<Option<PathBuf>>>,
     dropped0: u64,
-    thread: Option<JoinHandle<io::Result<(u64, Vec<PathBuf>)>>>,
+    thread: Option<JoinHandle<io::Result<Done>>>,
 }
 
 impl Recorder {
@@ -127,6 +137,8 @@ impl Recorder {
             optimise: options.optimise,
             open: None,
             files: Vec::new(),
+            starts: Vec::new(),
+            opened_at: 0,
             frames: 0,
             current: current.clone(),
         };
@@ -179,7 +191,7 @@ impl Recorder {
     fn finish(&mut self) -> io::Result<Take> {
         self.tap.on.store(false, Release);
         let t = self.thread.take().expect("stopped once");
-        let (frames, files) = t
+        let (frames, files, starts) = t
             .join()
             .map_err(|_| io::Error::other("writer thread panicked"))??;
         Ok(Take {
@@ -187,6 +199,7 @@ impl Recorder {
             rate: self.tap.rate(),
             dropped: self.tap.ring.dropped() - self.dropped0,
             files,
+            starts,
         })
     }
 }
@@ -201,12 +214,7 @@ impl Drop for Recorder {
 
 /// Writer thread: drain the ring until the tap is switched off *and* empty (or the gate ends the recording).
 /// `on` is read before the drain so frames pushed up to the switch-off are written.
-fn drain(
-    tap: &Tap,
-    mut gate: Gate,
-    mut w: Writer,
-    written: &AtomicU64,
-) -> io::Result<(u64, Vec<PathBuf>)> {
+fn drain(tap: &Tap, mut gate: Gate, mut w: Writer, written: &AtomicU64) -> io::Result<Done> {
     let mut buf = Vec::with_capacity(4096);
     let mut patched = Instant::now();
     loop {
@@ -224,7 +232,7 @@ fn drain(
                     Step::End => {
                         w.close()?;
                         written.store(w.frames, Relaxed);
-                        return Ok((w.frames, w.files));
+                        return Ok((w.frames, w.files, w.starts));
                     }
                 }
             }
@@ -232,7 +240,7 @@ fn drain(
         }
         if !live {
             w.close()?;
-            return Ok((w.frames, w.files));
+            return Ok((w.frames, w.files, w.starts));
         }
         if patched.elapsed() >= PATCH_EVERY {
             w.sync()?;
@@ -248,9 +256,7 @@ pub fn new_path(dir: Option<&Path>) -> io::Result<PathBuf> {
     let dir = dir
         .map(Path::to_path_buf)
         .or_else(|| crate::paths::output_dir("OPENFADER_REC_DIR"))
-        .ok_or_else(|| {
-            io::Error::other("no recording directory: set OPENFADER_REC_DIR or HOME")
-        })?;
+        .ok_or_else(|| io::Error::other("no recording directory: set OPENFADER_REC_DIR or HOME"))?;
     crate::paths::timestamped(&dir, "rec", "wav")
 }
 
@@ -380,6 +386,7 @@ mod tests {
             "the take and the second of silence that separated it"
         );
         assert_eq!(len(&take.files[1]), 1500);
+        assert_eq!(take.starts, [0, 3000], "each file's first frame on the recording's clock");
         let peak = std::fs::read(&take.files[1]).unwrap()[44..]
             .chunks(2)
             .map(|c| i16::from_le_bytes([c[0], c[1]]).unsigned_abs())

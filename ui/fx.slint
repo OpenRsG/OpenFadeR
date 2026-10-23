@@ -23,7 +23,7 @@ export struct FxUnit {
     slots: [FxSlot],
     /// The BEAT target: the slot the BEAT ◁ / ▷ buttons step and the controller's beat display shows (FX SELECT on a controller).
     target: int,
-    /// 0..3 = CH A..D, 4 = MASTER.
+    /// 0..3 = CH A..D, 4 = MASTER, 5 = AUX (the AUX input's channel).
     assign: int,
     /// Tempo the unit follows, "128.00 BPM"; `no-bpm` when no deck gave one and 120 is the fallback;
     /// `tapped` when TAP set the tempo (the CH / MST chip goes back to the source).
@@ -242,16 +242,17 @@ component Unit inherits Rectangle {
                     horizontal-stretch: 0;
                     FxLabel { text: @tr("CH"); }
                     Rectangle { width: 2px; }
-                    for name[i] in DeckState.count == 4 ? ["1", "2", "3", "4", "M"] : ["1", "2", "M"]: Chip {
+                    for name[i] in DeckState.count == 4 ? (MixerState.aux-shown ? ["1", "2", "3", "4", "M", "AUX"] : ["1", "2", "3", "4", "M"]) : (MixerState.aux-shown ? ["1", "2", "M", "AUX"] : ["1", "2", "M"]): Chip {
+                        property <int> value: name == "M" ? 4 : name == "AUX" ? 5 : i;
                         text: name;
                         font-size: Theme.font-xs;
-                        min-width: root.touch ? root.ctl-h : 22px;
-                        max-width: root.touch ? root.ctl-h : 22px;
+                        min-width: root.touch ? root.ctl-h : name == "AUX" ? 30px : 22px;
+                        max-width: root.touch ? root.ctl-h : name == "AUX" ? 30px : 22px;
                         horizontal-stretch: 0;
                         height: root.ctl-h;
-                        tooltip: name == "M" ? @tr("Apply to the master") : @tr("Apply to channel {}", name);
-                        active: u.assign == (name == "M" ? 4 : i);
-                        clicked => { FxState.assign-selected(root.n, name == "M" ? 4 : i); }
+                        tooltip: name == "M" ? @tr("Apply to the master") : name == "AUX" ? @tr("Apply to the AUX input") : @tr("Apply to channel {}", name);
+                        active: u.assign == value;
+                        clicked => { FxState.assign-selected(root.n, value); }
                     }
                     if DeckState.decks[0].stems && FxState.stem-fx: Chip {
                         text: [@tr("ALL"), @tr("VOCAL"), @tr("INST"), @tr("BASS"), @tr("DRUMS")][u.part];
@@ -259,8 +260,8 @@ component Unit inherits Rectangle {
                         min-width: 44px;
                         horizontal-stretch: 0;
                         height: root.ctl-h;
-                        enabled: u.assign != 4;
-                        active: u.part != 0 && u.assign != 4;
+                        enabled: u.assign < 4;
+                        active: u.part != 0 && u.assign < 4;
                         active-color: Theme.stem-vocal;
                         tooltip: @tr("FX PART: the stem the effect runs on");
                         clicked => { FxState.part-step(root.n); }

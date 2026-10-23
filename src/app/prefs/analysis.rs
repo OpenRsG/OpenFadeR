@@ -5,7 +5,7 @@
 //! | item | setting | wired to |
 //! | --- | --- | --- |
 //! | high precision | `high_precision` | [`openfader::analysis::detect::GridOptions::precision`] (1 ms flux frames, sub-frame onsets) |
-//! | mode, BPM range | `track_mode`, `bpm_range` | [`openfader::analysis::detect::Mode`], `bpm_range` (octave fold + search band); Auto only with high precision |
+//! | tempo changes, BPM range | `detect_tempo_changes`, `bpm_range` | [`openfader::analysis::detect::Mode`] (on = Auto: sections of one tempo each where the tempo changes, one steady grid otherwise; off = Normal), `bpm_range` (octave fold + search band) |
 //! | parts | `part_*` | [`openfader::analysis::options::Parts`]: a part off is not computed and left empty |
 //! | grid source | `grid_source` | which beat grid and cues a LOAD uses first: the connected library's or ours ([`crate::app::deck`]); the user's own edits win over both |
 //! | Auto Analysis | `auto_analysis` | the background run at start ([`crate::app::analyze::wire`]); off = only ANALYZE NOW / the track menu |
@@ -17,11 +17,6 @@
 use super::{choice, section, Prefs, Row};
 use openfader::analysis::auto::{MAX_HOT, MAX_MEMORY, MIN_TRACKS};
 
-choice!(
-    /// Track Analysis Mode: Normal = one steady tempo, Dynamic = a tempo-varying grid, Auto = Dynamic when the
-    /// tempo drifts (needs high precision).
-    TrackMode { #[default] Normal = "normal", Dynamic = "dynamic", Auto = "auto" }
-);
 choice!(
     /// BPM Range for Normal analysis: the tempo is doubled or halved
     /// into it. Every range spans an octave, so exactly one reading fits.
@@ -39,6 +34,10 @@ choice!(
     /// Where a LOAD takes a track's beat grid and cues from first: the connected library (what it holds, ours fills the gaps)
     /// or our own analysis (the library's grid and cues are ignored). The user's own edits win over both.
     GridSource { #[default] Library = "library", Ours = "ours" }
+);
+choice!(
+    /// Key Analysis detector: the chroma/profile method, or a small neural network (a model downloaded on first use).
+    KeyDetector { #[default] Classic = "classic", Neural = "neural" }
 );
 
 impl BpmRange {
@@ -62,9 +61,9 @@ section!(
     Analysis {
         /// Auto Analysis of imported / newly seen tracks.
         auto_analysis: bool = true;
-        /// Use high precision BeatGrid analysis, Track Analysis Mode, BPM range of the grid.
+        /// Use high precision BeatGrid analysis, Detect tempo changes, BPM range of the grid.
         high_precision: bool = false;
-        track_mode: TrackMode = TrackMode::Normal;
+        detect_tempo_changes: bool = true;
         bpm_range: BpmRange = BpmRange::R85;
         /// Track Analysis Setting: BPM / Grid, KEY, Phrase, Vocal.
         part_grid: bool = true;
@@ -73,6 +72,8 @@ section!(
         part_vocal: bool = true;
         /// Beat grid and cues from the connected library or from our own analysis.
         grid_source: GridSource = GridSource::Library;
+        /// Key Analysis > detector.
+        key_detector: KeyDetector = KeyDetector::Classic;
         /// Key Analysis > Write the value to the ID3 tag.
         key_write_tag: bool = false;
         /// Analysis Process.
@@ -89,28 +90,12 @@ section!(
     }
 );
 
-impl Analysis {
-    /// Auto only exists with high precision; without it a stored Auto reads as Normal.
-    pub fn mode(&self) -> TrackMode {
-        if self.track_mode == TrackMode::Auto && !self.high_precision {
-            TrackMode::Normal
-        } else {
-            self.track_mode
-        }
-    }
-}
-
 fn numbers(n: usize) -> Vec<String> {
     (0..=n).map(|i| i.to_string()).collect()
 }
 
 pub fn rows(p: &Prefs) -> Vec<Row> {
     let a = &p.analysis;
-    let mode_names: &[&str] = if a.high_precision {
-        &["NORMAL", "DYNAMIC", "AUTO"]
-    } else {
-        &["NORMAL", "DYNAMIC"]
-    };
     let learnt = crate::app::analyze::tendency_status();
     let auto_cue = a.cue_mode == CueSetting::Auto;
     let followed = auto_cue && learnt.tendency.is_some(); // Auto with a tendency overrides the counts and bar options
@@ -127,17 +112,12 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             a.high_precision,
         )
         .hint(tr!("1 ms frames")),
-        Row::chips(
-            "track_mode",
-            tr!("TRACK ANALYSIS MODE"),
-            mode_names,
-            a.mode() as usize,
+        Row::check(
+            "detect_tempo_changes",
+            tr!("Detect tempo changes"),
+            a.detect_tempo_changes,
         )
-        .hint(if a.high_precision {
-            tr!("AUTO: Dynamic when the tempo drifts")
-        } else {
-            tr!("AUTO needs high precision")
-        }),
+        .hint(tr!("a tempo section where the tempo changes; a steady track stays one")),
         Row::of("bpm_range", tr!("BPM RANGE"), a.bpm_range).hint("BPM"),
         Row::header(tr!("TRACK ANALYSIS SETTING")),
         Row::check("part_grid", tr!("BPM / Grid"), a.part_grid),
@@ -161,6 +141,18 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             usize::MAX,
         ),
         Row::header(tr!("KEY ANALYSIS")),
+        Row::chips(
+            "key_detector",
+            tr!("KEY DETECTOR"),
+            &[tr!("CLASSIC"), tr!("NEURAL")],
+            a.key_detector as usize,
+        )
+        .hint(if cfg!(feature = "stems") {
+            tr!("NEURAL: a CNN (MIT licence), downloaded on first use, CPU only")
+        } else {
+            tr!("NEURAL needs a build with ONNX Runtime")
+        })
+        .enabled(a.part_key && cfg!(feature = "stems")),
         Row::check(
             "key_write_tag",
             tr!("Write the value to the ID3 tag"),
@@ -255,12 +247,6 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
         "cue_repeat_bars" => {
             a.cue_repeat_bars = REPEAT_BARS.get(i).copied().unwrap_or(a.cue_repeat_bars)
         }
-        "high_precision" => {
-            a.high_precision = i == 1;
-            if !a.high_precision && a.track_mode == TrackMode::Auto {
-                a.track_mode = TrackMode::Normal;
-            }
-        }
         "analyze_now" => super::run_action(key),
         // the same setting as VIEW > Layout > Browser panel > CUE Analysis Playlist
         "panel_cue_analysis" => p.view.panel_cue_analysis = i == 1,
@@ -278,22 +264,11 @@ mod tests {
     }
 
     #[test]
-    fn auto_mode_exists_only_with_high_precision() {
+    fn tempo_change_detection_is_on_and_a_checkbox() {
         let mut p = Prefs::default();
-        assert!(choose(&mut p, "high_precision", 1));
-        assert!(choose(&mut p, "track_mode", 2));
-        assert_eq!(p.analysis.mode(), TrackMode::Auto);
-        assert_eq!(row(&p, "track_mode").options.len(), 3);
-        choose(&mut p, "high_precision", 0);
-        assert_eq!(
-            p.analysis.track_mode,
-            TrackMode::Normal,
-            "Auto falls back to Normal when precision goes off"
-        );
-        assert_eq!(row(&p, "track_mode").options.len(), 2);
-        p.analysis.track_mode = TrackMode::Auto; // a hand-edited file
-        assert_eq!(p.analysis.mode(), TrackMode::Normal);
-        assert_eq!(row(&p, "track_mode").current, 0);
+        assert!(p.analysis.detect_tempo_changes && row(&p, "detect_tempo_changes").current == 1);
+        assert!(choose(&mut p, "detect_tempo_changes", 0));
+        assert!(!p.analysis.detect_tempo_changes);
     }
 
     #[test]

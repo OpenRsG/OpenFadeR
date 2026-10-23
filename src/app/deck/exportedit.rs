@@ -7,6 +7,7 @@
 //! The range is applied where every grid edit already runs (`Deck::edit_range`): the edit sees only the tail, [`join`] puts the
 //! untouched head back. History holds whole grids (`HIST` of them, ~6 bytes a beat); it is dropped with the track.
 
+use super::beatmath::sections;
 use super::{Deck, grid::nearest, pads};
 use crate::app::PadView;
 use openfader::{analysis::Beat, store};
@@ -70,6 +71,22 @@ pub fn join(head: &[Beat], tail: Vec<Beat>, per: u16) -> Vec<Beat> {
             }),
     );
     v
+}
+
+/// How many beats from the front of `beats` form one tempo section (the whole slice when the tempo never changes).
+pub fn section_len(beats: &[Beat]) -> usize {
+    sections(beats).next().map_or(0, |r| r.end)
+}
+
+/// `head` ++ the edited section `mid` ++ the untouched later sections `rest`: later sections keep their place on the
+/// track, so the edited one is cut where they begin and their bar positions continue the count.
+pub fn splice(head: &[Beat], mid: Vec<Beat>, rest: &[Beat], per: u16) -> Vec<Beat> {
+    let mut v = join(head, mid, per);
+    let Some(next) = rest.first() else {
+        return v;
+    };
+    v.retain(|b| b.time_ms < next.time_ms);
+    join(&v, rest.to_vec(), per)
 }
 
 /// Every beat's distance to the one at `anchor` grows by `delta_ms` per beat (negative narrows): the beat at `anchor` stays,
@@ -202,11 +219,18 @@ impl Deck {
     /// Range buttons: `true` edits from the playhead on, `false` the whole track.
     pub fn grid_range(&self, from_here: bool) {
         self.loaded.borrow_mut().grid_hist.from_here = from_here;
+        self.show(|v| v.grid_here = from_here);
         self.say(if from_here {
             tr!("grid edits apply from the playhead on")
         } else {
             tr!("grid edits apply to the whole track")
         });
+    }
+
+    /// HERE chip: [`Deck::grid_range`] flipped.
+    pub fn grid_here_toggle(&self) {
+        let on = !self.loaded.borrow().grid_hist.from_here;
+        self.grid_range(on);
     }
 
     /// Widen (`ms` > 0) or narrow the distance between beats by `ms` per beat around the beat at the playhead.
@@ -325,5 +349,25 @@ mod tests {
             h.record(grid(i % 3));
         }
         assert_eq!((h.undo.len(), h.redo.len()), (HIST, 0));
+    }
+
+    #[test]
+    fn a_section_edit_stops_at_the_next_tempo_change() {
+        // 120 BPM: beats 0..1500, 150 BPM from 2000 (400 ms), 120 BPM again from 3600
+        let mut g = grid(4);
+        let b0 = g[0];
+        g.extend((0..4).map(|i| Beat { bpm_x100: 15000, time_ms: 2000 + i * 400, ..b0 }));
+        g.extend((0..2).map(|i| Beat { time_ms: 3600 + i * 500, ..b0 }));
+        let (head, tail) = split(&g, 2000.0, true);
+        let n = section_len(tail);
+        assert_eq!((head.len(), n), (4, 4));
+        // the middle section widened by 10 ms per beat around its first beat: the last section is where it was
+        let mid = stretch(&tail[..n], 0, 10).unwrap();
+        let v = splice(head, mid, &tail[n..], 4);
+        let t: Vec<u32> = v.iter().map(|b| b.time_ms).collect();
+        assert_eq!(t, [0, 500, 1000, 1500, 2000, 2410, 2820, 3230, 3600, 4100]);
+        assert_eq!(v.iter().map(|b| b.bar_pos).collect::<Vec<_>>(), [1, 2, 3, 4, 1, 2, 3, 4, 1, 2]);
+        assert_eq!(section_len(&v[4..]), 4);
+        assert_eq!(section_len(&[]), 0);
     }
 }

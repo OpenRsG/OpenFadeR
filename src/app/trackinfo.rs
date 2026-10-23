@@ -6,7 +6,7 @@ use openfader::{
     library::{Library, Track},
     store,
 };
-use slint::{Color, ComponentHandle, Image, ModelRc, VecModel};
+use slint::{Color, ComponentHandle, ModelRc, VecModel};
 use std::{
     cell::{Cell, RefCell},
     path::Path,
@@ -250,10 +250,7 @@ fn display_track(app: &App, t: &Track) {
         prefs::with(|p| p.key_notation),
     );
     s.set_detected(detected_text(t, &ours, notation).into());
-    let cover = t
-        .artwork
-        .as_deref()
-        .and_then(|p| Image::load_from_path(p).ok());
+    let cover = super::artwork::cover(&store::global(), t, 160);
     s.set_has_cover(cover.is_some());
     s.set_cover(cover.unwrap_or_default());
     s.set_has_track(true);
@@ -281,6 +278,7 @@ fn display_track(app: &App, t: &Track) {
     );
     s.set_comment(t.comment.as_str().into());
     s.set_phrases(phrases(t, edits.phrases).into());
+    s.set_stems(stems(t).into());
     s.set_rating(t.rating.into());
 }
 
@@ -295,4 +293,12 @@ fn phrases(t: &Track, edit: Option<openfader::analysis::Phrases>) -> String {
         Some(p) => tr!("Phrases: {} · {}", format!("{:?}", p.mood), p.list.len()),
         None => String::new(),
     }
+}
+
+/// "Stem file: Drums · Bass · Melody · Vocals" when the track's file names its four parts, else empty.
+fn stems(t: &Track) -> String {
+    t.file
+        .as_deref()
+        .and_then(openfader::audio::stemfile::read_info)
+        .map_or_else(String::new, |i| tr!("Stem file: {}", i.label()).into())
 }

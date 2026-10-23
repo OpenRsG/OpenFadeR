@@ -9,6 +9,7 @@
 //! MIX POINT LINK: the settings of the panel in [`crate::app::deck::mixpoint`], tab rows in [`mixpoint`].
 
 mod deck;
+mod drivers;
 mod effect;
 mod mixer;
 mod mixpoint;
@@ -18,6 +19,7 @@ mod sampler;
 
 use super::{Prefs, Row, choice, section};
 pub use named::{Fader, KnobMode};
+pub use drivers::{Driver, port_key};
 
 choice!(
     /// Sync Type: BEAT SYNC follows tempo and beat phase, BPM SYNC only the tempo.
@@ -136,6 +138,8 @@ section!(
         midi_clock_port: String = String::new();
         /// Others > Soft takeover: an absolute knob or fader of a controller waits until it reaches the value on screen ([`crate::app::midi`]).
         soft_takeover: bool = true;
+        /// Controller plugins > which driver each MIDI input port gets: `port=plugin;…`, see [`drivers`].
+        controller_plugins: String = String::new();
         /// MIX POINT LINK > Enable, Default MIX POINT Setting and auto switch, Display time, Display grids (+ only when enlarged),
         /// Automatically changes the BEAT/BPM SYNC setting, Automatically limits the zoom out range.
         mix_point_link: bool = false;
@@ -257,6 +261,7 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     rows.extend(super::advanced::recording_rows(&p.advanced));
     rows.extend(mixpoint::rows(c));
     rows.extend(others::rows(c));
+    rows.extend(drivers::rows(c));
     rows
 }
 
@@ -264,6 +269,7 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
     p.controller.pick_number(key, i)
         || p.controller.pick(key, i)
         || deck::choose(p, key, i)
+        || drivers::choose(p, key, i)
         || mixer::choose(p, key, i)
         || super::advanced::choose(p, key, i)
 }

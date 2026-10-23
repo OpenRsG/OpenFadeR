@@ -1,6 +1,6 @@
 //! What LIGHTING and the MIDI clock need from a deck: the beat position (and phrase) while it plays, and which deck leads.
 
-use super::{DECKS, Deck, Decks, beat_at, cue::Preview, grid, grid_bpm};
+use super::{DECKS, Deck, Decks, beat_at, cue::Preview, grid, tempo_at};
 use openfader::lighting::{Input, scene::PhraseCtx};
 
 /// What the MIDI clock follows: the beat counted from the grid's first downbeat (a multiple of `per_bar` is a bar's first
@@ -34,7 +34,7 @@ impl Deck {
             return None;
         }
         let beat = beat_at(&l.analysis.beats, pos)?;
-        let bpm = grid_bpm(&l.analysis.beats)? * self.rate();
+        let bpm = tempo_at(&l.analysis.beats, pos)? * self.rate();
         Some(Input {
             beat,
             bpm,
@@ -59,7 +59,7 @@ impl Deck {
         let beats = &l.analysis.beats;
         Some(Pulse {
             beat: beat_at(beats, pos)? - grid::downbeat(beats) as f64,
-            bpm: grid_bpm(beats)? * self.rate(),
+            bpm: tempo_at(beats, pos)? * self.rate(),
             per_bar: grid::per_bar(beats),
         })
     }

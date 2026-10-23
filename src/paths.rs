@@ -209,6 +209,64 @@ pub fn timestamped(dir: &Path, prefix: &str, ext: &str) -> io::Result<PathBuf> {
     Ok(p)
 }
 
+/// `path`, or the first of `stem (2).ext`, `stem (3).ext` … beside it that `taken` does not claim: nothing is overwritten.
+pub fn free_name(path: &Path, taken: impl Fn(&Path) -> bool) -> PathBuf {
+    if !taken(path) {
+        return path.to_path_buf();
+    }
+    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+    let ext = path
+        .extension()
+        .map_or_else(String::new, |e| format!(".{}", e.to_string_lossy()));
+    (2..)
+        .map(|n| path.with_file_name(format!("{stem} ({n}){ext}")))
+        .find(|p| !taken(p))
+        .expect("an unbounded range")
+}
+
+/// Moves the file `from` to `to` (its folders are made): a rename, else a copy and a delete when `to` is on another volume.
+pub fn move_file(from: &Path, to: &Path) -> Result<(), String> {
+    if let Some(dir) = to.parent() {
+        at(std::fs::create_dir_all(dir), dir)?;
+    }
+    if std::fs::rename(from, to).is_ok() {
+        return Ok(());
+    }
+    at(std::fs::copy(from, to), to)?;
+    at(std::fs::remove_file(from), from).inspect_err(|_| {
+        let _ = std::fs::remove_file(to);
+    })
+}
+
+/// [`move_file`] for every `(from, to)` in order, all or nothing: a `from` that is gone is left out, a `to` that is taken or
+/// a failed move puts the earlier ones back and reports. Returns the moves made, for [`move_back`].
+pub fn move_files(pairs: &[(PathBuf, PathBuf)]) -> Result<Vec<(PathBuf, PathBuf)>, String> {
+    let mut done: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for (from, to) in pairs {
+        if !from.is_file() || from == to {
+            continue;
+        }
+        let moved = if to.exists() {
+            Err(format!("{} is in the way", to.display()))
+        } else {
+            move_file(from, to)
+        };
+        if let Err(e) = moved {
+            move_back(&done);
+            return Err(e);
+        }
+        done.push((from.clone(), to.clone()));
+    }
+    Ok(done)
+}
+
+/// Undoes what [`move_files`] returned, last move first (a file that cannot go back stays).
+pub fn move_back(done: &[(PathBuf, PathBuf)]) {
+    for (from, to) in done.iter().rev() {
+        let _ = move_file(to, from);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,5 +354,37 @@ mod tests {
         );
         assert_eq!(file_stem("  ", 40), "track");
         assert_eq!(file_stem(&"x".repeat(200), 80).len(), 80);
+    }
+
+    #[test]
+    fn moves_never_overwrite_and_a_failed_batch_puts_everything_back() {
+        let dir = std::env::temp_dir().join(format!("openfader-moves-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = |n: &str| dir.join(n);
+        for n in ["a.mp3", "b.mp3", "c.mp3"] {
+            std::fs::write(f(n), n).unwrap();
+        }
+        let taken = |p: &Path| p.exists();
+        assert_eq!(free_name(&f("a.mp3"), taken), f("a (2).mp3"));
+        assert_eq!(free_name(&f("new.mp3"), taken), f("new.mp3"));
+        std::fs::write(f("a (2).mp3"), "").unwrap();
+        assert_eq!(free_name(&f("a.mp3"), taken), f("a (3).mp3"));
+        // The second move meets a taken name: the first goes back, nothing is lost.
+        let pairs = [(f("a.mp3"), f("sub/a.mp3")), (f("b.mp3"), f("c.mp3"))];
+        assert!(move_files(&pairs).unwrap_err().contains("in the way"));
+        assert!(f("a.mp3").is_file() && !f("sub/a.mp3").exists() && f("b.mp3").is_file());
+        // A good batch moves, a file that is gone is left out, and move_back restores.
+        let pairs = [
+            (f("a.mp3"), f("sub/a.mp3")),
+            (f("gone.mp3"), f("sub/gone.mp3")),
+            (f("b.mp3"), f("sub/deeper/b.mp3")),
+        ];
+        let done = move_files(&pairs).unwrap();
+        assert_eq!(done.len(), 2);
+        assert!(f("sub/deeper/b.mp3").is_file() && !f("b.mp3").exists());
+        move_back(&done);
+        assert!(f("a.mp3").is_file() && f("b.mp3").is_file());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

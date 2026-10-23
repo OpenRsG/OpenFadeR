@@ -67,13 +67,21 @@ pub(super) fn read(b: &[u8], le: bool) -> Option<String> {
 
 /// `b` with its tag chunk holding `key` (a new tag chunk when there was none).
 pub(super) fn write(b: &[u8], le: bool, key: &str) -> Result<Vec<u8>, String> {
+    write_with(b, le, |tag| with_key(tag, key))
+}
+
+/// `b` with its tag chunk made by `make` from the tag it had (a new tag chunk when there was none).
+pub(super) fn write_with(
+    b: &[u8],
+    le: bool,
+    make: impl FnOnce(Option<super::Id3>) -> Vec<u8>,
+) -> Result<Vec<u8>, String> {
     let (chunks, end) = chunks(b, le)?;
     let old = chunks.iter().find(|c| is_id3(b, c));
-    let tag = with_key(
+    let tag = make(
         old.map(|c| parse_id3(&b[c.data.clone()]))
             .transpose()?
             .flatten(),
-        key,
     );
     let mut out = b[..12].to_vec();
     for c in chunks.iter().filter(|c| !is_id3(b, c)) {

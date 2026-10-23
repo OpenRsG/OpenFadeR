@@ -20,6 +20,7 @@ import { DeviceState } from "device.slint";
 import { KeysState } from "help.slint";
 import { TouchActions } from "touch-actions.slint";
 import { TrackInfoEditor, TrackInfoState } from "trackinfo.slint";
+import { ArtworkPicker, ArtworkState } from "artwork.slint";
 
 /// A theme-selected presentation of the full Linux app. No separate session or reduced feature set.
 export component TouchWorkspace inherits Rectangle {
@@ -175,4 +176,5 @@ export component TouchWorkspace inherits Rectangle {
     }
     // The browser can be hidden or taller than its viewport; the editor uses the whole workspace.
     if root.visible && TrackInfoState.editor-open: TrackInfoEditor {}
+    if root.visible && ArtworkState.open: ArtworkPicker {}
 }

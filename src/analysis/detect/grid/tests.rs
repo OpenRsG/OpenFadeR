@@ -149,9 +149,9 @@ fn ramping_tempo_gets_a_piecewise_grid_in_dynamic_and_in_auto() {
 }
 
 #[test]
-fn normal_mode_keeps_one_tempo_on_a_ramp_and_auto_without_precision_is_normal() {
+fn normal_mode_keeps_one_tempo_on_a_ramp() {
     let audio = render(&times(|t| 120.0 + 6.0 * t / 60.0, 0.173, 60.0), 60.0);
-    for opt in [opts(Mode::Normal, false), opts(Mode::Auto, false)] {
+    for opt in [opts(Mode::Normal, false)] {
         let beats = beat_grid_with(&audio, RATE, &opt);
         assert!(
             beats.len() > 100 && beats.iter().all(|b| b.bpm_x100 == beats[0].bpm_x100),
@@ -163,7 +163,12 @@ fn normal_mode_keeps_one_tempo_on_a_ramp_and_auto_without_precision_is_normal() 
 #[test]
 fn a_steady_track_is_one_tempo_in_dynamic_and_auto_decides_normal() {
     let audio = render(&times(|_| 128.0, 0.173, 40.0), 40.0);
-    for opt in [opts(Mode::Dynamic, false), opts(Mode::Auto, true)] {
+    for opt in [
+        opts(Mode::Dynamic, false),
+        opts(Mode::Auto, true),
+        opts(Mode::Auto, false),
+        GridOptions::default(),
+    ] {
         let beats = beat_grid_with(&audio, RATE, &opt);
         assert!(beats.len() > 60, "{opt:?}");
         assert!(
@@ -208,6 +213,46 @@ fn a_tempo_step_is_two_segments_with_their_own_tempo() {
     }
 }
 
+/// Runs of equal tempo as `(first beat, bpm_x100)`.
+fn sections(beats: &[Beat]) -> Vec<(usize, u16)> {
+    let mut s: Vec<(usize, u16)> = Vec::new();
+    for (i, b) in beats.iter().enumerate() {
+        if s.last().map(|x| x.1) != Some(b.bpm_x100) {
+            s.push((i, b.bpm_x100));
+        }
+    }
+    s
+}
+
+#[test]
+fn a_tempo_change_at_bar_33_is_two_sections_within_a_millisecond() {
+    // 120 BPM for 32 bars (64 s), then 128 BPM
+    let clicks = times(|t| if t < 64.0 { 120.0 } else { 128.0 }, 0.173, 120.0);
+    let audio = render(&clicks, 120.0);
+    for opt in [
+        GridOptions::default(),
+        opts(Mode::Auto, false),
+        opts(Mode::Auto, true),
+    ] {
+        let beats = beat_grid_with(&audio, RATE, &opt);
+        assert_eq!(beats.len(), clicks.len(), "{opt:?}");
+        let s = sections(&beats);
+        assert_eq!(
+            s.iter().map(|x| x.0).collect::<Vec<_>>(),
+            [0, 128],
+            "{opt:?}: two sections, the second from bar 33: {s:?}"
+        );
+        assert!(
+            s[0].1.abs_diff(12000) <= 10 && s[1].1.abs_diff(12800) <= 10,
+            "{opt:?}: {s:?}"
+        );
+        for (b, t) in beats.iter().zip(&clicks) {
+            let d = (b.time_ms as f64 - t * 1000.0).abs();
+            assert!(d <= 1.0, "{opt:?}: beat at {} ms is {d} ms off", b.time_ms);
+        }
+    }
+}
+
 #[test]
 fn bpm_range_folds_octaves() {
     let range = |lo: u16, hi: u16| (lo as f64, hi as f64);
@@ -245,13 +290,7 @@ fn modes_and_the_auto_decision() {
         precision,
         ..Default::default()
     };
-    assert_eq!(
-        o(Mode::Auto, false).effective_mode(),
-        Mode::Normal,
-        "Auto needs high precision"
-    );
-    assert_eq!(o(Mode::Auto, true).effective_mode(), Mode::Auto);
-    assert_eq!(o(Mode::Dynamic, false).effective_mode(), Mode::Dynamic);
+    assert_eq!(GridOptions::default().mode, Mode::Auto);
     for drifts in [false, true] {
         assert!(!o(Mode::Normal, true).tracks(drifts), "Normal never tracks");
         assert!(
@@ -263,9 +302,10 @@ fn modes_and_the_auto_decision() {
             drifts,
             "Auto follows the drift"
         );
-        assert!(
-            !o(Mode::Auto, false).tracks(drifts),
-            "Auto without high precision is Normal"
+        assert_eq!(
+            o(Mode::Auto, false).tracks(drifts),
+            drifts,
+            "Auto needs no high precision"
         );
     }
     assert!(

@@ -290,4 +290,23 @@ mod tests {
         // double time: it wraps twice as often
         assert!((wait_phase(&master, 250.0, 2.0).unwrap()).abs() < 1e-9);
     }
+
+    #[test]
+    fn phase_runs_on_through_the_masters_tempo_change() {
+        // master: 120 BPM to beat 7 at 3500 ms, 150 BPM (400 ms beats) from beat 8 at 4000 ms
+        let mut master = grid(0, 120, 8);
+        master.extend((0..8).map(|i| Beat {
+            bar_pos: (i % 4 + 1) as u16,
+            bpm_x100: 15000,
+            time_ms: 4000 + i * 400,
+        }));
+        let own = grid(0, 120, 64);
+        // half a beat into the faster section (beat 8.5 at 4200 ms): the follower at beat 8.5 (4250 ms) is on phase
+        let (err, at) = align(&own, 4250.0, &master, 4200.0, 1.0).unwrap();
+        assert!(err.abs() < 1e-9 && (at - 4250.0).abs() < 1e-6, "{err} {at}");
+        // the master a whole beat later (4600 ms, beat 9.5): the follower is a beat behind, which is in phase again
+        let (err, _) = align(&own, 4250.0, &master, 4600.0, 1.0).unwrap();
+        assert!(err.abs() < 1e-9, "{err}");
+        assert!((wait_phase(&master, 5200.0, 1.0).unwrap()).abs() < 1e-9, "beat 11 sits on 5200 ms");
+    }
 }

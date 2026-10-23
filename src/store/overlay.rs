@@ -75,6 +75,12 @@ impl Edited {
     }
 }
 
+/// `tracks` with the store's text and rating edits on, as [`Overlay`] shows a library's list: for a list the store holds itself
+/// (the stages).
+pub(super) fn edited(store: &Store, tracks: &mut [Track]) {
+    Edited::of(store.track_fields().unwrap_or_default()).apply(tracks);
+}
+
 /// The library's list, the edits it was merged with and the result.
 type Merged = (Arc<Vec<Track>>, Arc<Edited>, Arc<Vec<Track>>);
 

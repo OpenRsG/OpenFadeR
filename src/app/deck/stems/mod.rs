@@ -15,6 +15,8 @@
 //! (PREFS) bass is part of INST: it follows INST's mute and has no button.
 //! The mute state resets on LOAD unless PREFS says KEEP. Without the model the first separation downloads it
 //! ([`openfader::stems::model`]); offline, the stem row says so and the status line names the command to fetch it by hand.
+//! A stem file (PREFS > Extensions > STEMS > "Use the parts of stem files") feeds its own four parts instead: no model, no
+//! cache; the buttons' tooltips name them.
 //! The waveforms follow the gains when PREFS STEM waveform is on: see [`super::stemwave`].
 //!
 //! This file holds the gain maths, the per-deck state and the button side; `job` runs the separation.
@@ -23,9 +25,14 @@ mod job;
 
 use super::Deck;
 use crate::app::prefs;
-use openfader::audio::{BASS, DRUMS, INST, STEM_COUNT, VOCAL};
+use openfader::audio::{BASS, DRUMS, INST, STEM_COUNT, VOCAL, stemfile};
 use openfader::stems::Job;
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+
+/// The file's part names for VOCAL, INST, BASS, DRUMS, as the buttons' tooltips show them.
+fn names_of(info: &stemfile::Info) -> Vec<SharedString> {
+    (0..STEM_COUNT).map(|k| info.name_of(k).into()).collect()
+}
 
 /// Player gains of VOCAL, INST, BASS, DRUMS from the mute buttons and the three isolator knobs (VOCAL, INST, DRUMS; 0..=1; the
 /// mixer shows them as INST, VOCAL, DRUMS, see `mixer::channel`).
@@ -125,8 +132,11 @@ pub(super) struct State {
     iso: [f32; 3],
     /// Progress, readiness or error text shown beside the buttons.
     text: String,
-    /// (STEMS, 4 stems, SOLO, ACTIVE STEM buttons shown, SPEED) as last applied, to ignore unrelated settings changes.
-    seen: Option<(bool, bool, bool, bool, bool)>,
+    /// The loaded track is a stem file whose parts are the stems (not separated): the file's part names.
+    parts: Option<stemfile::Info>,
+    /// (STEMS, 4 stems, SOLO, ACTIVE STEM buttons shown, SPEED, stem files used) as last applied, to ignore unrelated
+    /// settings changes.
+    seen: Option<(bool, bool, bool, bool, bool, bool)>,
     /// (play position's segment, hot cues) the job was last pointed at.
     focus: Option<(usize, usize)>,
 }
@@ -141,6 +151,7 @@ impl Default for State {
             mute: [false; STEM_COUNT],
             iso: [1.0; 3],
             text: String::new(),
+            parts: None,
             seen: None,
             focus: None,
         }
@@ -158,7 +169,7 @@ impl Deck {
             .enumerate()
             .map(|(k, g)| *g >= FULL && !(swapped && k == DRUMS))
             .collect();
-        let (ready, text) = (s.ready, s.text.clone());
+        let (ready, text, names) = (s.ready, s.text.clone(), s.parts.as_ref().map(names_of));
         drop(s);
         self.show(|v| {
             v.stems = stems;
@@ -167,6 +178,7 @@ impl Deck {
             v.stem_ready = ready;
             v.stem_full = ModelRc::new(VecModel::from(full));
             v.stem_text = text.into();
+            v.stem_names = ModelRc::new(VecModel::from(names.unwrap_or_default()));
         });
     }
 
@@ -213,6 +225,7 @@ impl Deck {
             let mut s = self.stems.borrow_mut();
             s.job = None;
             s.attached = None;
+            s.parts = None;
             (s.ready, s.complete, s.focus) = (false, false, None);
             s.text.clear();
             if prefs::with(|p| p.stems_reset) {
