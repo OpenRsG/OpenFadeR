@@ -1,8 +1,9 @@
 name: Release
 
 # Tag v*: build the app on Linux, Windows and macOS (arm64), bundle it with the themes, the controller mappings and the plugins
-# (the native ones prebuilt) in the folders it finds next to its executable, run the app from the packaged files, and create a
-# DRAFT release with the three archives. A manual run (workflow_dispatch) builds and uploads the archives as workflow artifacts only.
+# (the native ones prebuilt) in the folders it finds next to its executable, run the app from the packaged files, cross-compile the
+# Raspberry Pi archive (Dockerfile.pi), and create a DRAFT release with the four archives. A manual run (workflow_dispatch) builds
+# and uploads the archives as workflow artifacts only.
 # Publish a draft with: gh release edit <tag> --draft=false
 on:
   push:
@@ -157,9 +158,23 @@ jobs:
           path: smoke/
           if-no-files-found: ignore
 
+  # The Raspberry Pi archive (aarch64, Debian 13), cross-compiled in Docker as in docs/raspberry-pi.md.
+  pi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Pi archive
+        run: docker buildx build -f Dockerfile.pi -o dist/pi .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-pi
+          path: dist/pi/*.tar.gz
+          if-no-files-found: error
+
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: package
+    needs: [package, pi]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -181,6 +196,7 @@ jobs:
             Archives (each holds the app with its themes, controller mappings and plugins, ready to run):
 
             - **Linux** (x86_64): `openfader-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
+            - **Raspberry Pi 3, 4, 5 and CM4** (aarch64, 64-bit Raspberry Pi OS based on Debian 13): `openfader-<version>-linux-aarch64-pi.tar.gz`. Unpack and run `./openfader-<version>-linux-aarch64-pi/openfader`. See docs/raspberry-pi.md.
             - **Windows** (x86_64): `openfader-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
             - **macOS** (Apple silicon): `OpenFadeR-<version>-macos-arm64.zip` holds `OpenFadeR.app`. It is **not signed or notarized**: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/OpenFadeR.app`.
 

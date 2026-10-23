@@ -1,7 +1,8 @@
-# Raspberry Pi 3, 4 and CM4
+# Raspberry Pi 3, 4, 5 and CM4
 
-OpenFadeR runs on the 64-bit Raspberry Pi OS based on Debian 13 ("trixie"). The Pi build is cross-compiled in Docker on any
-x86_64 machine, then copied to the Pi:
+OpenFadeR runs on the 64-bit Raspberry Pi OS based on Debian 13 ("trixie"). Each release has a Pi archive,
+`openfader-<version>-linux-aarch64-pi.tar.gz`. It runs on the Pi 3, 4, 5 and CM4. To build that archive yourself, cross-compile
+it in Docker on any x86_64 machine, then copy it to the Pi:
 
 ```sh
 docker buildx build -f Dockerfile.pi -o dist/pi .
@@ -15,10 +16,13 @@ repositories from GitHub (`--build-arg PLUGINS_REF=…`, `THEMES_REF`, `MAPPINGS
 present in `extension/plugin`, `extension/skin` or `mappings` are used as they are. The cargo registry and the target folders stay in
 BuildKit cache mounts, so the next build only recompiles what changed.
 
+To build on the Pi itself, with the menu entry and the `openfader` command, run `./install.sh` from a checkout. On ARM Linux it
+builds without the GPU STEMS engine; a plain `cargo build` needs `--no-default-features --features app` there.
+
 ## What the build changes
 
 - Profile `pi` (`Cargo.toml`): the `dist` profile with whole-program LTO and no symbol table (an 82 MB program instead of 104 MB).
-- `-C target-cpu=cortex-a53`: the Pi 3's core; the code also runs on the Pi 4 / CM4 Cortex-A72 (`--build-arg TARGET_CPU=cortex-a72` for those only).
+- `-C target-cpu=cortex-a53`: the Pi 3's core. The code also runs on the Pi 4 / CM4 (Cortex-A72) and the Pi 5 (Cortex-A76). To build for one of those only, pass `--build-arg TARGET_CPU=cortex-a72` or `cortex-a76`.
 - `--no-default-features --features app`: STEMS separates on the CPU. ONNX Runtime has no WebGPU build for ARM Linux; its
   ARM build is also why the program needs Debian 13 (glibc 2.38, GCC 14's C++ library).
 
