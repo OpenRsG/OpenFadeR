@@ -1,4 +1,4 @@
-//! OTHERS tab: quantize, the MIDI clock output. (Ableton Link is network-based and left out.)
+//! OTHERS tab: quantize, the MIDI clock output, soft takeover. (Ableton Link is network-based and left out.)
 
 use super::{Controller, Row};
 
@@ -36,6 +36,12 @@ pub(super) fn rows(c: &Controller) -> Vec<Row> {
         Row::info(
             "",
             tr!("part of the port name; empty = off. 24 PPQN at the playing master deck's tempo and beat, START on its next bar"),
+        ),
+        Row::header(tr!("MIDI CONTROLS")),
+        Row::check(
+            "soft_takeover",
+            tr!("Soft takeover: a knob or fader waits until it reaches the value on screen"),
+            c.soft_takeover,
         ),
     ]
 }

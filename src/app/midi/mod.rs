@@ -6,7 +6,8 @@
 //! and [`mapfile`] (the mapping file of the connected controller). The actions are the table in [`actions`]. Status is the note-on
 //! (`0x9n`) or CC (`0xBn`) byte with the channel in `n`; a note-on with velocity 0 is a note-off
 //! (release). Press actions fire on note-on or CC ≥ 64, knobs scale CC 0..127 to 0..1 (14-bit pairs:
-//! CC `n` = MSB, CC `n+0x20` = LSB, applied on the LSB, when the mapping says `hires`) and relative
+//! CC `n` = MSB, CC `n+0x20` = LSB, applied on the LSB, when the mapping says `hires`; with PREFS soft takeover a knob or
+//! fader waits until it reaches the value on screen, [`pickup`]) and relative
 //! encoders decode to signed ticks ([`rel_2c`] / [`rel_64`]). Jog wheels go through [`jog`] to the deck's
 //! scratch / bend API. LEDs follow the app state through [`led`] on the controller's output port, change
 //! only; the messages leave through a [`port::Sink`] thread, one per `<outInterval>` ms of the mapping file, so the
@@ -37,7 +38,8 @@
 //!
 //! Children of this base: [`input`] (one decoded message: LEARN capture, state dump, dispatch to the binding's action), [`wheel`]
 //! (jog and platter state), [`learn`] (binding a captured control), [`lights`] (the light timer and signals), [`clock`] (the MIDI
-//! clock output that external gear follows), [`wire`] (set-up and the input wakes and jog/housekeeping timer). They add methods to
+//! clock output that external gear follows), [`pickup`] (soft takeover of absolute knobs and faders), [`wire`] (set-up and the
+//! input wakes and jog/housekeeping timer). They add methods to
 //! [`Midi`]; the types they share live here. [`get`] is the way in for the repository catalog
 //! (`app/catalog`): mapping files read, installed into the config folder, and the session opened again with one.
 
@@ -53,6 +55,7 @@ mod learn;
 mod led;
 mod lights;
 mod mapfile;
+mod pickup;
 mod port;
 mod session;
 mod usermap;
@@ -261,6 +264,8 @@ enum Outcome {
     /// MSB of a 14-bit pair: applied when the LSB arrives.
     Half,
     Ignored(i32),
+    /// A knob or fader waiting for soft takeover: action index and deck.
+    Waiting(usize, i32),
     Unmapped,
     /// A report of the controller's state dump ([`dump`]) and what became of it.
     Dump(&'static str),
@@ -277,6 +282,12 @@ impl fmt::Display for Outcome {
             ),
             Outcome::Half => f.write_str("14-bit MSB held"),
             Outcome::Ignored(deck) => write!(f, "deck {} layer ignored (2-deck layout)", deck + 1),
+            Outcome::Waiting(act, deck) => write!(
+                f,
+                "{} {}: waiting for soft takeover",
+                actions::ACTIONS[*act].name,
+                DECK_NAMES[*deck as usize]
+            ),
             Outcome::Unmapped => f.write_str("unmapped"),
             Outcome::Dump(why) => write!(f, "state dump: {why}"),
         }
@@ -296,6 +307,8 @@ struct Midi {
     captured: Cell<Option<(u8, u8)>>,
     /// Last MSB seen per 14-bit control.
     msb: RefCell<HashMap<(u8, u8), u8>>,
+    /// Soft takeover state of every CC knob and fader ([`pickup`]).
+    pickup: pickup::Pickup,
     jog: RefCell<[Jog; DECKS]>,
     /// PREFS jog rotation speed, kept here so the per-tick path does not clone the settings.
     jog_factor: Cell<f64>,

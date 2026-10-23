@@ -26,10 +26,12 @@ export struct FxUnit {
     /// 0..3 = CH A..D, 4 = MASTER.
     assign: int,
     /// Tempo the unit follows, "128.00 BPM"; `no-bpm` when no deck gave one and 120 is the fallback;
-    /// `tapped` when TAP set the tempo (AUTO goes back to the master deck's).
+    /// `tapped` when TAP set the tempo (the CH / MST chip goes back to the source).
     bpm-text: string,
     no-bpm: bool,
     tapped: bool,
+    /// Tempo source without TAP: false = CH (the deck on the unit's channel; MASTER follows the master deck), true = MST (the master deck).
+    master-tempo: bool,
     /// RELEASE is held.
     releasing: bool,
     /// MERGE FX side of this row (MFX1 on row 0 = deck A, MFX2 on row 1 = deck B): preset index and its name
@@ -70,10 +72,12 @@ export global FxState {
     callback toggled(int, int);
     callback held(int, int, bool);
     callback assign-selected(int, int);
-    /// Tap the beat: the series' tempo overrides the master deck's for this unit.
+    /// Tap the beat: the series' tempo overrides the unit's source for this unit.
     callback tapped(int);
-    /// Back to the master deck's tempo.
+    /// Back to the source's tempo (the controller's AUTO).
     callback auto-beat(int);
+    /// The unit's source: CH ↔ MST.
+    callback tempo-source(int);
     /// (unit, held) momentary echo-out: held = ECHO at full level on, released = the feed stops and the tail rings out.
     callback release(int, bool);
     /// MERGE FX, every callback names its side (0 = MFX1 / deck A, 1 = MFX2 / deck B): (side, held) the build-up runs while held,
@@ -117,6 +121,8 @@ component FxSlotView inherits HorizontalLayout {
 component Unit inherits Rectangle {
     in property <int> n;
     property <FxUnit> u: FxState.units[root.n];
+    /// What the bpm text follows: TAP, MST (also CH on the master), or the channel.
+    property <string> src: root.u.tapped ? @tr("TAP") : (root.u.master-tempo || root.u.assign >= 4) ? @tr("MST") : @tr("CH{}", root.u.assign + 1);
     property <bool> touch: Theme.layout-profile == 1;
     property <length> ctl-h: root.touch ? Theme.touch-target : 20px;
     property <length> button-w: root.touch ? Theme.touch-target : 32px;
@@ -143,7 +149,7 @@ component Unit inherits Rectangle {
                 FxDivider { }
                 // Tempo the unit follows; ~ = no deck gave one (120 fallback), blue = tapped. Never elided.
                 Text {
-                    text: u.no-bpm ? "~" + u.bpm-text : u.bpm-text;
+                    text: (u.no-bpm ? "~" : "") + root.src + " " + u.bpm-text;
                     color: u.tapped ? Theme.accent-hi : u.no-bpm ? Theme.cue : Theme.text-bright;
                     font-family: Theme.font;
                     font-size: Theme.font-size;
@@ -168,7 +174,7 @@ component Unit inherits Rectangle {
                     pressed => { FxState.release(root.n, true); }
                     released => { FxState.release(root.n, false); }
                 }
-                Text { text: u.no-bpm ? "~" + u.bpm-text : u.bpm-text; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-size; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-alignment: right; min-width: self.preferred-width; horizontal-stretch: 0; }
+                Text { text: (u.no-bpm ? "~" : "") + root.src + " " + u.bpm-text; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-size; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-alignment: right; min-width: self.preferred-width; horizontal-stretch: 0; }
             }
             if FxState.view == 2: HorizontalLayout {
                 height: root.ctl-h;
@@ -217,7 +223,7 @@ component Unit inherits Rectangle {
                     FxLabel { text: @tr("TEMPO"); }
                     Rectangle { width: 2px; }
                     Chip { text: @tr("TAP"); font-size: Theme.font-xs; min-width: root.button-w; horizontal-stretch: 0; height: root.ctl-h; tooltip: @tr("Tap the tempo"); clicked => { FxState.tapped(root.n); } }
-                    Chip { text: @tr("AUTO"); font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 38px; horizontal-stretch: 0; height: root.ctl-h; active: !u.tapped; tooltip: @tr("Follow the master deck's tempo"); clicked => { FxState.auto-beat(root.n); } }
+                    Chip { text: u.master-tempo ? @tr("MST") : @tr("CH"); font-size: Theme.font-xs; min-width: root.touch ? root.ctl-h : 38px; horizontal-stretch: 0; height: root.ctl-h; active: !u.tapped; tooltip: @tr("Tempo source: CH follows the deck on the unit's channel, MST the master deck (click to switch; after TAP, click to return)"); clicked => { if (u.tapped) { FxState.auto-beat(root.n); } else { FxState.tempo-source(root.n); } } }
                     Chip {
                         text: @tr("REL");
                         font-size: Theme.font-xs;

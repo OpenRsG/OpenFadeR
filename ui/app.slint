@@ -208,6 +208,7 @@ export component App inherits Window {
             MenuItem { title: @tr("Analyze Track"); activated => { LibraryState.action("track-analyze"); } }
             MenuItem { title: @tr("Analysis Lock"); activated => { LibraryState.action("track-lock"); } }
             MenuItem { title: @tr("Reload Tag"); activated => { LibraryState.action("track-reload-tag"); } }
+            MenuItem { title: @tr("Reload Tag (discard edits)"); activated => { LibraryState.action("track-reload-tag-discard"); } }
             MenuItem { title: @tr("Show in File Manager"); activated => { LibraryState.action("track-show"); } }
             MenuSeparator {}
             MenuItem { title: @tr("Relocate…"); activated => { LibraryState.action("track-relocate"); } }

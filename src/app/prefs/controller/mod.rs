@@ -134,6 +134,8 @@ section!(
         quantize_all_decks: bool = false;
         /// Others > MIDI CLOCK OUT: part of the name of the output port that gets the clock; empty = off ([`crate::app::midi`]).
         midi_clock_port: String = String::new();
+        /// Others > Soft takeover: an absolute knob or fader of a controller waits until it reaches the value on screen ([`crate::app::midi`]).
+        soft_takeover: bool = true;
         /// MIX POINT LINK > Enable, Default MIX POINT Setting and auto switch, Display time, Display grids (+ only when enlarged),
         /// Automatically changes the BEAT/BPM SYNC setting, Automatically limits the zoom out range.
         mix_point_link: bool = false;

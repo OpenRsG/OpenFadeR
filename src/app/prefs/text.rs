@@ -81,6 +81,7 @@ impl Prefs {
                         .position(|n| n.to_lowercase() == v.to_lowercase())
                 ),
                 "fx_beat" => set!(fx_beat, BEAT_TEXT.iter().position(|&b| b == v)),
+                "fx_tempo_master" => set!(fx_tempo_master, v.parse().ok()),
                 "decks" => set!(decks, v.parse().ok().filter(|n| [2, 4].contains(n))),
                 "stems" => set!(stems, v.parse().ok()),
                 "stems_mode" => set!(stems_four, which(&STEMS_MODE, v)),
@@ -128,6 +129,7 @@ impl Prefs {
         line("window_h", &self.window_h.to_string());
         line("fx_effect", &effect_name(self.fx_effect));
         line("fx_beat", BEAT_TEXT[self.fx_beat]);
+        line("fx_tempo_master", &self.fx_tempo_master.to_string());
         line("decks", &self.decks.to_string());
         line("stems", &self.stems.to_string());
         line("stems_mode", STEMS_MODE[self.stems_four as usize]);

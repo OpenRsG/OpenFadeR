@@ -1,6 +1,7 @@
 //! Toast ↔ ui/toast.slint (global `ToastState`): `show(&app, "text")` pops a short notification near the top centre
 //! that hides itself after [`SHOW_FOR`]. A message that arrives while one is still up goes under it (three lines at
-//! most, oldest dropped) and restarts the clock, so "controller connected" and "Audio output: controller" read together.
+//! most, oldest dropped) and restarts the clock, so "controller connected" and "Audio output: controller" read together;
+//! the same text again only restarts the clock.
 
 use super::{App, ToastState};
 use slint::{ComponentHandle, Timer, TimerMode};
@@ -16,11 +17,10 @@ thread_local! {
 
 /// `current` (what is up now, "" when nothing is) with `new` underneath, keeping the last [`LINES`] lines.
 fn stacked(current: &str, new: &str) -> String {
-    let lines: Vec<&str> = current
-        .lines()
-        .filter(|l| !l.is_empty())
-        .chain(std::iter::once(new))
-        .collect();
+    let mut lines: Vec<&str> = current.lines().filter(|l| !l.is_empty()).collect();
+    if lines.last() != Some(&new) {
+        lines.push(new);
+    }
     lines[lines.len().saturating_sub(LINES)..].join("\n")
 }
 
@@ -56,5 +56,10 @@ mod tests {
             "controller connected\nAudio output: controller"
         );
         assert_eq!(stacked("a\nb\nc", "d"), "b\nc\nd");
+        assert_eq!(
+            stacked("a\nb", "b"),
+            "a\nb",
+            "the same text again adds no line"
+        );
     }
 }

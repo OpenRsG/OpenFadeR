@@ -1,8 +1,9 @@
-//! One channel strip: knobs, EQ / STEM mode, CFX type, fader, CUE and crossfader assignment, pushed to the deck's player.
+//! One channel strip: knobs, EQ / STEM ISO mode, CFX type, fader, CUE and crossfader assignment, pushed to the deck's player.
 
 use super::{
-    auto_db, crossfade_gains, cue_gain, curve, gain, map, side_gain, Mixer, MixerState, DECKS,
+    auto_db, crossfade_gains, cue_gain, curve, gain, map, side_gain, App, Mixer, MixerState, DECKS,
 };
+use crate::app::{ChannelView, prefs::controller::EqType};
 use openfader::audio::{
     cfx::{self, Kind},
     EQ_KILL_DB,
@@ -17,6 +18,36 @@ const SLOT: [usize; 3] = [1, 0, 2];
 /// BASS has no knob: with 4 stems it rides the INST knob (`deck::stems::gains`).
 fn swap_vocal_inst(v: [f32; 3]) -> [f32; 3] {
     SLOT.map(|i| v[i])
+}
+
+/// The EQ the player runs, `[low, mid, high]` in dB, from the EQ knobs alone: STEM ISO only changes what the HIGH / MID / LOW
+/// knobs show, so a band the DJ cut stays cut and the stem levels apply on top. `low_cut` is the AUTO LOW CUT kill.
+fn eq_dbs(row: &ChannelView, eq: EqType, low_cut: bool) -> [f32; 3] {
+    let db = |band| map::eq_db(row.knobs.row_data(band).unwrap_or(map::CENTRE), eq);
+    let low = if low_cut { EQ_KILL_DB } else { db(map::LOW) };
+    [low, db(map::MID), db(map::HI)]
+}
+
+/// Knob `knob` of channel `ch` as the strip shows it, 0..1: in STEM mode HI / MID / LOW show the ISO gains ([`Mixer::set_knob`]).
+pub(in crate::app) fn knob_at(app: &App, ch: i32, knob: usize) -> Option<f32> {
+    let row = app
+        .global::<MixerState>()
+        .get_channels()
+        .row_data(usize::try_from(ch).ok()?)?;
+    if row.iso && (map::HI..=map::LOW).contains(&knob) {
+        row.iso_knobs.row_data(knob - map::HI)
+    } else {
+        row.knobs.row_data(knob)
+    }
+}
+
+/// STEM ISOLATOR `part` (0 VOCAL, 1 INST, 2 DRUMS) of channel `ch` as the strip holds it, 0..1, whatever the channel's mode.
+pub(in crate::app) fn iso_at(app: &App, ch: i32, part: usize) -> Option<f32> {
+    let row = app
+        .global::<MixerState>()
+        .get_channels()
+        .row_data(usize::try_from(ch).ok()?)?;
+    row.iso_knobs.row_data(*SLOT.get(part)?)
 }
 
 impl Mixer {
@@ -105,7 +136,7 @@ impl Mixer {
         let auto = auto_db(cfg.auto_gain, self.decks[ch].auto_gain_db());
         self.auto[ch].set(auto);
         let (trim_db, sel) = (map::trim_db(k(map::TRIM)) + auto, self.cfx_type());
-        // STEM mode: the HIGH / MID / LOW knobs are the stem levels (INST, VOCAL, DRUMS) and the EQ stays flat.
+        // STEM ISO: the HIGH / MID / LOW knobs are the stem levels (INST, VOCAL, DRUMS); the EQ keeps running underneath.
         let iso = row
             .iso
             .then(|| swap_vocal_inst([0, 1, 2].map(|i| row.iso_knobs.row_data(i).unwrap_or(1.0))));
@@ -127,15 +158,8 @@ impl Mixer {
             p.fader().set_index(index);
             p.fader().set_knob(row.fader);
             p.set_cue_gain(cue_gain(trim_db, row.cue));
-            let eq = |band: usize| {
-                if iso.is_some() {
-                    0.0
-                } else {
-                    map::eq_db(k(band), cfg.eq)
-                }
-            };
-            let low = if low_cut { EQ_KILL_DB } else { eq(map::LOW) };
-            p.set_eq(low, eq(map::MID), eq(map::HI));
+            let [low, mid, high] = eq_dbs(&row, cfg.eq, low_cut);
+            p.set_eq(low, mid, high);
             p.cfx().set_index(sel);
             p.cfx().set_knob(cfx);
         });
@@ -178,6 +202,18 @@ impl Mixer {
         self.set_knob(ch, map::HI + SLOT[part], v);
     }
 
+    /// A deck's part button or pad moved the rotary of `part` (0 VOCAL, 1 INST, 2 DRUMS) to `v`: the strip stays in its mode (EQ or STEM ISO).
+    pub(super) fn set_part_level(&self, ch: usize, part: usize, v: f32) {
+        if part > 2 || ch >= DECKS {
+            return;
+        }
+        self.row(ch)
+            .iso_knobs
+            .set_row_data(SLOT[part], v.clamp(0.0, 1.0));
+        self.show_eq(ch);
+        self.apply(ch);
+    }
+
     pub(super) fn toggle_cue(&self, ch: usize) {
         self.update(ch, |row| row.cue = !row.cue);
         self.apply(ch);
@@ -204,5 +240,30 @@ mod tests {
         );
         // a controller's PART ISOLATOR for VOCAL (part 0) lands on the MID knob, INST (part 1) on HIGH
         assert_eq!((SLOT[0], SLOT[1], SLOT[2]), (1, 0, 2));
+    }
+
+    #[test]
+    fn stem_iso_keeps_the_eq_the_dj_set_and_back_again() {
+        let knobs = [map::CENTRE, map::CENTRE, map::CENTRE, 0.0, map::CENTRE];
+        let mut row = ChannelView {
+            knobs: slint::ModelRc::new(slint::VecModel::from(knobs.to_vec())),
+            iso_knobs: slint::ModelRc::new(slint::VecModel::from(vec![1.0; 3])),
+            ..Default::default()
+        }; // LOW killed
+        let eq = EqType::Isolator;
+        let in_eq = eq_dbs(&row, eq, false);
+        assert_eq!(in_eq, [EQ_KILL_DB, 0.0, 0.0]);
+        row.iso = true;
+        assert_eq!(
+            eq_dbs(&row, eq, false),
+            in_eq,
+            "STEM ISO leaves the band cut"
+        );
+        row.iso = false;
+        assert_eq!(
+            eq_dbs(&row, eq, false),
+            in_eq,
+            "and back to EQ shows the same"
+        );
     }
 }

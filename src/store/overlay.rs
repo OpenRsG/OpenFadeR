@@ -297,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn reload_tag_shows_the_files_text_over_edits_and_undo_brings_the_edits_back() {
+    fn reload_tag_keeps_edits_over_the_files_text_and_discard_drops_them_until_undo() {
         let s = Arc::new(Store::in_memory().unwrap());
         let t = crate::library::Track {
             title: "Old".into(),
@@ -312,16 +312,21 @@ mod tests {
         let ov = Overlay::new(Box::new(crate::library::own::Own::new(s.clone())), s.clone());
         let shown = || {
             let t = ov.tracks_all().unwrap()[0].clone();
-            (t.title, t.artist, t.comment, t.rating)
+            (t.title, t.artist, t.album, t.comment, t.rating)
         };
-        assert_eq!(shown(), ("Mine".into(), "Me".into(), "note".into(), 4));
+        let edited = ("Mine".to_string(), "Me".into(), "".into(), "note".into(), 4);
+        assert_eq!(shown(), edited);
         let fresh = crate::library::Track {
             title: "From File".into(),
+            artist: "File Artist".into(),
+            album: "File Album".into(),
             ..s.collection_track(id).unwrap().unwrap()
         };
-        s.action("Reload Tag", || s.reload_tags(&key, &fresh)).unwrap();
-        assert_eq!(shown(), ("From File".into(), "".into(), "".into(), 4));
+        s.action("Reload Tag", || s.reload_tags(&key, &fresh, true)).unwrap();
+        assert_eq!(shown(), edited);
+        s.action("Reload Tag (discard edits)", || s.reload_tags(&key, &fresh, false)).unwrap();
+        assert_eq!(shown(), ("From File".into(), "File Artist".into(), "File Album".into(), "".into(), 4));
         s.undo().unwrap();
-        assert_eq!(shown(), ("Mine".into(), "Me".into(), "note".into(), 4));
+        assert_eq!(shown(), edited);
     }
 }

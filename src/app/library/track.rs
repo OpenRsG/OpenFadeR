@@ -28,7 +28,8 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
             c.analyze(vec![t], true);
         }
         "track-lock" => lock(c, &t),
-        "track-reload-tag" => reload_tag(c, &t),
+        "track-reload-tag" => reload_tag(c, &t, true),
+        "track-reload-tag-discard" => reload_tag(c, &t, false),
         "track-show" => match &t.file {
             Some(f) => show_in_folder(f),
             None => c.say(tr!("this track has no file")),
@@ -110,21 +111,48 @@ fn retagged(t: &Track, fresh: Track) -> Track {
 }
 
 /// Reload Tag: the file's tags replace what the track shows (a Collection row shadows the source's, which stays untouched).
-fn reload_tag(c: &Rc<Ctx>, t: &Track) {
+/// `keep_edits`: the text the user edited stays over the file's, and the status names the kept edits that differ from the file.
+fn reload_tag(c: &Rc<Ctx>, t: &Track, keep_edits: bool) {
     let Some(file) = t.file.as_deref().filter(|f| f.is_file()) else {
         return c.say(tr!("the file is missing: relocate it first"));
     };
-    // The row's own values are the base: what the user edited (the overrides, dropped below) is not the file's.
+    // The row's own values are the base: what the user edited (the overrides) is not the file's.
     let row =
         t.id.and_then(|id| c.store.collection_track(id).ok().flatten());
     let merged = retagged(row.as_ref().unwrap_or(t), folder::read_track(file));
     let key = c.store.key_of(t);
+    let kept = if keep_edits {
+        let e = c.store.edits(&key).unwrap_or_default();
+        [
+            (tr!("Title"), &e.title, &merged.title),
+            (tr!("Artist"), &e.artist, &merged.artist),
+            (tr!("Album"), &e.album, &merged.album),
+            (tr!("Genre"), &e.genre, &merged.genre),
+            (tr!("Label"), &e.label, &merged.label),
+            (tr!("Comment"), &e.comment, &merged.comment),
+        ]
+        .into_iter()
+        .filter(|(_, edit, file)| edit.as_ref().is_some_and(|v| v != *file))
+        .map(|(name, ..)| name)
+        .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let label = if keep_edits {
+        tr!("Reload Tag")
+    } else {
+        tr!("Reload Tag (discard edits)")
+    };
     match c
         .store
-        .action(tr!("Reload Tag"), || c.store.reload_tags(&key, &merged))
+        .action(label, || c.store.reload_tags(&key, &merged, keep_edits))
     {
         Ok(_) => {
-            c.say(&tr!("tags of “{}” reloaded", t.title));
+            c.say(&if kept.is_empty() {
+                tr!("tags of “{}” reloaded", t.title)
+            } else {
+                tr!("Reload Tag: kept your edits of {}", kept.join(", "))
+            });
             c.reload(None);
         }
         Err(e) => c.say(&tr!("store: {}", e)),

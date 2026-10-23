@@ -10,7 +10,7 @@
 //! Gain of a stem = its mute state × its isolator knob. A deck button silences a part at full level and brings any other
 //! level back to full. The pads and the controller's ACTIVE PART follow PREFS (MUTE: the same as the buttons; SOLO: silence
 //! every other part, pressing the sole part again brings all back); either way the part's rotary moves with it, and turning a
-//! rotary up brings back the parts it drives.
+//! rotary up brings back the parts it drives. A part button only mutes or solos: the mixer strip stays in its EQ or STEM ISO mode.
 //! The mixer has three knobs, top to bottom INST, VOCAL, DRUMS; BASS rides the INST knob. With 3 STEMS
 //! (PREFS) bass is part of INST: it follows INST's mute and has no button.
 //! The mute state resets on LOAD unless PREFS says KEEP. Without the model the first separation downloads it
@@ -61,6 +61,15 @@ pub fn press(mute: &mut [bool; STEM_COUNT], k: usize, solo: bool, four: bool) {
 /// A stem at this gain or above counts as full: its button is filled, a press silences it.
 const FULL: f32 = 0.99;
 
+/// The mixer rotary (0 VOCAL, 1 INST, 2 DRUMS) that drives stem `k`; BASS rides INST's.
+fn part_of(k: usize) -> usize {
+    match k {
+        VOCAL => 0,
+        INST | BASS => 1,
+        _ => 2,
+    }
+}
+
 /// Button gain endpoints; INST and BASS share one rotary without muting each other. Without `solo` a press silences a part at
 /// full level and brings any other level (silenced or turned down on the mixer) back to full.
 fn activate(
@@ -82,11 +91,7 @@ fn activate(
         !mute[INST] || (four && !mute[BASS]),
         !mute[DRUMS],
     ];
-    let selected = match k {
-        VOCAL => 0,
-        INST | BASS => 1,
-        _ => 2,
-    };
+    let selected = part_of(k);
     std::array::from_fn(|part| {
         if solo || part == selected {
             if audible[part] { 1.0 } else { 0.0 }
@@ -239,15 +244,18 @@ impl Deck {
             prefs::update(|p| p.stems = true);
         }
         self.ensure_stems();
-        let levels = {
+        let (levels, selected) = {
             let mut s = self.stems.borrow_mut();
             let iso = s.iso;
-            activate(&mut s.mute, iso, k, solo, four)
+            (activate(&mut s.mute, iso, k, solo, four), part_of(k))
         };
         if let Some(app) = self.app.upgrade() {
             let mixer = app.global::<crate::app::MixerState>();
+            // The rotaries the press decided (all of them for a solo); the strip keeps its EQ / STEM ISO mode.
             for (part, level) in levels.into_iter().enumerate() {
-                mixer.invoke_iso_knob(self.index as i32, part as i32, level);
+                if solo || part == selected {
+                    mixer.invoke_iso_part(self.index as i32, part as i32, level);
+                }
             }
         }
         self.refresh_stem_buttons();
@@ -397,5 +405,39 @@ mod tests {
             s, ALL,
             "solo with 3 stems ignores bass when deciding the part is alone"
         );
+    }
+
+    #[test]
+    fn a_part_button_mutes_without_switching_the_strip_to_stem_iso() {
+        use crate::app::{MixerState, prefs::set_for_test};
+        use openfader::{
+            library::{Library, own::Own},
+            store::Store,
+        };
+        use slint::Model;
+        crate::app::headless::init();
+        let app = crate::app::App::new().unwrap();
+        let lib: std::rc::Rc<dyn Library> =
+            std::rc::Rc::new(Own::new(std::sync::Arc::new(Store::in_memory().unwrap())));
+        let decks = crate::app::deck::wire(&app, lib, Default::default());
+        set_for_test(|p| p.stems = true);
+        crate::app::mixer::wire(&app, decks.clone());
+        decks[0].show(|v| v.loaded = true);
+        let mixer = app.global::<MixerState>();
+        let row = || mixer.get_channels().row_data(0).unwrap();
+
+        decks[0].stem_click(VOCAL);
+        assert!(decks[0].stem_mutes()[VOCAL]);
+        assert!(!row().iso, "the strip stays in EQ mode");
+        assert_eq!(
+            row().iso_knobs.row_data(1),
+            Some(0.0),
+            "the VOCAL rotary follows"
+        );
+
+        mixer.invoke_iso_toggled(0);
+        decks[0].stem_click(VOCAL);
+        assert!(!decks[0].stem_mutes()[VOCAL]);
+        assert!(row().iso, "and a strip in STEM ISO stays there");
     }
 }

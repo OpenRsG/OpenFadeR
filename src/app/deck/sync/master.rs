@@ -28,36 +28,49 @@ pub fn after_play_change(
 
 /// What SYNC on deck `me` follows. `decks`: per deck (holds a track, tempo can be followed, plays). The master
 /// unless it is `me` (or nobody, or hidden by a 2-deck layout: only the first `shown` decks count); else the
-/// first other shown deck that can be followed, a playing one before an idle one.
+/// first other shown deck that can be followed, a playing one before an idle one. `spare_audible` (SYNC, not KEY SYNC):
+/// a playing `me` never follows an idle deck, except the master the MASTER button pinned (`manual`).
 pub fn leader_of(
     master: Option<usize>,
+    manual: bool,
     me: usize,
     shown: usize,
     decks: [(bool, bool, bool); DECKS],
+    spare_audible: bool,
 ) -> Option<usize> {
-    if let Some(m) = master.filter(|&m| m != me && m < shown) {
+    let audible = spare_audible && decks[me].2;
+    if let Some(m) = master.filter(|&m| m != me && m < shown && (!audible || manual || decks[m].2))
+    {
         return Some(m);
     }
     (0..shown)
-        .filter(|&i| i != me && decks[i].0)
+        .filter(|&i| i != me && decks[i].0 && (!audible || decks[i].2))
         .min_by_key(|&i| (!decks[i].1, !decks[i].2))
 }
 
 impl Deck {
     /// The deck SYNC on this one follows ([`leader_of`]); `followable` says whether this deck can follow a peer's tempo.
-    fn leader(&self, followable: impl Fn(&Deck) -> bool) -> Option<Rc<Deck>> {
+    fn leader(&self, followable: impl Fn(&Deck) -> bool, spare_audible: bool) -> Option<Rc<Deck>> {
         let l = &self.sync.link;
         let info = std::array::from_fn(|i| {
             l.deck(i).map_or((false, false, false), |d| {
                 (d.ready(), followable(&d), d.playing())
             })
         });
-        leader_of(l.master.get(), self.index, active(), info).and_then(|i| l.deck(i))
+        leader_of(
+            l.master.get(),
+            l.manual.get(),
+            self.index,
+            active(),
+            info,
+            spare_audible,
+        )
+        .and_then(|i| l.deck(i))
     }
 
     /// The deck KEY SYNC matches: the master, else another shown deck holding a track (a playing one first).
     pub(in crate::app::deck) fn key_target(&self) -> Option<Rc<Deck>> {
-        self.leader(|_| true)
+        self.leader(|_| true, false)
     }
 
     /// The tempo this deck could follow `peer` at.
@@ -87,7 +100,14 @@ impl Deck {
             self.show(|v| v.synced = false);
             return self.say(tr!("sync off: the tempo fader is yours again"));
         }
-        let Some(peer) = self.leader(|d| self.can_follow(d)) else {
+        let Some(peer) = self.leader(|d| self.can_follow(d), true) else {
+            if self.playing() && self.key_target().is_some() {
+                // only audible deck, the others idle: it leads, its tempo stays
+                if !self.is_master() {
+                    self.set_master(Some(self.index));
+                }
+                return self.say(tr!("sync: nothing else plays, this deck leads"));
+            }
             return self.say(tr!("sync: load a track on another deck first"));
         };
         if !peer.ready() || !self.can_follow(&peer) {
@@ -282,30 +302,62 @@ mod tests {
         let playing = (true, true, true);
         // the master wins, whichever deck it is
         assert_eq!(
-            leader_of(Some(3), 0, 4, [none, loaded, playing, playing]),
+            leader_of(Some(3), false, 0, 4, [none, loaded, playing, playing], true),
             Some(3)
         );
         // SYNC on the master itself, or with none: a playing deck before an idle one, followable before not
         assert_eq!(
-            leader_of(Some(0), 0, 4, [playing, loaded, none, playing]),
+            leader_of(Some(0), false, 0, 4, [playing, loaded, none, playing], true),
             Some(3)
         );
         assert_eq!(
-            leader_of(None, 0, 4, [none, (true, false, true), loaded, none]),
+            leader_of(
+                None,
+                false,
+                0,
+                4,
+                [none, (true, false, true), loaded, none],
+                true
+            ),
             Some(2)
         );
-        assert_eq!(leader_of(None, 1, 4, [loaded, none, none, none]), Some(0));
+        assert_eq!(
+            leader_of(None, false, 1, 4, [loaded, none, none, none], true),
+            Some(0)
+        );
         // nothing else loaded: nobody to follow
-        assert_eq!(leader_of(None, 0, 4, [loaded, none, none, none]), None);
+        assert_eq!(
+            leader_of(None, false, 0, 4, [loaded, none, none, none], true),
+            None
+        );
         // the 2-deck layout hides C and D: they are neither master nor candidates
         assert_eq!(
-            leader_of(Some(2), 0, 2, [loaded, none, playing, playing]),
+            leader_of(Some(2), false, 0, 2, [loaded, none, playing, playing], true),
             None
         );
         assert_eq!(
-            leader_of(None, 0, 2, [loaded, loaded, playing, playing]),
+            leader_of(None, false, 0, 2, [loaded, loaded, playing, playing], true),
             Some(1)
         );
+    }
+
+    #[test]
+    fn a_playing_deck_never_follows_an_idle_one_unless_it_was_pinned_master() {
+        let none = (false, false, false);
+        let loaded = (true, true, false);
+        let playing = (true, true, true);
+        let (a, b) = ([playing, loaded, none, none], [loaded, playing, none, none]);
+        // A plays alone, B idle at another tempo: whoever the (unpinned) master is, SYNC finds nothing to follow
+        assert_eq!(leader_of(None, false, 0, 4, a, true), None);
+        assert_eq!(leader_of(Some(0), false, 0, 4, a, true), None);
+        assert_eq!(leader_of(Some(1), false, 0, 4, a, true), None);
+        // KEY SYNC still matches the idle deck's key
+        assert_eq!(leader_of(None, false, 0, 4, a, false), Some(1));
+        // MASTER pressed on idle B: that is the explicit override, followed idle
+        assert_eq!(leader_of(Some(1), true, 0, 4, a, true), Some(1));
+        // an idle deck still follows a playing one, and a playing master stays followed
+        assert_eq!(leader_of(None, false, 0, 4, b, true), Some(1));
+        assert_eq!(leader_of(Some(1), false, 0, 4, b, true), Some(1));
     }
 
     struct NoTracks;

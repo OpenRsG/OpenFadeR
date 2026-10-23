@@ -99,9 +99,10 @@ pub struct Prefs {
     pub window_w: u32,
     pub window_h: u32,
     /// Beat FX: selector index (`Effect::names()`: built-ins, then plugin effects; stored by name) and into `BEAT_TEXT`,
-    /// restored at start-up.
+    /// restored at start-up; and FX1's tempo source (`false` = CH, the deck on its channel; `true` = MST, the master deck).
     pub fx_effect: usize,
     pub fx_beat: usize,
+    pub fx_tempo_master: bool,
     /// Decks shown and playable: 2 (A, B) or 4 (A to D), see `deck::active`.
     pub decks: usize,
     /// STEMS (track separation, `openfader::stems`): off by default (switching it on downloads a 316 MB model once, `app/stems_model`, and it uses
@@ -143,6 +144,7 @@ impl Default for Prefs {
             window_h: 0,
             fx_effect: 0,
             fx_beat: DEFAULT_BEAT,
+            fx_tempo_master: false,
             decks: 2,
             stems: false,
             stems_fast: false,

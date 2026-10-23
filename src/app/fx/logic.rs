@@ -105,8 +105,24 @@ pub(in crate::app) fn tempo(master: i32, decks: [(bool, f32); DECKS]) -> Option<
         .map(|(_, bpm)| bpm)
 }
 
-/// What the units follow now: the playing decks' tempo, else (the last deck paused) the one they had, so a tail keeps ringing
-/// at the tempo it started at. Only a unit that never had a tempo runs at the 120 BPM fallback.
+/// The tempo a unit's source gives: CH (`master_tempo` false) the deck on the unit's channel `assign` (0..3) while it plays at a
+/// known tempo; MST, or CH on MASTER (4), the `master` tempo of [`tempo`]. `None` while there is nothing to follow.
+pub(super) fn follow(
+    assign: i32,
+    master_tempo: bool,
+    master: Option<f32>,
+    decks: [(bool, f32); DECKS],
+) -> Option<f32> {
+    match usize::try_from(assign).ok().filter(|&d| d < DECKS) {
+        Some(d) if !master_tempo => Some(decks[d])
+            .filter(|&(p, b)| p && b > 0.0)
+            .map(|(_, b)| b),
+        _ => master,
+    }
+}
+
+/// What a unit follows now: its source's tempo while that plays, else (the deck paused) the one the unit had, so a tail keeps
+/// ringing at the tempo it started at. Only a unit that never had a tempo runs at the 120 BPM fallback.
 pub(super) fn held_tempo(last: &Cell<Option<f32>>, playing: Option<f32>) -> Option<f32> {
     let t = playing.or(last.get());
     last.set(t);
@@ -124,11 +140,11 @@ pub(in crate::app) fn pad_fx_rgb(c: PadFxColor) -> [u8; 3] {
     }
 }
 
-/// The tempo a unit follows and whether it is only the fallback: `over` (TAP), else the decks' `master` tempo.
-pub(super) fn unit_bpm(over: Option<f32>, master: Option<f32>) -> (f32, bool) {
+/// The tempo a unit runs at and whether it is only the fallback: `over` (TAP), else the `followed` tempo of its CH / MST source.
+pub(super) fn unit_bpm(over: Option<f32>, followed: Option<f32>) -> (f32, bool) {
     (
-        over.or(master).unwrap_or(super::FALLBACK_BPM),
-        over.is_none() && master.is_none(),
+        over.or(followed).unwrap_or(super::FALLBACK_BPM),
+        over.is_none() && followed.is_none(),
     )
 }
 

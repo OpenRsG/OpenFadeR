@@ -113,6 +113,8 @@ Also: `removed(id)` (tracks of a source the user removed), `relocated(orig, path
 `track(key, rating, comment, color, cues_set, grid, grid_orig, title, artist, album, genre, label)`: a null column means no
 edit, the source's value stands. An empty text value explicitly clears that field. The title, artist, album, genre, label
 and comment overrides are saved together as one atomic edit and one undo step; they do not alter the `collection` row or file tags.
+Track > Reload Tag reads the file's tags into the `collection` row and keeps these overrides (the status line names the kept
+ones that differ from the file); Reload Tag (discard edits) also clears them, as one undo step.
 The library overlay applies these fields along with rating and comment, so exports use the edited values. Source libraries
 are unchanged unless an existing two-way connection writes back the edits.
 `rating` 0..=5. `color` 1..=8 (1 Pink, 2 Red, 3 Orange, 4 Yellow, 5 Green, 6 Aqua, 7 Blue, 8 Purple). `cues_set` is 1 when

@@ -257,6 +257,7 @@ export component TrackTable inherits Rectangle {
                 MenuItem { text: @tr("Analyze track"); activated => { LibraryState.action("track-analyze"); menu.close(); } }
                 MenuItem { text: @tr("Analysis lock"); activated => { LibraryState.action("track-lock"); menu.close(); } }
                 MenuItem { text: @tr("Reload tag"); activated => { LibraryState.action("track-reload-tag"); menu.close(); } }
+                MenuItem { text: @tr("Reload tag (discard edits)"); activated => { LibraryState.action("track-reload-tag-discard"); menu.close(); } }
                 MenuItem { text: @tr("Show in file manager"); activated => { LibraryState.action("track-show"); menu.close(); } }
                 MenuItem { text: @tr("Relocate…"); activated => { LibraryState.action("track-relocate"); menu.close(); } }
                 MenuItem { text: @tr("Auto relocate"); activated => { LibraryState.action("track-auto-relocate"); menu.close(); } }

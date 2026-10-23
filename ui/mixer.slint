@@ -15,7 +15,7 @@ export struct ChannelView {
     peak: float,
     /// Crossfader assignment: 0 = A side, 1 = THRU (not on the crossfader), 2 = B side. Decks A and C start on A, B and D on B.
     xf: int,
-    /// STEM mode: the HIGH / MID / LOW knobs are the INST / VOCAL / DRUMS levels (`iso-knobs`, 0..1 = gain, in that knob order) and the EQ is flat.
+    /// STEM ISO: the HIGH / MID / LOW knobs show the INST / VOCAL / DRUMS levels (`iso-knobs`, 0..1 = gain, in that knob order) instead of the EQ, which keeps running on the audio.
     iso: bool,
     iso-knobs: [float],
     /// AUTO GAIN knob position (0.5 = no adjustment) and the gain the loaded track plays with ("+1.5 dB"), set by Rust from the deck.
@@ -69,6 +69,8 @@ export global MixerState {
     callback iso-toggled(int);
     /// (channel, part 0 VOCAL / 1 INST / 2 DRUMS, gain 0..1) from a controller's PART ISOLATOR knob; switches the channel to ISO mode.
     callback iso-knob(int, int, float);
+    /// (channel, part 0 VOCAL / 1 INST / 2 DRUMS, gain 0..1) from a deck's part button: the part's STEM ISO level follows; the channel stays in its EQ / STEM ISO mode.
+    callback iso-part(int, int, float);
     callback cfx-selected(int);
     /// (channel, knob index, position)
     callback knob(int, int, float);

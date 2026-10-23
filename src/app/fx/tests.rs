@@ -80,15 +80,35 @@ fn assignment_offers_only_the_shown_channels_and_master() {
 }
 
 #[test]
-fn tap_overrides_the_master_tempo_and_auto_returns_to_it() {
-    assert_eq!(unit_bpm(None, Some(128.0)), (128.0, false));
-    assert_eq!(unit_bpm(Some(90.0), Some(128.0)), (90.0, false), "TAP wins");
+fn a_unit_follows_its_channel_deck_in_ch_the_master_in_mst_and_tap_overrides_both() {
+    // deck 1 at 128, deck 2 at 120 and started last (master = deck 1, index 0 asked first)
+    let decks = [(true, 128.0), (true, 120.0), (false, 0.0), (false, 0.0)];
+    let master = tempo(0, decks);
+    let on_ch2 = |master_tempo, over| unit_bpm(over, follow(1, master_tempo, master, decks));
+    assert_eq!(on_ch2(false, None), (120.0, false), "CH: deck 2");
+    assert_eq!(on_ch2(true, None), (128.0, false), "MST: the master deck");
+    assert_eq!(on_ch2(false, Some(90.0)), (90.0, false), "TAP beats CH");
+    assert_eq!(on_ch2(true, Some(90.0)), (90.0, false), "and MST");
     assert_eq!(
-        unit_bpm(Some(90.0), None),
-        (90.0, false),
-        "and needs no deck"
+        follow(4, false, master, decks),
+        Some(128.0),
+        "CH on MASTER is MST"
     );
+    // a CH deck that does not play, or has no tempo, gives none: the unit keeps its last (held_tempo)
+    let stopped = [(true, 128.0), (false, 120.0), (false, 0.0), (false, 0.0)];
+    assert_eq!(follow(1, false, tempo(0, stopped), stopped), None);
+    assert_eq!(follow(0, false, None, [(true, 0.0); 4]), None);
     assert_eq!(unit_bpm(None, None), (FALLBACK_BPM, true));
+    let last = Cell::new(None);
+    assert_eq!(
+        held_tempo(&last, follow(1, false, master, decks)),
+        Some(120.0)
+    );
+    assert_eq!(
+        held_tempo(&last, follow(1, false, tempo(0, stopped), stopped)),
+        Some(120.0),
+        "deck 2 paused: the tail keeps 120, not deck 1's 128"
+    );
 }
 
 #[test]
