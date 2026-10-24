@@ -33,7 +33,8 @@ pub enum Confirm {
     Restore(PathBuf),
     Remove(Vec<Track>),
     RemoveMissing(Vec<Track>),
-    /// Make Auto Cue point: some of these tracks already have a cue point (1 = replace it, 2 = keep it).
+    /// Make Auto Cue point: some of these tracks already have cues (1 = replace the cue point and hot cues, 2 = only add
+    /// what is missing).
     AutoCue(Vec<super::autocue::Job>),
     /// A two-way connection's write-back, after its dry run (the plan is held by [`crate::app::connect`]).
     WriteBack,
