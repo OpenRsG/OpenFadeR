@@ -2,8 +2,12 @@
 
 use super::{BLANK, Palette, TAG_LIST_MAX, UNTITLED, assign::SLOTS, drag::Drag};
 use crate::app::{
+    browser::{
+        playlists::{fresh_keys, playlist_labels},
+        sidebar::Entry,
+        Home, View,
+    },
     App, BrowserState,
-    browser::{Home, View, playlists::playlist_labels, sidebar::Entry},
 };
 use openfader::{
     library::Track,
@@ -44,9 +48,9 @@ impl Palette {
                 };
                 self.put_playlist(app, &mut v, pal, id);
             }
-            Drag::Track(_) | Drag::Palette(..) => match self.track_of(&v, &drag) {
-                Some(t) => self.add_track(app, &mut v, pal, &t),
-                None => v.say(app, tr!("that track is gone")),
+            Drag::Track(_) | Drag::Palette(..) => match self.tracks_of(&v, &drag) {
+                tracks if !tracks.is_empty() => self.add_tracks(app, &mut v, pal, &tracks),
+                _ => v.say(app, tr!("that track is gone")),
             },
         }
     }
@@ -79,17 +83,32 @@ impl Palette {
         self.sync(v);
     }
 
-    /// `t` goes to the end of palette `pal`'s list; a blank palette first makes "Untitled Playlist" and asks for its name.
-    pub(super) fn add_track(&self, app: &App, v: &mut View, pal: usize, t: &Track) {
+    /// `ts` go to the end of palette `pal`'s list; a blank palette first makes "Untitled Playlist" and asks for its name.
+    pub(super) fn add_tracks(&self, app: &App, v: &mut View, pal: usize, ts: &[Track]) {
         if pal == 0 {
-            let msg = if v.tags.contains(t) {
-                tr!("“{}” is already in the Tag List", t.title)
-            } else if v.tags.len() >= TAG_LIST_MAX {
-                tr!("the Tag List holds up to {} tracks", TAG_LIST_MAX)
-            } else {
-                v.tags.push(t.clone());
-                v.tags_changed(app);
-                tr!("tagged “{}” ({} in the Tag List)", t.title, v.tags.len())
+            let msg = match ts {
+                [t] if v.tags.contains(t) => tr!("“{}” is already in the Tag List", t.title),
+                [_] if v.tags.len() >= TAG_LIST_MAX => {
+                    tr!("the Tag List holds up to {} tracks", TAG_LIST_MAX)
+                }
+                [t] => {
+                    v.tags.push(t.clone());
+                    v.tags_changed(app);
+                    tr!("tagged “{}” ({} in the Tag List)", t.title, v.tags.len())
+                }
+                _ => {
+                    let mut fresh: Vec<Track> = Vec::new();
+                    for t in ts.iter().filter(|t| !v.tags.contains(t)) {
+                        if !fresh.contains(t) {
+                            fresh.push(t.clone());
+                        }
+                    }
+                    fresh.truncate(TAG_LIST_MAX.saturating_sub(v.tags.len()));
+                    let n = fresh.len();
+                    v.tags.extend(fresh);
+                    v.tags_changed(app);
+                    tr!("{} tracks added to the Tag List", n)
+                }
             };
             v.say(app, msg);
             return self.sync(v);
@@ -109,18 +128,29 @@ impl Palette {
                 Err(e) => return v.say(app, tr!("store: {}", e)),
             },
         };
-        let key = store::key(t);
+        let keys: Vec<String> = ts.iter().map(store::key).collect();
         let name = v
             .nodes
             .iter()
             .find(|n| n.id == id)
             .map_or_else(|| UNTITLED.to_owned(), |n| n.name.clone());
         let msg = match store.entries(id) {
-            Ok(have) if have.contains(&key) => tr!("“{}” is already in {}", t.title, name),
-            Ok(_) => match store.add_entries(id, &[key]) {
-                Ok(()) => tr!("added “{}” to {}", t.title, name),
-                Err(e) => tr!("store: {}", e),
-            },
+            Ok(have) => {
+                let (new, held) = fresh_keys(&have, &keys);
+                match (ts, new.is_empty()) {
+                    ([t], true) => tr!("“{}” is already in {}", t.title, name),
+                    (_, true) if ts.len() > 1 => {
+                        tr!("{} added, {} already in the playlist", 0, held)
+                    }
+                    _ => match store.add_entries(id, &new) {
+                        Ok(()) => match ts {
+                            [t] => tr!("added “{}” to {}", t.title, name),
+                            _ => tr!("{} added, {} already in the playlist", new.len(), held),
+                        },
+                        Err(e) => tr!("store: {}", e),
+                    },
+                }
+            }
             Err(e) => tr!("store: {}", e),
         };
         if fresh {

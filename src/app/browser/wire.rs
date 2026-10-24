@@ -50,6 +50,14 @@ pub(super) fn load_to_deck(app: &App, on_track: &dyn Fn(&Track), t: &Track) {
     }
 }
 
+/// The chosen row became `t`: the panels that follow it, then the deck-side hook.
+fn chosen(v: &Rc<RefCell<View>>, app: &App, t: &Track, on_selected: &dyn Fn(&Track)) {
+    v.borrow().suggest_selected(app);
+    v.borrow().health_selected(app, t);
+    trackinfo::show(app, t);
+    on_selected(t);
+}
+
 /// Fills the playlist tree, lists all tracks, and calls `on_track` when a track row is chosen.
 pub fn wire(
     app: &App,
@@ -70,6 +78,8 @@ pub fn wire(
     let played = super::played::load(&store);
     let rows = Rc::new(super::table::Rows::new(played));
     state.set_tracks(rows.clone().into());
+    let marks = Rc::new(VecModel::default());
+    state.set_selected_rows(marks.clone().into());
     tagging::ensure_defaults(&store);
     let view = Rc::new(RefCell::new(View {
         lib,
@@ -88,6 +98,10 @@ pub fn wire(
         tags: Vec::new(),
         history: Vec::new(),
         selected: None,
+        sel: Default::default(),
+        sel_entry: Entry::All,
+        marks,
+        status_base: String::new(),
         reference: Reference::default(),
         detected_ver: detected().version(),
         sel_at: None,
@@ -278,18 +292,29 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
     let (v, weak) = (view.clone(), app.as_weak());
     state.on_tag_add(move || {
         let (app, mut v) = (weak.unwrap(), v.borrow_mut());
-        let msg = match v.selected.clone() {
-            None => tr!("select a track to tag").to_owned(),
-            Some(t) if v.tags.contains(&t) => tr!("“{}” is already in the Tag List", t.title),
-            Some(t) => {
+        let msg = match v.selection().as_slice() {
+            [] => tr!("select a track to tag").to_owned(),
+            [t] if v.tags.contains(t) => tr!("“{}” is already in the Tag List", t.title),
+            [t] => {
                 let msg = tr!(
                     "tagged “{}” ({} in the Tag List)",
                     t.title,
                     v.tags.len() + 1
                 );
-                v.tags.push(t);
+                v.tags.push(t.clone());
                 v.tags_changed(&app);
                 msg
+            }
+            many => {
+                let fresh: Vec<Track> = many
+                    .iter()
+                    .filter(|t| !v.tags.contains(t))
+                    .cloned()
+                    .collect();
+                let n = fresh.len();
+                v.tags.extend(fresh);
+                v.tags_changed(&app);
+                tr!("{} tracks added to the Tag List", n)
             }
         };
         app.global::<BrowserState>().set_status(msg.into());
@@ -333,9 +358,22 @@ fn wire_selection(
     state.on_list_remove(move || {
         let (app, mut v) = (weak.unwrap(), v.borrow_mut());
         let Some(pos) = v.cursor(&app) else { return };
-        if !v.remove_at(&app, pos) {
+        // Every selected entry goes, last first so the positions still to remove stay valid.
+        let mut rows = v.sel.ordered(&v.shown);
+        if rows.len() < 2 {
+            rows = vec![pos];
+        }
+        rows.sort_unstable();
+        v.sel.clear();
+        let removed = rows
+            .iter()
+            .rev()
+            .take_while(|&&at| v.remove_at(&app, at))
+            .count();
+        if removed == 0 {
             return;
         }
+        let pos = rows[rows.len() - removed];
         // The neighbour inherits the selection so the arrow keys keep working down the queue.
         v.sel_at = Some(if pos < v.list.len() {
             pos
@@ -355,21 +393,88 @@ fn wire_selection(
         }
     });
     let (v, weak, on_selected) = (view.clone(), app.as_weak(), on_track.clone());
-    state.on_track_selected(move |i| {
-        if let Some(t) = track_at(&v, i) {
-            let app = weak.unwrap();
-            {
-                let mut view = v.borrow_mut();
-                view.sel_at = usize::try_from(i)
-                    .ok()
-                    .and_then(|i| view.shown.get(i).copied());
-                view.selected = Some(t.clone());
+    // A plain click or key: only this row is selected.
+    state.on_track_selected({
+        let on_selected = on_selected.clone();
+        let (v, weak) = (v.clone(), weak.clone());
+        move |i| {
+            if let Some(t) = track_at(&v, i) {
+                let app = weak.unwrap();
+                {
+                    let mut view = v.borrow_mut();
+                    view.sel_at = usize::try_from(i)
+                        .ok()
+                        .and_then(|i| view.shown.get(i).copied());
+                    view.selected = Some(t.clone());
+                    if let Some(at) = view.sel_at {
+                        view.sel.pick(at);
+                    }
+                    view.publish_selection(&app);
+                }
+                chosen(&v, &app, &t, &*on_selected);
             }
-            v.borrow().suggest_selected(&app);
-            v.borrow().health_selected(&app, &t);
-            trackinfo::show(&app, &t);
-            on_selected(&t);
         }
+    });
+    // Ctrl+click (mode 1) and Shift+click / Shift+arrows (mode 2): the selection grows or shrinks.
+    let (vv, weak2) = (v.clone(), weak.clone());
+    state.on_track_picked(move |i, mode| {
+        let app = weak2.unwrap();
+        let t = {
+            let mut view = vv.borrow_mut();
+            let view = &mut *view;
+            let Some((row, &at)) = usize::try_from(i)
+                .ok()
+                .and_then(|i| view.shown.get(i).map(|s| (i, s)))
+            else {
+                return;
+            };
+            let was_chosen = view.sel_at == Some(at);
+            if mode == 1 {
+                view.sel.toggle(at);
+            } else {
+                view.sel.range(&view.shown, at);
+            }
+            let row = if view.sel.contains(at) {
+                row
+            } else if !was_chosen {
+                return view.publish_selection(&app); // another row left; the chosen one stays
+            } else {
+                // The chosen row left: the nearest selected row takes over (the last selected row cannot leave).
+                let rows: Vec<usize> = (0..view.shown.len())
+                    .filter(|&r| view.sel.contains(view.shown[r]))
+                    .collect();
+                match rows.iter().rev().find(|&&r| r < row).or(rows.first()) {
+                    Some(&r) => r,
+                    None => {
+                        view.sel.add(at);
+                        row
+                    }
+                }
+            };
+            view.sel_at = Some(view.shown[row]);
+            let t = view.list[view.shown[row]].clone();
+            view.selected = Some(t.clone());
+            view.publish_selection(&app);
+            app.global::<BrowserState>().set_current_row(row as i32);
+            t
+        };
+        chosen(&vv, &app, &t, &*on_selected);
+    });
+    let (vv, weak2) = (v.clone(), weak.clone());
+    state.on_select_all(move || {
+        let mut view = vv.borrow_mut();
+        let view = &mut *view;
+        view.sel.all(&view.shown);
+        view.publish_selection(&weak2.unwrap());
+    });
+    let (vv, weak2) = (v.clone(), weak.clone());
+    state.on_select_collapse(move || {
+        let mut view = vv.borrow_mut();
+        match view.sel_at {
+            Some(at) => view.sel.pick(at),
+            None => view.sel.clear(),
+        }
+        view.publish_selection(&weak2.unwrap());
     });
     playlists::wire(app, view);
     strip::wire(app, view);
@@ -409,6 +514,7 @@ fn wire_selection(
             .cloned();
         if let Some(t) = found {
             v.selected = Some(t.clone());
+            v.sel.clear();
             v.refresh(&app);
             trackinfo::show(&app, &t);
             on_found(&t);

@@ -28,6 +28,7 @@
 //! `beat_loop` / `loop_halve` / `loop_double`, `beat_jump`, `memory_cue`, `cue_call`, `toggle_delete`.
 
 mod autocue;
+pub(in crate::app) use autocue::first_sound;
 mod bank;
 mod beatmath;
 pub(in crate::app) use beatmath::{beat_at, grid_bpm, ms_at, tempo_at};

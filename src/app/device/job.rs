@@ -2,6 +2,7 @@
 
 use super::{BUSY, Ctx, Job, toast};
 use openfader::{device, plugin::device::Control};
+use slint::ComponentHandle;
 use std::{
     rc::Rc,
     sync::{Arc, atomic::Ordering::Relaxed, mpsc},
@@ -95,18 +96,28 @@ impl Ctx {
     fn show_progress(&self, ctl: &Control) {
         let (done, total) = (ctl.done.load(Relaxed), ctl.total.load(Relaxed));
         let phase = ctl.phase();
+        let fraction = if total == 0 {
+            0.0
+        } else {
+            done as f32 / total as f32
+        };
+        let status = if total == 0 {
+            phase.clone()
+        } else {
+            format!("{phase} {done}/{total}")
+        };
+        // A transfer from the browser has no window open: its progress shows in the status bar too.
+        if self.mirror.get()
+            && let Some(app) = self.app()
+        {
+            let s = app.global::<crate::app::BrowserState>();
+            s.set_load_text(status.as_str().into());
+            s.set_load_progress(fraction);
+        }
         self.with_state(|s| {
-            s.set_progress(if total == 0 {
-                0.0
-            } else {
-                done as f32 / total as f32
-            });
-            s.set_phase(phase.clone().into());
-            s.set_status(if total == 0 {
-                phase.into()
-            } else {
-                format!("{phase} {done}/{total}").into()
-            });
+            s.set_progress(fraction);
+            s.set_phase(phase.into());
+            s.set_status(status.into());
         });
     }
 }

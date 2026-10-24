@@ -31,6 +31,14 @@ impl View {
                     },
                 );
             }
+            "new-from-selection" => {
+                let tracks = self.selection();
+                if tracks.is_empty() {
+                    return self.say(app, tr!("select a track to add"));
+                }
+                let name = default_name(&tracks);
+                self.ask(app, Ask::NewFrom(tracks), tr!("New playlist name:"), name);
+            }
             "delete" => self.side_delete(app),
             "renumber" | "sort-title" | "sort-artist" | "sort-genre" | "sort-key" | "sort-bpm"
             | "sort-time" | "sort-rating" | "sort-comment" => self.reorder(app, op),
@@ -178,8 +186,13 @@ impl View {
         if name.is_empty() {
             return self.say(app, tr!("a name is needed"));
         }
+        let keys = match &ask {
+            Ask::NewFrom(tracks) => self.collection_keys(tracks),
+            _ => Vec::new(),
+        };
         let st = self.store.clone();
         let new_smart = matches!(ask, Ask::NewNode(_, NodeKind::Smart));
+        let from = matches!(ask, Ask::NewFrom(_)).then_some(keys.len());
         let made = match ask {
             Ask::NewNode(parent, kind) => st.add_node(parent, &name, kind).and_then(|id| {
                 if kind == NodeKind::Smart {
@@ -197,6 +210,10 @@ impl View {
             Ask::NewTag(c) => st.add_mytag(c, &name).map(Entry::Tag),
             Ask::NewBank => st.add_bank(&name).map(Entry::Bank),
             Ask::NewStage => st.add_stage(&name).map(Entry::Stage),
+            Ask::NewFrom(_) => st.add_node(None, &name, NodeKind::Playlist).and_then(|id| {
+                st.add_entries(id, &keys)?;
+                Ok(Entry::User(id))
+            }),
         };
         if let Some(e) = self.try_store(app, made) {
             self.entry = e.clone();
@@ -204,6 +221,9 @@ impl View {
             self.show(app);
             if let (true, Entry::User(id)) = (new_smart, &e) {
                 self.open_editor(app, *id);
+            }
+            if let Some(n) = from {
+                self.say(app, tr!("created playlist “{}” with {} tracks", name, n));
             }
         }
     }
@@ -336,9 +356,48 @@ impl View {
     /// A row of the ADD TO panel was clicked: the chosen track goes to the end of that playlist.
     pub(super) fn add_to(&mut self, app: &App, id: i64) {
         self.close_panel(app);
-        if let Some(t) = self.selected.clone() {
-            self.add_track_to(app, id, &t);
+        let tracks = self.selection();
+        if !tracks.is_empty() {
+            self.add_tracks_to(app, id, &tracks);
         }
+    }
+
+    /// Keys of the tracks of `ts` the Collection lists, each once: only those can be in a playlist.
+    fn collection_keys(&mut self, ts: &[Track]) -> Vec<String> {
+        let Ok(c) = self.cache() else {
+            return Vec::new();
+        };
+        let keys: Vec<String> = ts
+            .iter()
+            .map(store::key)
+            .filter(|k| c.by_key.contains_key(k))
+            .collect();
+        fresh_keys(&[], &keys).0
+    }
+
+    /// `ts` go to the end of playlist `id` (ADD TO, a drop on the tree row): the ones it already holds are skipped.
+    pub(in crate::app::browser) fn add_tracks_to(&mut self, app: &App, id: i64, ts: &[Track]) {
+        if let [t] = ts {
+            return self.add_track_to(app, id, t);
+        }
+        let keys = self.collection_keys(ts);
+        let unknown = ts.len() - keys.len();
+        let add = || -> Result<String, String> {
+            let (fresh, held) = fresh_keys(&self.store.entries(id)?, &keys);
+            if !fresh.is_empty() {
+                self.store.add_entries(id, &fresh)?;
+            }
+            let mut msg = tr!("{} added, {} already in the playlist", fresh.len(), held);
+            if unknown > 0 {
+                msg += &format!(" · {}", tr!("{} not in the Collection", unknown));
+            }
+            Ok(msg)
+        };
+        let msg = add().unwrap_or_else(|e| tr!("store: {}", e));
+        if matches!(self.home, Home::User(h) if h == id) {
+            self.load(app);
+        }
+        self.say(app, msg);
     }
 
     /// `t` goes to the end of playlist `id` (ADD TO, a drop on the tree row).
@@ -366,6 +425,27 @@ impl View {
         }
         self.say(app, msg);
     }
+}
+
+/// Of `keys`, the ones not in `have` (and not repeated), in order, and how many were left out.
+pub(in crate::app::browser) fn fresh_keys(have: &[String], keys: &[String]) -> (Vec<String>, usize) {
+    let mut seen: std::collections::HashSet<&str> = have.iter().map(String::as_str).collect();
+    let fresh: Vec<String> = keys
+        .iter()
+        .filter(|k| seen.insert(k.as_str()))
+        .cloned()
+        .collect();
+    let held = keys.len() - fresh.len();
+    (fresh, held)
+}
+
+/// What a playlist made from `tracks` is called until the user types another name: the first artist, else "New playlist".
+fn default_name(tracks: &[Track]) -> String {
+    tracks
+        .iter()
+        .map(|t| t.artist.trim())
+        .find(|a| !a.is_empty())
+        .map_or_else(|| tr!("New playlist").to_owned(), str::to_owned)
 }
 
 #[cfg(test)]
@@ -412,5 +492,32 @@ mod tests {
             ]
         );
         assert!(st.move_node(f, Some(f), 0).is_err());
+    }
+}
+
+#[cfg(test)]
+mod selection_tests {
+    use super::*;
+
+    fn keys(k: &[&str]) -> Vec<String> {
+        k.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn tracks_a_playlist_holds_are_skipped_and_counted() {
+        let (fresh, held) = fresh_keys(&keys(&["a", "b"]), &keys(&["b", "c", "a", "d", "c"]));
+        assert_eq!((fresh, held), (keys(&["c", "d"]), 3));
+        assert_eq!(fresh_keys(&[], &keys(&["x", "y"])), (keys(&["x", "y"]), 0));
+        assert_eq!(fresh_keys(&keys(&["x"]), &[]), (Vec::new(), 0));
+    }
+
+    #[test]
+    fn a_playlist_from_the_selection_is_named_after_the_first_artist() {
+        let t = |artist: &str| Track {
+            artist: artist.into(),
+            ..Track::default()
+        };
+        assert_eq!(default_name(&[t(""), t(" Club Angel "), t("Other")]), "Club Angel");
+        assert_eq!(default_name(&[t("")]), tr!("New playlist"));
     }
 }

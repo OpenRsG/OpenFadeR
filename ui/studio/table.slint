@@ -81,16 +81,21 @@ export component StudioTable inherits Rectangle {
         if (i * root.row-h + list.content-y < 0) { list.content-y = -i * root.row-h; }
         else if ((i + 1) * root.row-h + list.content-y > list.height) { list.content-y = list.height - (i + 1) * root.row-h; }
     }
-    function choose(i: int) {
+    /// `mode`: 0 only this row is selected, 1 it joins / leaves the selection (Ctrl+click), 2 the range from the anchor (Shift+click / Shift+arrows).
+    function choose(i: int, mode: int) {
         BrowserState.current-row = i;
-        BrowserState.track-selected(i);
+        if (mode == 0) { BrowserState.track-selected(i); } else { BrowserState.track-picked(i, mode); }
     }
-    function move(d: int) {
-        if (BrowserState.tracks.length > 0) { root.choose(max(0, min(BrowserState.tracks.length - 1, BrowserState.current-row + d))); }
+    function move(d: int, mode: int) {
+        if (BrowserState.tracks.length > 0) { root.choose(max(0, min(BrowserState.tracks.length - 1, BrowserState.current-row + d)), mode); }
     }
+    /// A press on one of several selected rows waits for the release: a drag from it carries the whole selection.
+    property <int> collapse-row: -1;
+    property <bool> multi: BrowserState.selected-count > 1;
+    property <int> menu-rows: 12 + (root.multi ? 1 : 0) + BrowserState.transfer-targets.length;
     function place-menu(x: length, y: length) {
         root.menu-x = min(x, root.width - 200px);
-        root.menu-y = min(y, max(0px, root.height - 9 * Theme.h-row - 4px));
+        root.menu-y = min(y, max(0px, root.height - root.menu-rows * Theme.h-row - 4px));
     }
     init => { StudioState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
     changed height => { StudioState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
@@ -100,12 +105,14 @@ export component StudioTable inherits Rectangle {
     clip: true;
     fs := FocusScope {
         key-pressed(e) => {
-            if (e.text == Key.UpArrow) { root.move(-1); return accept; }
-            if (e.text == Key.DownArrow) { root.move(1); return accept; }
-            if (e.text == Key.PageUp) { root.move(-10); return accept; }
-            if (e.text == Key.PageDown) { root.move(10); return accept; }
-            if (e.text == Key.Home) { root.choose(0); return accept; }
-            if (e.text == Key.End) { root.choose(max(0, BrowserState.tracks.length - 1)); return accept; }
+            if (e.modifiers.control && (e.text == "a" || e.text == "\u{1}")) { BrowserState.select-all(); return accept; }
+            if (e.text == Key.Escape && root.multi) { BrowserState.select-collapse(); return accept; }
+            if (e.text == Key.UpArrow) { root.move(-1, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.DownArrow) { root.move(1, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.PageUp) { root.move(-10, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.PageDown) { root.move(10, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.Home) { root.choose(0, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.End) { root.choose(max(0, BrowserState.tracks.length - 1), e.modifiers.shift ? 2 : 0); return accept; }
             reject
         }
         VerticalLayout {
@@ -123,6 +130,7 @@ export component StudioTable inherits Rectangle {
                 for cells[i] in BrowserState.tracks: Rectangle {
                     height: root.row-h;
                     property <bool> current: i == BrowserState.current-row;
+                    property <bool> picked: BrowserState.selected-rows[i];
                     property <int> gen: root.cover-generation;
                     property <bool> on-deck: cells[0].text != "" && (DeckState.decks[0].title == cells[0].text || DeckState.decks[1].title == cells[0].text);
                     changed gen => { BrowserState.cover-wanted(i); }
@@ -133,7 +141,10 @@ export component StudioTable inherits Rectangle {
                         width: parent.width - root.pad - root.w-scroll + root.pad / 2;
                         height: parent.height - 2px;
                         border-radius: Theme.studio-radius-ctl;
-                        background: current ? Theme.select : row-ta.has-hover ? Theme.hover-row : transparent;
+                        background: current || picked ? Theme.select : row-ta.has-hover ? Theme.hover-row : transparent;
+                        // Among several selected rows the chosen one keeps a frame.
+                        border-width: current && root.multi ? 1px : 0px;
+                        border-color: Theme.accent;
                     }
                     Rectangle {
                         x: root.pad;
@@ -160,14 +171,23 @@ export component StudioTable inherits Rectangle {
                         changed dragging => { DragState.drag-changed(self.dragging, BrowserState.drag-track(i)); }
                         row-ta := TouchArea {
                             pointer-event(e) => {
+                                if (e.kind == PointerEventKind.cancel) { root.collapse-row = -1; return; }
+                                if (e.kind == PointerEventKind.up) {
+                                    if (e.button == PointerEventButton.left && root.collapse-row == i) { root.collapse-row = -1; root.choose(i, 0); }
+                                    return;
+                                }
                                 if (e.kind != PointerEventKind.down) { return; }
+                                root.collapse-row = -1;
                                 root.focused();
                                 fs.focus();
                                 if (e.button == PointerEventButton.left) {
-                                    root.choose(i);
-                                    BrowserState.track-pressed(i);
+                                    if (e.modifiers.control || e.modifiers.meta) { root.choose(i, 1); }
+                                    else if (e.modifiers.shift) { root.choose(i, 2); }
+                                    else if (picked) { root.collapse-row = i; }
+                                    else { root.choose(i, 0); }
+                                    if (!e.modifiers.control && !e.modifiers.meta && !e.modifiers.shift) { BrowserState.track-pressed(i); }
                                 } else if (e.button == PointerEventButton.right) {
-                                    root.choose(i);
+                                    if (!picked) { root.choose(i, 0); }
                                     root.place-menu(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);
                                     menu.show();
                                 }
@@ -192,7 +212,7 @@ export component StudioTable inherits Rectangle {
         x: root.menu-x;
         y: root.menu-y;
         width: 200px;
-        height: 9 * Theme.h-row + 4px;
+        height: root.menu-rows * Theme.h-row + 4px;
         Rectangle {
             background: Theme.panel-raised;
             border-width: 1px;
@@ -200,15 +220,20 @@ export component StudioTable inherits Rectangle {
             border-radius: Theme.studio-radius-ctl;
             VerticalLayout {
                 padding: 1px;
-                MenuItem { text: @tr("Load to deck 1"); activated => { DeckState.load(0); menu.close(); } }
-                MenuItem { text: @tr("Load to deck 2"); activated => { DeckState.load(1); menu.close(); } }
-                MenuItem { text: @tr("Edit track details…"); activated => { LibraryState.action("track-edit"); menu.close(); } }
+                if root.multi: MenuItem { text: @tr("{} tracks selected", BrowserState.selected-count); enabled: false; }
+                MenuItem { text: @tr("Load to deck 1"); enabled: !root.multi; activated => { DeckState.load(0); menu.close(); } }
+                MenuItem { text: @tr("Load to deck 2"); enabled: !root.multi; activated => { DeckState.load(1); menu.close(); } }
+                MenuItem { text: @tr("Edit track details…"); enabled: !root.multi; activated => { LibraryState.action("track-edit"); menu.close(); } }
                 MenuItem { text: @tr("Add to Tag List (T)"); activated => { BrowserState.tag-add(); menu.close(); } }
                 MenuItem { text: @tr("Add to playlist…"); activated => { BrowserState.panel-request(0); menu.close(); } }
-                MenuItem { text: @tr("Tags…"); activated => { BrowserState.panel-request(1); menu.close(); } }
-                MenuItem { text: BrowserState.related ? @tr("Hide related tracks") : @tr("Related tracks"); activated => { BrowserState.related-toggled(!BrowserState.related); menu.close(); } }
+                MenuItem { text: @tr("New playlist from selection…"); activated => { BrowserState.playlist-op("new-from-selection"); menu.close(); } }
+                for label[i] in BrowserState.transfer-targets: MenuItem { text: @tr("Transfer to {}", label); activated => { BrowserState.transfer-to(i); menu.close(); } }
+                MenuItem { text: @tr("Tags…"); enabled: !root.multi; activated => { BrowserState.panel-request(1); menu.close(); } }
+                MenuItem { text: BrowserState.related ? @tr("Hide related tracks") : @tr("Related tracks"); enabled: !root.multi; activated => { BrowserState.related-toggled(!BrowserState.related); menu.close(); } }
                 MenuItem { text: @tr("Analyze track"); activated => { LibraryState.action("track-analyze"); menu.close(); } }
-                MenuItem { text: @tr("Show in file manager"); activated => { LibraryState.action("track-show"); menu.close(); } }
+                MenuItem { text: @tr("Make Auto Cue point"); activated => { LibraryState.action("track-autocue"); menu.close(); } }
+                MenuItem { text: @tr("Show in file manager"); enabled: !root.multi; activated => { LibraryState.action("track-show"); menu.close(); } }
+                MenuItem { text: @tr("Remove from Collection"); activated => { LibraryState.action("track-remove"); menu.close(); } }
             }
         }
     }

@@ -54,7 +54,8 @@ impl View {
         state.set_remote_search(self.search_entry().is_some());
         match list {
             Ok(list) => {
-                self.list = std::rc::Rc::new(list);
+                let old = std::mem::replace(&mut self.list, std::rc::Rc::new(list));
+                self.sel.remap(&old, &self.list);
                 self.rank_list(app);
                 self.rows
                     .replace(self.list.clone(), self.suggest.notes.clone());
@@ -92,6 +93,7 @@ impl View {
             shown
         };
         self.shown = shown;
+        self.sel.retain(&self.shown);
         if self.rows.update(&self.shown, look, self.reference.clone()) {
             self.strips.reset(app, self.shown.len());
             self.covers.reset(app, self.shown.len());
@@ -100,6 +102,9 @@ impl View {
         // The selection follows the track, not the row index.
         let at = self.selected.as_ref().and_then(|s| self.row_of(s));
         state.set_current_row(at.map_or(-1, |n| n as i32));
+        if let Some(n) = at {
+            self.sel.add(self.shown[n]); // the chosen row is always selected
+        }
         let mut status = match (&self.related, &self.home, self.suggest_status()) {
             (Some(a), ..) => tr!(
                 "{} tracks relate to “{}” (registered partners, then compatible key, BPM ±6%)",
@@ -128,7 +133,9 @@ impl View {
         if self.filter.ignored(&self.reference) {
             status += tr!(" · BPM ±6% / KEY MATCH wait for a loaded deck");
         }
-        state.set_status(status.into());
+        state.set_status(status.as_str().into());
+        self.status_base = status;
+        self.publish_selection(app);
         state.set_tag_filter_count(self.tag_filter.len() as i32);
     }
 

@@ -43,7 +43,8 @@ export component DeckDropTarget inherits Rectangle {
             DragState.moved(root.absolute-position.x + e.position.x, root.absolute-position.y + e.position.y);
             DragState.accepts-deck(root.index, e.data) ? DragAction.copy : DragAction.none
         }
-        dropped(e) => { DragState.deck-drop(root.index, e.data); DragAction.copy }
+        // The ghost goes with the drop: a source row scrolled out of view during the drag never reports its end.
+        dropped(e) => { DragState.active = false; DragState.deck-drop(root.index, e.data); DragAction.copy }
     }
 }
 
@@ -56,7 +57,7 @@ export component TreeDropTarget inherits Rectangle {
             DragState.moved(root.absolute-position.x + e.position.x, root.absolute-position.y + e.position.y);
             DragState.accepts-tree(root.tree-row, e.data) ? DragAction.copy : DragAction.none
         }
-        dropped(e) => { DragState.tree-drop(root.tree-row, e.data); DragAction.copy }
+        dropped(e) => { DragState.active = false; DragState.tree-drop(root.tree-row, e.data); DragAction.copy }
     }
 }
 

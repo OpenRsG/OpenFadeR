@@ -23,9 +23,9 @@ mod edit;
 mod target;
 
 use super::{
-    View,
-    table::{BPM, cell},
+    table::{cell, BPM},
     wire::load_to_deck,
+    View,
 };
 use crate::app::{App, BrowserState, DragState, prefs, trackinfo};
 use assign::{Assign, SLOTS};
@@ -154,9 +154,9 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>, on_track: Rc<dyn Fn(&Tra
             return;
         };
         let mut v = q.view.borrow_mut();
-        match v.selected.clone() {
-            Some(t) => q.add_track(&app, &mut v, pal, &t),
-            None => v.say(&app, tr!("select a track to add")),
+        match v.selection() {
+            tracks if !tracks.is_empty() => q.add_tracks(&app, &mut v, pal, &tracks),
+            _ => v.say(&app, tr!("select a track to add")),
         }
     });
     let (weak, q) = (app.as_weak(), p.clone());
@@ -186,14 +186,14 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>, on_track: Rc<dyn Fn(&Tra
         let (Some(app), Some(t)) = (weak.upgrade(), q.track(pal, row)) else {
             return;
         };
-        q.view.borrow_mut().selected = Some(t.clone());
+        q.view.borrow_mut().choose_elsewhere(&app, &t);
         trackinfo::show(&app, &t);
         (q.on_track)(&t);
     });
     let (weak, q) = (app.as_weak(), p.clone());
     state.on_palette_track_load(move |pal, row| {
         if let (Some(app), Some(t)) = (weak.upgrade(), q.track(pal, row)) {
-            q.view.borrow_mut().selected = Some(t.clone());
+            q.view.borrow_mut().choose_elsewhere(&app, &t);
             load_to_deck(&app, &*q.on_track, &t);
         }
     });

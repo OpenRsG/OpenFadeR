@@ -14,7 +14,7 @@ use crate::app::{prefs, toast};
 use openfader::{
     device::{self, Device, plug},
     library::{self, Library, Playlist, folder::Folder},
-    plugin,
+    plugin::{self, device::Feature},
 };
 use slint::ComponentHandle;
 use std::{path::PathBuf, rc::Rc, time::Instant};
@@ -81,12 +81,37 @@ impl Kind {
     /// What reading the source needs, opened.
     fn open(&self) -> Result<Box<dyn Library + Send>, String> {
         match self {
-            Kind::Device(d) => device::open_library(d),
+            Kind::Device(d) => {
+                // A blank stick written since it was listed (its first transfer) holds a library now.
+                let fresh = (!d.has_library())
+                    .then(|| device::scan().into_iter().find(|x| x.id == d.id))
+                    .flatten();
+                match fresh.as_ref().unwrap_or(d) {
+                    d if d.has_library() => device::open_library(d),
+                    _ => Ok(Box::new(Blank)),
+                }
+            }
             Kind::Plugin { plugin, path, .. } => {
                 Ok(Box::new(plugin::library::open_with(plugin, path)?))
             }
             Kind::Explorer(p) => Ok(Box::new(Folder::open(p)?)),
         }
+    }
+}
+
+/// A writable stick with no library yet: listed so tracks and playlists can be dropped on it (the first transfer creates its
+/// library).
+struct Blank;
+
+impl Library for Blank {
+    fn kind(&self) -> &str {
+        "Device"
+    }
+    fn playlists(&self) -> Result<Vec<Playlist>, String> {
+        Ok(Vec::new())
+    }
+    fn tracks(&self, _: Option<&str>) -> Result<Vec<library::Track>, String> {
+        Ok(Vec::new())
     }
 }
 
@@ -97,7 +122,7 @@ type Read = Result<(Box<dyn Library + Send>, Vec<Playlist>, usize), String>;
 pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
     let mut kinds: Vec<Kind> = device::scan()
         .into_iter()
-        .filter(Device::has_library)
+        .filter(|d| d.has_library() || (d.writable() && d.can(Feature::Export)))
         .map(Kind::Device)
         .collect();
     kinds.extend(
@@ -243,6 +268,49 @@ impl View {
             Entry::SourceList(..) => tr!("Folder of the source: choose a playlist inside it"),
             _ => return None,
         })
+    }
+
+    /// The device a tree row is, or one of whose playlists it is (a drop or a transfer lands there); `None` for any other row.
+    pub(super) fn device_target(&self, e: &Entry) -> Option<crate::app::device::Dest> {
+        let (i, j) = match e {
+            Entry::Source(i) | Entry::SourceAll(i) => (*i, None),
+            Entry::SourceList(i, j) => (*i, Some(*j)),
+            _ => return None,
+        };
+        let Source {
+            kind: Kind::Device(d),
+            playlists,
+            ..
+        } = self.sources.get(i)?
+        else {
+            return None;
+        };
+        let list = match j {
+            None => None,
+            Some(j) => {
+                let p = playlists.get(j).filter(|p| !p.is_folder)?;
+                Some(crate::app::device::List {
+                    id: p.id.clone(),
+                    path: device::playlist_path(playlists, &p.id)?,
+                })
+            }
+        };
+        Some(crate::app::device::Dest {
+            device: d.id.clone(),
+            list,
+        })
+    }
+
+    /// Device `id` was written to: its library is read again (the tree keeps showing the old one until the new one is in).
+    pub(super) fn reread_device(&mut self, app: &App, id: &str) {
+        let Some(s) = self.sources.iter_mut().find(|s| {
+            matches!(&s.kind, Kind::Device(d) if d.id == id) && s.lib.is_some() && !s.reading
+        }) else {
+            return;
+        };
+        s.reading = true;
+        loading(app, &tr!("{}: reading…", s.kind.short()), Some(0.0));
+        read(app, s.kind.clone());
     }
 
     /// The library plugin / Explorer list on screen, for IMPORT TO COLLECTION.

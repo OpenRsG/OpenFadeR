@@ -23,8 +23,9 @@
 //! (Playlist Palette: the TAG LIST and three playlists under the track list, drag and drop), [`strip`] (the Preview column's
 //! waveform strips with the cue markers), [`preview`] (the PREVIEW button and the strips' click-to-preview player), [`remote`]
 //! (Enter in the search box on the search entry of a plugin source searches online), [`health`] (the Library health node: a scan of
-//! the Collection for problems on a worker thread, a row per check, the fixes and ignores) and [`stages`] (the Stages node: INBOX →
-//! REVIEW → COLLECTION, moving tracks between them, recent moves).
+//! the Collection for problems on a worker thread, a row per check, the fixes and ignores), [`stages`] (the Stages node: INBOX →
+//! REVIEW → COLLECTION, moving tracks between them, recent moves) and [`select`] (the table's multi-selection: Ctrl / Shift click,
+//! Shift+arrows, Ctrl+A; the chosen row is always one of the selected rows, the menus act on [`Context::tracks`]).
 
 mod cover;
 mod editor;
@@ -38,6 +39,7 @@ mod played;
 mod playlists;
 mod preview;
 mod remote;
+mod select;
 mod session;
 mod sidebar;
 mod smart;
@@ -60,7 +62,7 @@ use openfader::{
 };
 use playlists::{Ask, Panel};
 use sidebar::Entry;
-use slint::{ComponentHandle, StandardListViewItem, Timer, VecModel};
+use slint::{ComponentHandle, Model, StandardListViewItem, Timer, VecModel};
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Duration};
 use table::Reference;
 
@@ -71,6 +73,8 @@ const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 /// export snapshot names it (`store:<node>` for My Playlists, the library's own id otherwise; `None` for other lists).
 pub struct Context {
     pub track: Option<Track>,
+    /// The selected tracks in row order (the chosen one alone when a single row is selected; empty when none).
+    pub tracks: Vec<Track>,
     pub list: Vec<Track>,
     pub name: String,
     pub playlist: Option<String>,
@@ -98,6 +102,7 @@ pub fn context() -> Context {
     view.map_or(
         Context {
             track: None,
+            tracks: Vec::new(),
             list: Vec::new(),
             name: String::new(),
             playlist: None,
@@ -107,6 +112,7 @@ pub fn context() -> Context {
             let v = v.borrow();
             Context {
                 track: v.selected.clone(),
+                tracks: v.selection(),
                 list: v.shown.iter().map(|&i| v.list[i].clone()).collect(),
                 name: v.list_name(),
                 source: v.source_sel(),
@@ -137,6 +143,13 @@ pub fn covers_changed(app: &App) {
     if let Some(v) = view() {
         let v = v.borrow();
         v.covers.reset(app, v.shown.len());
+    }
+}
+
+/// Device `id` was written to (a transfer, an export): the tree reads its library again if it showed it.
+pub fn device_written(app: &App, id: &str) {
+    if let Some(v) = view() {
+        v.borrow_mut().reread_device(app, id);
     }
 }
 
@@ -206,6 +219,14 @@ struct View {
     history: Vec<Track>,
     /// The track chosen in the table last.
     selected: Option<Track>,
+    /// The selected rows (the chosen one is always among them).
+    sel: select::Selection,
+    /// The entry `sel` belongs to: another one resets it.
+    sel_entry: Entry,
+    /// `BrowserState.selected-rows` while several rows are selected (empty otherwise).
+    marks: Rc<VecModel<bool>>,
+    /// The status line without the "{} selected" suffix ([`View::publish_selection`]).
+    status_base: String,
     reference: Reference,
     /// `detected().version()` the rows were last built for.
     detected_ver: u64,
@@ -317,6 +338,41 @@ impl View {
     fn cursor(&self, app: &App) -> Option<usize> {
         let row = usize::try_from(app.global::<BrowserState>().get_current_row()).ok()?;
         self.shown.get(row).copied()
+    }
+
+    /// The selected tracks in row order; the chosen track alone when at most one row is selected.
+    fn selection(&self) -> Vec<Track> {
+        let rows = self.sel.ordered(&self.shown);
+        if rows.len() > 1 || self.selected.is_none() {
+            return rows.iter().map(|&i| self.list[i].clone()).collect();
+        }
+        self.selected.iter().cloned().collect()
+    }
+
+    /// `t` was chosen outside the table (a palette, a drop on a deck): the table's multi-selection ends.
+    fn choose_elsewhere(&mut self, app: &App, t: &Track) {
+        self.selected = Some(t.clone());
+        self.sel.clear();
+        self.publish_selection(app);
+    }
+
+    /// Tells the table which rows are selected and the status line how many; call after the selection or the rows changed.
+    fn publish_selection(&mut self, app: &App) {
+        let state = app.global::<BrowserState>();
+        let n = self.sel.len();
+        let was = self.marks.row_count() > 0;
+        self.marks.set_vec(if n > 1 {
+            self.sel.marks(&self.shown)
+        } else {
+            Vec::new()
+        });
+        state.set_selected_count(n.max(1) as i32);
+        if n > 1 {
+            let text = format!("{} · {}", self.status_base, tr!("{} selected", n));
+            state.set_status(text.into());
+        } else if was {
+            state.set_status(self.status_base.as_str().into());
+        }
     }
 }
 

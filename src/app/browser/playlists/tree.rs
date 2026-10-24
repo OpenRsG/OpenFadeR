@@ -254,6 +254,10 @@ impl View {
     pub(in crate::app::browser) fn show(&mut self, app: &App) {
         self.confirm = None;
         self.home = self.home_of(&self.entry);
+        if self.sel_entry != self.entry {
+            self.sel.clear(); // another list: only the chosen track stays selected
+            self.sel_entry = self.entry.clone();
+        }
         self.related = None;
         app.global::<BrowserState>()
             .set_side_kind(self.side_kind(&self.entry));

@@ -155,6 +155,7 @@ impl Ctx {
                 .map(|d| SharedString::from(d.label.as_str()))
                 .collect::<Vec<_>>(),
         );
+        self.show_targets();
         if self.current().is_none() {
             *self.current.borrow_mut() = now.first().map(|d| d.id.clone());
         }
