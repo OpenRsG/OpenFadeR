@@ -21,7 +21,8 @@
 //!
 //! The browser's Devices tree (src/app/browser) shows each device's playlists read-only and calls [`show_panel`] when a device
 //! row is chosen; its toolbar buttons call the `DeviceState` callbacks `import-playlist`, `delete-playlist`, `import-history`,
-//! `delete-track` and `export-playlists` that [`actions`] / [`export`] answer.
+//! `delete-track` and `export-playlists` that [`actions`] / [`export`] answer. [`transfer`] sends tracks and playlists from the
+//! browser (a drop on a device row, the track menu's "Transfer to <device>") to a device.
 
 mod actions;
 mod backup;
@@ -32,8 +33,10 @@ mod link;
 mod pick;
 mod scan;
 mod sync;
+mod transfer;
 
 pub use link::{track_edited, track_loading};
+pub use transfer::{drop_playlist, drop_tracks, Dest, List};
 
 use super::{
     deck::Decks, toast, ActionItem, App, BackupItem, DeviceItem, DeviceState, FormatItem,
@@ -103,6 +106,8 @@ pub(super) struct Ctx {
     backups: RefCell<Vec<store::DeviceBackup>>,
     sync: Pick,
     ticks: Cell<u32>,
+    /// The running job's progress also shows in the browser's status bar (a transfer started from the browser).
+    mirror: Cell<bool>,
     models: Models,
     /// Cue sync: the tracks each device shares with the collection, by device id ([`link`]).
     links: RefCell<HashMap<String, Rc<openfader::device::link::Links>>>,
@@ -116,6 +121,8 @@ struct Models {
     actions: Rc<VecModel<ActionItem>>,
     backups: Rc<VecModel<BackupItem>>,
     formats: Rc<VecModel<FormatItem>>,
+    /// The labels of the devices the track menu's "Transfer to" lists ([`transfer`]).
+    targets: Rc<VecModel<SharedString>>,
 }
 
 /// Keeps the timer (and with it the whole window logic) alive for as long as the window runs.
@@ -367,12 +374,14 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
         backups: RefCell::default(),
         sync: Pick::default(),
         ticks: Cell::new(0),
+        mirror: Cell::new(false),
         models: Models {
             devices: Rc::default(),
             names: Rc::default(),
             actions: Rc::default(),
             backups: Rc::default(),
             formats: Rc::default(),
+            targets: Rc::default(),
         },
         links: RefCell::default(),
         pushes: RefCell::default(),
@@ -439,6 +448,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     backup::wire(&cx, app);
     actions::wire(&cx, app);
     link::register(&cx);
+    transfer::wire(&cx, app);
 
     let c = cx.clone();
     let timer = Timer::default();

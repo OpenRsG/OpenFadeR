@@ -1,5 +1,5 @@
-//! Fetch Missing Artwork: every album of the list on screen that shows no picture gets the first one the plugins offer
-//! ([`artwork::Fetch::missing`]). One run at a time; the status line counts the lookups while it goes.
+//! Fetch Missing Artwork: every album of the selected tracks (of the list on screen when at most one is selected) that shows no
+//! picture gets the first one the plugins offer ([`artwork::Fetch::missing`]). One run at a time; the status line counts the lookups while it goes.
 
 use super::{changed, plugins, say, Ctx};
 use crate::app::{browser, library::settings};
@@ -13,7 +13,12 @@ use std::{
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
 pub fn fetch_missing(c: &Rc<Ctx>) {
-    let tracks = browser::context().list;
+    let ctx = browser::context();
+    let tracks = if ctx.tracks.len() > 1 {
+        ctx.tracks
+    } else {
+        ctx.list
+    };
     let plugins = plugins();
     if plugins.is_empty() {
         return c.say(tr!(

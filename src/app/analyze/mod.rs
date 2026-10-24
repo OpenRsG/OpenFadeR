@@ -250,6 +250,70 @@ pub fn request(tracks: &[Track], explicit: bool) {
     start_run(&app, jobs(&*lib, &refs, explicit), prefs::with(settings));
 }
 
+/// What [`request`] would run for `tracks`, gathered on the UI thread for a caller that waits for the analysis on a worker thread
+/// (a device transfer: it writes the cues, grid and key the analysis finds). `None` when there is nothing to run (before
+/// [`wire`], no file, analysis lock).
+pub fn batch(tracks: &[Track]) -> Option<Batch> {
+    let (_, lib) = context()?;
+    let refs: Vec<&Track> = tracks.iter().collect();
+    let jobs = jobs(&*lib, &refs, false);
+    (!jobs.is_empty()).then(|| Batch {
+        jobs,
+        settings: prefs::with(settings),
+    })
+}
+
+/// The jobs of [`batch`], with the settings of the moment.
+pub struct Batch {
+    jobs: Vec<Job>,
+    settings: Settings,
+}
+
+impl Batch {
+    pub fn len(&self) -> usize {
+        self.jobs.len()
+    }
+
+    /// Runs the jobs on the shared pool and waits; `progress(done)` is called as each track ends. A `cancelled` run drops what is
+    /// queued. Returns what the tracks that were analysed gave, for [`publish`].
+    pub fn run(
+        self,
+        store: Arc<Store>,
+        cancelled: &dyn Fn() -> bool,
+        progress: &dyn Fn(usize),
+    ) -> Vec<(std::path::PathBuf, Found)> {
+        let total = self.jobs.len();
+        let (tx, rx) = mpsc::channel();
+        let _run = job::spawn(self.jobs, self.settings, store, tx);
+        let (mut done, mut found) = (0, Vec::new());
+        while done < total && !cancelled() {
+            match rx.recv_timeout(Duration::from_millis(200)) {
+                Ok((path, r)) => {
+                    done += 1;
+                    progress(done);
+                    match r {
+                        Ok(o) => found.push((path, o.found)),
+                        Err(e) => eprintln!("analyze: {e}"),
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+        found
+    }
+}
+
+/// Shows what a [`Batch`] found as a background run's results are shown (the browser's BPM and key cells).
+pub fn publish(found: Vec<(std::path::PathBuf, Found)>) {
+    let Some((app, _)) = context() else { return };
+    let have = detected();
+    for (path, f) in found {
+        have.insert(path.clone(), f);
+        trackinfo::detected_changed(&app, &path);
+    }
+}
+
 /// The status line's tail for an explicit ANALYZE of `t` whose shown grid stays the library's: the preference picks the
 /// library, the library has beats and the user did not edit the grid, so our detected grid changes nothing visible.
 pub fn library_grid_notice(t: &Track) -> &'static str {

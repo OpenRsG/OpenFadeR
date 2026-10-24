@@ -13,6 +13,15 @@ export global BrowserState {
     callback playlist-selected(int);
     /// Row index in `tracks` (the filtered, sorted view).
     callback track-selected(int);
+    /// Ctrl+click (mode 1) / Shift+click and Shift+arrows (mode 2) on row `i`: the multi-selection grows, shrinks or spans a range.
+    callback track-picked(int, int);
+    /// Ctrl+A; Esc (back to the chosen row only).
+    callback select-all();
+    callback select-collapse();
+    /// One flag per row of `tracks` while several rows are selected (empty otherwise: the chosen row alone is marked by `current-row`).
+    in property <[bool]> selected-rows;
+    /// Rows selected (1 when one or none is).
+    in property <int> selected-count: 1;
     /// Left-button press on a row (same index); Rust turns two quick presses on one row into a double-click.
     callback track-pressed(int);
     callback search-edited(string);
@@ -135,6 +144,10 @@ export global BrowserState {
     callback palette-track-remove(int, int);
     /// The right-click menu of the track table: the chosen track goes to palette `p` (0 = Tag List).
     callback palette-add-chosen(int);
+    /// The right-click menu's "Transfer to <device>" items: the label of each mounted writable device; `transfer-to(i)` sends the
+    /// selected tracks to device `i` (src/app/device/transfer.rs).
+    in property <[string]> transfer-targets;
+    callback transfer-to(int);
     /// Drag and drop (Slint DragArea / DropArea): what a row carries, and a drop on palette `p`.
     pure callback drag-track(int) -> data-transfer;
     pure callback drag-tree(int) -> data-transfer;

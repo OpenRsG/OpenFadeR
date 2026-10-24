@@ -73,11 +73,17 @@ export component TrackTable inherits Rectangle {
     /// Chooses row `i` (clamped) as a click would: the selection moves, the row scrolls into view, Rust is told.
     public function set-current-row(i: int) {
         if (BrowserState.tracks.length == 0) { return; }
-        root.choose(max(0, min(BrowserState.tracks.length - 1, i)));
+        root.choose(max(0, min(BrowserState.tracks.length - 1, i)), 0);
     }
-    function choose(i: int) {
+    /// Shift+arrow: the selection spans from where a plain click last chose to row `i` (clamped).
+    function extend-to-row(i: int) {
+        if (BrowserState.tracks.length == 0) { return; }
+        root.choose(max(0, min(BrowserState.tracks.length - 1, i)), 2);
+    }
+    /// `mode`: 0 only this row is selected, 1 it joins / leaves the selection (Ctrl+click), 2 the range from the anchor (Shift+click).
+    function choose(i: int, mode: int) {
         BrowserState.current-row = i;
-        BrowserState.track-selected(i);
+        if (mode == 0) { BrowserState.track-selected(i); } else { BrowserState.track-picked(i, mode); }
         if (BrowserState.center-selected) {
             list.content-y = max(list.height - BrowserState.tracks.length * Theme.h-row, min(0px, (list.height - Theme.h-row) / 2 - i * Theme.h-row));
         } else if (i * Theme.h-row + list.content-y < 0) { list.content-y = -i * Theme.h-row; }
@@ -112,9 +118,12 @@ export component TrackTable inherits Rectangle {
     property <length> x-key: root.x-time + root.w-time;
     property <length> menu-x;
     property <length> menu-y;
+    /// A press on one of several selected rows waits for the release: a drag from it carries the whole selection.
+    property <int> collapse-row: -1;
     property <bool> list-view: BrowserState.tag-view || BrowserState.user-view;
+    property <bool> multi: BrowserState.selected-count > 1;
     /// Rows of the right-click menu (the library entries come last).
-    property <int> menu-rows: (root.list-view ? 8 : 5) + 10 + (BrowserState.palette-enabled ? 3 : 0);
+    property <int> menu-rows: 18 + (root.list-view ? 3 : 0) + (BrowserState.palette-enabled ? 3 : 0) + (root.multi ? 1 : 0) + BrowserState.transfer-targets.length;
     function place-menu(x: length, y: length) {
         root.menu-x = min(x, root.width - 190px);
         root.menu-y = min(y, max(0px, root.height - root.menu-rows * Theme.h-row - 4px));
@@ -128,6 +137,16 @@ export component TrackTable inherits Rectangle {
 
     fs := FocusScope {
         key-pressed(e) => {
+            if (e.modifiers.control && (e.text == "a" || e.text == "\u{1}")) { BrowserState.select-all(); return accept; }
+            if (e.text == Key.Escape && root.multi) { BrowserState.select-collapse(); return accept; }
+            if (e.modifiers.shift) {
+                if (e.text == Key.UpArrow) { root.extend-to-row(BrowserState.current-row - 1); return accept; }
+                if (e.text == Key.DownArrow) { root.extend-to-row(BrowserState.current-row + 1); return accept; }
+                if (e.text == Key.PageUp) { root.extend-to-row(BrowserState.current-row - 10); return accept; }
+                if (e.text == Key.PageDown) { root.extend-to-row(BrowserState.current-row + 10); return accept; }
+                if (e.text == Key.Home) { root.extend-to-row(0); return accept; }
+                if (e.text == Key.End) { root.extend-to-row(BrowserState.tracks.length - 1); return accept; }
+            }
             if (e.text == Key.UpArrow) { root.set-current-row(BrowserState.current-row - 1); return accept; }
             if (e.text == Key.DownArrow) { root.set-current-row(BrowserState.current-row + 1); return accept; }
             if (e.text == Key.PageUp) { root.set-current-row(BrowserState.current-row - 10); return accept; }
@@ -163,6 +182,7 @@ export component TrackTable inherits Rectangle {
                 for cells[i] in BrowserState.tracks: Rectangle {
                     height: Theme.h-row;
                     property <bool> current: i == BrowserState.current-row;
+                    property <bool> picked: BrowserState.selected-rows[i];
                     property <string> hints: cells[9].text;
                     property <int> preview-generation: BrowserState.preview-generation;
                     property <bool> preview-enabled: root.w-preview > 0px;
@@ -172,7 +192,7 @@ export component TrackTable inherits Rectangle {
                     changed cover-generation => { BrowserState.cover-wanted(i); }
                     /// The track is the one a deck has loaded (its row wears `row-loaded`).
                     property <bool> on-deck: cells[0].text != "" && (DeckState.decks[0].title == cells[0].text || DeckState.decks[1].title == cells[0].text || DeckState.decks[2].title == cells[0].text || DeckState.decks[3].title == cells[0].text);
-                    background: current ? Theme.select : (row-ta.has-hover ? Theme.hover-row : (Math.mod(i, 2) == 0 ? Theme.bg-deep : Theme.row-alt));
+                    background: current || picked ? Theme.select : (row-ta.has-hover ? Theme.hover-row : (Math.mod(i, 2) == 0 ? Theme.bg-deep : Theme.row-alt));
                     Cell { x: 0; width: root.w-lead - Theme.space-md; text: "\{i + 1}"; right: true; color: Theme.text-faint; }
                     Image { x: root.x-art; y: 2px; width: 18px; height: 18px; source: BrowserState.covers[i]; image-fit: cover; }
                     if root.w-preview > 0px: Image { x: root.x-preview + 1px; y: (parent.height - self.height) / 2; width: root.w-strip; height: 20px; source: BrowserState.previews[i]; image-fit: fill; }
@@ -198,23 +218,34 @@ export component TrackTable inherits Rectangle {
                     // Camelot hue on the key; a bar before it when the key mixes with the master deck.
                     Rectangle { x: root.x-key + 2px; y: 4px; width: 2px; height: parent.height - 8px; background: hints == "k" || hints == "kb" ? Theme.play : transparent; }
                     Cell { x: root.x-key + Theme.space-md; width: root.w-key - Theme.space-md; text: cells[3].text; font-weight: Theme.weight-bold; color: cells[8].text == "0" ? Theme.text-dim : Colors.hsv(cells[8].text.to-float() * 30, Theme.key-sat, Theme.key-val); }
+                    // Among several selected rows the chosen one keeps a frame.
+                    if current && root.multi: Rectangle { border-width: 1px; border-color: Theme.accent; }
                     DragArea {
                         data: BrowserState.drag-track(i);
                         allow-copy: true;
                         changed dragging => { DragState.drag-changed(self.dragging, BrowserState.drag-track(i)); }
                         row-ta := TouchArea {
                             pointer-event(e) => {
-                                if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) { hold.running = false; return; }
+                                if (e.kind == PointerEventKind.cancel) { hold.running = false; root.collapse-row = -1; return; }
+                                if (e.kind == PointerEventKind.up) {
+                                    hold.running = false;
+                                    if (e.button == PointerEventButton.left && root.collapse-row == i) { root.collapse-row = -1; root.choose(i, 0); }
+                                    return;
+                                }
                                 if (e.kind != PointerEventKind.down) { return; }
                                 root.focused();
                                 fs.focus();
+                                root.collapse-row = -1;
                                 if (e.button == PointerEventButton.left) {
-                                    root.choose(i);
-                                    BrowserState.track-pressed(i);
+                                    if (e.modifiers.control || e.modifiers.meta) { root.choose(i, 1); }
+                                    else if (e.modifiers.shift) { root.choose(i, 2); }
+                                    else if (picked) { root.collapse-row = i; }
+                                    else { root.choose(i, 0); }
+                                    if (!e.modifiers.control && !e.modifiers.meta && !e.modifiers.shift) { BrowserState.track-pressed(i); }
                                     root.place-menu(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);
                                     hold.running = BrowserState.hold-menu;
                                 } else if (e.button == PointerEventButton.right) {
-                                    root.choose(i);
+                                    if (!picked) { root.choose(i, 0); }
                                     root.place-menu(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);
                                     menu.show();
                                 }
@@ -226,7 +257,7 @@ export component TrackTable inherits Rectangle {
                         x: root.x-preview + 1px;
                         width: root.w-strip;
                         mouse-cursor: MouseCursor.pointer;
-                        clicked => { root.focused(); fs.focus(); root.choose(i); BrowserState.preview-seek(i, self.mouse-x / self.width); }
+                        clicked => { root.focused(); fs.focus(); root.choose(i, 0); BrowserState.preview-seek(i, self.mouse-x / self.width); }
                     }
                     init => { BrowserState.cover-wanted(i); if (root.w-preview > 0px) { BrowserState.preview-wanted(i); } }
                 }
@@ -258,26 +289,30 @@ export component TrackTable inherits Rectangle {
             border-radius: Theme.radius;
             VerticalLayout {
                 padding: 1px;
-                MenuItem { text: @tr("Load to deck"); activated => { BrowserState.track-pressed(BrowserState.current-row); BrowserState.track-pressed(BrowserState.current-row); menu.close(); } }
-                MenuItem { text: @tr("Edit track details…"); activated => { LibraryState.action("track-edit"); menu.close(); } }
+                if root.multi: MenuItem { text: @tr("{} tracks selected", BrowserState.selected-count); enabled: false; }
+                MenuItem { text: @tr("Load to deck"); enabled: !root.multi; activated => { BrowserState.track-pressed(BrowserState.current-row); BrowserState.track-pressed(BrowserState.current-row); menu.close(); } }
+                MenuItem { text: @tr("Edit track details…"); enabled: !root.multi; activated => { LibraryState.action("track-edit"); menu.close(); } }
                 MenuItem { text: @tr("Add to Tag List (T)"); activated => { BrowserState.tag-add(); menu.close(); } }
                 MenuItem { text: @tr("Add to playlist…"); activated => { BrowserState.panel-request(0); menu.close(); } }
+                MenuItem { text: @tr("New playlist from selection…"); activated => { BrowserState.playlist-op("new-from-selection"); menu.close(); } }
+                for label[i] in BrowserState.transfer-targets: MenuItem { text: @tr("Transfer to {}", label); activated => { BrowserState.transfer-to(i); menu.close(); } }
                 if BrowserState.palette-enabled: MenuItem { text: @tr("Add to palette 1"); activated => { BrowserState.palette-add-chosen(1); menu.close(); } }
                 if BrowserState.palette-enabled: MenuItem { text: @tr("Add to palette 2"); activated => { BrowserState.palette-add-chosen(2); menu.close(); } }
                 if BrowserState.palette-enabled: MenuItem { text: @tr("Add to palette 3"); activated => { BrowserState.palette-add-chosen(3); menu.close(); } }
-                MenuItem { text: @tr("Tags…"); activated => { BrowserState.panel-request(1); menu.close(); } }
-                MenuItem { text: BrowserState.related ? @tr("Hide related tracks") : @tr("Related tracks"); activated => { BrowserState.related-toggled(!BrowserState.related); menu.close(); } }
-                if root.list-view: MenuItem { text: @tr("Move up"); activated => { BrowserState.list-move(-1); menu.close(); } }
-                if root.list-view: MenuItem { text: @tr("Move down"); activated => { BrowserState.list-move(1); menu.close(); } }
+                MenuItem { text: @tr("Tags…"); enabled: !root.multi; activated => { BrowserState.panel-request(1); menu.close(); } }
+                MenuItem { text: BrowserState.related ? @tr("Hide related tracks") : @tr("Related tracks"); enabled: !root.multi; activated => { BrowserState.related-toggled(!BrowserState.related); menu.close(); } }
+                if root.list-view: MenuItem { text: @tr("Move up"); enabled: !root.multi; activated => { BrowserState.list-move(-1); menu.close(); } }
+                if root.list-view: MenuItem { text: @tr("Move down"); enabled: !root.multi; activated => { BrowserState.list-move(1); menu.close(); } }
                 if root.list-view: MenuItem { text: @tr("Remove from list"); activated => { BrowserState.list-remove(); menu.close(); } }
                 MenuItem { text: @tr("Analyze track"); activated => { LibraryState.action("track-analyze"); menu.close(); } }
+                MenuItem { text: @tr("Make Auto Cue point"); activated => { LibraryState.action("track-autocue"); menu.close(); } }
                 MenuItem { text: @tr("Analysis lock"); activated => { LibraryState.action("track-lock"); menu.close(); } }
                 MenuItem { text: @tr("Reload tag"); activated => { LibraryState.action("track-reload-tag"); menu.close(); } }
                 MenuItem { text: @tr("Reload tag (discard edits)"); activated => { LibraryState.action("track-reload-tag-discard"); menu.close(); } }
-                MenuItem { text: @tr("Find artwork…"); activated => { LibraryState.action("track-artwork"); menu.close(); } }
+                MenuItem { text: @tr("Find artwork…"); enabled: !root.multi; activated => { LibraryState.action("track-artwork"); menu.close(); } }
                 MenuItem { text: @tr("Fetch missing artwork"); activated => { LibraryState.action("track-artwork-missing"); menu.close(); } }
-                MenuItem { text: @tr("Show in file manager"); activated => { LibraryState.action("track-show"); menu.close(); } }
-                MenuItem { text: @tr("Relocate…"); activated => { LibraryState.action("track-relocate"); menu.close(); } }
+                MenuItem { text: @tr("Show in file manager"); enabled: !root.multi; activated => { LibraryState.action("track-show"); menu.close(); } }
+                MenuItem { text: @tr("Relocate…"); enabled: !root.multi; activated => { LibraryState.action("track-relocate"); menu.close(); } }
                 MenuItem { text: @tr("Auto relocate"); activated => { LibraryState.action("track-auto-relocate"); menu.close(); } }
                 MenuItem { text: @tr("Remove from Collection"); activated => { LibraryState.action("track-remove"); menu.close(); } }
             }

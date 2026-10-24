@@ -1,7 +1,7 @@
 //! The Track menu on the track chosen in the browser: Import To Collection, Analyze Track, Analysis Lock,
 //! Reload Tag, Show in file manager, Relocate, Auto Relocate, Remove from Collection.
 
-use super::{Ask, Confirm, Ctx, missing, show_in_folder};
+use super::{autocue, missing, show_in_folder, Ask, Confirm, Ctx};
 use crate::app::{analyze, browser};
 use openfader::{
     library::{Track, folder},
@@ -10,40 +10,39 @@ use openfader::{
 use std::rc::Rc;
 
 pub fn act(c: &Rc<Ctx>, id: &str) {
-    let Some(t) = browser::context().track else {
+    let ctx = browser::context();
+    let Some(t) = ctx.track else {
         return c.say(tr!("choose a track first"));
     };
+    let tracks = ctx.tracks;
     match id {
         "track-edit" => crate::app::trackinfo::open_editor(&c.app(), &t),
         "track-import" => import(c, t),
-        "track-analyze" => {
-            if c.store.analysis_locked(&store::key(&t)).unwrap_or(false) {
-                return c.say(tr!("this track has an Analysis Lock: unlock it first"));
-            }
-            c.say(&tr!(
-                "analysing “{}”…{}",
-                t.title,
-                analyze::library_grid_notice(&t)
-            ));
-            c.analyze(vec![t], true);
-        }
-        "track-lock" => lock(c, &t),
-        "track-reload-tag" => reload_tag(c, &t, true),
-        "track-reload-tag-discard" => reload_tag(c, &t, false),
+        "track-analyze" => analyze_tracks(c, tracks),
+        "track-autocue" => autocue::start(c, tracks),
+        "track-lock" => lock(c, &tracks),
+        "track-reload-tag" => reload_tag(c, &tracks, true),
+        "track-reload-tag-discard" => reload_tag(c, &tracks, false),
         "track-show" => match &t.file {
             Some(f) => show_in_folder(f),
             None => c.say(tr!("this track has no file")),
         },
         "track-relocate" => c.ask_path(Ask::Relocate(vec![t]), None),
-        "track-auto-relocate" => missing::auto(c, vec![t]),
+        "track-auto-relocate" => missing::auto(c, tracks),
         "track-remove" => {
             if !c.protected(tr!("remove tracks")) {
-                let text = tr!(
-                    "Remove “{}” from the Collection? Its playlist places and edits are dropped; the file is not deleted.",
-                    t.title
-                );
+                let text = match tracks.as_slice() {
+                    [t] => tr!(
+                        "Remove “{}” from the Collection? Its playlist places and edits are dropped; the file is not deleted.",
+                        t.title
+                    ),
+                    many => tr!(
+                        "Remove {} tracks from the Collection? Their playlist places and edits are dropped; the files are not deleted.",
+                        many.len()
+                    ),
+                };
                 c.confirm(
-                    Confirm::Remove(vec![t]),
+                    Confirm::Remove(tracks),
                     tr!("REMOVE FROM COLLECTION"),
                     &text,
                     tr!("OK"),
@@ -52,6 +51,38 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
             }
         }
         _ => c.say(&tr!("unknown track action {}", id)),
+    }
+}
+
+/// Analyze Track on the selection: tracks with an Analysis Lock are skipped, and the status says how many.
+fn analyze_tracks(c: &Rc<Ctx>, tracks: Vec<Track>) {
+    let (run, locked): (Vec<Track>, Vec<Track>) = tracks
+        .into_iter()
+        .partition(|t| !c.store.analysis_locked(&store::key(t)).unwrap_or(false));
+    match (run.as_slice(), locked.len()) {
+        ([], 1) => c.say(tr!("this track has an Analysis Lock: unlock it first")),
+        ([t], 0) => c.say(&tr!(
+            "analysing “{}”…{}",
+            t.title,
+            analyze::library_grid_notice(t)
+        )),
+        (run, skipped) => {
+            let mut msg = if run.is_empty() {
+                String::new()
+            } else {
+                tr!("analysing {} tracks…", run.len())
+            };
+            if skipped > 0 {
+                if !msg.is_empty() {
+                    msg += " · ";
+                }
+                msg += &tr!("{} skipped (Analysis Lock)", skipped);
+            }
+            c.say(&msg);
+        }
+    }
+    if !run.is_empty() {
+        c.analyze(run, true);
     }
 }
 
@@ -73,16 +104,24 @@ fn import(c: &Rc<Ctx>, t: Track) {
     }
 }
 
-fn lock(c: &Rc<Ctx>, t: &Track) {
-    let key = store::key(t);
-    let on = !c.store.analysis_locked(&key).unwrap_or(false);
-    match c.store.set_analysis_lock(&key, on) {
-        Ok(()) => c.say(&if on {
+/// Analysis Lock: every selected track gets the same new state (all locked, unless they all are already).
+fn lock(c: &Rc<Ctx>, tracks: &[Track]) {
+    let keys: Vec<String> = tracks.iter().map(store::key).collect();
+    let on = keys
+        .iter()
+        .any(|k| !c.store.analysis_locked(k).unwrap_or(false));
+    let done = keys
+        .iter()
+        .try_for_each(|k| c.store.set_analysis_lock(k, on));
+    match (done, tracks) {
+        (Ok(()), [t]) => c.say(&if on {
             tr!("Analysis Lock on for “{}”", t.title)
         } else {
             tr!("Analysis Lock off for “{}”", t.title)
         }),
-        Err(e) => c.say(&tr!("store: {}", e)),
+        (Ok(()), _) if on => c.say(&tr!("Analysis Lock on for {} tracks", tracks.len())),
+        (Ok(()), _) => c.say(&tr!("Analysis Lock off for {} tracks", tracks.len())),
+        (Err(e), _) => c.say(&tr!("store: {}", e)),
     }
 }
 
@@ -112,47 +151,60 @@ fn retagged(t: &Track, fresh: Track) -> Track {
 
 /// Reload Tag: the file's tags replace what the track shows (a Collection row shadows the source's, which stays untouched).
 /// `keep_edits`: the text the user edited stays over the file's, and the status names the kept edits that differ from the file.
-fn reload_tag(c: &Rc<Ctx>, t: &Track, keep_edits: bool) {
-    let Some(file) = t.file.as_deref().filter(|f| f.is_file()) else {
+/// Tracks whose file is gone are left alone and counted.
+fn reload_tag(c: &Rc<Ctx>, ts: &[Track], keep_edits: bool) {
+    let mut jobs = Vec::new();
+    for t in ts {
+        let Some(file) = t.file.as_deref().filter(|f| f.is_file()) else {
+            continue;
+        };
+        // The row's own values are the base: what the user edited (the overrides) is not the file's.
+        let row =
+            t.id.and_then(|id| c.store.collection_track(id).ok().flatten());
+        let merged = retagged(row.as_ref().unwrap_or(t), folder::read_track(file));
+        let key = c.store.key_of(t);
+        let kept = if keep_edits {
+            let e = c.store.edits(&key).unwrap_or_default();
+            [
+                (tr!("Title"), &e.title, &merged.title),
+                (tr!("Artist"), &e.artist, &merged.artist),
+                (tr!("Album"), &e.album, &merged.album),
+                (tr!("Genre"), &e.genre, &merged.genre),
+                (tr!("Label"), &e.label, &merged.label),
+                (tr!("Comment"), &e.comment, &merged.comment),
+            ]
+            .into_iter()
+            .filter(|(_, edit, file)| edit.as_ref().is_some_and(|v| v != *file))
+            .map(|(name, ..)| name)
+            .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        jobs.push((key, merged, kept));
+    }
+    if jobs.is_empty() {
         return c.say(tr!("the file is missing: relocate it first"));
-    };
-    // The row's own values are the base: what the user edited (the overrides) is not the file's.
-    let row =
-        t.id.and_then(|id| c.store.collection_track(id).ok().flatten());
-    let merged = retagged(row.as_ref().unwrap_or(t), folder::read_track(file));
-    let key = c.store.key_of(t);
-    let kept = if keep_edits {
-        let e = c.store.edits(&key).unwrap_or_default();
-        [
-            (tr!("Title"), &e.title, &merged.title),
-            (tr!("Artist"), &e.artist, &merged.artist),
-            (tr!("Album"), &e.album, &merged.album),
-            (tr!("Genre"), &e.genre, &merged.genre),
-            (tr!("Label"), &e.label, &merged.label),
-            (tr!("Comment"), &e.comment, &merged.comment),
-        ]
-        .into_iter()
-        .filter(|(_, edit, file)| edit.as_ref().is_some_and(|v| v != *file))
-        .map(|(name, ..)| name)
-        .collect::<Vec<_>>()
-    } else {
-        Vec::new()
-    };
+    }
     let label = if keep_edits {
         tr!("Reload Tag")
     } else {
         tr!("Reload Tag (discard edits)")
     };
-    match c
-        .store
-        .action(label, || c.store.reload_tags(&key, &merged, keep_edits))
-    {
-        Ok(_) => {
-            c.say(&if kept.is_empty() {
-                tr!("tags of “{}” reloaded", t.title)
-            } else {
-                tr!("Reload Tag: kept your edits of {}", kept.join(", "))
-            });
+    let done = c.store.action(label, || {
+        jobs.iter()
+            .try_for_each(|(key, merged, _)| c.store.reload_tags(key, merged, keep_edits))
+    });
+    match done {
+        Ok(()) => {
+            let mut msg = match (ts, jobs.as_slice()) {
+                ([t], [(.., kept)]) if kept.is_empty() => tr!("tags of “{}” reloaded", t.title),
+                ([_], [(.., kept)]) => tr!("Reload Tag: kept your edits of {}", kept.join(", ")),
+                _ => tr!("tags of {} tracks reloaded", jobs.len()),
+            };
+            if ts.len() > jobs.len() && ts.len() > 1 {
+                msg += &format!(" · {}", tr!("{} files are missing", ts.len() - jobs.len()));
+            }
+            c.say(&msg);
             c.reload(None);
         }
         Err(e) => c.say(&tr!("store: {}", e)),

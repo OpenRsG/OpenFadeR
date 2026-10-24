@@ -12,6 +12,16 @@ impl Snapshot {
     /// first; smart playlists are skipped: their criteria are the browser's). Entries naming tracks that are not in the
     /// snapshot are dropped. A track is matched to the store by [`store::key`].
     pub fn add_store(&mut self, store: &Store) -> Result<(), String> {
+        self.add_store_with(store, true)
+    }
+
+    /// [`Snapshot::add_store`] without the user playlists: the colours and tags of the tracks only (a transfer of tracks makes no
+    /// playlist on the device).
+    pub fn add_store_marks(&mut self, store: &Store) -> Result<(), String> {
+        self.add_store_with(store, false)
+    }
+
+    fn add_store_with(&mut self, store: &Store, playlists: bool) -> Result<(), String> {
         let keys: Vec<String> = self.tracks.iter().map(|(t, _)| store::key(t)).collect();
         let mut index: HashMap<&str, usize> = HashMap::new();
         for (i, k) in keys.iter().enumerate() {
@@ -58,6 +68,9 @@ impl Snapshot {
             })
             .collect();
 
+        if !playlists {
+            return Ok(());
+        }
         let mut depth: HashMap<i64, usize> = HashMap::new();
         for n in store
             .nodes()?

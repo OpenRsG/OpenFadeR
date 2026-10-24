@@ -134,6 +134,36 @@ impl Snapshot {
         }
     }
 
+    /// The tracks with their analysis, giving up the snapshot.
+    pub fn into_tracks(self) -> Vec<(Track, Option<Analysis>)> {
+        self.tracks
+    }
+
+    /// `tracks` as the one playlist `name` inside the folders `folders` (outermost first) and nothing else: a device export merges
+    /// a playlist by its folder path and name ([`crate::device::transfer`]).
+    pub fn single_playlist(
+        tracks: Vec<(Track, Option<Analysis>)>,
+        folders: &[String],
+        name: &str,
+    ) -> Self {
+        let mut s = Self::of_tracks(tracks);
+        for (depth, n) in folders.iter().map(String::as_str).chain([name]).enumerate() {
+            let is_folder = depth < folders.len();
+            s.members.push(if is_folder {
+                Vec::new()
+            } else {
+                (0..s.tracks.len()).collect()
+            });
+            s.pls.push(Playlist {
+                id: format!("transfer:{depth}"),
+                name: n.to_owned(),
+                depth,
+                is_folder,
+            });
+        }
+        s
+    }
+
     /// Points every track whose [`crate::store::key`] is in `copies` at that file instead (the copy a device holds), so the
     /// next format written to that device uses the audio already there.
     pub fn retarget(&mut self, copies: &HashMap<String, std::path::PathBuf>) {

@@ -19,6 +19,7 @@ use slint::{ComponentHandle, StandardListViewItem};
 use std::{cell::RefCell, fmt::Display, rc::Rc};
 use tree::more_rows;
 
+pub(super) use manage::fresh_keys;
 pub use tree::playlist_labels;
 
 /// What the name bar is asking a name for.
@@ -31,6 +32,8 @@ pub enum Ask {
     NewTag(i64),
     NewBank,
     NewStage,
+    /// A playlist (top level of My Playlists) holding these tracks, made from the selection.
+    NewFrom(Vec<openfader::library::Track>),
 }
 
 /// The picker panel on the table's right edge; each row's id is a playlist node or a tag (`None`: a heading).

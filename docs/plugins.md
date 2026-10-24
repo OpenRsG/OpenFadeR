@@ -403,8 +403,8 @@ Candidates without a usable `url` or `data` are dropped and at most eight are ta
 fails (no network) only reports its error; a lookup that every plugin answered with nothing is remembered for 30 days.
 
 **Find Artwork…** (Track menu, right-click menu, FIND ARTWORK in the track info) shows the candidates with thumbnails; a click
-keeps one, for the track's whole album (one undo step). **Fetch Missing Artwork** does that for every album of the list on screen
-that has no cover, taking the first candidate. A folder image beside the file (`cover.jpg`, `folder.jpg`, `front.png`, …) counts
+keeps one, for the track's whole album (one undo step). **Fetch Missing Artwork** does that for every album of the selected
+tracks (of the list on screen when at most one track is selected) that has no cover, taking the first candidate. A folder image beside the file (`cover.jpg`, `folder.jpg`, `front.png`, …) counts
 without any plugin. With PREFERENCES > ADVANCED > BROWSE > Write fetched artwork into the file's tags the picture is also
 written into the tags of the album's tracks (MP3, WAV, AIFF with an ID3v2 `APIC` frame, FLAC with a `PICTURE` block; off by default). The pictures are shown in the browser's
 Cover column, on the decks and in the track info.
@@ -751,6 +751,16 @@ and phrases kept the same on both copies (PREFERENCES > DJ SYSTEM > DEVICE > CUE
 plugin offers `update`, so that it reads back. When a device is plugged in, each copy that lacks one of these parts is filled from the
 other. When a track is loaded on a deck, the copy loaded wins. Edits of a loaded track reach its device copies a few seconds after the
 last one. A device copy is written with an `export` of just those tracks, in the device's picked formats.
+
+**Transfer.** Tracks go to a device straight from the browser: dragged onto the device's row in the tree, onto one of its playlists,
+or sent with the track menu's "Transfer to <device>" (one item per mounted writable device); a My Playlists playlist or folder dragged
+onto the device row goes as a Sync Manager sync of that one playlist does. Tracks without a beat grid or a key are analysed first (the
+analysis pool, the Analysis Lock respected). The write is an `export` of a snapshot of just those tracks, in the device's picked
+formats, with the analysis the collection holds (your cue, grid and key edits on top). Onto the device itself the snapshot has no
+playlist. Onto a device playlist the snapshot holds one playlist with the device playlist's folder path and name, which the plugin
+merges by (it replaces that playlist's content), so the snapshot lists the playlist's current members first (a member the collection
+has too is written with the collection's analysis, its empty parts filled from the device copy; any other member with the analysis
+read from the device) and then the new tracks; a track the playlist holds already is skipped and counted.
 
 A job (`export`, `update`, `remove`, `device_action`) runs inside its call on a thread of the app. Meanwhile the plugin calls back
 through the `host` table every request receives (`openfader_plugin::library::host` in Rust): `analysis` (the beat grid, cues,

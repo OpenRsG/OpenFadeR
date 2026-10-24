@@ -223,11 +223,13 @@ impl View {
             .set_tag_filter_count(self.tag_filter.len() as i32);
     }
 
-    /// `t` gets tag `id` (a drop on the tag's tree row).
-    pub(super) fn tag_track(&mut self, app: &App, t: &Track, id: i64) {
-        let key = store::key(t);
-        if let Err(e) = self.store.set_track_mytag(&key, id, true) {
-            return self.say(app, tr!("store: {}", e));
+    /// `ts` get tag `id` (a drop on the tag's tree row).
+    pub(super) fn tag_tracks(&mut self, app: &App, ts: &[Track], id: i64) {
+        let keys: Vec<String> = ts.iter().map(store::key).collect();
+        for key in &keys {
+            if let Err(e) = self.store.set_track_mytag(key, id, true) {
+                return self.say(app, tr!("store: {}", e));
+            }
         }
         self.reload_tag_map(app);
         if matches!(self.home, Home::Tag(_) | Home::Smart(_)) {
@@ -237,12 +239,18 @@ impl View {
             .mytags
             .iter()
             .find(|m| m.id == id)
-            .map(|m| m.name.as_str());
-        self.say(
-            app,
-            tr!("added “{}” to tag “{}”", t.title, name.unwrap_or_default()),
-        );
-        if self.selected.as_ref().is_some_and(|s| store::key(s) == key) {
+            .map(|m| m.name.as_str())
+            .unwrap_or_default();
+        let msg = match ts {
+            [t] => tr!("added “{}” to tag “{}”", t.title, name),
+            _ => tr!("added {} tracks to tag “{}”", ts.len(), name),
+        };
+        self.say(app, msg);
+        if self
+            .selected
+            .as_ref()
+            .is_some_and(|s| keys.contains(&store::key(s)))
+        {
             self.tags_into_comment(app);
         }
     }

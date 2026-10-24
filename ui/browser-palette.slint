@@ -63,7 +63,7 @@ component PaletteColumn inherits Rectangle {
             DragState.moved(root.absolute-position.x + e.position.x, root.absolute-position.y + e.position.y);
             DragAction.copy
         }
-        dropped(e) => { BrowserState.palette-drop(root.slot, e.data); DragAction.copy }
+        dropped(e) => { DragState.active = false; BrowserState.palette-drop(root.slot, e.data); DragAction.copy }
         VerticalLayout {
             spacing: 0;
             Rectangle {

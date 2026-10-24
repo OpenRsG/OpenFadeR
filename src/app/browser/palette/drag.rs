@@ -58,3 +58,26 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod selection_tests {
+    use super::*;
+    use crate::app::browser::select::Selection;
+
+    /// A row drag is still just `track:<row>`: the selection it carries is resolved on drop ([`Selection::carried`]), so a
+    /// drag text never goes stale when the selection changes before the drop.
+    #[test]
+    fn a_row_drag_names_only_its_row_and_the_drop_reads_the_selection() {
+        let shown = [2, 0, 1];
+        let mut s = Selection::default();
+        s.pick(0);
+        s.toggle(1);
+        let Some(Drag::Track(row)) = Drag::parse(&Drag::Track(2).text()) else {
+            panic!("not a track drag");
+        };
+        assert_eq!(s.carried(&shown, row), [0, 1]); // row 2 is list row 1, one of the two selected
+        s.pick(2);
+        assert_eq!(s.carried(&shown, row), [1]); // the selection changed before the drop: it goes alone
+        assert_eq!(Drag::parse("track:99999999999999999999999"), None);
+    }
+}

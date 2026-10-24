@@ -15,6 +15,7 @@
 //! Long work (reading tags of a folder, scanning for missing files, copying music) runs on a thread; [`Ctx::spawn`] hands
 //! the result back to the UI thread.
 
+mod autocue;
 mod backup;
 mod dialog;
 pub mod dupes;
@@ -235,6 +236,8 @@ fn confirm_done(c: &Rc<Ctx>, answer: i32) {
         (Confirm::BackupMusic, n) => c.ask_path(Ask::BackupTo { music: n == 1 }, None),
         (Confirm::Restore(p), 1) => backup::restore(c, p),
         (Confirm::Remove(t), 1) => track::remove(c, t),
+        (Confirm::AutoCue(j), 1) => autocue::run(c, j, autocue::Mode::Replace, false),
+        (Confirm::AutoCue(j), 2) => autocue::run(c, j, autocue::Mode::Keep, false),
         (Confirm::RemoveMissing(t), 1) => missing::remove(c, t),
         _ => {}
     }
