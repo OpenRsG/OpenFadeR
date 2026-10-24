@@ -902,7 +902,7 @@ msgstr "+ CONDITION"
 
 #: ui/browser-tree.slint:114
 #: ui/browser.slint:307
-#: ui/device-preview.slint:78
+#: ui/device-format.slint:73
 msgid "CANCEL"
 msgstr "ANNULER"
 
@@ -947,7 +947,7 @@ msgid "New playlist / folder / smart playlist / Tags / Cue Bank / Stage"
 msgstr "Nouvelle playlist / dossier / playlist intelligente / tags / Cue Bank / étape"
 
 #: ui/browser.slint:191
-#: ui/device-devices.slint:248
+#: ui/device-devices.slint:249
 #: ui/plugins.slint:167
 msgid "MORE"
 msgstr "PLUS"
@@ -1919,8 +1919,8 @@ msgid "Create or extend the libraries on this device"
 msgstr "Créer ou étendre les bibliothèques de cet appareil"
 
 #: ui/device-devices.slint:235
-#: ui/device.slint:68
-#: ui/device.slint:78
+#: ui/device.slint:69
+#: ui/device.slint:79
 msgid "SYNC MANAGER"
 msgstr "GESTIONNAIRE SYNC"
 
@@ -1953,8 +1953,8 @@ msgid "KEEP IT SAFE"
 msgstr "PROTÉGER"
 
 #: ui/device-devices.slint:244
-#: ui/device.slint:68
-#: ui/device.slint:78
+#: ui/device.slint:69
+#: ui/device.slint:79
 msgid "BACKUPS"
 msgstr "SAUVEGARDES"
 
@@ -1971,6 +1971,14 @@ msgstr "RÉGLAGES"
 #: ui/device-devices.slint:245
 msgid "The player settings this device carries (Preferences > DJ SYSTEM)"
 msgstr "Les réglages de lecteur que porte cet appareil (Préférences > DJ SYSTEM)"
+
+#: ui/device-devices.slint:246
+msgid "FORMAT…"
+msgstr "FORMATER…"
+
+#: ui/device-devices.slint:246
+msgid "Erase the whole stick or card and format it again (FAT32 plays on every player)"
+msgstr "Efface toute la clé ou la carte et la reformate (le FAT32 est lu par tous les lecteurs)"
 
 #: ui/device-export.slint:29
 msgid "Writes the library, its analysis and the audio in every format that is on: several formats share one copy of each track, so the device works with any software. A library already on the device is extended, never wiped."
@@ -2019,6 +2027,46 @@ msgstr "PLAYLISTS À SYNCHRONISER"
 msgid "SYNC NOW"
 msgstr "SYNC MAINT."
 
+#: ui/device-format.slint:12
+msgid "FORMAT"
+msgstr "FORMATER"
+
+#: ui/device-format.slint:30
+msgid "NEW FILE SYSTEM"
+msgstr "NOUVEAU SYSTÈME DE FICHIERS"
+
+#: ui/device-format.slint:39
+msgid "Older players cannot read exFAT"
+msgstr "Les anciens lecteurs ne lisent pas l'exFAT"
+
+#: ui/device-format.slint:39
+msgid "FAT32 plays on every player, whatever the size of the stick. The disk gets one MBR partition."
+msgstr "Le FAT32 est lu par tous les lecteurs, quelle que soit la taille de la clé. Le disque reçoit une seule partition MBR."
+
+#: ui/device-format.slint:39
+msgid "FAT32 is the only choice for an SD card: players refuse exFAT cards. The card gets one MBR partition."
+msgstr "Le FAT32 est le seul choix pour une carte SD : les lecteurs refusent les cartes exFAT. La carte reçoit une seule partition MBR."
+
+#: ui/device-format.slint:43
+msgid "LABEL"
+msgstr "NOM DU VOLUME"
+
+#: ui/device-format.slint:45
+msgid "up to 11 letters or digits"
+msgstr "11 lettres ou chiffres au plus"
+
+#: ui/device-format.slint:48
+msgid "Back up the library first"
+msgstr "Sauvegarder d'abord la bibliothèque"
+
+#: ui/device-format.slint:53
+msgid "TO CONFIRM, TYPE: {}"
+msgstr "POUR CONFIRMER, TAPEZ : {}"
+
+#: ui/device-format.slint:72
+msgid "ERASE AND FORMAT"
+msgstr "EFFACER ET FORMATER"
+
 #: ui/device-preview.slint:48
 msgid "HIDE LIST"
 msgstr "MASQUER LA LISTE"
@@ -2036,17 +2084,17 @@ msgstr "DÉMARRER"
 msgid "NOT NOW"
 msgstr "PAS MAINTENANT"
 
-#: ui/device.slint:15
-#: ui/device.slint:63
-#: ui/device.slint:68
+#: ui/device.slint:16
+#: ui/device.slint:64
+#: ui/device.slint:69
 msgid "DEVICES"
 msgstr "APPAREILS"
 
-#: ui/device.slint:55
+#: ui/device.slint:56
 msgid "Cancel"
 msgstr "Annuler"
 
-#: ui/device.slint:107
+#: ui/device.slint:108
 msgid "CONFIRM"
 msgstr "CONFIRMER"
 
@@ -6899,7 +6947,6 @@ msgid "{}: there is no library on it to back up. Export to it first."
 msgstr "{} : il n'y a pas de bibliothèque à sauvegarder. Exportez-y d'abord."
 
 #: src/app/device/backup.rs:145
-#: src/app/device/check.rs:694
 #: src/app/device/safety.rs:90
 msgid "No backup folder: type one"
 msgstr "Aucun dossier de sauvegarde : saisissez-en un"
@@ -7154,65 +7201,57 @@ msgstr "Reconstruire la bibliothèque de {} depuis votre collection : les playli
 msgid "REBUILD"
 msgstr "RECONSTRUIRE"
 
-#: src/app/device/check.rs:545
+#: src/app/device/check.rs:540
 msgid "Fixing the stick"
 msgstr "Réparation de la clé"
 
-#: src/app/device/check.rs:562
+#: src/app/device/check.rs:557
 msgid "it is mounted read-only"
 msgstr "elle est montée en lecture seule"
 
-#: src/app/device/check.rs:650
+#: src/app/device/check.rs:645
 msgid "Finishing what was cut off"
 msgstr "Fin de ce qui a été interrompu"
 
-#: src/app/device/check.rs:653
+#: src/app/device/check.rs:648
 msgid "{}: the cut-off export could not be put right ({})."
 msgstr "{} : l'export interrompu n'a pas pu être rétabli ({})."
 
-#: src/app/device/check.rs:660
+#: src/app/device/check.rs:655
 msgid "{}: the extension {} is switched off. Switch it on in PREFERENCES > EXTENSIONS."
 msgstr "{} : l'extension {} est désactivée. Activez-la dans PRÉFÉRENCES > EXTENSIONS."
 
-#: src/app/device/check.rs:661
+#: src/app/device/check.rs:656
 msgid "Repairing ({})"
 msgstr "Réparation ({})"
 
-#: src/app/device/check.rs:676
+#: src/app/device/check.rs:671
 msgid "{} is ready."
 msgstr "{} est prête."
 
-#: src/app/device/check.rs:680
+#: src/app/device/check.rs:675
 msgid "{} still needs attention: {}"
 msgstr "{} demande encore de l'attention : {}"
 
-#: src/app/device/check.rs:697
-msgid "Not fixed: the backup failed ({}). Fix that or switch the backup off in PREFERENCES > DJ SYSTEM, then try again."
-msgstr "Non réparé : la sauvegarde a échoué ({}). Corrigez cela ou désactivez la sauvegarde dans PRÉFÉRENCES > SYSTÈME DJ, puis réessayez."
-
-#: src/app/device/check.rs:712
-msgid "Backed up the library first: {}"
-msgstr "Bibliothèque sauvegardée d'abord : {}"
-
-#: src/app/device/check.rs:720
+#: src/app/device/check.rs:687
 msgid "Writing the library again"
 msgstr "Réécriture de la bibliothèque"
 
-#: src/app/device/check.rs:752
+#: src/app/device/check.rs:719
 msgid "Copying missing music"
 msgstr "Copie de la musique manquante"
 
-#: src/app/device/check.rs:764
+#: src/app/device/check.rs:731
 msgid "Copied {n} missing audio file again from your collection."
 msgid_plural "Copied {n} missing audio files again from your collection."
 msgstr[0] "{n} fichier audio manquant recopié depuis votre collection."
 msgstr[1] "{n} fichiers audio manquants recopiés depuis votre collection."
 
-#: src/app/device/check.rs:766
+#: src/app/device/check.rs:733
 msgid "Copied {} of {} missing audio files again. {} are not in your collection: copy them to the stick by hand or take them off its playlists."
 msgstr "{} fichiers audio manquants sur {} recopiés. {} ne sont pas dans votre collection : copiez-les à la main sur la clé ou retirez-les de ses playlists."
 
-#: src/app/device/check.rs:807
+#: src/app/device/check.rs:774
 msgid "{}: the copy is shorter than the original"
 msgstr "{} : la copie est plus courte que l'original"
 
@@ -7239,6 +7278,138 @@ msgstr "Aucune des playlists cochées ne contient de pistes"
 #: src/app/device/export.rs:113
 msgid "Exporting"
 msgstr "Export en cours"
+
+#: src/app/device/format.rs:46
+msgid "Reading the disk"
+msgstr "Lecture du disque"
+
+#: src/app/device/format.rs:47
+msgid "Unmounting"
+msgstr "Démontage"
+
+#: src/app/device/format.rs:48
+msgid "Erasing the disk"
+msgstr "Effacement du disque"
+
+#: src/app/device/format.rs:49
+msgid "Formatting"
+msgstr "Formatage"
+
+#: src/app/device/format.rs:50
+msgid "Mounting"
+msgstr "Montage"
+
+#: src/app/device/format.rs:64
+msgid "{} is not on a disk this app can format. Nothing was erased. Choose a USB stick or an SD card."
+msgstr "{} n'est pas sur un disque que l'application peut formater. Rien n'a été effacé. Choisissez une clé USB ou une carte SD."
+
+#: src/app/device/format.rs:65
+msgid "{} is on the disk this computer runs from. Nothing was erased. Only USB sticks and SD cards can be formatted here."
+msgstr "{} se trouve sur le disque qui fait tourner cet ordinateur. Rien n'a été effacé. Seules les clés USB et les cartes SD peuvent être formatées ici."
+
+#: src/app/device/format.rs:66
+msgid "{} is on a disk that is not removable. Nothing was erased. Only USB sticks and SD cards can be formatted here."
+msgstr "{} se trouve sur un disque non amovible. Rien n'a été effacé. Seules les clés USB et les cartes SD peuvent être formatées ici."
+
+#: src/app/device/format.rs:67
+msgid "{} is write-protected or mounted read-only. Nothing was erased. Slide the lock switch of the card to unlocked or plug it in again, then try again."
+msgstr "{} est protégé en écriture ou monté en lecture seule. Rien n'a été effacé. Faites glisser le verrou de la carte sur déverrouillé ou rebranchez-la, puis réessayez."
+
+#: src/app/device/format.rs:68
+msgid "A job is writing to {}. Nothing was erased. Wait for it or cancel it (X), then format."
+msgstr "Une tâche écrit sur {}. Rien n'a été effacé. Attendez-la ou annulez-la (X), puis formatez."
+
+#: src/app/device/format.rs:69
+msgid "The disk holds a volume ({}) that was not listed when you confirmed. Nothing was erased. Press FORMAT… again to see everything on the disk."
+msgstr "Le disque contient un volume ({}) qui n'était pas listé quand vous avez confirmé. Rien n'a été effacé. Appuyez de nouveau sur FORMATER… pour voir tout ce que contient le disque."
+
+#: src/app/device/format.rs:70
+msgid "The confirmation does not match. Nothing was erased. Type {} exactly as shown."
+msgstr "La confirmation ne correspond pas. Rien n'a été effacé. Tapez {} exactement comme indiqué."
+
+#: src/app/device/format.rs:71
+msgid "Players refuse exFAT SD cards. Nothing was erased. Choose FAT32 for the card."
+msgstr "Les lecteurs refusent les cartes SD en exFAT. Rien n'a été effacé. Choisissez FAT32 pour la carte."
+
+#: src/app/device/format.rs:72
+msgid "This disk is larger than 2 TB, the most an MBR partition table holds. Nothing was erased. Use a smaller stick, or format it with the disk tool of your system."
+msgstr "Ce disque dépasse 2 To, le maximum d'une table de partitions MBR. Rien n'a été effacé. Utilisez une clé plus petite, ou formatez-le avec l'outil de disques de votre système."
+
+#: src/app/device/format.rs:73
+msgid "The label is not valid for {}: use up to 11 letters or digits, no punctuation. Nothing was erased. Type a simpler label."
+msgstr "Le nom n'est pas valide pour {} : 11 lettres ou chiffres au plus, sans ponctuation. Rien n'a été effacé. Saisissez un nom plus simple."
+
+#: src/app/device/format.rs:74
+msgid "The system did not allow formatting. Nothing was erased. Try again and enter your password when asked."
+msgstr "Le système n'a pas autorisé le formatage. Rien n'a été effacé. Réessayez et saisissez votre mot de passe quand il est demandé."
+
+#: src/app/device/format.rs:75
+msgid "The system stopped allowing the format after the disk was erased, so it has no usable volume yet. Press FORMAT… again and enter your password when asked."
+msgstr "Le système a cessé d'autoriser le formatage après l'effacement du disque : il n'a donc pas encore de volume utilisable. Appuyez de nouveau sur FORMATER… et saisissez votre mot de passe quand il est demandé."
+
+#: src/app/device/format.rs:76
+msgid "{} is in use by another program. Nothing was erased. Close what uses it, then try again."
+msgstr "{} est utilisé par un autre programme. Rien n'a été effacé. Fermez ce qui l'utilise, puis réessayez."
+
+#: src/app/device/format.rs:77
+msgid "The tool {} is not available. Nothing was erased. Install it (on Linux: udisks2) and try again."
+msgstr "L'outil {} n'est pas disponible. Rien n'a été effacé. Installez-le (sous Linux : udisks2) et réessayez."
+
+#: src/app/device/format.rs:80
+msgid "reading the disk"
+msgstr "la lecture du disque"
+
+#: src/app/device/format.rs:81
+msgid "unmounting it"
+msgstr "le démontage"
+
+#: src/app/device/format.rs:82
+msgid "writing the partition table"
+msgstr "l'écriture de la table de partitions"
+
+#: src/app/device/format.rs:83
+msgid "making the file system"
+msgstr "la création du système de fichiers"
+
+#: src/app/device/format.rs:84
+msgid "mounting it"
+msgstr "le montage"
+
+#: src/app/device/format.rs:87
+msgid "Formatting {} stopped while {}: {}. The disk was erased and has no usable volume yet. Press FORMAT… again to finish."
+msgstr "Le formatage de {} s'est arrêté pendant {} : {}. Le disque a été effacé et n'a pas encore de volume utilisable. Appuyez de nouveau sur FORMATER… pour terminer."
+
+#: src/app/device/format.rs:89
+msgid "Formatting {} stopped while {}: {}. Nothing was erased. Try again."
+msgstr "Le formatage de {} s'est arrêté pendant {} : {}. Rien n'a été effacé. Réessayez."
+
+#: src/app/device/format.rs:98
+msgid "no file system"
+msgstr "aucun système de fichiers"
+
+#: src/app/device/format.rs:108
+msgid "no label"
+msgstr "sans nom"
+
+#: src/app/device/format.rs:159
+msgid "Disk"
+msgstr "Disque"
+
+#: src/app/device/format.rs:166
+msgid "Everything on this disk will be erased: the music, the libraries and every volume listed here. This cannot be undone."
+msgstr "Tout ce qui se trouve sur ce disque sera effacé : la musique, les bibliothèques et chaque volume listé ici. Cette action est irréversible."
+
+#: src/app/device/format.rs:225
+msgid "Not formatted: the library backup failed ({}). The disk was not touched. Fix that or untick the backup, then try again."
+msgstr "Pas formaté : la sauvegarde de la bibliothèque a échoué ({}). Le disque n'a pas été touché. Corrigez cela ou décochez la sauvegarde, puis réessayez."
+
+#: src/app/device/format.rs:252
+msgid "{} formatted: {} on one MBR partition. Choose EXPORT to put music on it."
+msgstr "{} formaté : {} sur une partition MBR. Choisissez EXPORT pour y mettre de la musique."
+
+#: src/app/device/format.rs:257
+msgid "{} formatted as {} instead of FAT32: the system makes FAT32 on a card this small only with an extra permission. DJ players read it all the same. Press FORMAT… again and enter your password when asked if you want FAT32."
+msgstr "{} formaté en {} au lieu de FAT32 : sur une carte aussi petite, le système ne crée du FAT32 qu'avec une autorisation supplémentaire. Les lecteurs DJ le lisent quand même. Appuyez de nouveau sur FORMATER… et saisissez votre mot de passe quand il est demandé si vous voulez du FAT32."
 
 #: src/app/device/formats.rs:45
 msgid "{}: switch on at least one library format"
@@ -7278,47 +7449,47 @@ msgstr "Écriture des cues"
 msgid "cues of {} track(s) written to {}"
 msgstr "cues de {} piste(s) écrits dans {}"
 
-#: src/app/device/mod.rs:71
+#: src/app/device/mod.rs:72
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr "Une autre tâche est en cours : attendez-la ou annulez-la (X)"
 
-#: src/app/device/mod.rs:161
+#: src/app/device/mod.rs:162
 msgid " — {} warning(s), first: {}"
 msgstr " — {} avertissement(s), premier : {}"
 
-#: src/app/device/mod.rs:163
+#: src/app/device/mod.rs:164
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr "{} pistes exportées ({} nouvelles, {} mises à jour) et {} playlists vers {}{}{}"
 
-#: src/app/device/mod.rs:182
+#: src/app/device/mod.rs:183
 msgid " — Update Collection baseline not recorded: {}"
 msgstr " — Référence de mise à jour de la collection non enregistrée : {}"
 
-#: src/app/device/mod.rs:207
+#: src/app/device/mod.rs:208
 msgid "failed: {}"
 msgstr "échec : {}"
 
-#: src/app/device/mod.rs:262
+#: src/app/device/mod.rs:263
 msgid "That stick is not connected any more. Plug it in again, then try once more."
 msgstr "Cette clé n'est plus connectée. Rebranchez-la, puis réessayez."
 
-#: src/app/device/mod.rs:274
+#: src/app/device/mod.rs:275
 msgid "No device is chosen. Pick one in the list on the left."
 msgstr "Aucun appareil n'est choisi. Choisissez-en un dans la liste de gauche."
 
-#: src/app/device/mod.rs:288
+#: src/app/device/mod.rs:289
 msgid "it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"
 msgstr "elle est montée en lecture seule : rien ne peut y être écrit. Vérifiez son interrupteur de protection en écriture, puis rebranchez-la"
 
-#: src/app/device/mod.rs:297
+#: src/app/device/mod.rs:298
 msgid "cannot read the collection: {}"
 msgstr "impossible de lire la collection : {}"
 
-#: src/app/device/mod.rs:338
+#: src/app/device/mod.rs:339
 msgid "{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports."
 msgstr "{} : son extension ne peut pas faire cela avec cet appareil. Activez l'extension dans PRÉFÉRENCES > EXTENSIONS, ou utilisez un appareil qu'elle prend en charge."
 
-#: src/app/device/mod.rs:478
+#: src/app/device/mod.rs:479
 msgid "Cancelling…"
 msgstr "Annulation…"
 

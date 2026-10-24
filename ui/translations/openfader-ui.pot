@@ -902,7 +902,7 @@ msgstr ""
 
 #: ui/browser-tree.slint:114
 #: ui/browser.slint:307
-#: ui/device-preview.slint:78
+#: ui/device-format.slint:73
 msgid "CANCEL"
 msgstr ""
 
@@ -947,7 +947,7 @@ msgid "New playlist / folder / smart playlist / Tags / Cue Bank / Stage"
 msgstr ""
 
 #: ui/browser.slint:191
-#: ui/device-devices.slint:248
+#: ui/device-devices.slint:249
 #: ui/plugins.slint:167
 msgid "MORE"
 msgstr ""
@@ -1919,8 +1919,8 @@ msgid "Create or extend the libraries on this device"
 msgstr ""
 
 #: ui/device-devices.slint:235
-#: ui/device.slint:68
-#: ui/device.slint:78
+#: ui/device.slint:69
+#: ui/device.slint:79
 msgid "SYNC MANAGER"
 msgstr ""
 
@@ -1953,8 +1953,8 @@ msgid "KEEP IT SAFE"
 msgstr ""
 
 #: ui/device-devices.slint:244
-#: ui/device.slint:68
-#: ui/device.slint:78
+#: ui/device.slint:69
+#: ui/device.slint:79
 msgid "BACKUPS"
 msgstr ""
 
@@ -1970,6 +1970,14 @@ msgstr ""
 
 #: ui/device-devices.slint:245
 msgid "The player settings this device carries (Preferences > DJ SYSTEM)"
+msgstr ""
+
+#: ui/device-devices.slint:246
+msgid "FORMAT…"
+msgstr ""
+
+#: ui/device-devices.slint:246
+msgid "Erase the whole stick or card and format it again (FAT32 plays on every player)"
 msgstr ""
 
 #: ui/device-export.slint:29
@@ -2019,6 +2027,46 @@ msgstr ""
 msgid "SYNC NOW"
 msgstr ""
 
+#: ui/device-format.slint:12
+msgid "FORMAT"
+msgstr ""
+
+#: ui/device-format.slint:30
+msgid "NEW FILE SYSTEM"
+msgstr ""
+
+#: ui/device-format.slint:39
+msgid "Older players cannot read exFAT"
+msgstr ""
+
+#: ui/device-format.slint:39
+msgid "FAT32 plays on every player, whatever the size of the stick. The disk gets one MBR partition."
+msgstr ""
+
+#: ui/device-format.slint:39
+msgid "FAT32 is the only choice for an SD card: players refuse exFAT cards. The card gets one MBR partition."
+msgstr ""
+
+#: ui/device-format.slint:43
+msgid "LABEL"
+msgstr ""
+
+#: ui/device-format.slint:45
+msgid "up to 11 letters or digits"
+msgstr ""
+
+#: ui/device-format.slint:48
+msgid "Back up the library first"
+msgstr ""
+
+#: ui/device-format.slint:53
+msgid "TO CONFIRM, TYPE: {}"
+msgstr ""
+
+#: ui/device-format.slint:72
+msgid "ERASE AND FORMAT"
+msgstr ""
+
 #: ui/device-preview.slint:48
 msgid "HIDE LIST"
 msgstr ""
@@ -2036,17 +2084,17 @@ msgstr ""
 msgid "NOT NOW"
 msgstr ""
 
-#: ui/device.slint:15
-#: ui/device.slint:63
-#: ui/device.slint:68
+#: ui/device.slint:16
+#: ui/device.slint:64
+#: ui/device.slint:69
 msgid "DEVICES"
 msgstr ""
 
-#: ui/device.slint:55
+#: ui/device.slint:56
 msgid "Cancel"
 msgstr ""
 
-#: ui/device.slint:107
+#: ui/device.slint:108
 msgid "CONFIRM"
 msgstr ""
 
@@ -6897,7 +6945,6 @@ msgid "{}: there is no library on it to back up. Export to it first."
 msgstr ""
 
 #: src/app/device/backup.rs:145
-#: src/app/device/check.rs:694
 #: src/app/device/safety.rs:90
 msgid "No backup folder: type one"
 msgstr ""
@@ -7150,65 +7197,57 @@ msgstr ""
 msgid "REBUILD"
 msgstr ""
 
-#: src/app/device/check.rs:545
+#: src/app/device/check.rs:540
 msgid "Fixing the stick"
 msgstr ""
 
-#: src/app/device/check.rs:562
+#: src/app/device/check.rs:557
 msgid "it is mounted read-only"
 msgstr ""
 
-#: src/app/device/check.rs:650
+#: src/app/device/check.rs:645
 msgid "Finishing what was cut off"
 msgstr ""
 
-#: src/app/device/check.rs:653
+#: src/app/device/check.rs:648
 msgid "{}: the cut-off export could not be put right ({})."
 msgstr ""
 
-#: src/app/device/check.rs:660
+#: src/app/device/check.rs:655
 msgid "{}: the extension {} is switched off. Switch it on in PREFERENCES > EXTENSIONS."
 msgstr ""
 
-#: src/app/device/check.rs:661
+#: src/app/device/check.rs:656
 msgid "Repairing ({})"
 msgstr ""
 
-#: src/app/device/check.rs:676
+#: src/app/device/check.rs:671
 msgid "{} is ready."
 msgstr ""
 
-#: src/app/device/check.rs:680
+#: src/app/device/check.rs:675
 msgid "{} still needs attention: {}"
 msgstr ""
 
-#: src/app/device/check.rs:697
-msgid "Not fixed: the backup failed ({}). Fix that or switch the backup off in PREFERENCES > DJ SYSTEM, then try again."
-msgstr ""
-
-#: src/app/device/check.rs:712
-msgid "Backed up the library first: {}"
-msgstr ""
-
-#: src/app/device/check.rs:720
+#: src/app/device/check.rs:687
 msgid "Writing the library again"
 msgstr ""
 
-#: src/app/device/check.rs:752
+#: src/app/device/check.rs:719
 msgid "Copying missing music"
 msgstr ""
 
-#: src/app/device/check.rs:764
+#: src/app/device/check.rs:731
 msgid "Copied {n} missing audio file again from your collection."
 msgid_plural "Copied {n} missing audio files again from your collection."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/app/device/check.rs:766
+#: src/app/device/check.rs:733
 msgid "Copied {} of {} missing audio files again. {} are not in your collection: copy them to the stick by hand or take them off its playlists."
 msgstr ""
 
-#: src/app/device/check.rs:807
+#: src/app/device/check.rs:774
 msgid "{}: the copy is shorter than the original"
 msgstr ""
 
@@ -7234,6 +7273,138 @@ msgstr ""
 
 #: src/app/device/export.rs:113
 msgid "Exporting"
+msgstr ""
+
+#: src/app/device/format.rs:46
+msgid "Reading the disk"
+msgstr ""
+
+#: src/app/device/format.rs:47
+msgid "Unmounting"
+msgstr ""
+
+#: src/app/device/format.rs:48
+msgid "Erasing the disk"
+msgstr ""
+
+#: src/app/device/format.rs:49
+msgid "Formatting"
+msgstr ""
+
+#: src/app/device/format.rs:50
+msgid "Mounting"
+msgstr ""
+
+#: src/app/device/format.rs:64
+msgid "{} is not on a disk this app can format. Nothing was erased. Choose a USB stick or an SD card."
+msgstr ""
+
+#: src/app/device/format.rs:65
+msgid "{} is on the disk this computer runs from. Nothing was erased. Only USB sticks and SD cards can be formatted here."
+msgstr ""
+
+#: src/app/device/format.rs:66
+msgid "{} is on a disk that is not removable. Nothing was erased. Only USB sticks and SD cards can be formatted here."
+msgstr ""
+
+#: src/app/device/format.rs:67
+msgid "{} is write-protected or mounted read-only. Nothing was erased. Slide the lock switch of the card to unlocked or plug it in again, then try again."
+msgstr ""
+
+#: src/app/device/format.rs:68
+msgid "A job is writing to {}. Nothing was erased. Wait for it or cancel it (X), then format."
+msgstr ""
+
+#: src/app/device/format.rs:69
+msgid "The disk holds a volume ({}) that was not listed when you confirmed. Nothing was erased. Press FORMAT… again to see everything on the disk."
+msgstr ""
+
+#: src/app/device/format.rs:70
+msgid "The confirmation does not match. Nothing was erased. Type {} exactly as shown."
+msgstr ""
+
+#: src/app/device/format.rs:71
+msgid "Players refuse exFAT SD cards. Nothing was erased. Choose FAT32 for the card."
+msgstr ""
+
+#: src/app/device/format.rs:72
+msgid "This disk is larger than 2 TB, the most an MBR partition table holds. Nothing was erased. Use a smaller stick, or format it with the disk tool of your system."
+msgstr ""
+
+#: src/app/device/format.rs:73
+msgid "The label is not valid for {}: use up to 11 letters or digits, no punctuation. Nothing was erased. Type a simpler label."
+msgstr ""
+
+#: src/app/device/format.rs:74
+msgid "The system did not allow formatting. Nothing was erased. Try again and enter your password when asked."
+msgstr ""
+
+#: src/app/device/format.rs:75
+msgid "The system stopped allowing the format after the disk was erased, so it has no usable volume yet. Press FORMAT… again and enter your password when asked."
+msgstr ""
+
+#: src/app/device/format.rs:76
+msgid "{} is in use by another program. Nothing was erased. Close what uses it, then try again."
+msgstr ""
+
+#: src/app/device/format.rs:77
+msgid "The tool {} is not available. Nothing was erased. Install it (on Linux: udisks2) and try again."
+msgstr ""
+
+#: src/app/device/format.rs:80
+msgid "reading the disk"
+msgstr ""
+
+#: src/app/device/format.rs:81
+msgid "unmounting it"
+msgstr ""
+
+#: src/app/device/format.rs:82
+msgid "writing the partition table"
+msgstr ""
+
+#: src/app/device/format.rs:83
+msgid "making the file system"
+msgstr ""
+
+#: src/app/device/format.rs:84
+msgid "mounting it"
+msgstr ""
+
+#: src/app/device/format.rs:87
+msgid "Formatting {} stopped while {}: {}. The disk was erased and has no usable volume yet. Press FORMAT… again to finish."
+msgstr ""
+
+#: src/app/device/format.rs:89
+msgid "Formatting {} stopped while {}: {}. Nothing was erased. Try again."
+msgstr ""
+
+#: src/app/device/format.rs:98
+msgid "no file system"
+msgstr ""
+
+#: src/app/device/format.rs:108
+msgid "no label"
+msgstr ""
+
+#: src/app/device/format.rs:159
+msgid "Disk"
+msgstr ""
+
+#: src/app/device/format.rs:166
+msgid "Everything on this disk will be erased: the music, the libraries and every volume listed here. This cannot be undone."
+msgstr ""
+
+#: src/app/device/format.rs:225
+msgid "Not formatted: the library backup failed ({}). The disk was not touched. Fix that or untick the backup, then try again."
+msgstr ""
+
+#: src/app/device/format.rs:252
+msgid "{} formatted: {} on one MBR partition. Choose EXPORT to put music on it."
+msgstr ""
+
+#: src/app/device/format.rs:257
+msgid "{} formatted as {} instead of FAT32: the system makes FAT32 on a card this small only with an extra permission. DJ players read it all the same. Press FORMAT… again and enter your password when asked if you want FAT32."
 msgstr ""
 
 #: src/app/device/formats.rs:45
@@ -7274,47 +7445,47 @@ msgstr ""
 msgid "cues of {} track(s) written to {}"
 msgstr ""
 
-#: src/app/device/mod.rs:71
+#: src/app/device/mod.rs:72
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr ""
 
-#: src/app/device/mod.rs:161
+#: src/app/device/mod.rs:162
 msgid " — {} warning(s), first: {}"
 msgstr ""
 
-#: src/app/device/mod.rs:163
+#: src/app/device/mod.rs:164
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr ""
 
-#: src/app/device/mod.rs:182
+#: src/app/device/mod.rs:183
 msgid " — Update Collection baseline not recorded: {}"
 msgstr ""
 
-#: src/app/device/mod.rs:207
+#: src/app/device/mod.rs:208
 msgid "failed: {}"
 msgstr ""
 
-#: src/app/device/mod.rs:262
+#: src/app/device/mod.rs:263
 msgid "That stick is not connected any more. Plug it in again, then try once more."
 msgstr ""
 
-#: src/app/device/mod.rs:274
+#: src/app/device/mod.rs:275
 msgid "No device is chosen. Pick one in the list on the left."
 msgstr ""
 
-#: src/app/device/mod.rs:288
+#: src/app/device/mod.rs:289
 msgid "it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"
 msgstr ""
 
-#: src/app/device/mod.rs:297
+#: src/app/device/mod.rs:298
 msgid "cannot read the collection: {}"
 msgstr ""
 
-#: src/app/device/mod.rs:338
+#: src/app/device/mod.rs:339
 msgid "{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports."
 msgstr ""
 
-#: src/app/device/mod.rs:478
+#: src/app/device/mod.rs:479
 msgid "Cancelling…"
 msgstr ""
 

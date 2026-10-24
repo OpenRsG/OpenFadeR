@@ -47,6 +47,7 @@ sys-locale = { version = "0.3", optional = true } # the system's language for PR
 alsa = "0.9"
 wayland-client = { version = "0.31", optional = true }
 wayland-backend = { version = "0.3", optional = true, features = ["client_system"] }
+zbus = "5" # udisks2 over the system D-Bus: the built-in formatter (src/device/format/linux.rs); already in the tree through Slint's tray support
 
 [target.'cfg(target_os = "android")'.dependencies]
 cpal = { version = "0.15", features = ["oboe-shared-stdcxx"] }
@@ -66,7 +67,9 @@ libc = "0.2"
 # Removable drives (GetDriveTypeW...), ejecting them (DeviceIoControl), the analysis threads' priority and the job
 # objects that end plugin processes with the app (src/plugin/process.rs).
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_SystemInformation", "Win32_System_Threading"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_UI_Shell"] } # Registry: SHELLEXECUTEINFOW (the elevated formatter)
+# FAT32 of any size for the built-in formatter (Windows' own tools stop at 32 GB): src/device/format/windows.rs.
+fatfs = { version = "0.3", default-features = false, features = ["std", "alloc"] }
 
 # The program icon in the .exe (build.rs, assets/openfader.rc).
 [target.'cfg(windows)'.build-dependencies]

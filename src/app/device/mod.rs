@@ -32,6 +32,7 @@ mod actions;
 mod backup;
 mod check;
 mod export;
+mod format; // Formatter
 mod formats;
 mod job;
 mod link;
@@ -490,6 +491,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     export::wire(&cx, app);
     sync::wire(&cx, app);
     backup::wire(&cx, app);
+    format::wire(&cx, app); // Formatter
     actions::wire(&cx, app);
     link::register(&cx);
     transfer::wire(&cx, app);

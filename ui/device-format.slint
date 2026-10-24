@@ -1,0 +1,75 @@
+import { Chip, SegmentedChips, TextField, Toggle } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DialogFrame, FormRow, Note } from "dialog.slint";
+import { Caption, DeviceState } from "device-state.slint";
+
+/// FORMAT… on a device (src/app/device/format.rs): says what will be erased (the disk, every volume on it, with its label), takes
+/// the file system (FAT32 plays on every player; exFAT only where the device allows it) and the new label, offers a backup of
+/// the library first, and asks for the device's label (ERASE when it has none) typed in. `format-problem` shows what the
+/// safeguards refuse, in the dialog, so nothing is erased and the text stays next to the choice that caused it.
+export component DeviceFormat inherits DialogFrame {
+    visible: DeviceState.format-open;
+    title: @tr("FORMAT");
+    card-width: Theme.layout-profile == 1 ? min(560px, root.width - 16px) : 560px;
+    closed => { DeviceState.format-cancel(); }
+    Text {
+        text: DeviceState.format-warning;
+        wrap: word-wrap;
+        color: Theme.danger;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+        font-weight: Theme.weight-bold;
+        vertical-stretch: 0;
+    }
+    VerticalLayout {
+        spacing: Theme.space-xs;
+        vertical-stretch: 0;
+        Text { text: DeviceState.format-disk; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; wrap: word-wrap; }
+        for v in DeviceState.format-volumes: Text { text: v; color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; }
+    }
+    Caption { text: @tr("NEW FILE SYSTEM"); }
+    SegmentedChips {
+        options: DeviceState.format-exfat ? ["FAT32", "exFAT"] : ["FAT32"];
+        current: DeviceState.format-fs;
+        vertical-stretch: 0;
+        alignment: start;
+        chose(i) => { DeviceState.format-fs = i; }
+    }
+    Note {
+        text: DeviceState.format-fs == 1 ? @tr("Older players cannot read exFAT") : DeviceState.format-exfat ? @tr("FAT32 plays on every player, whatever the size of the stick. The disk gets one MBR partition.") : @tr("FAT32 is the only choice for an SD card: players refuse exFAT cards. The card gets one MBR partition.");
+        vertical-stretch: 0;
+    }
+    FormRow {
+        label: @tr("LABEL");
+        vertical-stretch: 0;
+        TextField { text <=> DeviceState.format-label; placeholder-text: @tr("up to 11 letters or digits"); horizontal-stretch: 1; }
+    }
+    if DeviceState.format-can-backup: Toggle {
+        text: @tr("Back up the library first");
+        checked: DeviceState.format-backup;
+        vertical-stretch: 0;
+        toggled(on) => { DeviceState.format-backup = on; }
+    }
+    Caption { text: @tr("TO CONFIRM, TYPE: {}", DeviceState.format-word); }
+    TextField {
+        text <=> DeviceState.format-typed;
+        placeholder-text: DeviceState.format-word;
+        vertical-stretch: 0;
+        accepted => { if (DeviceState.format-typed == DeviceState.format-word) { DeviceState.format-go(); } }
+    }
+    if DeviceState.format-problem != "": Text {
+        text: DeviceState.format-problem;
+        wrap: word-wrap;
+        color: Theme.danger;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+        vertical-stretch: 0;
+    }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        alignment: end;
+        vertical-stretch: 0;
+        Chip { text: @tr("ERASE AND FORMAT"); width: 160px; horizontal-stretch: 0; active: DeviceState.format-typed == DeviceState.format-word; enabled: DeviceState.format-typed == DeviceState.format-word; clicked => { DeviceState.format-go(); } }
+        Chip { text: @tr("CANCEL"); width: 80px; horizontal-stretch: 0; clicked => { DeviceState.format-cancel(); } }
+    }
+}

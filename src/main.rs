@@ -47,6 +47,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         return roll_back();
     }
+    // The elevated relaunch of the built-in formatter (src/device/format/windows.rs): no window, no app.
+    #[cfg(windows)]
+    if std::env::args_os()
+        .nth(1)
+        .is_some_and(|a| a == "--format-disk")
+    {
+        let args: Vec<_> = std::env::args_os().skip(2).collect();
+        std::process::exit(openfader::device::format::elevated_main(&args));
+    }
     low_memory_malloc();
     openfader::diag::init(); // after the malloc settings (it starts threads): the log file and the crash reports
     openfader::audio::device::quiet_alsa();

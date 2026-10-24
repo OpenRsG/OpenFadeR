@@ -236,6 +236,29 @@ export global DeviceState {
     public pure function state-color(state: int) -> color {
         return state == 0 ? Theme.play : state == 1 ? Theme.cue : state == 2 ? Theme.danger : Theme.text-dim;
     }
+
+    // Formatter: the FORMAT… dialog (src/app/device/format.rs, ui/device-format.slint).
+    in-out property <bool> format-open;
+    /// The consequence line, and what is about to be erased: "SanDisk Ultra · 14.9 GB" and one line per volume.
+    in property <string> format-warning;
+    in property <string> format-disk;
+    in property <[string]> format-volumes;
+    /// What the user types to confirm: the device's label, ERASE when it has none.
+    in property <string> format-word;
+    in-out property <string> format-typed;
+    in-out property <string> format-label;
+    /// 0 FAT32, 1 exFAT; `format-exfat` = exFAT is offered (not on an SD card).
+    in-out property <int> format-fs;
+    in property <bool> format-exfat;
+    /// The device holds a library the device backup can keep; `format-backup` = back it up first.
+    in property <bool> format-can-backup;
+    in-out property <bool> format-backup;
+    /// What a safeguard refuses, shown in the dialog.
+    in property <string> format-problem;
+    /// FORMAT… on the chosen device: reads its disk, then opens the dialog.
+    callback format-ask();
+    callback format-go();
+    callback format-cancel();
 }
 
 /// Checkbox rows for playlists and folders.

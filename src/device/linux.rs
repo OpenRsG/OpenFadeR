@@ -3,8 +3,15 @@
 //! (`/sys/block/<disk>/removable`) or on USB (its sysfs path runs through a `usb` bus: USB SSDs report not removable), so a
 //! stick mounted by hand shows up too.
 
-use super::{Device, Kind, Support};
+use super::{format::parse, Device, Kind, Support};
 use std::path::Path;
+
+/// The udev database text of block device `name` (`sdb`, `sdb1`; `/run/udev/data/b<major>:<minor>`); empty when there is none.
+pub(super) fn udev(name: &str) -> String {
+    std::fs::read_to_string(format!("/sys/class/block/{name}/dev"))
+        .and_then(|d| std::fs::read_to_string(format!("/run/udev/data/b{}", d.trim())))
+        .unwrap_or_default()
+}
 
 /// One line of `/proc/self/mountinfo` that matters here.
 pub(super) struct Mount {
@@ -65,6 +72,16 @@ pub(super) trait Sys {
     /// The disk (`sdb`, `mmcblk0`) behind a partition (`sdb1`, `mmcblk0p1`) with whether the kernel calls it removable.
     fn disk(&self, part: &str) -> Option<(String, bool)>;
     fn uuid(&self, part: &str) -> Option<String>;
+    /// The partition table type of whole disk `disk` (`dos`, `gpt`); empty while unknown.
+    fn table(&self, disk: &str) -> String {
+        let _ = disk;
+        String::new()
+    }
+    /// The file system type udev found on partition `part` (`exfat`, `ntfs`), for a mount that names only a FUSE driver.
+    fn fs_type(&self, part: &str) -> Option<String> {
+        let _ = part;
+        None
+    }
 }
 
 pub(super) struct Linux;
@@ -84,6 +101,14 @@ impl Sys for Linux {
                 .components()
                 .any(|c| c.as_os_str().to_string_lossy().starts_with("usb"));
         Some((disk.file_name()?.to_string_lossy().into_owned(), removable))
+    }
+
+    fn table(&self, disk: &str) -> String {
+        parse::table_from_udev(&udev(disk))
+    }
+
+    fn fs_type(&self, part: &str) -> Option<String> {
+        parse::udev_prop(&udev(part), "ID_FS_TYPE").map(str::to_owned)
     }
 
     fn uuid(&self, part: &str) -> Option<String> {
@@ -115,11 +140,18 @@ fn devices_in(mountinfo: &str, sys: &dyn Sys) -> Vec<Device> {
             Kind::Usb
         };
         let id = sys.uuid(part).unwrap_or_else(|| m.point.clone());
-        let support = Support::of(&m.fs, kind);
+        // A FUSE driver (exfat-fuse, ntfs-3g) reports `fuseblk`: what the disk holds says which file system it is.
+        let fs = if m.fs == "fuseblk" {
+            sys.fs_type(part).unwrap_or(m.fs)
+        } else {
+            m.fs
+        };
+        let support = Support::of(&fs, kind);
         out.push(Device {
             source: m.source,
             read_only: m.ro,
-            ..Device::new(id, m.point.into(), m.fs, kind, support)
+            table: disk.map_or_else(String::new, |d| sys.table(&d.0)),
+            ..Device::new(id, m.point.into(), fs, kind, support)
         });
     }
     out.sort_by(|a, b| a.mount.cmp(&b.mount));
@@ -146,6 +178,10 @@ mod tests {
                 "sda2" => Some(("sda".into(), false)),
                 _ => None,
             }
+        }
+
+        fn table(&self, disk: &str) -> String {
+            (disk == "sdb").then(|| "dos".into()).unwrap_or_default()
         }
 
         fn uuid(&self, part: &str) -> Option<String> {
@@ -190,8 +226,38 @@ mod tests {
         assert_eq!(v[0].id, "/media/dj/data", "no uuid: the mount path");
         assert!(v[2].writable() && !v[0].writable() && !v[1].writable());
         assert_eq!(
+            v.iter().map(|d| d.table.as_str()).collect::<Vec<_>>(),
+            ["", "", "dos", ""],
+            "only the disk the fake knows has a table; an unknown one stays empty"
+        );
+        assert_eq!(
             v[1].support,
             Support::Unsupported("exFAT on an SD card: players read FAT16 / FAT32 cards only")
+        );
+    }
+
+    #[test]
+    fn a_fuse_mount_is_the_file_system_the_disk_holds() {
+        struct Fuse(Option<&'static str>);
+        impl Sys for Fuse {
+            fn disk(&self, _: &str) -> Option<(String, bool)> {
+                Some(("sdb".into(), true))
+            }
+            fn uuid(&self, _: &str) -> Option<String> {
+                None
+            }
+            fn fs_type(&self, _: &str) -> Option<String> {
+                self.0.map(str::to_owned)
+            }
+        }
+        let mount = "80 24 8:17 / /run/media/dj/EX rw - fuseblk /dev/sdb1 rw\n";
+        let v = devices_in(mount, &Fuse(Some("exfat")));
+        assert_eq!(v[0].fs, "exfat", "exfat-fuse is exFAT, not NTFS");
+        assert!(matches!(v[0].support, Support::Warn(_)));
+        assert_eq!(
+            devices_in(mount, &Fuse(None))[0].fs,
+            "fuseblk",
+            "without udev's answer it stays as the kernel says"
         );
     }
 }

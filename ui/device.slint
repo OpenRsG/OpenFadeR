@@ -5,6 +5,7 @@ import { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOpti
 import { DevicesPage } from "device-devices.slint";
 import { ExportPage, SyncPage } from "device-export.slint";
 import { BackupPage } from "device-backup.slint";
+import { DeviceFormat } from "device-format.slint";
 import { DevicePreview, DeviceSyncAsk } from "device-preview.slint";
 export { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow, PreviewRow }
 import { CheckLib, CheckPlayer, CheckPreset, CheckProblem } from "device-state.slint";
@@ -130,4 +131,5 @@ export component DeviceOverlay inherits Rectangle {
     DeviceConfirm {}
     DevicePreview {}
     DeviceSyncAsk {}
+    DeviceFormat {}
 }
