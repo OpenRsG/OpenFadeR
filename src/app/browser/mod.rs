@@ -24,8 +24,9 @@
 //! waveform strips with the cue markers), [`preview`] (the PREVIEW button and the strips' click-to-preview player), [`remote`]
 //! (Enter in the search box on the search entry of a plugin source searches online), [`health`] (the Library health node: a scan of
 //! the Collection for problems on a worker thread, a row per check, the fixes and ignores), [`stages`] (the Stages node: INBOX →
-//! REVIEW → COLLECTION, moving tracks between them, recent moves) and [`select`] (the table's multi-selection: Ctrl / Shift click,
-//! Shift+arrows, Ctrl+A; the chosen row is always one of the selected rows, the menus act on [`Context::tracks`]).
+//! REVIEW → COLLECTION, moving tracks between them, recent moves), [`select`] (the table's multi-selection: Ctrl / Shift click,
+//! Shift+arrows, Ctrl+A; the chosen row is always one of the selected rows, the menus act on [`Context::tracks`]) and [`saved`]
+//! (saved searches: the search box and filter bar under a name, recalled from the SAVED panel).
 
 mod cover;
 mod editor;
@@ -39,6 +40,7 @@ mod played;
 mod playlists;
 mod preview;
 mod remote;
+mod saved;
 mod select;
 mod session;
 mod sidebar;
@@ -208,6 +210,8 @@ struct View {
     filter: Filter,
     /// tag ids a track must all carry (the TAG FILTER panel).
     tag_filter: Vec<i64>,
+    /// The saved searches by name ([`saved`]), in the order of the SAVED panel.
+    saved: Vec<store::SavedSearch>,
     /// (column, ascending); kept across playlist changes, like the header's sort arrow.
     sort: Option<(usize, bool)>,
     home: Home,

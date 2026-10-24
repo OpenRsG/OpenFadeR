@@ -304,6 +304,52 @@ fn glance_from(dir: &Path, t: &Track) -> Option<Glance> {
     (made_for == size).then_some(g)
 }
 
+/// How the stored entry of a track relates to this build's analysis.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Age {
+    /// No entry, or not one this build can judge (not ours, or written by a newer build).
+    None,
+    /// Made by this build's layout and detector.
+    Current,
+    /// Made by an older analysis: an older cache layout, or the detector of the entry [`migrate`] upgraded (empty profile).
+    /// [`load`] ignores it and the next analysis of the track replaces it.
+    Older,
+}
+
+/// The [`Age`] of `entry`'s first bytes: magic, version, audio size, profile.
+fn age_of(head: &[u8]) -> Age {
+    let mut c = Cur(head);
+    let (Ok(magic), Ok(v)) = (c.take(4), c.u32()) else {
+        return Age::None;
+    };
+    if magic != MAGIC {
+        return Age::None;
+    }
+    match v.cmp(&VERSION) {
+        std::cmp::Ordering::Less => Age::Older,
+        std::cmp::Ordering::Greater => Age::None,
+        // Size, then the profile: a layout upgraded by `migrate` has none.
+        std::cmp::Ordering::Equal => match (c.u64(), c.u64()) {
+            (Ok(_), Ok(0)) => Age::Older,
+            (Ok(_), Ok(_)) => Age::Current,
+            _ => Age::None,
+        },
+    }
+}
+
+/// The [`Age`] of `t`'s entry, from its first 24 bytes (no stat of the audio file: a bulk scan of a big library).
+pub fn age(t: &Track) -> Age {
+    age_from(&dir().unwrap_or_default(), t)
+}
+
+fn age_from(dir: &Path, t: &Track) -> Age {
+    use std::io::Read;
+    let mut head = Vec::with_capacity(24);
+    std::fs::File::open(dir.join(file_name(t)))
+        .and_then(|f| f.take(24).read_to_end(&mut head))
+        .map_or(Age::None, |_| age_of(&head))
+}
+
 /// The vocal regions the analysis cache holds for `t` ([`super::detect::vocal_regions`], an inferred heuristic);
 /// empty when the track was not analysed or the Vocal part was off. What VIEW > Layout > Vocal draws.
 pub fn vocal(t: &Track) -> Vec<VocalRegion> {
@@ -792,6 +838,38 @@ mod tests {
             "a current entry is not an old one"
         );
         assert!(upgrade(b"RKA", 5).is_none());
+    }
+
+    #[test]
+    fn an_entry_is_current_older_or_not_ours_by_its_first_bytes() {
+        let (dir, t) = fixture("age");
+        assert_eq!(age_from(&dir, &t), Age::None, "no entry");
+        store_in(&dir, &t, &sample(), profile()).unwrap();
+        assert_eq!(age_from(&dir, &t), Age::Current);
+        let name = dir.join(file_name(&t));
+        let put = |b: &[u8]| std::fs::write(&name, b).unwrap();
+        let mut b = encode(&sample(), profile(), 5);
+        b[4..8].copy_from_slice(&(VERSION - 1).to_le_bytes());
+        put(&b);
+        assert_eq!(age_from(&dir, &t), Age::Older, "an older layout");
+        b[4..8].copy_from_slice(&(VERSION + 1).to_le_bytes());
+        put(&b);
+        assert_eq!(
+            age_from(&dir, &t),
+            Age::None,
+            "a newer build's entry is left alone"
+        );
+        put(&upgrade(&old_entry(&sample()), 5).unwrap());
+        assert_eq!(
+            age_from(&dir, &t),
+            Age::Older,
+            "an upgraded version 3 entry: the old detector"
+        );
+        put(b"junk");
+        assert_eq!(age_from(&dir, &t), Age::None);
+        put(&encode(&sample(), profile(), 5)[..10]);
+        assert_eq!(age_from(&dir, &t), Age::None, "cut short");
+        std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
     }
 
     #[test]

@@ -128,6 +128,43 @@ pub fn restart_requested() -> bool {
     RESTART.load(Ordering::Relaxed)
 }
 
+/// When the process started (set first thing in `main`), for the start-up line [`log_first_frame`] writes.
+static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
+/// Records the start of the process.
+pub fn started() {
+    STARTED.get_or_init(std::time::Instant::now);
+}
+
+/// Writes `startup: window shown after <ms> ms (<n> tracks)` once, at the first frame the renderer draws (the software
+/// renderer has no notifier: then at the first turn of the event loop, which is right after the window is shown).
+/// `.github/smoke.sh` reads it.
+fn log_first_frame(app: &App) {
+    let done = Rc::new(std::cell::Cell::new(false));
+    let line = {
+        let (done, weak) = (done.clone(), app.as_weak());
+        move || {
+            if done.replace(true) {
+                return;
+            }
+            let ms = STARTED.get().map_or(0, |t| t.elapsed().as_millis());
+            let n = weak.upgrade().map_or(0, |a| {
+                slint::Model::row_count(&a.global::<BrowserState>().get_tracks())
+            });
+            eprintln!("startup: window shown after {ms} ms ({n} tracks)");
+        }
+    };
+    let first = line.clone();
+    let hooked = app.window().set_rendering_notifier(move |state, _| {
+        if matches!(state, slint::RenderingState::AfterRendering) {
+            first();
+        }
+    });
+    if hooked.is_err() {
+        slint::Timer::single_shot(std::time::Duration::ZERO, line);
+    }
+}
+
 pub use openfader_ui::*;
 
 /// Opens the Collection. `legacy` (a path given at start, or the old Database setting) and `music` (the own music folder)
@@ -202,6 +239,7 @@ pub fn run(
     })?;
     let _analyzer = analyze::wire(&app, lib.clone()); // dropping it cancels the worker: lives until the window closes
     connect::wire(&app); // live sync of the connected libraries; after the browser, which it asks to reload
+    log_first_frame(&app);
     app.run()?;
     update::quit(); // a clean exit shows that the version just installed starts
     openfader::plugin::event::fire("app_quit", serde_json::json!({}));

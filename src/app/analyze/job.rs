@@ -39,6 +39,9 @@ pub struct Job {
     /// Asked for by the user (the track menu): analysed again whatever the cache holds, and its key is written to the tag
     /// even when the library has one.
     pub explicit: bool,
+    /// Analysed again because an update changed the analysis ([`super::stale`]): the cache entry is replaced, but a cue list
+    /// the track has stays whatever the settings say, and no tag is written.
+    pub refresh: bool,
     /// The library gave the track a key.
     pub library_key: bool,
     pub guide: Guide,
@@ -78,20 +81,25 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
         && store
             .edits(&job.key)
             .is_ok_and(|e| e.cues.is_some_and(|c| !c.is_empty()));
+    // A refresh never replaces a cue list, whatever "Prohibit overwriting CUEs" says.
+    let cue_options = auto::CueOptions {
+        keep_existing: s.options.cue.keep_existing || job.refresh,
+        ..s.options.cue
+    };
     let cues = !arrived
-        && auto::for_analysis(beats, phrases.as_ref(), &s.options.cue, g.has_cues).is_some_and(
-            |c| match store.system(|| store_cues(store, &job.key, &c)) {
+        && auto::for_analysis(beats, phrases.as_ref(), &cue_options, g.has_cues).is_some_and(|c| {
+            match store.system(|| store_cues(store, &job.key, &c)) {
                 Ok(()) => true,
                 Err(e) => {
                     eprintln!("analyze: {}: cues not stored: {e}", job.path.display());
                     false
                 }
-            },
-        );
+            }
+        });
     let tag = s
         .tag
         .as_ref()
-        .filter(|_| job.explicit || !job.library_key)
+        .filter(|_| !job.refresh && (job.explicit || !job.library_key))
         .zip(a.key.as_deref())
         .map(|(text, key)| tag::write_key(&job.path, &text(key)));
     Outcome {
@@ -409,6 +417,7 @@ mod tests {
             },
             key: format!("{path}|1"),
             explicit: false,
+            refresh: false,
             library_key: false,
             guide,
         }
@@ -497,6 +506,54 @@ mod tests {
         store.set_cues(&j.key, Some(&mine)).unwrap();
         assert!(!finish(&j, &analysed(), src(), &settings(false), &store).cues);
         assert_eq!(store.edits(&j.key).unwrap().cues, Some(mine));
+    }
+
+    #[test]
+    fn a_refresh_after_an_update_keeps_the_users_cues_grid_and_tags() {
+        let store = Store::in_memory().unwrap();
+        let (dir, file) = temp_mp3("refresh");
+        let path = file.to_str().unwrap();
+        let before = std::fs::read(&file).unwrap();
+        let mut j = job(
+            path,
+            Guide {
+                has_cues: true,
+                ..Default::default()
+            },
+        );
+        j.refresh = true;
+        // The user's cue list and an edited grid (the library's own beats, shifted).
+        let mine = vec![openfader::analysis::Cue {
+            hot_cue: 1,
+            time_ms: 4_000,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        }];
+        let grid: Vec<Beat> = beats()
+            .into_iter()
+            .map(|b| Beat {
+                time_ms: b.time_ms + 70,
+                ..b
+            })
+            .collect();
+        store.set_cues(&j.key, Some(&mine)).unwrap();
+        store.set_grid(&j.key, &grid, &beats()).unwrap();
+        // Overwriting CUEs is allowed (the default) and the key tag is asked for: a refresh does neither.
+        let out = finish(&j, &analysed(), src(), &settings(true), &store);
+        assert!(!out.cues && out.tag.is_none());
+        let edits = store.edits(&j.key).unwrap();
+        assert_eq!(edits.cues, Some(mine));
+        assert_eq!(edits.grid, Some(grid));
+        assert_eq!(
+            std::fs::read(&file).unwrap(),
+            before,
+            "the file is untouched"
+        );
+        // The same job without the refresh mark (the track menu's re-analysis) does overwrite the cues.
+        j.refresh = false;
+        assert!(finish(&j, &analysed(), src(), &settings(false), &store).cues);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

@@ -2,6 +2,8 @@ import { ListView } from "std-widgets.slint";
 import { Chip, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DialogFrame, FormRow, Note } from "dialog.slint";
+import { ImportReportOverlay } from "import-report.slint";
+export { ImportReportState, ImportSkipRow } from "import-report.slint";
 
 /// One track of the Missing File Manager.
 export struct MissingRow {
@@ -134,6 +136,9 @@ component DupeLine inherits Rectangle {
 
 /// Every dialog of LibraryState; instantiate once in the window.
 export component LibraryOverlays inherits Rectangle {
+    // The import report sits under the path dialog SAVE AS TEXT opens.
+    ImportReportOverlay {}
+
     // Path / name entry.
     DialogFrame {
         visible: LibraryState.path-open;

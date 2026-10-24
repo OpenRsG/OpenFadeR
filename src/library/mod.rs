@@ -13,6 +13,7 @@
 pub mod connect;
 pub mod folder;
 pub mod import;
+pub mod import_report;
 pub mod open_format;
 pub mod own;
 pub mod playlist_file;

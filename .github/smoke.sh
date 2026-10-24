@@ -3,6 +3,9 @@
 # desktop, check that the process is still alive and that its output holds no panic, then close it.
 # Usage: smoke.sh <openfader binary> <output folder> [seconds to wait, default 20]
 # Writes <output folder>/screenshot.png and app.log. Linux needs a display (run it under xvfb-run) and ImageMagick.
+# Start-up time: with SMOKE_TRACKS=<n> and SMOKE_GEN=<the big_library example binary> the private store is first filled with
+# n synthetic tracks (`cargo build --release --example big_library`), and on Linux the app's `startup: window shown after
+# <ms> ms` line must show at most SMOKE_STARTUP_MS (default 5000).
 set -u
 bin=$1
 out=$2
@@ -25,6 +28,13 @@ if [ "$os" = windows ]; then
 	w=$(cygpath -w "$home")
 	mkdir -p "$home/AppData/Roaming" "$home/AppData/Local"
 	export USERPROFILE="$w" APPDATA="$w\\AppData\\Roaming" LOCALAPPDATA="$w\\AppData\\Local"
+fi
+
+if [ -n "${SMOKE_TRACKS:-}" ]; then
+	"$SMOKE_GEN" "$SMOKE_TRACKS" || {
+		echo "::error::could not make the test library"
+		exit 1
+	}
 fi
 
 (
@@ -81,6 +91,19 @@ fi
 if ! grep -qE "^plugins: [1-9][0-9]* found" "$out/app.log"; then
 	echo "::error::no plugin was found"
 	status=1
+fi
+# Start-up: the window must show within the limit, even with a big library (the library may fill in after it).
+if [ -n "${SMOKE_TRACKS:-}" ] && [ "$os" = linux ]; then
+	ms=$(sed -n 's/^startup: window shown after \([0-9]*\) ms.*/\1/p' "$out/app.log" | head -n 1)
+	if [ -z "$ms" ]; then
+		echo "::error::no 'startup: window shown' line in the output"
+		status=1
+	elif [ "$ms" -gt "${SMOKE_STARTUP_MS:-5000}" ]; then
+		echo "::error::the window took ${ms} ms to show with $SMOKE_TRACKS tracks (limit ${SMOKE_STARTUP_MS:-5000} ms)"
+		status=1
+	else
+		echo "start-up: window shown after ${ms} ms with $SMOKE_TRACKS tracks"
+	fi
 fi
 if [ ! -s "$out/screenshot.png" ]; then
 	echo "::error::no screenshot was taken"

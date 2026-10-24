@@ -192,6 +192,15 @@ export global BrowserState {
     callback cond-remove(int);
     callback editor-save();
     callback editor-cancel();
+    // Saved searches (src/app/browser/saved.rs): the search box text (bound to the boxes of every skin) and the SAVED panel.
+    in-out property <string> search-text;
+    in-out property <bool> saved-open;
+    in property <[string]> saved-names;
+    /// SAVE asks for a name (the name bar) and keeps the search box and filters under it.
+    callback saved-save();
+    callback saved-recall(int);
+    callback saved-rename(int);
+    callback saved-delete(int);
 }
 
 /// Automix (src/app/automix/): plays the shown list over both decks. The AUTOMIX button is handled by the browser

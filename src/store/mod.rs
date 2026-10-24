@@ -25,7 +25,7 @@
 //! applies the track data to a [`crate::library::Library`].
 
 mod artwork;
-mod backup;
+pub mod backup;
 mod bank;
 mod collection;
 pub mod connect;
@@ -41,6 +41,7 @@ mod node;
 mod overlay;
 mod phrase;
 mod rekey;
+mod saved_search;
 mod sequence;
 mod tag;
 mod track;
@@ -49,10 +50,11 @@ pub use artwork::{MISS_TTL, album_key};
 pub use backup::{Backup, MUSIC_DIR, Restored};
 pub use bank::{BankSlot, HotCueBank, collect_banks};
 pub use device::{DeviceBackup, NewBackup};
-pub use gain::{effective_db, TrackGain};
+pub use gain::{TrackGain, effective_db};
 pub use inbox::{Batch, Move, Role, Stage};
 pub use node::{Node, NodeKind};
 pub use overlay::{Overlay, apply, overlay};
+pub use saved_search::SavedSearch;
 pub use sequence::{MAX_SEQUENCES, Sequence};
 pub use tag::{Tag, TagGroup};
 pub use track::{AUTO_CUES, Edits, TRACK_COLORS};
@@ -65,8 +67,8 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc, LazyLock, OnceLock,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -207,8 +209,12 @@ const MIGRATIONS: &[&str] = &[
      CREATE TABLE IF NOT EXISTS inbox_seen (sig TEXT PRIMARY KEY, track INTEGER) WITHOUT ROWID;",
     // v20: cover art by album or track (src/store/artwork.rs); an empty `path` is a lookup that found nothing at `at` (unix s).
     "CREATE TABLE IF NOT EXISTS artwork (key TEXT PRIMARY KEY, path TEXT NOT NULL, at INTEGER NOT NULL) WITHOUT ROWID;",
-    // v21: backups the app took itself before it rewrote a device library (`auto`), pruned to the last few per device.
-    "ALTER TABLE device_backup ADD COLUMN auto INTEGER NOT NULL DEFAULT 0;",
+    // v21: backups the app took itself before it rewrote a device library (`device_backup.auto`), pruned to the last few per
+    // device. SQL cannot guard an ALTER, so [`migrate`] adds the column when missing (as for v19).
+    "SELECT 1;",
+    // v22: saved searches of the media browser (src/store/saved_search.rs); `spec` is the browser's own text form of the search box and filters.
+    "CREATE TABLE IF NOT EXISTS saved_search (
+        id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, spec TEXT NOT NULL, created INTEGER NOT NULL);",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as
@@ -408,21 +414,27 @@ fn migrate(conn: &mut Connection) -> R<()> {
         tx.pragma_update(None, "user_version", i as i64 + 1).s()?;
         tx.commit().s()?;
     }
-    // v19's `collection.stage` column: SQL cannot guard an ALTER, so it is added here when missing (a re-run of v19 keeps it).
-    if conn
-        .query_row(
-            "SELECT COUNT(*) FROM pragma_table_info('collection') WHERE name = 'stage'",
-            [],
+    // Columns SQL cannot guard: added here when missing, so a re-run of their migration keeps them (v19 `collection.stage`, v21
+    // `device_backup.auto`).
+    let has = |table: &str, column: &str| {
+        conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info(?1) WHERE name = ?2",
+            [table, column],
             |r| r.get::<_, i64>(0),
         )
-        .s()?
-        == 0
-    {
+        .s()
+        .map(|n| n > 0)
+    };
+    if !has("collection", "stage")? {
         conn.execute_batch(
             "ALTER TABLE collection ADD COLUMN stage INTEGER REFERENCES stage(id);
              CREATE INDEX IF NOT EXISTS collection_stage ON collection(stage);",
         )
         .s()?;
+    }
+    if !has("device_backup", "auto")? {
+        conn.execute_batch("ALTER TABLE device_backup ADD COLUMN auto INTEGER NOT NULL DEFAULT 0;")
+            .s()?;
     }
     Ok(())
 }

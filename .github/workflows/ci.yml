@@ -78,9 +78,17 @@ jobs:
       - name: Smoke test
         if: matrix.name != 'linux'
         run: bash .github/smoke.sh target/release/openfader smoke
+      - name: Start-up time with 50 000 tracks (Linux, under Xvfb; the window must show within 5 s)
+        if: matrix.name == 'linux'
+        run: |
+          cargo build --release --example big_library
+          SMOKE_TRACKS=50000 SMOKE_GEN=target/release/examples/big_library \
+            xvfb-run -a -s "-screen 0 1600x1000x24" bash .github/smoke.sh target/release/openfader smoke-startup 10
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: smoke-${{ matrix.name }}
-          path: smoke/
+          path: |
+            smoke/
+            smoke-startup/
           if-no-files-found: ignore

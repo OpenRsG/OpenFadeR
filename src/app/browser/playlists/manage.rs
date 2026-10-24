@@ -210,6 +210,8 @@ impl View {
             Ask::NewTag(c) => st.add_mytag(c, &name).map(Entry::Tag),
             Ask::NewBank => st.add_bank(&name).map(Entry::Bank),
             Ask::NewStage => st.add_stage(&name).map(Entry::Stage),
+            Ask::SaveSearch => return self.save_search(app, &name),
+            Ask::RenameSearch(id) => return self.rename_search(app, id, &name),
             Ask::NewFrom(_) => st.add_node(None, &name, NodeKind::Playlist).and_then(|id| {
                 st.add_entries(id, &keys)?;
                 Ok(Entry::User(id))

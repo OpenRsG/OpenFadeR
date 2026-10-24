@@ -4,7 +4,7 @@
 //!
 //! Children, one per feature: [`import`] (File > Import: tracks, folder, playlist file, a collection file through a library plugin),
 //! [`track`] (the Track menu on the chosen track), [`missing`] (Missing File Manager, relocate, auto relocate),
-//! [`dupes`] (duplicate finder + manager), [`health`] (Library health: the checks and the scan; the browser lists them), [`backup`] (Backup / Restore Library), [`playlist`] (Playlist menu: files,
+//! [`dupes`] (duplicate finder + manager), [`health`] (Library health: the checks and the scan; the browser lists them), [`backup`] (Backup / Restore Library), [`report`] (the report that ends a collection import, File > Library > Last Import Report…), [`playlist`] (Playlist menu: files,
 //! sort, renumber), [`export`] (Export Collection: a library plugin writes it), [`settings`] (Preferences > Advanced > Database / Browse),
 //! [`dialog`] (what the dialogs ask, the file chooser), [`undo`] (Edit > Undo / Redo over the store's change journal).
 //!
@@ -25,6 +25,7 @@ mod import;
 pub mod inbox;
 pub(super) mod missing;
 mod playlist;
+mod report;
 pub mod settings;
 mod track;
 mod undo;
@@ -216,6 +217,7 @@ fn path_done(c: &Rc<Ctx>, ok: bool) {
         Ask::ImportFolder => import::files(c, vec![path]),
         Ask::ImportPlaylist => import::playlist(c, path),
         Ask::ImportCollection(i) => import::collection(c, path, i),
+        Ask::SaveImportReport => report::save(c, path),
         Ask::BackupTo { music } => backup::run(c, path, music),
         Ask::Restore => backup::confirm_restore(c, path),
         Ask::ExportList(f) => playlist::write(c, path, f),
@@ -400,6 +402,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) {
     s.on_dupes_delete(move || dupes::delete(&k));
     let k = c.clone();
     s.on_dupes_rescan(move || dupes::scan(&k));
+    report::wire(&c);
     export::wire(app, &c);
     inbox::wire(&c);
     super::artwork::wire(app, &c);

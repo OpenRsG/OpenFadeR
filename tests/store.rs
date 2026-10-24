@@ -434,3 +434,60 @@ fn metadata_follows_legacy_adoption_copies_and_rekey() {
     assert_eq!(s.edits(&first).unwrap(), Default::default());
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn saved_searches_round_trip_in_name_order_and_replace_rename_delete() {
+    let s = Store::in_memory().unwrap();
+    assert!(s.saved_searches().unwrap().is_empty());
+    assert!(!s.save_search("warm up", r#"{"q":"daft"}"#).unwrap());
+    assert!(!s.save_search("Closing", r#"{"rating":4}"#).unwrap());
+    assert!(!s.save_search("afro", "{}").unwrap());
+    let names = |s: &Store| -> Vec<String> {
+        s.saved_searches()
+            .unwrap()
+            .into_iter()
+            .map(|x| x.name)
+            .collect()
+    };
+    assert_eq!(names(&s), ["afro", "Closing", "warm up"]);
+    // the same name in any case replaces the spec, keeps the row and its first spelling
+    assert!(s.save_search("WARM UP", r#"{"q":"new"}"#).unwrap());
+    let all = s.saved_searches().unwrap();
+    assert_eq!(all.len(), 3);
+    assert_eq!(
+        (all[2].name.as_str(), all[2].spec.as_str()),
+        ("warm up", r#"{"q":"new"}"#)
+    );
+    // rename: a free name works, a taken one (any case) is refused and changes nothing
+    let id = all[0].id;
+    assert!(s.rename_search(id, "zulu").unwrap());
+    assert!(!s.rename_search(id, "closing").unwrap());
+    assert!(
+        s.rename_search(id, "ZULU").unwrap(),
+        "a row may take its own name in another case"
+    );
+    assert_eq!(names(&s), ["Closing", "warm up", "ZULU"]);
+    s.delete_search(id).unwrap();
+    s.delete_search(id).unwrap();
+    assert_eq!(names(&s), ["Closing", "warm up"]);
+}
+
+#[test]
+fn a_rerun_of_the_saved_search_migration_keeps_the_saved_searches() {
+    let dir = temp("saved-search-migration");
+    let path = dir.join("store.db");
+    {
+        let s = Store::open_at(&path).unwrap();
+        s.save_search("kept", r#"{"q":"x"}"#).unwrap();
+    }
+    {
+        // the schema version before this table: the migration runs again over the existing table
+        let db = rusqlite::Connection::open(&path).unwrap();
+        db.execute_batch("PRAGMA user_version = 20;").unwrap();
+    }
+    let s = Store::open_at(&path).unwrap();
+    let all = s.saved_searches().unwrap();
+    assert_eq!((all.len(), all[0].name.as_str()), (1, "kept"));
+    drop(s);
+    std::fs::remove_dir_all(dir).unwrap();
+}

@@ -10,6 +10,7 @@ pub const DAY: u64 = 24 * 60 * 60;
 
 /// An update this program installed: `from` is what `<install>.prev` holds.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Applied {
     pub from: String,
     pub to: String,
@@ -17,6 +18,11 @@ pub struct Applied {
     pub confirmed: bool,
     /// How many times the new version has been started.
     pub starts: u32,
+    /// The store schema `from` reads (0 = not recorded: an update made before this was kept) and the automatic backup of
+    /// the library made just before the update (empty = none). A roll-back to `from` puts that backup back when the new
+    /// version migrated the store past `schema`.
+    pub schema: usize,
+    pub backup: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

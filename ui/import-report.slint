@@ -1,0 +1,77 @@
+import { ListView } from "std-widgets.slint";
+import { Chip } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DialogFrame, Note } from "dialog.slint";
+
+/// One entry an import skipped: the file (or track) and why, already translated.
+export struct ImportSkipRow {
+    name: string,
+    reason: string,
+}
+
+/// The report that ends the import of a collection, and File > Library > Last Import Report… (src/app/library/report.rs).
+export global ImportReportState {
+    in-out property <bool> open;
+    /// An import has left a report: the menu entry is live.
+    in property <bool> has-report;
+    /// Where the collection came from and when.
+    in property <string> headline;
+    /// Counts of what came in and of what was skipped, one per line.
+    in property <string> summary;
+    /// The first rows of the skipped list.
+    in property <[ImportSkipRow]> rows;
+    /// "and N more" under the list; empty when it is all shown.
+    in property <string> more;
+    callback show();
+    /// SAVE AS TEXT: the whole report (every skipped entry) goes to a file the user names.
+    callback save();
+}
+
+component SkipLine inherits Rectangle {
+    in property <ImportSkipRow> item;
+    in property <bool> alt;
+    height: Theme.h-row;
+    background: root.alt ? Theme.row-alt : transparent;
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-md;
+        spacing: Theme.space-md;
+        Text { text: root.item.reason; width: 150px; horizontal-stretch: 0; vertical-alignment: center; overflow: elide; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; }
+        Text { text: root.item.name; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-size; }
+    }
+}
+
+export component ImportReportOverlay inherits DialogFrame {
+    visible: ImportReportState.open;
+    title: @tr("IMPORT REPORT");
+    card-width: 820px;
+    card-height: 600px;
+    closed => { ImportReportState.open = false; }
+    Text { text: ImportReportState.headline; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; vertical-stretch: 0; }
+    Text { text: ImportReportState.summary; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; vertical-stretch: 0; }
+    Rectangle {
+        background: Theme.bg-deep;
+        border-color: Theme.line-strong;
+        border-width: 1px;
+        ListView {
+            for row[i] in ImportReportState.rows: SkipLine { item: row; alt: Math.mod(i, 2) == 1; }
+        }
+        if ImportReportState.rows.length == 0: Text {
+            text: @tr("Nothing was skipped");
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            color: Theme.text-faint;
+            font-family: Theme.font;
+            font-size: Theme.font-size;
+        }
+    }
+    if ImportReportState.more != "": Text { text: ImportReportState.more; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; vertical-stretch: 0; }
+    Note { text: @tr("The source library was not changed."); vertical-stretch: 0; }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        vertical-stretch: 0;
+        alignment: end;
+        Chip { text: @tr("SAVE AS TEXT…"); width: 130px; horizontal-stretch: 0; clicked => { ImportReportState.save(); } }
+        Chip { text: @tr("CLOSE"); width: 80px; horizontal-stretch: 0; active: true; clicked => { ImportReportState.open = false; } }
+    }
+}

@@ -166,6 +166,7 @@ pub fn collection(c: &Rc<Ctx>, path: PathBuf, i: usize) {
         return c.say(tr!("that library plugin is not loaded"));
     };
     let (plugin, sampler) = (r.plugin, r.samples);
+    let source = path.display().to_string();
     let (store, known, p) = job(c, tr!("importing"));
     c.say(tr!("importing…"));
     c.spawn(
@@ -184,15 +185,20 @@ pub fn collection(c: &Rc<Ctx>, path: PathBuf, i: usize) {
             )?;
             Ok((report, None))
         },
-        |c, r: Result<(Report, Option<Vec<(PathBuf, f32)>>), String>| match r {
-            Ok((report, Some(bank))) => {
-                let n = crate::app::sampler::load_bank(&c.app(), bank);
-                let text = tr!("{} · {} sampler slots loading", report.text(), n);
-                finished(c, Ok(report));
-                c.say(&text);
+        move |c, r: Result<(Report, Option<Vec<(PathBuf, f32)>>), String>| {
+            if let Ok((report, _)) = &r {
+                super::report::record(c, &source, report);
             }
-            Ok((report, None)) => finished(c, Ok(report)),
-            Err(e) => finished(c, Err(e)),
+            match r {
+                Ok((report, Some(bank))) => {
+                    let n = crate::app::sampler::load_bank(&c.app(), bank);
+                    let text = tr!("{} · {} sampler slots loading", report.text(), n);
+                    finished(c, Ok(report));
+                    c.say(&text);
+                }
+                Ok((report, None)) => finished(c, Ok(report)),
+                Err(e) => finished(c, Err(e)),
+            }
         },
     );
 }

@@ -59,465 +59,473 @@ msgstr "LICENCE"
 msgid "Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."
 msgstr "Logiciel libre : vous pouvez l'utiliser, le partager et le modifier selon l'AGPL. Conçu avec Rust et Slint."
 
-#: ui/app.slint:199
+#: ui/app.slint:200
 msgid "File"
 msgstr "Fichier"
 
-#: ui/app.slint:201
+#: ui/app.slint:202
 msgid "Import"
 msgstr "Importer"
 
-#: ui/app.slint:202
+#: ui/app.slint:203
 msgid "Import Track…"
 msgstr "Importer une piste…"
 
-#: ui/app.slint:203
+#: ui/app.slint:204
 msgid "Import Folder…"
 msgstr "Importer un dossier…"
 
-#: ui/app.slint:204
-#: ui/app.slint:276
+#: ui/app.slint:205
+#: ui/app.slint:278
 msgid "Import Playlist…"
 msgstr "Importer une playlist…"
 
-#: ui/app.slint:208
+#: ui/app.slint:209
 msgid "Display All Missing Files"
 msgstr "Afficher tous les fichiers manquants"
 
-#: ui/app.slint:209
+#: ui/app.slint:210
 msgid "Display All Duplicated Files"
 msgstr "Afficher tous les fichiers en double"
 
-#: ui/app.slint:211
+#: ui/app.slint:212
 #: ui/touch.slint:85
 #: ui/touch.slint:99
 msgid "Library"
 msgstr "Bibliothèque"
 
-#: ui/app.slint:212
+#: ui/app.slint:213
 msgid "Backup Library…"
 msgstr "Sauvegarder la bibliothèque…"
 
-#: ui/app.slint:213
+#: ui/app.slint:214
 msgid "Restore Library…"
 msgstr "Restaurer la bibliothèque…"
 
-#: ui/app.slint:214
+#: ui/app.slint:215
 msgid "Backed up device library management…"
 msgstr "Gestion des bibliothèques d'appareils sauvegardées…"
 
-#: ui/app.slint:217
+#: ui/app.slint:216
+msgid "Last Import Report…"
+msgstr "Dernier rapport d'import…"
+
+#: ui/app.slint:216
+msgid "Last Import Report: no import yet"
+msgstr "Dernier rapport d'import : aucun import"
+
+#: ui/app.slint:219
 msgid "Export Collection"
 msgstr "Exporter la collection"
 
-#: ui/app.slint:221
+#: ui/app.slint:223
 msgid "Preferences…"
 msgstr "Préférences…"
 
-#: ui/app.slint:222
+#: ui/app.slint:224
 msgid "Exit"
 msgstr "Quitter"
 
-#: ui/app.slint:225
+#: ui/app.slint:227
 #: ui/touch.slint:81
 #: ui/touch.slint:81
 msgid "Edit"
 msgstr "Édition"
 
-#: ui/app.slint:226
+#: ui/app.slint:228
 msgid "Undo (Ctrl+Z)"
 msgstr "Annuler (Ctrl+Z)"
 
-#: ui/app.slint:226
+#: ui/app.slint:228
 msgid "Undo {} (Ctrl+Z)"
 msgstr "Annuler {} (Ctrl+Z)"
 
-#: ui/app.slint:227
+#: ui/app.slint:229
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr "Rétablir (Ctrl+Shift+Z)"
 
-#: ui/app.slint:227
+#: ui/app.slint:229
 msgid "Redo {} (Ctrl+Shift+Z)"
 msgstr "Rétablir {} (Ctrl+Shift+Z)"
 
-#: ui/app.slint:230
+#: ui/app.slint:232
 msgid "Track"
 msgstr "Piste"
 
-#: ui/app.slint:231
+#: ui/app.slint:233
 msgid "Edit Track Details…"
 msgstr "Modifier les détails de la piste…"
 
-#: ui/app.slint:232
+#: ui/app.slint:234
 msgid "Import To Collection"
 msgstr "Importer dans la collection"
 
-#: ui/app.slint:233
+#: ui/app.slint:235
 msgid "Analyze Track"
 msgstr "Analyser la piste"
 
-#: ui/app.slint:234
+#: ui/app.slint:236
 msgid "Analysis Lock"
 msgstr "Verrouillage de l'analyse"
 
-#: ui/app.slint:235
+#: ui/app.slint:237
 #: src/app/library/track.rs:189
 msgid "Reload Tag"
 msgstr "Recharger le tag"
 
-#: ui/app.slint:236
+#: ui/app.slint:238
 #: src/app/library/track.rs:191
 msgid "Reload Tag (discard edits)"
 msgstr "Recharger le tag (annuler les modifications)"
 
-#: ui/app.slint:237
+#: ui/app.slint:239
 msgid "Find Artwork…"
 msgstr "Chercher la pochette…"
 
-#: ui/app.slint:238
+#: ui/app.slint:240
 msgid "Fetch Missing Artwork"
 msgstr "Récupérer les pochettes manquantes"
 
-#: ui/app.slint:239
+#: ui/app.slint:241
 msgid "Show in File Manager"
 msgstr "Afficher dans le gestionnaire de fichiers"
 
-#: ui/app.slint:241
+#: ui/app.slint:243
 #: ui/browser-table.slint:315
 msgid "Relocate…"
 msgstr "Relocaliser…"
 
-#: ui/app.slint:242
+#: ui/app.slint:244
 msgid "Auto Relocate"
 msgstr "Relocalisation auto"
 
-#: ui/app.slint:243
+#: ui/app.slint:245
 #: ui/browser-table.slint:317
 #: ui/stage/table.slint:283
 msgid "Remove from Collection"
 msgstr "Retirer de la collection"
 
-#: ui/app.slint:245
+#: ui/app.slint:247
 msgid "Add to Tag List"
 msgstr "Ajouter à la liste de tags"
 
-#: ui/app.slint:246
+#: ui/app.slint:248
 msgid "Add to Playlist…"
 msgstr "Ajouter à une playlist…"
 
-#: ui/app.slint:247
+#: ui/app.slint:249
 #: ui/browser-table.slint:302
 #: ui/stage/table.slint:278
 msgid "Tags…"
 msgstr "Tags…"
 
-#: ui/app.slint:250
+#: ui/app.slint:252
 msgid "Playlist"
 msgstr "Playlist"
 
-#: ui/app.slint:251
+#: ui/app.slint:253
 msgid "Create New Playlist"
 msgstr "Créer une playlist"
 
-#: ui/app.slint:252
+#: ui/app.slint:254
 msgid "Create New Intelligent Playlist"
 msgstr "Créer une playlist intelligente"
 
-#: ui/app.slint:253
+#: ui/app.slint:255
 msgid "Create New Folder"
 msgstr "Créer un dossier"
 
-#: ui/app.slint:254
+#: ui/app.slint:256
 msgid "Delete Playlist"
 msgstr "Supprimer la playlist"
 
-#: ui/app.slint:257
+#: ui/app.slint:259
 msgid "Sort Items"
 msgstr "Trier les éléments"
 
-#: ui/app.slint:258
+#: ui/app.slint:260
 msgid "Track Title"
 msgstr "Titre de la piste"
 
-#: ui/app.slint:259
+#: ui/app.slint:261
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:198
 msgid "Artist"
 msgstr "Artiste"
 
-#: ui/app.slint:260
+#: ui/app.slint:262
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:202
 msgid "Genre"
 msgstr "Genre"
 
-#: ui/app.slint:262
+#: ui/app.slint:264
 #: ui/browser-tree.slint:102
 #: ui/touch-actions.slint:74
 msgid "Key"
 msgstr "Key"
 
-#: ui/app.slint:263
+#: ui/app.slint:265
 #: ui/touch-actions.slint:74
 msgid "Time"
 msgstr "Durée"
 
-#: ui/app.slint:264
+#: ui/app.slint:266
 #: ui/touch-actions.slint:74
 msgid "Rating"
 msgstr "Note"
 
-#: ui/app.slint:265
+#: ui/app.slint:267
 #: ui/touch-actions.slint:74
 msgid "Comments"
 msgstr "Commentaires"
 
-#: ui/app.slint:267
+#: ui/app.slint:269
 msgid "Renumber Track Order"
 msgstr "Renuméroter l'ordre des pistes"
 
-#: ui/app.slint:270
+#: ui/app.slint:272
 msgid "Export a playlist to a file"
 msgstr "Exporter une playlist dans un fichier"
 
-#: ui/app.slint:273
+#: ui/app.slint:275
 #: ui/touch-actions.slint:76
 msgid "Text"
 msgstr "Texte"
 
-#: ui/app.slint:275
+#: ui/app.slint:277
 msgid "Export Playlist (to a device)…"
 msgstr "Exporter la playlist (vers un appareil)…"
 
-#: ui/app.slint:279
+#: ui/app.slint:281
 msgid "View"
 msgstr "Affichage"
 
-#: ui/app.slint:280
+#: ui/app.slint:282
 msgid "Full Screen"
 msgstr "Plein écran"
 
-#: ui/app.slint:282
-#: ui/app.slint:475
+#: ui/app.slint:284
+#: ui/app.slint:477
 msgid "2Deck Horizontal"
 msgstr "2 decks horizontal"
 
-#: ui/app.slint:283
-#: ui/app.slint:475
+#: ui/app.slint:285
+#: ui/app.slint:477
 msgid "2Deck Vertical"
 msgstr "2 decks vertical"
 
-#: ui/app.slint:284
-#: ui/app.slint:475
+#: ui/app.slint:286
+#: ui/app.slint:477
 msgid "4Deck Horizontal"
 msgstr "4 decks horizontal"
 
-#: ui/app.slint:285
-#: ui/app.slint:475
+#: ui/app.slint:287
+#: ui/app.slint:477
 msgid "4Deck Vertical"
 msgstr "4 decks vertical"
 
-#: ui/app.slint:286
-#: ui/app.slint:475
+#: ui/app.slint:288
+#: ui/app.slint:477
 msgid "Browse"
 msgstr "Parcourir"
 
-#: ui/app.slint:287
+#: ui/app.slint:289
 #: ui/exportmode-state.slint:54
 msgid "1 PLAYER"
 msgstr "1 LECTEUR"
 
-#: ui/app.slint:288
+#: ui/app.slint:290
 #: ui/exportmode-state.slint:54
 msgid "2 PLAYER"
 msgstr "2 LECTEURS"
 
-#: ui/app.slint:289
+#: ui/app.slint:291
 #: ui/exportmode-state.slint:54
 msgid "DUAL PLAYER"
 msgstr "DOUBLE LECTEUR"
 
-#: ui/app.slint:290
+#: ui/app.slint:292
 #: ui/exportmode-state.slint:54
 msgid "SIMPLE PLAYER"
 msgstr "LECTEUR SIMPLE"
 
-#: ui/app.slint:291
+#: ui/app.slint:293
 #: ui/exportmode-state.slint:54
 msgid "FULL BROWSER"
 msgstr "NAVIGATEUR COMPLET"
 
-#: ui/app.slint:292
+#: ui/app.slint:294
 msgid "Close Split Screen"
 msgstr "Fermer l'écran partagé"
 
-#: ui/app.slint:292
+#: ui/app.slint:294
 msgid "Split Screen"
 msgstr "Écran partagé"
 
-#: ui/app.slint:294
+#: ui/app.slint:296
 #: src/app/prefs/view.rs:417
 msgid "Mixer"
 msgstr "Mixer"
 
-#: ui/app.slint:295
+#: ui/app.slint:297
 msgid "Effect Panel"
 msgstr "Panneau d'effets"
 
-#: ui/app.slint:296
+#: ui/app.slint:298
 #: ui/touch.slint:85
 #: ui/touch.slint:99
 msgid "Sampler"
 msgstr "Sampler"
 
-#: ui/app.slint:297
-#: ui/app.slint:494
+#: ui/app.slint:299
+#: ui/app.slint:496
 #: ui/groove.slint:250
 msgid "BEAT LAB"
 msgstr "BEAT LAB"
 
-#: ui/app.slint:299
+#: ui/app.slint:301
 #: ui/stage/library.slint:53
 #: src/app/prefs/view.rs:348
 msgid "Related Tracks"
 msgstr "Pistes associées"
 
-#: ui/app.slint:300
+#: ui/app.slint:302
 #: ui/browser-tree.slint:102
 msgid "Tags"
 msgstr "Tags"
 
-#: ui/app.slint:301
+#: ui/app.slint:303
 #: ui/studio/automix.slint:181
 #: ui/touch-actions.slint:79
 msgid "Automix"
 msgstr "Automix"
 
-#: ui/app.slint:304
+#: ui/app.slint:306
 msgid "Plugins"
 msgstr "Plugins"
 
-#: ui/app.slint:308
+#: ui/app.slint:310
 msgid "Help"
 msgstr "Aide"
 
-#: ui/app.slint:309
+#: ui/app.slint:311
 msgid "Keyboard Shortcuts"
 msgstr "Raccourcis clavier"
 
-#: ui/app.slint:310
+#: ui/app.slint:312
 #: ui/welcome.slint:69
 msgid "Welcome"
 msgstr "Bienvenue"
 
-#: ui/app.slint:311
+#: ui/app.slint:313
 msgid "Update to {}…"
 msgstr "Mettre à jour vers {}…"
 
-#: ui/app.slint:311
+#: ui/app.slint:313
 #: ui/touch-actions.slint:85
 msgid "Check for Updates"
 msgstr "Rechercher des mises à jour"
 
-#: ui/app.slint:312
+#: ui/app.slint:314
 msgid "Roll Back to {}…"
 msgstr "Revenir à {}…"
 
-#: ui/app.slint:313
+#: ui/app.slint:315
 msgid "Report a Problem…"
 msgstr "Signaler un problème…"
 
-#: ui/app.slint:314
+#: ui/app.slint:316
 msgid "About OpenFadeR"
 msgstr "À propos d'OpenFadeR"
 
-#: ui/app.slint:434
+#: ui/app.slint:436
 msgid "Split screen: the browser in a window of its own"
 msgstr "Écran partagé : le navigateur dans sa propre fenêtre"
 
-#: ui/app.slint:435
+#: ui/app.slint:437
 msgid "Switch the active window"
 msgstr "Changer de fenêtre active"
 
-#: ui/app.slint:463
-#: ui/app.slint:464
 #: ui/app.slint:465
+#: ui/app.slint:466
+#: ui/app.slint:467
 msgid "EXPORT"
 msgstr "EXPORT"
 
-#: ui/app.slint:463
-#: ui/app.slint:464
 #: ui/app.slint:465
+#: ui/app.slint:466
+#: ui/app.slint:467
 msgid "PERFORMANCE"
 msgstr "PERFORMANCE"
 
-#: ui/app.slint:463
-#: ui/app.slint:464
 #: ui/app.slint:465
+#: ui/app.slint:466
+#: ui/app.slint:467
 msgid "EDIT"
 msgstr "ÉDITION"
 
-#: ui/app.slint:463
-#: ui/app.slint:464
-#: ui/app.slint:506
+#: ui/app.slint:465
+#: ui/app.slint:466
+#: ui/app.slint:508
 msgid "LIGHTING (BETA)"
 msgstr "ÉCLAIRAGE (BÊTA)"
 
-#: ui/app.slint:463
 #: ui/app.slint:465
-#: ui/app.slint:505
+#: ui/app.slint:467
+#: ui/app.slint:507
 msgid "VIDEO (BETA)"
 msgstr "VIDÉO (BÊTA)"
 
-#: ui/app.slint:493
+#: ui/app.slint:495
 #: ui/stage/mixer.slint:224
 msgid "FX"
 msgstr "FX"
 
-#: ui/app.slint:495
+#: ui/app.slint:497
 #: src/app/prefs/controller/mixpoint.rs:8
 msgid "MIX POINT LINK"
 msgstr "MIX POINT LINK"
 
-#: ui/app.slint:496
+#: ui/app.slint:498
 #: ui/stage/deck-parts.slint:478
 #: ui/stage/strip.slint:164
 msgid "SAMPLER"
 msgstr "SAMPLER"
 
-#: ui/app.slint:497
+#: ui/app.slint:499
 #: ui/stage/mixer.slint:224
 #: ui/stage/mixer.slint:226
 msgid "MIXER"
 msgstr "MIXER"
 
-#: ui/app.slint:502
+#: ui/app.slint:504
 msgid "REC panel"
 msgstr "Panneau REC"
 
-#: ui/app.slint:502
+#: ui/app.slint:504
 #: ui/stage/bar.slint:80
 #: ui/studio/bar.slint:57
 msgid "REC (master out)"
 msgstr "REC (sortie master)"
 
-#: ui/app.slint:512
+#: ui/app.slint:514
 msgid "SHORTCUTS (?)"
 msgstr "RACCOURCIS (?)"
 
-#: ui/app.slint:513
+#: ui/app.slint:515
 msgid "PREFS"
 msgstr "PRÉFS"
 
-#: ui/app.slint:526
+#: ui/app.slint:528
 msgid "Zoom out the waveforms"
 msgstr "Dézoomer les formes d'onde"
 
-#: ui/app.slint:527
+#: ui/app.slint:529
 msgid "Default waveform zoom"
 msgstr "Zoom par défaut de la forme d'onde"
 
-#: ui/app.slint:528
+#: ui/app.slint:530
 msgid "Zoom in the waveforms"
 msgstr "Zoomer les formes d'onde"
 
@@ -528,12 +536,12 @@ msgstr "CHERCHER POCHETTE"
 
 #: ui/artwork.slint:67
 #: ui/automix-panel.slint:29
-#: ui/browser-tree.slint:84
+#: ui/browser-saved.slint:25
 msgid "Close"
 msgstr "Fermer"
 
 #: ui/automix-panel.slint:28
-#: ui/browser.slint:218
+#: ui/browser.slint:219
 #: ui/studio/automix.slint:49
 msgid "AUTOMIX"
 msgstr "AUTOMIX"
@@ -585,6 +593,39 @@ msgstr "Charger sur le deck"
 msgid "Remove from list"
 msgstr "Retirer de la liste"
 
+#: ui/browser-saved.slint:23
+msgid "SAVED SEARCHES"
+msgstr "RECHERCHES ENREGISTRÉES"
+
+#: ui/browser-saved.slint:24
+#: ui/browser-tree.slint:113
+#: ui/sampler.slint:161
+msgid "SAVE"
+msgstr "ENREG."
+
+#: ui/browser-saved.slint:24
+msgid "Keep the search box and the filters under a name"
+msgstr "Garde la recherche et les filtres sous un nom"
+
+#: ui/browser-saved.slint:28
+msgid "Nothing saved yet: type a search or set a filter, then SAVE."
+msgstr "Rien d'enregistré : tapez une recherche ou réglez un filtre, puis ENREGISTRER."
+
+#: ui/browser-saved.slint:39
+#: ui/browser.slint:189
+msgid "RENAME"
+msgstr "RENOMMER"
+
+#: ui/browser-saved.slint:41
+msgid "SURE?"
+msgstr "SÛR ?"
+
+#: ui/browser-saved.slint:41
+#: ui/browser.slint:190
+#: ui/device-backup.slint:68
+msgid "DELETE"
+msgstr "SUPPR."
+
 #: ui/browser-state.slint:74
 #: src/app/browser/suggest/view.rs:176
 msgid "LIST"
@@ -629,7 +670,7 @@ msgid "FOR"
 msgstr "POUR"
 
 #: ui/browser-table.slint:162
-#: ui/stage/library.slint:167
+#: ui/stage/library.slint:168
 #: src/app/prefs/audio/page.rs:164
 msgid "PREVIEW"
 msgstr "ÉCOUTE"
@@ -743,18 +784,18 @@ msgid "Hide related tracks"
 msgstr "Masquer les pistes associées"
 
 #: ui/browser-table.slint:303
-#: ui/browser.slint:150
+#: ui/browser.slint:151
 #: ui/stage/library.slint:53
 msgid "Related tracks"
 msgstr "Pistes associées"
 
 #: ui/browser-table.slint:304
-#: ui/browser.slint:399
+#: ui/browser.slint:408
 msgid "Move up"
 msgstr "Monter"
 
 #: ui/browser-table.slint:305
-#: ui/browser.slint:400
+#: ui/browser.slint:409
 msgid "Move down"
 msgstr "Descendre"
 
@@ -859,13 +900,8 @@ msgstr "TOUS"
 msgid "+ CONDITION"
 msgstr "+ CONDITION"
 
-#: ui/browser-tree.slint:113
-#: ui/sampler.slint:161
-msgid "SAVE"
-msgstr "ENREG."
-
 #: ui/browser-tree.slint:114
-#: ui/browser.slint:304
+#: ui/browser.slint:307
 #: ui/device-preview.slint:78
 msgid "CANCEL"
 msgstr "ANNULER"
@@ -874,379 +910,377 @@ msgstr "ANNULER"
 msgid "Remove condition"
 msgstr "Supprimer la condition"
 
-#: ui/browser.slint:146
+#: ui/browser.slint:147
 #: src/app/browser/sidebar.rs:115
 #: src/app/browser/sidebar.rs:195
 msgid "All tracks"
 msgstr "Toutes les pistes"
 
-#: ui/browser.slint:147
+#: ui/browser.slint:148
 #: ui/stage/library.slint:50
 msgid "Tag List"
 msgstr "Liste de tags"
 
-#: ui/browser.slint:148
+#: ui/browser.slint:149
 msgid "Session history"
 msgstr "Historique de session"
 
-#: ui/browser.slint:149
+#: ui/browser.slint:150
 #: ui/stage/library.slint:52
 #: ui/studio/library.slint:33
 msgid "Duplicate tracks"
 msgstr "Pistes en double"
 
-#: ui/browser.slint:155
+#: ui/browser.slint:156
 #: ui/stage/library.slint:62
 #: ui/studio/library.slint:39
 msgid "{} ({}): open its device window"
 msgstr "{} ({}) : ouvrir sa fenêtre d'appareil"
 
-#: ui/browser.slint:187
+#: ui/browser.slint:188
 #: src/app/browser/playlists/manage.rs:158
 msgid "NEW"
 msgstr "NOUVEAU"
 
-#: ui/browser.slint:187
+#: ui/browser.slint:188
 msgid "New playlist / folder / smart playlist / Tags / Cue Bank / Stage"
 msgstr "Nouvelle playlist / dossier / playlist intelligente / tags / Cue Bank / étape"
 
-#: ui/browser.slint:188
-msgid "RENAME"
-msgstr "RENOMMER"
-
-#: ui/browser.slint:189
-#: ui/device-backup.slint:68
-#: ui/edit.slint:155
-msgid "DELETE"
-msgstr "SUPPR."
-
-#: ui/browser.slint:190
+#: ui/browser.slint:191
 #: ui/device-devices.slint:239
 #: ui/plugins.slint:167
 msgid "MORE"
 msgstr "PLUS"
 
-#: ui/browser.slint:190
+#: ui/browser.slint:191
 msgid "Edit smart playlist, move; Cue Bank: add cues, load onto a deck; Stage: move tracks, recent moves"
 msgstr "Modifier la playlist intelligente, déplacer ; Cue Bank : ajouter des cues, charger sur un deck ; étape : déplacer des pistes, déplacements récents"
 
-#: ui/browser.slint:213
+#: ui/browser.slint:214
 #: src/app/prefs/libraries.rs:39
 msgid "TRACKS"
 msgstr "PISTES"
 
-#: ui/browser.slint:214
+#: ui/browser.slint:215
 #: src/app/browser/palette/mod.rs:244
 #: src/app/library/settings.rs:157
 msgid "TAG LIST"
 msgstr "LISTE DE TAGS"
 
-#: ui/browser.slint:215
+#: ui/browser.slint:216
 msgid "RELATED"
 msgstr "ASSOCIÉES"
 
-#: ui/browser.slint:216
+#: ui/browser.slint:217
 msgid "SUGGEST"
 msgstr "SUGGESTIONS"
 
-#: ui/browser.slint:221
+#: ui/browser.slint:222
 msgid "Transition style and length"
 msgstr "Style et durée de la transition"
 
-#: ui/browser.slint:224
+#: ui/browser.slint:225
 #: ui/studio/automix.slint:57
 #: ui/welcome.slint:107
 msgid "SKIP"
 msgstr "PASSE"
 
-#: ui/browser.slint:245
+#: ui/browser.slint:246
 #: ui/mixer.slint:138
 #: ui/stage/deck-performance.slint:74
 msgid "FILTER"
 msgstr "FILTER"
 
-#: ui/browser.slint:251
-#: ui/stage/library.slint:154
-#: ui/studio/library.slint:85
+#: ui/browser.slint:247
+msgid "SAVED"
+msgstr "ENREG."
+
+#: ui/browser.slint:247
+msgid "Saved searches: keep the search and filters under a name"
+msgstr "Recherches enregistrées : garde la recherche et les filtres sous un nom"
+
+#: ui/browser.slint:254
+#: ui/stage/library.slint:155
+#: ui/studio/library.slint:86
 msgid "Search online (Enter)"
 msgstr "Rechercher en ligne (Entrée)"
 
-#: ui/browser.slint:251
-#: ui/stage/library.slint:154
-#: ui/studio/library.slint:85
+#: ui/browser.slint:254
+#: ui/stage/library.slint:155
+#: ui/studio/library.slint:86
 msgid "Search tracks (Ctrl+F)"
 msgstr "Rechercher des pistes (Ctrl+F)"
 
-#: ui/browser.slint:270
+#: ui/browser.slint:273
 msgid "min"
 msgstr "min"
 
-#: ui/browser.slint:271
+#: ui/browser.slint:274
 msgid "–"
 msgstr "–"
 
-#: ui/browser.slint:272
+#: ui/browser.slint:275
 msgid "max"
 msgstr "max"
 
-#: ui/browser.slint:273
-#: ui/stage/library.slint:168
+#: ui/browser.slint:276
+#: ui/stage/library.slint:169
 msgid "±6% MASTER"
 msgstr "±6% MASTER"
 
-#: ui/browser.slint:274
-#: ui/stage/library.slint:169
+#: ui/browser.slint:277
+#: ui/stage/library.slint:170
 msgid "KEY MATCH"
 msgstr "KEY MATCH"
 
-#: ui/browser.slint:276
-#: ui/stage/library.slint:173
+#: ui/browser.slint:279
+#: ui/stage/library.slint:174
 msgid "RATING ≥ any"
 msgstr "NOTE ≥ toutes"
 
-#: ui/browser.slint:276
-#: ui/stage/library.slint:173
+#: ui/browser.slint:279
+#: ui/stage/library.slint:174
 msgid "RATING ≥ {}★"
 msgstr "NOTE ≥ {}★"
 
-#: ui/browser.slint:281
+#: ui/browser.slint:284
 msgid "TAG FILTER ({})"
 msgstr "FILTRE DE TAGS ({})"
 
-#: ui/browser.slint:281
+#: ui/browser.slint:284
 msgid "TAG FILTER"
 msgstr "FILTRE DE TAGS"
 
-#: ui/browser.slint:303
+#: ui/browser.slint:306
 #: ui/groove.slint:263
-#: ui/library.slint:158
+#: ui/library.slint:163
 msgid "OK"
 msgstr "OK"
 
-#: ui/browser.slint:321
+#: ui/browser.slint:324
 msgid "ANALYSE"
 msgstr "ANALYSER"
 
-#: ui/browser.slint:321
+#: ui/browser.slint:324
 msgid "Analyse the chosen track"
 msgstr "Analyser la piste choisie"
 
-#: ui/browser.slint:322
+#: ui/browser.slint:325
 msgid "ANALYSE ALL"
 msgstr "ANALYSER TOUT"
 
-#: ui/browser.slint:322
+#: ui/browser.slint:325
 msgid "Analyse every listed track"
 msgstr "Analyser toutes les pistes listées"
 
-#: ui/browser.slint:323
-#: ui/library.slint:211
-#: src/app/library/dialog.rs:134
+#: ui/browser.slint:326
+#: ui/library.slint:216
+#: src/app/library/dialog.rs:143
 msgid "RELOCATE"
 msgstr "RELOCALISER"
 
-#: ui/browser.slint:323
+#: ui/browser.slint:326
 msgid "Point the chosen track at its file"
 msgstr "Rattacher la piste choisie à son fichier"
 
-#: ui/browser.slint:324
+#: ui/browser.slint:327
 msgid "AUTO RELOCATE ALL"
 msgstr "RELOC. AUTO TOUT"
 
-#: ui/browser.slint:324
+#: ui/browser.slint:327
 msgid "Search the music folders for every listed track"
 msgstr "Chercher chaque piste listée dans les dossiers de musique"
 
-#: ui/browser.slint:325
+#: ui/browser.slint:328
 msgid "EDIT TAGS"
 msgstr "MODIF. TAGS"
 
-#: ui/browser.slint:325
+#: ui/browser.slint:328
 msgid "Edit the chosen track's tags"
 msgstr "Modifier les tags de la piste choisie"
 
-#: ui/browser.slint:326
+#: ui/browser.slint:329
 msgid "REMOVE"
 msgstr "RETIRER"
 
-#: ui/browser.slint:326
+#: ui/browser.slint:329
 msgid "Remove the chosen track from the Collection"
 msgstr "Retirer la piste choisie de la collection"
 
-#: ui/browser.slint:327
+#: ui/browser.slint:330
 msgid "UN-IGNORE"
 msgstr "RÉTABLIR"
 
-#: ui/browser.slint:327
+#: ui/browser.slint:330
 msgid "IGNORE"
 msgstr "IGNORER"
 
-#: ui/browser.slint:327
+#: ui/browser.slint:330
 msgid "Hide the chosen track from this check, or list it again"
 msgstr "Masquer la piste choisie de cette vérification, ou la lister à nouveau"
 
-#: ui/browser.slint:328
+#: ui/browser.slint:331
 msgid "UN-IGNORE ALL"
 msgstr "TOUT RÉTABLIR"
 
-#: ui/browser.slint:328
+#: ui/browser.slint:331
 msgid "IGNORE ALL"
 msgstr "TOUT IGNORER"
 
-#: ui/browser.slint:328
+#: ui/browser.slint:331
 msgid "The same for every listed track"
 msgstr "Pareil pour toutes les pistes listées"
 
-#: ui/browser.slint:329
+#: ui/browser.slint:332
 msgid "SHOW IGNORED"
 msgstr "VOIR IGNORÉES"
 
-#: ui/browser.slint:329
+#: ui/browser.slint:332
 msgid "List the tracks ignored for this check"
 msgstr "Lister les pistes ignorées pour cette vérification"
 
-#: ui/browser.slint:330
-#: ui/library.slint:209
-#: ui/library.slint:249
+#: ui/browser.slint:333
+#: ui/library.slint:214
+#: ui/library.slint:254
 msgid "RESCAN"
 msgstr "RESCANNER"
 
-#: ui/browser.slint:330
+#: ui/browser.slint:333
 msgid "Look at every file again"
 msgstr "Réexaminer tous les fichiers"
 
-#: ui/browser.slint:384
+#: ui/browser.slint:393
 msgid "Sort: Title"
 msgstr "Tri : titre"
 
-#: ui/browser.slint:384
+#: ui/browser.slint:393
 msgid "Sort: Artist"
 msgstr "Tri : artiste"
 
-#: ui/browser.slint:384
+#: ui/browser.slint:393
 msgid "Sort: Genre"
 msgstr "Tri : genre"
 
-#: ui/browser.slint:384
+#: ui/browser.slint:393
 msgid "Sort: Key"
 msgstr "Tri : KEY"
 
-#: ui/browser.slint:384
+#: ui/browser.slint:393
 msgid "Sort: BPM"
 msgstr "Tri : BPM"
 
-#: ui/browser.slint:384
+#: ui/browser.slint:393
 msgid "Sort: Time"
 msgstr "Tri : durée"
 
-#: ui/browser.slint:384
+#: ui/browser.slint:393
 msgid "Sort: Rating"
 msgstr "Tri : note"
 
-#: ui/browser.slint:384
+#: ui/browser.slint:393
 msgid "Sort: Comment"
 msgstr "Tri : commentaire"
 
-#: ui/browser.slint:385
+#: ui/browser.slint:394
 msgid "Ascending"
 msgstr "Croissant"
 
-#: ui/browser.slint:385
+#: ui/browser.slint:394
 msgid "Descending"
 msgstr "Décroissant"
 
-#: ui/browser.slint:387
+#: ui/browser.slint:396
 #: ui/touch-actions.slint:67
 msgid "Add to playlist"
 msgstr "Ajouter à une playlist"
 
-#: ui/browser.slint:388
+#: ui/browser.slint:397
 msgid "Tags of the chosen track"
 msgstr "Tags de la piste choisie"
 
-#: ui/browser.slint:389
+#: ui/browser.slint:398
 msgid "Add to the Tag List (T)"
 msgstr "Ajouter à la liste de tags (T)"
 
-#: ui/browser.slint:390
+#: ui/browser.slint:399
 msgid "Preview the chosen track on the headphones"
 msgstr "Écouter la piste choisie au casque"
 
-#: ui/browser.slint:391
+#: ui/browser.slint:400
 msgid "Headphone preview: tap the waveform to seek"
 msgstr "Écoute au casque : touchez la forme d'onde pour vous déplacer"
 
-#: ui/browser.slint:398
+#: ui/browser.slint:407
 #: src/app/prefs/view.rs:362
 msgid "Playlist Palette"
 msgstr "Palette de playlists"
 
-#: ui/browser.slint:401
+#: ui/browser.slint:410
 #: ui/studio/automix.slint:96
 msgid "Remove from the list"
 msgstr "Retirer de la liste"
 
-#: ui/browser.slint:402
+#: ui/browser.slint:411
 msgid "Duplicate to My Playlists"
 msgstr "Dupliquer dans Mes playlists"
 
-#: ui/browser.slint:403
+#: ui/browser.slint:412
 msgid "Export to a device"
 msgstr "Exporter vers un appareil"
 
-#: ui/browser.slint:404
+#: ui/browser.slint:413
 msgid "Import to Collection"
 msgstr "Importer dans la collection"
 
-#: ui/browser.slint:405
+#: ui/browser.slint:414
 msgid "Connect: keep this library synced into the Collection"
 msgstr "Connecter : garder cette bibliothèque synchronisée avec la collection"
 
-#: ui/browser.slint:406
+#: ui/browser.slint:415
 msgid "Import to Collection as a playlist"
 msgstr "Importer dans la collection en tant que playlist"
 
-#: ui/browser.slint:407
+#: ui/browser.slint:416
 msgid "Import into the play history"
 msgstr "Importer dans l'historique de lecture"
 
-#: ui/browser.slint:408
+#: ui/browser.slint:417
 msgid "Delete from the device"
 msgstr "Supprimer de l'appareil"
 
-#: ui/browser.slint:409
+#: ui/browser.slint:418
 msgid "Save as M3U8"
 msgstr "Enregistrer en M3U8"
 
-#: ui/browser.slint:410
+#: ui/browser.slint:419
 msgid "Browse view (W)"
 msgstr "Vue Parcourir (W)"
 
-#: ui/browser.slint:453
+#: ui/browser.slint:462
 msgid "Tracks"
 msgstr "Pistes"
 
-#: ui/browser.slint:453
+#: ui/browser.slint:462
 msgid "Sources"
 msgstr "Sources"
 
-#: ui/browser.slint:453
+#: ui/browser.slint:462
 msgid "Info"
 msgstr "Infos"
 
-#: ui/browser.slint:453
+#: ui/browser.slint:462
 msgid "Actions"
 msgstr "Actions"
 
-#: ui/browser.slint:459
+#: ui/browser.slint:468
 msgid "→ {}"
 msgstr "→ {}"
 
-#: ui/browser.slint:459
+#: ui/browser.slint:468
 msgid "Load {}"
 msgstr "LOAD {}"
 
-#: ui/browser.slint:460
+#: ui/browser.slint:469
 msgid "Load the selected track to deck {}"
 msgstr "Charger la piste sélectionnée sur le deck {}"
 
@@ -1535,7 +1569,7 @@ msgstr "Changement de tempo ici : TAP, ×2, ÷2 ne modifient que la section de t
 
 #: ui/deck-panel.slint:33
 #: ui/fx.slint:275
-#: ui/library.slint:247
+#: ui/library.slint:252
 msgid "MERGE"
 msgstr "MERGE"
 
@@ -2718,55 +2752,72 @@ msgstr "RACCOURCIS CLAVIER"
 msgid "Up / Down move the track selection (when the search box is not focused).  Beat jump with a loop active moves the loop.  Hold CUE to preview, release returns; PLAY while held keeps playing.  SYNC latches: the deck follows the master's tempo and beats.  Drag a waveform to scratch.  The keys are the current KEYBOARD preset plus your changes (PREFERENCES > KEYBOARD).  ? or click to close."
 msgstr "Haut / Bas déplacent la sélection de piste (quand la zone de recherche n'a pas le focus).  Un BEAT JUMP avec une LOOP active déplace la LOOP.  Maintenez CUE pour écouter, relâchez pour revenir ; PLAY pendant le maintien continue la lecture.  SYNC se verrouille : le deck suit le tempo et les beats du MASTER.  Faites glisser une forme d'onde pour scratcher.  Les touches sont le preset KEYBOARD actuel plus vos modifications (PRÉFÉRENCES > KEYBOARD).  ? ou clic pour fermer."
 
-#: ui/library.slint:46
-#: src/app/library/mod.rs:330
+#: ui/import-report.slint:46
+msgid "IMPORT REPORT"
+msgstr "RAPPORT D'IMPORT"
+
+#: ui/import-report.slint:60
+msgid "Nothing was skipped"
+msgstr "Rien n'a été ignoré"
+
+#: ui/import-report.slint:69
+#: src/app/library/report.rs:94
+msgid "The source library was not changed."
+msgstr "La bibliothèque source n'a pas été modifiée."
+
+#: ui/import-report.slint:74
+msgid "SAVE AS TEXT…"
+msgstr "ENREGISTRER EN TEXTE…"
+
+#: ui/import-report.slint:75
+#: ui/library.slint:219
+#: ui/library.slint:255
+msgid "CLOSE"
+msgstr "FERMER"
+
+#: ui/library.slint:48
+#: src/app/library/mod.rs:332
 msgid "YES"
 msgstr "OUI"
 
-#: ui/library.slint:152
+#: ui/library.slint:157
 msgid "BROWSE…"
 msgstr "PARCOURIR…"
 
-#: ui/library.slint:183
+#: ui/library.slint:188
 msgid "MISSING FILE MANAGER"
 msgstr "GESTIONNAIRE DE FICHIERS MANQUANTS"
 
-#: ui/library.slint:187
+#: ui/library.slint:192
 msgid "Tracks whose audio file cannot be found. Tick tracks, then RELOCATE (choose the new file of the first one; the others are looked for in its folder), AUTO RELOCATE (search the Auto Relocate Search Folders from Preferences > Advanced > Database) or DELETE (remove from the Collection; files are never deleted). None ticked = all."
 msgstr "Pistes dont le fichier audio est introuvable. Cochez des pistes, puis RELOCALISER (choisissez le nouveau fichier de la première ; les autres sont cherchés dans son dossier), RELOC. AUTO (recherche dans les dossiers de recherche de la relocalisation auto de Préférences > Avancé > Base de données) ou SUPPRIMER (retirer de la collection ; les fichiers ne sont jamais supprimés). Aucune case cochée = toutes."
 
-#: ui/library.slint:196
+#: ui/library.slint:201
 #: src/app/library/missing.rs:86
 msgid "Searching…"
 msgstr "Recherche…"
 
-#: ui/library.slint:196
+#: ui/library.slint:201
 msgid "No missing files"
 msgstr "Aucun fichier manquant"
 
-#: ui/library.slint:208
+#: ui/library.slint:213
 msgid "SELECT ALL"
 msgstr "TOUT SÉLECT."
 
-#: ui/library.slint:212
+#: ui/library.slint:217
 msgid "AUTO RELOCATE"
 msgstr "RELOC. AUTO"
 
-#: ui/library.slint:214
-#: ui/library.slint:250
-#: ui/stems-model.slint:63
-msgid "CLOSE"
-msgstr "FERMER"
-
-#: ui/library.slint:221
+#: ui/library.slint:226
 msgid "DUPLICATED FILE MANAGER"
 msgstr "GESTIONNAIRE DE FICHIERS EN DOUBLE"
 
-#: ui/library.slint:225
+#: ui/library.slint:230
 msgid "Tracks with the same title and artist (length within 1 s). The filled circle is the representative file. MERGE keeps it, adds the cues, playlist places, tags and plays of the others to it and removes the others from the Collection; DELETE removes the ticked tracks from the Collection. Files are never deleted."
 msgstr "Pistes de même titre et même artiste (durée à 1 s près). Le cercle plein est le fichier représentatif. MERGE le conserve, lui ajoute les cues, les emplacements de playlist, les tags et les lectures des autres, et retire les autres de la collection ; SUPPRIMER retire les pistes cochées de la collection. Les fichiers ne sont jamais supprimés."
 
-#: ui/library.slint:234
+#: ui/library.slint:239
 #: src/app/library/dupes.rs:161
 msgid "No duplicate track found"
 msgstr "Aucune piste en double trouvée"
@@ -2818,7 +2869,7 @@ msgid "SCENE"
 msgstr "SCÈNE"
 
 #: ui/lighting.slint:151
-#: src/app/prefs/analysis.rs:172
+#: src/app/prefs/analysis.rs:190
 #: src/app/prefs/analysis.rs:31
 msgid "AUTO"
 msgstr "AUTO"
@@ -2985,7 +3036,7 @@ msgid "Inst"
 msgstr "Inst"
 
 #: ui/mixer-touch.slint:47
-#: src/app/prefs/analysis.rs:126
+#: src/app/prefs/analysis.rs:133
 msgid "Vocal"
 msgstr "Vocal"
 
@@ -3719,9 +3770,9 @@ msgstr "Doublons"
 msgid "Playlists"
 msgstr "Playlists"
 
-#: ui/stage/library.slint:177
 #: ui/stage/library.slint:178
-#: ui/studio/library.slint:97
+#: ui/stage/library.slint:179
+#: ui/studio/library.slint:98
 msgid "LOAD {}"
 msgstr "CHARGER {}"
 
@@ -3882,7 +3933,7 @@ msgid "PAUSE"
 msgstr "PAUSE"
 
 #: ui/studio/deck-controls.slint:281
-#: src/app/prefs/analysis.rs:202
+#: src/app/prefs/analysis.rs:220
 msgid "HOT CUES"
 msgstr "HOT CUES"
 
@@ -3903,8 +3954,8 @@ msgstr "Key : un clic revient à la KEY de la piste"
 msgid "TOTAL {}"
 msgstr "TOTAL {}"
 
-#: ui/studio/library.slint:97
 #: ui/studio/library.slint:98
+#: ui/studio/library.slint:99
 msgid "Load the chosen track on deck {}"
 msgstr "Charger la piste choisie sur le deck {}"
 
@@ -4217,7 +4268,7 @@ msgstr "Playlists et mixage"
 
 #: ui/touch-actions.slint:70
 #: src/app/browser/playlists/manage.rs:142
-#: src/app/browser/playlists/manage.rs:448
+#: src/app/browser/playlists/manage.rs:450
 msgid "New playlist"
 msgstr "Nouvelle playlist"
 
@@ -4231,7 +4282,7 @@ msgid "New folder"
 msgstr "Nouveau dossier"
 
 #: ui/touch-actions.slint:73
-#: src/app/browser/playlists/manage.rs:263
+#: src/app/browser/playlists/manage.rs:265
 msgid "Delete playlist"
 msgstr "Supprimer la playlist"
 
@@ -4531,6 +4582,7 @@ msgid "SKIP THIS VERSION"
 msgstr "IGNORER CETTE VERSION"
 
 #: ui/update.slint:117
+#: ui/update.slint:152
 #: ui/welcome.slint:109
 msgid "LATER"
 msgstr "PLUS TARD"
@@ -4542,6 +4594,14 @@ msgstr "METTRE À JOUR"
 #: ui/update.slint:119
 msgid "OPEN RELEASE PAGE"
 msgstr "OUVRIR LA PAGE"
+
+#: ui/update.slint:139
+msgid "ANALYSIS UPDATED"
+msgstr "ANALYSE MISE À JOUR"
+
+#: ui/update.slint:153
+msgid "RE-ANALYSE NOW"
+msgstr "RÉANALYSER"
 
 #: ui/video.slint:111
 msgid "OpenFadeR — video output"
@@ -4651,11 +4711,11 @@ msgstr "Le modèle de KEY NEURAL est encore en téléchargement : cette analyse 
 msgid "NEURAL key model unavailable: this run uses CLASSIC"
 msgstr "Modèle de KEY NEURAL indisponible : cette analyse utilise CLASSIC"
 
-#: src/app/analyze/mod.rs:246
+#: src/app/analyze/mod.rs:255
 msgid "analysis: library query failed: {}"
 msgstr "analyse : échec de la requête de bibliothèque : {}"
 
-#: src/app/analyze/mod.rs:344
+#: src/app/analyze/mod.rs:353
 msgid " · library grid in use: PREFS > ANALYSIS > BEAT GRID FROM > OPENFADER ANALYSIS shows ours"
 msgstr " · grille de la bibliothèque utilisée : PRÉFS > ANALYSE > GRILLE DE BEATS ET CUES ISSUS DE > ANALYSE OPENFADER affiche la nôtre"
 
@@ -4690,6 +4750,38 @@ msgstr "tags de KEY écrits"
 #: src/app/analyze/progress.rs:49
 msgid "key tags not written"
 msgstr "tags de KEY non écrits"
+
+#: src/app/analyze/stale.rs:74
+msgid "under a minute"
+msgstr "moins d'une minute"
+
+#: src/app/analyze/stale.rs:75
+#: src/app/device/pace.rs:186
+msgid "about {} min"
+msgstr "environ {} min"
+
+#: src/app/analyze/stale.rs:76
+#: src/app/device/pace.rs:189
+msgid "about {} h {} min"
+msgstr "environ {} h {} min"
+
+#: src/app/analyze/stale.rs:82
+msgid "{n} track was analysed by an older version of the analysis."
+msgid_plural "{n} tracks were analysed by an older version of the analysis."
+msgstr[0] "{n} morceau a été analysé par une version plus ancienne de l'analyse."
+msgstr[1] "{n} morceaux ont été analysés par une version plus ancienne de l'analyse."
+
+#: src/app/analyze/stale.rs:88
+msgid "RE-ANALYSE NOW redoes it in the background: {} at the speed measured on this computer."
+msgstr "RÉANALYSER refait l'analyse en arrière-plan : {} à la vitesse mesurée sur cet ordinateur."
+
+#: src/app/analyze/stale.rs:92
+msgid "RE-ANALYSE NOW redoes it in the background; the time could not be measured."
+msgstr "RÉANALYSER refait l'analyse en arrière-plan ; la durée n'a pas pu être mesurée."
+
+#: src/app/analyze/stale.rs:95
+msgid "Your own cues, grids and tracks with the analysis lock are not changed. LATER asks again at the next start."
+msgstr "Vos propres cues, grilles et morceaux verrouillés pour l'analyse ne sont pas modifiés. PLUS TARD redemande au prochain démarrage."
 
 #: src/app/artwork/bulk.rs:24
 #: src/app/artwork/picker.rs:42
@@ -4832,8 +4924,8 @@ msgid "{}: {} tracks, {} ignored. {}"
 msgstr "{} : {} pistes, {} ignorées. {}"
 
 #: src/app/browser/health.rs:250
+#: src/app/library/report.rs:146
 #: src/app/midi/claim/mod.rs:247
-#: src/app/plugins/mod.rs:163
 msgid "{}: {}"
 msgstr "{} : {}"
 
@@ -4954,7 +5046,7 @@ msgstr "Pistes : {} sur {}"
 msgid " · BPM ±6% / KEY MATCH wait for a loaded deck"
 msgstr " · BPM ±6% / KEY MATCH attendent un deck chargé"
 
-#: src/app/browser/mod.rs:371
+#: src/app/browser/mod.rs:375
 msgid "{} selected"
 msgstr "{} sélectionnées"
 
@@ -4972,12 +5064,12 @@ msgstr "cette piste a disparu"
 
 #: src/app/browser/palette/edit.rs:74
 #: src/app/browser/palette/edit.rs:110
-#: src/app/browser/wire.rs:317
+#: src/app/browser/wire.rs:319
 msgid "{} tracks added to the Tag List"
 msgstr "{} pistes ajoutées à la liste de tags"
 
 #: src/app/browser/palette/edit.rs:90
-#: src/app/browser/wire.rs:297
+#: src/app/browser/wire.rs:299
 msgid "“{}” is already in the Tag List"
 msgstr "« {} » est déjà dans la liste de tags"
 
@@ -4986,23 +5078,23 @@ msgid "the Tag List holds up to {} tracks"
 msgstr "la liste de tags contient jusqu'à {} pistes"
 
 #: src/app/browser/palette/edit.rs:97
-#: src/app/browser/wire.rs:299
+#: src/app/browser/wire.rs:301
 msgid "tagged “{}” ({} in the Tag List)"
 msgstr "« {} » taguée ({} dans la liste de tags)"
 
 #: src/app/browser/palette/edit.rs:141
-#: src/app/browser/playlists/manage.rs:417
+#: src/app/browser/playlists/manage.rs:419
 msgid "“{}” is already in {}"
 msgstr "« {} » est déjà dans {}"
 
 #: src/app/browser/palette/edit.rs:143
 #: src/app/browser/palette/edit.rs:148
-#: src/app/browser/playlists/manage.rs:390
+#: src/app/browser/playlists/manage.rs:392
 msgid "{} added, {} already in the playlist"
 msgstr "{} ajoutées, {} déjà dans la playlist"
 
 #: src/app/browser/palette/edit.rs:147
-#: src/app/browser/playlists/manage.rs:420
+#: src/app/browser/playlists/manage.rs:422
 msgid "added “{}” to {}"
 msgstr "« {} » ajoutée à {}"
 
@@ -5013,7 +5105,7 @@ msgstr "un nom est requis"
 
 #: src/app/browser/palette/mod.rs:159
 #: src/app/browser/playlists/manage.rs:37
-#: src/app/browser/playlists/manage.rs:344
+#: src/app/browser/playlists/manage.rs:346
 msgid "select a track to add"
 msgstr "sélectionnez une piste à ajouter"
 
@@ -5129,82 +5221,83 @@ msgid "the Genre, Components and Situation categories keep their names"
 msgstr "les catégories Genre, Composants et Situation gardent leur nom"
 
 #: src/app/browser/playlists/manage.rs:175
+#: src/app/browser/saved.rs:176
 msgid "Rename to:"
 msgstr "Renommer en :"
 
-#: src/app/browser/playlists/manage.rs:226
+#: src/app/browser/playlists/manage.rs:228
 msgid "created playlist “{}” with {} tracks"
 msgstr "playlist « {} » créée avec {} pistes"
 
-#: src/app/browser/playlists/manage.rs:232
+#: src/app/browser/playlists/manage.rs:234
 #: src/app/edit/ops.rs:100
 msgid "delete"
 msgstr "supprimer"
 
-#: src/app/browser/playlists/manage.rs:242
+#: src/app/browser/playlists/manage.rs:244
 msgid "INBOX and COLLECTION cannot be deleted: rename them instead"
 msgstr "INBOX et COLLECTION ne peuvent pas être supprimées : renommez-les plutôt"
 
-#: src/app/browser/playlists/manage.rs:248
+#: src/app/browser/playlists/manage.rs:250
 msgid "the Genre, Components and Situation categories cannot be deleted"
 msgstr "les catégories Genre, Composants et Situation ne peuvent pas être supprimées"
 
-#: src/app/browser/playlists/manage.rs:255
+#: src/app/browser/playlists/manage.rs:257
 msgid "press DELETE again to delete “{}” (the tracks stay in the library)"
 msgstr "appuyez de nouveau sur SUPPRIMER pour supprimer « {} » (les pistes restent dans la bibliothèque)"
 
-#: src/app/browser/playlists/manage.rs:265
+#: src/app/browser/playlists/manage.rs:267
 msgid "Delete tag category"
 msgstr "Supprimer la catégorie de tags"
 
-#: src/app/browser/playlists/manage.rs:267
+#: src/app/browser/playlists/manage.rs:269
 msgid "Delete tag"
 msgstr "Supprimer le tag"
 
-#: src/app/browser/playlists/manage.rs:268
+#: src/app/browser/playlists/manage.rs:270
 msgid "Delete cue bank"
 msgstr "Supprimer le Cue Bank"
 
-#: src/app/browser/playlists/manage.rs:269
+#: src/app/browser/playlists/manage.rs:271
 msgid "Delete stage"
 msgstr "Supprimer l'étape"
 
-#: src/app/browser/playlists/manage.rs:286
+#: src/app/browser/playlists/manage.rs:288
 msgid "deleted “{}”"
 msgstr "« {} » supprimé"
 
-#: src/app/browser/playlists/manage.rs:295
+#: src/app/browser/playlists/manage.rs:297
 msgid "tracks of a plugin source have no file to copy yet: load them first"
 msgstr "les pistes d'une source de plugin n'ont pas encore de fichier à copier : chargez-les d'abord"
 
-#: src/app/browser/playlists/manage.rs:324
+#: src/app/browser/playlists/manage.rs:326
 msgid "duplicate failed: {}"
 msgstr "échec de la duplication : {}"
 
-#: src/app/browser/playlists/manage.rs:333
+#: src/app/browser/playlists/manage.rs:335
 msgid "copied {n} playlist to My Playlists"
 msgid_plural "copied {n} playlists to My Playlists"
 msgstr[0] "{n} playlist copiée dans Mes playlists"
 msgstr[1] "{n} playlists copiées dans Mes playlists"
 
-#: src/app/browser/playlists/manage.rs:350
+#: src/app/browser/playlists/manage.rs:352
 msgid "no playlists yet: choose My Playlists and + NEW > New playlist"
 msgstr "aucune playlist pour l'instant : choisissez Mes playlists puis + NOUVEAU > Créer une playlist"
 
-#: src/app/browser/playlists/manage.rs:353
+#: src/app/browser/playlists/manage.rs:355
 msgid "ADD TO PLAYLIST"
 msgstr "AJOUTER À LA PLAYLIST"
 
-#: src/app/browser/playlists/manage.rs:392
+#: src/app/browser/playlists/manage.rs:394
 msgid "{} not in the Collection"
 msgstr "{} hors de la Collection"
 
-#: src/app/browser/playlists/manage.rs:411
+#: src/app/browser/playlists/manage.rs:413
 msgid "“{}” is not in the Collection: import it first"
 msgstr "« {} » n'est pas dans la Collection : importez-le d'abord"
 
-#: src/app/browser/playlists/mod.rs:100
-#: src/app/library/mod.rs:95
+#: src/app/browser/playlists/mod.rs:103
+#: src/app/library/mod.rs:96
 msgid "Library Protection is on: cannot {} (Preferences > Advanced > Browse)"
 msgstr "La protection de la bibliothèque est activée : impossible de {} (Préférences > Avancé > Parcourir)"
 
@@ -5295,6 +5388,34 @@ msgstr "saisissez votre recherche, puis appuyez sur Entrée"
 #: src/app/browser/remote.rs:29
 msgid "searching “{}”…"
 msgstr "recherche de « {} »…"
+
+#: src/app/browser/saved.rs:88
+msgid "nothing to save: type a search or set a filter first"
+msgstr "rien à enregistrer : tapez d'abord une recherche ou réglez un filtre"
+
+#: src/app/browser/saved.rs:92
+msgid "Save the search as:"
+msgstr "Enregistrer la recherche sous :"
+
+#: src/app/browser/saved.rs:105
+msgid "replaced the saved search “{}”"
+msgstr "recherche enregistrée « {} » remplacée"
+
+#: src/app/browser/saved.rs:107
+msgid "saved the search “{}”"
+msgstr "recherche « {} » enregistrée"
+
+#: src/app/browser/saved.rs:116
+msgid "a saved search named “{}” exists"
+msgstr "une recherche enregistrée nommée « {} » existe déjà"
+
+#: src/app/browser/saved.rs:127
+msgid "the saved search “{}” cannot be read"
+msgstr "la recherche enregistrée « {} » est illisible"
+
+#: src/app/browser/saved.rs:190
+msgid "deleted the saved search “{}”"
+msgstr "recherche enregistrée « {} » supprimée"
 
 #: src/app/browser/session.rs:31
 #: src/app/browser/sidebar.rs:116
@@ -5683,7 +5804,7 @@ msgid " · reading {}/{}"
 msgstr " · lecture {}/{}"
 
 #: src/app/browser/tagging.rs:141
-#: src/app/browser/wire.rs:296
+#: src/app/browser/wire.rs:298
 msgid "select a track to tag"
 msgstr "sélectionnez une piste à taguer"
 
@@ -5719,21 +5840,21 @@ msgstr "{} pistes ajoutées au tag « {} »"
 msgid "every deck is playing; pause one to load"
 msgstr "tous les decks sont en lecture ; mettez-en un en pause pour charger"
 
-#: src/app/browser/wire.rs:224
+#: src/app/browser/wire.rs:226
 msgid "saved {n} track to {}"
 msgid_plural "saved {n} tracks to {}"
 msgstr[0] "{n} piste enregistrée dans {}"
 msgstr[1] "{n} pistes enregistrées dans {}"
 
-#: src/app/browser/wire.rs:230
+#: src/app/browser/wire.rs:232
 msgid "save failed: {}"
 msgstr "échec de l'enregistrement : {}"
 
-#: src/app/browser/wire.rs:288
+#: src/app/browser/wire.rs:290
 msgid "select a track to see what relates to it"
 msgstr "sélectionnez une piste pour voir ce qui s'y rapporte"
 
-#: src/app/browser/wire.rs:351
+#: src/app/browser/wire.rs:353
 msgid "AUTOMIX stopped"
 msgstr "AUTOMIX arrêté"
 
@@ -6876,14 +6997,6 @@ msgstr "quelques secondes"
 msgid "about {} s"
 msgstr "environ {} s"
 
-#: src/app/device/pace.rs:186
-msgid "about {} min"
-msgstr "environ {} min"
-
-#: src/app/device/pace.rs:189
-msgid "about {} h {} min"
-msgstr "environ {} h {} min"
-
 #: src/app/device/preview.rs:207
 msgid "Not enough room: this needs {} and the stick has {} free. Leave some playlists out or free some space."
 msgstr "Pas assez de place : il faut {} et la clé a {} de libre. Écartez des playlists ou libérez de la place."
@@ -7161,6 +7274,7 @@ msgid "insert silence"
 msgstr "insérer du silence"
 
 #: src/app/edit/ops.rs:121
+#: src/app/library/report.rs:26
 msgid "duplicate"
 msgstr "dupliquer"
 
@@ -7653,7 +7767,7 @@ msgid "Restore {}? The Collection, playlists, cues, grids, ratings, tags, histor
 msgstr "Restaurer {} ? La collection, les playlists, cues, grilles, notes, tags, l'historique et les préférences sont remplacés par ceux de la sauvegarde."
 
 #: src/app/library/backup.rs:62
-#: src/app/library/dialog.rs:118
+#: src/app/library/dialog.rs:120
 msgid "RESTORE LIBRARY"
 msgstr "RESTAURER LA BIBLIOTHÈQUE"
 
@@ -7677,84 +7791,89 @@ msgstr "La collection a été restaurée{}"
 msgid "restore failed: {}"
 msgstr "échec de la restauration : {}"
 
-#: src/app/library/dialog.rs:73
+#: src/app/library/dialog.rs:75
 msgid "IMPORT TRACK"
 msgstr "IMPORTER UNE PISTE"
 
-#: src/app/library/dialog.rs:74
+#: src/app/library/dialog.rs:76
 msgid "Path of a music file, or several separated by | (mp3, m4a, aac, flac, wav, aiff)."
 msgstr "Chemin d'un fichier musical, ou plusieurs séparés par | (mp3, m4a, aac, flac, wav, aiff)."
 
-#: src/app/library/dialog.rs:80
+#: src/app/library/dialog.rs:82
 msgid "IMPORT FOLDER"
 msgstr "IMPORTER UN DOSSIER"
 
-#: src/app/library/dialog.rs:81
+#: src/app/library/dialog.rs:83
 msgid "Every music file below this folder joins the Collection."
 msgstr "Tous les fichiers musicaux de ce dossier et de ses sous-dossiers rejoignent la collection."
 
-#: src/app/library/dialog.rs:85
+#: src/app/library/dialog.rs:87
 msgid "IMPORT PLAYLIST"
 msgstr "IMPORTER UNE PLAYLIST"
 
-#: src/app/library/dialog.rs:86
+#: src/app/library/dialog.rs:88
 msgid "An .m3u, .m3u8 or .pls file: its tracks join the Collection and a playlist of the same name lists them."
 msgstr "Un fichier .m3u, .m3u8 ou .pls : ses pistes rejoignent la collection et une playlist du même nom les répertorie."
 
-#: src/app/library/dialog.rs:92
+#: src/app/library/dialog.rs:94
 msgid "IMPORT COLLECTION"
 msgstr "IMPORTER UNE COLLECTION"
 
-#: src/app/library/dialog.rs:93
+#: src/app/library/dialog.rs:95
 msgid "A collection file of the library plugin you chose: its tracks, playlists, ratings, comments, cues and beat grids are imported."
 msgstr "Un fichier de collection du plugin de bibliothèque choisi : ses pistes, playlists, notes, commentaires, cues et grilles de beats sont importés."
 
-#: src/app/library/dialog.rs:109
-#: src/app/library/mod.rs:328
+#: src/app/library/dialog.rs:111
+#: src/app/library/mod.rs:330
 msgid "BACKUP LIBRARY"
 msgstr "SAUVEGARDER LA BIBLIOTHÈQUE"
 
-#: src/app/library/dialog.rs:110
+#: src/app/library/dialog.rs:112
 msgid "Folder for the backup zip (and for the music files, in a backup folder beside it)."
 msgstr "Dossier de la sauvegarde zip (et des fichiers musicaux, dans un dossier de sauvegarde à côté)."
 
-#: src/app/library/dialog.rs:119
+#: src/app/library/dialog.rs:121
 msgid "A backup zip made by Backup Library. The Collection, playlists, cues and every other stored edit are replaced."
 msgstr "Une sauvegarde zip créée par Sauvegarder la bibliothèque. La collection, les playlists, les cues et toutes les autres modifications enregistrées sont remplacées."
 
-#: src/app/library/dialog.rs:126
+#: src/app/library/dialog.rs:128
 msgid "EXPORT PLAYLIST (M3U8)"
 msgstr "EXPORTER LA PLAYLIST (M3U8)"
 
-#: src/app/library/dialog.rs:127
+#: src/app/library/dialog.rs:129
 msgid "EXPORT PLAYLIST (PLS)"
 msgstr "EXPORTER LA PLAYLIST (PLS)"
 
-#: src/app/library/dialog.rs:128
+#: src/app/library/dialog.rs:130
 msgid "EXPORT PLAYLIST (TEXT)"
 msgstr "EXPORTER LA PLAYLIST (TEXTE)"
 
-#: src/app/library/dialog.rs:130
+#: src/app/library/dialog.rs:132
+#: src/app/library/dialog.rs:137
 msgid "File to write (an existing file is never overwritten)."
 msgstr "Fichier à écrire (un fichier existant n'est jamais écrasé)."
 
-#: src/app/library/dialog.rs:135
+#: src/app/library/dialog.rs:136
+msgid "SAVE IMPORT REPORT"
+msgstr "ENREGISTRER LE RAPPORT D'IMPORT"
+
+#: src/app/library/dialog.rs:144
 msgid "The new file of the first track — the others are looked for in its folder — or a folder to look in for all of them."
 msgstr "Le nouveau fichier de la première piste — les autres sont cherchées dans son dossier — ou un dossier où toutes les chercher."
 
-#: src/app/library/dialog.rs:141
+#: src/app/library/dialog.rs:150
 msgid "ADD LIBRARY"
 msgstr "AJOUTER UNE BIBLIOTHÈQUE"
 
-#: src/app/library/dialog.rs:143
+#: src/app/library/dialog.rs:152
 msgid "A folder of music: its files and sub-folders are synced into the Collection and follow the folder."
 msgstr "Un dossier de musique : ses fichiers et sous-dossiers sont synchronisés dans la collection et suivent le dossier."
 
-#: src/app/library/dialog.rs:147
+#: src/app/library/dialog.rs:156
 msgid "A library file another app wrote, read by an enabled library plugin: its tracks and playlists are synced into the Collection."
 msgstr "Un fichier de bibliothèque écrit par une autre application, lu par un plugin de bibliothèque activé : ses pistes et playlists sont synchronisées dans la collection."
 
-#: src/app/library/dialog.rs:301
+#: src/app/library/dialog.rs:310
 msgid "cannot open {}: {}"
 msgstr "impossible d'ouvrir {} : {}"
 
@@ -7936,7 +8055,7 @@ msgstr "lecture des tags"
 
 #: src/app/library/import.rs:73
 #: src/app/library/import.rs:80
-#: src/app/library/import.rs:170
+#: src/app/library/import.rs:171
 msgid "importing…"
 msgstr "import en cours…"
 
@@ -7944,16 +8063,16 @@ msgstr "import en cours…"
 msgid "that library plugin is not loaded"
 msgstr "ce plugin de bibliothèque n'est pas chargé"
 
-#: src/app/library/import.rs:169
-#: src/app/library/import.rs:209
+#: src/app/library/import.rs:170
+#: src/app/library/import.rs:215
 msgid "importing"
 msgstr "import en cours"
 
-#: src/app/library/import.rs:190
+#: src/app/library/import.rs:195
 msgid "{} · {} sampler slots loading"
 msgstr "{} · {} emplacements de sampler en chargement"
 
-#: src/app/library/import.rs:205
+#: src/app/library/import.rs:211
 msgid "choose All tracks or a playlist of a library source or Explorer first"
 msgstr "choisissez d'abord Toutes les pistes ou une playlist d'une source de bibliothèque ou de l'Explorateur"
 
@@ -8053,41 +8172,41 @@ msgstr[1] "Supprimer {n} pistes manquantes de la collection ? Leurs emplacements
 msgid "DELETE FROM COLLECTION"
 msgstr "SUPPRIMER DE LA COLLECTION"
 
-#: src/app/library/mod.rs:142
+#: src/app/library/mod.rs:143
 msgid "removed {n} track from the Collection"
 msgid_plural "removed {n} tracks from the Collection"
 msgstr[0] "{n} piste supprimée de la collection"
 msgstr[1] "{n} pistes supprimées de la collection"
 
-#: src/app/library/mod.rs:208
+#: src/app/library/mod.rs:209
 msgid "a path is needed"
 msgstr "un chemin est requis"
 
-#: src/app/library/mod.rs:258
+#: src/app/library/mod.rs:260
 msgid "WRITE BACK"
 msgstr "RÉÉCRIRE"
 
-#: src/app/library/mod.rs:260
+#: src/app/library/mod.rs:262
 msgid "WRITE"
 msgstr "ÉCRIRE"
 
-#: src/app/library/mod.rs:288
+#: src/app/library/mod.rs:290
 msgid "recording added to the Collection ({})"
 msgstr "enregistrement ajouté à la collection ({})"
 
-#: src/app/library/mod.rs:290
+#: src/app/library/mod.rs:292
 msgid "recording not imported: {}"
 msgstr "enregistrement non importé : {}"
 
-#: src/app/library/mod.rs:329
+#: src/app/library/mod.rs:331
 msgid "Do you want to back up music files as well?"
 msgstr "Voulez-vous aussi sauvegarder les fichiers musicaux ?"
 
-#: src/app/library/mod.rs:331
+#: src/app/library/mod.rs:333
 msgid "NO"
 msgstr "NON"
 
-#: src/app/library/mod.rs:349
+#: src/app/library/mod.rs:351
 msgid "unknown menu action {}"
 msgstr "action de menu inconnue {}"
 
@@ -8104,6 +8223,75 @@ msgid "exported {n} track to {}"
 msgid_plural "exported {n} tracks to {}"
 msgstr[0] "{n} piste exportée vers {}"
 msgstr[1] "{n} pistes exportées vers {}"
+
+#: src/app/library/report.rs:24
+msgid "missing file"
+msgstr "fichier manquant"
+
+#: src/app/library/report.rs:25
+msgid "unsupported format"
+msgstr "format non pris en charge"
+
+#: src/app/library/report.rs:31
+msgid "Read from {} on {}"
+msgstr "Lu depuis {} le {}"
+
+#: src/app/library/report.rs:37
+msgid "{n} track imported"
+msgid_plural "{n} tracks imported"
+msgstr[0] "{n} morceau importé"
+msgstr[1] "{n} morceaux importés"
+
+#: src/app/library/report.rs:38
+msgid "{n} playlist or folder imported"
+msgid_plural "{n} playlists and folders imported"
+msgstr[0] "{n} playlist ou dossier importé"
+msgstr[1] "{n} playlists et dossiers importés"
+
+#: src/app/library/report.rs:43
+msgid "{n} cue point imported"
+msgid_plural "{n} cue points imported"
+msgstr[0] "{n} point de cue importé"
+msgstr[1] "{n} points de cue importés"
+
+#: src/app/library/report.rs:44
+msgid "{n} beat grid imported"
+msgid_plural "{n} beat grids imported"
+msgstr[0] "{n} grille de tempo importée"
+msgstr[1] "{n} grilles de tempo importées"
+
+#: src/app/library/report.rs:47
+msgid "{n} imported track has no file at its path now (see Display All Missing Files)"
+msgid_plural "{n} imported tracks have no file at their path now (see Display All Missing Files)"
+msgstr[0] "{n} morceau importé n'a plus de fichier à son emplacement (voir Afficher tous les fichiers manquants)"
+msgstr[1] "{n} morceaux importés n'ont plus de fichier à leur emplacement (voir Afficher tous les fichiers manquants)"
+
+#: src/app/library/report.rs:53
+msgid "{n} entry skipped"
+msgid_plural "{n} entries skipped"
+msgstr[0] "{n} élément ignoré"
+msgstr[1] "{n} éléments ignorés"
+
+#: src/app/library/report.rs:89
+msgid "Skipped entries"
+msgstr "Éléments ignorés"
+
+#: src/app/library/report.rs:105
+msgid "and {} more (SAVE AS TEXT has them all)"
+msgstr "et {} de plus (ENREGISTRER EN TEXTE les contient tous)"
+
+#: src/app/library/report.rs:121
+msgid "import report not kept: {}"
+msgstr "rapport d'import non conservé : {}"
+
+#: src/app/library/report.rs:130
+#: src/app/library/report.rs:137
+msgid "No import yet"
+msgstr "Aucun import pour l'instant"
+
+#: src/app/library/report.rs:145
+msgid "import report saved to {}"
+msgstr "rapport d'import enregistré dans {}"
 
 #: src/app/library/settings.rs:117
 msgid "AUTO RELOCATE SEARCH FOLDERS"
@@ -8687,300 +8875,347 @@ msgstr "pas de raccourci {}"
 msgid "nothing was typed"
 msgstr "rien n'a été saisi"
 
-#: src/app/prefs/advanced.rs:122
+#: src/app/prefs/advanced.rs:141
 #: src/app/prefs/extensions.rs:175
 msgid "LOCATION OF FILES"
 msgstr "EMPLACEMENT DES FICHIERS"
 
-#: src/app/prefs/advanced.rs:123
+#: src/app/prefs/advanced.rs:142
 msgid "empty = ~/Music/OpenFadeR"
 msgstr "vide = ~/Music/OpenFadeR"
 
-#: src/app/prefs/advanced.rs:126
+#: src/app/prefs/advanced.rs:145
 msgid "SILENCE LEVEL THRESHOLD"
 msgstr "SEUIL DE NIVEAU DE SILENCE"
 
-#: src/app/prefs/advanced.rs:135
+#: src/app/prefs/advanced.rs:154
 msgid "RECORDING STARTS WHEN"
 msgstr "L'ENREGISTREMENT DÉMARRE QUAND"
 
-#: src/app/prefs/advanced.rs:136
-#: src/app/prefs/advanced.rs:142
+#: src/app/prefs/advanced.rs:155
+#: src/app/prefs/advanced.rs:161
 msgid "REC BUTTON"
 msgstr "BOUTON REC"
 
-#: src/app/prefs/advanced.rs:136
+#: src/app/prefs/advanced.rs:155
 msgid "AUDIO INPUT"
 msgstr "ENTRÉE AUDIO"
 
-#: src/app/prefs/advanced.rs:141
+#: src/app/prefs/advanced.rs:160
 msgid "RECORDING ENDS WHEN"
 msgstr "L'ENREGISTREMENT SE TERMINE QUAND"
 
-#: src/app/prefs/advanced.rs:142
+#: src/app/prefs/advanced.rs:161
 msgid "20 S SILENCE"
 msgstr "20 S DE SILENCE"
 
-#: src/app/prefs/advanced.rs:147
+#: src/app/prefs/advanced.rs:166
 msgid "Automatically separate files when silence continues"
 msgstr "Séparer automatiquement les fichiers lorsque le silence se prolonge"
 
-#: src/app/prefs/advanced.rs:152
+#: src/app/prefs/advanced.rs:171
 msgid "SILENCE LENGTH"
 msgstr "DURÉE DU SILENCE"
 
-#: src/app/prefs/advanced.rs:159
+#: src/app/prefs/advanced.rs:178
 msgid "Automatically optimize the audio level of a recorded file"
 msgstr "Optimiser automatiquement le niveau audio d'un fichier enregistré"
 
-#: src/app/prefs/advanced.rs:164
+#: src/app/prefs/advanced.rs:183
 msgid "Automatically import a recorded file"
 msgstr "Importer automatiquement un fichier enregistré"
 
-#: src/app/prefs/advanced.rs:169
+#: src/app/prefs/advanced.rs:188
 msgid "Automatically display the tag information of a recorded file"
 msgstr "Afficher automatiquement les tags d'un fichier enregistré"
 
-#: src/app/prefs/advanced.rs:174
+#: src/app/prefs/advanced.rs:193
 msgid "Write a cue sheet next to each recording"
 msgstr "Écrire une cue sheet à côté de chaque enregistrement"
 
-#: src/app/prefs/advanced.rs:179
+#: src/app/prefs/advanced.rs:198
 msgid "Write a tracklist next to each recording"
 msgstr "Écrire une liste de pistes à côté de chaque enregistrement"
 
-#: src/app/prefs/advanced.rs:184
+#: src/app/prefs/advanced.rs:203
 msgid "Write a control log next to each recording"
 msgstr "Écrire un journal de contrôle à côté de chaque enregistrement"
 
-#: src/app/prefs/advanced.rs:189
+#: src/app/prefs/advanced.rs:208
 msgid "SHORTEST TRACK LISTED"
 msgstr "PISTE LA PLUS COURTE"
 
-#: src/app/prefs/advanced.rs:211
+#: src/app/prefs/advanced.rs:230
 #: src/app/prefs/controller/mod.rs:260
 msgid "RECORDINGS"
 msgstr "ENREGISTREMENTS"
 
-#: src/app/prefs/advanced.rs:214
+#: src/app/prefs/advanced.rs:233
 msgid "OTHERS"
 msgstr "AUTRES"
 
-#: src/app/prefs/advanced.rs:215
+#: src/app/prefs/advanced.rs:234
 #: src/app/prefs/controller/deck.rs:80
 msgid "SYNC TYPE"
 msgstr "TYPE DE SYNC"
 
-#: src/app/prefs/advanced.rs:218
+#: src/app/prefs/advanced.rs:237
 #: src/app/prefs/controller/deck.rs:83
 msgid "Allow BEAT/BPM SYNC with double/half BPM"
 msgstr "Autoriser BEAT/BPM SYNC avec BPM double/moitié"
 
-#: src/app/prefs/advanced.rs:223
+#: src/app/prefs/advanced.rs:242
 #: src/app/prefs/controller/deck.rs:88
 msgid "HOT CUE: during pause, GATE playback is applied"
 msgstr "HOT CUE : en pause, la lecture GATE est appliquée"
 
-#: src/app/prefs/advanced.rs:226
+#: src/app/prefs/advanced.rs:245
 msgid "EXPORT LOOP AS WAV"
 msgstr "EXPORTER LA LOOP EN WAV"
 
-#: src/app/prefs/advanced.rs:227
+#: src/app/prefs/advanced.rs:246
 msgid "sampling frequency"
 msgstr "fréquence d'échantillonnage"
 
-#: src/app/prefs/advanced.rs:228
+#: src/app/prefs/advanced.rs:247
 msgid "Check for updates"
 msgstr "Rechercher des mises à jour"
 
-#: src/app/prefs/advanced.rs:229
+#: src/app/prefs/advanced.rs:248
 msgid "once a day, at start"
 msgstr "une fois par jour, au démarrage"
 
-#: src/app/prefs/analysis.rs:108
+#: src/app/prefs/advanced.rs:251
+msgid "UPDATE CHANNEL"
+msgstr "CANAL DE MISE À JOUR"
+
+#: src/app/prefs/advanced.rs:252
+#: src/app/prefs/advanced.rs:22
+msgid "STABLE"
+msgstr "STABLE"
+
+#: src/app/prefs/advanced.rs:252
+#: src/app/prefs/advanced.rs:22
+msgid "BETA"
+msgstr "BÊTA"
+
+#: src/app/prefs/advanced.rs:255
+msgid "BETA also offers pre-releases"
+msgstr "BÊTA propose aussi les préversions"
+
+#: src/app/prefs/advanced.rs:258
+msgid "Back up the library before updating"
+msgstr "Sauvegarder la bibliothèque avant la mise à jour"
+
+#: src/app/prefs/advanced.rs:261
+msgid "the last 3 are kept; a roll-back puts the library back"
+msgstr "les 3 dernières sont gardées ; un retour en arrière remet la bibliothèque"
+
+#: src/app/prefs/analysis.rs:115
 msgid "TRACK ANALYSIS"
 msgstr "ANALYSE DES PISTES"
 
-#: src/app/prefs/analysis.rs:111
+#: src/app/prefs/analysis.rs:118
 msgid "Use high precision BeatGrid analysis"
 msgstr "Utiliser l'analyse de grille de beats haute précision"
 
-#: src/app/prefs/analysis.rs:114
+#: src/app/prefs/analysis.rs:121
 msgid "1 ms frames"
 msgstr "frames de 1 ms"
 
-#: src/app/prefs/analysis.rs:117
+#: src/app/prefs/analysis.rs:124
 msgid "Detect tempo changes"
 msgstr "Détecter les changements de tempo"
 
-#: src/app/prefs/analysis.rs:120
+#: src/app/prefs/analysis.rs:127
 msgid "a tempo section where the tempo changes; a steady track stays one"
 msgstr "une section de tempo à chaque changement de tempo ; une piste régulière n'en a qu'une"
 
-#: src/app/prefs/analysis.rs:121
+#: src/app/prefs/analysis.rs:128
 msgid "BPM RANGE"
 msgstr "PLAGE DE BPM"
 
-#: src/app/prefs/analysis.rs:122
+#: src/app/prefs/analysis.rs:129
 msgid "TRACK ANALYSIS SETTING"
 msgstr "RÉGLAGE DE L'ANALYSE DES PISTES"
 
-#: src/app/prefs/analysis.rs:123
+#: src/app/prefs/analysis.rs:130
 msgid "BPM / Grid"
 msgstr "BPM / Grille"
 
-#: src/app/prefs/analysis.rs:125
+#: src/app/prefs/analysis.rs:132
 msgid "Phrase"
 msgstr "Phrase"
 
-#: src/app/prefs/analysis.rs:125
+#: src/app/prefs/analysis.rs:132
 msgid "needs the grid"
 msgstr "nécessite la grille"
 
-#: src/app/prefs/analysis.rs:126
+#: src/app/prefs/analysis.rs:133
 msgid "heuristic"
 msgstr "heuristique"
 
-#: src/app/prefs/analysis.rs:129
+#: src/app/prefs/analysis.rs:136
 msgid "BEAT GRID AND CUES FROM"
 msgstr "GRILLE DE BEATS ET CUES ISSUS DE"
 
-#: src/app/prefs/analysis.rs:130
+#: src/app/prefs/analysis.rs:137
 msgid "THE CONNECTED LIBRARY"
 msgstr "LA BIBLIOTHÈQUE CONNECTÉE"
 
-#: src/app/prefs/analysis.rs:130
+#: src/app/prefs/analysis.rs:137
 msgid "OPENFADER ANALYSIS"
 msgstr "ANALYSE OPENFADER"
 
-#: src/app/prefs/analysis.rs:133
+#: src/app/prefs/analysis.rs:140
 msgid "your own edits win over both"
 msgstr "vos propres modifications priment sur les deux"
 
-#: src/app/prefs/analysis.rs:134
+#: src/app/prefs/analysis.rs:141
 msgid "AUTO ANALYSIS"
 msgstr "ANALYSE AUTO"
 
-#: src/app/prefs/analysis.rs:135
+#: src/app/prefs/analysis.rs:142
 msgid "Auto Analysis"
 msgstr "Analyse auto"
 
-#: src/app/prefs/analysis.rs:136
+#: src/app/prefs/analysis.rs:143
 msgid "tracks without a BPM or key"
 msgstr "pistes sans BPM ni key"
 
-#: src/app/prefs/analysis.rs:139
+#: src/app/prefs/analysis.rs:146
 msgid "ANALYZE LIBRARY"
 msgstr "ANALYSER LA BIBLIOTHÈQUE"
 
-#: src/app/prefs/analysis.rs:140
+#: src/app/prefs/analysis.rs:147
 msgid "ANALYZE NOW"
 msgstr "ANALYSER MAINTENANT"
 
-#: src/app/prefs/analysis.rs:143
+#: src/app/prefs/analysis.rs:152
+msgid "WHEN AN UPDATE CHANGES THE ANALYSIS"
+msgstr "QUAND UNE MISE À JOUR CHANGE L'ANALYSE"
+
+#: src/app/prefs/analysis.rs:154
+#: src/app/prefs/analysis.rs:45
+msgid "ASK"
+msgstr "DEMANDER"
+
+#: src/app/prefs/analysis.rs:155
+msgid "IN THE BACKGROUND"
+msgstr "EN ARRIÈRE-PLAN"
+
+#: src/app/prefs/analysis.rs:156
+msgid "WHEN A TRACK IS LOADED"
+msgstr "AU CHARGEMENT D'UN MORCEAU"
+
+#: src/app/prefs/analysis.rs:160
+msgid "tracks analysed by an older version"
+msgstr "morceaux analysés par une version plus ancienne"
+
+#: src/app/prefs/analysis.rs:161
 msgid "KEY ANALYSIS"
 msgstr "ANALYSE DE KEY"
 
-#: src/app/prefs/analysis.rs:146
+#: src/app/prefs/analysis.rs:164
 msgid "KEY DETECTOR"
 msgstr "KEY DETECTOR"
 
-#: src/app/prefs/analysis.rs:147
+#: src/app/prefs/analysis.rs:165
 #: src/app/prefs/analysis.rs:40
 #: src/app/prefs/view.rs:262
 msgid "CLASSIC"
 msgstr "CLASSIQUE"
 
-#: src/app/prefs/analysis.rs:147
+#: src/app/prefs/analysis.rs:165
 #: src/app/prefs/analysis.rs:40
 msgid "NEURAL"
 msgstr "NEURAL"
 
-#: src/app/prefs/analysis.rs:151
+#: src/app/prefs/analysis.rs:169
 msgid "NEURAL: a CNN (MIT licence), downloaded on first use, CPU only"
 msgstr "NEURAL : un CNN (licence MIT), téléchargé à la première utilisation, CPU uniquement"
 
-#: src/app/prefs/analysis.rs:153
+#: src/app/prefs/analysis.rs:171
 msgid "NEURAL needs a build with ONNX Runtime"
 msgstr "NEURAL nécessite une version avec ONNX Runtime"
 
-#: src/app/prefs/analysis.rs:158
+#: src/app/prefs/analysis.rs:176
 msgid "Write the value to the ID3 tag"
 msgstr "Écrire la valeur dans le tag ID3"
 
-#: src/app/prefs/analysis.rs:163
-#: src/app/prefs/analysis.rs:164
+#: src/app/prefs/analysis.rs:181
+#: src/app/prefs/analysis.rs:182
 msgid "ANALYSIS PROCESS"
 msgstr "PROCESSUS D'ANALYSE"
 
-#: src/app/prefs/analysis.rs:164
+#: src/app/prefs/analysis.rs:182
 msgid "{} worker thread(s)"
 msgstr "{} thread(s) de travail"
 
-#: src/app/prefs/analysis.rs:168
+#: src/app/prefs/analysis.rs:186
 msgid "CUE ANALYSIS"
 msgstr "ANALYSE DES CUES"
 
-#: src/app/prefs/analysis.rs:171
+#: src/app/prefs/analysis.rs:189
 msgid "SET CUE DURING ANALYSIS"
 msgstr "DÉFINIR LES CUES PENDANT L'ANALYSE"
 
-#: src/app/prefs/analysis.rs:172
+#: src/app/prefs/analysis.rs:190
 #: src/app/prefs/analysis.rs:31
 #: src/app/prefs/view.rs:397
 msgid "MANUAL"
 msgstr "MANUEL"
 
-#: src/app/prefs/analysis.rs:179
-#: src/app/prefs/analysis.rs:191
+#: src/app/prefs/analysis.rs:197
+#: src/app/prefs/analysis.rs:209
 msgid "PERSONAL CUE TENDENCY"
 msgstr "TENDANCE PERSONNELLE DES CUES"
 
-#: src/app/prefs/analysis.rs:180
+#: src/app/prefs/analysis.rs:198
 msgid "{} tracks: first cue at bar {}, {}, {} hot / {} memory"
 msgstr "{} pistes : premier cue à la mesure {}, {}, {} hot / {} memory"
 
-#: src/app/prefs/analysis.rs:185
+#: src/app/prefs/analysis.rs:203
 msgid "on phrases"
 msgstr "sur les phrases"
 
-#: src/app/prefs/analysis.rs:185
+#: src/app/prefs/analysis.rs:203
 msgid "every {} bars"
 msgstr "toutes les {} mesures"
 
-#: src/app/prefs/analysis.rs:192
+#: src/app/prefs/analysis.rs:210
 msgid "needs {} tracks with cues ({} found): MANUAL settings apply"
 msgstr "nécessite {} pistes avec cues ({} trouvées) : les réglages MANUEL s'appliquent"
 
-#: src/app/prefs/analysis.rs:208
+#: src/app/prefs/analysis.rs:226
 msgid "MEMORY CUES"
 msgstr "MEMORY CUES"
 
-#: src/app/prefs/analysis.rs:214
+#: src/app/prefs/analysis.rs:232
 msgid "Set to 1.1 Bars"
 msgstr "Placer sur 1.1 mesure"
 
-#: src/app/prefs/analysis.rs:219
+#: src/app/prefs/analysis.rs:237
 msgid "Repeat CUE settings per N bars from 1.1 Bars"
 msgstr "Répéter les réglages de CUE toutes les N mesures à partir de 1.1 mesure"
 
-#: src/app/prefs/analysis.rs:225
+#: src/app/prefs/analysis.rs:243
 msgid "N BARS"
 msgstr "N MESURES"
 
-#: src/app/prefs/analysis.rs:230
+#: src/app/prefs/analysis.rs:248
 msgid "Prohibit overwriting CUEs"
 msgstr "Interdire l'écrasement des CUEs"
 
-#: src/app/prefs/analysis.rs:231
+#: src/app/prefs/analysis.rs:249
 msgid "Add a comment to CUE"
 msgstr "Ajouter un commentaire au CUE"
 
-#: src/app/prefs/analysis.rs:232
+#: src/app/prefs/analysis.rs:250
 msgid "phrase or bar"
 msgstr "phrase ou mesure"
 
-#: src/app/prefs/analysis.rs:235
+#: src/app/prefs/analysis.rs:253
 msgid "Display the CUE Analysis playlist"
 msgstr "Afficher la playlist d'analyse des CUE"
 
@@ -9015,6 +9250,14 @@ msgstr "ÉCONOMIE D'ÉNERGIE"
 #: src/app/prefs/analysis.rs:36
 msgid "OURS"
 msgstr "LA NÔTRE"
+
+#: src/app/prefs/analysis.rs:45
+msgid "BACKGROUND"
+msgstr "ARRIÈRE-PLAN"
+
+#: src/app/prefs/analysis.rs:45
+msgid "ON-LOAD"
+msgstr "AU CHARGEMENT"
 
 #: src/app/prefs/audio/cards/mod.rs:65
 msgid "IN USE"
@@ -11087,73 +11330,81 @@ msgstr "Phrases : {} · {}"
 msgid "Stem file: {}"
 msgstr "Fichier stem : {}"
 
-#: src/app/update.rs:77
+#: src/app/update.rs:80
 msgid "No release notes."
 msgstr "Pas de notes de version."
 
-#: src/app/update.rs:91
+#: src/app/update.rs:94
 msgid "Checking for updates…"
 msgstr "Recherche de mises à jour…"
 
-#: src/app/update.rs:118
+#: src/app/update.rs:122
 msgid "Could not check for updates: {}"
 msgstr "Impossible de rechercher les mises à jour : {}"
 
-#: src/app/update.rs:127
+#: src/app/update.rs:131
 msgid "OpenFadeR {} is the latest version."
 msgstr "OpenFadeR {} est la dernière version."
 
-#: src/app/update.rs:144
+#: src/app/update.rs:148
 msgid "This release has no archive for this system: UPDATE opens its page."
 msgstr "Cette version n'a pas d'archive pour ce système : METTRE À JOUR ouvre sa page."
 
-#: src/app/update.rs:146
+#: src/app/update.rs:150
 msgid "Not updated here ({}): UPDATE opens the release page."
 msgstr "Pas de mise à jour ici ({}) : METTRE À JOUR ouvre la page de la version."
 
-#: src/app/update.rs:155
+#: src/app/update.rs:159
 msgid "OpenFadeR {} is available: Help > Update"
 msgstr "OpenFadeR {} est disponible : Aide > Mise à jour"
 
-#: src/app/update.rs:167
+#: src/app/update.rs:171
 msgid "{n} plugin has an update (GET PLUGINS): {}"
 msgid_plural "{n} plugins have updates (GET PLUGINS): {}"
 msgstr[0] "{n} plugin a une mise à jour (GET PLUGINS) : {}"
 msgstr[1] "{n} plugins ont une mise à jour (GET PLUGINS) : {}"
 
-#: src/app/update.rs:187
+#: src/app/update.rs:202
 msgid "The release page is open in your browser."
 msgstr "La page de la version est ouverte dans votre navigateur."
 
-#: src/app/update.rs:197
+#: src/app/update.rs:222
+msgid "Backing up the library…"
+msgstr "Sauvegarde de la bibliothèque…"
+
+#: src/app/update.rs:224
 msgid "Downloading…"
 msgstr "Téléchargement…"
 
-#: src/app/update.rs:216
+#: src/app/update.rs:258
 msgid "Installing…"
 msgstr "Installation…"
 
-#: src/app/update.rs:233
+#: src/app/update.rs:275
 msgid "Downloading… {} of {} MB"
 msgstr "Téléchargement… {} sur {} Mo"
 
-#: src/app/update.rs:257
+#: src/app/update.rs:307
 msgid "Installed. Restarting…"
 msgstr "Installé. Redémarrage…"
 
-#: src/app/update.rs:260
+#: src/app/update.rs:310
 msgid "Cancelled."
 msgstr "Annulé."
 
-#: src/app/update.rs:261
+#: src/app/update.rs:311
 msgid "The update failed, nothing was changed: {}"
 msgstr "La mise à jour a échoué, rien n'a été modifié : {}"
 
-#: src/app/update.rs:273
+#: src/app/update.rs:327
+msgid "Rolled back. The library from before the update was put back; the newer one is kept as {}. Restarting…"
+msgstr "Retour en arrière effectué. La bibliothèque d'avant la mise à jour a été remise ; la plus récente est gardée sous {}. Redémarrage…"
+
+#: src/app/update.rs:335
 msgid "Could not roll back: {}"
 msgstr "Impossible de revenir en arrière : {}"
 
-#: src/app/update.rs:344
+#: src/app/update.rs:406
 msgid "The last start did not finish: Help > Roll Back goes to the version before"
 msgstr "Le dernier démarrage n'a pas abouti : Aide > Roll Back revient à la version précédente"
 

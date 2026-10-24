@@ -25,6 +25,9 @@ const CONFIRM_AFTER: Duration = Duration::from_secs(20);
 /// The most release notes shown (characters).
 const NOTES: usize = 8000;
 
+/// How long the restart after a roll-back that put the library back waits, so that the text can be read.
+const LIBRARY_NOTICE: Duration = Duration::from_secs(6);
+
 thread_local! {
     /// The newer release the window offers (UI thread).
     static FOUND: RefCell<Option<Release>> = const { RefCell::new(None) };
@@ -90,9 +93,10 @@ fn check(app: &App, auto: bool) {
     if !auto {
         s.set_status(tr!("Checking for updates…").into());
     }
+    let channel = prefs::with(|p| p.advanced.update_channel.channel());
     let weak = app.as_weak();
     std::thread::spawn(move || {
-        let release = update::latest(&update::api_base());
+        let release = update::latest(&update::api_base(), channel);
         let reached = release.is_ok();
         if reached && auto {
             state::update(|s| s.checked = state::now());
@@ -176,6 +180,17 @@ fn addons(app: &App, names: &[String], auto: bool) {
     }
 }
 
+/// UPDATE NOW's first step: the automatic backup of the library (and the settings file) in the data folder; the last 3 stay.
+fn back_up_library(
+    store: &openfader::store::Store,
+    settings: Option<&std::path::Path>,
+    dir: Option<&std::path::Path>,
+) -> Result<std::path::PathBuf, String> {
+    let dir = dir.ok_or("no data directory (set XDG_DATA_HOME or HOME)")?;
+    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+    store.backup_auto(dir, settings, VERSION, &stamp, 3)
+}
+
 /// UPDATE NOW: download, verify, swap, restart; or the release page when this install is not ours to replace.
 fn update_now(app: &App) {
     let Some(rel) = FOUND.with_borrow(Clone::clone) else {
@@ -194,10 +209,37 @@ fn update_now(app: &App) {
     s.set_busy(true);
     s.set_downloading(true);
     s.set_progress(0.0);
-    s.set_status(tr!("Downloading…").into());
     let to = rel.version().map(|v| v.to_string()).unwrap_or_default();
+    let backup = prefs::with(|p| p.advanced.backup_before_update).then(|| {
+        (
+            openfader::store::global(),
+            prefs::path(),
+            openfader::store::backup::auto_dir(),
+        )
+    });
+    s.set_status(
+        if backup.is_some() {
+            tr!("Backing up the library…")
+        } else {
+            tr!("Downloading…")
+        }
+        .into(),
+    );
     let weak = app.as_weak();
     std::thread::spawn(move || {
+        // The library first: a roll-back to this version puts it back when the new one migrated the store.
+        let mut saved = String::new();
+        if let Some((store, settings, dir)) = backup {
+            match back_up_library(&store, settings.as_deref(), dir.as_deref()) {
+                Ok(zip) => saved = zip.display().to_string(),
+                Err(e) => {
+                    let _ = weak.upgrade_in_event_loop(move |app| {
+                        installed(&app, Err(format!("the library could not be backed up first ({e}); PREFS > ADVANCED can turn that off")), &install, to, String::new())
+                    });
+                    return;
+                }
+            }
+        }
         let dest = openfader::paths::cache_dir()
             .unwrap_or_else(std::env::temp_dir)
             .join("update")
@@ -218,7 +260,7 @@ fn update_now(app: &App) {
         }
         let done = got.and_then(|_| install::apply(&install, &dest));
         let _ = std::fs::remove_file(&dest);
-        let _ = weak.upgrade_in_event_loop(move |app| installed(&app, done, &install, to));
+        let _ = weak.upgrade_in_event_loop(move |app| installed(&app, done, &install, to, saved));
     });
 }
 
@@ -240,7 +282,13 @@ fn progress(app: &App, got: u64, total: u64) {
 }
 
 /// The update ended: restart into it, or say why not.
-fn installed(app: &App, done: Result<(), String>, install: &install::Install, to: String) {
+fn installed(
+    app: &App,
+    done: Result<(), String>,
+    install: &install::Install,
+    to: String,
+    backup: String,
+) {
     BUSY.set(false);
     let s = app.global::<UpdateState>();
     s.set_busy(false);
@@ -251,6 +299,8 @@ fn installed(app: &App, done: Result<(), String>, install: &install::Install, to
                 s.applied = Some(state::Applied {
                     from: VERSION.into(),
                     to,
+                    schema: openfader::store::backup::schema(),
+                    backup,
                     ..Default::default()
                 })
             });
@@ -262,13 +312,25 @@ fn installed(app: &App, done: Result<(), String>, install: &install::Install, to
     }
 }
 
-/// ROLL BACK: the version in `<install>.prev` comes back and the program restarts into it.
+/// ROLL BACK: the version in `<install>.prev` comes back and the program restarts into it. When the library from before the
+/// update was put back, the restart waits a few seconds so that the text can be read.
 fn roll_back(app: &App) {
     let s = app.global::<UpdateState>();
     match update::roll_back() {
-        Ok(install) => {
+        Ok(done) => {
             s.set_rollback("".into());
-            super::restart_as(install.exe_path());
+            let exe = done.install.exe_path();
+            let Some(library) = done.library else {
+                return super::restart_as(exe);
+            };
+            s.set_status(
+                tr!(
+                    "Rolled back. The library from before the update was put back; the newer one is kept as {}. Restarting…",
+                    library.kept.display()
+                )
+                .into(),
+            );
+            Timer::single_shot(LIBRARY_NOTICE, move || super::restart_as(exe));
         }
         Err(e) => s.set_status(tr!("Could not roll back: {}", e).into()),
     }

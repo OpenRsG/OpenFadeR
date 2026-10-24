@@ -2,7 +2,7 @@
 //! BROWSE are the library's ([`crate::app::library::settings`]); BEAT/BPM SYNC and HOT CUE are the CONTROLLER >
 //! Deck settings shown again. Streaming services, Tribe XR and PRO DJ LINK items need a network and are left out.
 
-use super::{section, Prefs, Row};
+use super::{choice, section, Prefs, Row};
 use crate::app::library::settings as library;
 use openfader::audio::RecOptions;
 use std::path::PathBuf;
@@ -16,6 +16,21 @@ const LOOP_RATES: [u32; 4] = [DEFAULT_LOOP_HZ, 48_000, 88_200, 96_000];
 /// Shortest time a track must lead the mix to get a line in a recording's cue sheet and tracklist, seconds.
 const MIN_TRACK_SECS: [u16; 8] = [0, 5, 10, 20, 30, 45, 60, 90];
 const DEFAULT_MIN_TRACK_SECS: u16 = 30;
+
+choice!(
+    /// Which releases UPDATE offers: the latest stable one, or the latest of all, pre-releases (release candidates) included.
+    UpdateChannel { #[default] Stable = "stable", Beta = "beta" }
+);
+
+impl UpdateChannel {
+    /// The updater's name for it.
+    pub fn channel(self) -> openfader::update::Channel {
+        match self {
+            UpdateChannel::Stable => openfader::update::Channel::Stable,
+            UpdateChannel::Beta => openfader::update::Channel::Beta,
+        }
+    }
+}
 
 section!(
     Advanced {
@@ -43,6 +58,10 @@ section!(
         export_loop_hz: u32 = DEFAULT_LOOP_HZ;
         /// Ask GitHub for a newer release at start, once a day (src/app/update.rs).
         check_updates: bool = true;
+        /// Which releases UPDATE offers (src/app/update.rs).
+        update_channel: UpdateChannel = UpdateChannel::Stable;
+        /// UPDATE NOW first backs up the library to the data folder (the last 3 are kept) so a roll-back can put it back.
+        backup_before_update: bool = true;
     }
 );
 
@@ -227,6 +246,21 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             .hint(tr!("sampling frequency")),
         Row::check("check_updates", tr!("Check for updates"), a.check_updates)
             .hint(tr!("once a day, at start")),
+        Row::chips(
+            "update_channel",
+            tr!("UPDATE CHANNEL"),
+            &[tr!("STABLE"), tr!("BETA")],
+            a.update_channel as usize,
+        )
+        .hint(tr!("BETA also offers pre-releases")),
+        Row::check(
+            "backup_before_update",
+            tr!("Back up the library before updating"),
+            a.backup_before_update,
+        )
+        .hint(tr!(
+            "the last 3 are kept; a roll-back puts the library back"
+        )),
     ]);
     rows
 }
@@ -310,5 +344,45 @@ mod tests {
             "sync_type is the Deck setting"
         );
         assert!(!choose(&mut p, "nope", 0));
+    }
+
+    #[test]
+    fn updates_follow_the_stable_channel_and_back_up_first_until_changed() {
+        let mut p = Prefs::default();
+        let row = |p: &Prefs, k: &str| rows(p).into_iter().find(|r| r.key == k).unwrap().current;
+        assert_eq!(
+            p.advanced.update_channel.channel(),
+            openfader::update::Channel::Stable
+        );
+        assert_eq!(
+            (row(&p, "update_channel"), row(&p, "backup_before_update")),
+            (0, 1)
+        );
+        assert!(choose(&mut p, "update_channel", 1) && choose(&mut p, "backup_before_update", 0));
+        assert_eq!(
+            p.advanced.update_channel.channel(),
+            openfader::update::Channel::Beta
+        );
+        assert!(!p.advanced.backup_before_update);
+        // They survive the settings file.
+        let mut lines = Vec::new();
+        crate::app::prefs::Section::write(&p.advanced, &mut |k, v| lines.push(format!("{k}={v}")));
+        assert!(lines.contains(&"update_channel=beta".to_owned()));
+        assert!(lines.contains(&"backup_before_update=false".to_owned()));
+        let mut back = Advanced::default();
+        assert_eq!(
+            crate::app::prefs::Section::parse(&mut back, "update_channel", "beta"),
+            Some(true)
+        );
+        assert_eq!(back.update_channel, UpdateChannel::Beta);
+        assert_eq!(
+            crate::app::prefs::Section::parse(&mut back, "update_channel", "nightly"),
+            Some(false)
+        );
+        assert_eq!(
+            back.update_channel,
+            UpdateChannel::Stable,
+            "an unknown value is the default"
+        );
     }
 }

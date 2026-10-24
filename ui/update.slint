@@ -106,15 +106,15 @@ export component UpdateOverlay inherits DialogFrame {
         spacing: Theme.space-sm;
         if UpdateState.rollback != "" && !UpdateState.busy: Chip {
             text: @tr("ROLL BACK TO {}", UpdateState.rollback);
-            width: 170px;
+            width: 150px;
             horizontal-stretch: 0;
             active: UpdateState.failed-start;
             clicked => { UpdateState.roll-back(); }
         }
         Rectangle { horizontal-stretch: 1; }
         if UpdateState.downloading: Chip { text: @tr("CANCEL"); width: 90px; horizontal-stretch: 0; clicked => { UpdateState.cancel(); } }
-        if UpdateState.version != "" && !UpdateState.busy: Chip { text: @tr("SKIP THIS VERSION"); width: 150px; horizontal-stretch: 0; clicked => { UpdateState.skip(); } }
-        if UpdateState.version != "" && !UpdateState.busy: Chip { text: @tr("LATER"); width: 80px; horizontal-stretch: 0; clicked => { UpdateState.visible = false; } }
+        if UpdateState.version != "" && !UpdateState.busy: Chip { text: @tr("SKIP THIS VERSION"); width: 140px; horizontal-stretch: 0; clicked => { UpdateState.skip(); } }
+        if UpdateState.version != "" && !UpdateState.busy: Chip { text: @tr("LATER"); width: 70px; horizontal-stretch: 0; clicked => { UpdateState.visible = false; } }
         if UpdateState.version != "" && !UpdateState.busy: Chip {
             text: UpdateState.can-update ? @tr("UPDATE NOW") : @tr("OPEN RELEASE PAGE");
             width: 150px;
@@ -123,5 +123,33 @@ export component UpdateOverlay inherits DialogFrame {
             clicked => { UpdateState.update-now(); }
         }
         if UpdateState.version == "" && !UpdateState.busy: Chip { text: @tr("CLOSE"); width: 80px; horizontal-stretch: 0; clicked => { UpdateState.visible = false; } }
+    }
+}
+
+/// The notice that an update changed the analysis (src/app/analyze/stale.rs): how many tracks an older version analysed.
+export global AnalysisNoticeState {
+    in-out property <bool> visible;
+    in property <string> text;
+    callback reanalyse();
+    callback later();
+}
+
+export component AnalysisNotice inherits DialogFrame {
+    visible: AnalysisNoticeState.visible;
+    title: @tr("ANALYSIS UPDATED");
+    card-width: 520px;
+    closed => { AnalysisNoticeState.later(); }
+    Text {
+        text: AnalysisNoticeState.text;
+        wrap: word-wrap;
+        color: Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+    }
+    HorizontalLayout {
+        spacing: Theme.space-sm;
+        Rectangle { horizontal-stretch: 1; }
+        Chip { text: @tr("LATER"); width: 90px; horizontal-stretch: 0; clicked => { AnalysisNoticeState.later(); } }
+        Chip { text: @tr("RE-ANALYSE NOW"); width: 170px; horizontal-stretch: 0; active: true; clicked => { AnalysisNoticeState.reanalyse(); } }
     }
 }

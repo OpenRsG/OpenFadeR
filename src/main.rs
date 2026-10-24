@@ -16,12 +16,23 @@ fn own_folder() -> Option<PathBuf> {
 /// `openfader --rollback`: puts back the version an in-app update kept in `<install>.prev`, without opening a window (for a
 /// new version that does not start). Prints the result.
 fn roll_back() -> Result<(), Box<dyn std::error::Error>> {
-    let install = openfader::update::roll_back()?;
-    println!("rolled back: start {} again", install.exe_path().display());
+    let done = openfader::update::roll_back()?;
+    println!(
+        "rolled back: start {} again",
+        done.install.exe_path().display()
+    );
+    if let Some(library) = done.library {
+        println!(
+            "the library from before the update was put back ({}); the newer library is kept as {}",
+            library.backup.display(),
+            library.kept.display()
+        );
+    }
     Ok(())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    app::started();
     if std::env::args_os()
         .nth(1)
         .is_some_and(|a| a == "--rollback")

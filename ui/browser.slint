@@ -12,6 +12,7 @@ import { PickerPanel, SmartEditor, TreeView } from "browser-tree.slint";
 import { Palette } from "browser-palette.slint";
 import { AutomixPanel } from "automix-panel.slint";
 import { SuggestBar } from "browser-suggest.slint";
+import { SavedPanel } from "browser-saved.slint";
 export { AutomixState, BrowserState }
 
 /// A tab over the list: `text-dim` idle, `text` with a 2 px accent underline when active.
@@ -243,7 +244,9 @@ export component Browser inherits Rectangle {
                         font-size: Theme.font-size;
                     }
                     Chip { text: @tr("FILTER"); width: 54px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: root.filter-open; clicked => { root.filter-open = !root.filter-open; } }
+                    Chip { text: @tr("SAVED"); width: 58px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: BrowserState.saved-open; tooltip: @tr("Saved searches: keep the search and filters under a name"); clicked => { BrowserState.saved-open = !BrowserState.saved-open; } }
                     search := TextField {
+                        text <=> BrowserState.search-text;
                         width: 200px;
                         y: (parent.height - self.height) / 2;
                         horizontal-stretch: 0;
@@ -356,6 +359,12 @@ export component Browser inherits Rectangle {
                     x: parent.width - self.width;
                     width: min(460px, parent.width);
                     height: min(parent.height, 300px);
+                }
+                if BrowserState.saved-open: SavedPanel {
+                    x: parent.width - self.width;
+                    width: min(380px, parent.width);
+                    height: min(parent.height, 300px);
+                    recalled => { root.filter-open = root.filter-open || BrowserState.bpm-min != "" || BrowserState.bpm-max != "" || BrowserState.bpm-around || BrowserState.key-match || BrowserState.min-rating > 0 || BrowserState.tag-filter-count > 0; }
                 }
                 if BrowserState.editor-open: SmartEditor { width: parent.width; height: parent.height; }
             }
