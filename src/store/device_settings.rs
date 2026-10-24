@@ -201,6 +201,8 @@ pub struct Behaviour {
     /// The booth profile: the player models (`Player::model`) the stick checker judges devices for, comma separated. Empty:
     /// every player the plugins know.
     pub booth: String,
+    /// Check the stick before it is ejected and ask when it needs fixing. On.
+    pub check_on_eject: bool,
 }
 
 impl Default for Behaviour {
@@ -217,12 +219,13 @@ impl Default for Behaviour {
             sync_ask: true,
             review_imports: true,
             booth: String::new(),
+            check_on_eject: true,
         }
     }
 }
 
 impl Behaviour {
-    const KEYS: [&'static str; 11] = [
+    const KEYS: [&'static str; 12] = [
         "delete_tracks",
         "import_history",
         "delete_history_after_import",
@@ -234,6 +237,7 @@ impl Behaviour {
         "sync_ask",
         "review_imports",
         "booth",
+        "check_on_eject",
     ];
 
     pub fn load(store: &Store) -> Self {
@@ -264,6 +268,7 @@ impl Behaviour {
                 .get(&format!("{BEHAVIOUR}booth"))
                 .cloned()
                 .unwrap_or_default(),
+            check_on_eject: flag("check_on_eject", d.check_on_eject),
         }
     }
 

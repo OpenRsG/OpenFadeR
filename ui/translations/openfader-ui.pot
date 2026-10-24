@@ -59,473 +59,473 @@ msgstr ""
 msgid "Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."
 msgstr ""
 
-#: ui/app.slint:200
+#: ui/app.slint:202
 msgid "File"
 msgstr ""
 
-#: ui/app.slint:202
+#: ui/app.slint:204
 msgid "Import"
 msgstr ""
 
-#: ui/app.slint:203
+#: ui/app.slint:205
 msgid "Import Track…"
 msgstr ""
 
-#: ui/app.slint:204
+#: ui/app.slint:206
 msgid "Import Folder…"
 msgstr ""
 
-#: ui/app.slint:205
-#: ui/app.slint:278
+#: ui/app.slint:207
+#: ui/app.slint:280
 msgid "Import Playlist…"
 msgstr ""
 
-#: ui/app.slint:209
+#: ui/app.slint:211
 msgid "Display All Missing Files"
 msgstr ""
 
-#: ui/app.slint:210
+#: ui/app.slint:212
 msgid "Display All Duplicated Files"
 msgstr ""
 
-#: ui/app.slint:212
+#: ui/app.slint:214
 #: ui/touch.slint:85
 #: ui/touch.slint:99
 msgid "Library"
 msgstr ""
 
-#: ui/app.slint:213
+#: ui/app.slint:215
 msgid "Backup Library…"
 msgstr ""
 
-#: ui/app.slint:214
+#: ui/app.slint:216
 msgid "Restore Library…"
 msgstr ""
 
-#: ui/app.slint:215
+#: ui/app.slint:217
 msgid "Backed up device library management…"
 msgstr ""
 
-#: ui/app.slint:216
+#: ui/app.slint:218
 msgid "Last Import Report…"
 msgstr ""
 
-#: ui/app.slint:216
+#: ui/app.slint:218
 msgid "Last Import Report: no import yet"
 msgstr ""
 
-#: ui/app.slint:219
+#: ui/app.slint:221
 msgid "Export Collection"
 msgstr ""
 
-#: ui/app.slint:223
+#: ui/app.slint:225
 msgid "Preferences…"
 msgstr ""
 
-#: ui/app.slint:224
+#: ui/app.slint:226
 msgid "Exit"
 msgstr ""
 
-#: ui/app.slint:227
+#: ui/app.slint:229
 #: ui/touch.slint:81
 #: ui/touch.slint:81
 msgid "Edit"
 msgstr ""
 
-#: ui/app.slint:228
+#: ui/app.slint:230
 msgid "Undo (Ctrl+Z)"
 msgstr ""
 
-#: ui/app.slint:228
+#: ui/app.slint:230
 msgid "Undo {} (Ctrl+Z)"
 msgstr ""
 
-#: ui/app.slint:229
+#: ui/app.slint:231
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr ""
 
-#: ui/app.slint:229
+#: ui/app.slint:231
 msgid "Redo {} (Ctrl+Shift+Z)"
 msgstr ""
 
-#: ui/app.slint:232
+#: ui/app.slint:234
 msgid "Track"
 msgstr ""
 
-#: ui/app.slint:233
+#: ui/app.slint:235
 msgid "Edit Track Details…"
 msgstr ""
 
-#: ui/app.slint:234
+#: ui/app.slint:236
 msgid "Import To Collection"
 msgstr ""
 
-#: ui/app.slint:235
+#: ui/app.slint:237
 msgid "Analyze Track"
 msgstr ""
 
-#: ui/app.slint:236
+#: ui/app.slint:238
 msgid "Analysis Lock"
 msgstr ""
 
-#: ui/app.slint:237
+#: ui/app.slint:239
 #: src/app/library/track.rs:189
 msgid "Reload Tag"
 msgstr ""
 
-#: ui/app.slint:238
+#: ui/app.slint:240
 #: src/app/library/track.rs:191
 msgid "Reload Tag (discard edits)"
 msgstr ""
 
-#: ui/app.slint:239
+#: ui/app.slint:241
 msgid "Find Artwork…"
 msgstr ""
 
-#: ui/app.slint:240
+#: ui/app.slint:242
 msgid "Fetch Missing Artwork"
 msgstr ""
 
-#: ui/app.slint:241
+#: ui/app.slint:243
 msgid "Show in File Manager"
 msgstr ""
 
-#: ui/app.slint:243
+#: ui/app.slint:245
 #: ui/browser-table.slint:315
 msgid "Relocate…"
 msgstr ""
 
-#: ui/app.slint:244
+#: ui/app.slint:246
 msgid "Auto Relocate"
 msgstr ""
 
-#: ui/app.slint:245
+#: ui/app.slint:247
 #: ui/browser-table.slint:317
 #: ui/stage/table.slint:283
 msgid "Remove from Collection"
 msgstr ""
 
-#: ui/app.slint:247
+#: ui/app.slint:249
 msgid "Add to Tag List"
 msgstr ""
 
-#: ui/app.slint:248
+#: ui/app.slint:250
 msgid "Add to Playlist…"
 msgstr ""
 
-#: ui/app.slint:249
+#: ui/app.slint:251
 #: ui/browser-table.slint:302
 #: ui/stage/table.slint:278
 msgid "Tags…"
 msgstr ""
 
-#: ui/app.slint:252
+#: ui/app.slint:254
 msgid "Playlist"
 msgstr ""
 
-#: ui/app.slint:253
+#: ui/app.slint:255
 msgid "Create New Playlist"
 msgstr ""
 
-#: ui/app.slint:254
+#: ui/app.slint:256
 msgid "Create New Intelligent Playlist"
 msgstr ""
 
-#: ui/app.slint:255
+#: ui/app.slint:257
 msgid "Create New Folder"
 msgstr ""
 
-#: ui/app.slint:256
+#: ui/app.slint:258
 msgid "Delete Playlist"
 msgstr ""
 
-#: ui/app.slint:259
+#: ui/app.slint:261
 msgid "Sort Items"
 msgstr ""
 
-#: ui/app.slint:260
+#: ui/app.slint:262
 msgid "Track Title"
 msgstr ""
 
-#: ui/app.slint:261
+#: ui/app.slint:263
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:198
 msgid "Artist"
 msgstr ""
 
-#: ui/app.slint:262
+#: ui/app.slint:264
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:202
 msgid "Genre"
 msgstr ""
 
-#: ui/app.slint:264
+#: ui/app.slint:266
 #: ui/browser-tree.slint:102
 #: ui/touch-actions.slint:74
 msgid "Key"
 msgstr ""
 
-#: ui/app.slint:265
+#: ui/app.slint:267
 #: ui/touch-actions.slint:74
 msgid "Time"
 msgstr ""
 
-#: ui/app.slint:266
+#: ui/app.slint:268
 #: ui/touch-actions.slint:74
 msgid "Rating"
 msgstr ""
 
-#: ui/app.slint:267
+#: ui/app.slint:269
 #: ui/touch-actions.slint:74
 msgid "Comments"
 msgstr ""
 
-#: ui/app.slint:269
+#: ui/app.slint:271
 msgid "Renumber Track Order"
 msgstr ""
 
-#: ui/app.slint:272
+#: ui/app.slint:274
 msgid "Export a playlist to a file"
 msgstr ""
 
-#: ui/app.slint:275
+#: ui/app.slint:277
 #: ui/touch-actions.slint:76
 msgid "Text"
 msgstr ""
 
-#: ui/app.slint:277
+#: ui/app.slint:279
 msgid "Export Playlist (to a device)…"
 msgstr ""
 
-#: ui/app.slint:281
+#: ui/app.slint:283
 msgid "View"
 msgstr ""
 
-#: ui/app.slint:282
+#: ui/app.slint:284
 msgid "Full Screen"
 msgstr ""
 
-#: ui/app.slint:284
-#: ui/app.slint:477
+#: ui/app.slint:286
+#: ui/app.slint:479
 msgid "2Deck Horizontal"
 msgstr ""
 
-#: ui/app.slint:285
-#: ui/app.slint:477
+#: ui/app.slint:287
+#: ui/app.slint:479
 msgid "2Deck Vertical"
 msgstr ""
 
-#: ui/app.slint:286
-#: ui/app.slint:477
+#: ui/app.slint:288
+#: ui/app.slint:479
 msgid "4Deck Horizontal"
 msgstr ""
 
-#: ui/app.slint:287
-#: ui/app.slint:477
+#: ui/app.slint:289
+#: ui/app.slint:479
 msgid "4Deck Vertical"
 msgstr ""
 
-#: ui/app.slint:288
-#: ui/app.slint:477
-msgid "Browse"
-msgstr ""
-
-#: ui/app.slint:289
-#: ui/exportmode-state.slint:54
-msgid "1 PLAYER"
-msgstr ""
-
 #: ui/app.slint:290
-#: ui/exportmode-state.slint:54
-msgid "2 PLAYER"
+#: ui/app.slint:479
+msgid "Browse"
 msgstr ""
 
 #: ui/app.slint:291
 #: ui/exportmode-state.slint:54
-msgid "DUAL PLAYER"
+msgid "1 PLAYER"
 msgstr ""
 
 #: ui/app.slint:292
 #: ui/exportmode-state.slint:54
-msgid "SIMPLE PLAYER"
+msgid "2 PLAYER"
 msgstr ""
 
 #: ui/app.slint:293
 #: ui/exportmode-state.slint:54
+msgid "DUAL PLAYER"
+msgstr ""
+
+#: ui/app.slint:294
+#: ui/exportmode-state.slint:54
+msgid "SIMPLE PLAYER"
+msgstr ""
+
+#: ui/app.slint:295
+#: ui/exportmode-state.slint:54
 msgid "FULL BROWSER"
 msgstr ""
 
-#: ui/app.slint:294
+#: ui/app.slint:296
 msgid "Close Split Screen"
 msgstr ""
 
-#: ui/app.slint:294
+#: ui/app.slint:296
 msgid "Split Screen"
 msgstr ""
 
-#: ui/app.slint:296
+#: ui/app.slint:298
 #: src/app/prefs/view.rs:417
 msgid "Mixer"
 msgstr ""
 
-#: ui/app.slint:297
+#: ui/app.slint:299
 msgid "Effect Panel"
 msgstr ""
 
-#: ui/app.slint:298
+#: ui/app.slint:300
 #: ui/touch.slint:85
 #: ui/touch.slint:99
 msgid "Sampler"
 msgstr ""
 
-#: ui/app.slint:299
-#: ui/app.slint:496
+#: ui/app.slint:301
+#: ui/app.slint:498
 #: ui/groove.slint:250
 msgid "BEAT LAB"
 msgstr ""
 
-#: ui/app.slint:301
+#: ui/app.slint:303
 #: ui/stage/library.slint:53
 #: src/app/prefs/view.rs:348
 msgid "Related Tracks"
 msgstr ""
 
-#: ui/app.slint:302
+#: ui/app.slint:304
 #: ui/browser-tree.slint:102
 msgid "Tags"
 msgstr ""
 
-#: ui/app.slint:303
+#: ui/app.slint:305
 #: ui/studio/automix.slint:181
 #: ui/touch-actions.slint:79
 msgid "Automix"
 msgstr ""
 
-#: ui/app.slint:306
+#: ui/app.slint:308
 msgid "Plugins"
 msgstr ""
 
-#: ui/app.slint:310
+#: ui/app.slint:312
 msgid "Help"
 msgstr ""
 
-#: ui/app.slint:311
+#: ui/app.slint:313
 msgid "Keyboard Shortcuts"
 msgstr ""
 
-#: ui/app.slint:312
+#: ui/app.slint:314
 #: ui/welcome.slint:69
 msgid "Welcome"
 msgstr ""
 
-#: ui/app.slint:313
+#: ui/app.slint:315
 msgid "Update to {}…"
 msgstr ""
 
-#: ui/app.slint:313
+#: ui/app.slint:315
 #: ui/touch-actions.slint:85
 msgid "Check for Updates"
 msgstr ""
 
-#: ui/app.slint:314
+#: ui/app.slint:316
 msgid "Roll Back to {}…"
 msgstr ""
 
-#: ui/app.slint:315
+#: ui/app.slint:317
 msgid "Report a Problem…"
 msgstr ""
 
-#: ui/app.slint:316
+#: ui/app.slint:318
 msgid "About OpenFadeR"
 msgstr ""
 
-#: ui/app.slint:436
+#: ui/app.slint:438
 msgid "Split screen: the browser in a window of its own"
 msgstr ""
 
-#: ui/app.slint:437
+#: ui/app.slint:439
 msgid "Switch the active window"
 msgstr ""
 
-#: ui/app.slint:465
-#: ui/app.slint:466
 #: ui/app.slint:467
+#: ui/app.slint:468
+#: ui/app.slint:469
 msgid "EXPORT"
 msgstr ""
 
-#: ui/app.slint:465
-#: ui/app.slint:466
 #: ui/app.slint:467
+#: ui/app.slint:468
+#: ui/app.slint:469
 msgid "PERFORMANCE"
 msgstr ""
 
-#: ui/app.slint:465
-#: ui/app.slint:466
 #: ui/app.slint:467
+#: ui/app.slint:468
+#: ui/app.slint:469
 msgid "EDIT"
 msgstr ""
 
-#: ui/app.slint:465
-#: ui/app.slint:466
-#: ui/app.slint:508
+#: ui/app.slint:467
+#: ui/app.slint:468
+#: ui/app.slint:510
 msgid "LIGHTING (BETA)"
 msgstr ""
 
-#: ui/app.slint:465
 #: ui/app.slint:467
-#: ui/app.slint:507
+#: ui/app.slint:469
+#: ui/app.slint:509
 msgid "VIDEO (BETA)"
 msgstr ""
 
-#: ui/app.slint:495
+#: ui/app.slint:497
 #: ui/stage/mixer.slint:224
 msgid "FX"
 msgstr ""
 
-#: ui/app.slint:497
+#: ui/app.slint:499
 #: src/app/prefs/controller/mixpoint.rs:8
 msgid "MIX POINT LINK"
 msgstr ""
 
-#: ui/app.slint:498
+#: ui/app.slint:500
 #: ui/stage/deck-parts.slint:478
 #: ui/stage/strip.slint:164
 msgid "SAMPLER"
 msgstr ""
 
-#: ui/app.slint:499
+#: ui/app.slint:501
 #: ui/stage/mixer.slint:224
 #: ui/stage/mixer.slint:226
 msgid "MIXER"
 msgstr ""
 
-#: ui/app.slint:504
+#: ui/app.slint:506
 msgid "REC panel"
 msgstr ""
 
-#: ui/app.slint:504
+#: ui/app.slint:506
 #: ui/stage/bar.slint:80
 #: ui/studio/bar.slint:57
 msgid "REC (master out)"
 msgstr ""
 
-#: ui/app.slint:514
+#: ui/app.slint:516
 msgid "SHORTCUTS (?)"
 msgstr ""
 
-#: ui/app.slint:515
+#: ui/app.slint:517
 msgid "PREFS"
 msgstr ""
 
-#: ui/app.slint:528
+#: ui/app.slint:530
 msgid "Zoom out the waveforms"
 msgstr ""
 
-#: ui/app.slint:529
+#: ui/app.slint:531
 msgid "Default waveform zoom"
 msgstr ""
 
-#: ui/app.slint:530
+#: ui/app.slint:532
 msgid "Zoom in the waveforms"
 msgstr ""
 
@@ -947,7 +947,7 @@ msgid "New playlist / folder / smart playlist / Tags / Cue Bank / Stage"
 msgstr ""
 
 #: ui/browser.slint:191
-#: ui/device-devices.slint:239
+#: ui/device-devices.slint:248
 #: ui/plugins.slint:167
 msgid "MORE"
 msgstr ""
@@ -957,6 +957,7 @@ msgid "Edit smart playlist, move; Cue Bank: add cues, load onto a deck; Stage: m
 msgstr ""
 
 #: ui/browser.slint:214
+#: ui/device-check.slint:145
 #: src/app/prefs/libraries.rs:39
 msgid "TRACKS"
 msgstr ""
@@ -1052,8 +1053,8 @@ msgid "TAG FILTER"
 msgstr ""
 
 #: ui/browser.slint:306
+#: ui/device-check.slint:121
 #: ui/groove.slint:263
-#: ui/library.slint:163
 msgid "OK"
 msgstr ""
 
@@ -1622,6 +1623,7 @@ msgid "Beat grid editing"
 msgstr ""
 
 #: ui/deck-panel.slint:151
+#: ui/device-check.slint:145
 msgid "CUES"
 msgstr ""
 
@@ -1750,139 +1752,223 @@ msgstr ""
 msgid "RESTORE TO DEVICE"
 msgstr ""
 
-#: ui/device-devices.slint:50
+#: ui/device-check.slint:39
+#: src/app/device/check.rs:448
+msgid "FIX THE STICK"
+msgstr ""
+
+#: ui/device-check.slint:46
+msgid "Repair this stick: finish what was cut off, copy missing music from your collection, rebuild a library that cannot be read. A backup comes first and nothing is deleted."
+msgstr ""
+
+#: ui/device-check.slint:50
+msgid "CHECK AGAIN"
+msgstr ""
+
+#: ui/device-check.slint:55
+msgid "Look at the stick again"
+msgstr ""
+
+#: ui/device-check.slint:59
+msgid "SETUP"
+msgstr ""
+
+#: ui/device-check.slint:59
+msgid "DETAILS"
+msgstr ""
+
+#: ui/device-check.slint:63
+msgid "Back to formats and actions"
+msgstr ""
+
+#: ui/device-check.slint:63
+msgid "Libraries, problems, which players read this stick, the booth profile"
+msgstr ""
+
+#: ui/device-check.slint:121
+#: src/app/library/mod.rs:333
+msgid "NO"
+msgstr ""
+
+#: ui/device-check.slint:139
+msgid "LIBRARIES ON THE STICK"
+msgstr ""
+
+#: ui/device-check.slint:145
+#: src/app/library/settings.rs:175
+#: src/app/prefs/analysis.rs:36
+msgid "LIBRARY"
+msgstr ""
+
+#: ui/device-check.slint:145
+msgid "LAST WRITTEN"
+msgstr ""
+
+#: ui/device-check.slint:145
+msgid "PLAYLISTS"
+msgstr ""
+
+#: ui/device-check.slint:147
+msgid "No library yet. EXPORT to it from the EXPORT tab."
+msgstr ""
+
+#: ui/device-check.slint:150
+msgid "WHAT IS WRONG"
+msgstr ""
+
+#: ui/device-check.slint:152
+msgid "YOUR BOOTH"
+msgstr ""
+
+#: ui/device-check.slint:153
+msgid "Tick the players you will find in the booth: the verdict is then for those only. Nothing ticked: every player the plugins know."
+msgstr ""
+
+#: ui/device-check.slint:158
+msgid "ALL PLAYERS"
+msgstr ""
+
+#: ui/device-check.slint:179
+msgid "PLAYERS"
+msgstr ""
+
+#: ui/device-check.slint:186
+msgid "No plugin lists player models yet."
+msgstr ""
+
+#: ui/device-devices.slint:51
 msgid "ON THE DEVICE: {}"
 msgstr ""
 
-#: ui/device-devices.slint:50
+#: ui/device-devices.slint:51
 msgid "WRITTEN BY THE NEXT EXPORT"
 msgstr ""
 
-#: ui/device-devices.slint:50
+#: ui/device-devices.slint:51
 #: ui/edit.slint:124
 #: ui/lighting.slint:162
 msgid "OFF"
 msgstr ""
 
-#: ui/device-devices.slint:127
+#: ui/device-devices.slint:128
 #: src/app/prefs/libraries.rs:18
 msgid "CONNECTED"
 msgstr ""
 
-#: ui/device-devices.slint:136
+#: ui/device-devices.slint:137
 msgid "No device plugin is on. Switch one on in PREFERENCES > EXTENSIONS, then restart."
 msgstr ""
 
-#: ui/device-devices.slint:136
+#: ui/device-devices.slint:137
 msgid "No USB drive or SD card is mounted. Insert one: it shows up here, and as a USB icon on the left of the browser, as soon as it is mounted."
 msgstr ""
 
-#: ui/device-devices.slint:170
+#: ui/device-devices.slint:175
 msgid "Choose a device on the left."
 msgstr ""
 
-#: ui/device-devices.slint:188
+#: ui/device-devices.slint:193
 #: ui/exportmode-dock.slint:70
-#: src/app/device/backup.rs:265
+#: src/app/device/backup.rs:271
 msgid "EJECT"
 msgstr ""
 
-#: ui/device-devices.slint:188
+#: ui/device-devices.slint:193
 msgid "Unmount it safely (a backup first, when Preferences ask for one)"
 msgstr ""
 
-#: ui/device-devices.slint:190
+#: ui/device-devices.slint:199
 msgid "WHAT IS THIS DEVICE FOR?"
 msgstr ""
 
-#: ui/device-devices.slint:195
+#: ui/device-devices.slint:204
 msgid "UNIVERSAL"
 msgstr ""
 
-#: ui/device-devices.slint:196
+#: ui/device-devices.slint:205
 msgid "Every format below on one device: it works in each app and on each player they list. The music is stored once."
 msgstr ""
 
-#: ui/device-devices.slint:202
+#: ui/device-devices.slint:211
 msgid "DEDICATED"
 msgstr ""
 
-#: ui/device-devices.slint:203
+#: ui/device-devices.slint:212
 msgid "Only the formats you tick below: for one app or one family of players. Exports are quicker."
 msgstr ""
 
-#: ui/device-devices.slint:209
+#: ui/device-devices.slint:218
 #: ui/device-export.slint:9
 msgid "FORMATS"
 msgstr ""
 
-#: ui/device-devices.slint:222
+#: ui/device-devices.slint:231
 msgid "Ticked formats are written by EXPORT, SYNC and the cue sync. Formats share one copy of each track, so ticking more costs little space."
 msgstr ""
 
-#: ui/device-devices.slint:224
+#: ui/device-devices.slint:233
 msgid "PUT MUSIC ON IT"
 msgstr ""
 
-#: ui/device-devices.slint:225
+#: ui/device-devices.slint:234
 msgid "EXPORT…"
 msgstr ""
 
-#: ui/device-devices.slint:225
+#: ui/device-devices.slint:234
 msgid "Create or extend the libraries on this device"
 msgstr ""
 
-#: ui/device-devices.slint:226
-#: ui/device.slint:66
-#: ui/device.slint:76
+#: ui/device-devices.slint:235
+#: ui/device.slint:68
+#: ui/device.slint:78
 msgid "SYNC MANAGER"
 msgstr ""
 
-#: ui/device-devices.slint:226
+#: ui/device-devices.slint:235
 msgid "Keep chosen playlists up to date on this device"
 msgstr ""
 
-#: ui/device-devices.slint:229
+#: ui/device-devices.slint:238
 msgid "BRING BACK"
 msgstr ""
 
-#: ui/device-devices.slint:230
+#: ui/device-devices.slint:239
 msgid "UPDATE COLLECTION"
 msgstr ""
 
-#: ui/device-devices.slint:230
+#: ui/device-devices.slint:239
 msgid "Import cues, grids, ratings, colours and comments edited on the player"
 msgstr ""
 
-#: ui/device-devices.slint:231
+#: ui/device-devices.slint:240
 msgid "IMPORT HISTORIES"
 msgstr ""
 
-#: ui/device-devices.slint:231
+#: ui/device-devices.slint:240
 msgid "Import what the players played"
 msgstr ""
 
-#: ui/device-devices.slint:234
+#: ui/device-devices.slint:243
 msgid "KEEP IT SAFE"
 msgstr ""
 
-#: ui/device-devices.slint:235
-#: ui/device.slint:66
-#: ui/device.slint:76
+#: ui/device-devices.slint:244
+#: ui/device.slint:68
+#: ui/device.slint:78
 msgid "BACKUPS"
 msgstr ""
 
-#: ui/device-devices.slint:235
+#: ui/device-devices.slint:244
 msgid "Back up or restore this device's library"
 msgstr ""
 
-#: ui/device-devices.slint:236
+#: ui/device-devices.slint:245
 #: ui/exportmode-dock.slint:69
 #: ui/plugins.slint:167
 msgid "SETTINGS"
 msgstr ""
 
-#: ui/device-devices.slint:236
+#: ui/device-devices.slint:245
 msgid "The player settings this device carries (Preferences > DJ SYSTEM)"
 msgstr ""
 
@@ -1950,17 +2036,17 @@ msgstr ""
 msgid "NOT NOW"
 msgstr ""
 
-#: ui/device.slint:13
-#: ui/device.slint:61
-#: ui/device.slint:66
+#: ui/device.slint:15
+#: ui/device.slint:63
+#: ui/device.slint:68
 msgid "DEVICES"
 msgstr ""
 
-#: ui/device.slint:53
+#: ui/device.slint:55
 msgid "Cancel"
 msgstr ""
 
-#: ui/device.slint:105
+#: ui/device.slint:107
 msgid "CONFIRM"
 msgstr ""
 
@@ -3437,7 +3523,7 @@ msgid "Shift selected item downward"
 msgstr ""
 
 #: ui/prefs-djsystem.slint:130
-#: src/app/prefs/dj_system/behaviour.rs:76
+#: src/app/prefs/dj_system/behaviour.rs:81
 #: src/app/prefs/dj_system/mod.rs:265
 msgid "Reset to defaults"
 msgstr ""
@@ -6683,97 +6769,97 @@ msgstr ""
 msgid "select a track in the library first"
 msgstr ""
 
-#: src/app/device/actions.rs:56
-msgid "{}: that action is not offered any more"
+#: src/app/device/actions.rs:57
+msgid "{}: its extension no longer offers that action. Open DEVICES and press CHECK AGAIN."
 msgstr ""
 
-#: src/app/device/actions.rs:64
-msgid "{}: its plugin is not available"
+#: src/app/device/actions.rs:65
+msgid "{}: its extension is switched off. Switch it on in PREFERENCES > EXTENSIONS, then restart."
 msgstr ""
 
-#: src/app/device/actions.rs:95
-msgid "{} has no library"
+#: src/app/device/actions.rs:97
+msgid "{} has no library to read from. Export to it first."
 msgstr ""
 
-#: src/app/device/actions.rs:102
+#: src/app/device/actions.rs:109
 msgid "Updating the collection"
 msgstr ""
 
-#: src/app/device/actions.rs:104
+#: src/app/device/actions.rs:111
 msgid "; {} track(s) of the device are not in the collection and were not updated"
 msgstr ""
 
-#: src/app/device/actions.rs:105
+#: src/app/device/actions.rs:112
 msgid "Update Collection: {} of {} track(s) changed ({} ratings, {} comments, {} colours, {} cue lists, {} grids){}"
 msgstr ""
 
-#: src/app/device/actions.rs:125
+#: src/app/device/actions.rs:132
 msgid "Importing histories"
 msgstr ""
 
-#: src/app/device/actions.rs:130
+#: src/app/device/actions.rs:137
 msgid "Imported {} history(ies) of {}: {} plays, {} of unknown tracks skipped, {} imported before"
 msgstr ""
 
-#: src/app/device/actions.rs:132
+#: src/app/device/actions.rs:139
 msgid "its plugin is not available"
 msgstr ""
 
-#: src/app/device/actions.rs:133
+#: src/app/device/actions.rs:140
 msgid "; deleted {} from the device"
 msgstr ""
 
-#: src/app/device/actions.rs:134
+#: src/app/device/actions.rs:141
 msgid "; not deleted from the device: {}"
 msgstr ""
 
-#: src/app/device/actions.rs:190
+#: src/app/device/actions.rs:197
 msgid "that playlist is not on the device any more"
 msgstr ""
 
-#: src/app/device/actions.rs:194
+#: src/app/device/actions.rs:201
 msgid "Imported {} into My Playlists: {} track(s), {} added to the collection"
 msgstr ""
 
-#: src/app/device/actions.rs:231
+#: src/app/device/actions.rs:238
 #: src/app/device/transfer.rs:292
 msgid "That playlist is not on the device any more"
 msgstr ""
 
-#: src/app/device/actions.rs:235
+#: src/app/device/actions.rs:242
 msgid "Delete the history {} from {}?"
 msgstr ""
 
-#: src/app/device/actions.rs:237
+#: src/app/device/actions.rs:244
 msgid "Delete {} from {}? Tracks that no other playlist lists are deleted too."
 msgstr ""
 
-#: src/app/device/actions.rs:243
+#: src/app/device/actions.rs:250
 msgid "Delete {} from {}? Its tracks stay on the device."
 msgstr ""
 
-#: src/app/device/actions.rs:251
-#: src/app/device/actions.rs:298
+#: src/app/device/actions.rs:258
+#: src/app/device/actions.rs:305
 msgid "Deleting"
 msgstr ""
 
-#: src/app/device/actions.rs:254
+#: src/app/device/actions.rs:261
 msgid "Deleted the history {} from {}"
 msgstr ""
 
-#: src/app/device/actions.rs:258
+#: src/app/device/actions.rs:265
 msgid "Deleted {} ({} list(s), {} track(s)) from {}{}"
 msgstr ""
 
-#: src/app/device/actions.rs:264
+#: src/app/device/actions.rs:271
 msgid " — {} file(s) could not be deleted, first: {}"
 msgstr ""
 
-#: src/app/device/actions.rs:290
+#: src/app/device/actions.rs:297
 msgid "Delete {} from {}? The file and its analysis are removed."
 msgstr ""
 
-#: src/app/device/actions.rs:306
+#: src/app/device/actions.rs:313
 msgid "Deleted {} track(s) from {}"
 msgstr ""
 
@@ -6807,10 +6893,11 @@ msgid "Backups deleted"
 msgstr ""
 
 #: src/app/device/backup.rs:139
-msgid "{} holds no library to back up"
+msgid "{}: there is no library on it to back up. Export to it first."
 msgstr ""
 
 #: src/app/device/backup.rs:145
+#: src/app/device/check.rs:694
 #: src/app/device/safety.rs:90
 msgid "No backup folder: type one"
 msgstr ""
@@ -6850,20 +6937,279 @@ msgstr ""
 msgid "CONTINUE"
 msgstr ""
 
-#: src/app/device/backup.rs:265
+#: src/app/device/backup.rs:271
 msgid "The library is loaded from {}: {} track(s) play from it and stop working when it is removed. Eject anyway?"
 msgstr ""
 
-#: src/app/device/backup.rs:269
+#: src/app/device/backup.rs:275
 msgid "A transfer to {} is running: cancel it (X) before ejecting"
 msgstr ""
 
-#: src/app/device/backup.rs:282
+#: src/app/device/backup.rs:291
 msgid "Ejecting"
 msgstr ""
 
-#: src/app/device/backup.rs:293
-msgid "Not ejected: the backup failed ({})"
+#: src/app/device/backup.rs:302
+msgid "Not ejected: the backup failed ({}). Fix that, or switch the backup off in PREFERENCES > DJ SYSTEM, then eject again."
+msgstr ""
+
+#: src/app/device/check.rs:89
+msgid "cannot read {}"
+msgstr ""
+
+#: src/app/device/check.rs:90
+msgid "cannot read a {} partition table"
+msgstr ""
+
+#: src/app/device/check.rs:94
+msgid "needs {}, this stick has none"
+msgstr ""
+
+#: src/app/device/check.rs:94
+msgid "or"
+msgstr ""
+
+#: src/app/device/check.rs:95
+msgid "cannot open the {} of this stick"
+msgstr ""
+
+#: src/app/device/check.rs:96
+msgid "finds the {} of this stick damaged (see WHAT IS WRONG)"
+msgstr ""
+
+#: src/app/device/check.rs:104
+msgid "Not confirmed yet"
+msgstr ""
+
+#: src/app/device/check.rs:105
+msgid "Not confirmed: {}"
+msgstr ""
+
+#: src/app/device/check.rs:106
+msgid "no extension knows this model"
+msgstr ""
+
+#: src/app/device/check.rs:114
+msgid "library"
+msgstr ""
+
+#: src/app/device/check.rs:120
+msgid "An export to this stick was cut off (it was pulled out or lost power while the library was written)."
+msgstr ""
+
+#: src/app/device/check.rs:121
+msgid "A player could show an old library next to a new one."
+msgstr ""
+
+#: src/app/device/check.rs:122
+msgid "FIX THE STICK finishes or undoes it; your music is not touched."
+msgstr ""
+
+#: src/app/device/check.rs:125
+msgid "{n} audio file that the {} lists is missing from this stick."
+msgid_plural "{n} audio files that the {} lists are missing from this stick."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/app/device/check.rs:131
+msgid "Those tracks would not load on a player."
+msgstr ""
+
+#: src/app/device/check.rs:132
+msgid "FIX THE STICK copies them again from your collection."
+msgstr ""
+
+#: src/app/device/check.rs:135
+msgid "The {} of this stick cannot be read ({})."
+msgstr ""
+
+#: src/app/device/check.rs:136
+msgid "A player would show an empty stick."
+msgstr ""
+
+#: src/app/device/check.rs:137
+msgid "FIX THE STICK writes the library again from your collection, or restore a backup in BACKUPS. Your music is not touched."
+msgstr ""
+
+#: src/app/device/check.rs:140
+msgid "Part of the check of this stick failed: {}"
+msgstr ""
+
+#: src/app/device/check.rs:141
+msgid "Some problems may not have been found."
+msgstr ""
+
+#: src/app/device/check.rs:142
+msgid "Press CHECK AGAIN. If it keeps failing, update the extension."
+msgstr ""
+
+#: src/app/device/check.rs:150
+msgid "READY"
+msgstr ""
+
+#: src/app/device/check.rs:151
+msgid "NEEDS FIXING"
+msgstr ""
+
+#: src/app/device/check.rs:152
+msgid "UNREADABLE"
+msgstr ""
+
+#: src/app/device/check.rs:153
+msgid "EMPTY"
+msgstr ""
+
+#: src/app/device/check.rs:172
+msgid "{} {}."
+msgstr ""
+
+#: src/app/device/check.rs:188
+msgid "{n} player reads it."
+msgid_plural "{n} players read it."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/app/device/check.rs:189
+msgid "{} of {} players read it."
+msgstr ""
+
+#: src/app/device/check.rs:197
+msgid "Ready for a set."
+msgstr ""
+
+#: src/app/device/check.rs:203
+msgid "No library of this stick can be read."
+msgstr ""
+
+#: src/app/device/check.rs:210
+msgid "No library on this stick yet. Export to it to use it."
+msgstr ""
+
+#: src/app/device/check.rs:219
+msgid "The last export to {} was cut off. It was finished from what was already on the stick: the new library is complete."
+msgstr ""
+
+#: src/app/device/check.rs:223
+msgid "The last export to {} was cut off. Its previous library is in use again: export once more to bring it up to date."
+msgstr ""
+
+#: src/app/device/check.rs:227
+msgid "The last export to {} was cut off and could not be put right ({}). Open DEVICES and press FIX THE STICK."
+msgstr ""
+
+#: src/app/device/check.rs:238
+msgid "not on this stick"
+msgstr ""
+
+#: src/app/device/check.rs:239
+msgid "cannot be read"
+msgstr ""
+
+#: src/app/device/check.rs:308
+#: src/app/device/check.rs:326
+msgid "CHECKING…"
+msgstr ""
+
+#: src/app/device/check.rs:327
+msgid "Looking at the stick…"
+msgstr ""
+
+#: src/app/device/check.rs:427
+msgid "{} needs fixing: {} Open DEVICES to fix it."
+msgstr ""
+
+#: src/app/device/check.rs:439
+msgid "{} needs fixing: {} Eject anyway?"
+msgstr ""
+
+#: src/app/device/check.rs:445
+msgid "EJECT ANYWAY"
+msgstr ""
+
+#: src/app/device/check.rs:476
+msgid "Checking {} before it is ejected…"
+msgstr ""
+
+#: src/app/device/check.rs:486
+msgid "Wait for the check to finish, then try again."
+msgstr ""
+
+#: src/app/device/check.rs:490
+msgid "Nothing on {} that this app can repair."
+msgstr ""
+
+#: src/app/device/check.rs:499
+msgid "Rebuild the library on {} from your collection: the whole collection?"
+msgstr ""
+
+#: src/app/device/check.rs:501
+msgid "Rebuild the library on {} from your collection: the playlists ticked in SYNC MANAGER?"
+msgstr ""
+
+#: src/app/device/check.rs:507
+msgid "REBUILD"
+msgstr ""
+
+#: src/app/device/check.rs:545
+msgid "Fixing the stick"
+msgstr ""
+
+#: src/app/device/check.rs:562
+msgid "it is mounted read-only"
+msgstr ""
+
+#: src/app/device/check.rs:650
+msgid "Finishing what was cut off"
+msgstr ""
+
+#: src/app/device/check.rs:653
+msgid "{}: the cut-off export could not be put right ({})."
+msgstr ""
+
+#: src/app/device/check.rs:660
+msgid "{}: the extension {} is switched off. Switch it on in PREFERENCES > EXTENSIONS."
+msgstr ""
+
+#: src/app/device/check.rs:661
+msgid "Repairing ({})"
+msgstr ""
+
+#: src/app/device/check.rs:676
+msgid "{} is ready."
+msgstr ""
+
+#: src/app/device/check.rs:680
+msgid "{} still needs attention: {}"
+msgstr ""
+
+#: src/app/device/check.rs:697
+msgid "Not fixed: the backup failed ({}). Fix that or switch the backup off in PREFERENCES > DJ SYSTEM, then try again."
+msgstr ""
+
+#: src/app/device/check.rs:712
+msgid "Backed up the library first: {}"
+msgstr ""
+
+#: src/app/device/check.rs:720
+msgid "Writing the library again"
+msgstr ""
+
+#: src/app/device/check.rs:752
+msgid "Copying missing music"
+msgstr ""
+
+#: src/app/device/check.rs:764
+msgid "Copied {n} missing audio file again from your collection."
+msgid_plural "Copied {n} missing audio files again from your collection."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/app/device/check.rs:766
+msgid "Copied {} of {} missing audio files again. {} are not in your collection: copy them to the stick by hand or take them off its playlists."
+msgstr ""
+
+#: src/app/device/check.rs:807
+msgid "{}: the copy is shorter than the original"
 msgstr ""
 
 #: src/app/device/export.rs:26
@@ -6928,48 +7274,47 @@ msgstr ""
 msgid "cues of {} track(s) written to {}"
 msgstr ""
 
-#: src/app/device/mod.rs:68
+#: src/app/device/mod.rs:71
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr ""
 
-#: src/app/device/mod.rs:156
+#: src/app/device/mod.rs:161
 msgid " — {} warning(s), first: {}"
 msgstr ""
 
-#: src/app/device/mod.rs:158
+#: src/app/device/mod.rs:163
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr ""
 
-#: src/app/device/mod.rs:177
+#: src/app/device/mod.rs:182
 msgid " — Update Collection baseline not recorded: {}"
 msgstr ""
 
-#: src/app/device/mod.rs:202
+#: src/app/device/mod.rs:207
 msgid "failed: {}"
 msgstr ""
 
-#: src/app/device/mod.rs:256
-#: src/app/device/sync.rs:111
-msgid "That device is not mounted any more"
+#: src/app/device/mod.rs:262
+msgid "That stick is not connected any more. Plug it in again, then try once more."
 msgstr ""
 
-#: src/app/device/mod.rs:265
-msgid "Choose a device first"
+#: src/app/device/mod.rs:274
+msgid "No device is chosen. Pick one in the list on the left."
 msgstr ""
 
-#: src/app/device/mod.rs:277
-msgid "mounted read-only"
+#: src/app/device/mod.rs:288
+msgid "it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"
 msgstr ""
 
-#: src/app/device/mod.rs:286
+#: src/app/device/mod.rs:297
 msgid "cannot read the collection: {}"
 msgstr ""
 
-#: src/app/device/mod.rs:327
-msgid "{}: its plugin does not offer that"
+#: src/app/device/mod.rs:338
+msgid "{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports."
 msgstr ""
 
-#: src/app/device/mod.rs:455
+#: src/app/device/mod.rs:478
 msgid "Cancelling…"
 msgstr ""
 
@@ -7096,18 +7441,18 @@ msgid "{}: plugged in, mounting /dev/{}…"
 msgstr ""
 
 #: src/app/device/scan.rs:75
-msgid "{}: cannot mount /dev/{}: {}"
+msgid "{}: cannot mount /dev/{}: {}. Mount it from your file manager, then it shows up here."
 msgstr ""
 
-#: src/app/device/scan.rs:103
+#: src/app/device/scan.rs:104
 msgid "{} connected ({})"
 msgstr ""
 
-#: src/app/device/scan.rs:114
+#: src/app/device/scan.rs:115
 msgid "{}: {} setting(s) changed on the player were taken over"
 msgstr ""
 
-#: src/app/device/scan.rs:146
+#: src/app/device/scan.rs:154
 msgid "{} removed"
 msgstr ""
 
@@ -7127,6 +7472,10 @@ msgstr ""
 
 #: src/app/device/sync.rs:84
 msgid "No playlist is set to synchronize: tick some in the list"
+msgstr ""
+
+#: src/app/device/sync.rs:111
+msgid "That device is not mounted any more"
 msgstr ""
 
 #: src/app/device/sync.rs:115
@@ -8198,10 +8547,6 @@ msgstr ""
 msgid "Do you want to back up music files as well?"
 msgstr ""
 
-#: src/app/library/mod.rs:333
-msgid "NO"
-msgstr ""
-
 #: src/app/library/mod.rs:351
 msgid "unknown menu action {}"
 msgstr ""
@@ -8359,12 +8704,6 @@ msgstr ""
 
 #: src/app/library/settings.rs:174
 msgid "MP3, WAV, AIFF and FLAC files"
-msgstr ""
-
-#: src/app/library/settings.rs:175
-#: src/app/prefs/analysis.rs:36
-#: src/app/welcome.rs:27
-msgid "LIBRARY"
 msgstr ""
 
 #: src/app/library/settings.rs:176
@@ -10067,19 +10406,23 @@ msgstr ""
 msgid "Automatically backup device library upon removal"
 msgstr ""
 
-#: src/app/prefs/dj_system/behaviour.rs:69
+#: src/app/prefs/dj_system/behaviour.rs:70
+msgid "Check the stick before it is ejected and ask when it needs fixing"
+msgstr ""
+
+#: src/app/prefs/dj_system/behaviour.rs:74
 msgid "Backups"
 msgstr ""
 
-#: src/app/prefs/dj_system/behaviour.rs:70
+#: src/app/prefs/dj_system/behaviour.rs:75
 msgid "Backup now and the list of backups are on each device's panel"
 msgstr ""
 
-#: src/app/prefs/dj_system/behaviour.rs:72
+#: src/app/prefs/dj_system/behaviour.rs:77
 msgid "THIS COMPUTER"
 msgstr ""
 
-#: src/app/prefs/dj_system/behaviour.rs:73
+#: src/app/prefs/dj_system/behaviour.rs:78
 msgid "Computer Name"
 msgstr ""
 

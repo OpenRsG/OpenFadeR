@@ -65,6 +65,11 @@ pub fn rows(store: &Store) -> Vec<Row> {
             tr!("Automatically backup device library upon removal"),
             b.auto_backup,
         ),
+        Row::check(
+            "djs.beh.check_on_eject",
+            tr!("Check the stick before it is ejected and ask when it needs fixing"),
+            b.check_on_eject,
+        ),
         Row::info(
             tr!("Backups"),
             tr!("Backup now and the list of backups are on each device's panel"),

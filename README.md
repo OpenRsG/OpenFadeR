@@ -200,6 +200,12 @@ The Collection is OpenFadeR's own database. Other apps' libraries connect to it 
 
 Track > Find Artwork… asks the artwork plugins (`cover-art` covers MusicBrainz, iTunes and Discogs) for covers, shows them to pick from, and keeps the chosen one for the album; Fetch Missing Artwork does it for a whole list. Folder images beside the files count too. See [Artwork plugins](docs/plugins.md#artwork).
 
+### A stick you can trust
+
+Every USB stick or SD card the app handles has a verdict at the top of its DEVICES tab, in big letters you can read in a dark booth: READY, NEEDS FIXING, UNREADABLE or EMPTY. It is found in the background when the stick is mounted, after anything writes to it and when the tab opens; the device list shows it as a chip. DETAILS lists the libraries on the stick (when written, tracks, playlists, cues), what is wrong as cause / consequence / action, and for each player model OK / NO / ? with the reason ("needs OneLibrary, this stick has none", "cannot read exFAT"; a model nobody has measured yet is never a plain OK). Tick the players of your booth there (or pick a preset) and the verdict is for those only. FIX THE STICK repairs what it can, after a backup of the stick's library: it finishes or undoes an export a pulled stick cut off, runs the extensions' own repairs, copies audio files a library lists but the stick lost from your collection again, and rebuilds a library nothing can repair from your collection after asking. Nothing is ever deleted. A stick that an export cut off is put right when it is mounted, and with PREFERENCES > DJ SYSTEM > DEVICE > "Check the stick before it is ejected" an eject of a stick that needs fixing asks first.
+
+`openfader verify <mount> [--players "CDJ-3000X,CDJ-2000NXS2"] [--json]` does the same check from a terminal, with no window and no audio, and never writes (a cut-off export is reported, not put right). It prints the verdict, libraries, problems and players, or JSON, and its exit code is the verdict: 0 ready, 1 needs fixing or empty, 2 unreadable, 3 it could not be checked (no such folder, not a stick the app lists, no device extension on). `openfader verify --help` shows the usage; `OPENFADER_DEVICE_ROOTS=<folder>` makes a folder a pretend stick for trying it out.
+
 ## Themes
 
 <p align="center"><img src="docs/media/themes-grid.jpg" alt="The same view in Catppuccin Mocha, Latte, Rek, So Pro, Dracula, Nord, Tokyo Night and Gruvbox Dark" width="100%"></p>

@@ -774,6 +774,19 @@ then finishes or undoes a change a pulled stick left (`commit::recover`), backs 
 five per device) unless Preferences say otherwise, writes, and reports the plugins' read-back (`verified`). Its status line shows the
 speed and the time left, and names what makes a slow stick slow.
 
+**Stick check.** The host judges every device ([`src/device/check.rs`](../src/device/check.rs); the DEVICES tab and `openfader verify`).
+A plugin listing `check` answers `device_check` (`libraries`: every library it can hold with `present`, `readable`, `modified`,
+`tracks`, `playlists`, `cues`; `problems`: `id` prefixed with the plugin name, `severity` `info` / `warning` / `error` /
+`unreadable`, `library`, `cause` / `consequence` / `action` as texts for the user, `fix` the id `device_fix` repairs it with, `files`
+the audio files it is about). A plugin without `check` is judged from the library the host opens through it: its track and playlist
+counts, and every audio file the library lists must be on the device (else a problem whose `files` the host copies again from the
+collection). The host adds what no plugin can know: a change a pulled stick cut off (the journal of `commit`), the file system and
+the partition table. Player models come from `players.json` next to `plugin.json` (`players`: `model`, `reads` the library names it
+reads, `file_systems`, `partition_tables`, `status` `confirmed` or `to_measure`, `note`; `presets`: named lists of models for the
+booth profile); the models of all plugins are merged. A model is OK when the file system and the partition table are in its lists
+(a list that is empty, or a table not known, is not held against it) and one library it reads is present, readable and without an
+`error` problem; `to_measure` is never a plain OK. FIX THE STICK runs the problems' `fix` ids in severity order through `device_fix`.
+
 A job (`export`, `update`, `remove`, `device_action`, `device_fix`) runs inside its call on a thread of the app. Meanwhile the plugin
 calls back through the `host` table every request receives (`openfader_plugin::library::host` in Rust): `analysis` (the beat grid,
 cues, waveforms of a track: `computed: false` what the track's own library holds, `true` the app's analysis of the audio, cached),

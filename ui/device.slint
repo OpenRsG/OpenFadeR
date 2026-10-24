@@ -7,6 +7,8 @@ import { ExportPage, SyncPage } from "device-export.slint";
 import { BackupPage } from "device-backup.slint";
 import { DevicePreview, DeviceSyncAsk } from "device-preview.slint";
 export { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow, PreviewRow }
+import { CheckLib, CheckPlayer, CheckPreset, CheckProblem } from "device-state.slint";
+export { CheckLib, CheckPlayer, CheckPreset, CheckProblem }
 
 /// Toolbar button that opens the device windows; lit while a job writes to a device.
 export component DeviceChip inherits Chip {
@@ -116,7 +118,8 @@ component DeviceConfirm inherits DialogFrame {
         spacing: Theme.space-md;
         alignment: end;
         vertical-stretch: 0;
-        Chip { text: DeviceState.confirm-yes; width: 120px; horizontal-stretch: 0; active: true; clicked => { DeviceState.confirmed(true); } }
+        Chip { text: DeviceState.confirm-yes; width: DeviceState.confirm-alt != "" ? 160px : 120px; horizontal-stretch: 0; active: true; clicked => { DeviceState.confirmed(true); } }
+        if DeviceState.confirm-alt != "": Chip { text: DeviceState.confirm-alt; width: 160px; horizontal-stretch: 0; active: true; clicked => { DeviceState.confirmed-alt(); } }
         Chip { text: @tr("CANCEL"); width: 80px; horizontal-stretch: 0; clicked => { DeviceState.confirmed(false); } }
     }
 }

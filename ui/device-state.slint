@@ -73,6 +73,40 @@ export struct PreviewRow {
     detail: string,
 }
 
+// Checker: what the stick check shows (src/app/device/check.rs).
+/// A library of the stick: when it was written and what it holds ("–" = not known); `state` 0 on the stick, 1 not on it, 2 unreadable.
+export struct CheckLib {
+    name: string,
+    written: string,
+    tracks: string,
+    playlists: string,
+    cues: string,
+    state: int,
+}
+
+/// What is wrong, worded cause / consequence / action; `severity` 0 info, 1 warning, 2 error, 3 unreadable.
+export struct CheckProblem {
+    severity: int,
+    cause: string,
+    consequence: string,
+    action: string,
+}
+
+/// A player model and whether it reads the stick: `fit` 0 OK, 1 not confirmed, 2 NO, 3 unknown; `reason` says why not or what the
+/// maker's notes say.
+export struct CheckPlayer {
+    model: string,
+    fit: int,
+    reason: string,
+}
+
+/// A set of player models for the booth profile.
+export struct CheckPreset {
+    id: string,
+    label: string,
+    on: bool,
+}
+
 /// The device windows (src/app/device/): detection, EXPORT to a device (create / add / update), SYNC MANAGER, backups, eject.
 /// Rust owns every value; the callbacks are the user's actions.
 export global DeviceState {
@@ -169,6 +203,39 @@ export global DeviceState {
     in property <bool> sync-ask-open;
     in property <string> sync-ask-text;
     callback sync-ask-answer(bool);
+
+    // Checker: the stick check of the chosen device (src/app/device/check.rs). `check-state`: -1 checking, 0 READY, 1 NEEDS FIXING,
+    // 2 UNREADABLE, 3 EMPTY; `check-title` and `check-line` are the words for it.
+    in property <int> check-state: -1;
+    in property <string> check-title;
+    in property <string> check-line;
+    in property <[CheckLib]> check-libs;
+    in property <[CheckProblem]> check-problems;
+    in property <[CheckPlayer]> check-players;
+    in property <[CheckPreset]> check-presets;
+    /// Every player model the plugins know, ticked when the booth profile holds it.
+    in property <[PickRow]> booth-rows;
+    /// The booth profile is empty: the stick is judged for every known model.
+    in property <bool> booth-all: true;
+    /// FIX THE STICK has something to do.
+    in property <bool> fixable;
+    /// The DEVICES tab shows the check details instead of the setup.
+    in-out property <bool> check-details;
+    /// Per device of `devices`: its check state (as `check-state`) and the short label of it.
+    in property <[int]> device-checks;
+    in property <[string]> device-check-labels;
+    /// A second answer of the open question (EJECT ANYWAY / FIX THE STICK): its label, "" = none.
+    in property <string> confirm-alt;
+    callback check-again();
+    callback fix-stick();
+    callback booth-toggle(int);
+    callback booth-preset(string);
+    callback booth-everything();
+    callback confirmed-alt();
+    /// The colour of a check state.
+    public pure function state-color(state: int) -> color {
+        return state == 0 ? Theme.play : state == 1 ? Theme.cue : state == 2 ? Theme.danger : Theme.text-dim;
+    }
 }
 
 /// Checkbox rows for playlists and folders.

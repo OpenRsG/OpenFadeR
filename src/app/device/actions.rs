@@ -8,8 +8,9 @@ use openfader::{
     library::{Library, Playlist, is_history},
     plugin::device::{Feature, RemoveTarget},
     store::{
-        self, NodeKind, Store,
+        self,
         device_settings::{self, Behaviour},
+        NodeKind, Store,
     },
 };
 use slint::ComponentHandle;
@@ -53,7 +54,7 @@ pub(super) fn wire(cx: &Rc<Ctx>, app: &App) {
 fn run_action(cx: &Rc<Ctx>, d: &Device, id: &str, confirmed: bool) {
     let Some(a) = d.info.actions.iter().find(|a| a.id == id) else {
         return cx.say(
-            &tr!("{}: that action is not offered any more", d.label),
+            &tr!("{}: its extension no longer offers that action. Open DEVICES and press CHECK AGAIN.", d.label),
             true,
         );
     };
@@ -61,7 +62,7 @@ fn run_action(cx: &Rc<Ctx>, d: &Device, id: &str, confirmed: bool) {
         return;
     }
     let Some(provider) = d.provider() else {
-        return cx.say(&tr!("{}: its plugin is not available", d.label), true);
+        return cx.say(&tr!("{}: its extension is switched off. Switch it on in PREFERENCES > EXTENSIONS, then restart.", d.label), true);
     };
     let config = device_settings::config(&cx.store, &d.id);
     let (dev, id) = (d.clone(), id.to_owned());
@@ -92,7 +93,13 @@ fn run_action(cx: &Rc<Ctx>, d: &Device, id: &str, confirmed: bool) {
 
 fn update_collection(cx: &Rc<Ctx>, d: &Device) {
     if !d.has_library() {
-        return cx.say(&tr!("{} has no library", d.label), true);
+        return cx.say(
+            &tr!(
+                "{} has no library to read from. Export to it first.",
+                d.label
+            ),
+            true,
+        );
     }
     let Some(provider) = cx.provider_for(d, Feature::Update) else {
         return;

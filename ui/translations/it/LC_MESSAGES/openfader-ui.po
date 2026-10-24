@@ -59,473 +59,473 @@ msgstr "LICENZA"
 msgid "Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."
 msgstr "Software libero: puoi usarlo, condividerlo e modificarlo secondo la AGPL. Realizzato con Rust e Slint."
 
-#: ui/app.slint:200
+#: ui/app.slint:202
 msgid "File"
 msgstr "File"
 
-#: ui/app.slint:202
+#: ui/app.slint:204
 msgid "Import"
 msgstr "Importa"
 
-#: ui/app.slint:203
+#: ui/app.slint:205
 msgid "Import Track…"
 msgstr "Importa traccia…"
 
-#: ui/app.slint:204
+#: ui/app.slint:206
 msgid "Import Folder…"
 msgstr "Importa cartella…"
 
-#: ui/app.slint:205
-#: ui/app.slint:278
+#: ui/app.slint:207
+#: ui/app.slint:280
 msgid "Import Playlist…"
 msgstr "Importa playlist…"
 
-#: ui/app.slint:209
+#: ui/app.slint:211
 msgid "Display All Missing Files"
 msgstr "Mostra tutti i file mancanti"
 
-#: ui/app.slint:210
+#: ui/app.slint:212
 msgid "Display All Duplicated Files"
 msgstr "Mostra tutti i file duplicati"
 
-#: ui/app.slint:212
+#: ui/app.slint:214
 #: ui/touch.slint:85
 #: ui/touch.slint:99
 msgid "Library"
 msgstr "Libreria"
 
-#: ui/app.slint:213
+#: ui/app.slint:215
 msgid "Backup Library…"
 msgstr "Backup della libreria…"
 
-#: ui/app.slint:214
+#: ui/app.slint:216
 msgid "Restore Library…"
 msgstr "Ripristina libreria…"
 
-#: ui/app.slint:215
+#: ui/app.slint:217
 msgid "Backed up device library management…"
 msgstr "Gestione delle librerie dei dispositivi salvate…"
 
-#: ui/app.slint:216
+#: ui/app.slint:218
 msgid "Last Import Report…"
 msgstr "Ultimo rapporto di importazione…"
 
-#: ui/app.slint:216
+#: ui/app.slint:218
 msgid "Last Import Report: no import yet"
 msgstr "Ultimo rapporto di importazione: nessuna importazione"
 
-#: ui/app.slint:219
+#: ui/app.slint:221
 msgid "Export Collection"
 msgstr "Esporta collezione"
 
-#: ui/app.slint:223
+#: ui/app.slint:225
 msgid "Preferences…"
 msgstr "Preferenze…"
 
-#: ui/app.slint:224
+#: ui/app.slint:226
 msgid "Exit"
 msgstr "Esci"
 
-#: ui/app.slint:227
+#: ui/app.slint:229
 #: ui/touch.slint:81
 #: ui/touch.slint:81
 msgid "Edit"
 msgstr "Modifica"
 
-#: ui/app.slint:228
+#: ui/app.slint:230
 msgid "Undo (Ctrl+Z)"
 msgstr "Annulla (Ctrl+Z)"
 
-#: ui/app.slint:228
+#: ui/app.slint:230
 msgid "Undo {} (Ctrl+Z)"
 msgstr "Annulla {} (Ctrl+Z)"
 
-#: ui/app.slint:229
+#: ui/app.slint:231
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr "Ripeti (Ctrl+Shift+Z)"
 
-#: ui/app.slint:229
+#: ui/app.slint:231
 msgid "Redo {} (Ctrl+Shift+Z)"
 msgstr "Ripeti {} (Ctrl+Shift+Z)"
 
-#: ui/app.slint:232
+#: ui/app.slint:234
 msgid "Track"
 msgstr "Traccia"
 
-#: ui/app.slint:233
+#: ui/app.slint:235
 msgid "Edit Track Details…"
 msgstr "Modifica dettagli traccia…"
 
-#: ui/app.slint:234
+#: ui/app.slint:236
 msgid "Import To Collection"
 msgstr "Importa nella collezione"
 
-#: ui/app.slint:235
+#: ui/app.slint:237
 msgid "Analyze Track"
 msgstr "Analizza traccia"
 
-#: ui/app.slint:236
+#: ui/app.slint:238
 msgid "Analysis Lock"
 msgstr "Blocco analisi"
 
-#: ui/app.slint:237
+#: ui/app.slint:239
 #: src/app/library/track.rs:189
 msgid "Reload Tag"
 msgstr "Ricarica tag"
 
-#: ui/app.slint:238
+#: ui/app.slint:240
 #: src/app/library/track.rs:191
 msgid "Reload Tag (discard edits)"
 msgstr "Ricarica tag (scarta modifiche)"
 
-#: ui/app.slint:239
+#: ui/app.slint:241
 msgid "Find Artwork…"
 msgstr "Trova copertina…"
 
-#: ui/app.slint:240
+#: ui/app.slint:242
 msgid "Fetch Missing Artwork"
 msgstr "Scarica copertine mancanti"
 
-#: ui/app.slint:241
+#: ui/app.slint:243
 msgid "Show in File Manager"
 msgstr "Mostra nel gestore file"
 
-#: ui/app.slint:243
+#: ui/app.slint:245
 #: ui/browser-table.slint:315
 msgid "Relocate…"
 msgstr "Ricollega…"
 
-#: ui/app.slint:244
+#: ui/app.slint:246
 msgid "Auto Relocate"
 msgstr "Ricollega automaticamente"
 
-#: ui/app.slint:245
+#: ui/app.slint:247
 #: ui/browser-table.slint:317
 #: ui/stage/table.slint:283
 msgid "Remove from Collection"
 msgstr "Rimuovi dalla collezione"
 
-#: ui/app.slint:247
+#: ui/app.slint:249
 msgid "Add to Tag List"
 msgstr "Aggiungi alla Tag List"
 
-#: ui/app.slint:248
+#: ui/app.slint:250
 msgid "Add to Playlist…"
 msgstr "Aggiungi a playlist…"
 
-#: ui/app.slint:249
+#: ui/app.slint:251
 #: ui/browser-table.slint:302
 #: ui/stage/table.slint:278
 msgid "Tags…"
 msgstr "Tag…"
 
-#: ui/app.slint:252
+#: ui/app.slint:254
 msgid "Playlist"
 msgstr "Playlist"
 
-#: ui/app.slint:253
+#: ui/app.slint:255
 msgid "Create New Playlist"
 msgstr "Crea nuova playlist"
 
-#: ui/app.slint:254
+#: ui/app.slint:256
 msgid "Create New Intelligent Playlist"
 msgstr "Crea nuova playlist intelligente"
 
-#: ui/app.slint:255
+#: ui/app.slint:257
 msgid "Create New Folder"
 msgstr "Crea nuova cartella"
 
-#: ui/app.slint:256
+#: ui/app.slint:258
 msgid "Delete Playlist"
 msgstr "Elimina playlist"
 
-#: ui/app.slint:259
+#: ui/app.slint:261
 msgid "Sort Items"
 msgstr "Ordina elementi"
 
-#: ui/app.slint:260
+#: ui/app.slint:262
 msgid "Track Title"
 msgstr "Titolo traccia"
 
-#: ui/app.slint:261
+#: ui/app.slint:263
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:198
 msgid "Artist"
 msgstr "Artista"
 
-#: ui/app.slint:262
+#: ui/app.slint:264
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:202
 msgid "Genre"
 msgstr "Genere"
 
-#: ui/app.slint:264
+#: ui/app.slint:266
 #: ui/browser-tree.slint:102
 #: ui/touch-actions.slint:74
 msgid "Key"
 msgstr "Key"
 
-#: ui/app.slint:265
+#: ui/app.slint:267
 #: ui/touch-actions.slint:74
 msgid "Time"
 msgstr "Durata"
 
-#: ui/app.slint:266
+#: ui/app.slint:268
 #: ui/touch-actions.slint:74
 msgid "Rating"
 msgstr "Valutazione"
 
-#: ui/app.slint:267
+#: ui/app.slint:269
 #: ui/touch-actions.slint:74
 msgid "Comments"
 msgstr "Commenti"
 
-#: ui/app.slint:269
+#: ui/app.slint:271
 msgid "Renumber Track Order"
 msgstr "Rinumera ordine tracce"
 
-#: ui/app.slint:272
+#: ui/app.slint:274
 msgid "Export a playlist to a file"
 msgstr "Esporta una playlist in un file"
 
-#: ui/app.slint:275
+#: ui/app.slint:277
 #: ui/touch-actions.slint:76
 msgid "Text"
 msgstr "Testo"
 
-#: ui/app.slint:277
+#: ui/app.slint:279
 msgid "Export Playlist (to a device)…"
 msgstr "Esporta playlist (su un dispositivo)…"
 
-#: ui/app.slint:281
+#: ui/app.slint:283
 msgid "View"
 msgstr "Visualizza"
 
-#: ui/app.slint:282
+#: ui/app.slint:284
 msgid "Full Screen"
 msgstr "Schermo intero"
 
-#: ui/app.slint:284
-#: ui/app.slint:477
+#: ui/app.slint:286
+#: ui/app.slint:479
 msgid "2Deck Horizontal"
 msgstr "2 deck orizzontale"
 
-#: ui/app.slint:285
-#: ui/app.slint:477
+#: ui/app.slint:287
+#: ui/app.slint:479
 msgid "2Deck Vertical"
 msgstr "2 deck verticale"
 
-#: ui/app.slint:286
-#: ui/app.slint:477
+#: ui/app.slint:288
+#: ui/app.slint:479
 msgid "4Deck Horizontal"
 msgstr "4 deck orizzontale"
 
-#: ui/app.slint:287
-#: ui/app.slint:477
+#: ui/app.slint:289
+#: ui/app.slint:479
 msgid "4Deck Vertical"
 msgstr "4 deck verticale"
 
-#: ui/app.slint:288
-#: ui/app.slint:477
+#: ui/app.slint:290
+#: ui/app.slint:479
 msgid "Browse"
 msgstr "Sfoglia"
 
-#: ui/app.slint:289
+#: ui/app.slint:291
 #: ui/exportmode-state.slint:54
 msgid "1 PLAYER"
 msgstr "1 PLAYER"
 
-#: ui/app.slint:290
+#: ui/app.slint:292
 #: ui/exportmode-state.slint:54
 msgid "2 PLAYER"
 msgstr "2 PLAYER"
 
-#: ui/app.slint:291
+#: ui/app.slint:293
 #: ui/exportmode-state.slint:54
 msgid "DUAL PLAYER"
 msgstr "DUAL PLAYER"
 
-#: ui/app.slint:292
+#: ui/app.slint:294
 #: ui/exportmode-state.slint:54
 msgid "SIMPLE PLAYER"
 msgstr "SIMPLE PLAYER"
 
-#: ui/app.slint:293
+#: ui/app.slint:295
 #: ui/exportmode-state.slint:54
 msgid "FULL BROWSER"
 msgstr "BROWSER COMPLETO"
 
-#: ui/app.slint:294
+#: ui/app.slint:296
 msgid "Close Split Screen"
 msgstr "Chiudi schermo diviso"
 
-#: ui/app.slint:294
+#: ui/app.slint:296
 msgid "Split Screen"
 msgstr "Schermo diviso"
 
-#: ui/app.slint:296
+#: ui/app.slint:298
 #: src/app/prefs/view.rs:417
 msgid "Mixer"
 msgstr "Mixer"
 
-#: ui/app.slint:297
+#: ui/app.slint:299
 msgid "Effect Panel"
 msgstr "Pannello effetti"
 
-#: ui/app.slint:298
+#: ui/app.slint:300
 #: ui/touch.slint:85
 #: ui/touch.slint:99
 msgid "Sampler"
 msgstr "Sampler"
 
-#: ui/app.slint:299
-#: ui/app.slint:496
+#: ui/app.slint:301
+#: ui/app.slint:498
 #: ui/groove.slint:250
 msgid "BEAT LAB"
 msgstr "BEAT LAB"
 
-#: ui/app.slint:301
+#: ui/app.slint:303
 #: ui/stage/library.slint:53
 #: src/app/prefs/view.rs:348
 msgid "Related Tracks"
 msgstr "Tracce correlate"
 
-#: ui/app.slint:302
+#: ui/app.slint:304
 #: ui/browser-tree.slint:102
 msgid "Tags"
 msgstr "Tag"
 
-#: ui/app.slint:303
+#: ui/app.slint:305
 #: ui/studio/automix.slint:181
 #: ui/touch-actions.slint:79
 msgid "Automix"
 msgstr "Automix"
 
-#: ui/app.slint:306
+#: ui/app.slint:308
 msgid "Plugins"
 msgstr "Plugins"
 
-#: ui/app.slint:310
+#: ui/app.slint:312
 msgid "Help"
 msgstr "Aiuto"
 
-#: ui/app.slint:311
+#: ui/app.slint:313
 msgid "Keyboard Shortcuts"
 msgstr "Scorciatoie da tastiera"
 
-#: ui/app.slint:312
+#: ui/app.slint:314
 #: ui/welcome.slint:69
 msgid "Welcome"
 msgstr "Benvenuto"
 
-#: ui/app.slint:313
+#: ui/app.slint:315
 msgid "Update to {}…"
 msgstr "Aggiorna a {}…"
 
-#: ui/app.slint:313
+#: ui/app.slint:315
 #: ui/touch-actions.slint:85
 msgid "Check for Updates"
 msgstr "Controlla aggiornamenti"
 
-#: ui/app.slint:314
+#: ui/app.slint:316
 msgid "Roll Back to {}…"
 msgstr "Torna a {}…"
 
-#: ui/app.slint:315
+#: ui/app.slint:317
 msgid "Report a Problem…"
 msgstr "Segnala un problema…"
 
-#: ui/app.slint:316
+#: ui/app.slint:318
 msgid "About OpenFadeR"
 msgstr "Info su OpenFadeR"
 
-#: ui/app.slint:436
+#: ui/app.slint:438
 msgid "Split screen: the browser in a window of its own"
 msgstr "Schermo diviso: il browser in una finestra separata"
 
-#: ui/app.slint:437
+#: ui/app.slint:439
 msgid "Switch the active window"
 msgstr "Cambia finestra attiva"
 
-#: ui/app.slint:465
-#: ui/app.slint:466
 #: ui/app.slint:467
+#: ui/app.slint:468
+#: ui/app.slint:469
 msgid "EXPORT"
 msgstr "ESPORTA"
 
-#: ui/app.slint:465
-#: ui/app.slint:466
 #: ui/app.slint:467
+#: ui/app.slint:468
+#: ui/app.slint:469
 msgid "PERFORMANCE"
 msgstr "PERFORMANCE"
 
-#: ui/app.slint:465
-#: ui/app.slint:466
 #: ui/app.slint:467
+#: ui/app.slint:468
+#: ui/app.slint:469
 msgid "EDIT"
 msgstr "MODIFICA"
 
-#: ui/app.slint:465
-#: ui/app.slint:466
-#: ui/app.slint:508
+#: ui/app.slint:467
+#: ui/app.slint:468
+#: ui/app.slint:510
 msgid "LIGHTING (BETA)"
 msgstr "LUCI (BETA)"
 
-#: ui/app.slint:465
 #: ui/app.slint:467
-#: ui/app.slint:507
+#: ui/app.slint:469
+#: ui/app.slint:509
 msgid "VIDEO (BETA)"
 msgstr "VIDEO (BETA)"
 
-#: ui/app.slint:495
+#: ui/app.slint:497
 #: ui/stage/mixer.slint:224
 msgid "FX"
 msgstr "FX"
 
-#: ui/app.slint:497
+#: ui/app.slint:499
 #: src/app/prefs/controller/mixpoint.rs:8
 msgid "MIX POINT LINK"
 msgstr "MIX POINT LINK"
 
-#: ui/app.slint:498
+#: ui/app.slint:500
 #: ui/stage/deck-parts.slint:478
 #: ui/stage/strip.slint:164
 msgid "SAMPLER"
 msgstr "SAMPLER"
 
-#: ui/app.slint:499
+#: ui/app.slint:501
 #: ui/stage/mixer.slint:224
 #: ui/stage/mixer.slint:226
 msgid "MIXER"
 msgstr "MIXER"
 
-#: ui/app.slint:504
+#: ui/app.slint:506
 msgid "REC panel"
 msgstr "Pannello REC"
 
-#: ui/app.slint:504
+#: ui/app.slint:506
 #: ui/stage/bar.slint:80
 #: ui/studio/bar.slint:57
 msgid "REC (master out)"
 msgstr "REC (uscita MASTER)"
 
-#: ui/app.slint:514
+#: ui/app.slint:516
 msgid "SHORTCUTS (?)"
 msgstr "SCORCIATOIE (?)"
 
-#: ui/app.slint:515
+#: ui/app.slint:517
 msgid "PREFS"
 msgstr "PREF."
 
-#: ui/app.slint:528
+#: ui/app.slint:530
 msgid "Zoom out the waveforms"
 msgstr "Riduci lo zoom delle forme d'onda"
 
-#: ui/app.slint:529
+#: ui/app.slint:531
 msgid "Default waveform zoom"
 msgstr "Zoom predefinito della forma d'onda"
 
-#: ui/app.slint:530
+#: ui/app.slint:532
 msgid "Zoom in the waveforms"
 msgstr "Aumenta lo zoom delle forme d'onda"
 
@@ -947,7 +947,7 @@ msgid "New playlist / folder / smart playlist / Tags / Cue Bank / Stage"
 msgstr "Nuova playlist / cartella / playlist intelligente / Tag / Cue Bank / fase"
 
 #: ui/browser.slint:191
-#: ui/device-devices.slint:239
+#: ui/device-devices.slint:248
 #: ui/plugins.slint:167
 msgid "MORE"
 msgstr "ALTRO"
@@ -957,6 +957,7 @@ msgid "Edit smart playlist, move; Cue Bank: add cues, load onto a deck; Stage: m
 msgstr "Modifica playlist intelligente, sposta; Cue Bank: aggiungi cue, carica su un deck; fase: sposta tracce, spostamenti recenti"
 
 #: ui/browser.slint:214
+#: ui/device-check.slint:145
 #: src/app/prefs/libraries.rs:39
 msgid "TRACKS"
 msgstr "TRACCE"
@@ -1052,8 +1053,8 @@ msgid "TAG FILTER"
 msgstr "FILTRO TAG"
 
 #: ui/browser.slint:306
+#: ui/device-check.slint:121
 #: ui/groove.slint:263
-#: ui/library.slint:163
 msgid "OK"
 msgstr "OK"
 
@@ -1622,6 +1623,7 @@ msgid "Beat grid editing"
 msgstr "Modifica della griglia dei beat"
 
 #: ui/deck-panel.slint:151
+#: ui/device-check.slint:145
 msgid "CUES"
 msgstr "CUES"
 
@@ -1750,139 +1752,223 @@ msgstr "Esegui il backup della libreria del dispositivo scelto"
 msgid "RESTORE TO DEVICE"
 msgstr "RIPRISTINA SUL DISPOSITIVO"
 
-#: ui/device-devices.slint:50
+#: ui/device-check.slint:39
+#: src/app/device/check.rs:448
+msgid "FIX THE STICK"
+msgstr "RIPARA LA CHIAVETTA"
+
+#: ui/device-check.slint:46
+msgid "Repair this stick: finish what was cut off, copy missing music from your collection, rebuild a library that cannot be read. A backup comes first and nothing is deleted."
+msgstr "Ripara questa chiavetta: completa ciò che era stato interrotto, ricopia la musica mancante dalla collezione, ricostruisce una libreria illeggibile. Prima si fa un backup e non viene cancellato nulla."
+
+#: ui/device-check.slint:50
+msgid "CHECK AGAIN"
+msgstr "CONTROLLA DI NUOVO"
+
+#: ui/device-check.slint:55
+msgid "Look at the stick again"
+msgstr "Esamina di nuovo la chiavetta"
+
+#: ui/device-check.slint:59
+msgid "SETUP"
+msgstr "IMPOSTAZIONI"
+
+#: ui/device-check.slint:59
+msgid "DETAILS"
+msgstr "DETTAGLI"
+
+#: ui/device-check.slint:63
+msgid "Back to formats and actions"
+msgstr "Torna a formati e azioni"
+
+#: ui/device-check.slint:63
+msgid "Libraries, problems, which players read this stick, the booth profile"
+msgstr "Librerie, problemi, quali lettori leggono questa chiavetta, il profilo della cabina"
+
+#: ui/device-check.slint:121
+#: src/app/library/mod.rs:333
+msgid "NO"
+msgstr "NO"
+
+#: ui/device-check.slint:139
+msgid "LIBRARIES ON THE STICK"
+msgstr "LIBRERIE SULLA CHIAVETTA"
+
+#: ui/device-check.slint:145
+#: src/app/library/settings.rs:175
+#: src/app/prefs/analysis.rs:36
+msgid "LIBRARY"
+msgstr "LIBRERIA"
+
+#: ui/device-check.slint:145
+msgid "LAST WRITTEN"
+msgstr "ULTIMA SCRITTURA"
+
+#: ui/device-check.slint:145
+msgid "PLAYLISTS"
+msgstr "PLAYLIST"
+
+#: ui/device-check.slint:147
+msgid "No library yet. EXPORT to it from the EXPORT tab."
+msgstr "Ancora nessuna libreria. Esporta qui dalla scheda ESPORTA."
+
+#: ui/device-check.slint:150
+msgid "WHAT IS WRONG"
+msgstr "COSA NON VA"
+
+#: ui/device-check.slint:152
+msgid "YOUR BOOTH"
+msgstr "LA TUA CABINA"
+
+#: ui/device-check.slint:153
+msgid "Tick the players you will find in the booth: the verdict is then for those only. Nothing ticked: every player the plugins know."
+msgstr "Spunta i lettori che troverai in cabina: il verdetto vale solo per quelli. Nessuno spuntato: tutti i lettori noti ai plugin."
+
+#: ui/device-check.slint:158
+msgid "ALL PLAYERS"
+msgstr "TUTTI I LETTORI"
+
+#: ui/device-check.slint:179
+msgid "PLAYERS"
+msgstr "LETTORI"
+
+#: ui/device-check.slint:186
+msgid "No plugin lists player models yet."
+msgstr "Nessun plugin elenca ancora modelli di lettore."
+
+#: ui/device-devices.slint:51
 msgid "ON THE DEVICE: {}"
 msgstr "SUL DISPOSITIVO: {}"
 
-#: ui/device-devices.slint:50
+#: ui/device-devices.slint:51
 msgid "WRITTEN BY THE NEXT EXPORT"
 msgstr "SCRITTO DALLA PROSSIMA ESPORTAZIONE"
 
-#: ui/device-devices.slint:50
+#: ui/device-devices.slint:51
 #: ui/edit.slint:124
 #: ui/lighting.slint:162
 msgid "OFF"
 msgstr "OFF"
 
-#: ui/device-devices.slint:127
+#: ui/device-devices.slint:128
 #: src/app/prefs/libraries.rs:18
 msgid "CONNECTED"
 msgstr "COLLEGATO"
 
-#: ui/device-devices.slint:136
+#: ui/device-devices.slint:137
 msgid "No device plugin is on. Switch one on in PREFERENCES > EXTENSIONS, then restart."
 msgstr "Nessun plugin di dispositivo è attivo. Attivane uno in PREFERENZE > ESTENSIONI, poi riavvia."
 
-#: ui/device-devices.slint:136
+#: ui/device-devices.slint:137
 msgid "No USB drive or SD card is mounted. Insert one: it shows up here, and as a USB icon on the left of the browser, as soon as it is mounted."
 msgstr "Nessuna chiavetta USB o scheda SD è montata. Inseriscine una: appare qui, e come icona USB a sinistra del browser, appena viene montata."
 
-#: ui/device-devices.slint:170
+#: ui/device-devices.slint:175
 msgid "Choose a device on the left."
 msgstr "Scegli un dispositivo a sinistra."
 
-#: ui/device-devices.slint:188
+#: ui/device-devices.slint:193
 #: ui/exportmode-dock.slint:70
-#: src/app/device/backup.rs:265
+#: src/app/device/backup.rs:271
 msgid "EJECT"
 msgstr "ESPELLI"
 
-#: ui/device-devices.slint:188
+#: ui/device-devices.slint:193
 msgid "Unmount it safely (a backup first, when Preferences ask for one)"
 msgstr "Smontalo in sicurezza (prima un backup, se le preferenze lo richiedono)"
 
-#: ui/device-devices.slint:190
+#: ui/device-devices.slint:199
 msgid "WHAT IS THIS DEVICE FOR?"
 msgstr "A COSA SERVE QUESTO DISPOSITIVO?"
 
-#: ui/device-devices.slint:195
+#: ui/device-devices.slint:204
 msgid "UNIVERSAL"
 msgstr "UNIVERSALE"
 
-#: ui/device-devices.slint:196
+#: ui/device-devices.slint:205
 msgid "Every format below on one device: it works in each app and on each player they list. The music is stored once."
 msgstr "Tutti i formati qui sotto su un solo dispositivo: funziona in ogni app e su ogni player elencato. La musica è salvata una sola volta."
 
-#: ui/device-devices.slint:202
+#: ui/device-devices.slint:211
 msgid "DEDICATED"
 msgstr "DEDICATO"
 
-#: ui/device-devices.slint:203
+#: ui/device-devices.slint:212
 msgid "Only the formats you tick below: for one app or one family of players. Exports are quicker."
 msgstr "Solo i formati che selezioni qui sotto: per un'app o una famiglia di player. Gli export sono più rapidi."
 
-#: ui/device-devices.slint:209
+#: ui/device-devices.slint:218
 #: ui/device-export.slint:9
 msgid "FORMATS"
 msgstr "FORMATI"
 
-#: ui/device-devices.slint:222
+#: ui/device-devices.slint:231
 msgid "Ticked formats are written by EXPORT, SYNC and the cue sync. Formats share one copy of each track, so ticking more costs little space."
 msgstr "I formati selezionati vengono scritti da ESPORTA, SYNC e dalla sincronizzazione dei CUE. I formati condividono una sola copia di ogni traccia, quindi selezionarne di più costa poco spazio."
 
-#: ui/device-devices.slint:224
+#: ui/device-devices.slint:233
 msgid "PUT MUSIC ON IT"
 msgstr "METTI LA MUSICA"
 
-#: ui/device-devices.slint:225
+#: ui/device-devices.slint:234
 msgid "EXPORT…"
 msgstr "ESPORTA…"
 
-#: ui/device-devices.slint:225
+#: ui/device-devices.slint:234
 msgid "Create or extend the libraries on this device"
 msgstr "Crea o estendi le librerie su questo dispositivo"
 
-#: ui/device-devices.slint:226
-#: ui/device.slint:66
-#: ui/device.slint:76
+#: ui/device-devices.slint:235
+#: ui/device.slint:68
+#: ui/device.slint:78
 msgid "SYNC MANAGER"
 msgstr "SYNC MANAGER"
 
-#: ui/device-devices.slint:226
+#: ui/device-devices.slint:235
 msgid "Keep chosen playlists up to date on this device"
 msgstr "Mantieni aggiornate su questo dispositivo le playlist scelte"
 
-#: ui/device-devices.slint:229
+#: ui/device-devices.slint:238
 msgid "BRING BACK"
 msgstr "RIPORTA INDIETRO"
 
-#: ui/device-devices.slint:230
+#: ui/device-devices.slint:239
 msgid "UPDATE COLLECTION"
 msgstr "AGGIORNA COLLEZIONE"
 
-#: ui/device-devices.slint:230
+#: ui/device-devices.slint:239
 msgid "Import cues, grids, ratings, colours and comments edited on the player"
 msgstr "Importa CUE, griglie, valutazioni, colori e commenti modificati sul player"
 
-#: ui/device-devices.slint:231
+#: ui/device-devices.slint:240
 msgid "IMPORT HISTORIES"
 msgstr "IMPORTA CRONOLOGIE"
 
-#: ui/device-devices.slint:231
+#: ui/device-devices.slint:240
 msgid "Import what the players played"
 msgstr "Importa ciò che hanno riprodotto i player"
 
-#: ui/device-devices.slint:234
+#: ui/device-devices.slint:243
 msgid "KEEP IT SAFE"
 msgstr "AL SICURO"
 
-#: ui/device-devices.slint:235
-#: ui/device.slint:66
-#: ui/device.slint:76
+#: ui/device-devices.slint:244
+#: ui/device.slint:68
+#: ui/device.slint:78
 msgid "BACKUPS"
 msgstr "BACKUP"
 
-#: ui/device-devices.slint:235
+#: ui/device-devices.slint:244
 msgid "Back up or restore this device's library"
 msgstr "Esegui il backup o il ripristino della libreria di questo dispositivo"
 
-#: ui/device-devices.slint:236
+#: ui/device-devices.slint:245
 #: ui/exportmode-dock.slint:69
 #: ui/plugins.slint:167
 msgid "SETTINGS"
 msgstr "PREFERENZE"
 
-#: ui/device-devices.slint:236
+#: ui/device-devices.slint:245
 msgid "The player settings this device carries (Preferences > DJ SYSTEM)"
 msgstr "Le impostazioni del player contenute in questo dispositivo (Preferenze > DJ SYSTEM)"
 
@@ -1950,17 +2036,17 @@ msgstr "AVVIA"
 msgid "NOT NOW"
 msgstr "NON ORA"
 
-#: ui/device.slint:13
-#: ui/device.slint:61
-#: ui/device.slint:66
+#: ui/device.slint:15
+#: ui/device.slint:63
+#: ui/device.slint:68
 msgid "DEVICES"
 msgstr "DISPOSITIVI"
 
-#: ui/device.slint:53
+#: ui/device.slint:55
 msgid "Cancel"
 msgstr "Annulla"
 
-#: ui/device.slint:105
+#: ui/device.slint:107
 msgid "CONFIRM"
 msgstr "CONFERMA"
 
@@ -3437,7 +3523,7 @@ msgid "Shift selected item downward"
 msgstr "Sposta in basso l'elemento selezionato"
 
 #: ui/prefs-djsystem.slint:130
-#: src/app/prefs/dj_system/behaviour.rs:76
+#: src/app/prefs/dj_system/behaviour.rs:81
 #: src/app/prefs/dj_system/mod.rs:265
 msgid "Reset to defaults"
 msgstr "Ripristina i predefiniti"
@@ -6685,97 +6771,97 @@ msgstr "il beat jump richiede una griglia dei beat"
 msgid "select a track in the library first"
 msgstr "seleziona prima una traccia nella libreria"
 
-#: src/app/device/actions.rs:56
-msgid "{}: that action is not offered any more"
-msgstr "{}: quell'azione non è più offerta"
+#: src/app/device/actions.rs:57
+msgid "{}: its extension no longer offers that action. Open DEVICES and press CHECK AGAIN."
+msgstr "{}: la sua estensione non offre più quell'azione. Apri DISPOSITIVI e premi CONTROLLA DI NUOVO."
 
-#: src/app/device/actions.rs:64
-msgid "{}: its plugin is not available"
-msgstr "{}: il suo plugin non è disponibile"
+#: src/app/device/actions.rs:65
+msgid "{}: its extension is switched off. Switch it on in PREFERENCES > EXTENSIONS, then restart."
+msgstr "{}: la sua estensione è disattivata. Attivala in PREFERENZE > ESTENSIONI, poi riavvia."
 
-#: src/app/device/actions.rs:95
-msgid "{} has no library"
-msgstr "{} non ha una libreria"
+#: src/app/device/actions.rs:97
+msgid "{} has no library to read from. Export to it first."
+msgstr "{} non ha una libreria da leggere. Esporta prima su di esso."
 
-#: src/app/device/actions.rs:102
+#: src/app/device/actions.rs:109
 msgid "Updating the collection"
 msgstr "Aggiornamento della collezione"
 
-#: src/app/device/actions.rs:104
+#: src/app/device/actions.rs:111
 msgid "; {} track(s) of the device are not in the collection and were not updated"
 msgstr "; {} tracce del dispositivo non sono nella collezione e non sono state aggiornate"
 
-#: src/app/device/actions.rs:105
+#: src/app/device/actions.rs:112
 msgid "Update Collection: {} of {} track(s) changed ({} ratings, {} comments, {} colours, {} cue lists, {} grids){}"
 msgstr "Aggiorna collezione: {} di {} tracce modificate ({} valutazioni, {} commenti, {} colori, {} liste di cue, {} griglie){}"
 
-#: src/app/device/actions.rs:125
+#: src/app/device/actions.rs:132
 msgid "Importing histories"
 msgstr "Importazione delle cronologie"
 
-#: src/app/device/actions.rs:130
+#: src/app/device/actions.rs:137
 msgid "Imported {} history(ies) of {}: {} plays, {} of unknown tracks skipped, {} imported before"
 msgstr "Importate {} cronologie di {}: {} riproduzioni, {} di tracce sconosciute saltate, {} importate in precedenza"
 
-#: src/app/device/actions.rs:132
+#: src/app/device/actions.rs:139
 msgid "its plugin is not available"
 msgstr "il suo plugin non è disponibile"
 
-#: src/app/device/actions.rs:133
+#: src/app/device/actions.rs:140
 msgid "; deleted {} from the device"
 msgstr "; eliminati {} dal dispositivo"
 
-#: src/app/device/actions.rs:134
+#: src/app/device/actions.rs:141
 msgid "; not deleted from the device: {}"
 msgstr "; non eliminati dal dispositivo: {}"
 
-#: src/app/device/actions.rs:190
+#: src/app/device/actions.rs:197
 msgid "that playlist is not on the device any more"
 msgstr "quella playlist non è più sul dispositivo"
 
-#: src/app/device/actions.rs:194
+#: src/app/device/actions.rs:201
 msgid "Imported {} into My Playlists: {} track(s), {} added to the collection"
 msgstr "Importata {} in Le mie playlist: {} tracce, {} aggiunte alla collezione"
 
-#: src/app/device/actions.rs:231
+#: src/app/device/actions.rs:238
 #: src/app/device/transfer.rs:292
 msgid "That playlist is not on the device any more"
 msgstr "Quella playlist non è più sul dispositivo"
 
-#: src/app/device/actions.rs:235
+#: src/app/device/actions.rs:242
 msgid "Delete the history {} from {}?"
 msgstr "Eliminare la cronologia {} da {}?"
 
-#: src/app/device/actions.rs:237
+#: src/app/device/actions.rs:244
 msgid "Delete {} from {}? Tracks that no other playlist lists are deleted too."
 msgstr "Eliminare {} da {}? Vengono eliminate anche le tracce che nessun'altra playlist elenca."
 
-#: src/app/device/actions.rs:243
+#: src/app/device/actions.rs:250
 msgid "Delete {} from {}? Its tracks stay on the device."
 msgstr "Eliminare {} da {}? Le sue tracce restano sul dispositivo."
 
-#: src/app/device/actions.rs:251
-#: src/app/device/actions.rs:298
+#: src/app/device/actions.rs:258
+#: src/app/device/actions.rs:305
 msgid "Deleting"
 msgstr "Eliminazione"
 
-#: src/app/device/actions.rs:254
+#: src/app/device/actions.rs:261
 msgid "Deleted the history {} from {}"
 msgstr "Cronologia {} eliminata da {}"
 
-#: src/app/device/actions.rs:258
+#: src/app/device/actions.rs:265
 msgid "Deleted {} ({} list(s), {} track(s)) from {}{}"
 msgstr "Eliminata {} ({} liste, {} tracce) da {}{}"
 
-#: src/app/device/actions.rs:264
+#: src/app/device/actions.rs:271
 msgid " — {} file(s) could not be deleted, first: {}"
 msgstr " — {} file non eliminati, il primo: {}"
 
-#: src/app/device/actions.rs:290
+#: src/app/device/actions.rs:297
 msgid "Delete {} from {}? The file and its analysis are removed."
 msgstr "Eliminare {} da {}? Il file e la sua analisi vengono rimossi."
 
-#: src/app/device/actions.rs:306
+#: src/app/device/actions.rs:313
 msgid "Deleted {} track(s) from {}"
 msgstr "Eliminate {} tracce da {}"
 
@@ -6809,10 +6895,11 @@ msgid "Backups deleted"
 msgstr "Backup eliminati"
 
 #: src/app/device/backup.rs:139
-msgid "{} holds no library to back up"
-msgstr "{} non contiene nessuna libreria da salvare"
+msgid "{}: there is no library on it to back up. Export to it first."
+msgstr "{}: non c'è nessuna libreria di cui fare il backup. Esporta prima su di esso."
 
 #: src/app/device/backup.rs:145
+#: src/app/device/check.rs:694
 #: src/app/device/safety.rs:90
 msgid "No backup folder: type one"
 msgstr "Nessuna cartella di backup: scrivine una"
@@ -6854,21 +6941,280 @@ msgstr ""
 msgid "CONTINUE"
 msgstr "CONTINUA"
 
-#: src/app/device/backup.rs:265
+#: src/app/device/backup.rs:271
 msgid "The library is loaded from {}: {} track(s) play from it and stop working when it is removed. Eject anyway?"
 msgstr "La libreria è caricata da {}: {} tracce vengono riprodotte da essa e smettono di funzionare se viene rimossa. Espellere comunque?"
 
-#: src/app/device/backup.rs:269
+#: src/app/device/backup.rs:275
 msgid "A transfer to {} is running: cancel it (X) before ejecting"
 msgstr "Un trasferimento verso {} è in corso: annullalo (X) prima di espellere"
 
-#: src/app/device/backup.rs:282
+#: src/app/device/backup.rs:291
 msgid "Ejecting"
 msgstr "Espulsione"
 
-#: src/app/device/backup.rs:293
-msgid "Not ejected: the backup failed ({})"
-msgstr "Non espulso: il backup non è riuscito ({})"
+#: src/app/device/backup.rs:302
+msgid "Not ejected: the backup failed ({}). Fix that, or switch the backup off in PREFERENCES > DJ SYSTEM, then eject again."
+msgstr "Non espulso: il backup è fallito ({}). Risolvi, oppure disattiva il backup in PREFERENZE > DJ SYSTEM, poi espelli di nuovo."
+
+#: src/app/device/check.rs:89
+msgid "cannot read {}"
+msgstr "non legge {}"
+
+#: src/app/device/check.rs:90
+msgid "cannot read a {} partition table"
+msgstr "non legge una tabella delle partizioni {}"
+
+#: src/app/device/check.rs:94
+msgid "needs {}, this stick has none"
+msgstr "ha bisogno di {}, questa chiavetta non ne ha"
+
+#: src/app/device/check.rs:94
+msgid "or"
+msgstr "o"
+
+#: src/app/device/check.rs:95
+msgid "cannot open the {} of this stick"
+msgstr "non riesce ad aprire la {} di questa chiavetta"
+
+#: src/app/device/check.rs:96
+msgid "finds the {} of this stick damaged (see WHAT IS WRONG)"
+msgstr "trova danneggiata la {} di questa chiavetta (vedi COSA NON VA)"
+
+#: src/app/device/check.rs:104
+msgid "Not confirmed yet"
+msgstr "Non ancora confermato"
+
+#: src/app/device/check.rs:105
+msgid "Not confirmed: {}"
+msgstr "Non confermato: {}"
+
+#: src/app/device/check.rs:106
+msgid "no extension knows this model"
+msgstr "nessuna estensione conosce questo modello"
+
+#: src/app/device/check.rs:114
+msgid "library"
+msgstr "libreria"
+
+#: src/app/device/check.rs:120
+msgid "An export to this stick was cut off (it was pulled out or lost power while the library was written)."
+msgstr "Un'esportazione su questa chiavetta è stata interrotta (è stata sfilata o è mancata la corrente mentre si scriveva la libreria)."
+
+#: src/app/device/check.rs:121
+msgid "A player could show an old library next to a new one."
+msgstr "Un lettore potrebbe mostrare una libreria vecchia accanto a una nuova."
+
+#: src/app/device/check.rs:122
+msgid "FIX THE STICK finishes or undoes it; your music is not touched."
+msgstr "RIPARA LA CHIAVETTA la completa o la annulla; la tua musica non viene toccata."
+
+#: src/app/device/check.rs:125
+msgid "{n} audio file that the {} lists is missing from this stick."
+msgid_plural "{n} audio files that the {} lists are missing from this stick."
+msgstr[0] "Manca {n} file audio elencato dalla {} su questa chiavetta."
+msgstr[1] "Mancano {n} file audio elencati dalla {} su questa chiavetta."
+
+#: src/app/device/check.rs:131
+msgid "Those tracks would not load on a player."
+msgstr "Quelle tracce non si caricherebbero su un lettore."
+
+#: src/app/device/check.rs:132
+msgid "FIX THE STICK copies them again from your collection."
+msgstr "RIPARA LA CHIAVETTA le copia di nuovo dalla tua collezione."
+
+#: src/app/device/check.rs:135
+msgid "The {} of this stick cannot be read ({})."
+msgstr "La {} di questa chiavetta non può essere letta ({})."
+
+#: src/app/device/check.rs:136
+msgid "A player would show an empty stick."
+msgstr "Un lettore mostrerebbe una chiavetta vuota."
+
+#: src/app/device/check.rs:137
+msgid "FIX THE STICK writes the library again from your collection, or restore a backup in BACKUPS. Your music is not touched."
+msgstr "RIPARA LA CHIAVETTA riscrive la libreria dalla tua collezione, oppure ripristina un backup in BACKUP. La tua musica non viene toccata."
+
+#: src/app/device/check.rs:140
+msgid "Part of the check of this stick failed: {}"
+msgstr "Una parte del controllo di questa chiavetta è fallita: {}"
+
+#: src/app/device/check.rs:141
+msgid "Some problems may not have been found."
+msgstr "Alcuni problemi potrebbero non essere stati trovati."
+
+#: src/app/device/check.rs:142
+msgid "Press CHECK AGAIN. If it keeps failing, update the extension."
+msgstr "Premi CONTROLLA DI NUOVO. Se continua a fallire, aggiorna l'estensione."
+
+#: src/app/device/check.rs:150
+msgid "READY"
+msgstr "PRONTA"
+
+#: src/app/device/check.rs:151
+msgid "NEEDS FIXING"
+msgstr "DA RIPARARE"
+
+#: src/app/device/check.rs:152
+msgid "UNREADABLE"
+msgstr "ILLEGGIBILE"
+
+#: src/app/device/check.rs:153
+msgid "EMPTY"
+msgstr "VUOTA"
+
+#: src/app/device/check.rs:172
+msgid "{} {}."
+msgstr "{} {}."
+
+#: src/app/device/check.rs:188
+msgid "{n} player reads it."
+msgid_plural "{n} players read it."
+msgstr[0] "{n} lettore la legge."
+msgstr[1] "{n} lettori la leggono."
+
+#: src/app/device/check.rs:189
+msgid "{} of {} players read it."
+msgstr "{} lettori su {} la leggono."
+
+#: src/app/device/check.rs:197
+msgid "Ready for a set."
+msgstr "Pronta per un set."
+
+#: src/app/device/check.rs:203
+msgid "No library of this stick can be read."
+msgstr "Nessuna libreria di questa chiavetta può essere letta."
+
+#: src/app/device/check.rs:210
+msgid "No library on this stick yet. Export to it to use it."
+msgstr "Ancora nessuna libreria su questa chiavetta. Esporta su di essa per usarla."
+
+#: src/app/device/check.rs:219
+msgid "The last export to {} was cut off. It was finished from what was already on the stick: the new library is complete."
+msgstr "L'ultima esportazione su {} è stata interrotta. È stata completata con ciò che era già sulla chiavetta: la nuova libreria è completa."
+
+#: src/app/device/check.rs:223
+msgid "The last export to {} was cut off. Its previous library is in use again: export once more to bring it up to date."
+msgstr "L'ultima esportazione su {} è stata interrotta. La libreria precedente è di nuovo in uso: esporta ancora una volta per aggiornarla."
+
+#: src/app/device/check.rs:227
+msgid "The last export to {} was cut off and could not be put right ({}). Open DEVICES and press FIX THE STICK."
+msgstr "L'ultima esportazione su {} è stata interrotta e non è stato possibile rimediare ({}). Apri DISPOSITIVI e premi RIPARA LA CHIAVETTA."
+
+#: src/app/device/check.rs:238
+msgid "not on this stick"
+msgstr "non è su questa chiavetta"
+
+#: src/app/device/check.rs:239
+msgid "cannot be read"
+msgstr "non leggibile"
+
+#: src/app/device/check.rs:308
+#: src/app/device/check.rs:326
+msgid "CHECKING…"
+msgstr "CONTROLLO…"
+
+#: src/app/device/check.rs:327
+msgid "Looking at the stick…"
+msgstr "Esame della chiavetta…"
+
+#: src/app/device/check.rs:427
+msgid "{} needs fixing: {} Open DEVICES to fix it."
+msgstr "{} va riparata: {} Apri DISPOSITIVI per ripararla."
+
+#: src/app/device/check.rs:439
+msgid "{} needs fixing: {} Eject anyway?"
+msgstr "{} va riparata: {} Espellere comunque?"
+
+#: src/app/device/check.rs:445
+msgid "EJECT ANYWAY"
+msgstr "ESPELLI COMUNQUE"
+
+#: src/app/device/check.rs:476
+msgid "Checking {} before it is ejected…"
+msgstr "Controllo di {} prima dell'espulsione…"
+
+#: src/app/device/check.rs:486
+msgid "Wait for the check to finish, then try again."
+msgstr "Attendi la fine del controllo, poi riprova."
+
+#: src/app/device/check.rs:490
+msgid "Nothing on {} that this app can repair."
+msgstr "Su {} non c'è nulla che questa app possa riparare."
+
+#: src/app/device/check.rs:499
+msgid "Rebuild the library on {} from your collection: the whole collection?"
+msgstr "Ricostruire la libreria su {} dalla tua collezione: tutta la collezione?"
+
+#: src/app/device/check.rs:501
+msgid "Rebuild the library on {} from your collection: the playlists ticked in SYNC MANAGER?"
+msgstr "Ricostruire la libreria su {} dalla tua collezione: le playlist spuntate in SYNC MANAGER?"
+
+#: src/app/device/check.rs:507
+msgid "REBUILD"
+msgstr "RICOSTRUISCI"
+
+#: src/app/device/check.rs:545
+msgid "Fixing the stick"
+msgstr "Riparazione della chiavetta"
+
+#: src/app/device/check.rs:562
+msgid "it is mounted read-only"
+msgstr "è montata in sola lettura"
+
+#: src/app/device/check.rs:650
+msgid "Finishing what was cut off"
+msgstr "Completamento di ciò che era stato interrotto"
+
+#: src/app/device/check.rs:653
+msgid "{}: the cut-off export could not be put right ({})."
+msgstr "{}: non è stato possibile rimediare all'esportazione interrotta ({})."
+
+#: src/app/device/check.rs:660
+msgid "{}: the extension {} is switched off. Switch it on in PREFERENCES > EXTENSIONS."
+msgstr "{}: l'estensione {} è disattivata. Attivala in PREFERENZE > ESTENSIONI."
+
+#: src/app/device/check.rs:661
+msgid "Repairing ({})"
+msgstr "Riparazione ({})"
+
+#: src/app/device/check.rs:676
+msgid "{} is ready."
+msgstr "{} è pronta."
+
+#: src/app/device/check.rs:680
+msgid "{} still needs attention: {}"
+msgstr "{} richiede ancora attenzione: {}"
+
+#: src/app/device/check.rs:697
+msgid "Not fixed: the backup failed ({}). Fix that or switch the backup off in PREFERENCES > DJ SYSTEM, then try again."
+msgstr "Non riparato: il backup è fallito ({}). Risolvi, oppure disattiva il backup in PREFERENZE > DJ SYSTEM, poi riprova."
+
+#: src/app/device/check.rs:712
+msgid "Backed up the library first: {}"
+msgstr "Prima è stato fatto il backup della libreria: {}"
+
+#: src/app/device/check.rs:720
+msgid "Writing the library again"
+msgstr "Riscrittura della libreria"
+
+#: src/app/device/check.rs:752
+msgid "Copying missing music"
+msgstr "Copia della musica mancante"
+
+#: src/app/device/check.rs:764
+msgid "Copied {n} missing audio file again from your collection."
+msgid_plural "Copied {n} missing audio files again from your collection."
+msgstr[0] "{n} file audio mancante è stato copiato di nuovo dalla tua collezione."
+msgstr[1] "{n} file audio mancanti sono stati copiati di nuovo dalla tua collezione."
+
+#: src/app/device/check.rs:766
+msgid "Copied {} of {} missing audio files again. {} are not in your collection: copy them to the stick by hand or take them off its playlists."
+msgstr "{} di {} file audio mancanti sono stati copiati di nuovo. {} non sono nella tua collezione: copiali a mano sulla chiavetta o toglili dalle sue playlist."
+
+#: src/app/device/check.rs:807
+msgid "{}: the copy is shorter than the original"
+msgstr "{}: la copia è più corta dell'originale"
 
 #: src/app/device/export.rs:26
 msgid "{} tracks, {} playlists in the collection"
@@ -6932,48 +7278,47 @@ msgstr "Scrittura dei cue"
 msgid "cues of {} track(s) written to {}"
 msgstr "cue di {} tracce scritti in {}"
 
-#: src/app/device/mod.rs:68
+#: src/app/device/mod.rs:71
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr "Un altro lavoro è in corso: attendi o annullalo (X)"
 
-#: src/app/device/mod.rs:156
+#: src/app/device/mod.rs:161
 msgid " — {} warning(s), first: {}"
 msgstr " — {} avvisi, il primo: {}"
 
-#: src/app/device/mod.rs:158
+#: src/app/device/mod.rs:163
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr "esportate {} tracce ({} nuove, {} aggiornate) e {} playlist in {}{}{}"
 
-#: src/app/device/mod.rs:177
+#: src/app/device/mod.rs:182
 msgid " — Update Collection baseline not recorded: {}"
 msgstr " — Punto di partenza di Aggiorna collezione non registrato: {}"
 
-#: src/app/device/mod.rs:202
+#: src/app/device/mod.rs:207
 msgid "failed: {}"
 msgstr "non riuscito: {}"
 
-#: src/app/device/mod.rs:256
-#: src/app/device/sync.rs:111
-msgid "That device is not mounted any more"
-msgstr "Quel dispositivo non è più montato"
+#: src/app/device/mod.rs:262
+msgid "That stick is not connected any more. Plug it in again, then try once more."
+msgstr "Quella chiavetta non è più collegata. Ricollegala e riprova."
 
-#: src/app/device/mod.rs:265
-msgid "Choose a device first"
-msgstr "Scegli prima un dispositivo"
+#: src/app/device/mod.rs:274
+msgid "No device is chosen. Pick one in the list on the left."
+msgstr "Nessun dispositivo scelto. Scegline uno nella lista a sinistra."
 
-#: src/app/device/mod.rs:277
-msgid "mounted read-only"
-msgstr "montato in sola lettura"
+#: src/app/device/mod.rs:288
+msgid "it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"
+msgstr "è montata in sola lettura, quindi non si può scrivere nulla. Controlla l'interruttore di protezione da scrittura, poi ricollegala"
 
-#: src/app/device/mod.rs:286
+#: src/app/device/mod.rs:297
 msgid "cannot read the collection: {}"
 msgstr "impossibile leggere la collezione: {}"
 
-#: src/app/device/mod.rs:327
-msgid "{}: its plugin does not offer that"
-msgstr "{}: il suo plugin non lo offre"
+#: src/app/device/mod.rs:338
+msgid "{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports."
+msgstr "{}: la sua estensione non può farlo con questo dispositivo. Attiva l'estensione in PREFERENZE > ESTENSIONI o usa un dispositivo supportato."
 
-#: src/app/device/mod.rs:455
+#: src/app/device/mod.rs:478
 msgid "Cancelling…"
 msgstr "Annullamento…"
 
@@ -7100,18 +7445,18 @@ msgid "{}: plugged in, mounting /dev/{}…"
 msgstr "{}: collegato, montaggio di /dev/{}…"
 
 #: src/app/device/scan.rs:75
-msgid "{}: cannot mount /dev/{}: {}"
-msgstr "{}: impossibile montare /dev/{}: {}"
+msgid "{}: cannot mount /dev/{}: {}. Mount it from your file manager, then it shows up here."
+msgstr "{}: impossibile montare /dev/{}: {}. Montala dal gestore file e comparirà qui."
 
-#: src/app/device/scan.rs:103
+#: src/app/device/scan.rs:104
 msgid "{} connected ({})"
 msgstr "{} collegato ({})"
 
-#: src/app/device/scan.rs:114
+#: src/app/device/scan.rs:115
 msgid "{}: {} setting(s) changed on the player were taken over"
 msgstr "{}: {} impostazioni modificate sul player sono state recepite"
 
-#: src/app/device/scan.rs:146
+#: src/app/device/scan.rs:154
 msgid "{} removed"
 msgstr "{} rimosso"
 
@@ -7132,6 +7477,10 @@ msgstr "{} è collegato: sincronizzare {} ({})?"
 #: src/app/device/sync.rs:84
 msgid "No playlist is set to synchronize: tick some in the list"
 msgstr "Nessuna playlist è impostata per la sincronizzazione: selezionane alcune nell'elenco"
+
+#: src/app/device/sync.rs:111
+msgid "That device is not mounted any more"
+msgstr "Quel dispositivo non è più montato"
 
 #: src/app/device/sync.rs:115
 msgid "Syncing"
@@ -8202,10 +8551,6 @@ msgstr "registrazione non importata: {}"
 msgid "Do you want to back up music files as well?"
 msgstr "Vuoi eseguire il backup anche dei file musicali?"
 
-#: src/app/library/mod.rs:333
-msgid "NO"
-msgstr "NO"
-
 #: src/app/library/mod.rs:351
 msgid "unknown menu action {}"
 msgstr "azione di menu sconosciuta {}"
@@ -8364,12 +8709,6 @@ msgstr "Scrivi le copertine scaricate nei tag del file"
 #: src/app/library/settings.rs:174
 msgid "MP3, WAV, AIFF and FLAC files"
 msgstr "File MP3, WAV, AIFF e FLAC"
-
-#: src/app/library/settings.rs:175
-#: src/app/prefs/analysis.rs:36
-#: src/app/welcome.rs:27
-msgid "LIBRARY"
-msgstr "LIBRERIA"
 
 #: src/app/library/settings.rs:176
 msgid "Library Protection"
@@ -10071,19 +10410,23 @@ msgstr "Esegui il backup della libreria del dispositivo prima di riscriverla"
 msgid "Automatically backup device library upon removal"
 msgstr "Esegui automaticamente il backup della libreria del dispositivo alla rimozione"
 
-#: src/app/prefs/dj_system/behaviour.rs:69
+#: src/app/prefs/dj_system/behaviour.rs:70
+msgid "Check the stick before it is ejected and ask when it needs fixing"
+msgstr "Controlla la chiavetta prima di espellerla e chiedi se va riparata"
+
+#: src/app/prefs/dj_system/behaviour.rs:74
 msgid "Backups"
 msgstr "Backup"
 
-#: src/app/prefs/dj_system/behaviour.rs:70
+#: src/app/prefs/dj_system/behaviour.rs:75
 msgid "Backup now and the list of backups are on each device's panel"
 msgstr "Il backup immediato e l'elenco dei backup si trovano nel pannello di ogni dispositivo"
 
-#: src/app/prefs/dj_system/behaviour.rs:72
+#: src/app/prefs/dj_system/behaviour.rs:77
 msgid "THIS COMPUTER"
 msgstr "QUESTO COMPUTER"
 
-#: src/app/prefs/dj_system/behaviour.rs:73
+#: src/app/prefs/dj_system/behaviour.rs:78
 msgid "Computer Name"
 msgstr "Nome del computer"
 

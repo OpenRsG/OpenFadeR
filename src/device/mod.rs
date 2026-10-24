@@ -17,6 +17,7 @@
 //! histories), [`plug`] (mount a stick nobody mounted, read its library files with progress).
 
 pub mod backup;
+pub mod check;
 pub mod eject;
 pub mod export;
 pub mod history;

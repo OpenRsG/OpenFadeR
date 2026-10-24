@@ -30,6 +30,7 @@
 
 mod actions;
 mod backup;
+mod check;
 mod export;
 mod formats;
 mod job;
@@ -41,13 +42,15 @@ mod safety;
 mod scan;
 mod sync;
 mod transfer;
+mod verify;
 
 pub use link::{track_edited, track_loading};
 pub use transfer::{drop_playlist, drop_tracks, Dest, List};
+pub use verify::verify;
 
 use super::{
-    deck::Decks, toast, ActionItem, App, BackupItem, DeviceItem, DeviceState, FormatItem,
-    FormatOption, PickRow, PreviewRow,
+    deck::Decks, toast, ActionItem, App, BackupItem, CheckLib, CheckPlayer, CheckPreset,
+    CheckProblem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow, PreviewRow,
 };
 use openfader::{
     device::{self, Device, export::Written},
@@ -126,6 +129,8 @@ pub(super) struct Ctx {
     pushes: RefCell<HashMap<String, (Option<Instant>, BTreeMap<String, Option<Track>>)>>,
     /// The preview card, the sync question and what they start ([`preview`]).
     prep: preview::Prep,
+    /// The stick checks ([`check`]).
+    check: check::State,
 }
 
 struct Models {
@@ -253,7 +258,10 @@ impl Ctx {
     fn device_or_say(&self, id: &str) -> Option<Device> {
         let d = self.device(id);
         if d.is_none() {
-            self.say(tr!("That device is not mounted any more"), true);
+            self.say(
+                tr!("That stick is not connected any more. Plug it in again, then try once more."),
+                true,
+            );
         }
         d
     }
@@ -262,7 +270,10 @@ impl Ctx {
     fn on_current(self: &Rc<Self>, f: impl FnOnce(&Rc<Self>, &Device)) {
         match self.current() {
             Some(d) => f(self, &d),
-            None => self.say(tr!("Choose a device first"), true),
+            None => self.say(
+                tr!("No device is chosen. Pick one in the list on the left."),
+                true,
+            ),
         }
     }
 
@@ -274,7 +285,7 @@ impl Ctx {
                 &format!(
                     "{}: {}",
                     d.label,
-                    d.support.message().unwrap_or(tr!("mounted read-only"))
+                    d.support.message().unwrap_or(tr!("it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"))
                 ),
                 true,
             );
@@ -324,13 +335,14 @@ impl Ctx {
     fn provider_for(&self, d: &Device, f: Feature) -> Option<Provider> {
         let p = d.provider().filter(|_| d.can(f));
         if p.is_none() {
-            self.say(&tr!("{}: its plugin does not offer that", d.label), true);
+            self.say(&tr!("{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports.", d.label), true);
         }
         p
     }
 
     /// Asks `text`; "yes" (button `yes`) runs `then`.
     fn confirm(&self, text: &str, yes: &str, then: impl FnOnce(&Rc<Ctx>) + 'static) {
+        self.drop_alt();
         *self.ask.borrow_mut() = Some(Box::new(then));
         self.with_state(|s| {
             s.set_confirm_text(text.into());
@@ -404,6 +416,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
         links: RefCell::default(),
         pushes: RefCell::default(),
         prep: preview::Prep::default(),
+        check: check::State::default(),
     });
     let s = app.global::<DeviceState>();
     s.set_devices(ModelRc::from(cx.models.devices.clone()));
@@ -439,11 +452,21 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
             .map(|d| d.id.clone());
         *c.current.borrow_mut() = id;
         c.show_current();
+        c.show_check();
+        if let Some(d) = c.current().filter(|d| !c.seen(&d.id)) {
+            c.recheck(&d.id);
+        }
         sync::refresh(&c);
     });
     let c = cx.clone();
     s.on_opened(move || {
         c.refresh_devices();
+        if let Some(d) = c
+            .current()
+            .filter(|_| c.with_state(|s| s.get_tab()) == Some(0))
+        {
+            c.recheck(&d.id);
+        }
         export::refresh(&c, true);
         sync::refresh(&c);
         backup::refresh(&c);
@@ -459,6 +482,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     s.on_confirmed(move |yes| {
         let then = c.ask.borrow_mut().take();
         c.with_state(|s| s.set_confirm_open(false));
+        c.drop_alt();
         if let (true, Some(then)) = (yes, then) {
             then(&c);
         }
@@ -469,6 +493,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     actions::wire(&cx, app);
     link::register(&cx);
     transfer::wire(&cx, app);
+    Ctx::wire_check(&cx, app);
 
     let c = cx.clone();
     let timer = Timer::default();
@@ -479,6 +504,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
             c.refresh_devices();
         }
         c.run_autos();
+        c.run_checks();
         c.run_pushes();
     });
     Guard {

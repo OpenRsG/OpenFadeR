@@ -97,6 +97,9 @@ mod update;
 mod video;
 mod welcome;
 
+/// `openfader verify` (src/app/device/verify.rs): the stick checker without a window.
+pub use device::verify;
+
 use openfader::library::Library;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};

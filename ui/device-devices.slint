@@ -3,6 +3,7 @@ import { Chip, Dropdown, Glyph, Icon, Toggle } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { Note } from "dialog.slint";
 import { Caption, DeviceState, FormatItem } from "device-state.slint";
+import { CheckDetails, VerdictCard } from "device-check.slint";
 
 /// One of the two answers to "what is this device for": a title and a line under it, lit when it is the current one.
 component ModeCard inherits Rectangle {
@@ -150,7 +151,11 @@ export component DevicesPage inherits HorizontalLayout {
                         Glyph { icon: Icon.usb; tint: i == DeviceState.current ? Theme.text-bright : Theme.text-dim; }
                         VerticalLayout {
                             spacing: Theme.space-xs;
-                            Text { text: d.name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; overflow: elide; }
+                            HorizontalLayout {
+                                spacing: Theme.space-md;
+                                Text { text: d.name; horizontal-stretch: 1; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; overflow: elide; }
+                                if DeviceState.device-checks.length > i: Text { text: DeviceState.device-check-labels[i]; horizontal-stretch: 0; color: DeviceState.state-color(DeviceState.device-checks[i]); font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+                            }
                             Text { text: d.library; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; overflow: elide; }
                             Text { text: d.summary; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; overflow: elide; }
                             if d.warning != "": Text { text: d.warning; color: d.writable ? Theme.cue : Theme.danger; font-family: Theme.font; font-size: Theme.font-sm; overflow: elide; }
@@ -187,6 +192,10 @@ export component DevicesPage inherits HorizontalLayout {
             }
             Chip { text: @tr("EJECT"); width: 72px; horizontal-stretch: 0; enabled: !DeviceState.busy; tooltip: @tr("Unmount it safely (a backup first, when Preferences ask for one)"); clicked => { DeviceState.eject(); } }
         }
+        VerdictCard {}
+        if DeviceState.check-details: CheckDetails { vertical-stretch: 1; }
+        if !DeviceState.check-details: VerticalLayout {
+        spacing: Theme.space-lg;
         Caption { text: @tr("WHAT IS THIS DEVICE FOR?"); }
         HorizontalLayout {
             spacing: Theme.space-md;
@@ -238,6 +247,7 @@ export component DevicesPage inherits HorizontalLayout {
         if DeviceState.actions.length > 0: ActionRow {
             label: @tr("MORE");
             for a in DeviceState.actions: Chip { text: a.label; min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: a.enabled && (!a.writes || root.writable) && !DeviceState.busy; tooltip: a.help; clicked => { DeviceState.run-action(a.id); } }
+        }
         }
     }
 }

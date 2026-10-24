@@ -31,7 +31,15 @@ fn roll_back() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// `openfader verify <mount>`: the stick checker, no window and no audio (src/app/device/verify.rs). Exits with its code.
+fn verify() -> ! {
+    std::process::exit(app::verify(std::env::args_os().skip(2).collect()).into())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args_os().nth(1).is_some_and(|a| a == "verify") {
+        verify();
+    }
     app::started();
     if std::env::args_os()
         .nth(1)
