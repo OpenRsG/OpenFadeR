@@ -427,7 +427,7 @@ pub fn open_with(plugin: &str, path: &Path) -> Result<PluginLibrary, String> {
 /// Translates in place ([`Plugin::tr`]) the texts of an answer the user reads: the strings (or lists of them) under these
 /// keys, at any depth outside the track data.
 fn localize(plugin: &Plugin, v: &mut Value) {
-    const SHOWN: [&str; 13] = [
+    const SHOWN: [&str; 17] = [
         "title",
         "about",
         "label",
@@ -441,8 +441,23 @@ fn localize(plugin: &Plugin, v: &mut Value) {
         "apply_label",
         "read_label",
         "kind",
+        "cause",
+        "consequence",
+        "action",
+        "blocked",
     ];
-    const DATA: [&str; 5] = ["edits", "tracks", "playlists", "values", "baselines"];
+    // Track data, and the names of libraries on a device (`LibraryState::name`, the key players are matched by).
+    const DATA: [&str; 9] = [
+        "edits",
+        "tracks",
+        "playlists",
+        "values",
+        "baselines",
+        "add",
+        "update",
+        "files",
+        "libraries",
+    ];
     fn shown(plugin: &Plugin, v: &mut Value) {
         match v {
             Value::String(s) => *s = plugin.tr(s),
