@@ -1,0 +1,254 @@
+import { Dropdown } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { DeckState } from "../deck-state.slint";
+import { FxState, FxUnit } from "../fx.slint";
+import { LightingState } from "../lighting.slint";
+import { ChannelView, MixerState } from "../mixer.slint";
+import { VideoState } from "../video.slint";
+import { StageButton, StageFader, StageKnob, StageMeter, StagePanel, StageTabs } from "controls.slint";
+import { StageMetrics, StageState } from "state.slint";
+
+/// A small dim caption (TRIM, HIGH, MASTER).
+component Cap inherits Text {
+    color: Theme.text-dim;
+    font-family: Theme.font;
+    font-size: Theme.font-xs;
+    font-weight: Theme.weight-bold;
+    vertical-alignment: center;
+    horizontal-alignment: center;
+    overflow: elide;
+}
+
+/// The labels of the knob rows, in the rows of the channel strips beside it, and the master meter at the height of the faders.
+component Gutter inherits Rectangle {
+    in property <int> ch;
+    in property <length> row-h;
+    in property <bool> master-meter;
+    property <bool> iso: MixerState.channels[root.ch].iso;
+    VerticalLayout {
+        spacing: 3px;
+        Rectangle { height: 18px; }
+        for label[p] in [@tr("TRIM"), @tr("HIGH"), @tr("MID"), @tr("LOW"), MixerState.cfx-names.length > MixerState.cfx-type ? MixerState.cfx-names[MixerState.cfx-type] : @tr("FILTER")]: Cap {
+            height: root.row-h;
+            text: root.iso && p >= 1 && p <= 3 ? ["", @tr("INST"), @tr("VOCAL"), @tr("DRUMS")][p] : label;
+        }
+        Rectangle { height: 20px; }
+        Rectangle {
+            vertical-stretch: 1;
+            if root.master-meter: StageMeter { x: (parent.width - self.width) / 2; width: 8px; height: parent.height; level: MixerState.bus.level; peak: MixerState.bus.peak; }
+        }
+    }
+}
+
+/// One channel strip: the deck number and its crossfader side (A / B), the TRIM, HIGH, MID, LOW and FILTER knobs, CUE (headphones),
+/// STEM (with STEMS: the HIGH / MID / LOW knobs become INST / VOCAL / DRUMS), then the fader beside its meter.
+component Channel inherits Rectangle {
+    in property <int> ch;
+    in property <length> row-h;
+    /// Four channels: a narrower header.
+    in property <bool> compact;
+    property <ChannelView> v: MixerState.channels[root.ch];
+    property <color> tone: StageState.tone(root.ch);
+    property <bool> stems: DeckState.decks[root.ch].stems && MixerState.iso-shown;
+    VerticalLayout {
+        spacing: 3px;
+        HorizontalLayout {
+            height: 18px;
+            spacing: 2px;
+            alignment: center;
+            Text { text: root.ch + 1; width: root.compact ? 12px : 14px; horizontal-alignment: center; vertical-alignment: center; color: root.tone; font-family: Theme.display-font; font-size: Theme.font-md; font-weight: Theme.weight-display; }
+            for side[i] in [@tr("A"), @tr("B")]: StageButton {
+                width: root.compact ? 20px : 22px;
+                text: side;
+                font-size: Theme.font-xs;
+                accent: root.tone;
+                active: root.v.xf == i * 2;
+                clicked => { MixerState.xf-assigned(root.ch, i * 2); }
+            }
+        }
+        for p in 5: Rectangle {
+            height: root.row-h;
+            property <bool> iso: root.v.iso && p >= 1 && p <= 3;
+            StageKnob {
+                x: (parent.width - self.width) / 2;
+                width: min(parent.width, 44px);
+                height: parent.height;
+                size: min(root.row-h - 2px, 34px);
+                bipolar: !iso;
+                accent: iso ? [Theme.accent, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums][p] : root.tone;
+                value: iso ? root.v.iso-knobs[p - 1] : root.v.knobs[p];
+                moved(x) => { MixerState.knob(root.ch, p, x); }
+                reset => { MixerState.knob(root.ch, p, iso ? 1.0 : 0.5); }
+            }
+        }
+        HorizontalLayout {
+            height: 20px;
+            spacing: 2px;
+            StageButton { text: @tr("CUE"); font-size: Theme.font-xs; accent: root.tone; active: root.v.cue; clicked => { MixerState.cue-toggled(root.ch); } }
+            if root.stems: StageButton { text: @tr("STEM"); font-size: Theme.font-xs; accent: root.tone; active: root.v.iso; clicked => { MixerState.iso-toggled(root.ch); } }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            min-height: StageMetrics.fader-min;
+            HorizontalLayout {
+                alignment: center;
+                spacing: 6px;
+                StageFader { width: 24px; horizontal-stretch: 0; accent: root.tone; value: root.v.fader; moved(x) => { MixerState.fader(root.ch, x); } }
+                StageMeter { width: 8px; horizontal-stretch: 0; accent: StageState.meter-tone(root.ch); level: root.v.level; peak: root.v.peak; }
+            }
+        }
+    }
+}
+
+/// The MIXER tab: the channel strips (two, or four with `Theme.stage-mixer` 1), the MASTER / MIX / PHONES knobs with the crossfader
+/// curve and SPLIT, and the crossfader between its A and B.
+component MixerPage inherits Rectangle {
+    property <bool> four: Theme.stage-mixer == 1;
+    property <[int]> chs: root.four ? [0, 1, 2, 3] : [DeckState.slots[0], DeckState.slots[1]];
+    /// Height of one knob row, from the panel's own height (a layout cannot feed its height back into its children).
+    in property <length> row-h;
+    VerticalLayout {
+        padding: 6px;
+        spacing: 3px;
+        HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 2px;
+            if !root.four: Channel { ch: root.chs[0]; row-h: root.row-h; }
+            if !root.four: Gutter { width: 46px; ch: root.chs[0]; row-h: root.row-h; master-meter: true; }
+            if !root.four: Channel { ch: root.chs[1]; row-h: root.row-h; }
+            if root.four: Gutter { width: 46px; ch: root.chs[0]; row-h: root.row-h; }
+            for c in root.four ? 4 : 0: Channel { ch: c; row-h: root.row-h; compact: true; }
+        }
+        HorizontalLayout {
+            height: 32px;
+            spacing: 4px;
+            for label[p] in [@tr("MASTER"), @tr("MIX"), @tr("PHONES")]: StageKnob {
+                min-width: 44px;
+                size: 20px;
+                label: label;
+                bipolar: p != 1;
+                value: MixerState.bus.knobs[p];
+                moved(x) => { MixerState.bus-knob(p, x); }
+                reset => { MixerState.bus-knob(p, p == 1 ? 0.0 : 0.5); }
+            }
+            VerticalLayout { alignment: center; horizontal-stretch: 0; width: 46px; StageButton { height: 22px; text: @tr("SPLIT"); font-size: Theme.font-xs; active: MixerState.bus.split; clicked => { MixerState.split-toggled(); } } }
+            VerticalLayout { alignment: center; horizontal-stretch: 0; width: 46px; StageButton { height: 22px; text: [@tr("SMOOTH"), @tr("SHARP"), @tr("CONST")][MixerState.curve]; font-size: Theme.font-xs; clicked => { MixerState.curve-cycled(); } } }
+        }
+        HorizontalLayout {
+            height: 22px;
+            spacing: 6px;
+            Cap { text: "A"; width: 14px; horizontal-stretch: 0; color: StageState.tone(root.chs[0]); font-size: Theme.font-sm; }
+            StageFader {
+                vertical: false;
+                accent: Theme.accent;
+                value: MixerState.crossfader;
+                moved(x) => { MixerState.crossfader = x; MixerState.crossfade(x); }
+                reset => { MixerState.crossfader = 0.5; MixerState.crossfade(0.5); }
+            }
+            Cap { text: "B"; width: 14px; horizontal-stretch: 0; color: StageState.tone(root.chs[1]); font-size: Theme.font-sm; }
+        }
+    }
+}
+
+/// The FX tab: the Beat FX unit the FX panel edits (FxState.unit), compact: its three slots (ON, effect, beat, level), BEAT ◀ ▶,
+/// TAP, REL and the channel it applies to.
+component FxPage inherits Rectangle {
+    property <int> n: FxState.unit;
+    property <FxUnit> u: FxState.units[root.n];
+    VerticalLayout {
+        padding: 6px;
+        spacing: 6px;
+        HorizontalLayout {
+            height: 24px;
+            spacing: 4px;
+            for name[i] in [@tr("FX{}", 1), @tr("FX{}", 2)]: StageButton { width: 40px; text: name; font-size: Theme.font-xs; active: root.n == i; clicked => { FxState.unit = i; } }
+            Text { text: (root.u.no-bpm ? "~" : "") + root.u.bpm-text; vertical-alignment: center; horizontal-alignment: right; overflow: elide; color: root.u.tapped ? Theme.accent-hi : Theme.text-bright; font-family: Theme.font; font-size: Theme.font-size; font-weight: Theme.weight-bold; }
+        }
+        for s[i] in root.u.slots: HorizontalLayout {
+            height: 28px;
+            spacing: 3px;
+            StageButton { width: 24px; text: "" + (i + 1); font-size: Theme.font-xs; active: s.on; accent: Theme.play; clicked => { FxState.toggled(root.n, i); } }
+            Dropdown { options: FxState.effects; current: s.effect; font-size: Theme.font-xs; min-width: 48px; chose(e) => { FxState.effect-selected(root.n, i, e); } }
+            StageButton { width: 34px; text: s.beat-text; font-size: Theme.font-xs; active: root.u.target == i; clicked => { FxState.target-selected(root.n, i); } }
+            StageKnob { width: 28px; size: 24px; value: s.level; moved(x) => { FxState.level-edited(root.n, i, x); } }
+        }
+        HorizontalLayout {
+            height: 24px;
+            spacing: 3px;
+            Cap { text: @tr("BEAT"); width: 32px; horizontal-stretch: 0; }
+            StageButton { width: 24px; text: "◀"; font-size: Theme.font-xs; clicked => { FxState.beat-step(root.n, -1); } }
+            StageButton { width: 24px; text: "▶"; font-size: Theme.font-xs; clicked => { FxState.beat-step(root.n, 1); } }
+            Rectangle { }
+            StageButton { width: 34px; text: @tr("TAP"); font-size: Theme.font-xs; clicked => { FxState.tapped(root.n); } }
+        }
+        HorizontalLayout {
+            height: 24px;
+            spacing: 3px;
+            Cap { text: @tr("CH"); width: 32px; horizontal-stretch: 0; }
+            for name[i] in ["1", "2", "M"]: StageButton {
+                width: 24px;
+                text: name;
+                font-size: Theme.font-xs;
+                active: root.u.assign == (name == "M" ? 4 : i);
+                clicked => { FxState.assign-selected(root.n, name == "M" ? 4 : i); }
+            }
+            Rectangle { }
+        }
+        Rectangle { vertical-stretch: 1; }
+    }
+}
+
+/// The REC tab: REC / stop of the master recording with its time, SPLIT, and the last message (headphone device, recording).
+component RecPage inherits Rectangle {
+    VerticalLayout {
+        padding: 10px;
+        spacing: 8px;
+        alignment: start;
+        StageButton {
+            height: Theme.stage-button;
+            text: MixerState.bus.rec-armed ? @tr("● ARMED") : MixerState.bus.rec ? "● " + MixerState.bus.rec-text : @tr("● REC");
+            accent: Theme.rec;
+            active: MixerState.bus.rec;
+            clicked => { MixerState.rec-toggled(); }
+        }
+        StageButton { height: 24px; text: @tr("SPLIT"); active: MixerState.bus.split; clicked => { MixerState.split-toggled(); } }
+        Text { text: MixerState.bus.status; color: Theme.cue; font-family: Theme.font; font-size: Theme.font-xs; wrap: word-wrap; }
+    }
+}
+
+/// The Stage mixer panel: optional tabs (`Theme.stage-tabs`: 1 MIXER / FX / REC, 2 MIXER / VIDEO / LIGHTING, which open those modes)
+/// over the mixer page, the FX unit or the recorder.
+export component StageMixer inherits Rectangle {
+    property <int> tab;
+    /// Tabs of VIDEO and LIGHTING only when those extensions are on; a lone MIXER tab is not worth a bar.
+    property <[string]> names: Theme.stage-tabs == 1 ? [@tr("MIXER"), @tr("FX"), @tr("REC")]
+        : Theme.stage-tabs != 2 ? []
+        : VideoState.enabled && LightingState.enabled ? [@tr("MIXER"), @tr("VIDEO"), @tr("LIGHTING")]
+        : VideoState.enabled ? [@tr("MIXER"), @tr("VIDEO")]
+        : LightingState.enabled ? [@tr("MIXER"), @tr("LIGHTING")]
+        : [];
+    /// The app's mode behind each tab of `stage-tabs` 2 (0 = this mixer, 4 VIDEO, 3 LIGHTING).
+    property <[int]> modes: VideoState.enabled && LightingState.enabled ? [0, 4, 3] : VideoState.enabled ? [0, 4] : [0, 3];
+    property <bool> tabs: root.names.length > 1;
+    /// What the knob rows get after the fixed rows (header, CUE, faders at least `fader-min`, the bus row, the crossfader, the tabs).
+    property <length> row-h: clamp((root.height - StageMetrics.mixer-fixed - (root.tabs ? StageMetrics.tabs-h : 0px)) / 5, StageMetrics.row-min, 34px);
+    property <int> page: Theme.stage-tabs == 1 && root.tab < root.names.length ? root.tab : 0;
+    StagePanel {
+        VerticalLayout {
+            padding: 6px;
+            spacing: 3px;
+            if root.tabs: StageTabs {
+                height: Theme.h-ctl + 2px;
+                tabs: root.names;
+                current: root.page;
+                picked(i) => {
+                    if Theme.stage-tabs == 1 { root.tab = i; }
+                    else if i > 0 { StageState.set-mode(root.modes[i]); }
+                }
+            }
+            if root.page == 0: MixerPage { vertical-stretch: 1; row-h: root.row-h; }
+            if root.page == 1: FxPage { vertical-stretch: 1; }
+            if root.page == 2: RecPage { vertical-stretch: 1; }
+        }
+    }
+}

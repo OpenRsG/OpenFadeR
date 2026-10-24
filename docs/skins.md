@@ -6,6 +6,10 @@ once, in the main window and in the split-screen window, and the choice is kept 
 the next start falls back to Catppuccin Mocha (a line on stderr says so). "Skin" and "theme" are the same thing: the settings key, the folder and
 the code say `skin`.
 
+A theme can also choose the **workspace**, the way the window is laid out: the desktop, touch, studio or stage workspace (see
+[Structural presentation](#structural-presentation)). The stage workspace is built from tokens, so one JSON file can change where the
+waveforms sit, how a deck panel looks and what the mixer shows. [Writing one](#writing-one) has the short path and four recipes.
+
 PREFERENCES > VIEW > DISPLAY TYPE > TEMPO DECIMAL PLACES switches BPM readouts between 1 and 2 decimals (default: 2).
 It applies immediately to deck headers and jogs, browser tables, track info and BEAT FX, and is saved independently of the theme.
 Regular and Pocket layouts share this preference. Compact jogs still hide the fractional part; playback, SYNC, stored BPM and the
@@ -38,12 +42,15 @@ copy them into `~/.config/openfader/extension/skin/`, or point `OPENFADER_SKINS`
   has a blue frame and a tick. Click a card to apply it: colours, fonts, sizes and, when the theme has `layout` hints, the layout
   change at once.
 * **CUSTOMIZE** opens the editor on the applied theme. Every token is there, in the groups SURFACES, TEXT, ACCENTS, WAVEFORM, DECKS
-  AND METERS, TYPOGRAPHY, SIZES and MOTION, with the doc line of ui/theme.slint as its hint. Every change shows in the whole app at
-  once (the app is the preview).
+  AND METERS, TYPOGRAPHY, SIZES, STAGE, STYLE and MOTION, with the doc line of ui/theme.slint as its hint. Every change shows in the
+  whole app at once (the app is the preview).
   * a colour: click its swatch for the picker (hue, saturation, value and alpha sliders, the hex code, and the theme's own colours to
     pick from), or type `#rrggbb` / `#rrggbbaa` (the `#` is optional) and press Enter;
   * a size, weight, time or number: `−` and `+` step it (1 px, a weight by 100, 10 ms, 0.05) or type the value (`12`, `12px`, `80ms`,
     `0.2s`);
+  * a token with a fixed set of values (`layout-profile`, `stage-deck`, `button-style`, ...): a drop-down of the named values;
+  * a token with a range (`glow`, `bevel`, `wave-fade`, ...): a slider and a field; a typed value outside the range is refused with
+    a message naming the range;
   * a font: type the family or pick one of the common ones; a family that is not installed falls back to the system's sans-serif;
   * **RESET** (per token) and **RESET ALL** go back to the values the theme had when the editor opened; edited tokens are shown in blue
     and bold;
@@ -108,6 +115,29 @@ Put `*.json` files in any of these folders (the first folder that has a name win
 A theme sets *every* token (yours, else the base's), so switching from one theme to another, or back to a built-in one, never leaves
 anything of the previous theme behind. Files from before `author`, `description` and `layout` existed load unchanged.
 
+### Tokens that follow another token
+
+A token whose default is another token follows it: `panel-top` (the top of a Stage panel's gradient, the bottom is `panel`) is
+`panel` unless the theme sets it, so a theme that sets `panel` and not `panel-top` gets flat panels in its own colour, on either base,
+whatever theme was applied before. The Tokens tables say `follows panel` in the Default column. The theme editor does the same: moving
+`panel` moves `panel-top` along while the two are equal; give `panel-top` its own colour for a gradient.
+
+`font-display` is empty by default. UI code reads the computed `display-font` (`Theme.display-font`), which is `font-display`, or
+`font` when that is empty. It is not a token: a theme cannot set it, it follows the two.
+
+### Waveform colours per deck
+
+`wave-style` 0 (the default) draws every deck's waveform with the shared bands `wave-low`, `wave-mid` and `wave-high`. `wave-style` 1
+gives each deck its own: the low band is `deckN`, the mid band is `deckN-hi` and the high band stays `wave-high`, where N is the deck
+that owns the waveform (the deck itself, not the panel that shows it: DECK 3 and DECK 4 of a 2-deck controller use `deck3` and `deck4`
+in whichever panel they appear). It covers the enlarged waveform, the overview and the vertical waveform, in every workspace, and
+follows the VIEW waveform colour setting: THREE BAND uses the three bands, RGB maps the red, green and blue of the stored waveform
+onto the low, mid and high band, BLUE draws `deckN` (whiter where the stored waveform is whiter). The preview column of the track
+list belongs to no deck and keeps the shared bands. The waveforms are rebuilt when the theme changes.
+
+`wave-fade` (0 to 1) darkens each band towards its outer edge, so a waveform is bright in the middle and dim at the peaks; 0 is the
+flat look. It applies to every waveform.
+
 ### Layout hints
 
 `layout` maps VIEW settings (their names in the settings file, the same values PREFERENCES shows) to the value the theme wants.
@@ -133,7 +163,7 @@ Sizes of the regions (deck height, waveform heights, the jog, the mixer channel)
 
 ### Structural presentation
 
-Themes can select a different presentation, not just recolor the desktop. The `layout-profile` token is `0` for the desktop workspace, `1` for the touch workspace and `2` for the studio workspace. These use the same Linux application, engine, Collection, plugins and callbacks; `mobile/` is the separate Android frontend and is not the Linux phone application.
+Themes can select a different presentation, not just recolor the desktop. The `layout-profile` token is `0` for the desktop workspace, `1` for the touch workspace, `2` for the studio workspace and `3` for the stage workspace. These use the same Linux application, engine, Collection, plugins and callbacks; `mobile/` is the separate Android frontend and is not the Linux phone application.
 
 Pocket (`extension/skin/pocket.json`) selects the touch presentation. Its workspace selector exposes decks/export players, Library, mixer/output, effects, sampler, Mix Point Link, Beat Lab and all commands. EDIT, LIGHTING and VIDEO use the same mode selector as desktop; optional features retain their normal preference/extension switches. Two or four decks are available. Below `touch-breakpoint`, select a deck; wider windows show a pair. All eight pads and all desktop pad modes, cue/loop editing and grid tools remain available.
 
@@ -167,6 +197,128 @@ xvfb-run -a -s '-screen 0 1440x1400x24' sh -c \
 
 This runs the actual binary with disposable settings and checks compact portrait/landscape window sizes, saving screenshots and logs. It is not proof of physical audio output, controllers or device export.
 
+### Stage workspace (`layout-profile` 3)
+
+Stage is a two-deck performance workspace like Studio, built in `ui/stage/*.slint` from the same globals (`DeckState`, `MixerState`,
+`FxState`, `PadsState`, `BrowserState`, ...), so every control changes the real deck, mixer, effect, pad or library state, and a tab or
+button with no backing feature does not appear. What differs is that its look is tokens: one theme file decides where the waveforms
+sit, which deck panel is drawn, how pads, buttons and the jog look and what the mixer and the strip hold. A deck panel shows the deck
+of its slot (`DeckState.slots`), so DECK 3 and DECK 4 of a 2-deck controller use the same two panels. The sketches below show the
+arrangement only, not the proportions.
+
+**Waveforms (`stage-wave`)**: 0 stacked across the top, 1 in a centre column between the decks, 2 inside each deck panel.
+
+```text
+stage-wave 0
++-----------------------------------------------+
+| top bar                                       |
++-----------------------------------------------+
+| wave 1  ~~~~~~~~~~~~~~~~~|~~~~~~~~~~~~~~~~~~~ |
+| wave 2  ~~~~~~~~~~~~~~~~~|~~~~~~~~~~~~~~~~~~~ |
++----------------+---------------+--------------+
+| deck 1         |     mixer     |        deck 2|
+| panel          |               |         panel|
++----------------+---------------+--------------+
+| strip (stage-strip 1), then the library       |
++-----------------------------------------------+
+
+stage-wave 1
++-----------------------------------------------+
+| top bar                                       |
++----------------+---------------+--------------+
+| deck 1         | wave 1 ~~|~~  |        deck 2|
+| panel          | wave 2 ~~|~~  |         panel|
+|                +---------------+              |
+|                |     mixer     |              |
++----------------+---------------+--------------+
+| strip (stage-strip 1), then the library       |
++-----------------------------------------------+
+
+stage-wave 2
++-----------------------------------------------+
+| top bar                                       |
++----------------+---------------+--------------+
+| wave ~~|~~     |               | wave ~~|~~   |
+| overview ~~~   |     mixer     |  overview ~~~|
+| controls       |               |      controls|
++----------------+---------------+--------------+
+| strip (stage-strip 1), then the library       |
++-----------------------------------------------+
+```
+
+**Deck panel (`stage-deck`)**, drawn for deck 1; deck 2 is the mirror image, with the controls on the other side. The pads, the
+mixer and the strip come from their own tokens; the sketches show the character of each style.
+
+```text
+stage-deck 0, performance
++-------------------------------+
+| cover  title        BPM  key  |
+|        artist       genre     |
+| overview ~~~~~~~~~~~~~~~~~~~~ |
+| [1][2][3][4]   LOOP  IN  OUT  |
+| [5][6][7][8]        1/2       |
+| BEAT FX  ECHO  (o) (o) (o)    |
+| FILTER  (  jog ring: BPM,key )|
+| (CUE) (PLAY)    SYNC  MASTER  |
++-------------------------------+
+
+stage-deck 1, turntable
++-------------------------------+
+| cover  title        BPM  key  |
+| HOT CUE | BEAT LOOP | SLICER  |
+|  .------.        A 0:32.1  x  |
+| /  vinyl  \      B 1:04.5  x  |
+| | platter |      C 1:36.9  x  |
+|  \ cover  /      tempo  +-10  |
+|   '------'       fader  [|]   |
+| CUE   PLAY   SYNC             |
++-------------------------------+
+
+stage-deck 2, controller
++-------------------------------+
+| 1   title           BPM  key  |
+| wave ~~~~|~~~~  (stage-wave 2)|
+| LOW MID HI CUE LPF HPF LEVEL  |
+| (o) (o) (o) (o) (o) (o) (o)   |
+| [ CUE ]  [ PLAY ]  [ SYNC ]   |
+| SLIP     VINYL     Q          |
++-------------------------------+
+
+stage-deck 3, ring
++-------------------------------+
+| title / artist                |
+|       .---------.             |
+|      /  128.0    \   tempo    |
+|     |    0.0 %    |   fader   |
+|      \           /    [|]     |
+|       '---------'             |
+| (PLAY) (CUE)   QUANTIZE (o)   |
+|                KEY SYNC (o)   |
++-------------------------------+
+```
+
+What each token picks (values in the Tokens tables):
+
+* `stage-pads`: the hot cue pads as a numbered grid 1-8 (outlined, the lit one in the deck colour), a cue list (rows A-F with the cue
+  time and a delete cross) or a grid filled in each cue's colour.
+* `stage-mixer`: two channels, or four (decks 3 and 4 follow the controller's layers). `stage-tabs`: none, MIXER / FX / REC or
+  MIXER / VIDEO / LIGHTING over the mixer. `stage-mixer-w` is its width.
+* `stage-strip` 1: a strip under the decks, EFFECTS (a BEAT FX drop-down, the effect, its knobs) on the left, SOUND COLOR FX and the
+  SAMPLER pads on the right.
+* `stage-mirror` 0: the right-hand deck has the left deck's arrangement; 1 (default): mirrored, its controls on the outer side.
+* `stage-list-wave` 1: the track list gets a waveform preview column and a badge naming the deck a track is loaded on. `stage-sidebar`: library side
+  bar with icon and label, or icons only. The list also shows ALBUM from 1000 px wide and DATE ADDED from 1180 px wide.
+* `wave-ruler` 1: a row of bar numbers (counted from the first downbeat of the grid; 1, 9, 17 … at wide zoom, every bar when zoomed in)
+  over the enlarged waveforms at the top or in the centre column.
+* Sizes: `stage-wave-h` (each enlarged waveform), `stage-gap`, `stage-radius` (panels), `stage-radius-ctl` (buttons, pads, tabs,
+  fields), `stage-cover`, `stage-row` (track list row), `stage-button` (big CUE / PLAY / SYNC), `stage-jog`.
+* Looks (Style group): `button-style` filled, outlined (the lit one glows) or raised (bevelled caps); `jog-style` ring with the BPM
+  inside, vinyl platter with the cover art, or a thin ring with beat ticks; `glow` (0 to 1) neon glow round lit controls, the jog ring
+  and the playheads; `bevel` (0 to 1) raised and inset shading of buttons, knobs and panels; `panel-top`, `panel` and `panel-border`
+  the vertical gradient and the outline of every panel; `deck-tint` 1 colours each deck's controls (jog arc, PLAY and CUE rims, lit
+  pads, knob arcs, meters, the deck badge) with its `deckN`; `font-display` and `weight-display` the big figures.
+
+Switching to any other theme restores that theme's workspace; the library, the decks, the mixer and the effects keep their values.
 
 ### Value forms
 
@@ -175,137 +327,140 @@ This runs the actual binary with disposable settings and checks compact portrait
 | color | `"#rrggbb"` or `"#rrggbbaa"` (alpha last) |
 | length | a number (logical px) or `"12px"` |
 | string | text, e.g. a font family name |
-| int | a whole number, e.g. a font weight (`400`, `700`) or `pad-style` |
-| float | a number |
+| int | a whole number, e.g. a font weight (`400`, `700`). Some tokens take only a fixed set of values (`layout-profile`, `pad-style`, every `stage-*` choice, `button-style`, `jog-style`, `deck-tint`, `wave-style`): the Values column of the Tokens tables lists them |
+| float | a number. `glow`, `bevel`, `wave-fade`, `key-sat` and `key-val` take 0 to 1 |
 | duration | a number of milliseconds, `"80ms"` or `"0.2s"` |
 
 ### Errors
 
 A token that is unknown, of the wrong type or has a bad value (`"red"` is not a colour) is reported on stderr as
 `skin <file>: token "accent": bad colour "red", use #rrggbb or #rrggbbaa` and left at the base's value; the rest of the theme still
-applies. A file that is not valid JSON, or has no JSON object at its top, holds no theme and is skipped. IMPORT and `install` refuse a
-file with no valid token at all.
+applies. So is a value outside what the token allows: `skin <file>: token "stage-deck": 7 is not allowed, use 0 (performance), 1
+(turntable), 2 (controller), 3 (ring)` or `token "glow": 1.5 is out of range, use 0 to 1`. A file that is not valid JSON, or has no JSON
+object at its top, holds no theme and is skipped. IMPORT and `install` refuse a file with no valid token at all.
 
 ## Tokens
 
 The tokens are the `in-out` properties of the `Theme` global in `ui/theme.slint`, which stays the one source of truth: `ui/build.rs`
-reads them (name, type, the `// @group` they sit under and their doc comment) and the skin code and the editor use them, so a token
-added there is themable, editable and listed in the editor without any Rust change. To list them:
-`grep 'in-out property' ui/theme.slint`. The doc comment above each property says where it is used. The tables below are that list
-at the time of writing (a test fails when a token is missing from them). The `in` properties (`light`, `tooltips`, `h-row`,
-`list-font`, `list-weight`) are set by the VIEW preferences and cannot be themed.
+reads them (name, type, the `// @group` they sit under, their doc comment, a `// @values a | b | c` or `// @range 0..1` line for the
+values they accept, and a default of `root.other` for a token that follows another) and the skin code and the editor use them, so a
+token added there is themable, editable and listed in the editor without any Rust change. The tables below list every token with its
+type, its default on the dark and the light base, the values it accepts and its doc comment; the test `the_docs_list_every_token`
+fails when a token is missing from them. The `in` properties (`light`, `tooltips`, `h-row`, `list-font`, `list-weight`) are set by the
+VIEW preferences and cannot be themed.
 
-Two kinds of token are used by Rust code that draws images instead of Slint elements: `wave-bg`, `wave-low`, `wave-mid`,
-`wave-high` (the deck waveforms and overviews, the mix point lanes, the EDIT and browser strips) and `cue` (the cue point marker).
-The waveform bands overlap in fixed mixes of the three colours; a theme that changes a band gets the mean of the
-overlapping bands instead.
+Tokens that Rust code reads to draw images instead of Slint elements: `wave-bg`, `wave-low`, `wave-mid`, `wave-high`, `wave-fade`,
+`wave-style` with `deck1` to `deck4` and their `-hi` twins (the deck waveforms and overviews, the mix point lanes, the EDIT and browser
+strips) and `cue`, `memory-cue` (the cue markers). The waveform bands overlap in fixed mixes of the three colours; a theme that changes
+a band gets the mean of the overlapping bands instead.
 
 ### Surfaces (backgrounds, lines, selection, overlays and the toast)
 
-| Token | Type | Default (dark / light if they differ) |
-|---|---|---|
-| `bg` | color | `#11111b` / `#dce0e8` |
-| `bg-deep` | color | `#181825` / `#eff1f5` |
-| `panel` | color | `#1e1e2e` / `#e6e9ef` |
-| `panel-raised` | color | `#313244` / `#ccd0da` |
-| `panel-high` | color | `#45475a` / `#bcc0cc` |
-| `deck-bg` | color | `#1e1e2e` / `#e6e9ef` |
-| `row-alt` | color | `#1b1b2a` / `#eaecf1` |
-| `list-head` | color | `#313244` / `#ccd0da` |
-| `line` | color | `#313244` / `#ccd0da` |
-| `line-strong` | color | `#585b70` / `#9ca0b0` |
-| `select` | color | `#425173` / `#b0c7f5` |
-| `hover-row` | color | `#282e43` / `#d6e0f5` |
-| `scrim` | color | `#11111bb0` / `#dce0e8b0` |
-| `fader-cap` | color | `#a6adc8` / `#8c8fa1` |
-| `deck-frame` | color | `#00000000` |
-| `overlay-scrim` | color | `#11111bcc` / `#dce0e8cc` |
-| `overlay-bg` | color | `#181825` / `#1c1c1c` |
-| `overlay-border` | color | `#fab387` / `#fe640b` |
-| `overlay-title` | color | `#fab387` / `#fe640b` |
-| `overlay-text` | color | `#cdd6f4` / `#ffffff` |
-| `overlay-soft` | color | `#bac2de` / `#cccccc` |
-| `overlay-dim` | color | `#7f849c` / `#888888` |
-| `overlay-faint` | color | `#6c7086` / `#666666` |
-| `overlay-ok` | color | `#a6e3a1` / `#79bc6b` |
-| `overlay-bound` | color | `#94e2d5` / `#40a02b` |
-| `overlay-warn` | color | `#f9e2af` / `#fe640b` |
-| `toast-bg` | color | `#313244f2` / `#2a2a2af2` |
-| `toast-text` | color | `#cdd6f4` / `#eeeeee` |
-| `toast-shadow` | color | `#11111baa` / `#000000aa` |
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `bg` | color | `#11111b` / `#dce0e8` |  | Window and the 1-2 px gaps between panels. |
+| `bg-deep` | color | `#181825` / `#eff1f5` |  | Waveform, track list and status bar background. |
+| `panel` | color | `#1e1e2e` / `#e6e9ef` |  | Panel body (deck panel, mixer, browser toolbar, tree). |
+| `panel-raised` | color | `#313244` / `#ccd0da` |  | Idle button / pad / input fill. |
+| `panel-high` | color | `#45475a` / `#bcc0cc` |  | Hovered button, fader groove, thumb-less borders. |
+| `deck-bg` | color | `#1e1e2e` / `#e6e9ef` |  | The deck panels' body (the header, overview, pads and jog sit on it). |
+| `row-alt` | color | `#1b1b2a` / `#eaecf1` |  | Odd track-list row (even rows are `bg-deep`). |
+| `list-head` | color | `#313244` / `#ccd0da` |  | Column header strip of the track list. |
+| `line` | color | `#313244` / `#ccd0da` |  | Hairline between panels / table cells. |
+| `line-strong` | color | `#585b70` / `#9ca0b0` |  | Checkbox / radio / input border. |
+| `select` | color | `#425173` / `#b0c7f5` |  | Selected track-list row and tree entry. |
+| `hover-row` | color | `#282e43` / `#d6e0f5` |  | Row under the pointer. |
+| `scrim` | color | `#11111bb0` / `#dce0e8b0` |  | Dim overlay behind dialogs. |
+| `fader-cap` | color | `#a6adc8` / `#8c8fa1` |  | Fader cap face. |
+| `deck-frame` | color | `#00000000` |  | Outline of a deck panel (see `deck-frame-w`; transparent = none). A themed accent colour draws one around each deck. |
+| `overlay-scrim` | color | `#11111bcc` / `#dce0e8cc` |  | Dim overlay behind the MIDI learn screen. |
+| `overlay-bg` | color | `#181825` / `#1c1c1c` |  | Card of the MIDI learn overlay. |
+| `overlay-border` | color | `#fab387` / `#fe640b` |  | Border of the learn overlay's card. |
+| `overlay-title` | color | `#fab387` / `#fe640b` |  | Title of the learn overlay. |
+| `overlay-text` | color | `#cdd6f4` / `#ffffff` |  | Main text of the learn overlay. |
+| `overlay-soft` | color | `#bac2de` / `#cccccc` |  | Secondary text of the learn overlay. |
+| `overlay-dim` | color | `#7f849c` / `#888888` |  | Dim text of the learn overlay. |
+| `overlay-faint` | color | `#6c7086` / `#666666` |  | Faintest text of the learn overlay. |
+| `overlay-ok` | color | `#a6e3a1` / `#79bc6b` |  | A mapped control in the learn overlay. |
+| `overlay-bound` | color | `#94e2d5` / `#40a02b` |  | A control that is bound in the learn overlay. |
+| `overlay-warn` | color | `#f9e2af` / `#fe640b` |  | A warning in the learn overlay. |
+| `toast-bg` | color | `#313244f2` / `#2a2a2af2` |  | Background of the toast (the notice that fades in over the window). |
+| `toast-text` | color | `#cdd6f4` / `#eeeeee` |  | Text of the toast. |
+| `toast-shadow` | color | `#11111baa` / `#000000aa` |  | Shadow of the toast. |
 
 `deck-bg` is the deck panels' body, `list-head` the track list's column header strip, `deck-frame` the outline of a deck panel
 (thickness: `deck-frame-w`, 0 = none).
 
 ### Text
 
-| Token | Type | Default (dark / light if they differ) |
-|---|---|---|
-| `text-bright` | color | `#cdd6f4` / `#11111b` |
-| `text` | color | `#bac2de` / `#4c4f69` |
-| `text-dim` | color | `#9399b2` / `#6c6f85` |
-| `text-faint` | color | `#7f849c` / `#8c8fa1` |
-| `text-disabled` | color | `#585b70` / `#acb0be` |
-| `row-dim` | color | `#9399b2` / `#6c6f85` |
-| `row-loaded` | color | `#cdd6f4` / `#11111b` |
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `text-bright` | color | `#cdd6f4` / `#11111b` |  | The strongest text: titles, the label of a lit button, the track title. Must read on `accent` and `select`. |
+| `text` | color | `#bac2de` / `#4c4f69` |  | Default text of lists, inputs and values. |
+| `text-dim` | color | `#9399b2` / `#6c6f85` |  | Labels (TRIM, HIGH, MID, LOW), artist, secondary values. |
+| `text-faint` | color | `#7f849c` / `#8c8fa1` |  | Disabled-looking glyphs, unit text. |
+| `text-disabled` | color | `#585b70` / `#acb0be` |  | Text of a disabled control. |
+| `row-dim` | color | `#9399b2` / `#6c6f85` |  | Secondary cells of the track list (artist, genre, comment, time). |
+| `row-loaded` | color | `#cdd6f4` / `#11111b` |  | The cells of a track list row whose track a deck has loaded. |
 
 `text-bright` is also the label of a lit button, so on a light theme it must read on `accent`. `row-dim` is the track list's secondary
 cells (artist, genre, comment, time); `row-loaded` the cells of a row whose track a deck has loaded.
 
 ### Accents
 
-| Token | Type | Default |
-|---|---|---|
-| `accent` | color | `#59719e` / `#1e66f5` |
-| `accent-hi` | color | `#89b4fa` / `#209fb5` |
-| `play` | color | `#a6e3a1` / `#40a02b` |
-| `cue` | color | `#fab387` / `#fe640b` |
-| `sync` | color | `#59719e` / `#1e66f5` |
-| `master` | color | `#59719e` / `#1e66f5` |
-| `bpm-sync` | color | `#f9e2af` / `#df8e1d` |
-| `danger` | color | `#f38ba8` / `#d20f39` |
-| `rec` | color | `#c6738c` / `#e64553` |
-| `memory-cue` | color | `#f5c2e7` / `#ea76cb` |
-| `sampler` | color | `#cba6f7` / `#8839ef` |
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `accent` | color | `#59719e` / `#1e66f5` |  | ON state of nearly every toggle: SYNC, MASTER, Q, MT, AU, bank, panel toggles. |
+| `accent-hi` | color | `#89b4fa` / `#209fb5` |  | A lighter accent: headings of the preferences, a synced BPM, glyphs on dark. |
+| `play` | color | `#a6e3a1` / `#40a02b` |  | PLAY / PAUSE ring and glyph. The loaded track's title is also this green. |
+| `cue` | color | `#fab387` / `#fe640b` |  | CUE ring and cue point marker. |
+| `sync` | color | `#59719e` / `#1e66f5` |  | The SYNC button when it is on. |
+| `master` | color | `#59719e` / `#1e66f5` |  | The MASTER button when it is on. |
+| `bpm-sync` | color | `#f9e2af` / `#df8e1d` |  | BPM SYNC icon when on. |
+| `danger` | color | `#f38ba8` / `#d20f39` |  | Alerts, SLIP lit, memory cue passed. |
+| `rec` | color | `#c6738c` / `#e64553` |  | REC button and recording indicator. |
+| `memory-cue` | color | `#f5c2e7` / `#ea76cb` |  | Memory cue not yet reached. |
+| `sampler` | color | `#cba6f7` / `#8839ef` |  | Sampler slot play arrow. |
 
 ### Waveform
 
-| Token | Type | Default |
-|---|---|---|
-| `wave-bg` | color | `#11111b` / `#eff1f5` |
-| `wave-low` | color | `#89b4fa` / `#1e66f5` |
-| `wave-mid` | color | `#fab387` / `#fe640b` |
-| `wave-high` | color | `#cdd6f4` / `#5c5f77` |
-| `wave-playhead` | color | `#f5e0dc` / `#4c4f69` |
-| `slip-ghost` | color | `#89dceb` / `#04a5e5` |
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `wave-bg` | color | `#11111b` / `#eff1f5` |  | Background of the waveforms and overviews (drawn by Rust). |
+| `wave-low` | color | `#89b4fa` / `#1e66f5` |  | Low (bass) band of the waveforms. |
+| `wave-mid` | color | `#fab387` / `#fe640b` |  | Mid band of the waveforms. |
+| `wave-high` | color | `#cdd6f4` / `#5c5f77` |  | High band of the waveforms. |
+| `wave-playhead` | color | `#f5e0dc` / `#4c4f69` |  | Playhead of the enlarged waveform and the slip ghost (the shadow playhead while SLIP diverges). |
+| `slip-ghost` | color | `#89dceb` / `#04a5e5` |  | The shadow playhead drawn while SLIP diverges. |
+| `wave-fade` | float | `0.0` | `0 to 1` | How much each waveform band darkens towards its outer edge (0..1): 0 = one flat colour per band, 1 = black at the edge, so the bright core stands out. Applies to every waveform. |
 
 ### Decks and meters
 
-| Token | Type | Default (dark / light if they differ) |
-|---|---|---|
-| `stem-vocal` | color | `#a6e3a1` / `#40a02b` |
-| `stem-inst` | color | `#f38ba8` / `#d20f39` |
-| `stem-drums` | color | `#89b4fa` / `#1e66f5` |
-| `stem-bass` | color | `#fab387` / `#fe640b` |
-| `deck1` | color | `#89b4fa` / `#1e66f5` |
-| `deck2` | color | `#fab387` / `#fe640b` |
-| `deck3` | color | `#cba6f7` / `#8839ef` |
-| `deck4` | color | `#94e2d5` / `#179299` |
-| `jog-ring` | color | `#45475a` / `#bcc0cc` |
-| `jog-face` | color | `#11111b` / `#eff1f5` |
-| `jog-arc` | color | `#f38ba8` / `#d20f39` |
-| `jog-bpm` | color | `#cdd6f4` / `#4c4f69` |
-| `jog-text` | color | `#a6adc8` / `#6c6f85` |
-| `jog-range` | color | `#a6e3a1` / `#40a02b` |
-| `pad-style` | int | `0` |
-| `key-sat` | float | `0.45` / `0.75` |
-| `key-val` | float | `1.0` / `0.75` |
-| `deck-title` | length | `14px` |
-| `deck-sub` | length | `12px` |
-| `deck-bpm` | length | `12px` |
-| `meter-lo` | color | `#a6e3a1` / `#40a02b` |
-| `meter-mid` | color | `#f9e2af` / `#df8e1d` |
-| `meter-hi` | color | `#f38ba8` / `#d20f39` |
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `stem-vocal` | color | `#a6e3a1` / `#40a02b` |  | Stem accents: VOCAL green, INST red, DRUMS blue. |
+| `stem-inst` | color | `#f38ba8` / `#d20f39` |  | INST stem. |
+| `stem-drums` | color | `#89b4fa` / `#1e66f5` |  | DRUMS stem. |
+| `stem-bass` | color | `#fab387` / `#fe640b` |  | BASS stem (4 stems). |
+| `deck1` | color | `#89b4fa` / `#1e66f5` |  | Deck number badges and "loaded on deck n" markers only. |
+| `deck2` | color | `#fab387` / `#fe640b` |  | Deck 2. |
+| `deck3` | color | `#cba6f7` / `#8839ef` |  | Deck 3. |
+| `deck4` | color | `#94e2d5` / `#179299` |  | Deck 4. |
+| `jog-ring` | color | `#45475a` / `#bcc0cc` |  | The jog's outer ring and the disc inside it. |
+| `jog-face` | color | `#11111b` / `#eff1f5` |  | The disc inside the jog's ring. |
+| `jog-arc` | color | `#f38ba8` / `#d20f39` |  | The playhead arc on the jog's ring. |
+| `jog-bpm` | color | `#cdd6f4` / `#4c4f69` |  | The big BPM figure in the jog. |
+| `jog-text` | color | `#a6adc8` / `#6c6f85` |  | The tempo offset text in the jog. |
+| `jog-range` | color | `#a6e3a1` / `#40a02b` |  | The tempo range text (±6 %) in the jog. |
+| `pad-style` | int | `0` | `0` list, `1` grid | Hot cue pads: 0 = a list (2 columns of 4 rows, a letter badge and the cue time), 1 = a grid (4 columns of 2 rows, every pad filled in its cue's colour). |
+| `key-sat` | float | `0.45` / `0.75` | `0 to 1` | Saturation and brightness (0..1) of the key column's Camelot colours (the hue is the key's). |
+| `key-val` | float | `1.0` / `0.75` | `0 to 1` | Brightness (0..1) of the key column's colours. |
+| `deck-title` | length | `14px` |  | Size of the deck header's title. |
+| `deck-sub` | length | `12px` |  | Size of the artist line under the deck title. |
+| `deck-bpm` | length | `12px` |  | Size of the BPM next to the artist (above `deck-sub` it is bold). |
+| `meter-lo` | color | `#a6e3a1` / `#40a02b` |  | Level meters: the quiet part. |
+| `meter-mid` | color | `#f9e2af` / `#df8e1d` |  | Level meters: the middle part. |
+| `meter-hi` | color | `#f38ba8` / `#d20f39` |  | Level meters: the loud part. |
 
 The jog is a ring (`jog-ring`) around a disc (`jog-face`) with the playhead arc (`jog-arc`), the BPM (`jog-bpm`), the tempo offset
 (`jog-text`) and the range (`jog-range`). `pad-style` 0 is the hot cue list (2 columns of 4, a letter badge and the cue
@@ -317,72 +472,119 @@ and brightness of the key column's colours, whose hue is the key's.
 
 ### Typography
 
-| Token | Type | Default |
-|---|---|---|
-| `font` | string | `"Liberation Sans"` |
-| `font-xs` | length | `9px` |
-| `font-sm` | length | `10px` |
-| `font-size` | length | `11px` |
-| `font-md` | length | `12px` |
-| `font-lg` | length | `14px` |
-| `font-xl` | length | `18px` |
-| `font-xxl` | length | `22px` |
-| `weight` | int | `400` |
-| `weight-bold` | int | `700` |
-| `font-toast` | length | `13px` |
-| `weight-semi` | int | `600` |
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `font` | string | `"Liberation Sans"` |  | Family of every text. A name that is not installed falls back to the system's default sans-serif. |
+| `font-xs` | length | `9px` |  | Smallest text: badges and tiny labels. |
+| `font-sm` | length | `10px` |  | Small text: labels, buttons, hints. |
+| `font-size` | length | `11px` |  | Default text (track list, tree, inputs). |
+| `font-md` | length | `12px` |  | Medium text: headings of the preferences, dialog titles. |
+| `font-lg` | length | `14px` |  | Deck title, elapsed / remaining time. |
+| `font-xl` | length | `18px` |  | Large text. |
+| `font-xxl` | length | `22px` |  | Jog-centre BPM integer part. |
+| `weight` | int | `400` |  | Normal font weight. |
+| `weight-bold` | int | `700` |  | Bold font weight (buttons, labels). |
+| `font-toast` | length | `13px` |  | Text size of the toast. |
+| `weight-semi` | int | `600` |  | Semi-bold font weight. |
 
 ### Sizes (spacing, radii and the shared regions)
 
-| Token | Type | Default |
-|---|---|---|
-| `layout-profile` | int | `0` (desktop), `1` selects touch, `2` the studio workspace |
-| `touch-breakpoint` | length | `760px` |
-| `touch-target` | length | `44px` |
-| `icon-size` | length | `14px` |
-| `gap` | length | `2px` |
-| `space-xs` | length | `2px` |
-| `space-sm` | length | `4px` |
-| `space-md` | length | `6px` |
-| `space-lg` | length | `8px` |
-| `space-xl` | length | `12px` |
-| `radius` | length | `2px` |
-| `radius-lg` | length | `4px` |
-| `radius-xl` | length | `6px` |
-| `deck-frame-w` | length | `0px` |
-| `h-bar` | length | `28px` |
-| `h-status` | length | `22px` |
-| `h-ctl` | length | `22px` |
-| `h-ctl-sm` | length | `18px` |
-| `h-header` | length | `20px` |
-| `h-tab` | length | `22px` |
-| `h-toolbar` | length | `28px` |
-| `h-wave-2` | length | `56px` |
-| `h-wave-4` | length | `44px` |
-| `h-overview` | length | `36px` |
-| `h-phrase` | length | `14px` |
-| `h-deck-2` | length | `240px` |
-| `h-deck-4` | length | `132px` |
-| `h-fx` | length | `110px` |
-| `h-mixpoint` | length | `96px` |
-| `h-sampler` | length | `96px` |
-| `w-channel` | length | `52px` |
-| `jog` | length | `112px` |
-| `ring` | length | `36px` |
-| `studio-radius` | length | `12px` |
-| `studio-radius-ctl` | length | `8px` |
-| `studio-button` | length | `48px` |
-| `studio-gap` | length | `8px` |
-| `studio-cover` | length | `72px` |
-| `studio-row` | length | `36px` |
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `layout-profile` | int | `0` | `0` desktop, `1` touch, `2` studio, `3` stage | Presentation profile: 0 desktop workspace, 1 touch workspace, 2 studio workspace (one window: stacked waveforms, a deck panel per side, a central mixer, the library and AUTOMIX under them), 3 stage workspace (the same, built from the Stage tokens: waveform placement, deck panel style, mixer, strip, library), all with the same application features. |
+| `touch-breakpoint` | length | `760px` |  | Width below which the touch workspace presents one selected deck instead of two columns. |
+| `touch-target` | length | `44px` |  | Minimum primary control size in the touch presentation. |
+| `icon-size` | length | `14px` |  | Glyph size inside shared buttons, independent of the control's hit area. |
+| `gap` | length | `2px` |  | Gap between panels. |
+| `space-xs` | length | `2px` |  | Spacing, smallest step. |
+| `space-sm` | length | `4px` |  | Spacing, small step. |
+| `space-md` | length | `6px` |  | Spacing, medium step. |
+| `space-lg` | length | `8px` |  | Spacing, large step. |
+| `space-xl` | length | `12px` |  | Spacing, largest step. |
+| `radius` | length | `2px` |  | Corner radius of buttons and inputs. |
+| `radius-lg` | length | `4px` |  | Corner radius of cards and dialogs. |
+| `radius-xl` | length | `6px` |  | Corner radius, largest. |
+| `deck-frame-w` | length | `0px` |  | Thickness of the `deck-frame` outline around each deck panel. |
+| `h-bar` | length | `28px` |  | Height of the global bar (and dialog title bars). |
+| `h-status` | length | `22px` |  | Height of the status bar. |
+| `h-ctl` | length | `22px` |  | Height of buttons and inputs. |
+| `h-ctl-sm` | length | `18px` |  | Height of small buttons. |
+| `h-header` | length | `20px` |  | Height of panel and column headers. |
+| `h-tab` | length | `22px` |  | Height of the browser tabs. |
+| `h-toolbar` | length | `28px` |  | Height of the browser toolbar and the mixer strip. |
+| `h-wave-2` | length | `56px` |  | Height of each enlarged waveform with 2 decks (horizontal layout). |
+| `h-wave-4` | length | `44px` |  | Height of each enlarged waveform with 4 decks (horizontal layout). |
+| `h-overview` | length | `36px` |  | Height of the deck's full-track waveform. |
+| `h-phrase` | length | `14px` |  | Height of the phrase strip under it. |
+| `h-deck-2` | length | `240px` |  | Height of a deck panel with 2 decks. |
+| `h-deck-4` | length | `132px` |  | Height of a deck panel with 4 decks. |
+| `h-fx` | length | `110px` |  | Optional panels (toggled from the global bar). |
+| `h-mixpoint` | length | `96px` |  | Height of the MIX POINT LINK panel. |
+| `h-sampler` | length | `96px` |  | Height of the sampler panel. |
+| `w-channel` | length | `52px` |  | Width of one mixer channel. |
+| `jog` | length | `112px` |  | Diameter of the jog. |
+| `ring` | length | `36px` |  | Diameter of the CUE and PLAY buttons. |
+| `studio-radius` | length | `12px` |  | Corner radius of the studio workspace's panels (layout-profile 2). |
+| `studio-radius-ctl` | length | `8px` |  | Corner radius of the studio workspace's big buttons, pads, tabs and fields. |
+| `studio-button` | length | `48px` |  | Height of the studio workspace's big PLAY, CUE and SYNC buttons. |
+| `studio-gap` | length | `8px` |  | Spacing between the studio workspace's panels. |
+| `studio-cover` | length | `72px` |  | Side of the cover art in the studio workspace's deck panels. |
+| `studio-row` | length | `36px` |  | Row height of the studio workspace's track list (a row carries a thumbnail). |
+
+### Stage (the stage workspace, `layout-profile` 3)
+
+The tokens of the stage workspace, described under [Stage workspace](#stage-workspace-layout-profile-3). They have no effect in the other workspaces, except `wave-style` and `wave-fade` (Style), which also colour the desktop's waveforms.
+
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `stage-wave` | int | `0` | `0` top, `1` centre, `2` decks | Stage workspace (layout-profile 3): where the enlarged waveforms sit. 0 = stacked across the top, 1 = in a centre column between the decks (above the mixer), 2 = inside each deck panel. |
+| `stage-deck` | int | `0` | `0` performance, `1` turntable, `2` controller, `3` ring | Stage deck panel: 0 = performance (pad grid, LOOP, BEAT FX, jog ring), 1 = turntable (big platter with the cover art, hot cue list, tempo fader), 2 = controller (a row of EQ / filter knobs, big CUE / PLAY / SYNC buttons), 3 = ring (a large tempo ring with the BPM, round PLAY / CUE, tempo fader). |
+| `stage-pads` | int | `0` | `0` numbered grid, `1` cue list, `2` coloured grid | Stage hot cue pads: 0 = numbered grid (1-8, outlined, the lit one in the deck colour), 1 = cue list (A-F rows with the cue time and a delete cross), 2 = grid filled in each cue's colour. |
+| `stage-mixer` | int | `0` | `0` two channels, `1` four channels | Stage mixer: 0 = two channels, 1 = four channels (decks 3 and 4 follow the controller's layers). |
+| `stage-tabs` | int | `0` | `0` none, `1` MIXER FX REC, `2` MIXER VIDEO LIGHTING | Tabs over the Stage mixer: 0 = none, 1 = MIXER / FX / REC, 2 = MIXER / VIDEO / LIGHTING. |
+| `stage-strip` | int | `0` | `0` none, `1` effects and sampler | A strip under the Stage decks: 0 = none, 1 = EFFECTS (left), SOUND COLOR FX and SAMPLER (right). |
+| `stage-list-wave` | int | `0` | `0` off, `1` on | Stage track list: 1 = a waveform preview column and a badge naming the deck a track is loaded on. |
+| `stage-sidebar` | int | `0` | `0` labels, `1` icons only | Stage library side bar: 0 = icon and label per entry, 1 = icons only. |
+| `stage-mirror` | int | `1` | `0` same, `1` mirrored | Stage right-hand deck: 0 = the same left-to-right arrangement as the left deck, 1 = mirrored (jog and buttons on the outer side). |
+| `wave-ruler` | int | `0` | `0` off, `1` on | Stage workspace: 1 = a bar ruler (the bar numbers, stepping with the zoom) along the top of the enlarged waveforms stacked across the top or in the centre column; hidden while a track has no beat grid. |
+| `stage-mixer-w` | length | `280px` |  | Width of the Stage mixer. |
+| `stage-wave-h` | length | `64px` |  | Height of each enlarged waveform in the Stage workspace. |
+| `stage-gap` | length | `8px` |  | Spacing between the Stage panels (and the window edge). |
+| `stage-radius` | length | `10px` |  | Corner radius of the Stage panels. |
+| `stage-radius-ctl` | length | `6px` |  | Corner radius of the Stage buttons, pads, tabs and fields. |
+| `stage-cover` | length | `80px` |  | Side of the cover art in the Stage deck panels. |
+| `stage-row` | length | `30px` |  | Row height of the Stage track list. |
+| `stage-button` | length | `44px` |  | Height of the Stage big CUE / PLAY / SYNC buttons (diameter when round). |
+| `stage-jog` | length | `180px` |  | Diameter of the Stage jog (ring or platter). |
+
+### Style (looks shared by the stage workspace and the waveforms)
+
+`glow`, `bevel`, `button-style`, `jog-style`, `panel-top`, `panel-border` and `deck-tint` are read by the stage workspace's controls. `wave-style` colours every deck waveform, in every workspace. `font-display` is the family of the big figures; UI code reads `display-font` (`Theme.display-font`), which is `font-display`, or `font` when `font-display` is empty (it is not a token).
+
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `glow` | float | `0.0` | `0 to 1` | Neon glow (0..1) around lit controls, the jog ring and the playheads of the Stage workspace; 0 = none. |
+| `bevel` | float | `0.0` | `0 to 1` | Raised / inset shading (0..1) of the Stage buttons, knobs and panels; 0 = flat. |
+| `button-style` | int | `0` | `0` filled, `1` outlined, `2` raised | Stage buttons: 0 = filled, 1 = outlined (the lit one glows in its colour), 2 = raised (bevelled caps). |
+| `jog-style` | int | `0` | `0` ring, `1` platter, `2` ticks | Stage jog: 0 = ring with the BPM inside, 1 = vinyl platter showing the cover art, 2 = thin ring with the beat ticks. |
+| `panel-top` | color | follows `panel` |  | Top colour of the Stage panels' vertical gradient (the bottom is `panel`); `panel` = no gradient. |
+| `panel-border` | color | `#00000000` |  | Outline of the Stage panels; transparent = none. |
+| `deck-tint` | int | `0` | `0` off, `1` on | 1 = each deck's controls take its deck colour (jog arc, PLAY / CUE rims, lit pads, knob arcs, meters, deck badge); 0 = the shared accents. |
+| `deck1-hi` | color | `#b4befe` / `#04a5e5` |  | Second colour of each deck: gradients and the mid band of its waveform when `wave-style` is 1. |
+| `deck2-hi` | color | `#f9e2af` / `#df8e1d` |  | Deck 2's second colour. |
+| `deck3-hi` | color | `#f5c2e7` / `#ea76cb` |  | Deck 3's second colour. |
+| `deck4-hi` | color | `#a6e3a1` / `#40a02b` |  | Deck 4's second colour. |
+| `wave-style` | int | `0` | `0` shared, `1` per deck | Waveform colours: 0 = the shared bands (`wave-low`, `wave-mid`, `wave-high`), 1 = per deck (low = `deckN`, mid = `deckN-hi`, high = `wave-high`). |
+| `font-display` | string | `""` |  | Family of the big figures (BPM, times, deck numbers); empty = `font`. |
+| `weight-display` | int | `600` |  | Weight of the big figures. |
 
 ### Motion
 
-| Token | Type | Default |
-|---|---|---|
-| `t-fast` | duration | `80ms` |
-| `t-fade` | duration | `180ms` |
-| `tooltip-delay` | duration | `600ms` |
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `t-fast` | duration | `80ms` |  | Hover and press fades of buttons. |
+| `t-fade` | duration | `180ms` |  | Toast fade. |
+| `tooltip-delay` | duration | `600ms` |  | Hover time before a tooltip shows. |
 
 ## Writing one
 
@@ -392,4 +594,105 @@ and brightness of the key column's colours, whose hue is the key's.
 2. List only what you change; start with the surfaces (`bg`, `panel*`, `text*`) and `accent`.
 3. Keep text readable on `select`, `hover-row` and `accent` (`text-bright` sits on them); `extension/skin/high-contrast.json` shows a
    high contrast set.
-4. The theme shows within a second of saving the file; stderr tells what was left out.
+4. Preview: the theme shows within a second of saving the file (the app compares the folders once a second), the applied theme
+   restyles at once, so keep the app open next to a text editor; stderr tells what was left out and why. A working folder of your own:
+   `OPENFADER_SKINS=~/my-themes openfader`. In CUSTOMIZE every change shows in the whole app as you make it.
+5. Share: a theme is one `.json` file, so send the file (IMPORT… or drop it on the window installs it), or put it in a GitHub
+   repository (files at the top or at most two folders deep) that others add in GET THEMES. Fill `author` and `description` (and
+   `locales` for translations) so the gallery card says what it is. Do not use the names or logos of other products in a theme, its
+   description or its screenshots.
+
+### Recipes
+
+Neon dark with a colour per deck: black panels, deck 1 lime and deck 2 purple, glowing outlined controls, waveforms in the deck
+colours fading towards their edges, four channels in the mixer. `panel-top` is not set, so it follows `panel` and the panels are flat.
+
+```json
+{
+  "name": "Neon recipe",
+  "base": "dark",
+  "description": "Black panels, lime deck 1, purple deck 2, glowing controls",
+  "tokens": {
+    "layout-profile": 3,
+    "stage-wave": 0,
+    "stage-deck": 0,
+    "stage-pads": 0,
+    "stage-mixer": 1,
+    "stage-list-wave": 1,
+    "button-style": 1,
+    "jog-style": 0,
+    "glow": 0.8,
+    "deck-tint": 1,
+    "wave-style": 1,
+    "wave-fade": 0.6,
+    "bg": "#050505",
+    "panel": "#0b0b0d",
+    "panel-border": "#26262c",
+    "wave-bg": "#000000",
+    "wave-high": "#ffffff",
+    "deck1": "#b6ff1a",
+    "deck1-hi": "#e4ff8a",
+    "deck2": "#b44dff",
+    "deck2-hi": "#dca8ff"
+  }
+}
+```
+
+Light bevelled: a light base, raised buttons, a gradient from a lighter top to the panel colour, a vinyl platter and a cue list.
+
+```json
+{
+  "name": "Frost recipe",
+  "base": "light",
+  "description": "Light frosted grey, raised buttons, vinyl platter",
+  "tokens": {
+    "layout-profile": 3,
+    "stage-deck": 1,
+    "stage-pads": 1,
+    "stage-tabs": 1,
+    "bevel": 0.7,
+    "button-style": 2,
+    "jog-style": 1,
+    "panel-top": "#f7f8fa",
+    "panel": "#dfe2e8",
+    "panel-border": "#b9bec9",
+    "wave-style": 1,
+    "deck1": "#2f7cf6",
+    "deck2": "#ff6a3d"
+  }
+}
+```
+
+Centre waveform: both waveforms in a column between the decks, ring decks, filled pads, the effects strip, controls in the deck
+colours.
+
+```json
+{
+  "name": "Centre recipe",
+  "description": "Waveforms between the decks, orange and blue",
+  "tokens": {
+    "layout-profile": 3,
+    "stage-wave": 1,
+    "stage-deck": 3,
+    "stage-pads": 2,
+    "stage-strip": 1,
+    "deck-tint": 1,
+    "jog-style": 2,
+    "wave-style": 1,
+    "wave-fade": 0.4,
+    "deck1": "#ff8a1f",
+    "deck1-hi": "#ffc27a",
+    "deck2": "#2f8bff",
+    "deck2-hi": "#8cc0ff"
+  }
+}
+```
+
+Per-deck waveforms on the desktop workspace (`layout-profile` stays 0): only the waveform tokens.
+
+```json
+{
+  "name": "Lime and purple recipe",
+  "tokens": { "wave-style": 1, "wave-fade": 0.6, "deck1": "#a6e22e", "deck2": "#9b59ff" }
+}
+```

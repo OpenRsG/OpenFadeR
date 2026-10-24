@@ -1,0 +1,516 @@
+import { Theme } from "../theme.slint";
+import { Glyph, Icon } from "../icons.slint";
+import { Tooltip } from "../widgets.slint";
+
+/// Colours the Stage deck parts share. `Theme.deck-tint` 1 makes every control of deck `i` wear its deck colour (`deckN`, `deckN-hi`);
+/// 0 keeps the shared accents. Pure functions only: nothing here holds state.
+export global StageTone {
+    /// The deck's main colour (the shared `accent` without `deck-tint`).
+    public pure function deck(i: int) -> color {
+        return Theme.deck-tint == 1 ? [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][i] : Theme.accent;
+    }
+    /// The deck's second colour (gradients, the lit rim of a pad).
+    public pure function hi(i: int) -> color {
+        return Theme.deck-tint == 1 ? [Theme.deck1-hi, Theme.deck2-hi, Theme.deck3-hi, Theme.deck4-hi][i] : Theme.accent-hi;
+    }
+    /// PLAY, CUE, SYNC and MASTER: the deck colour with `deck-tint`, else their own accents.
+    public pure function play(i: int) -> color { return Theme.deck-tint == 1 ? StageTone.deck(i) : Theme.play; }
+    public pure function cue(i: int) -> color { return Theme.deck-tint == 1 ? StageTone.deck(i) : Theme.cue; }
+    public pure function sync(i: int) -> color { return Theme.deck-tint == 1 ? StageTone.deck(i) : Theme.sync; }
+    public pure function master(i: int) -> color { return Theme.deck-tint == 1 ? StageTone.deck(i) : Theme.master; }
+    /// Relative luminance (0..1) of a colour.
+    public pure function lum(c: color) -> float {
+        return 0.2126 * StageTone.lin(c.red / 255) + 0.7152 * StageTone.lin(c.green / 255) + 0.0722 * StageTone.lin(c.blue / 255);
+    }
+    pure function lin(v: float) -> float {
+        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    }
+    /// WCAG contrast ratio of two colours.
+    public pure function contrast(a: color, b: color) -> float {
+        return (max(StageTone.lum(a), StageTone.lum(b)) + 0.05) / (min(StageTone.lum(a), StageTone.lum(b)) + 0.05);
+    }
+    /// The label colour for a fill `c`: `text-bright`, or the opposite end (the dark `bg` / black on a light text-bright, else white) when that
+    /// contrasts more. Use it for every label on a filled, lit surface.
+    public pure function on(c: color) -> color {
+        return StageTone.contrast(c, Theme.text-bright) >= StageTone.contrast(c, StageTone.opposite()) ? Theme.text-bright : StageTone.opposite();
+    }
+    pure function opposite() -> color {
+        return StageTone.lum(Theme.text-bright) > 0.4 ? (StageTone.lum(Theme.bg) < 0.1 ? Theme.bg : Colors.black) : Colors.white;
+    }
+    /// The Camelot number (1..12) of a key such as "8A" / "11B"; 0 = not a Camelot name.
+    public pure function camelot(k: string) -> float {
+        return k == "1A" || k == "1B" ? 1.0 : k == "2A" || k == "2B" ? 2.0 : k == "3A" || k == "3B" ? 3.0 : k == "4A" || k == "4B" ? 4.0
+            : k == "5A" || k == "5B" ? 5.0 : k == "6A" || k == "6B" ? 6.0 : k == "7A" || k == "7B" ? 7.0 : k == "8A" || k == "8B" ? 8.0
+            : k == "9A" || k == "9B" ? 9.0 : k == "10A" || k == "10B" ? 10.0 : k == "11A" || k == "11B" ? 11.0 : k == "12A" || k == "12B" ? 12.0 : 0.0;
+    }
+    /// The key's colour as in the track list (hue = Camelot number); `text-dim` for a key that is not a Camelot name.
+    public pure function key(k: string) -> color {
+        return StageTone.camelot(k) == 0.0 ? Theme.text-dim : Colors.hsv(StageTone.camelot(k) * 30, Theme.key-sat, Theme.key-val);
+    }
+}
+
+/// A panel body: vertical gradient `panel-top` → `panel`, `stage-radius`, `panel-border`, a bevel (light top edge, dark bottom
+/// edge, scaled by `Theme.bevel`) and, while `lit` with `Theme.glow` > 0, a glow and rim in `accent`. Children go inside.
+export component StagePanel inherits Rectangle {
+    in property <color> accent: transparent;
+    in property <bool> lit: false;
+    property <bool> glowing: root.lit && Theme.glow > 0;
+    background: Theme.panel-top == Theme.panel ? Theme.panel : @linear-gradient(180deg, Theme.panel-top 0%, Theme.panel 100%);
+    border-radius: Theme.stage-radius;
+    border-width: 1px;
+    border-color: root.glowing ? root.accent.with-alpha(0.55 + 0.3 * Theme.glow) : Theme.panel-border;
+    drop-shadow-blur: root.glowing ? 22px * Theme.glow : 0px;
+    drop-shadow-color: root.glowing ? root.accent.with-alpha(0.5 * Theme.glow) : transparent;
+    if Theme.bevel > 0: Rectangle {
+        x: Theme.stage-radius / 2;
+        y: 1px;
+        width: parent.width - Theme.stage-radius;
+        height: 1px;
+        background: Colors.white.with-alpha(0.5 * Theme.bevel);
+    }
+    if Theme.bevel > 0: Rectangle {
+        x: Theme.stage-radius / 2;
+        y: parent.height - 2px;
+        width: parent.width - Theme.stage-radius;
+        height: 1px;
+        background: Colors.black.with-alpha(0.4 * Theme.bevel);
+    }
+}
+
+/// A button in the `Theme.button-style`: 0 filled (the lit one fills with `accent`), 1 outlined (the lit one glows in `accent`),
+/// 2 raised (a bevelled cap; the lit one is pressed in and its label takes `accent`). `round` makes it a disc (give it a square box);
+/// `flat` drops the idle fill (the tabs of StageTabs). Fills the box it is given.
+export component StageButton inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    /// One of the app's own glyphs, drawn in the label colour (instead of `icon`).
+    in property <Icon> glyph;
+    in property <bool> active;
+    in property <bool> enabled: true;
+    in property <color> accent: Theme.accent;
+    in property <bool> round;
+    in property <bool> flat;
+    /// The outline wears `accent` even while the button is idle (the PLAY / CUE rims in the deck colour).
+    in property <bool> rim;
+    /// What the button does, shown on hover and read by assistive tools (needed where the label is an abbreviation or a glyph).
+    in property <string> tooltip;
+    in property <length> font-size: Theme.font-sm;
+    /// A pointer press and release for momentary buttons (CUE); `clicked` still fires on a click.
+    callback clicked;
+    callback pressed;
+    callback released;
+    property <int> style: Theme.button-style;
+    property <bool> lit: root.active && root.enabled;
+    property <bool> glowing: root.lit && Theme.glow > 0 && root.style != 2;
+    property <color> rest: root.flat ? transparent : Theme.panel-raised;
+    /// What the lit face effectively looks like behind the label (style 1's tint is lifted by the glow bleeding through it).
+    property <color> lit-fill: root.style == 0 ? root.accent : root.style == 1 ? root.accent.mix(Theme.panel, 0.2 + 0.4 * Theme.glow) : Theme.panel-raised.darker(0.2);
+    property <color> label: !root.enabled ? Theme.text-disabled
+        : root.lit ? (root.style == 2 && StageTone.contrast(root.accent, root.lit-fill) > 3 ? root.accent : root.style == 1 && StageTone.contrast(root.accent.brighter(0.25), root.lit-fill) > 4.5 ? root.accent.brighter(0.25) : StageTone.on(root.lit-fill))
+        : ta.has-hover ? Theme.text-bright : Theme.text;
+    min-width: 12px;
+    min-height: 12px;
+    accessible-role: button;
+    accessible-label: root.tooltip != "" ? root.tooltip : root.text;
+    accessible-action-default => { if root.enabled { root.pressed(); root.released(); root.clicked(); } }
+    face := Rectangle {
+        border-radius: root.round ? self.height / 2 : Theme.stage-radius-ctl;
+        border-width: root.style == 1 || root.style == 2 || root.rim ? 1px : 0px;
+        border-color: !root.enabled ? Theme.line
+            : root.rim ? (root.lit ? root.accent.brighter(0.2) : ta.has-hover ? root.accent : root.accent.with-alpha(0.75))
+            : root.style == 1 ? (root.lit ? root.accent : ta.has-hover ? Theme.text-dim : Theme.line-strong)
+            : Theme.line-strong.with-alpha(0.55);
+        background: !root.enabled ? (root.flat ? transparent : Theme.panel)
+            : root.style == 0 ? (root.lit ? (ta.pressed ? root.accent.darker(0.2) : ta.has-hover ? root.accent.brighter(0.15) : root.accent)
+                : ta.pressed ? Theme.bg-deep : ta.has-hover ? (root.flat ? Theme.panel-raised : Theme.panel-high) : root.rest)
+            : root.style == 1 ? (root.lit ? root.accent.with-alpha(ta.pressed ? 0.34 : 0.2) : ta.pressed ? Theme.bg-deep.with-alpha(0.6) : ta.has-hover ? Theme.panel-raised.with-alpha(0.5) : transparent)
+            : root.lit || ta.pressed ? (root.round ? Theme.panel-raised.darker(0.2) : @linear-gradient(180deg, Theme.panel-raised.darker(0.25 * Theme.bevel + 0.1) 0%, Theme.panel-raised.darker(0.08) 100%))
+            : root.round ? (ta.has-hover ? Theme.panel-high : Theme.panel-raised.brighter(0.1 * Theme.bevel)) : @linear-gradient(180deg, Theme.panel-raised.brighter(0.3 * Theme.bevel + 0.08) 0%, Theme.panel-raised.darker(0.1 * Theme.bevel) 100%);
+        drop-shadow-blur: root.glowing ? 16px * Theme.glow : root.style == 2 && root.enabled && !root.lit && !root.flat ? 4px * Theme.bevel : 0px;
+        drop-shadow-color: root.glowing ? root.accent.with-alpha(0.75 * Theme.glow) : root.style == 2 && !root.lit && !root.flat ? Colors.black.with-alpha(0.4 * Theme.bevel) : transparent;
+        drop-shadow-offset-y: root.glowing ? 0px : 1px;
+        animate background { duration: Theme.t-fast; }
+        animate border-color { duration: Theme.t-fast; }
+        // The raised cap's light top edge.
+        if root.style == 2 && root.enabled && !root.lit && !root.flat && Theme.bevel > 0: Rectangle {
+            x: parent.border-radius * 0.6;
+            y: 1px;
+            width: parent.width - parent.border-radius * 1.2;
+            height: 1px;
+            background: Colors.white.with-alpha(0.55 * Theme.bevel);
+        }
+        // A raised cap that is lit shows a lamp under its label.
+        if root.style == 2 && root.lit: Rectangle {
+            x: parent.width * 0.25;
+            y: parent.height - 4px;
+            width: parent.width * 0.5;
+            height: 2px;
+            border-radius: 1px;
+            background: root.accent;
+            drop-shadow-blur: 6px * Theme.glow;
+            drop-shadow-color: root.accent.with-alpha(0.9 * Theme.glow);
+        }
+    }
+    if root.text != "": Text {
+        x: 2px;
+        y: root.style == 2 && (root.lit || ta.pressed) ? 1px : 0px;
+        width: parent.width - 4px;
+        height: parent.height;
+        text: root.text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+        color: root.label;
+        font-family: Theme.font;
+        font-size: root.font-size;
+        font-weight: Theme.weight-bold;
+    }
+    if root.text == "" && root.glyph != Icon.none: Glyph {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: max(root.font-size * 1.5, min(parent.width, parent.height) * 0.42);
+        height: self.width;
+        icon: root.glyph;
+        tint: root.label;
+        stroke-width: 1.5px;
+    }
+    if root.text == "" && root.glyph == Icon.none: Image {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: max(root.font-size * 1.5, min(parent.width, parent.height) * 0.42);
+        height: self.width;
+        source: root.icon;
+        colorize: root.label;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left {
+                if e.kind == PointerEventKind.down { root.pressed(); }
+                if e.kind == PointerEventKind.up { root.released(); }
+            }
+        }
+    }
+    if root.tooltip != "": Tooltip { width: root.width; height: root.height; text: root.tooltip; hovered: ta.has-hover && !ta.pressed; }
+}
+
+/// Rotary knob of `size` at the top centre of its box with `label` under it. A pure function of `value` (0..1): a 270° arc
+/// (from the left stop, or from the top when `bipolar`) in `accent`; a vertical drag turns it (150 px = the full range),
+/// a double-click asks for `reset`.
+export component StageKnob inherits Rectangle {
+    in property <float> value;
+    in property <bool> bipolar;
+    in property <string> label;
+    in property <color> accent: Theme.accent;
+    in property <length> size: 32px;
+    callback moved(float);
+    callback reset();
+    property <float> start;
+    property <length> c: root.size / 2;
+    property <angle> sweep: (clamp(root.value, 0, 1) - 0.5) * 270deg;
+    width: root.size + (root.label != "" ? 20px : 0px);
+    /// A position (0..1; negative = none) one drag cannot pass: a turn that starts on one side halts there (the COLOR FX knob mode).
+    in property <float> stop: -1;
+    height: root.size + (root.label != "" ? 12px : 0px);
+    pure function held(v: float) -> float {
+        return root.stop < 0 ? v : root.start < root.stop ? min(v, root.stop) : root.start > root.stop ? max(v, root.stop) : v;
+    }
+    // Path commands need "." decimals whatever the UI language: to-string-unlocalized.
+    pure function pt(r: length, a: angle) -> string {
+        return ((root.width / 2 + r * sin(a)) / 1px).to-string-unlocalized() + " " + ((root.c - r * cos(a)) / 1px).to-string-unlocalized();
+    }
+    pure function arc(r: length, a0: angle, a1: angle) -> string {
+        return "M " + root.pt(r, a0) + " A " + (r / 1px).to-string-unlocalized() + " " + (r / 1px).to-string-unlocalized() + " 0 " + (abs((a1 - a0) / 1deg) > 180 ? "1" : "0") + " " + (a1 >= a0 ? "1" : "0") + " " + root.pt(r, a1);
+    }
+    // Body: a disc inside the arc, domed with the bevel.
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: root.c - self.height / 2;
+        width: root.size * 0.7;
+        height: self.width;
+        border-radius: self.width / 2;
+        border-width: 1px;
+        border-color: Theme.line-strong.with-alpha(0.5);
+        background: ta.has-hover ? Theme.panel-high : Theme.panel-raised;
+        animate background { duration: Theme.t-fast; }
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: root.arc(root.c - 2px, -135deg, 135deg);
+        stroke: Theme.line-strong.with-alpha(0.6);
+        stroke-width: max(2px, root.size / 14);
+        stroke-line-cap: round;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: root.arc(root.c - 2px, root.bipolar ? 0deg : -135deg, root.sweep);
+        stroke: root.accent;
+        stroke-width: max(2px, root.size / 14);
+        stroke-line-cap: round;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: "M " + root.pt(root.c * 0.2, root.sweep) + " L " + root.pt(root.c * 0.6, root.sweep);
+        stroke: Theme.text-bright;
+        stroke-width: max(1.5px, root.size / 20);
+        stroke-line-cap: round;
+    }
+    if root.label != "": Text {
+        y: root.size;
+        width: root.width;
+        height: 12px;
+        text: root.label;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+        color: Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-xs;
+        font-weight: Theme.weight-bold;
+    }
+    ta := TouchArea {
+        y: 0px;
+        height: root.size;
+        mouse-cursor: ns-resize;
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { root.start = root.value; }
+        }
+        moved => {
+            if self.pressed { root.moved(root.held(clamp(root.start + (self.pressed-y - self.mouse-y) / 150px, 0, 1))); }
+        }
+        double-clicked => { root.reset(); }
+    }
+}
+
+/// A fader: a pure function of `value` (0..1; vertical: 1 is the top). The groove fills in `accent` from the end (from the middle
+/// with `detent`, which also marks it); `moved` carries the value while the cap is dragged or the groove is pressed, `reset` a double-click.
+export component StageFader inherits Rectangle {
+    in property <float> value;
+    in property <bool> vertical: true;
+    in property <color> accent: Theme.accent;
+    in property <bool> detent;
+    callback moved(float);
+    callback reset();
+    property <length> cap: root.vertical ? 16px : 14px;
+    property <length> len: root.vertical ? root.height : root.width;
+    property <length> at: root.cap / 2 + (root.len - root.cap) * (root.vertical ? 1 - clamp(root.value, 0, 1) : clamp(root.value, 0, 1));
+    property <length> from: root.detent ? root.len / 2 : (root.vertical ? root.len - root.cap / 2 : root.cap / 2);
+    pure function pick(pos: length) -> float {
+        return clamp(root.vertical ? 1 - (pos - root.cap / 2) / (root.len - root.cap) : (pos - root.cap / 2) / (root.len - root.cap), 0, 1);
+    }
+    min-width: root.vertical ? 18px : 40px;
+    min-height: root.vertical ? 40px : 18px;
+    Rectangle {
+        x: root.vertical ? (root.width - self.width) / 2 : 0px;
+        y: root.vertical ? 0px : (root.height - self.height) / 2;
+        width: root.vertical ? 5px : root.width;
+        height: root.vertical ? root.height : 5px;
+        border-radius: 2.5px;
+        background: Theme.bg-deep;
+        border-width: 1px;
+        border-color: Theme.line;
+    }
+    Rectangle {
+        x: root.vertical ? (root.width - self.width) / 2 : min(root.from, root.at);
+        y: root.vertical ? min(root.from, root.at) : (root.height - self.height) / 2;
+        width: root.vertical ? 3px : abs(root.at - root.from);
+        height: root.vertical ? abs(root.at - root.from) : 3px;
+        border-radius: 1.5px;
+        background: root.accent;
+    }
+    if root.detent: Rectangle {
+        x: root.vertical ? 0px : root.len / 2 - 0.5px;
+        y: root.vertical ? root.len / 2 - 0.5px : 0px;
+        width: root.vertical ? root.width : 1px;
+        height: root.vertical ? 1px : root.height;
+        background: Theme.line-strong;
+    }
+    Rectangle {
+        x: root.vertical ? (root.width - self.width) / 2 : root.at - root.cap / 2;
+        y: root.vertical ? root.at - root.cap / 2 : (root.height - self.height) / 2;
+        width: root.vertical ? min(root.width - 2px, 28px) : root.cap;
+        height: root.vertical ? root.cap : min(root.height - 2px, 22px);
+        border-radius: Theme.stage-radius-ctl / 2;
+        border-width: 1px;
+        border-color: Theme.line-strong.with-alpha(0.6);
+        background: @linear-gradient(180deg, Theme.fader-cap.brighter(0.2 + 0.3 * Theme.bevel) 0%, Theme.fader-cap.darker(0.15 + 0.2 * Theme.bevel) 100%);
+        drop-shadow-blur: 4px * Theme.bevel;
+        drop-shadow-color: Colors.black.with-alpha(0.45 * Theme.bevel);
+        drop-shadow-offset-y: 1px;
+        Rectangle {
+            x: root.vertical ? 3px : (parent.width - self.width) / 2;
+            y: root.vertical ? (parent.height - self.height) / 2 : 3px;
+            width: root.vertical ? parent.width - 6px : 2px;
+            height: root.vertical ? 2px : parent.height - 6px;
+            background: ta.pressed ? root.accent : Theme.panel;
+        }
+    }
+    ta := TouchArea {
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { root.moved(root.pick(root.vertical ? self.mouse-y : self.mouse-x)); }
+        }
+        moved => {
+            if self.pressed { root.moved(root.pick(root.vertical ? self.mouse-y : self.mouse-x)); }
+        }
+        double-clicked => { root.reset(); }
+    }
+}
+
+/// A level meter, `level` and `peak` 0..1 (`peak` 0 hides the hold marker). Vertical when the box is taller than wide. Cut into
+/// segments; `accent` transparent paints `meter-lo` / `meter-mid` / `meter-hi`, a colour paints that colour only.
+export component StageMeter inherits Rectangle {
+    in property <float> level;
+    in property <float> peak;
+    in property <color> accent: transparent;
+    in property <int> segments: 16;
+    property <bool> vert: root.height > root.width;
+    property <length> len: root.vert ? root.height : root.width;
+    background: Theme.bg-deep;
+    border-radius: 1px;
+    clip: true;
+    Rectangle {
+        x: 0px;
+        y: root.vert ? root.height * (1 - clamp(root.level, 0, 1)) : 0px;
+        width: root.vert ? root.width : root.width * clamp(root.level, 0, 1);
+        height: root.vert ? root.height * clamp(root.level, 0, 1) : root.height;
+        clip: true;
+        Rectangle {
+            x: 0px;
+            y: root.vert ? -parent.y : 0px;
+            width: root.width;
+            height: root.height;
+            background: root.accent != transparent ? @linear-gradient(root.vert ? 0deg : 90deg, root.accent.darker(0.1) 0%, root.accent 70%, root.accent.brighter(0.3) 100%)
+                : @linear-gradient(root.vert ? 0deg : 90deg, Theme.meter-lo 0%, Theme.meter-lo 60%, Theme.meter-mid 80%, Theme.meter-hi 100%);
+        }
+    }
+    for n in root.segments - 1: Rectangle {
+        x: root.vert ? 0px : (n + 1) * root.len / root.segments - 0.5px;
+        y: root.vert ? (n + 1) * root.len / root.segments - 0.5px : 0px;
+        width: root.vert ? root.width : 1px;
+        height: root.vert ? 1px : root.height;
+        background: Theme.bg-deep;
+    }
+    if root.peak > 0: Rectangle {
+        x: root.vert ? 0px : clamp(root.peak, 0, 1) * (root.width - 2px);
+        y: root.vert ? (1 - clamp(root.peak, 0, 1)) * (root.height - 2px) : 0px;
+        width: root.vert ? root.width : 2px;
+        height: root.vert ? 2px : root.height;
+        background: Theme.text-bright;
+    }
+}
+
+/// A row of tabs filling its box: the current one is lit in the `button-style`. `current` is the caller's to keep (the tab only
+/// tells which was picked, and takes it itself so a lone StageTabs works); `tabs` are already translated.
+export component StageTabs inherits Rectangle {
+    in property <[string]> tabs;
+    in-out property <int> current;
+    in property <length> font-size: Theme.font-sm;
+    in property <color> accent: Theme.accent;
+    callback picked(int);
+    background: Theme.bg-deep.with-alpha(0.55);
+    border-radius: Theme.stage-radius-ctl + 2px;
+    HorizontalLayout {
+        padding: 2px;
+        spacing: 2px;
+        for t[i] in root.tabs: StageButton {
+            text: t;
+            flat: true;
+            active: i == root.current;
+            accent: root.accent;
+            font-size: root.font-size;
+            clicked => { root.picked(i); }
+        }
+    }
+}
+
+/// A button that opens a list of `options` (the effect, the pad mode). Shows `label`, else the current option; a pure function of
+/// `current`, `chose` carries the picked index. Outlined in the `button-style` 1, otherwise filled like a StageButton.
+export component StageSelect inherits Rectangle {
+    in property <[string]> options;
+    in property <int> current;
+    in property <string> label;
+    in property <bool> enabled: true;
+    in property <length> font-size: Theme.font-sm;
+    /// Width of the open list; 0 = as wide as the button, at least 100 px.
+    in property <length> list-width: 0px;
+    callback chose(int);
+    min-width: 40px;
+    accessible-role: combobox;
+    face := Rectangle {
+        border-radius: Theme.stage-radius-ctl;
+        border-width: 1px;
+        border-color: !root.enabled ? Theme.line : ta.has-hover ? Theme.text-dim : Theme.line-strong.with-alpha(Theme.button-style == 1 ? 1.0 : 0.55);
+        background: !root.enabled ? Theme.panel : Theme.button-style == 1 ? (ta.pressed ? Theme.bg-deep.with-alpha(0.6) : transparent)
+            : ta.pressed ? Theme.bg-deep : @linear-gradient(180deg, (ta.has-hover ? Theme.panel-high : Theme.panel-raised).brighter(0.25 * Theme.bevel) 0%, (ta.has-hover ? Theme.panel-high : Theme.panel-raised).darker(0.1 * Theme.bevel) 100%);
+        animate border-color { duration: Theme.t-fast; }
+    }
+    Text {
+        x: Theme.space-md;
+        width: parent.width - 2 * Theme.space-md - 12px;
+        height: parent.height;
+        text: root.label != "" ? root.label : root.options.length > root.current ? root.options[root.current] : "";
+        vertical-alignment: center;
+        overflow: elide;
+        color: root.enabled ? Theme.text-bright : Theme.text-disabled;
+        font-family: Theme.font;
+        font-size: root.font-size;
+        font-weight: Theme.weight-bold;
+    }
+    Glyph {
+        x: parent.width - self.width - Theme.space-sm;
+        y: (parent.height - self.height) / 2;
+        width: 12px;
+        height: 12px;
+        icon: Icon.tri-down;
+        tint: Theme.text-dim;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { pop.show(); }
+    }
+    pop := PopupWindow {
+        x: 0px;
+        y: root.height + 1px;
+        width: max(root.list-width > 0px ? root.list-width : root.width, 100px);
+        height: min(root.options.length * Theme.h-row + 2px, 320px);
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.stage-radius-ctl;
+            Flickable {
+                content-width: self.width;
+                content-height: items.preferred-height;
+                items := VerticalLayout {
+                    padding: 1px;
+                    for o[i] in root.options: Rectangle {
+                        height: Theme.h-row;
+                        background: row.has-hover ? Theme.select : i == root.current ? Theme.panel-high : transparent;
+                        Text {
+                            x: Theme.space-md;
+                            width: parent.width - 2 * Theme.space-md;
+                            height: parent.height;
+                            text: o;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            color: Theme.text;
+                            font-family: Theme.font;
+                            font-size: Theme.font-size;
+                        }
+                        row := TouchArea { clicked => { root.chose(i); pop.close(); } }
+                    }
+                }
+            }
+        }
+    }
+}

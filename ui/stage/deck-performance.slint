@@ -1,0 +1,154 @@
+import { Theme } from "../theme.slint";
+import { Icon } from "../icons.slint";
+import { DeckState, DeckView } from "../deck-state.slint";
+import { MixerState } from "../mixer.slint";
+import { StageButton, StageKnob, StagePanel, StageTone } from "controls.slint";
+import { StageFx, StageGeom, StageHead, StageJog, StageLoop, StagePads, StageTempo, StageWave } from "deck-parts.slint";
+
+/// Stage deck 0, performance: cover and title with the overview, the pad area, LOOP, BEAT FX and the FILTER knob; the jog with SLIP / Q /
+/// MT under it, the tempo fader, and PLAY, CUE, SYNC and MASTER. The control row mirrors for the right-hand deck.
+export component StagePerformance inherits Rectangle {
+    in property <int> index;
+    in property <bool> mirrored;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <color> tone: StageTone.deck(root.index);
+    property <length> g: Theme.space-lg;
+    property <length> iw: root.width - 2 * root.g;
+    property <length> ih: root.height - 2 * root.g;
+    property <length> hh: StageGeom.head-ov;
+    property <bool> waved: StageGeom.waved;
+    property <length> wh: root.waved ? min(StageGeom.wave, max(30px, root.ih * 0.2)) : 0px;
+    property <length> cy: root.hh + root.g + (root.waved ? root.wh + root.g : 0px);
+    property <length> ch: max(0px, min(root.ih - root.cy, Theme.stage-jog + root.chips-h + root.g));
+    property <length> bw: 62px;
+    property <length> tw: 38px;
+    property <length> chips-h: 22px;
+    property <length> d: max(40px, min(Theme.stage-jog, root.ch - root.chips-h - root.g, root.iw * 0.34));
+    property <length> lw: max(0px, root.iw - root.d - root.tw - root.bw - 3 * root.g);
+    property <bool> wide: root.lw >= 340px;
+    property <length> r1h: root.wide ? root.ch : root.ch * 0.56;
+    // The blocks of the left cluster: pads, loop, beat fx, filter (x unmirrored, inside the cluster).
+    property <length> pads-w: root.wide ? root.lw * 0.42 : root.lw * 0.6 - root.g / 2;
+    property <length> loop-x: root.pads-w + root.g;
+    property <length> loop-w: root.wide ? root.lw * 0.18 : root.lw - root.loop-x;
+    property <length> fx-x: root.wide ? root.loop-x + root.loop-w + root.g : 0px;
+    property <length> fx-y: root.wide ? 0px : root.r1h + root.g;
+    property <length> fx-w: root.wide ? root.lw * 0.28 : root.lw * 0.64;
+    property <length> blk-h: root.wide ? root.ch : root.ch - root.r1h - root.g;
+    property <length> flt-x: root.fx-x + root.fx-w + root.g;
+    property <length> flt-w: max(0px, root.lw - root.flt-x);
+    property <length> ks: clamp(min(root.blk-h - 14px, root.flt-w - 20px), 22px, 40px);
+    property <length> jog-x: root.lw + root.g;
+    property <length> tempo-x: root.jog-x + root.d + root.g;
+    property <length> btn-x: root.tempo-x + root.tw + root.g;
+    property <length> rb: clamp((root.ch - 2 * 24px - 3 * root.g) / 2, 30px, root.bw);
+    property <length> btn-gh: 2 * root.rb + 2 * 24px + 3 * root.g;
+    property <length> jog-y: max(0px, (root.ch - root.d - root.chips-h - root.g) / 2);
+    pure function px(x: length, w: length) -> length { return root.mirrored ? root.iw - x - w : x; }
+    StagePanel {
+        width: root.width;
+        height: root.height;
+        accent: root.tone;
+        lit: root.v.master;
+    }
+    if true: Rectangle {
+        x: root.g;
+        y: root.g;
+        width: root.iw;
+        height: root.ih;
+        if true: StageHead { x: 0px; y: 0px; width: root.iw; height: root.hh; index: root.index; overview: true; syncs: true; }
+        if root.waved: StageWave { x: 0px; y: root.hh + root.g; width: root.iw; height: root.wh; index: root.index; }
+        if true: Rectangle {
+            x: 0px;
+            y: root.cy;
+            width: root.iw;
+            height: root.ch;
+            StagePads { x: root.px(0px, root.pads-w); y: 0px; width: root.pads-w; height: root.r1h; index: root.index; tone: root.tone; }
+            StageLoop { x: root.px(root.loop-x, root.loop-w); y: 0px; width: root.loop-w; height: root.r1h; index: root.index; tone: root.tone; }
+            StageFx { x: root.px(root.fx-x, root.fx-w); y: root.fx-y; width: root.fx-w; height: root.blk-h; index: root.index; tone: root.tone; }
+            StageKnob {
+                x: root.px(root.flt-x, root.flt-w) + (root.flt-w - self.width) / 2;
+                y: root.fx-y + 14px;
+                size: root.ks;
+                bipolar: true;
+                label: MixerState.cfx-names.length > MixerState.cfx-type ? MixerState.cfx-names[MixerState.cfx-type] : @tr("FILTER");
+                accent: Theme.deck-tint == 1 ? root.tone : Theme.cue;
+                stop: MixerState.cfx-stop;
+                value: MixerState.channels[root.index].knobs[4];
+                moved(v) => { MixerState.knob(root.index, 4, v); }
+                reset() => { MixerState.knob(root.index, 4, 0.5); }
+            }
+            StageJog { x: root.px(root.jog-x, root.d); y: root.jog-y; width: root.d; height: root.d; index: root.index; tone: root.tone; tone-hi: StageTone.hi(root.index); }
+            HorizontalLayout {
+                x: root.px(root.jog-x, root.d);
+                y: root.jog-y + root.d + root.g;
+                width: root.d;
+                height: root.chips-h;
+                spacing: Theme.space-sm;
+                StageButton { text: @tr("SLIP"); tooltip: @tr("Slip mode"); font-size: Theme.font-xs; active: root.v.slip; enabled: root.v.loaded; accent: Theme.deck-tint == 1 ? root.tone : Theme.danger; clicked => { DeckState.slip(root.index); } }
+                StageButton { text: "Q"; tooltip: @tr("Quantize"); font-size: Theme.font-xs; active: root.v.quantize; accent: root.tone; clicked => { DeckState.quantize(root.index); } }
+                StageButton { text: @tr("MT"); tooltip: @tr("Master tempo (key lock)"); font-size: Theme.font-xs; active: root.v.key-lock; accent: root.tone; clicked => { DeckState.key-lock(root.index); } }
+            }
+            StageTempo { x: root.px(root.tempo-x, root.tw); y: 0px; width: root.tw; height: root.ch; index: root.index; tone: root.tone; steps: root.ch >= 170px; }
+            if true: Rectangle {
+                x: root.px(root.btn-x, root.bw);
+                y: (root.ch - root.btn-gh) / 2;
+                width: root.bw;
+                height: root.btn-gh;
+                StageButton {
+                    tooltip: @tr("Play / pause");
+                    x: (parent.width - self.width) / 2;
+                    y: 0px;
+                    width: root.rb;
+                    height: root.rb;
+                    round: true;
+                    glyph: root.v.playing ? Icon.pause : Icon.play;
+                    active: root.v.playing;
+                    enabled: root.v.loaded;
+                    accent: StageTone.play(root.index);
+                    rim: Theme.deck-tint == 1;
+                    clicked => { DeckState.play-pause(root.index); }
+                }
+                StageButton {
+                    tooltip: @tr("Cue: hold to preview, release to return");
+                    x: (parent.width - self.width) / 2;
+                    y: root.rb + root.g;
+                    width: root.rb;
+                    height: root.rb;
+                    round: true;
+                    text: @tr("CUE");
+                    active: root.v.at-cue;
+                    enabled: root.v.loaded;
+                    accent: StageTone.cue(root.index);
+                    rim: Theme.deck-tint == 1;
+                    pressed => { DeckState.cue(root.index); }
+                    released => { DeckState.cue-released(root.index); }
+                }
+                StageButton {
+                    tooltip: @tr("Beat sync to the master");
+                    y: 2 * root.rb + 2 * root.g;
+                    width: parent.width;
+                    height: 24px;
+                    text: @tr("SYNC");
+                    font-size: Theme.font-xs;
+                    active: root.v.synced;
+                    enabled: root.v.loaded;
+                    accent: StageTone.sync(root.index);
+                    clicked => { DeckState.sync(root.index); }
+                }
+                StageButton {
+                    tooltip: @tr("Tempo master");
+                    y: 2 * root.rb + 3 * root.g + 24px;
+                    width: parent.width;
+                    height: 24px;
+                    text: @tr("MASTER");
+                    font-size: Theme.font-xs;
+                    active: root.v.master;
+                    enabled: root.v.loaded;
+                    accent: StageTone.master(root.index);
+                    clicked => { DeckState.master-toggle(root.index); }
+                }
+            }
+        }
+    }
+}

@@ -61,6 +61,14 @@ impl Detected {
         })
     }
 
+    /// What a deck's own analysis of `audio` found: the lists show it from now on like a bulk run's result. Does nothing when the
+    /// map already holds exactly this, so a deck loaded again does not make every list rebuild.
+    pub(super) fn note(&self, audio: &Path, found: Found) {
+        if self.0.map.borrow().get(audio) != Some(&found) {
+            self.insert(audio.to_owned(), found);
+        }
+    }
+
     pub(super) fn insert(&self, audio: PathBuf, found: Found) {
         self.0.map.borrow_mut().insert(audio, found);
         self.0.version.set(self.0.version.get() + 1);
@@ -101,6 +109,30 @@ mod tests {
 
     fn files(t: Vec<&Track>) -> Vec<PathBuf> {
         t.into_iter().filter_map(|t| t.file.clone()).collect()
+    }
+
+    #[test]
+    fn what_a_deck_found_fills_the_lists_once_and_a_repeat_changes_nothing() {
+        let have = Detected::default();
+        let t = track("/m/new.flac", 0, "");
+        assert_eq!(have.fill(&t), (0, String::new()));
+        let before = have.version();
+        have.note(Path::new("/m/new.flac"), (12700, "7A".into()));
+        assert_eq!(have.fill(&t), (12700, "7A".into()));
+        assert_eq!(have.version(), before + 1);
+        have.note(Path::new("/m/new.flac"), (12700, "7A".into()));
+        assert_eq!(
+            have.version(),
+            before + 1,
+            "the same result again: the lists keep their rows"
+        );
+        // the library's own values still come first
+        assert_eq!(
+            have.fill(&track("/m/new.flac", 12800, "8A")),
+            (12800, "8A".into())
+        );
+        // and a track the deck found is no longer queued for a bulk run
+        assert!(pending(&[t], &have, &Parts::default()).is_empty());
     }
 
     #[test]

@@ -3,7 +3,8 @@
 //! is the preview; closing it (Discard, a theme chosen, Save as) restores the chosen skin. The values are kept for every token (not
 //! only the changed ones), so a saved theme is complete and does not depend on what the built-in values become later.
 
-use super::{Base, Skin, TOKEN_INFO, TOKENS, Ty, Value, file};
+use super::{Base, FOLLOWS, Skin, TOKEN_INFO, TOKEN_RULES, TOKENS, Ty, Value, file};
+use openfader_ui::skin::Rule;
 use slint::Color;
 use std::cell::RefCell;
 
@@ -33,12 +34,18 @@ pub struct Row {
     pub index: usize,
     pub name: &'static str,
     pub hint: &'static str,
-    /// 0 colour, 1 number (length, int, float or duration), 2 text, 3 the font family.
+    /// 0 colour, 1 number (length, int, float or duration), 2 text, 3 the font family, 4 a float with a range (a slider), 5 a whole
+    /// number from a fixed set (a dropdown of [`Row::options`]).
     pub kind: i32,
     /// The value as the field shows it (`#rrggbb`, `12`, `80ms`).
     pub text: String,
     pub color: Color,
     pub changed: bool,
+    /// Kind 5: the names of the values 0, 1, ... and the one the token has.
+    pub options: &'static [&'static str],
+    pub current: i32,
+    /// Kind 4: where the value is in the token's range, 0..=1.
+    pub fraction: f32,
 }
 
 thread_local! {
@@ -113,14 +120,17 @@ impl Draft {
     pub fn row(&self, i: usize) -> Row {
         let (name, ty) = TOKENS[i];
         let v = &self.values[i];
+        let rule = TOKEN_RULES[i];
         Row {
             index: i,
             name,
             hint: TOKEN_INFO[i].1,
-            kind: match (ty, name) {
-                (Ty::Color, _) => 0,
-                (Ty::Str, "font") => 3,
-                (Ty::Str, _) => 2,
+            kind: match (rule, ty, name) {
+                (Rule::Choice(_), ..) => 5,
+                (Rule::Range(..), ..) => 4,
+                (_, Ty::Color, _) => 0,
+                (_, Ty::Str, "font") => 3,
+                (_, Ty::Str, _) => 2,
                 _ => 1,
             },
             text: file::show(v),
@@ -129,6 +139,30 @@ impl Draft {
                 _ => Color::from_argb_u8(0, 0, 0, 0),
             },
             changed: *v != self.start[i],
+            options: match rule {
+                Rule::Choice(names) => names,
+                _ => &[],
+            },
+            current: match v {
+                Value::Int(n) => *n,
+                _ => 0,
+            },
+            fraction: match (rule, v) {
+                (Rule::Range(lo, hi), Value::Float(x)) => ((x - lo) / (hi - lo)).clamp(0.0, 1.0),
+                _ => 0.0,
+            },
+        }
+    }
+
+    /// Puts `v` in token `i`; a token that follows it ([`FOLLOWS`]) and still had its value moves along.
+    fn put(&mut self, i: usize, v: Value) {
+        let old = std::mem::replace(&mut self.values[i], v);
+        for (follower, _) in FOLLOWS.iter().filter(|f| f.1 == TOKENS[i].0) {
+            if let Some(j) = TOKENS.iter().position(|t| t.0 == *follower)
+                && self.values[j] == old
+            {
+                self.values[j] = self.values[i].clone();
+            }
         }
     }
 
@@ -137,7 +171,7 @@ impl Draft {
         let ok = i < TOKENS.len()
             && std::mem::discriminant(&v) == std::mem::discriminant(&self.values[i]);
         if ok {
-            self.values[i] = v;
+            self.put(i, v);
         }
         ok
     }
@@ -146,32 +180,58 @@ impl Draft {
     pub fn set_text(&mut self, i: usize, text: &str) -> Result<(), String> {
         let ty = TOKENS.get(i).ok_or(tr!("no such token"))?.1;
         let v = file::from_text(ty, text)?;
+        file::check(i, &v)?;
         self.set(i, v);
         Ok(())
     }
 
-    /// Moves a number token one step (`dir` ±1): a length 1 px, a whole number 1 (a font weight 100), a float 0.05, a duration 10 ms.
+    /// Sets the whole-number token `i` to value `n` of its dropdown.
+    pub fn choose(&mut self, i: usize, n: i32) {
+        let v = Value::Int(n);
+        if file::check(i, &v).is_ok() {
+            self.set(i, v);
+        }
+    }
+
+    /// Sets the float token `i` to the point `fraction` (0..=1) of its range.
+    pub fn slide(&mut self, i: usize, fraction: f32) {
+        if let Some(Rule::Range(lo, hi)) = TOKEN_RULES.get(i).copied() {
+            let x = lo + fraction.clamp(0.0, 1.0) * (hi - lo);
+            self.set(i, Value::Float((x * 100.0).round() / 100.0));
+        }
+    }
+
+    /// Moves a number token one step (`dir` ±1): a length 1 px, a whole number 1 (a font weight 100) within its set of values, a
+    /// float 0.05 within its range, a duration 10 ms.
     pub fn step(&mut self, i: usize, dir: i32) {
         let d = dir.signum();
         let name = TOKENS.get(i).map_or("", |t| t.0);
-        let v = match &self.values[i] {
-            Value::Length(n) => Value::Length((n + d as f32).max(0.0)),
-            Value::Int(n) => {
-                Value::Int((n + d * if name.starts_with("weight") { 100 } else { 1 }).max(0))
+        let v = match (&self.values[i], TOKEN_RULES[i]) {
+            (Value::Length(n), _) => Value::Length((n + d as f32).max(0.0)),
+            (Value::Int(n), rule) => {
+                let n = n + d * if name.starts_with("weight") { 100 } else { 1 };
+                Value::Int(match rule {
+                    Rule::Choice(names) => n.clamp(0, names.len() as i32 - 1),
+                    _ => n.max(0),
+                })
             }
-            Value::Float(n) => {
-                Value::Float(((n + 0.05 * d as f32).clamp(0.0, 1.0) * 100.0).round() / 100.0)
+            (Value::Float(n), rule) => {
+                let (lo, hi) = match rule {
+                    Rule::Range(lo, hi) => (lo, hi),
+                    _ => (0.0, 1.0),
+                };
+                Value::Float(((n + 0.05 * d as f32).clamp(lo, hi) * 100.0).round() / 100.0)
             }
-            Value::Duration(ms) => Value::Duration((ms + 10 * i64::from(d)).max(0)),
+            (Value::Duration(ms), _) => Value::Duration((ms + 10 * i64::from(d)).max(0)),
             _ => return,
         };
-        self.values[i] = v;
+        self.put(i, v);
     }
 
     /// Puts token `i` back to the value it had when the draft was opened.
     pub fn reset(&mut self, i: usize) {
-        if let Some(s) = self.start.get(i) {
-            self.values[i] = s.clone();
+        if let Some(s) = self.start.get(i).cloned() {
+            self.put(i, s);
         }
     }
 
@@ -212,13 +272,13 @@ impl Draft {
             hsva[3].clamp(0.0, 1.0),
         ];
         let [h, s, v, a] = self.hsva;
-        self.values[i] = Value::Color(Color::from_hsva(h, s, v, a));
+        self.put(i, Value::Color(Color::from_hsva(h, s, v, a)));
     }
 
     /// Sets the picked colour to `c` (a swatch, the hex field) and moves the sliders to it.
     pub fn set_picked(&mut self, c: Color) {
         if let Some(i) = self.picked {
-            self.values[i] = Value::Color(c);
+            self.put(i, Value::Color(c));
             self.pick(Some(i));
         }
     }
@@ -266,6 +326,38 @@ mod tests {
             let total: usize = (0..g.len()).map(|n| d.rows(n).len()).sum();
             assert_eq!(total, TOKENS.len());
             assert!(d.rows(g.len()).is_empty());
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn rows_of_fixed_sets_and_ranges_edit_within_them_and_a_follower_moves_with_its_token() {
+        let _app = dark();
+        with(|d| {
+            let deck = d.row(at("stage-deck"));
+            assert_eq!((deck.kind, deck.options.len(), deck.current), (5, 4, 0));
+            assert_eq!(deck.options[3], "ring");
+            d.choose(at("stage-deck"), 3);
+            d.choose(at("stage-deck"), 4);
+            assert_eq!(d.row(at("stage-deck")).current, 3, "4 is not one of the four");
+            d.step(at("stage-deck"), 1);
+            assert_eq!(d.row(at("stage-deck")).current, 3, "a step stops at the last value");
+            assert!(d.set_text(at("stage-deck"), "9").unwrap_err().contains("not allowed"));
+            assert!(d.set_text(at("glow"), "1.2").unwrap_err().contains("out of range"));
+            d.set_text(at("glow"), "0.4").unwrap();
+            assert_eq!((d.row(at("glow")).kind, d.row(at("glow")).fraction), (4, 0.4));
+            d.slide(at("bevel"), 0.25);
+            assert_eq!(d.values[at("bevel")], Value::Float(0.25));
+            d.slide(at("bevel"), 7.0);
+            assert_eq!(d.values[at("bevel")], Value::Float(1.0));
+            // panel-top follows panel until it is edited itself
+            let red = Value::Color(Color::from_rgb_u8(255, 0, 0));
+            d.set(at("panel"), red.clone());
+            assert_eq!(d.values[at("panel-top")], red);
+            let blue = Value::Color(Color::from_rgb_u8(0, 0, 255));
+            d.set(at("panel-top"), blue.clone());
+            d.set(at("panel"), Value::Color(Color::from_rgb_u8(0, 255, 0)));
+            assert_eq!(d.values[at("panel-top")], blue);
         })
         .unwrap();
     }

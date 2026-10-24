@@ -101,6 +101,15 @@ fn summary(a: &Analysis) -> Found {
     )
 }
 
+/// A deck analysed `track` when it loaded it: the lists (track table, preview strips, related tracks) show the BPM, key and
+/// waveform it found, as they do after a bulk run, instead of waiting for ANALYZE NOW. Tracks without a file, and tracks the
+/// library already gives a BPM and key, change nothing the lists show.
+pub fn noted(track: &Track, a: &Analysis) {
+    if let Some(file) = track.file.as_deref() {
+        detected().note(file, summary(a));
+    }
+}
+
 /// Stores `cues` as the whole cue list of `key`, marked as CUE Analysis's ([`Store::set_auto_cues`]).
 fn store_cues(store: &Store, key: &str, cues: &[openfader::analysis::Cue]) -> Result<(), String> {
     store.set_auto_cues(key, cues)

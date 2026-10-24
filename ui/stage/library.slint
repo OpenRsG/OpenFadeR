@@ -1,0 +1,190 @@
+import { Glyph, Icon, TextField, Tooltip } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { BrowserState } from "../browser-state.slint";
+import { TreeView } from "../browser-tree.slint";
+import { DeckState } from "../deck-state.slint";
+import { DeviceState } from "../device-state.slint";
+import { StudioState } from "../studio-state.slint";
+import { StageButton, StagePanel } from "controls.slint";
+import { StageTable } from "table.slint";
+
+/// One source of the library side bar: its icon, and with `compact` false its label.
+component SideEntry inherits Rectangle {
+    in property <Icon> icon;
+    in property <string> text;
+    in property <string> tip;
+    in property <bool> active;
+    in property <bool> compact;
+    callback clicked;
+    border-radius: Theme.stage-radius-ctl;
+    background: root.active ? Theme.select : ta.has-hover ? Theme.hover-row : transparent;
+    Glyph { x: root.compact ? (parent.width - self.width) / 2 : Theme.space-md + 2px; y: (parent.height - self.height) / 2; width: 16px; height: 16px; icon: root.icon; tint: root.active ? Theme.text-bright : Theme.accent-hi; }
+    if !root.compact: Text {
+        x: 36px;
+        width: parent.width - 36px - Theme.space-md;
+        height: parent.height;
+        text: root.text;
+        vertical-alignment: center;
+        overflow: elide;
+        color: root.active ? Theme.text-bright : Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+        font-weight: root.active ? Theme.weight-bold : 400;
+    }
+    ta := TouchArea { clicked => { root.clicked(); } }
+    if root.compact && root.tip != "": Tooltip { width: root.width; height: root.height; text: root.tip; hovered: ta.has-hover && !ta.pressed; }
+}
+
+/// The sources of the side bar: the collection, the Tag List, the session history, duplicates, related tracks and one entry per
+/// connected device, as a column or (`horiz`) one row of icons.
+component Sources inherits Rectangle {
+    in property <bool> compact;
+    in property <bool> horiz;
+    callback show-list(int);
+    property <length> step: root.horiz ? 30px : Theme.h-ctl + 6px;
+    property <int> n0: BrowserState.related-enabled ? 5 : 4;
+    out property <length> extent: (root.n0 + DeviceState.devices.length) * root.step;
+    pure function at-x(i: int) -> length { return root.horiz ? i * root.step : 0px; }
+    pure function at-y(i: int) -> length { return root.horiz ? 0px : i * root.step; }
+    SideEntry { x: root.at-x(0); y: root.at-y(0); width: root.horiz ? root.step : root.width; height: Theme.h-ctl + 4px; compact: root.compact; icon: Icon.folder; text: @tr("Collection"); tip: @tr("Folders: all tracks"); active: BrowserState.tree-row == 0 && !BrowserState.related; clicked => { root.show-list(0); } }
+    SideEntry { x: root.at-x(1); y: root.at-y(1); width: root.horiz ? root.step : root.width; height: Theme.h-ctl + 4px; compact: root.compact; icon: Icon.star; text: @tr("Tag List"); tip: @tr("Favourites: the Tag List"); active: BrowserState.tag-view && !BrowserState.related; clicked => { root.show-list(BrowserState.tag-row); } }
+    SideEntry { x: root.at-x(2); y: root.at-y(2); width: root.horiz ? root.step : root.width; height: Theme.h-ctl + 4px; compact: root.compact; icon: Icon.loop; text: @tr("History"); tip: @tr("History of this session"); active: BrowserState.tree-row == 2 && !BrowserState.related; clicked => { root.show-list(2); } }
+    SideEntry { x: root.at-x(3); y: root.at-y(3); width: root.horiz ? root.step : root.width; height: Theme.h-ctl + 4px; compact: root.compact; icon: Icon.grid; text: @tr("Duplicates"); tip: @tr("Duplicate tracks"); active: BrowserState.tree-row == 3 && !BrowserState.related; clicked => { root.show-list(3); } }
+    if BrowserState.related-enabled: SideEntry { x: root.at-x(4); y: root.at-y(4); width: root.horiz ? root.step : root.width; height: Theme.h-ctl + 4px; compact: root.compact; icon: Icon.link; text: @tr("Related Tracks"); tip: @tr("Related tracks"); active: BrowserState.related; clicked => { BrowserState.related-toggled(!BrowserState.related); } }
+    for d[i] in DeviceState.devices: SideEntry {
+        x: root.at-x(root.n0 + i);
+        y: root.at-y(root.n0 + i);
+        width: root.horiz ? root.step : root.width;
+        height: Theme.h-ctl + 4px;
+        compact: root.compact;
+        icon: Icon.usb;
+        text: d.name;
+        tip: @tr("{} ({}): open its device window", d.name, d.library);
+        active: DeviceState.visible && DeviceState.current == i;
+        clicked => {
+            DeviceState.tab = 0;
+            DeviceState.visible = true;
+            DeviceState.select(i);
+            DeviceState.opened();
+        }
+    }
+}
+
+/// The left of the library: the sources and the folder tree under them (`Theme.stage-sidebar` 0; one row of icons when the library
+/// is short), or, icons only (1), the same icons with the tree one click away in a list beside them.
+component StageSidebar inherits Rectangle {
+    property <bool> icons: Theme.stage-sidebar == 1;
+    property <bool> horiz: !root.icons && root.height < 270px;
+    public function focus-tree() { tree.focus(); }
+    function show-list(r: int) {
+        StudioState.tree-focus = false;
+        if (BrowserState.related) { BrowserState.related-toggled(false); }
+        if (BrowserState.suggest) { BrowserState.suggest-toggled(false); }
+        if (BrowserState.playlists.length > 0) {
+            BrowserState.tree-row = max(0, min(BrowserState.playlists.length - 1, r));
+            BrowserState.playlist-selected(BrowserState.tree-row);
+        }
+    }
+    StagePanel { }
+    VerticalLayout {
+        padding: Theme.space-sm;
+        spacing: 2px;
+        Sources { height: root.horiz ? 28px : self.extent; compact: root.icons || root.horiz; horiz: root.horiz; show-list(r) => { root.show-list(r); } }
+        if root.icons: SideEntry { compact: true; icon: Icon.list; tip: @tr("Playlists"); clicked => { fly.show(); } }
+        if !root.icons && !root.horiz: Text { text: @tr("Playlists"); height: Theme.h-header; vertical-alignment: center; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; }
+        tree := TreeView {
+            visible: !root.icons;
+            vertical-stretch: 1;
+            min-height: root.icons ? 0px : 40px;
+            max-height: root.icons ? 0px : 100000px;
+            background: transparent;
+            current-item <=> BrowserState.tree-row;
+            border-radius: Theme.stage-radius-ctl;
+            item-changed(i) => { BrowserState.playlist-selected(i); }
+            focused => { StudioState.tree-focus = true; }
+        }
+        if root.icons: Rectangle { vertical-stretch: 1; }
+    }
+    fly := PopupWindow {
+        x: root.width + Theme.stage-gap;
+        y: 0px;
+        width: 240px;
+        height: min(max(root.height, 160px), 360px);
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.stage-radius-ctl;
+            TreeView {
+                background: transparent;
+                current-item <=> BrowserState.tree-row;
+                item-changed(i) => { BrowserState.playlist-selected(i); }
+                focused => { StudioState.tree-focus = true; }
+            }
+        }
+    }
+}
+
+/// The bottom of the workspace: the side bar, and beside it the search / filter / load bar over the track list. The search box, the
+/// tree and the list take the focus when `StudioState.focus-pulse` asks (Ctrl+F, the MIDI browse encoder).
+export component StageLibrary inherits Rectangle {
+    property <length> g: Theme.stage-gap;
+    property <length> side-w: Theme.stage-sidebar == 1 ? 46px : clamp(root.width * 0.16, 170px, 230px);
+    property <length> bar-h: Theme.h-ctl + 2 * Theme.space-md;
+    property <length> main-w: root.width - root.side-w - root.g;
+    property <int> pulse: StudioState.focus-pulse;
+    changed pulse => {
+        if (StudioState.focus-target == 0) { search.focus-field(); }
+        else if (StudioState.focus-target == 1) { sidebar.focus-tree(); }
+        else { table.focus-list(); StudioState.tree-focus = false; }
+    }
+    sidebar := StageSidebar { x: 0px; y: 0px; width: root.side-w; height: root.height; }
+    StagePanel {
+        x: root.side-w + root.g;
+        y: 0px;
+        width: root.main-w;
+        height: root.bar-h;
+        HorizontalLayout {
+            padding: Theme.space-md;
+            spacing: Theme.space-md;
+            search := TextField {
+                horizontal-stretch: 1;
+                max-width: 340px;
+                icon: Icon.search;
+                placeholder-text: BrowserState.remote-search ? @tr("Search online (Enter)") : @tr("Search tracks (Ctrl+F)");
+                edited(text) => { BrowserState.search-edited(text); }
+                accepted(text) => { BrowserState.search-accepted(text); table.focus-list(); }
+            }
+            Text {
+                text: BrowserState.status;
+                min-width: 60px;
+                vertical-alignment: center;
+                overflow: elide;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+            }
+            StageButton { width: 76px; horizontal-stretch: 0; text: @tr("PREVIEW"); active: BrowserState.preview-playing; clicked => { BrowserState.preview-toggled(); } }
+            if root.main-w >= 880px: StageButton { width: 90px; horizontal-stretch: 0; text: @tr("±6% MASTER"); active: BrowserState.bpm-around; clicked => { BrowserState.bpm-around = !BrowserState.bpm-around; BrowserState.filter-changed(); } }
+            if root.main-w >= 880px: StageButton { width: 80px; horizontal-stretch: 0; text: @tr("KEY MATCH"); active: BrowserState.key-match; clicked => { BrowserState.key-match = !BrowserState.key-match; BrowserState.filter-changed(); } }
+            if root.main-w >= 880px: StageButton {
+                width: 100px;
+                horizontal-stretch: 0;
+                text: BrowserState.min-rating == 0 ? @tr("RATING ≥ any") : @tr("RATING ≥ {}★", BrowserState.min-rating);
+                active: BrowserState.min-rating > 0;
+                clicked => { BrowserState.min-rating = Math.mod(BrowserState.min-rating + 1, 6); BrowserState.filter-changed(); }
+            }
+            StageButton { width: 62px; horizontal-stretch: 0; text: @tr("LOAD {}", DeckState.slots[0] + 1); clicked => { DeckState.load(DeckState.slots[0]); } }
+            StageButton { width: 62px; horizontal-stretch: 0; text: @tr("LOAD {}", DeckState.slots[1] + 1); clicked => { DeckState.load(DeckState.slots[1]); } }
+        }
+    }
+    StagePanel { x: root.side-w + root.g; y: root.bar-h + root.g; width: root.main-w; height: root.height - root.bar-h - root.g; }
+    table := StageTable {
+        x: root.side-w + root.g;
+        y: root.bar-h + root.g;
+        width: root.main-w;
+        height: root.height - root.bar-h - root.g;
+        row-h: root.height > 330px ? Theme.stage-row : 28px;
+        focused => { StudioState.tree-focus = false; }
+    }
+}

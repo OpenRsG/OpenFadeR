@@ -1,0 +1,183 @@
+import { Dropdown } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { DeckState } from "../deck-state.slint";
+import { FxState, FxUnit } from "../fx.slint";
+import { MixerState } from "../mixer.slint";
+import { SamplerState, SlotView } from "../sampler.slint";
+import { StageButton, StageKnob, StagePanel, StageTone } from "controls.slint";
+import { StageState } from "state.slint";
+
+/// A bold dim caption (EFFECTS, SAMPLER).
+component Title inherits Text {
+    color: Theme.text-dim;
+    font-family: Theme.font;
+    font-size: Theme.font-sm;
+    font-weight: Theme.weight-bold;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+/// A momentary button: lit while held, `pressed` / `released` carry the pointer (RELEASE FX).
+component HoldButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback pressed;
+    callback released;
+    StageButton { width: 100%; height: 100%; text: root.text; font-size: Theme.font-xs; active: root.active; }
+    TouchArea {
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left {
+                if e.kind == PointerEventKind.down { root.pressed(); }
+                if e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel { root.released(); }
+            }
+        }
+    }
+}
+
+/// One sampler slot as a pad: its number, filled in the slice's colour while it plays, tinted while it holds a sample, framed when it
+/// is the selected slot. Press / release as the sampler panel's pads.
+component Pad inherits Rectangle {
+    in property <int> slot;
+    property <SlotView> v: SamplerState.slots[root.slot];
+    property <color> tone: SamplerState.purple ? Theme.sampler : [Theme.wave-low, Theme.wave-mid, Theme.wave-high][root.v.band];
+    border-radius: Theme.stage-radius-ctl;
+    background: root.v.playing ? root.tone : root.v.loaded ? root.tone.with-alpha(0.3) : Theme.panel-raised;
+    border-width: SamplerState.selected == root.slot ? 2px : 1px;
+    border-color: SamplerState.selected == root.slot ? Theme.text-bright : root.v.loaded ? root.tone : Theme.line-strong;
+    Text {
+        text: (root.slot + 1) + (root.v.looped ? " ∞" : "");
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: root.v.playing ? StageTone.on(root.tone) : root.v.loaded ? Theme.text-bright : Theme.text-faint;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+        font-weight: Theme.weight-bold;
+    }
+    TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(e) => {
+            if (e.button == PointerEventButton.left) {
+                if (e.kind == PointerEventKind.down) { SamplerState.pad-pressed(root.slot); }
+                if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) { SamplerState.pad-released(root.slot); }
+            }
+        }
+    }
+}
+
+/// EFFECTS: the Beat FX unit the FX panel edits. Row 1: the unit (FX1 / FX2), its slot to edit (1 2 3), ON for that slot and the tempo it
+/// follows; row 2: its effect (list, previous, next); row 3: LEVEL, BEAT ◀ ▶ (the slot's beat fraction), TAP and the held REL.
+export component StageEffects inherits Rectangle {
+    property <int> n: FxState.unit;
+    property <FxUnit> u: FxState.units[root.n];
+    property <int> t: root.u.target;
+    property <int> count: FxState.effects.length;
+    StagePanel {
+        VerticalLayout {
+            padding: 8px;
+            spacing: 4px;
+            HorizontalLayout {
+                height: 22px;
+                spacing: 3px;
+                Title { text: @tr("EFFECTS"); width: 62px; horizontal-stretch: 0; }
+                for name[i] in [@tr("FX{}", 1), @tr("FX{}", 2)]: StageButton { width: 34px; text: name; font-size: Theme.font-xs; active: root.n == i; clicked => { FxState.unit = i; } }
+                Rectangle { width: 4px; horizontal-stretch: 0; }
+                for i in 3: StageButton { width: 22px; text: "" + (i + 1); font-size: Theme.font-xs; active: root.t == i; clicked => { FxState.target-selected(root.n, i); } }
+                StageButton { width: 34px; text: @tr("ON"); font-size: Theme.font-xs; accent: Theme.play; active: root.u.slots[root.t].on; clicked => { FxState.toggled(root.n, root.t); } }
+                Text { text: (root.u.no-bpm ? "~" : "") + root.u.bpm-text; overflow: elide; vertical-alignment: center; horizontal-alignment: right; color: root.u.tapped ? Theme.accent-hi : Theme.text-bright; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+            }
+            HorizontalLayout {
+                height: 24px;
+                spacing: 3px;
+                Dropdown { options: FxState.effects; current: root.u.slots[root.t].effect; chose(e) => { FxState.effect-selected(root.n, root.t, e); } }
+                StageButton { width: 24px; text: "◀"; font-size: Theme.font-xs; enabled: root.count > 0; clicked => { FxState.effect-selected(root.n, root.t, Math.mod(root.u.slots[root.t].effect + root.count - 1, root.count)); } }
+                StageButton { width: 24px; text: "▶"; font-size: Theme.font-xs; enabled: root.count > 0; clicked => { FxState.effect-selected(root.n, root.t, Math.mod(root.u.slots[root.t].effect + 1, root.count)); } }
+            }
+            HorizontalLayout {
+                vertical-stretch: 1;
+                min-height: 28px;
+                spacing: 4px;
+                Title { text: @tr("LEVEL"); width: 38px; horizontal-stretch: 0; }
+                StageKnob { width: 34px; horizontal-stretch: 0; size: 28px; value: root.u.slots[root.t].level; moved(x) => { FxState.level-edited(root.n, root.t, x); } reset => { FxState.level-edited(root.n, root.t, 0.5); } }
+                Rectangle { width: 6px; horizontal-stretch: 0; }
+                Title { text: @tr("BEAT"); width: 34px; horizontal-stretch: 0; }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
+                    HorizontalLayout {
+                        height: 22px;
+                        spacing: 3px;
+                        StageButton { width: 24px; text: "◀"; font-size: Theme.font-xs; clicked => { FxState.beat-step(root.n, -1); } }
+                        Text { text: root.u.slots[root.t].beat-text; width: 34px; horizontal-alignment: center; vertical-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+                        StageButton { width: 24px; text: "▶"; font-size: Theme.font-xs; clicked => { FxState.beat-step(root.n, 1); } }
+                    }
+                }
+                Rectangle { }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
+                    HorizontalLayout {
+                        height: 22px;
+                        spacing: 3px;
+                        StageButton { width: 36px; text: @tr("TAP"); font-size: Theme.font-xs; clicked => { FxState.tapped(root.n); } }
+                        HoldButton { width: 36px; text: @tr("REL"); active: root.u.releasing; pressed => { FxState.release(root.n, true); } released => { FxState.release(root.n, false); } }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// SOUND COLOR FX: the COLOR FX the FILTER knobs run (list) with the knob of each deck, and the SAMPLER: the pads of the bank in use,
+/// BANK, and + to fill the selected slot from the source the sampler panel chose (FROM).
+export component StageColorSampler inherits Rectangle {
+    property <int> first: SamplerState.bank * 8;
+    property <int> pads: max(0, min(8, SamplerState.slot-count - root.first));
+    StagePanel {
+        HorizontalLayout {
+            padding: 8px;
+            spacing: 12px;
+            VerticalLayout {
+                width: 138px;
+                horizontal-stretch: 0;
+                spacing: 3px;
+                Title { text: @tr("SOUND COLOR FX"); height: 18px; }
+                Dropdown { height: 22px; options: MixerState.cfx-names; current: MixerState.cfx-type; list-width: 180px; chose(n) => { MixerState.cfx-selected(n); } }
+                HorizontalLayout {
+                    vertical-stretch: 1;
+                    min-height: 30px;
+                    for s in 2: StageKnob {
+                        size: 30px;
+                        label: "" + (DeckState.slots[s] + 1);
+                        accent: StageState.tone(DeckState.slots[s]);
+                        bipolar: true;
+                        value: MixerState.channels[DeckState.slots[s]].knobs[4];
+                        moved(x) => { MixerState.knob(DeckState.slots[s], 4, x); }
+                        reset => { MixerState.knob(DeckState.slots[s], 4, 0.5); }
+                    }
+                }
+            }
+            VerticalLayout {
+                spacing: 4px;
+                HorizontalLayout {
+                    height: 22px;
+                    spacing: 3px;
+                    Title { text: @tr("SAMPLER"); horizontal-stretch: 0; min-width: self.preferred-width; }
+                    for b in SamplerState.slot-count > 8 ? 2 : 0: StageButton { width: 22px; text: "" + (b + 1); font-size: Theme.font-xs; active: SamplerState.bank == b; clicked => { if (SamplerState.bank != b) { SamplerState.bank-toggled(); } } }
+                    Text { text: SamplerState.status; overflow: elide; vertical-alignment: center; horizontal-alignment: right; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; }
+                }
+                HorizontalLayout {
+                    vertical-stretch: 1;
+                    spacing: 4px;
+                    VerticalLayout {
+                        spacing: 4px;
+                        for r in root.pads > 4 ? 2 : 1: HorizontalLayout {
+                            spacing: 4px;
+                            for c in 4: Pad { slot: root.first + r * 4 + c; visible: r * 4 + c < root.pads; }
+                        }
+                    }
+                    StageButton { width: 34px; text: "+"; font-size: Theme.font-md; clicked => { SamplerState.load-clicked(); } }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,30 @@
+import { Theme } from "../theme.slint";
+import { DeckState } from "../deck-state.slint";
+import { DeckDropTarget } from "../dnd.slint";
+import { StageController } from "deck-controller.slint";
+import { StageGeom } from "deck-parts.slint";
+import { StagePerformance } from "deck-performance.slint";
+import { StageRing } from "deck-ring.slint";
+import { StageTurntable } from "deck-turntable.slint";
+
+/// The height a Stage deck panel needs with the current `stage-deck`, `stage-wave`, `stage-jog`, `stage-cover` and `stage-button` tokens
+/// and no empty band: cap the deck row at it. Shorter panels shrink the jog, pads and waveforms; taller ones keep the parts at the top.
+export global StageDeckSize {
+    out property <length> natural: StageGeom.natural;
+}
+
+/// One deck panel of the Stage workspace (slot 0 left, 1 right), in the style `Theme.stage-deck` names: 0 performance, 1 turntable,
+/// 2 controller, 3 ring. It shows the deck `DeckState.slots[slot]` (decks 3 and 4 while the controller's DECK 3 / 4 layer is on), so
+/// every control and callback follows the slot. `mirrored` is the right-hand deck: its control rows run the other way round, unless
+/// `Theme.stage-mirror` is 0 (the right deck then has the left deck's arrangement).
+export component StageDeck inherits Rectangle {
+    in property <int> slot;
+    in property <bool> mirrored;
+    property <int> index: DeckState.slots[root.slot];
+    property <bool> mirror: root.mirrored && Theme.stage-mirror == 1;
+    if Theme.stage-deck == 0: StagePerformance { width: root.width; height: root.height; index: root.index; mirrored: root.mirror; }
+    if Theme.stage-deck == 1: StageTurntable { width: root.width; height: root.height; index: root.index; mirrored: root.mirror; }
+    if Theme.stage-deck == 2: StageController { width: root.width; height: root.height; index: root.index; mirrored: root.mirror; }
+    if Theme.stage-deck == 3: StageRing { width: root.width; height: root.height; index: root.index; mirrored: root.mirror; }
+    DeckDropTarget { index: root.index; }
+}

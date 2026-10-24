@@ -24,8 +24,8 @@ pub mod get;
 mod page;
 mod store;
 
-use crate::app::{Theme, prefs, render};
-use openfader_ui::skin::{TOKEN_INFO, TOKENS, get, set};
+use crate::app::{prefs, render, Theme};
+use openfader_ui::skin::{get, set, FOLLOWS, TOKENS, TOKEN_INFO, TOKEN_RULES};
 pub use openfader_ui::skin::{Ty, Value};
 use render::{Palette, Rgb};
 use slint::ComponentHandle;
@@ -193,9 +193,10 @@ where
         .collect()
 }
 
-/// The value of every token (in [`TOKENS`] order) under a skin: its override, else the base's built-in value.
+/// The value of every token (in [`TOKENS`] order) under a skin: its override, else the base's built-in value, except that a token
+/// that [`FOLLOWS`] another one takes the value that other one ends up with.
 fn plan(builtin: &Builtin, base: Base, overrides: &[(&str, Value)]) -> Vec<Value> {
-    TOKENS
+    let mut values: Vec<Value> = TOKENS
         .iter()
         .zip(builtin.of(base))
         .map(|((name, _), default)| {
@@ -205,7 +206,16 @@ fn plan(builtin: &Builtin, base: Base, overrides: &[(&str, Value)]) -> Vec<Value
                 .map_or(default, |(_, v)| v)
                 .clone()
         })
-        .collect()
+        .collect();
+    for (token, target) in FOLLOWS {
+        if !overrides.iter().any(|(n, _)| n == token) {
+            let at = |n: &str| TOKENS.iter().position(|t| t.0 == n);
+            if let (Some(i), Some(j)) = (at(token), at(target)) {
+                values[i] = values[j].clone();
+            }
+        }
+    }
+    values
 }
 
 /// The base and every token value of the skin `name` among `skins` (`None`: no such skin, or no window has been styled yet).
@@ -226,10 +236,9 @@ fn complete(values: Vec<Value>) -> Vec<(&'static str, Value)> {
 
 /// The colours Rust draws with, out of the token values `values` (a missing or non-colour token keeps the built-in colour).
 fn palette(values: &[Value]) -> Palette {
+    let at = |name: &str| TOKENS.iter().position(|(n, _)| *n == name);
     let rgb = |name: &str, default: Rgb| {
-        TOKENS
-            .iter()
-            .position(|(n, _)| *n == name)
+        at(name)
             .and_then(|i| match &values[i] {
                 Value::Color(c) => Some([c.red(), c.green(), c.blue()]),
                 _ => None,
@@ -246,6 +255,15 @@ fn palette(values: &[Value]) -> Palette {
         ],
         cue: rgb("cue", d.cue),
         memory: rgb("memory-cue", d.memory),
+        decks: std::array::from_fn(|n| {
+            let (lo, hi) = (format!("deck{}", n + 1), format!("deck{}-hi", n + 1));
+            [rgb(&lo, d.decks[n][0]), rgb(&hi, d.decks[n][1])]
+        }),
+        per_deck: at("wave-style").is_some_and(|i| values[i] == Value::Int(1)),
+        fade: at("wave-fade").map_or(0.0, |i| match values[i] {
+            Value::Float(f) => f.clamp(0.0, 1.0),
+            _ => 0.0,
+        }),
     }
 }
 
@@ -314,7 +332,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::{App, headless};
+    use crate::app::{headless, App};
+    use openfader_ui::skin::Rule;
     use slint::Color;
 
     fn skin(name: &str, base: Base, tokens: &[(&'static str, Value)]) -> Skin {
@@ -470,5 +489,147 @@ mod tests {
         assert_eq!((p.band[0], p.bg, p.cue), ([1, 2, 3], [4, 5, 6], [7, 8, 9]));
         assert_eq!(p.band[1..], Palette::DEFAULT.band[1..]);
         restyle(&app, &skins, BUILTIN[0]);
+    }
+
+    fn token(app: &App, name: &str) -> Value {
+        get(app, name).unwrap()
+    }
+
+    #[test]
+    fn a_token_that_follows_another_takes_the_skins_value_unless_the_skin_sets_it() {
+        let app = window();
+        let skins = [
+            skin("Flat", Base::Light, &[("panel", color(1, 2, 3))]),
+            skin(
+                "Set",
+                Base::Dark,
+                &[("panel", color(1, 2, 3)), ("panel-top", color(9, 9, 9))],
+            ),
+        ];
+        assert!(FOLLOWS.contains(&("panel-top", "panel")));
+        restyle(&app, &skins, BUILTIN[0]);
+        let (dark, dark_top) = (token(&app, "panel"), token(&app, "panel-top"));
+        assert_eq!(dark, dark_top, "the built-in themes have a flat panel");
+        for _ in 0..2 {
+            restyle(&app, &skins, "Flat");
+            assert_eq!(
+                token(&app, "panel-top"),
+                color(1, 2, 3),
+                "follows the skin's panel"
+            );
+            restyle(&app, &skins, "Set");
+            assert_eq!(
+                token(&app, "panel-top"),
+                color(9, 9, 9),
+                "unless the skin sets it"
+            );
+            restyle(&app, &skins, BUILTIN[1]);
+            assert_eq!(token(&app, "panel-top"), token(&app, "panel"));
+            assert_ne!(token(&app, "panel-top"), dark_top);
+        }
+        restyle(&app, &skins, "Flat");
+        restyle(&app, &skins, BUILTIN[0]);
+        assert_eq!(
+            token(&app, "panel-top"),
+            dark_top,
+            "switching back restores it"
+        );
+    }
+
+    #[test]
+    fn display_font_is_the_display_family_or_else_the_font() {
+        let app = window();
+        let skins = [
+            skin("A", Base::Dark, &[("font", Value::Str("Inter".into()))]),
+            skin(
+                "B",
+                Base::Dark,
+                &[
+                    ("font", Value::Str("Inter".into())),
+                    ("font-display", Value::Str("Orbitron".into())),
+                ],
+            ),
+        ];
+        let shown = |name: &str| {
+            restyle(&app, &skins, name);
+            app.global::<Theme>().get_display_font().to_string()
+        };
+        assert_eq!(shown(BUILTIN[0]), "Liberation Sans");
+        assert_eq!(shown("A"), "Inter");
+        assert_eq!(shown("B"), "Orbitron");
+        assert_eq!(shown("A"), "Inter");
+    }
+
+    #[test]
+    fn the_built_in_values_obey_their_rules() {
+        assert_eq!(TOKEN_RULES.len(), TOKENS.len());
+        let app = window();
+        for base in BUILTIN {
+            restyle(&app, &[], base);
+            for (i, v) in read_all(&app).iter().enumerate() {
+                assert_eq!(file::check(i, v), Ok(()), "{} under {base}", TOKENS[i].0);
+            }
+        }
+        let at = |n: &str| TOKENS.iter().position(|t| t.0 == n).unwrap();
+        assert!(matches!(TOKEN_RULES[at("stage-deck")], Rule::Choice(n) if n.len() == 4));
+        assert!(matches!(TOKEN_RULES[at("glow")], Rule::Range(lo, hi) if (lo, hi) == (0.0, 1.0)));
+        assert_eq!(TOKEN_RULES[at("accent")], Rule::Any);
+    }
+
+    #[test]
+    fn wave_style_one_gives_each_deck_its_own_bands_and_wave_fade_reaches_the_renderers() {
+        let app = window();
+        let skins = [
+            skin(
+                "Neon",
+                Base::Dark,
+                &[
+                    ("wave-style", Value::Int(1)),
+                    ("deck1", color(0, 255, 0)),
+                    ("deck1-hi", color(1, 2, 3)),
+                    ("deck2", color(200, 0, 255)),
+                    ("wave-fade", Value::Float(0.6)),
+                ],
+            ),
+            skin(
+                "Plain",
+                Base::Dark,
+                &[("deck1", color(0, 255, 0)), ("deck2", color(200, 0, 255))],
+            ),
+        ];
+        restyle(&app, &skins, "Neon");
+        let p = palette(&read_all(&app));
+        let (d1, d2) = (p.for_deck(0), p.for_deck(1));
+        assert_eq!(d1.band, [[0, 255, 0], [1, 2, 3], p.band[2]]);
+        assert_eq!(d2.band[0], [200, 0, 255]);
+        assert_eq!(
+            d2.band[1],
+            Palette::DEFAULT.decks[1][1],
+            "deck2-hi keeps its default"
+        );
+        assert_eq!(d1.band[2], d2.band[2], "the high band is shared");
+        assert_eq!(p.fade, 0.6);
+        restyle(&app, &skins, "Plain");
+        let p = palette(&read_all(&app));
+        assert_eq!(
+            p.for_deck(0),
+            p.for_deck(1),
+            "wave-style 0: every deck the same"
+        );
+        assert_eq!(p.for_deck(0).band, p.band);
+        assert_eq!(p.fade, 0.0);
+        restyle(&app, &skins, BUILTIN[0]);
+    }
+
+    #[test]
+    fn the_docs_list_every_token() {
+        let docs = include_str!("../../../docs/skins.md");
+        for (name, _) in TOKENS {
+            assert!(
+                docs.contains(&format!("`{name}`")),
+                "docs/skins.md does not list the token {name}"
+            );
+        }
+        assert!(docs.contains("`display-font`"));
     }
 }

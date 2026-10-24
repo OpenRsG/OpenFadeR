@@ -1,0 +1,108 @@
+import { Theme } from "../theme.slint";
+import { Icon } from "../icons.slint";
+import { DeckState, DeckView } from "../deck-state.slint";
+import { StageButton, StagePanel, StageTone } from "controls.slint";
+import { StageGeom, StageHead, StageJog, StagePads, StageTempo, StageWave } from "deck-parts.slint";
+
+/// Stage deck 1, turntable: cover and title over a SYNC / MASTER row, the hot cue area with its HOT CUE / BEAT LOOP / SLICER / SAMPLER
+/// tabs, the platter (PLAY and CUE in its lower corners), SLIP and the tempo fader with its range button. The platter row mirrors
+/// for the right-hand deck.
+export component StageTurntable inherits Rectangle {
+    in property <int> index;
+    in property <bool> mirrored;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <color> tone: StageTone.deck(root.index);
+    property <length> g: Theme.space-lg;
+    property <length> iw: root.width - 2 * root.g;
+    property <length> ih: root.height - 2 * root.g;
+    property <length> hh: StageGeom.head;
+    property <bool> waved: StageGeom.waved;
+    property <length> wh: root.waved ? min(StageGeom.wave-ov, max(54px, root.ih * 0.26)) : 0px;
+    property <length> row-y: root.hh + root.g + (root.waved ? root.wh + root.g : 0px);
+    property <length> row-h: 24px;
+    property <length> cy: root.row-y + root.row-h + root.g;
+    property <length> ch: max(0px, min(root.ih - root.cy, max(Theme.stage-jog, 170px)));
+    property <length> rc: 54px;
+    property <length> d: max(60px, min(Theme.stage-jog, root.ch, root.iw * 0.46));
+    property <length> pads-w: max(0px, root.iw - root.d - root.rc - 2 * root.g);
+    property <length> jog-x: root.pads-w + root.g;
+    property <length> btn: min(Theme.stage-button, root.d * 0.34);
+    pure function px(x: length, w: length) -> length { return root.mirrored ? root.iw - x - w : x; }
+    StagePanel {
+        width: root.width;
+        height: root.height;
+        accent: root.tone;
+        lit: root.v.master;
+    }
+    if true: Rectangle {
+        x: root.g;
+        y: root.g;
+        width: root.iw;
+        height: root.ih;
+        if true: StageHead { x: 0px; y: 0px; width: root.iw; height: root.hh; index: root.index; }
+        if root.waved: StageWave { x: 0px; y: root.hh + root.g; width: root.iw; height: root.wh; index: root.index; overview: true; }
+        if true: HorizontalLayout {
+            x: 0px;
+            y: root.row-y;
+            width: root.iw;
+            height: root.row-h;
+            spacing: Theme.space-md;
+            StageButton { text: @tr("SYNC"); tooltip: @tr("Beat sync to the master"); max-width: 90px; active: root.v.synced; enabled: root.v.loaded; accent: StageTone.sync(root.index); clicked => { DeckState.sync(root.index); } }
+            StageButton { text: @tr("MASTER"); tooltip: @tr("Tempo master"); max-width: 90px; active: root.v.master; enabled: root.v.loaded; accent: StageTone.master(root.index); clicked => { DeckState.master-toggle(root.index); } }
+            Rectangle { horizontal-stretch: 2; }
+            StageButton { text: @tr("KEY SYNC"); tooltip: @tr("Match the key of the other deck"); max-width: 90px; enabled: root.v.loaded; accent: root.tone; clicked => { DeckState.key-sync(root.index); } }
+            StageButton { text: "Q"; tooltip: @tr("Quantize"); max-width: 36px; active: root.v.quantize; accent: root.tone; clicked => { DeckState.quantize(root.index); } }
+            StageButton { text: @tr("MT"); tooltip: @tr("Master tempo (key lock)"); max-width: 36px; active: root.v.key-lock; accent: root.tone; clicked => { DeckState.key-lock(root.index); } }
+        }
+        if true: Rectangle {
+            x: 0px;
+            y: root.cy;
+            width: root.iw;
+            height: root.ch;
+            StagePads { x: root.px(0px, root.pads-w); y: 0px; width: root.pads-w; height: root.ch; index: root.index; tone: root.tone; tabbed: true; }
+            StageJog { x: root.px(root.jog-x, root.d); y: (root.ch - root.d) / 2; width: root.d; height: root.d; index: root.index; tone: root.tone; tone-hi: StageTone.hi(root.index); }
+            StageButton {
+                tooltip: @tr("Play / pause");
+                x: root.px(root.jog-x, root.d);
+                y: (root.ch + root.d) / 2 - root.btn;
+                width: root.btn;
+                height: root.btn;
+                round: true;
+                glyph: root.v.playing ? Icon.pause : Icon.play;
+                active: root.v.playing;
+                enabled: root.v.loaded;
+                accent: StageTone.play(root.index);
+                rim: Theme.deck-tint == 1;
+                clicked => { DeckState.play-pause(root.index); }
+            }
+            StageButton {
+                tooltip: @tr("Cue: hold to preview, release to return");
+                x: root.px(root.jog-x, root.d) + root.d - root.btn;
+                y: (root.ch + root.d) / 2 - root.btn;
+                width: root.btn;
+                height: root.btn;
+                round: true;
+                text: @tr("CUE");
+                active: root.v.at-cue;
+                enabled: root.v.loaded;
+                accent: StageTone.cue(root.index);
+                rim: Theme.deck-tint == 1;
+                pressed => { DeckState.cue(root.index); }
+                released => { DeckState.cue-released(root.index); }
+            }
+            StageButton {
+                tooltip: @tr("Slip mode");
+                x: root.px(root.jog-x + root.d + root.g, root.rc);
+                y: 0px;
+                width: root.rc;
+                height: 24px;
+                text: @tr("SLIP");
+                active: root.v.slip;
+                enabled: root.v.loaded;
+                accent: Theme.deck-tint == 1 ? root.tone : Theme.danger;
+                clicked => { DeckState.slip(root.index); }
+            }
+            StageTempo { x: root.px(root.jog-x + root.d + root.g, root.rc); y: 24px + root.g; width: root.rc; height: root.ch - 24px - root.g; index: root.index; tone: root.tone; caption: true; }
+        }
+    }
+}

@@ -1,0 +1,287 @@
+import { ListView } from "std-widgets.slint";
+import { Glyph, Icon, MenuItem } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { BrowserState } from "../browser-state.slint";
+import { DeckState } from "../deck-state.slint";
+import { DragState } from "../dnd.slint";
+import { LibraryState } from "../library.slint";
+import { StudioState } from "../studio-state.slint";
+import { StageState } from "state.slint";
+
+/// A column title of the track list; sortable ones carry `clicked`.
+component Head inherits Rectangle {
+    in property <string> title;
+    in property <bool> sorted;
+    in property <bool> right;
+    in property <bool> sortable: true;
+    callback clicked;
+    background: root.sortable && ta.has-hover ? Theme.panel-raised : transparent;
+    border-radius: Theme.stage-radius-ctl;
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-md;
+        spacing: 2px;
+        alignment: root.right ? LayoutAlignment.end : LayoutAlignment.start;
+        Text {
+            text: root.title;
+            vertical-alignment: center;
+            overflow: elide;
+            color: root.sorted ? Theme.text-bright : Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.font-xs;
+            font-weight: Theme.weight-bold;
+        }
+        if root.sorted: Glyph { width: 12px; height: 12px; y: (parent.height - self.height) / 2; icon: BrowserState.sort-asc ? Icon.tri-up : Icon.tri-down; tint: Theme.accent; }
+    }
+    ta := TouchArea { enabled: root.sortable; clicked => { root.clicked(); } }
+}
+
+component Cell inherits Text {
+    in property <bool> right;
+    vertical-alignment: center;
+    horizontal-alignment: root.right ? TextHorizontalAlignment.right : TextHorizontalAlignment.left;
+    overflow: elide;
+    color: Theme.text;
+    font-family: Theme.font;
+    font-size: Theme.list-font;
+}
+
+/// The Stage track list: the row number, with `Theme.stage-list-wave` 1 the deck the track is loaded on (a badge in its colour) and a
+/// waveform preview (a click plays from there), then the cover, title, artist, BPM, the key in its Camelot colour, genre, length and
+/// the rating of each row of `BrowserState.tracks`. Selection, double-click to load, drag to a deck, the right-click menu and the
+/// sort titles are the studio list's.
+export component StageTable inherits Rectangle {
+    in property <length> row-h: Theme.stage-row;
+    callback focused;
+    out property <bool> has-focus: fs.has-focus;
+    public function focus-list() { fs.focus(); }
+    property <bool> wave: Theme.stage-list-wave == 1 && root.width >= 600px;
+    /// Optional columns drop out as the list narrows: GENRE from 760 px, ALBUM from 1000, DATE ADDED from 1180.
+    property <bool> wide: root.width >= 760px;
+    property <bool> album: root.width >= 1000px;
+    property <bool> added: root.width >= 1180px;
+    property <length> pad: Theme.stage-gap;
+    property <length> w-num: 30px;
+    property <length> w-badge: root.wave ? 26px : 0px;
+    property <length> w-wave: root.wave ? 112px : 0px;
+    property <length> w-thumb: root.row-h;
+    property <length> w-artist: root.wide ? 150px : 110px;
+    property <length> w-album: root.album ? 150px : 0px;
+    property <length> w-bpm: 56px;
+    property <length> w-key: 48px;
+    property <length> w-genre: root.wide ? 100px : 0px;
+    property <length> w-time: 56px;
+    property <length> w-rating: 78px;
+    property <length> w-added: root.added ? 92px : 0px;
+    property <length> w-scroll: 14px;
+    property <length> w-title: max(80px, root.width - 2 * root.pad - root.w-scroll - root.w-num - root.w-badge - root.w-wave - root.w-thumb - root.w-artist - root.w-album - root.w-bpm - root.w-key - root.w-genre - root.w-time - root.w-rating - root.w-added);
+    property <length> x-badge: root.pad + root.w-num;
+    property <length> x-wave: root.x-badge + root.w-badge;
+    property <length> x-thumb: root.x-wave + root.w-wave;
+    property <length> x-title: root.x-thumb + root.w-thumb;
+    property <length> x-artist: root.x-title + root.w-title;
+    property <length> x-album: root.x-artist + root.w-artist;
+    property <length> x-bpm: root.x-album + root.w-album;
+    property <length> x-key: root.x-bpm + root.w-bpm;
+    property <length> x-genre: root.x-key + root.w-key;
+    property <length> x-time: root.x-genre + root.w-genre;
+    property <length> x-rating: root.x-time + root.w-time;
+    property <length> x-added: root.x-rating + root.w-rating;
+    property <length> menu-x;
+    property <length> menu-y;
+    property <int> cover-generation: BrowserState.cover-generation;
+    property <int> current: BrowserState.current-row;
+    // Rows move under the selection from outside too (the keyboard, MIDI, Rust): keep the chosen one in view.
+    changed current => { root.reveal(root.current); }
+    function reveal(i: int) {
+        if (i < 0) { return; }
+        if (i * root.row-h + list.content-y < 0) { list.content-y = -i * root.row-h; }
+        else if ((i + 1) * root.row-h + list.content-y > list.height) { list.content-y = list.height - (i + 1) * root.row-h; }
+    }
+    /// `mode`: 0 only this row is selected, 1 it joins / leaves the selection (Ctrl+click), 2 the range from the anchor (Shift+click / Shift+arrows).
+    function choose(i: int, mode: int) {
+        BrowserState.current-row = i;
+        if (mode == 0) { BrowserState.track-selected(i); } else { BrowserState.track-picked(i, mode); }
+    }
+    function move(d: int, mode: int) {
+        if (BrowserState.tracks.length > 0) { root.choose(max(0, min(BrowserState.tracks.length - 1, BrowserState.current-row + d)), mode); }
+    }
+    /// A press on one of several selected rows waits for the release: a drag from it carries the whole selection.
+    property <int> collapse-row: -1;
+    property <bool> multi: BrowserState.selected-count > 1;
+    property <int> menu-rows: 12 + (root.multi ? 1 : 0) + BrowserState.transfer-targets.length;
+    function place-menu(x: length, y: length) {
+        root.menu-x = min(x, root.width - 200px);
+        root.menu-y = min(y, max(0px, root.height - root.menu-rows * Theme.h-row - 4px));
+    }
+    init => { StudioState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
+    changed height => { StudioState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
+    forward-focus: fs;
+    border-radius: Theme.stage-radius;
+    clip: true;
+    fs := FocusScope {
+        key-pressed(e) => {
+            if (e.modifiers.control && (e.text == "a" || e.text == "\u{1}")) { BrowserState.select-all(); return accept; }
+            if (e.text == Key.Escape && root.multi) { BrowserState.select-collapse(); return accept; }
+            if (e.text == Key.UpArrow) { root.move(-1, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.DownArrow) { root.move(1, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.PageUp) { root.move(-10, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.PageDown) { root.move(10, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.Home) { root.choose(0, e.modifiers.shift ? 2 : 0); return accept; }
+            if (e.text == Key.End) { root.choose(max(0, BrowserState.tracks.length - 1), e.modifiers.shift ? 2 : 0); return accept; }
+            reject
+        }
+        VerticalLayout {
+            Rectangle {
+                height: Theme.h-header + Theme.space-sm;
+                Head { x: root.pad; width: root.w-num; height: Theme.h-header; y: Theme.space-sm; title: "#"; sortable: false; }
+                if root.wave: Head { x: root.x-wave; width: root.w-wave; height: Theme.h-header; y: Theme.space-sm; title: @tr("WAVEFORM"); sortable: false; }
+                Head { x: root.x-title; width: root.w-title; height: Theme.h-header; y: Theme.space-sm; title: @tr("TITLE"); sorted: BrowserState.sort-col == 0; clicked => { StudioState.sort-by(0); } }
+                Head { x: root.x-artist; width: root.w-artist; height: Theme.h-header; y: Theme.space-sm; title: @tr("ARTIST"); sorted: BrowserState.sort-col == 1; clicked => { StudioState.sort-by(1); } }
+                if root.album: Head { x: root.x-album; width: root.w-album; height: Theme.h-header; y: Theme.space-sm; title: @tr("ALBUM"); sorted: BrowserState.sort-col == 12; clicked => { StudioState.sort-by(12); } }
+                Head { x: root.x-bpm; width: root.w-bpm; height: Theme.h-header; y: Theme.space-sm; title: "BPM"; right: true; sorted: BrowserState.sort-col == 4; clicked => { StudioState.sort-by(4); } }
+                Head { x: root.x-key; width: root.w-key; height: Theme.h-header; y: Theme.space-sm; title: @tr("KEY"); sorted: BrowserState.sort-col == 3; clicked => { StudioState.sort-by(3); } }
+                if root.w-genre > 0px: Head { x: root.x-genre; width: root.w-genre; height: Theme.h-header; y: Theme.space-sm; title: @tr("GENRE"); sorted: BrowserState.sort-col == 2; clicked => { StudioState.sort-by(2); } }
+                Head { x: root.x-time; width: root.w-time; height: Theme.h-header; y: Theme.space-sm; title: @tr("LENGTH"); right: true; sorted: BrowserState.sort-col == 5; clicked => { StudioState.sort-by(5); } }
+                Head { x: root.x-rating; width: root.w-rating; height: Theme.h-header; y: Theme.space-sm; title: @tr("RATING"); sorted: BrowserState.sort-col == 6; clicked => { StudioState.sort-by(6); } }
+                if root.added: Head { x: root.x-added; width: root.w-added; height: Theme.h-header; y: Theme.space-sm; title: @tr("DATE ADDED"); sorted: BrowserState.sort-col == 13; clicked => { StudioState.sort-by(13); } }
+            }
+            list := ListView {
+                for cells[i] in BrowserState.tracks: Rectangle {
+                    height: root.row-h;
+                    property <bool> current: i == BrowserState.current-row;
+                    property <bool> picked: BrowserState.selected-rows[i];
+                    property <int> gen: root.cover-generation;
+                    property <int> preview-generation: BrowserState.preview-generation;
+                    property <bool> preview-enabled: root.wave;
+                    /// The deck that has this track loaded (-1 none), by title as the other lists do.
+                    property <int> on-deck: cells[0].text == "" ? -1 : DeckState.decks[0].title == cells[0].text ? 0 : DeckState.decks[1].title == cells[0].text ? 1 : DeckState.decks[2].title == cells[0].text ? 2 : DeckState.decks[3].title == cells[0].text ? 3 : -1;
+                    property <color> loaded-tone: Theme.deck-tint == 1 && on-deck >= 0 ? StageState.tone(on-deck) : Theme.accent-hi;
+                    changed gen => { BrowserState.cover-wanted(i); }
+                    changed preview-generation => { if (self.preview-enabled) { BrowserState.preview-wanted(i); } }
+                    changed preview-enabled => { if (self.preview-enabled) { BrowserState.preview-wanted(i); } }
+                    init => { BrowserState.cover-wanted(i); if (self.preview-enabled) { BrowserState.preview-wanted(i); } }
+                    Rectangle {
+                        x: root.pad / 2;
+                        y: 1px;
+                        width: parent.width - root.pad - root.w-scroll + root.pad / 2;
+                        height: parent.height - 2px;
+                        border-radius: Theme.stage-radius-ctl;
+                        background: current || picked ? Theme.select : row-ta.has-hover ? Theme.hover-row : transparent;
+                        // Among several selected rows the chosen one keeps a frame.
+                        border-width: current && root.multi ? 1px : 0px;
+                        border-color: Theme.accent;
+                    }
+                    Cell { x: root.pad; width: root.w-num - Theme.space-md; text: "\{i + 1}"; right: true; color: Theme.text-faint; }
+                    if root.wave && on-deck >= 0: Rectangle {
+                        x: root.x-badge + 2px;
+                        y: (parent.height - self.height) / 2;
+                        width: 18px;
+                        height: 16px;
+                        border-radius: 3px;
+                        border-width: 1px;
+                        border-color: StageState.tone(on-deck);
+                        Text { text: on-deck + 1; horizontal-alignment: center; vertical-alignment: center; color: StageState.tone(on-deck); font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; }
+                    }
+                    if root.wave: Image { x: root.x-wave + 1px; y: (parent.height - self.height) / 2; width: root.w-wave - 6px; height: min(22px, parent.height - 4px); source: BrowserState.previews[i]; image-fit: fill; }
+                    Rectangle {
+                        x: root.x-thumb;
+                        y: (parent.height - self.height) / 2;
+                        width: root.row-h - 6px;
+                        height: self.width;
+                        border-radius: 4px;
+                        background: Theme.panel-raised;
+                        clip: true;
+                        Text { text: "♪"; color: Theme.panel-high; font-size: (root.row-h - 6px) * 0.6; horizontal-alignment: center; vertical-alignment: center; }
+                        Image { source: BrowserState.covers[i]; image-fit: cover; }
+                    }
+                    Cell { x: root.x-title; width: root.w-title - Theme.space-md; text: cells[0].text; font-weight: Theme.weight-semi; color: on-deck >= 0 ? loaded-tone : cells[10].text == "1" ? Theme.text-dim : Theme.text-bright; }
+                    Cell { x: root.x-artist; width: root.w-artist - Theme.space-md; text: cells[1].text; color: Theme.row-dim; }
+                    if root.album: Cell { x: root.x-album; width: root.w-album - Theme.space-md; text: cells[12].text; color: Theme.row-dim; }
+                    Cell { x: root.x-bpm; width: root.w-bpm - Theme.space-md; text: cells[4].text; right: true; color: cells[9].text == "b" || cells[9].text == "kb" ? Theme.play : Theme.text; }
+                    Cell { x: root.x-key + Theme.space-md; width: root.w-key - Theme.space-md; text: cells[3].text; font-weight: Theme.weight-bold; color: cells[8].text == "0" ? Theme.text-dim : Colors.hsv(cells[8].text.to-float() * 30, Theme.key-sat, Theme.key-val); }
+                    if root.w-genre > 0px: Cell { x: root.x-genre; width: root.w-genre - Theme.space-md; text: cells[2].text; color: Theme.row-dim; }
+                    Cell { x: root.x-time; width: root.w-time - Theme.space-md; text: cells[5].text; right: true; color: Theme.row-dim; }
+                    Text { x: root.x-rating + Theme.space-md; height: parent.height; text: @tr("★★★★★"); vertical-alignment: center; color: Theme.text-disabled; font-size: 10px; letter-spacing: 1px; }
+                    Text { x: root.x-rating + Theme.space-md; height: parent.height; text: cells[6].text; vertical-alignment: center; color: Theme.accent-hi; font-size: 10px; letter-spacing: 1px; }
+                    if root.added: Cell { x: root.x-added; width: root.w-added - Theme.space-md; text: cells[13].text; color: Theme.row-dim; }
+                    DragArea {
+                        data: BrowserState.drag-track(i);
+                        allow-copy: true;
+                        changed dragging => { DragState.drag-changed(self.dragging, BrowserState.drag-track(i)); }
+                        row-ta := TouchArea {
+                            pointer-event(e) => {
+                                if (e.kind == PointerEventKind.cancel) { root.collapse-row = -1; return; }
+                                if (e.kind == PointerEventKind.up) {
+                                    if (e.button == PointerEventButton.left && root.collapse-row == i) { root.collapse-row = -1; root.choose(i, 0); }
+                                    return;
+                                }
+                                if (e.kind != PointerEventKind.down) { return; }
+                                root.collapse-row = -1;
+                                root.focused();
+                                fs.focus();
+                                if (e.button == PointerEventButton.left) {
+                                    if (e.modifiers.control || e.modifiers.meta) { root.choose(i, 1); }
+                                    else if (e.modifiers.shift) { root.choose(i, 2); }
+                                    else if (picked) { root.collapse-row = i; }
+                                    else { root.choose(i, 0); }
+                                    if (!e.modifiers.control && !e.modifiers.meta && !e.modifiers.shift) { BrowserState.track-pressed(i); }
+                                } else if (e.button == PointerEventButton.right) {
+                                    if (!picked) { root.choose(i, 0); }
+                                    root.place-menu(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);
+                                    menu.show();
+                                }
+                            }
+                        }
+                    }
+                    // A click on the strip previews from that point (the chosen row follows).
+                    if root.wave: TouchArea {
+                        x: root.x-wave + 1px;
+                        width: root.w-wave - 6px;
+                        mouse-cursor: MouseCursor.pointer;
+                        clicked => { root.focused(); fs.focus(); root.choose(i, 0); BrowserState.preview-seek(i, self.mouse-x / self.width); }
+                    }
+                }
+            }
+        }
+    }
+    if BrowserState.tracks.length == 0: Text {
+        y: Theme.h-header;
+        height: parent.height - Theme.h-header;
+        text: @tr("No tracks");
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: Theme.text-faint;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+    }
+    menu := PopupWindow {
+        x: root.menu-x;
+        y: root.menu-y;
+        width: 200px;
+        height: root.menu-rows * Theme.h-row + 4px;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.stage-radius-ctl;
+            VerticalLayout {
+                padding: 1px;
+                if root.multi: MenuItem { text: @tr("{} tracks selected", BrowserState.selected-count); enabled: false; }
+                MenuItem { text: @tr("Load to deck {}", DeckState.slots[0] + 1); enabled: !root.multi; activated => { DeckState.load(DeckState.slots[0]); menu.close(); } }
+                MenuItem { text: @tr("Load to deck {}", DeckState.slots[1] + 1); enabled: !root.multi; activated => { DeckState.load(DeckState.slots[1]); menu.close(); } }
+                MenuItem { text: @tr("Edit track details…"); enabled: !root.multi; activated => { LibraryState.action("track-edit"); menu.close(); } }
+                MenuItem { text: @tr("Add to Tag List (T)"); activated => { BrowserState.tag-add(); menu.close(); } }
+                MenuItem { text: @tr("Add to playlist…"); activated => { BrowserState.panel-request(0); menu.close(); } }
+                MenuItem { text: @tr("New playlist from selection…"); activated => { BrowserState.playlist-op("new-from-selection"); menu.close(); } }
+                for label[i] in BrowserState.transfer-targets: MenuItem { text: @tr("Transfer to {}", label); activated => { BrowserState.transfer-to(i); menu.close(); } }
+                MenuItem { text: @tr("Tags…"); enabled: !root.multi; activated => { BrowserState.panel-request(1); menu.close(); } }
+                MenuItem { text: BrowserState.related ? @tr("Hide related tracks") : @tr("Related tracks"); enabled: !root.multi; activated => { BrowserState.related-toggled(!BrowserState.related); menu.close(); } }
+                MenuItem { text: @tr("Analyze track"); activated => { LibraryState.action("track-analyze"); menu.close(); } }
+                MenuItem { text: @tr("Make Auto Cue point"); activated => { LibraryState.action("track-autocue"); menu.close(); } }
+                MenuItem { text: @tr("Show in file manager"); enabled: !root.multi; activated => { LibraryState.action("track-show"); menu.close(); } }
+                MenuItem { text: @tr("Remove from Collection"); activated => { LibraryState.action("track-remove"); menu.close(); } }
+            }
+        }
+    }
+}

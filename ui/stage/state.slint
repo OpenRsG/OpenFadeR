@@ -1,0 +1,54 @@
+import { Theme } from "../theme.slint";
+import { EditState } from "../edit.slint";
+import { ExportModeState } from "../exportmode-state.slint";
+import { LightingState } from "../lighting.slint";
+import { VideoState } from "../video.slint";
+
+/// What the Stage workspace's parts (bar, mixer, strip, library) share: the colour of a deck's controls and the mode switch. No Rust side.
+export global StageState {
+    /// The colour a deck's controls wear: its `deckN` colour when the theme tints (`deck-tint` 1), else the shared accent.
+    public pure function tone(deck: int) -> color {
+        return Theme.deck-tint == 1 ? [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][deck] : Theme.accent;
+    }
+    /// The same for a meter: transparent keeps the meter's own green / amber / red.
+    public pure function meter-tone(deck: int) -> color {
+        return Theme.deck-tint == 1 ? [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][deck] : transparent;
+    }
+    /// Mode selector: 0 EXPORT, 1 PERFORMANCE, 2 EDIT, 3 LIGHTING, 4 VIDEO (the window's own switch in app.slint).
+    public function set-mode(n: int) {
+        ExportModeState.visible = n == 0;
+        EditState.visible = n == 2;
+        LightingState.visible = n == 3;
+        VideoState.visible = n == 4;
+    }
+}
+
+/// What the window needs of the Stage workspace before it is built, and the sizes its parts share: the smallest window the tokens fit
+/// in, the mixer's width and the room its rows need.
+export global StageMetrics {
+    out property <length> bar-h: max(Theme.h-bar, 36px);
+    /// The enlarged waveforms of a window under 900 px high shrink to 3/4 of `stage-wave-h`.
+    out property <length> wave-min: max(40px, Theme.stage-wave-h * 0.75);
+    /// Height of the ruler row over a waveform (`wave-ruler` 1).
+    out property <length> ruler-h: Theme.wave-ruler == 1 ? 14px : 0px;
+    out property <length> deck-min: 300px;
+    /// The strip of effects, colour FX and sampler under the decks.
+    out property <length> strip-h: 124px;
+    out property <length> lib-min: 170px;
+    /// Knob rows of a channel: the smallest height of one, and what the fader, the headphone row, the header, the bus knobs, the crossfader
+    /// and the paddings of a mixer panel need besides them (without its tabs).
+    out property <length> row-min: 22px;
+    out property <length> fader-min: 90px;
+    out property <length> mixer-fixed: 143px + root.fader-min;
+    out property <length> tabs-h: Theme.stage-tabs == 0 ? 0px : 27px;
+    /// The mixer panel's height at its smallest.
+    out property <length> mixer-min: root.mixer-fixed + root.tabs-h + 5 * root.row-min;
+    /// The mixer is as wide as the theme says, or as its channels need: the decks give way.
+    out property <length> mixer-w: max(Theme.stage-mixer-w, Theme.stage-mixer == 1 ? 330px : 230px);
+    /// The centre waveforms never get thinner than this (a ruler row included).
+    out property <length> col-wave-min: 40px;
+    /// The row of decks (and strip) at least; with the centre waveforms the mixer under them needs its minimum too.
+    out property <length> body-min: max(root.deck-min + (Theme.stage-strip == 1 ? root.strip-h + Theme.stage-gap : 0px), root.mixer-min + (Theme.stage-wave == 1 ? 2 * root.col-wave-min + 4px + Theme.stage-gap : 0px));
+    out property <length> min-w: max(1100px, 2 * 380px + root.mixer-w + 4 * Theme.stage-gap);
+    out property <length> min-h: max(720px, root.bar-h + Theme.stage-gap + (Theme.stage-wave == 0 ? 2 * root.wave-min + 4px + Theme.stage-gap : 0px) + root.body-min + Theme.stage-gap + root.lib-min + Theme.h-status);
+}

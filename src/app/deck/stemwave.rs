@@ -17,9 +17,9 @@ use crate::app::render;
 use openfader::analysis::detect;
 use openfader::audio::{Mixed, STEM_COUNT, Source, Stems, Track16};
 use std::sync::{
-    Arc, OnceLock,
     atomic::{AtomicBool, Ordering::Relaxed},
-    mpsc::{Receiver, TryRecvError, channel},
+    mpsc::{channel, Receiver, TryRecvError},
+    Arc, OnceLock,
 };
 use std::time::{Duration, Instant};
 
@@ -190,8 +190,9 @@ impl Deck {
             if want == Some(g) {
                 let mut l = self.loaded.borrow_mut();
                 let prev = (l.detail.take(), l.overview.take());
-                l.detail = render::detail::wave_3band(&detail);
-                l.overview = render::overview::wave_3band(&preview, l.duration_ms);
+                let colors = render::deck_palette(self.index);
+                l.detail = render::detail::wave_3band(&colors, &detail);
+                l.overview = render::overview::wave_3band(&colors, &preview, l.duration_ms);
                 if st.shown.is_none() {
                     st.orig = Some(prev);
                 }

@@ -146,6 +146,7 @@ impl Deck {
             self.show(|v| {
                 v.title = t.title.as_str().into();
                 v.artist = t.artist.as_str().into();
+                v.genre = t.genre.as_str().into();
             });
             if let Some(pending) = loaded.pending.as_mut() {
                 pending.title.clone_from(&edited.title);
@@ -338,7 +339,8 @@ impl Deck {
         self.slicer_reset();
         self.stems_clear();
         let mut pending = None;
-        let detail = render::detail::wave(&a, None);
+        let colors = render::deck_palette(self.index);
+        let detail = render::detail::wave(&colors, &a, None);
         if let Some(player) = &self.player {
             let mut player = player.borrow_mut();
             player.load(audio::Pcm::default());
@@ -400,7 +402,7 @@ impl Deck {
             ready: true,
             pending,
             detail,
-            overview: render::overview::wave(&a, duration),
+            overview: render::overview::wave(&colors, &a, duration),
             lib_beats: a.beats.clone(),
             analysis: a,
             duration_ms: duration,
@@ -422,6 +424,7 @@ impl Deck {
             v.pads = ModelRc::new(VecModel::from(pad_views));
             v.title = t.title.clone().into();
             v.artist = t.artist.clone().into();
+            v.genre = t.genre.clone().into();
             (v.elapsed_text, v.remain_text) =
                 (fmt_ms(0).into(), format!("-{}", fmt_ms(duration)).into());
             v.total_text = fmt_ms(duration).into();
@@ -461,9 +464,10 @@ impl Deck {
     pub(in crate::app) fn rewave(&self) {
         let mut l = self.loaded.borrow_mut();
         let l = &mut *l;
+        let colors = render::deck_palette(self.index);
         let (detail, overview) = (
-            render::detail::wave(&l.analysis, None),
-            render::overview::wave(&l.analysis, l.duration_ms),
+            render::detail::wave(&colors, &l.analysis, None),
+            render::overview::wave(&colors, &l.analysis, l.duration_ms),
         );
         let mut sw = self.stemwave.borrow_mut();
         let (d, o) = match sw.orig.as_mut() {
@@ -496,6 +500,7 @@ impl Deck {
         let Some(mut pending) = l.pending.take() else {
             return;
         };
+        let colors = render::deck_palette(self.index);
         let result = match pending.rx.try_recv() {
             Err(TryRecvError::Empty) => {
                 l.pending = Some(pending);
@@ -558,7 +563,10 @@ impl Deck {
                     .and_then(|t| store::global().edits(&store::key(t)).ok())
                     .unwrap_or_default();
                 merge_analysis(&mut l, an, &edits, &mut pending.notes);
-                detail_update = render::detail::wave(&l.analysis, None);
+                if let Some(t) = l.track.as_ref() {
+                    crate::app::analyze::noted(t, &l.analysis);
+                }
+                detail_update = render::detail::wave(&colors, &l.analysis, None);
                 analysis::auto::fill(&mut l.analysis);
                 let edited_cues = edits.cues.is_some();
                 if l.analysis.cues.is_empty() && !edited_cues {
@@ -574,7 +582,7 @@ impl Deck {
                 finished = true;
             }
         }
-        let overview = render::overview::wave(&l.analysis, l.duration_ms);
+        let overview = render::overview::wave(&colors, &l.analysis, l.duration_ms);
         {
             let mut sw = self.stemwave.borrow_mut();
             let (detail, over) = match sw.orig.as_mut() {

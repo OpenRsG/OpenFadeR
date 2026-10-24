@@ -20,6 +20,8 @@ export struct DeckView {
     total-text: string,
     title: string,
     artist: string,
+    /// Genre of the loaded track (the Stage deck headers show it).
+    genre: string,
     /// The loaded track's cover (src/app/artwork) and whether it has one.
     cover: image,
     has-cover: bool,
@@ -114,6 +116,13 @@ export struct DeckScroll {
     phase-own: float,
     phase-ref: float,
     phase-off: float,
+    /// Bar ruler (Theme.wave-ruler, src/app/deck/ruler.rs): the number of the first labelled bar, the x of its line in the view, the
+    /// distance between labels, the bars between two labels and the grid's last bar. `ruler-w` 0 = no grid, no ruler.
+    ruler-bar: int,
+    ruler-x: length,
+    ruler-w: length,
+    ruler-step: int,
+    ruler-last: int,
 }
 
 /// One entry of `decks` per deck; every callback carries the deck index (0 = A … 3 = D).

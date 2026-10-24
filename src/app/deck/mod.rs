@@ -58,6 +58,7 @@ mod phrase;
 pub(in crate::app) use phrase::Hit;
 mod quantize;
 mod reedit;
+mod ruler;
 mod sequencer;
 mod slicer;
 mod slip;

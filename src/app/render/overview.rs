@@ -7,8 +7,8 @@
 //! With the STEM waveform on (PREFS) and a part muted, the 3-band wave of the stems heard ([`wave_3band`]) replaces these.
 
 use super::{
-    Axis, Canvas, Col, Layers, Src, Wave, cue_letter, hot_cue_rgb, mono_layers,
-    phrase::phrase_band, playhead, slip_ghost, sources, three_band,
+    cue_letter, hot_cue_rgb, mono_layers, phrase::phrase_band, playhead, slip_ghost, sources,
+    three_band, Axis, Canvas, Col, Layers, Palette, Src, Wave,
 };
 use crate::app::prefs::{
     self,
@@ -21,7 +21,7 @@ use openfader::analysis::Analysis;
 /// `max(b3,b4,b5)` tall at 75% brightness, the front layer `b5` tall at full brightness, each
 /// colour normalised by the back height. Heights are scaled so the tallest column fills the view
 /// (our choice).
-fn color_preview(src: &[[u8; 6]]) -> Vec<Layers> {
+fn color_preview(p: &Palette, src: &[[u8; 6]]) -> Vec<Layers> {
     let max = src
         .iter()
         .map(|c| c[3].max(c[4]).max(c[5]))
@@ -32,7 +32,7 @@ fn color_preview(src: &[[u8; 6]]) -> Vec<Layers> {
         let back = c[3].max(c[4]).max(c[5]).max(1) as f32;
         Col {
             h: h as f32 / max,
-            rgb: [c[3], c[4], c[5]].map(|v| v as f32 * level / back),
+            rgb: p.tint([c[3], c[4], c[5]].map(|v| v as f32 * level / back)),
         }
     };
     src.iter()
@@ -46,14 +46,15 @@ fn color_preview(src: &[[u8; 6]]) -> Vec<Layers> {
         .collect()
 }
 
-/// The overview wave in the current waveform mode ([`prefs::with`]).
-pub fn wave(a: &Analysis, duration_ms: u32) -> Option<Wave> {
+/// The overview wave in the current waveform mode ([`prefs::with`]) and the colours `p` ([`super::deck_palette`] of the deck
+/// that shows it).
+pub fn wave(p: &Palette, a: &Analysis, duration_ms: u32) -> Option<Wave> {
     let layers = sources(prefs::with(|p| p.waveform_colors))
         .into_iter()
         .map(|s| match s {
-            Src::ThreeBand => three_band(&a.three_band_preview),
-            Src::Color => color_preview(&a.color_preview),
-            Src::Mono => a.preview.iter().map(|&v| mono_layers(v)).collect(),
+            Src::ThreeBand => three_band(p, &a.three_band_preview),
+            Src::Color => color_preview(p, &a.color_preview),
+            Src::Mono => a.preview.iter().map(|&v| mono_layers(p, v)).collect(),
         })
         .find(|l: &Vec<Layers>| !l.is_empty())?;
     (duration_ms > 0).then(|| Wave {
@@ -63,10 +64,10 @@ pub fn wave(a: &Analysis, duration_ms: u32) -> Option<Wave> {
 }
 
 /// The overview wave of 3-band `[low, mid, high]` entries (the STEM waveform, see `deck::stemwave`), whatever the waveform mode.
-pub fn wave_3band(preview: &[[u8; 3]], duration_ms: u32) -> Option<Wave> {
+pub fn wave_3band(p: &Palette, preview: &[[u8; 3]], duration_ms: u32) -> Option<Wave> {
     (duration_ms > 0 && !preview.is_empty()).then(|| Wave {
         per_ms: preview.len() as f64 / duration_ms as f64,
-        layers: three_band(preview),
+        layers: three_band(p, preview),
     })
 }
 
@@ -261,9 +262,9 @@ mod tests {
             preview: vec![31; 400],
             ..Default::default()
         };
-        assert_eq!(wave(&a, 1000).unwrap().layers.len(), 400);
+        assert_eq!(wave(&Palette::DEFAULT, &a, 1000).unwrap().layers.len(), 400);
         a.color_preview = vec![[0, 0, 0, 0, 0, 60], [0, 0, 0, 120, 60, 0]];
-        let w = wave(&a, 1000).unwrap();
+        let w = wave(&Palette::DEFAULT, &a, 1000).unwrap();
         assert_eq!(w.layers.len(), 2);
         // blue-only column: both layers 0.5 tall, back dimmer; red/green column: no front layer
         assert_eq!(
@@ -289,6 +290,9 @@ mod tests {
         );
         assert_eq!(w.layers[1][1].h, 0.0);
         a.three_band_preview = vec![[1, 2, 3]; 1200];
-        assert_eq!(wave(&a, 1000).unwrap().layers.len(), 1200);
+        assert_eq!(
+            wave(&Palette::DEFAULT, &a, 1000).unwrap().layers.len(),
+            1200
+        );
     }
 }

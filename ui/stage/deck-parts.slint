@@ -1,0 +1,871 @@
+import { Theme } from "../theme.slint";
+import { Glyph, Icon } from "../icons.slint";
+import { Tooltip } from "../widgets.slint";
+import { DeckState, DeckView } from "../deck-state.slint";
+import { DeckBadge, DeckOverview, WaveStrip } from "../deck-wave.slint";
+import { PadOptions, PadsState } from "../pads.slint";
+import { FxState, FxUnit } from "../fx.slint";
+import { StageButton, StageKnob, StageFader, StageSelect, StageTabs, StageTone } from "controls.slint";
+
+/// A big figure (BPM, times, deck numbers) in the Stage display font.
+export component StageFig inherits Text {
+    color: Theme.text-bright;
+    font-family: Theme.display-font;
+    font-weight: Theme.weight-display;
+}
+
+/// A small dim bold caption.
+export component StageCaption inherits Text {
+    color: Theme.text-dim;
+    font-family: Theme.font;
+    font-size: Theme.font-xs;
+    font-weight: Theme.weight-bold;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+/// The loaded track's cover, or the empty-jacket note; a click loads the track selected in the browser.
+export component StageCover inherits Rectangle {
+    in property <int> index;
+    property <DeckView> v: DeckState.decks[root.index];
+    border-radius: Theme.stage-radius-ctl;
+    clip: true;
+    background: Theme.panel-raised;
+    if !root.v.has-cover: Text { text: "♪"; color: Theme.panel-high; font-size: root.height * 0.6; horizontal-alignment: center; vertical-alignment: center; }
+    if root.v.has-cover: Image { source: root.v.cover; image-fit: cover; width: root.width; height: root.height; }
+    ta := TouchArea { mouse-cursor: pointer; clicked => { DeckState.load(root.index); } }
+    Rectangle { background: Theme.text-bright.with-alpha(ta.has-hover ? 0.12 : 0); }
+}
+
+/// The top of a deck panel: cover, title, artist and the key under them, the remaining time and BPM on the right, and with
+/// `overview` the whole-track waveform under the title; `syncs` adds KEY SYNC / BEAT SYNC at the far right.
+export component StageHead inherits Rectangle {
+    in property <int> index;
+    in property <bool> overview;
+    in property <bool> syncs;
+    /// The deck's number on the cover's corner (the 3 / 4 layer's number beside it, as the other decks show it).
+    in property <bool> badge: true;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <length> cover: min(Theme.stage-cover, root.height);
+    property <length> sync-w: root.syncs ? 66px : 0px;
+    property <length> tx: root.cover + Theme.space-lg;
+    property <length> tw: max(0px, root.width - root.tx - (root.syncs ? root.sync-w + Theme.space-md : 0px));
+    property <length> ov-h: root.overview ? StageGeom.ov : 0px;
+    property <length> top-h: root.height - root.ov-h - (root.overview ? Theme.space-md : 0px);
+    property <length> read-w: min(root.tw * 0.46, Theme.font-xl * 7.5);
+    StageCover { x: 0px; y: 0px; width: root.cover; height: root.cover; index: root.index; }
+    if root.badge: DeckBadge { index: root.index; size: clamp(root.cover * 0.28, 16px, 22px); x: 0px; y: 0px; }
+    VerticalLayout {
+        x: root.tx;
+        y: 0px;
+        width: max(0px, root.tw - root.read-w - Theme.space-md);
+        height: root.top-h;
+        alignment: start;
+        spacing: 1px;
+        Text {
+            text: root.v.title != "" ? root.v.title : (root.v.loading ? @tr("loading…") : @tr("LOAD A TRACK"));
+            color: root.v.title != "" ? Theme.text-bright : Theme.text-faint;
+            font-family: Theme.font;
+            font-size: Theme.deck-title;
+            font-weight: Theme.weight-bold;
+            overflow: elide;
+        }
+        Text {
+            text: root.v.title != "" ? root.v.artist : root.v.status;
+            color: Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.deck-sub;
+            overflow: elide;
+        }
+        if root.top-h >= 40px: HorizontalLayout {
+            spacing: Theme.space-md;
+            alignment: start;
+            Text {
+                text: root.v.key-eff;
+                color: StageTone.key(root.v.key-eff);
+                font-family: Theme.font;
+                font-size: Theme.deck-sub;
+                font-weight: Theme.weight-bold;
+                horizontal-stretch: 0;
+            }
+            Text {
+                text: root.v.key-shift;
+                color: Theme.accent-hi;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+                vertical-alignment: center;
+                horizontal-stretch: 0;
+            }
+            Text {
+                text: root.v.genre;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+                vertical-alignment: center;
+                overflow: elide;
+                horizontal-stretch: 1;
+                min-width: 0px;
+            }
+            Text {
+                text: root.v.elapsed-text;
+                color: Theme.text-faint;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+                vertical-alignment: center;
+                horizontal-stretch: 0;
+            }
+        }
+    }
+    VerticalLayout {
+        x: root.tx + root.tw - root.read-w;
+        y: 0px;
+        width: root.read-w;
+        height: root.top-h;
+        alignment: start;
+        spacing: 1px;
+        StageFig {
+            text: root.v.remain-text != "" ? root.v.remain-text : "--:--.-";
+            color: root.v.ending ? Theme.danger : Theme.text-bright;
+            font-size: Theme.font-xl;
+            horizontal-alignment: right;
+        }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            alignment: end;
+            StageFig { text: root.v.bpm-text; color: root.v.synced ? Theme.accent-hi : Theme.text; font-size: Theme.font-xl; horizontal-stretch: 0; }
+            Text { text: root.v.tempo-text; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-sm; vertical-alignment: bottom; horizontal-stretch: 0; }
+        }
+    }
+    if root.overview: Rectangle {
+        x: root.tx;
+        y: root.height - root.ov-h;
+        width: root.tw;
+        height: root.ov-h;
+        border-radius: Theme.stage-radius-ctl / 2;
+        clip: true;
+        DeckOverview { index: root.index; }
+    }
+    if root.syncs: VerticalLayout {
+        x: root.width - root.sync-w;
+        y: 0px;
+        width: root.sync-w;
+        height: root.height;
+        spacing: Theme.space-sm;
+        StageButton { text: @tr("KEY SYNC"); tooltip: @tr("Match the key of the other deck"); font-size: Theme.font-xs; enabled: root.v.loaded; accent: StageTone.deck(root.index); clicked => { DeckState.key-sync(root.index); } }
+        StageButton { text: @tr("BEAT SYNC"); tooltip: @tr("Beat sync to the master"); font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.synced; accent: StageTone.sync(root.index); clicked => { DeckState.sync(root.index); } }
+    }
+}
+
+/// The enlarged waveform of the deck (a drag scratches, a click plays or pauses as the other waveforms do) with, under it, the
+/// overview, and with `zoom` the `◀ span ▶` selector (over the overview's right end, else the waveform's corner).
+export component StageWave inherits Rectangle {
+    in property <int> index;
+    in property <bool> overview;
+    in property <bool> zoom;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <length> last-x;
+    property <length> down-x;
+    property <bool> scratching;
+    property <length> ov-h: root.overview ? StageGeom.ov : 0px;
+    property <length> zoom-w: root.zoom ? 92px : 0px;
+    property <length> detail-h: root.height - root.ov-h - (root.overview ? Theme.space-md : 0px);
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.detail-h;
+        border-radius: Theme.stage-radius-ctl;
+        clip: true;
+        background: Theme.wave-bg;
+        WaveStrip {
+            index: root.index;
+            width: parent.width;
+            height: parent.height;
+            resized(w, h) => { DeckState.detail-resized(root.index, w, h); }
+        }
+        // Drag = scratch: press holds the platter, release lets go; a click without a drag is PLAY / PAUSE (VIEW > Click on the waveform), a right press the CUE button.
+        TouchArea {
+            mouse-cursor: crosshair;
+            enabled: root.v.loaded;
+            pointer-event(e) => {
+                if (e.button == PointerEventButton.left) {
+                    if (e.kind == PointerEventKind.down) {
+                        root.last-x = self.mouse-x;
+                        root.down-x = self.mouse-x;
+                        root.scratching = true;
+                        DeckState.scratch-begin(root.index);
+                    }
+                    if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) {
+                        root.scratching = false;
+                        DeckState.scratch-end(root.index);
+                        if (e.kind == PointerEventKind.up && abs(self.mouse-x - root.down-x) < 4px && DeckState.click-wave) { DeckState.play-pause(root.index); }
+                    }
+                }
+                if (e.button == PointerEventButton.right && DeckState.click-wave) {
+                    if (e.kind == PointerEventKind.down) { DeckState.cue(root.index); }
+                    if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) { DeckState.cue-released(root.index); }
+                }
+            }
+            moved => {
+                if (self.pressed && root.scratching) {
+                    DeckState.scratch-move(root.index, self.mouse-x - root.last-x);
+                    root.last-x = self.mouse-x;
+                }
+            }
+        }
+        if root.zoom && !root.overview: Rectangle {
+            x: parent.width - self.width - Theme.space-sm;
+            y: Theme.space-sm;
+            width: 92px;
+            height: 18px;
+            background: Theme.panel.with-alpha(0.8);
+            border-radius: Theme.stage-radius-ctl;
+            HorizontalLayout {
+                StageButton { width: 20px; flat: true; glyph: Icon.chevron-left; tooltip: @tr("Zoom out"); font-size: Theme.font-xs; clicked => { DeckState.zoom(root.index, -1); } }
+                Text { text: root.v.zoom-text; color: Theme.text; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+                StageButton { width: 20px; flat: true; glyph: Icon.chevron-right; tooltip: @tr("Zoom in"); font-size: Theme.font-xs; clicked => { DeckState.zoom(root.index, 1); } }
+            }
+        }
+    }
+    if root.overview: Rectangle {
+        x: 0px;
+        y: root.detail-h + Theme.space-md;
+        width: root.width - root.zoom-w;
+        height: root.ov-h;
+        border-radius: Theme.stage-radius-ctl / 2;
+        clip: true;
+        DeckOverview { index: root.index; }
+    }
+    if root.overview && root.zoom: HorizontalLayout {
+        x: root.width - root.zoom-w;
+        y: root.detail-h + Theme.space-md;
+        width: root.zoom-w;
+        height: root.ov-h;
+        StageButton { width: 22px; flat: true; glyph: Icon.chevron-left; tooltip: @tr("Zoom out"); font-size: Theme.font-xs; clicked => { DeckState.zoom(root.index, -1); } }
+        Text { text: root.v.zoom-text; color: Theme.text; font-family: Theme.font; font-size: Theme.font-xs; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
+        StageButton { width: 22px; flat: true; glyph: Icon.chevron-right; tooltip: @tr("Zoom in"); font-size: Theme.font-xs; clicked => { DeckState.zoom(root.index, 1); } }
+    }
+}
+
+/// The jog in the `Theme.jog-style`: 0 a thick ring in the deck colour with the BPM and key inside, 1 a vinyl platter showing the
+/// cover and title, 2 a thin ring with beat ticks. A ring arc (style 2: a dot) follows the playhead on a 33⅓ rpm platter. A drag
+/// scratches (as the studio jog does); a double-click on the figure resets the tempo. Sized by the smaller of its width and height.
+export component StageJog inherits Rectangle {
+    in property <int> index;
+    in property <color> tone;
+    in property <color> tone-hi;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <int> style: Theme.jog-style;
+    property <length> d: min(root.width, root.height);
+    property <length> t: root.style == 0 ? root.d * 0.07 : root.style == 1 ? root.d * 0.06 : max(2px, root.d * 0.02);
+    property <angle> spin: DeckState.scroll[root.index].jog-angle * 1deg;
+    property <length> last-x;
+    property <int> bpm-scale: Theme.tempo-decimals == 1 ? 10 : 100;
+    property <int> bpm-rounded: Math.round(root.v.bpm * root.bpm-scale);
+    property <int> bpm-int: Math.floor(root.bpm-rounded / root.bpm-scale);
+    property <int> bpm-dec: Math.mod(root.bpm-rounded, root.bpm-scale);
+    pure function pt(r: length, a: angle) -> string {
+        return ((root.d / 2 + r * sin(a)) / 1px).to-string-unlocalized() + " " + ((root.d / 2 - r * cos(a)) / 1px).to-string-unlocalized();
+    }
+    pure function arc(r: length, a0: angle, a1: angle) -> string {
+        return "M " + root.pt(r, a0) + " A " + (r / 1px).to-string-unlocalized() + " " + (r / 1px).to-string-unlocalized() + " 0 " + (abs((a1 - a0) / 1deg) > 180 ? "1" : "0") + " " + (a1 >= a0 ? "1" : "0") + " " + root.pt(r, a1);
+    }
+    pure function tick(i: int) -> string {
+        return root.style == 1
+            ? "M " + root.pt(root.d / 2 - root.t * 0.5, i * 22.5deg) + " L " + root.pt(root.d / 2 - root.t * 0.5, i * 22.5deg + 0.3deg)
+            : "M " + root.pt(root.d / 2 - root.t - 2px, i * 22.5deg) + " L " + root.pt(root.d / 2 - root.t - (Math.mod(i, 4) == 0 ? 10px : 5px), i * 22.5deg);
+    }
+    disc := Rectangle {
+        x: (root.width - root.d) / 2;
+        y: (root.height - root.d) / 2;
+        width: root.d;
+        height: root.d;
+        // The ring (styles 0 and 2) or the platter's rim (1).
+        Rectangle {
+            border-radius: root.d / 2;
+            background: root.style == 1 ? Theme.jog-ring : Theme.jog-face;
+            border-width: root.style == 1 ? 1px : root.t;
+            border-color: root.style == 1 ? Theme.line-strong : root.v.loaded ? root.tone.with-alpha(root.style == 0 ? 0.9 : 0.55) : Theme.line-strong.with-alpha(0.6);
+            drop-shadow-blur: root.v.loaded && Theme.glow > 0 ? 28px * Theme.glow : 0px;
+            drop-shadow-color: root.v.loaded && Theme.glow > 0 ? root.tone.with-alpha(0.7 * Theme.glow) : transparent;
+        }
+        // Platter: the record under the rim, cover art on it, the title on its lower half, the spindle.
+        if root.style == 1: Rectangle {
+            x: root.t;
+            y: root.t;
+            width: root.d - 2 * root.t;
+            height: self.width;
+            border-radius: self.width / 2;
+            clip: true;
+            background: Theme.jog-face;
+            if root.v.has-cover: Image { source: root.v.cover; image-fit: cover; width: parent.width; height: parent.height; }
+            Rectangle {
+                y: parent.height / 2;
+                height: parent.height / 2;
+                background: Theme.panel.with-alpha(0.62);
+            }
+            StageFig {
+                x: parent.width * 0.1;
+                y: parent.height * 0.62;
+                width: parent.width * 0.8;
+                text: root.v.title;
+                font-size: root.d * 0.085;
+                horizontal-alignment: center;
+                overflow: elide;
+            }
+            Text {
+                x: parent.width * 0.1;
+                y: parent.height * 0.62 + root.d * 0.105;
+                width: parent.width * 0.8;
+                text: root.v.artist;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: root.d * 0.05;
+                horizontal-alignment: center;
+                overflow: elide;
+            }
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: root.d * 0.13;
+                height: self.width;
+                border-radius: self.width / 2;
+                background: Theme.jog-face;
+                border-width: 2px;
+                border-color: Theme.text-bright.with-alpha(0.8);
+            }
+        }
+        // Beat ticks (ring) / the dots of the platter's rim.
+        if root.style != 0: Path {
+            width: root.d;
+            height: root.d;
+            viewbox-width: root.d / 1px;
+            viewbox-height: root.d / 1px;
+            commands: root.tick(0) + " " + root.tick(1) + " " + root.tick(2) + " " + root.tick(3) + " " + root.tick(4) + " " + root.tick(5) + " " + root.tick(6) + " " + root.tick(7)
+                + " " + root.tick(8) + " " + root.tick(9) + " " + root.tick(10) + " " + root.tick(11) + " " + root.tick(12) + " " + root.tick(13) + " " + root.tick(14) + " " + root.tick(15);
+            stroke: root.style == 1 ? Theme.text-faint : Theme.line-strong;
+            stroke-width: root.style == 1 ? 2.5px : 1.5px;
+            stroke-line-cap: round;
+        }
+        // The playhead on the ring.
+        if root.v.playing: Path {
+            width: root.d;
+            height: root.d;
+            viewbox-width: root.d / 1px;
+            viewbox-height: root.d / 1px;
+            commands: root.arc(root.d / 2 - root.t / 2, root.spin, root.spin + (root.style == 2 ? 24deg : 55deg));
+            stroke: root.tone-hi;
+            stroke-width: root.style == 2 ? root.t * 1.8 : root.t;
+            stroke-line-cap: round;
+        }
+        // The cue point's place on the platter.
+        if root.v.loaded && root.style != 1: Rectangle {
+            width: max(5px, root.d * 0.035);
+            height: self.width;
+            x: root.d / 2 + (root.d / 2 - root.t / 2) * sin(root.v.jog-cue * 1deg) - self.width / 2;
+            y: root.d / 2 - (root.d / 2 - root.t / 2) * cos(root.v.jog-cue * 1deg) - self.height / 2;
+            border-radius: self.width / 2;
+            background: root.v.slip ? Theme.danger : StageTone.cue(root.index);
+        }
+        if root.style != 1: VerticalLayout {
+            x: root.d * 0.2;
+            width: root.d * 0.6;
+            height: root.d;
+            alignment: center;
+            spacing: 0px;
+            HorizontalLayout {
+                alignment: center;
+                StageFig {
+                    text: root.v.bpm > 0 ? "" + root.bpm-int : "—";
+                    color: root.v.synced ? Theme.accent-hi : Theme.jog-bpm;
+                    font-size: root.d * 0.17;
+                    vertical-alignment: bottom;
+                }
+                if root.v.bpm > 0: StageFig {
+                    text: "." + (Theme.tempo-decimals == 2 && root.bpm-dec < 10 ? "0" : "") + root.bpm-dec;
+                    color: root.v.synced ? Theme.accent-hi : Theme.jog-bpm;
+                    font-size: root.d * 0.085;
+                    vertical-alignment: bottom;
+                }
+            }
+            if root.style == 0: Text {
+                text: root.v.key-eff;
+                color: root.v.loaded ? root.tone-hi : Theme.text-faint;
+                font-family: Theme.font;
+                font-size: root.d * 0.075;
+                font-weight: Theme.weight-bold;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: root.v.tempo-text;
+                color: Theme.jog-text;
+                font-family: Theme.font;
+                font-size: root.d * 0.06;
+                horizontal-alignment: center;
+            }
+        }
+        // Scratch under the figure's own double-click.
+        TouchArea {
+            enabled: root.v.loaded;
+            mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+            pointer-event(e) => {
+                if e.button == PointerEventButton.left {
+                    if e.kind == PointerEventKind.down { root.last-x = self.mouse-x; DeckState.scratch-begin(root.index); }
+                    if e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel { DeckState.scratch-end(root.index); }
+                }
+            }
+            moved => {
+                if self.pressed {
+                    DeckState.scratch-move(root.index, self.mouse-x - root.last-x);
+                    root.last-x = self.mouse-x;
+                }
+            }
+        }
+        if root.style != 1: TouchArea {
+            x: root.d * 0.25;
+            y: root.d * 0.3;
+            width: root.d * 0.5;
+            height: root.d * 0.4;
+            enabled: root.v.loaded;
+            double-clicked => { DeckState.tempo(root.index, 0.5); }
+        }
+    }
+}
+
+/// The eight pads of the deck's pad mode in the `Theme.stage-pads` style (0 outlined numbered grid with the set ones lit in the
+/// deck colour, 1 a cue list with the time and a delete cross per row, 2 a grid filled in each cue's colour), over the mode
+/// chooser: `tabbed` shows HOT CUE / BEAT LOOP / SLICER / SAMPLER tabs, else a list of every mode. The mode's option chips
+/// (SAMPLER bank, ...) sit under the pads.
+export component StagePads inherits Rectangle {
+    in property <int> index;
+    in property <color> tone;
+    in property <bool> tabbed;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <int> style: Theme.stage-pads;
+    property <bool> options: PadsState.options.length > root.index && PadsState.options[root.index].length > 0;
+    /// Pad modes of the four tabs: HOT CUE, BEAT LOOP, SLICER, SAMPLER.
+    property <[int]> tab-modes: [0, 3, 7, 9];
+    property <int> tab: root.v.pad-mode == 0 ? 0 : root.v.pad-mode == 3 ? 1 : root.v.pad-mode == 7 ? 2 : root.v.pad-mode == 9 ? 3 : -1;
+    property <length> g: Theme.space-sm;
+    property <length> head-h: 22px;
+    property <length> opt-h: root.options ? 20px : 0px;
+    property <length> area-y: root.head-h + root.g;
+    property <length> area-h: max(0px, root.height - root.area-y - (root.options ? root.opt-h + root.g : 0px));
+    /// HOT CUE and the plugin modes draw the hot cues (letter, time); the other modes draw their own pad labels.
+    property <bool> cues: root.v.pad-mode == 0 || root.v.pad-mode >= 12;
+    property <bool> list: root.style == 1 && root.cues;
+    /// S.SCRATCH, SAMPLER and SEQ. CALL pads work on an empty deck.
+    property <bool> live: root.v.loaded || root.v.pad-mode == 6 || root.v.pad-mode == 9 || root.v.pad-mode == 10;
+    property <int> rows: root.list ? max(1, min(8, floor((root.area-h + root.g) / (22px + root.g)))) : 2;
+    property <length> cw: (root.width - 3 * root.g) / 4;
+    property <length> ch: (root.area-h - root.g) / 2;
+    property <length> rh: (root.area-h - (root.rows - 1) * root.g) / root.rows;
+    if !root.tabbed: StageSelect {
+        x: 0px;
+        y: 0px;
+        width: root.width - (root.v.pad-mode == 0 && !root.list ? root.head-h + root.g : 0px);
+        height: root.head-h;
+        options: root.v.stems ? DeckState.pad-mode-names-stems : DeckState.pad-mode-names;
+        current: !root.v.stems && root.v.pad-mode > 11 ? root.v.pad-mode - 1 : root.v.pad-mode;
+        list-width: 130px;
+        chose(m) => { DeckState.pad-mode(root.index, !root.v.stems && m >= 11 ? m + 1 : m); }
+    }
+    if root.tabbed: StageTabs {
+        x: 0px;
+        y: 0px;
+        width: root.width - (root.v.pad-mode == 0 && !root.list ? root.head-h + root.g : 0px);
+        height: root.head-h;
+        tabs: [@tr("HOT CUE"), @tr("BEAT LOOP"), @tr("SLICER"), @tr("SAMPLER")];
+        current: root.tab;
+        accent: root.tone;
+        font-size: Theme.font-xs;
+        picked(i) => { DeckState.pad-mode(root.index, root.tab-modes[i]); }
+    }
+    // × arms the delete mode: the next hot cue pad pressed is deleted (the cue list has its own cross per row).
+    if root.v.pad-mode == 0 && !root.list: StageButton {
+        tooltip: @tr("Delete a hot cue: press its pad");
+        x: root.width - root.head-h;
+        y: 0px;
+        width: root.head-h;
+        height: root.head-h;
+        text: "×";
+        font-size: Theme.font-md;
+        active: root.v.delete-mode;
+        accent: Theme.danger;
+        enabled: root.v.loaded;
+        clicked => { DeckState.cue-delete(root.index); }
+    }
+    for p[i] in root.v.pads: pad := Rectangle {
+        // BEAT JUMP pairs pad 2k (-n) with pad 2k+1 (+n) in a column.
+        property <bool> pairs: root.v.pad-mode == 1;
+        property <int> c: self.pairs ? Math.floor(i / 2) : Math.mod(i, 4);
+        property <int> r: self.pairs ? Math.mod(i, 2) : Math.floor(i / 4);
+        /// The colour a lit pad wears: its cue's (filled style), the PAD FX colour, else the deck's.
+        property <color> lit-c: root.v.pad-mode == 4 ? [Theme.accent, Theme.play, Theme.deck2, Theme.danger, Theme.sampler][DeckState.pad-fx-color] : root.tone;
+        property <bool> lit: p.set;
+        property <bool> filled: root.style == 2 && root.cues;
+        visible: !root.list || i < root.rows;
+        x: root.list ? 0px : self.c * (root.cw + root.g);
+        y: root.area-y + (root.list ? i * (root.rh + root.g) : self.r * (root.ch + root.g));
+        width: root.list ? root.width : root.cw;
+        height: root.list ? root.rh : root.ch;
+        opacity: root.live ? 1 : 0.4;
+        border-radius: Theme.stage-radius-ctl;
+        border-width: 1px;
+        border-color: root.v.delete-mode && p.set && root.v.pad-mode == 0 ? Theme.danger
+            : self.filled ? (p.set ? p.color : Theme.line) : self.lit && !root.list ? self.lit-c : root.list ? Theme.line : Theme.line-strong.with-alpha(0.8);
+        background: self.filled && p.set ? p.color
+            : self.lit && !root.list ? (ta.pressed ? self.lit-c : self.lit-c.with-alpha(root.cues ? 0.2 : 0.4))
+            : ta.pressed ? Theme.bg-deep : ta.has-hover ? Theme.panel-raised.with-alpha(0.7) : root.list ? Theme.bg-deep.with-alpha(0.5) : transparent;
+        drop-shadow-blur: (ta.pressed || (self.lit && !root.cues)) && !root.list && !self.filled && Theme.glow > 0 ? 14px * Theme.glow : 0px;
+        drop-shadow-color: (ta.pressed || (self.lit && !root.cues)) && !root.list && !self.filled && Theme.glow > 0 ? self.lit-c.with-alpha(0.7 * Theme.glow) : transparent;
+        animate background { duration: Theme.t-fast; }
+        // Grid: the number (hot cues) or the pad's own label, the cue time under it when filled.
+        if !root.list: Text {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: pad.filled && p.time != "" ? parent.height * 0.6 : parent.height;
+            text: root.v.delete-mode && p.set && root.v.pad-mode == 0 ? "×" : root.cues ? "" + (i + 1) : p.label;
+            color: pad.filled && p.set ? StageTone.on(p.color) : ta.pressed && p.set && !pad.filled ? StageTone.on(pad.lit-c) : p.set ? pad.lit-c.brighter(0.3) : Theme.text-dim;
+            font-family: Theme.font;
+            font-size: root.v.pad-mode == 4 || root.v.pad-mode == 11 ? Theme.font-xs : Theme.font-md;
+            font-weight: Theme.weight-bold;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+
+        }
+        if !root.list && pad.filled && p.set: Text {
+            x: 0px;
+            y: parent.height * 0.58;
+            width: parent.width;
+            text: p.time;
+            color: Colors.black.with-alpha(0.7);
+            font-family: Theme.font;
+            font-size: Theme.font-xs;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+        // List: letter badge, time, delete cross.
+        if root.list: Rectangle {
+            x: Theme.space-md;
+            y: (parent.height - self.height) / 2;
+            width: min(parent.height - 6px, 18px);
+            height: self.width;
+            border-radius: Theme.stage-radius-ctl / 2;
+            background: p.set ? p.color : Theme.panel-high;
+            Text {
+                text: p.label;
+                color: p.set ? Colors.black.with-alpha(0.75) : Theme.text-faint;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+                font-weight: Theme.weight-bold;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+        if root.list: Text {
+            x: Theme.space-md * 2 + 22px;
+            width: parent.width - self.x - parent.height;
+            height: parent.height;
+            text: p.set && p.time != "" ? p.time : "—";
+            color: p.set ? Theme.text : Theme.text-faint;
+            font-family: Theme.font;
+            font-size: Theme.font-size;
+            vertical-alignment: center;
+        }
+        ta := TouchArea {
+            enabled: root.live;
+            width: root.list ? parent.width - parent.height : parent.width;
+            pointer-event(e) => {
+                if (e.button == PointerEventButton.left) {
+                    if (e.kind == PointerEventKind.down) { DeckState.pad(root.index, i); }
+                    if (e.kind == PointerEventKind.up) { DeckState.pad-released(root.index); }
+                }
+            }
+        }
+        if root.list && p.set: Rectangle {
+            x: parent.width - self.width;
+            width: parent.height;
+            Glyph { x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 10px; height: 10px; icon: Icon.close; tint: del.has-hover ? Theme.danger : Theme.text-dim; }
+            del := TouchArea {
+                mouse-cursor: pointer;
+                // Delete mode deletes the next pad pressed, so arm it for this one press and put it back.
+                clicked => {
+                    if root.v.delete-mode { DeckState.pad(root.index, i); }
+                    else { DeckState.cue-delete(root.index); DeckState.pad(root.index, i); DeckState.cue-delete(root.index); }
+                }
+            }
+        }
+    }
+    if root.options: PadOptions { x: 0px; y: root.height - root.opt-h; width: root.width; height: root.opt-h; index: root.index; }
+}
+
+/// LOOP: IN / OUT set a manual loop; ◀ and ▶ halve and double the running loop (or the length the box shows while none runs); the box
+/// starts a loop of that many beats, or leaves the running one; RELOOP goes back into the last loop (tall enough only).
+export component StageLoop inherits Rectangle {
+    in property <int> index;
+    in property <color> tone;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <int> auto-n: 4;
+    /// The ◀ ▶ buttons picked a length here; until then the box shows and starts the PREFS > Auto Beat Loop length.
+    property <bool> custom;
+    property <int> shown: root.custom ? root.auto-n : (root.v.auto-beats > 0 ? root.v.auto-beats : root.auto-n);
+    property <length> g: Theme.space-sm;
+    property <length> lh: min(24px, (root.height - root.g * 2 - 14px) / 3);
+    StageCaption { x: 0px; y: 0px; width: root.width; height: 14px; text: @tr("LOOP"); horizontal-alignment: center; }
+    HorizontalLayout {
+        x: 0px;
+        y: 14px + root.g;
+        width: root.width;
+        height: root.lh;
+        spacing: root.g;
+        StageButton { text: @tr("IN"); tooltip: @tr("Loop in at the playhead"); font-size: Theme.font-xs; enabled: root.v.loaded; accent: root.tone; clicked => { DeckState.loop-in(root.index); } }
+        StageButton { text: @tr("OUT"); tooltip: @tr("Loop out at the playhead: the loop starts"); font-size: Theme.font-xs; enabled: root.v.loaded; accent: root.tone; clicked => { DeckState.loop-out(root.index); } }
+    }
+    HorizontalLayout {
+        x: 0px;
+        y: 14px + 2 * root.g + root.lh;
+        width: root.width;
+        height: root.lh;
+        spacing: root.g;
+        StageButton {
+            tooltip: @tr("Halve the loop");
+            width: root.lh;
+            glyph: Icon.chevron-left;
+            enabled: root.v.loaded;
+            accent: root.tone;
+            clicked => { if (root.v.loop-active) { DeckState.loop-halve(root.index); } else { root.auto-n = Math.max(1, Math.floor(root.shown / 2)); root.custom = true; } }
+        }
+        StageButton {
+            text: root.v.loop-active ? (root.v.loop-beats > 0 ? "" + root.v.loop-beats : @tr("LOOP")) : "" + root.shown;
+            font-size: Theme.font-md;
+            active: root.v.loop-active;
+            enabled: root.v.loaded;
+            accent: root.tone;
+            clicked => { if (root.v.loop-active) { DeckState.reloop(root.index); } else { DeckState.auto-loop(root.index, root.custom ? root.auto-n : 0); } }
+        }
+        StageButton {
+            tooltip: @tr("Double the loop");
+            width: root.lh;
+            glyph: Icon.chevron-right;
+            enabled: root.v.loaded;
+            accent: root.tone;
+            clicked => { if (root.v.loop-active) { DeckState.loop-double(root.index); } else { root.auto-n = Math.min(16, root.shown * 2); root.custom = true; } }
+        }
+    }
+    if root.height >= 14px + 3 * root.g + 3 * 20px: StageButton {
+        tooltip: @tr("Leave the loop, or go back into the last one");
+        x: 0px;
+        y: 14px + 3 * root.g + 2 * root.lh;
+        width: root.width;
+        height: root.lh;
+        text: @tr("RELOOP");
+        font-size: Theme.font-xs;
+        active: root.v.loop-active;
+        enabled: root.v.loaded;
+        accent: root.tone;
+        clicked => { DeckState.reloop(root.index); }
+    }
+}
+
+/// BEAT FX of the deck's unit (deck A / C: FX1, deck B / D: FX2), on the unit's lit slot: the effect list, ON, the BEAT knob (turns
+/// through the beat fractions 1/16 … 32) and the DEPTH knob (the slot's level). The unit's own panel keeps the other two slots.
+export component StageFx inherits Rectangle {
+    in property <int> index;
+    in property <color> tone;
+    property <int> unit: Math.mod(root.index, 2);
+    property <FxUnit> u: FxState.units[root.unit];
+    property <int> t: root.u.target;
+    property <bool> ok: root.u.slots.length > root.t;
+    property <int> beat: root.ok ? root.u.slots[root.t].beat : 0;
+    property <length> g: Theme.space-sm;
+    property <length> row-h: 22px;
+    StageCaption { x: 0px; y: 0px; width: root.width; height: 14px; text: @tr("BEAT FX"); }
+    StageSelect {
+        x: 0px;
+        y: 14px + root.g;
+        width: root.width - root.row-h * 1.5 - root.g;
+        height: root.row-h;
+        options: FxState.effects;
+        current: root.ok ? root.u.slots[root.t].effect : 0;
+        list-width: 120px;
+        chose(e) => { FxState.effect-selected(root.unit, root.t, e); }
+    }
+    StageButton {
+        tooltip: @tr("FX{}-{} ON", root.unit + 1, root.t + 1);
+        x: root.width - root.row-h * 1.5;
+        y: 14px + root.g;
+        width: root.row-h * 1.5;
+        height: root.row-h;
+        text: @tr("ON");
+        font-size: Theme.font-xs;
+        active: root.ok && root.u.slots[root.t].on;
+        accent: StageTone.play(root.index);
+        clicked => { FxState.toggled(root.unit, root.t); }
+    }
+    property <length> ks: clamp(root.height - 14px - 2 * root.g - root.row-h - 14px, 22px, 36px);
+    HorizontalLayout {
+        x: 0px;
+        y: 14px + 2 * root.g + root.row-h;
+        width: root.width;
+        height: root.ks + 14px;
+        alignment: space-around;
+        StageKnob {
+            size: root.ks;
+            value: root.beat / 10.0;
+            label: @tr("BEAT") + " " + (root.ok ? root.u.slots[root.t].beat-text : "");
+            accent: root.tone;
+            // The beat fraction is one of eleven steps: the knob's place picks it, BEAT ◀ ▶ moves the lit slot by the difference.
+            moved(v) => { if (Math.round(v * 10) != root.beat) { FxState.beat-step(root.unit, Math.round(v * 10) - root.beat); } }
+            reset() => { FxState.beat-step(root.unit, 5 - root.beat); }
+        }
+        StageKnob {
+            size: root.ks;
+            value: root.ok ? root.u.slots[root.t].level : 0.0;
+            label: @tr("DEPTH");
+            accent: root.tone;
+            moved(v) => { FxState.level-edited(root.unit, root.t, v); }
+            reset() => { FxState.level-edited(root.unit, root.t, 0.5); }
+        }
+    }
+}
+
+/// The tempo fader (1 = faster at the top, or at the bottom with PREFS > VIEW > tempo reverse) with, under it, the range button
+/// (±6 / ±10 / ±16 / WIDE); `steps` adds + and − buttons at its ends; a double-click on the fader returns to 0 %.
+export component StageTempo inherits Rectangle {
+    in property <int> index;
+    in property <color> tone;
+    in property <bool> steps;
+    in property <bool> caption;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <length> bh: 20px;
+    property <length> g: Theme.space-sm;
+    property <length> top: root.steps ? root.bh + root.g : 0px;
+    property <length> bottom: root.bh + root.g + (root.steps ? root.bh + root.g : 0px) + (root.caption ? 12px : 0px);
+    if root.steps: StageButton {
+        tooltip: DeckState.tempo-reverse ? @tr("Slower") : @tr("Faster");
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.bh;
+        text: DeckState.tempo-reverse ? "−" : "+";
+        font-size: Theme.font-md;
+        enabled: root.v.loaded;
+        accent: root.tone;
+        clicked => { DeckState.tempo(root.index, clamp(root.v.tempo + (DeckState.tempo-reverse ? -0.01 : 0.01), 0, 1)); }
+    }
+    StageFader {
+        x: 0px;
+        y: root.top;
+        width: root.width;
+        height: max(0px, root.height - root.top - root.bottom);
+        detent: true;
+        accent: root.tone;
+        value: DeckState.tempo-fader(root.v.tempo);
+        moved(p) => { DeckState.tempo(root.index, DeckState.tempo-fader(p)); }
+        reset() => { DeckState.tempo(root.index, 0.5); }
+    }
+    if root.steps: StageButton {
+        tooltip: DeckState.tempo-reverse ? @tr("Faster") : @tr("Slower");
+        x: 0px;
+        y: root.height - root.bottom + root.g;
+        width: root.width;
+        height: root.bh;
+        text: DeckState.tempo-reverse ? "+" : "−";
+        font-size: Theme.font-md;
+        enabled: root.v.loaded;
+        accent: root.tone;
+        clicked => { DeckState.tempo(root.index, clamp(root.v.tempo + (DeckState.tempo-reverse ? 0.01 : -0.01), 0, 1)); }
+    }
+    if root.caption: StageCaption { x: 0px; y: root.height - root.bh - root.g - 12px; width: root.width; height: 12px; text: @tr("TEMPO"); horizontal-alignment: center; }
+    StageButton {
+        tooltip: @tr("Tempo range");
+        x: 0px;
+        y: root.height - root.bh;
+        width: root.width;
+        height: root.bh;
+        text: root.v.tempo-range;
+        font-size: Theme.font-xs;
+        accent: root.tone;
+        clicked => { DeckState.tempo-range(root.index); }
+    }
+}
+
+/// A small lamp and a caption (SLIP, QUANTIZE, KEY SYNC): the lamp is lit in `accent` while `active`.
+export component StageDot inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <bool> enabled: true;
+    in property <color> accent: Theme.accent;
+    callback clicked;
+    min-width: 20px;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    Rectangle {
+        x: 0px;
+        y: (parent.height - self.height) / 2;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: root.active && root.enabled ? root.accent : Theme.line-strong;
+        drop-shadow-blur: root.active && root.enabled && Theme.glow > 0 ? 8px * Theme.glow : 0px;
+        drop-shadow-color: root.active && root.enabled && Theme.glow > 0 ? root.accent.with-alpha(Theme.glow) : transparent;
+    }
+    Text {
+        x: 14px;
+        width: parent.width - 14px;
+        height: parent.height;
+        text: root.text;
+        vertical-alignment: center;
+        overflow: elide;
+        color: !root.enabled ? Theme.text-disabled : root.active ? Theme.text-bright : ta.has-hover ? Theme.text : Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-xs;
+        font-weight: Theme.weight-bold;
+    }
+    ta := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+/// The deck's number or letter in a box outlined in the deck colour (ref: the A / B box, the big number at the panel's edge).
+export component StageBadge inherits Rectangle {
+    in property <string> text;
+    in property <color> tone;
+    in property <bool> boxed: true;
+    border-radius: Theme.stage-radius-ctl;
+    border-width: root.boxed ? 1px : 0px;
+    border-color: root.tone;
+    background: root.boxed ? root.tone.with-alpha(0.12) : transparent;
+    StageFig {
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        color: root.tone;
+        font-size: min(parent.width, parent.height) * (root.boxed ? 0.55 : 0.9);
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+/// The sizes the Stage deck styles are laid out with, from the tokens: what a deck of the current `stage-deck` / `stage-wave` / `stage-jog`
+/// needs for no empty band (`natural`). Deck panels taller than that keep their parts compact at the top; shorter ones shrink the jog,
+/// the pads and the waveform.
+export global StageGeom {
+    out property <length> g: Theme.space-lg;
+    /// The overview strip.
+    out property <length> ov: 26px;
+    out property <bool> waved: Theme.stage-wave == 2;
+    /// Header with the overview strip beside the cover, and without.
+    out property <length> head-ov: max(Theme.stage-cover, 86px);
+    out property <length> head: max(Theme.stage-cover, 52px);
+    /// The waveform alone, and the waveform with its overview.
+    out property <length> wave: root.waved ? Theme.stage-wave-h : 0px;
+    out property <length> wave-ov: root.waved ? Theme.stage-wave-h + root.ov + Theme.space-md : 0px;
+    out property <length> perf: 2 * root.g + root.head-ov + root.g + (root.waved ? root.wave + root.g : 0px) + Theme.stage-jog + 22px + root.g;
+    out property <length> turntable: 2 * root.g + root.head + root.g + (root.waved ? root.wave-ov + root.g : 0px) + 24px + root.g + max(Theme.stage-jog, 170px);
+    out property <length> controller: 2 * root.g + root.head + root.g + (root.waved ? root.wave-ov + root.g : 0px) + 78px + root.g + Theme.stage-button;
+    out property <length> ring: 2 * root.g + root.head-ov + root.g + (root.waved ? root.wave + root.g : 0px) + 24px + root.g + Theme.stage-jog;
+    out property <length> natural: Theme.stage-deck == 0 ? root.perf : Theme.stage-deck == 1 ? root.turntable : Theme.stage-deck == 2 ? root.controller : root.ring;
+}
