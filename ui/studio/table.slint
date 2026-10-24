@@ -221,8 +221,8 @@ export component StudioTable inherits Rectangle {
             VerticalLayout {
                 padding: 1px;
                 if root.multi: MenuItem { text: @tr("{} tracks selected", BrowserState.selected-count); enabled: false; }
-                MenuItem { text: @tr("Load to deck 1"); enabled: !root.multi; activated => { DeckState.load(0); menu.close(); } }
-                MenuItem { text: @tr("Load to deck 2"); enabled: !root.multi; activated => { DeckState.load(1); menu.close(); } }
+                MenuItem { text: @tr("Load to deck {}", DeckState.slots[0] + 1); enabled: !root.multi; activated => { DeckState.load(DeckState.slots[0]); menu.close(); } }
+                MenuItem { text: @tr("Load to deck {}", DeckState.slots[1] + 1); enabled: !root.multi; activated => { DeckState.load(DeckState.slots[1]); menu.close(); } }
                 MenuItem { text: @tr("Edit track details…"); enabled: !root.multi; activated => { LibraryState.action("track-edit"); menu.close(); } }
                 MenuItem { text: @tr("Add to Tag List (T)"); activated => { BrowserState.tag-add(); menu.close(); } }
                 MenuItem { text: @tr("Add to playlist…"); activated => { BrowserState.panel-request(0); menu.close(); } }

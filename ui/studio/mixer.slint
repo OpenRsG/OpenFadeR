@@ -11,8 +11,10 @@ component KnobRow inherits Rectangle {
     in property <int> p;
     in property <string> label;
     in property <length> size;
-    property <ChannelView> a: MixerState.channels[0];
-    property <ChannelView> b: MixerState.channels[1];
+    property <int> ia: DeckState.slots[0];
+    property <int> ib: DeckState.slots[1];
+    property <ChannelView> a: MixerState.channels[root.ia];
+    property <ChannelView> b: MixerState.channels[root.ib];
     property <bool> iso-a: root.a.iso && root.p >= 1 && root.p <= 3;
     property <bool> iso-b: root.b.iso && root.p >= 1 && root.p <= 3;
     property <[color]> iso-tone: [Theme.accent, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums];
@@ -28,7 +30,7 @@ component KnobRow inherits Rectangle {
                 arc-color: root.iso-a ? root.iso-tone[root.p] : root.p == 4 ? Theme.cue : Theme.accent;
                 value: root.iso-a ? root.a.iso-knobs[root.p - 1] : root.a.knobs[root.p];
                 stop: root.p == 4 ? MixerState.cfx-stop : -1;
-                edited(v) => { MixerState.knob(0, root.p, v); }
+                edited(v) => { MixerState.knob(root.ia, root.p, v); }
             }
         }
         Caption {
@@ -50,7 +52,7 @@ component KnobRow inherits Rectangle {
                 arc-color: root.iso-b ? root.iso-tone[root.p] : root.p == 4 ? Theme.cue : Theme.accent;
                 value: root.iso-b ? root.b.iso-knobs[root.p - 1] : root.b.knobs[root.p];
                 stop: root.p == 4 ? MixerState.cfx-stop : -1;
-                edited(v) => { MixerState.knob(1, root.p, v); }
+                edited(v) => { MixerState.knob(root.ib, root.p, v); }
             }
         }
     }
@@ -83,6 +85,8 @@ component BusKnob inherits VerticalLayout {
 component MixerPage inherits Rectangle {
     /// Height of one knob row, from the column's own height (set by the workspace, not by this layout).
     in property <length> row-h;
+    property <int> ia: DeckState.slots[0];
+    property <int> ib: DeckState.slots[1];
     VerticalLayout {
         spacing: Theme.space-md;
         for label[p] in [@tr("GAIN"), @tr("HIGH"), @tr("MID"), @tr("LOW"), MixerState.cfx-names.length > MixerState.cfx-type ? MixerState.cfx-names[MixerState.cfx-type] : @tr("FILTER")]: KnobRow {
@@ -95,20 +99,20 @@ component MixerPage inherits Rectangle {
             vertical-stretch: 1;
             min-height: 60px;
             spacing: Theme.space-md;
-            Fader { vertical: true; width: 30px; horizontal-stretch: 0; value: MixerState.channels[0].fader; edited(v) => { MixerState.fader(0, v); } }
+            Fader { vertical: true; width: 30px; horizontal-stretch: 0; value: MixerState.channels[root.ia].fader; edited(v) => { MixerState.fader(root.ia, v); } }
             HorizontalLayout {
                 alignment: center;
                 spacing: Theme.space-md;
-                Meter { vertical: true; width: 10px; horizontal-stretch: 0; segments: 24; level: MixerState.channels[0].level; peak: MixerState.channels[0].peak; }
-                Meter { vertical: true; width: 10px; horizontal-stretch: 0; segments: 24; level: MixerState.channels[1].level; peak: MixerState.channels[1].peak; }
+                Meter { vertical: true; width: 10px; horizontal-stretch: 0; segments: 24; level: MixerState.channels[root.ia].level; peak: MixerState.channels[root.ia].peak; }
+                Meter { vertical: true; width: 10px; horizontal-stretch: 0; segments: 24; level: MixerState.channels[root.ib].level; peak: MixerState.channels[root.ib].peak; }
             }
-            Fader { vertical: true; width: 30px; horizontal-stretch: 0; value: MixerState.channels[1].fader; edited(v) => { MixerState.fader(1, v); } }
+            Fader { vertical: true; width: 30px; horizontal-stretch: 0; value: MixerState.channels[root.ib].fader; edited(v) => { MixerState.fader(root.ib, v); } }
         }
         HorizontalLayout {
             height: 24px;
             spacing: Theme.space-md;
-            Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; active: MixerState.channels[0].cue; tooltip: @tr("Headphone CUE, deck 1"); clicked => { MixerState.cue-toggled(0); } }
-            Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; active: MixerState.channels[1].cue; tooltip: @tr("Headphone CUE, deck 2"); clicked => { MixerState.cue-toggled(1); } }
+            Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; active: MixerState.channels[root.ia].cue; tooltip: @tr("Headphone CUE, deck {}", root.ia + 1); clicked => { MixerState.cue-toggled(root.ia); } }
+            Chip { text: @tr("CUE"); icon: Icon.headphones; font-size: Theme.font-xs; active: MixerState.channels[root.ib].cue; tooltip: @tr("Headphone CUE, deck {}", root.ib + 1); clicked => { MixerState.cue-toggled(root.ib); } }
         }
         HorizontalLayout {
             height: 46px;
@@ -149,13 +153,14 @@ component SettingsPage inherits Rectangle {
             }
         }
         for ch in 2: VerticalLayout {
+            property <int> d: DeckState.slots[ch];
             spacing: Theme.space-sm;
-            Caption { text: @tr("DECK {} ON THE CROSSFADER", ch + 1); height: 14px; }
+            Caption { text: @tr("DECK {} ON THE CROSSFADER", d + 1); height: 14px; }
             SegmentedChips {
                 options: [@tr("A"), @tr("THRU"), @tr("B")];
-                current: MixerState.channels[ch].xf;
+                current: MixerState.channels[d].xf;
                 font-size: Theme.font-xs;
-                chose(n) => { if n != MixerState.channels[ch].xf { MixerState.xf-assigned(ch, n == 1 ? MixerState.channels[ch].xf : n); } }
+                chose(n) => { if n != MixerState.channels[d].xf { MixerState.xf-assigned(d, n == 1 ? MixerState.channels[d].xf : n); } }
             }
         }
         HorizontalLayout {
@@ -176,8 +181,8 @@ component SettingsPage inherits Rectangle {
 /// The centre column: MIXER / SETTINGS tabs, the EQ menu (EQ ↔ STEM ISO on both channels) and the page of the tab.
 export component StudioMixer inherits Rectangle {
     property <int> tab;
-    property <bool> stems: DeckState.decks[0].stems || DeckState.decks[1].stems;
-    property <bool> iso: MixerState.channels[0].iso || MixerState.channels[1].iso;
+    property <bool> stems: DeckState.decks[DeckState.slots[0]].stems || DeckState.decks[DeckState.slots[1]].stems;
+    property <bool> iso: MixerState.channels[DeckState.slots[0]].iso || MixerState.channels[DeckState.slots[1]].iso;
     background: Theme.panel;
     /// One knob row: what the column leaves after the tabs, the faders, the CUE row, the bus knobs and the crossfader.
     property <length> row-h: clamp((root.height - 258px) / 5, 26px, 38px);
@@ -197,8 +202,8 @@ export component StudioMixer inherits Rectangle {
                 current: root.iso ? 1 : 0;
                 list-width: 110px;
                 chose(n) => {
-                    if MixerState.channels[0].iso != (n == 1) { MixerState.iso-toggled(0); }
-                    if MixerState.channels[1].iso != (n == 1) { MixerState.iso-toggled(1); }
+                    if MixerState.channels[DeckState.slots[0]].iso != (n == 1) { MixerState.iso-toggled(DeckState.slots[0]); }
+                    if MixerState.channels[DeckState.slots[1]].iso != (n == 1) { MixerState.iso-toggled(DeckState.slots[1]); }
                 }
             }
         }

@@ -10,7 +10,9 @@ import { BigButton, Caption, PillTabs } from "parts.slint";
 /// then the unit's channel (CH n / MST) over its BEAT ◀ ▶ selector, which steps the lit slot's beat fraction.
 export component StudioFx inherits Rectangle {
     in property <int> index;
-    property <FxUnit> u: FxState.units[root.index];
+    /// The FX unit of this deck's side (FX1 left, FX2 right), whichever deck the slot draws; `index` is the deck whose channel it takes.
+    property <int> unit: Math.mod(root.index, 2);
+    property <FxUnit> u: FxState.units[root.unit];
     property <length> gap: Theme.studio-gap;
     HorizontalLayout {
         spacing: root.gap;
@@ -29,8 +31,8 @@ export component StudioFx inherits Rectangle {
                     font-size: Theme.font-xs;
                     active: s.on;
                     active-color: Theme.play;
-                    tooltip: @tr("FX{}-{} ON", root.index + 1, i + 1);
-                    clicked => { FxState.toggled(root.index, i); }
+                    tooltip: @tr("FX{}-{} ON", root.unit + 1, i + 1);
+                    clicked => { FxState.toggled(root.unit, i); }
                 }
                 Dropdown {
                     options: FxState.effects;
@@ -39,7 +41,7 @@ export component StudioFx inherits Rectangle {
                     min-width: 40px;
                     height: 22px;
                     y: (parent.height - self.height) / 2;
-                    chose(e) => { FxState.effect-selected(root.index, i, e); }
+                    chose(e) => { FxState.effect-selected(root.unit, i, e); }
                 }
                 Knob {
                     width: 30px;
@@ -48,7 +50,7 @@ export component StudioFx inherits Rectangle {
                     horizontal-stretch: 0;
                     value: s.level;
                     arc-color: Theme.accent;
-                    edited(v) => { FxState.level-edited(root.index, i, v); }
+                    edited(v) => { FxState.level-edited(root.unit, i, v); }
                 }
             }
         }
@@ -63,12 +65,12 @@ export component StudioFx inherits Rectangle {
                 font-size: Theme.font-xs;
                 active: root.u.assign == root.index;
                 tooltip: @tr("The unit's channel: this deck, or the master (click to switch)");
-                clicked => { FxState.assign-selected(root.index, root.u.assign == root.index ? 4 : root.index); }
+                clicked => { FxState.assign-selected(root.unit, root.u.assign == root.index ? 4 : root.index); }
             }
             HorizontalLayout {
                 height: 22px;
                 spacing: 2px;
-                Chip { text: "◀"; width: 24px; horizontal-stretch: 0; tooltip: @tr("BEAT down (the lit slot)"); clicked => { FxState.beat-step(root.index, -1); } }
+                Chip { text: "◀"; width: 24px; horizontal-stretch: 0; tooltip: @tr("BEAT down (the lit slot)"); clicked => { FxState.beat-step(root.unit, -1); } }
                 Text {
                     text: root.u.slots.length > root.u.target ? root.u.slots[root.u.target].beat-text : "";
                     horizontal-alignment: center;
@@ -78,7 +80,7 @@ export component StudioFx inherits Rectangle {
                     font-size: Theme.font-xs;
                     font-weight: Theme.weight-bold;
                 }
-                Chip { text: "▶"; width: 24px; horizontal-stretch: 0; tooltip: @tr("BEAT up (the lit slot)"); clicked => { FxState.beat-step(root.index, 1); } }
+                Chip { text: "▶"; width: 24px; horizontal-stretch: 0; tooltip: @tr("BEAT up (the lit slot)"); clicked => { FxState.beat-step(root.unit, 1); } }
             }
         }
     }

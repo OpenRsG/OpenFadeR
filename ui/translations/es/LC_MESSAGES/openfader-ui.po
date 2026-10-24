@@ -356,7 +356,7 @@ msgid "Split Screen"
 msgstr "Pantalla dividida"
 
 #: ui/app.slint:290
-#: src/app/prefs/view.rs:409
+#: src/app/prefs/view.rs:417
 msgid "Mixer"
 msgstr "Mezclador"
 
@@ -377,7 +377,7 @@ msgid "BEAT LAB"
 msgstr "BEAT LAB"
 
 #: ui/app.slint:295
-#: src/app/prefs/view.rs:340
+#: src/app/prefs/view.rs:348
 msgid "Related Tracks"
 msgstr "Pistas relacionadas"
 
@@ -478,13 +478,13 @@ msgid "MIX POINT LINK"
 msgstr "MIX POINT LINK"
 
 #: ui/app.slint:492
-#: ui/studio/deck-controls.slint:279
+#: ui/studio/deck-controls.slint:281
 #: src/app/deck/pads/mod.rs:91
 msgid "SAMPLER"
 msgstr "SAMPLER"
 
 #: ui/app.slint:493
-#: ui/studio/mixer.slint:191
+#: ui/studio/mixer.slint:196
 #: src/app/prefs/controller/mixer.rs:40
 msgid "MIXER"
 msgstr "MEZCLADOR"
@@ -943,7 +943,7 @@ msgstr "OMITIR"
 
 #: ui/browser.slint:245
 #: ui/mixer.slint:138
-#: ui/studio/mixer.slint:88
+#: ui/studio/mixer.slint:92
 msgid "FILTER"
 msgstr "FILTER"
 
@@ -1153,7 +1153,7 @@ msgid "Headphone preview: tap the waveform to seek"
 msgstr "Previa en auriculares: toca la forma de onda para desplazarte"
 
 #: ui/browser.slint:398
-#: src/app/prefs/view.rs:354
+#: src/app/prefs/view.rs:362
 msgid "Playlist Palette"
 msgstr "Paleta de listas"
 
@@ -1341,31 +1341,31 @@ msgstr "LOOP"
 
 #: ui/deck-controls.slint:209
 #: ui/deck-wave-v.slint:105
-#: ui/deck-wave.slint:149
+#: ui/deck-wave.slint:176
 msgid "IN"
 msgstr "IN"
 
 #: ui/deck-controls.slint:210
 #: ui/deck-wave-v.slint:97
-#: ui/deck-wave.slint:142
+#: ui/deck-wave.slint:169
 msgid "OUT"
 msgstr "OUT"
 
 #: ui/deck-controls.slint:212
 #: ui/exportmode-parts.slint:230
-#: ui/studio/deck-controls.slint:143
+#: ui/studio/deck-controls.slint:145
 msgid "RELOOP"
 msgstr "RELOOP"
 
 #: ui/deck-controls.slint:218
 #: ui/exportmode-parts.slint:204
-#: ui/studio/deck-controls.slint:105
+#: ui/studio/deck-controls.slint:107
 msgid "Halve the loop"
 msgstr "Reducir el LOOP a la mitad"
 
 #: ui/deck-controls.slint:224
 #: ui/exportmode-parts.slint:225
-#: ui/studio/deck-controls.slint:133
+#: ui/studio/deck-controls.slint:135
 msgid "Double the loop"
 msgstr "Duplicar el LOOP"
 
@@ -1400,7 +1400,7 @@ msgid "Match the key of the other deck"
 msgstr "Igualar la KEY del otro deck"
 
 #: ui/deck-header.slint:66
-#: ui/studio/deck-controls.slint:258
+#: ui/studio/deck-controls.slint:260
 msgid "Beat sync to the master"
 msgstr "Sincronizar beats con el MASTER"
 
@@ -1509,7 +1509,7 @@ msgid "Remove the tempo section at the playhead"
 msgstr "Quitar la sección de tempo en el cabezal"
 
 #: ui/deck-panel.slint:116
-#: ui/studio/deck-controls.slint:292
+#: ui/studio/deck-controls.slint:294
 msgid "Delete a hot cue: press its pad"
 msgstr "Eliminar un HOT CUE: pulsa su PAD"
 
@@ -1617,19 +1617,19 @@ msgid "Memory cue"
 msgstr "Cue MEMORY"
 
 #: ui/deck-wave-v.slint:112
-#: ui/deck-wave.slint:156
+#: ui/deck-wave.slint:183
 #: ui/mixpoint.slint:132
 msgid "SILENT"
 msgstr "SILENCIO"
 
 #: ui/deck-wave-v.slint:165
-#: ui/deck-wave.slint:209
+#: ui/deck-wave.slint:236
 #: ui/touch.slint:108
 msgid "Zoom in"
 msgstr "Acercar"
 
 #: ui/deck-wave-v.slint:167
-#: ui/deck-wave.slint:207
+#: ui/deck-wave.slint:234
 #: ui/touch.slint:106
 msgid "Zoom out"
 msgstr "Alejar"
@@ -1902,7 +1902,7 @@ msgstr "STOP"
 
 #: ui/edit.slint:120
 #: ui/sampler.slint:153
-#: ui/studio/deck-controls.slint:234
+#: ui/studio/deck-controls.slint:236
 msgid "PLAY"
 msgstr "PLAY"
 
@@ -2234,19 +2234,19 @@ msgstr "A-GAIN"
 
 #: ui/exportmode-parts.slint:107
 #: ui/mixer.slint:118
-#: ui/studio/mixer.slint:88
+#: ui/studio/mixer.slint:92
 msgid "HIGH"
 msgstr "HIGH"
 
 #: ui/exportmode-parts.slint:107
 #: ui/mixer.slint:118
-#: ui/studio/mixer.slint:88
+#: ui/studio/mixer.slint:92
 msgid "MID"
 msgstr "MID"
 
 #: ui/exportmode-parts.slint:107
 #: ui/mixer.slint:118
-#: ui/studio/mixer.slint:88
+#: ui/studio/mixer.slint:92
 msgid "LOW"
 msgstr "LOW"
 
@@ -2359,13 +2359,13 @@ msgstr "ENTRADA"
 
 #: ui/exportmode.slint:175
 #: ui/mixer.slint:259
-#: ui/studio/mixer.slint:165
+#: ui/studio/mixer.slint:170
 msgid "● ARMED"
 msgstr "● ARMADO"
 
 #: ui/exportmode.slint:175
 #: ui/mixer.slint:259
-#: ui/studio/mixer.slint:165
+#: ui/studio/mixer.slint:170
 msgid "● REC"
 msgstr "● REC"
 
@@ -2374,7 +2374,7 @@ msgid "Start / stop recording"
 msgstr "Iniciar / detener grabación"
 
 #: ui/fx.slint:104
-#: ui/studio/deck-controls.slint:32
+#: ui/studio/deck-controls.slint:34
 msgid "FX{}-{} ON"
 msgstr "FX{}-{} ON"
 
@@ -2384,12 +2384,12 @@ msgstr "Beat (encendido: BEAT ◀ ▶ cambia este slot)"
 
 #: ui/fx.slint:125
 #: ui/fx.slint:226
-#: ui/studio/deck-controls.slint:61
+#: ui/studio/deck-controls.slint:63
 msgid "MST"
 msgstr "MST"
 
 #: ui/fx.slint:125
-#: ui/studio/deck-controls.slint:61
+#: ui/studio/deck-controls.slint:63
 msgid "CH{}"
 msgstr "CH{}"
 
@@ -2452,12 +2452,12 @@ msgid "SAMPLE"
 msgstr "MUESTRA"
 
 #: ui/fx.slint:216
-#: ui/studio/deck-controls.slint:71
+#: ui/studio/deck-controls.slint:73
 msgid "BEAT down (the lit slot)"
 msgstr "BEAT abajo (el slot encendido)"
 
 #: ui/fx.slint:217
-#: ui/studio/deck-controls.slint:81
+#: ui/studio/deck-controls.slint:83
 msgid "BEAT up (the lit slot)"
 msgstr "BEAT arriba (el slot encendido)"
 
@@ -2764,17 +2764,17 @@ msgid "AMBIENT"
 msgstr "AMBIENTE"
 
 #: ui/lighting.slint:152
-#: src/app/prefs/view.rs:98
+#: src/app/prefs/view.rs:102
 msgid "RED"
 msgstr "ROJO"
 
 #: ui/lighting.slint:152
-#: src/app/prefs/view.rs:98
+#: src/app/prefs/view.rs:102
 msgid "GREEN"
 msgstr "VERDE"
 
 #: ui/lighting.slint:152
-#: src/app/prefs/view.rs:397
+#: src/app/prefs/view.rs:405
 #: src/app/prefs/view.rs:39
 msgid "BLUE"
 msgstr "AZUL"
@@ -2862,131 +2862,131 @@ msgstr "Capturado {} — elige una acción (A / B = deck):"
 msgid "Bound {}"
 msgstr "Asignado {}"
 
-#: ui/mixer-touch.slint:16
+#: ui/mixer-touch.slint:17
 msgid " Pause"
 msgstr " Pausa"
 
-#: ui/mixer-touch.slint:16
+#: ui/mixer-touch.slint:17
 msgid " Play"
 msgstr " Play"
 
-#: ui/mixer-touch.slint:19
+#: ui/mixer-touch.slint:20
 msgid "Headphone cue deck {}"
 msgstr "CUE de auriculares del deck {}"
 
-#: ui/mixer-touch.slint:27
-#: ui/mixer-touch.slint:44
+#: ui/mixer-touch.slint:28
+#: ui/mixer-touch.slint:45
 msgid "Mid"
 msgstr "Mid"
 
-#: ui/mixer-touch.slint:27
+#: ui/mixer-touch.slint:28
 msgid "Center crossfader"
 msgstr "Centrar crossfader"
 
-#: ui/mixer-touch.slint:41
-#: ui/mixer-touch.slint:77
+#: ui/mixer-touch.slint:42
+#: ui/mixer-touch.slint:78
 #: ui/mixer.slint:158
 msgid "AUX"
 msgstr "AUX"
 
-#: ui/mixer-touch.slint:41
-#: ui/mixer-touch.slint:76
+#: ui/mixer-touch.slint:42
+#: ui/mixer-touch.slint:77
 #: ui/touch.slint:153
 msgid "Deck {}"
 msgstr "Deck {}"
 
-#: ui/mixer-touch.slint:44
+#: ui/mixer-touch.slint:45
 msgid "Trim"
 msgstr "Trim"
 
-#: ui/mixer-touch.slint:44
+#: ui/mixer-touch.slint:45
 msgid "High"
 msgstr "High"
 
-#: ui/mixer-touch.slint:44
+#: ui/mixer-touch.slint:45
 msgid "Low"
 msgstr "Low"
 
-#: ui/mixer-touch.slint:44
+#: ui/mixer-touch.slint:45
 msgid "Filter"
 msgstr "Filtro"
 
-#: ui/mixer-touch.slint:44
+#: ui/mixer-touch.slint:45
 #: ui/mixer.slint:118
 msgid "CFX"
 msgstr "CFX"
 
-#: ui/mixer-touch.slint:46
+#: ui/mixer-touch.slint:47
 msgid "Inst"
 msgstr "Inst"
 
-#: ui/mixer-touch.slint:46
+#: ui/mixer-touch.slint:47
 #: src/app/prefs/analysis.rs:126
 msgid "Vocal"
 msgstr "Voz"
 
-#: ui/mixer-touch.slint:46
+#: ui/mixer-touch.slint:47
 msgid "Drums"
 msgstr "Batería"
 
-#: ui/mixer-touch.slint:55
-#: ui/studio/mixer.slint:196
+#: ui/mixer-touch.slint:56
+#: ui/studio/mixer.slint:201
 msgid "STEM ISO"
 msgstr "STEM ISO"
 
-#: ui/mixer-touch.slint:56
+#: ui/mixer-touch.slint:57
 msgid "AUX ON"
 msgstr "AUX ON"
 
-#: ui/mixer-touch.slint:58
+#: ui/mixer-touch.slint:59
 msgid "Crossfader A"
 msgstr "Crossfader A"
 
-#: ui/mixer-touch.slint:58
+#: ui/mixer-touch.slint:59
 msgid "Through"
 msgstr "Through"
 
-#: ui/mixer-touch.slint:58
+#: ui/mixer-touch.slint:59
 msgid "Crossfader B"
 msgstr "Crossfader B"
 
-#: ui/mixer-touch.slint:82
+#: ui/mixer-touch.slint:83
 msgid "Master"
 msgstr "Master"
 
-#: ui/mixer-touch.slint:82
+#: ui/mixer-touch.slint:83
 msgid "Headphone mix"
 msgstr "Mezcla de auriculares"
 
-#: ui/mixer-touch.slint:82
+#: ui/mixer-touch.slint:83
 msgid "Headphone level"
 msgstr "Nivel de auriculares"
 
-#: ui/mixer-touch.slint:93
+#: ui/mixer-touch.slint:94
 msgid "Split cue"
 msgstr "Split cue"
 
-#: ui/mixer-touch.slint:94
+#: ui/mixer-touch.slint:95
 msgid "Stop recording"
 msgstr "Detener grabación"
 
-#: ui/mixer-touch.slint:94
+#: ui/mixer-touch.slint:95
 msgid "Record"
 msgstr "Grabar"
 
-#: ui/mixer-touch.slint:96
+#: ui/mixer-touch.slint:97
 msgid "Crossfader: {}"
 msgstr "Crossfader: {}"
 
-#: ui/mixer-touch.slint:96
+#: ui/mixer-touch.slint:97
 msgid "Smooth"
 msgstr "Suave"
 
-#: ui/mixer-touch.slint:96
+#: ui/mixer-touch.slint:97
 msgid "Sharp"
 msgstr "Cortante"
 
-#: ui/mixer-touch.slint:96
+#: ui/mixer-touch.slint:97
 msgid "Constant"
 msgstr "Constante"
 
@@ -3028,39 +3028,39 @@ msgid "HP LEVEL"
 msgstr "NIVEL HP"
 
 #: ui/mixer.slint:244
-#: ui/studio/mixer.slint:163
+#: ui/studio/mixer.slint:168
 msgid "SPLIT"
 msgstr "SPLIT"
 
 #: ui/mixer.slint:244
-#: ui/studio/mixer.slint:163
+#: ui/studio/mixer.slint:168
 msgid "Mono HP left / master right"
 msgstr "HP mono a la izquierda / master a la derecha"
 
 #: ui/mixer.slint:265
-#: ui/studio/mixer.slint:168
+#: ui/studio/mixer.slint:173
 msgid "Waiting for audio, click to cancel"
 msgstr "Esperando audio, haz clic para cancelar"
 
 #: ui/mixer.slint:265
-#: ui/studio/mixer.slint:168
+#: ui/studio/mixer.slint:173
 msgid "Record master"
 msgstr "Grabar master"
 
 #: ui/mixer.slint:289
-#: ui/studio/mixer.slint:143
+#: ui/studio/mixer.slint:147
 #: src/app/prefs/mod.rs:67
 msgid "SMOOTH"
 msgstr "SUAVE"
 
 #: ui/mixer.slint:289
-#: ui/studio/mixer.slint:143
+#: ui/studio/mixer.slint:147
 #: src/app/prefs/mod.rs:67
 msgid "SHARP"
 msgstr "CORTANTE"
 
 #: ui/mixer.slint:289
-#: ui/studio/mixer.slint:143
+#: ui/studio/mixer.slint:147
 msgid "CONST"
 msgstr "CONST"
 
@@ -3631,56 +3631,56 @@ msgstr "Abrir este modo"
 msgid "VIDEO"
 msgstr "VÍDEO"
 
-#: ui/studio/deck-controls.slint:65
+#: ui/studio/deck-controls.slint:67
 msgid "The unit's channel: this deck, or the master (click to switch)"
 msgstr "El canal de la unidad: este deck, o el master (clic para cambiar)"
 
-#: ui/studio/deck-controls.slint:140
+#: ui/studio/deck-controls.slint:142
 msgid "Loop in at the playhead"
 msgstr "LOOP IN en el cabezal"
 
-#: ui/studio/deck-controls.slint:141
+#: ui/studio/deck-controls.slint:143
 msgid "Loop out at the playhead: the loop starts"
 msgstr "LOOP OUT en el cabezal: el bucle empieza"
 
-#: ui/studio/deck-controls.slint:143
+#: ui/studio/deck-controls.slint:145
 msgid "Leave the loop, or go back into the last one"
 msgstr "Salir del bucle, o volver al último"
 
-#: ui/studio/deck-controls.slint:213
-#: ui/studio/deck-controls.slint:223
+#: ui/studio/deck-controls.slint:215
+#: ui/studio/deck-controls.slint:225
 msgid "Slower"
 msgstr "Más lento"
 
-#: ui/studio/deck-controls.slint:213
-#: ui/studio/deck-controls.slint:223
+#: ui/studio/deck-controls.slint:215
+#: ui/studio/deck-controls.slint:225
 msgid "Faster"
 msgstr "Más rápido"
 
-#: ui/studio/deck-controls.slint:234
+#: ui/studio/deck-controls.slint:236
 #: ui/video.slint:153
 msgid "PAUSE"
 msgstr "PAUSA"
 
-#: ui/studio/deck-controls.slint:239
+#: ui/studio/deck-controls.slint:241
 msgid "Play / pause"
 msgstr "Reproducir / pausa"
 
-#: ui/studio/deck-controls.slint:248
+#: ui/studio/deck-controls.slint:250
 msgid "Cue: hold to preview, release to return"
 msgstr "Cue: mantén para escuchar, suelta para volver"
 
-#: ui/studio/deck-controls.slint:279
+#: ui/studio/deck-controls.slint:281
 #: src/app/prefs/analysis.rs:202
 msgid "HOT CUES"
 msgstr "HOT CUES"
 
-#: ui/studio/deck-controls.slint:279
+#: ui/studio/deck-controls.slint:281
 #: src/app/deck/pads/mod.rs:86
 msgid "PAD FX"
 msgstr "PAD FX"
 
-#: ui/studio/deck-controls.slint:279
+#: ui/studio/deck-controls.slint:281
 msgid "BEAT JUMP"
 msgstr "BEAT JUMP"
 
@@ -3705,63 +3705,54 @@ msgid "History of this session"
 msgstr "Historial de esta sesión"
 
 #: ui/studio/library.slint:97
-msgid "LOAD 1"
-msgstr "CARGAR 1"
+#: ui/studio/library.slint:98
+msgid "LOAD {}"
+msgstr "CARGAR {}"
 
 #: ui/studio/library.slint:97
-msgid "Load the chosen track on deck 1"
-msgstr "Cargar la pista elegida en el deck 1"
-
 #: ui/studio/library.slint:98
-msgid "LOAD 2"
-msgstr "CARGAR 2"
+msgid "Load the chosen track on deck {}"
+msgstr "Cargar la pista elegida en el deck {}"
 
-#: ui/studio/library.slint:98
-msgid "Load the chosen track on deck 2"
-msgstr "Cargar la pista elegida en el deck 2"
+#: ui/studio/mixer.slint:114
+#: ui/studio/mixer.slint:115
+msgid "Headphone CUE, deck {}"
+msgstr "CUE auriculares, deck {}"
 
-#: ui/studio/mixer.slint:110
-msgid "Headphone CUE, deck 1"
-msgstr "CUE auriculares, deck 1"
-
-#: ui/studio/mixer.slint:111
-msgid "Headphone CUE, deck 2"
-msgstr "CUE auriculares, deck 2"
-
-#: ui/studio/mixer.slint:116
+#: ui/studio/mixer.slint:120
 msgid "PHONES"
 msgstr "AURIC."
 
-#: ui/studio/mixer.slint:117
+#: ui/studio/mixer.slint:121
 msgid "MIX"
 msgstr "MIX"
 
-#: ui/studio/mixer.slint:139
+#: ui/studio/mixer.slint:143
 msgid "FILTER KNOB (COLOR FX)"
 msgstr "MANDO FILTRO (COLOR FX)"
 
-#: ui/studio/mixer.slint:141
+#: ui/studio/mixer.slint:145
 #: src/app/prefs/controller/mixer.rs:55
 msgid "CROSSFADER CURVE"
 msgstr "CURVA DEL CROSSFADER"
 
-#: ui/studio/mixer.slint:153
+#: ui/studio/mixer.slint:158
 msgid "DECK {} ON THE CROSSFADER"
 msgstr "DECK {} EN EL CROSSFADER"
 
-#: ui/studio/mixer.slint:155
+#: ui/studio/mixer.slint:160
 msgid "A"
 msgstr "A"
 
-#: ui/studio/mixer.slint:155
+#: ui/studio/mixer.slint:160
 msgid "THRU"
 msgstr "THRU"
 
-#: ui/studio/mixer.slint:155
+#: ui/studio/mixer.slint:160
 msgid "B"
 msgstr "B"
 
-#: ui/studio/mixer.slint:196
+#: ui/studio/mixer.slint:201
 #: src/app/prefs/controller/mixer.rs:46
 #: src/app/prefs/controller/mod.rs:34
 msgid "EQ"
@@ -3772,12 +3763,9 @@ msgid "TITLE"
 msgstr "TÍTULO"
 
 #: ui/studio/table.slint:224
-msgid "Load to deck 1"
-msgstr "Cargar en el deck 1"
-
 #: ui/studio/table.slint:225
-msgid "Load to deck 2"
-msgstr "Cargar en el deck 2"
+msgid "Load to deck {}"
+msgstr "Cargar en el deck {}"
 
 #: ui/themes.slint:162
 msgid "yours"
@@ -4182,18 +4170,24 @@ msgstr "Todos los comandos"
 
 #: ui/touch.slint:88
 #: ui/touch.slint:88
+#: ui/touch.slint:88
 msgid "Deck A"
 msgstr "Deck A"
 
+#: ui/touch.slint:88
 #: ui/touch.slint:88
 #: ui/touch.slint:88
 msgid "Deck B"
 msgstr "Deck B"
 
 #: ui/touch.slint:88
+#: ui/touch.slint:88
+#: ui/touch.slint:88
 msgid "Deck C"
 msgstr "Deck C"
 
+#: ui/touch.slint:88
+#: ui/touch.slint:88
 #: ui/touch.slint:88
 msgid "Deck D"
 msgstr "Deck D"
@@ -4555,7 +4549,7 @@ msgstr "carátulas: {} encontradas, {} no encontradas, {} ya tenían una, {} fal
 
 #: src/app/artwork/picker.rs:38
 #: src/app/browser/health.rs:280
-#: src/app/library/autocue.rs:198
+#: src/app/library/autocue.rs:199
 msgid "choose a track first"
 msgstr "elige antes una pista"
 
@@ -5240,7 +5234,7 @@ msgid "{}  ({}, {} free)"
 msgstr "{}  ({}, {} libres)"
 
 #: src/app/browser/sources.rs:77
-#: src/app/prefs/view.rs:347
+#: src/app/prefs/view.rs:355
 msgid "Explorer"
 msgstr "Explorador"
 
@@ -5938,7 +5932,7 @@ msgid "loading… · {}"
 msgstr "cargando… · {}"
 
 #: src/app/deck/load.rs:573
-#: src/app/midi/session.rs:261
+#: src/app/midi/session.rs:263
 msgid "audio: {}"
 msgstr "audio: {}"
 
@@ -6030,12 +6024,12 @@ msgstr "MIX OUT: elige el deck que está sonando"
 msgid "MIX IN: pick a stopped deck"
 msgstr "MIX IN: elige un deck detenido"
 
-#: src/app/deck/mod.rs:271
+#: src/app/deck/mod.rs:283
 #: src/app/deck/pads/mod.rs:460
 msgid "Select a track, then LOAD"
 msgstr "Selecciona una pista y luego LOAD"
 
-#: src/app/deck/mod.rs:273
+#: src/app/deck/mod.rs:285
 msgid "audio disabled: {}"
 msgstr "audio desactivado: {}"
 
@@ -6254,7 +6248,7 @@ msgstr "todas las frases eliminadas"
 msgid "phrases back to the analysis"
 msgstr "frases restablecidas al análisis"
 
-#: src/app/deck/quantize.rs:134
+#: src/app/deck/quantize.rs:141
 msgid "quantize: jumping on the next beat…"
 msgstr "quantize: saltando en el siguiente beat…"
 
@@ -6624,19 +6618,19 @@ msgstr "el proceso de trabajo se detuvo"
 msgid "Cancelled: the device was left as it was"
 msgstr "Cancelado: el dispositivo se dejó como estaba"
 
-#: src/app/device/link.rs:95
+#: src/app/device/link.rs:114
 msgid "Matching tracks"
 msgstr "Emparejando pistas"
 
-#: src/app/device/link.rs:116
+#: src/app/device/link.rs:135
 msgid "{}: cue sync filled {} track(s) here and {} on the device"
 msgstr "{}: la sincronización de cues rellenó {} pista(s) aquí y {} en el dispositivo"
 
-#: src/app/device/link.rs:220
+#: src/app/device/link.rs:256
 msgid "Writing cues"
 msgstr "Escribiendo cues"
 
-#: src/app/device/link.rs:224
+#: src/app/device/link.rs:260
 msgid "cues of {} track(s) written to {}"
 msgstr "cues de {} pista(s) escritos en {}"
 
@@ -6644,43 +6638,43 @@ msgstr "cues de {} pista(s) escritos en {}"
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr "Hay otra tarea en curso: espera o cancélala (X)"
 
-#: src/app/device/mod.rs:143
+#: src/app/device/mod.rs:144
 msgid " — {} warning(s), first: {}"
 msgstr " — {} advertencia(s), la primera: {}"
 
-#: src/app/device/mod.rs:145
+#: src/app/device/mod.rs:146
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr "exportadas {} pistas ({} nuevas, {} actualizadas) y {} listas a {}{}{}"
 
-#: src/app/device/mod.rs:164
+#: src/app/device/mod.rs:165
 msgid " — Update Collection baseline not recorded: {}"
 msgstr " — línea base de Actualizar colección no registrada: {}"
 
-#: src/app/device/mod.rs:189
+#: src/app/device/mod.rs:190
 msgid "failed: {}"
 msgstr "error: {}"
 
-#: src/app/device/mod.rs:243
+#: src/app/device/mod.rs:244
 msgid "That device is not mounted any more"
 msgstr "Ese dispositivo ya no está montado"
 
-#: src/app/device/mod.rs:252
+#: src/app/device/mod.rs:253
 msgid "Choose a device first"
 msgstr "Elige primero un dispositivo"
 
-#: src/app/device/mod.rs:264
+#: src/app/device/mod.rs:265
 msgid "mounted read-only"
 msgstr "montado solo lectura"
 
-#: src/app/device/mod.rs:273
+#: src/app/device/mod.rs:274
 msgid "cannot read the collection: {}"
 msgstr "no se puede leer la colección: {}"
 
-#: src/app/device/mod.rs:311
+#: src/app/device/mod.rs:312
 msgid "{}: its plugin does not offer that"
 msgstr "{}: su plugin no ofrece eso"
 
-#: src/app/device/mod.rs:435
+#: src/app/device/mod.rs:436
 msgid "Cancelling…"
 msgstr "Cancelando…"
 
@@ -7275,47 +7269,47 @@ msgstr "enfocar el cuadro de búsqueda"
 msgid "show / hide this help"
 msgstr "mostrar / ocultar esta ayuda"
 
-#: src/app/library/autocue.rs:218
+#: src/app/library/autocue.rs:219
 msgid "“{}” already has cues. Replace its cue point and hot cues with the automatic ones?"
 msgstr "«{}» ya tiene cues. ¿Reemplazar su cue point y sus hot cues por los automáticos?"
 
-#: src/app/library/autocue.rs:222
+#: src/app/library/autocue.rs:223
 msgid "{} of {} tracks already have cues. Replace their cue point and hot cues with the automatic ones?"
 msgstr "{} de {} pistas ya tienen cues. ¿Reemplazar su cue point y sus hot cues por los automáticos?"
 
-#: src/app/library/autocue.rs:230
+#: src/app/library/autocue.rs:231
 msgid "MAKE AUTO CUE POINT"
 msgstr "CREAR PUNTO DE CUE AUTOMÁTICO"
 
-#: src/app/library/autocue.rs:232
+#: src/app/library/autocue.rs:233
 msgid "Replace"
 msgstr "Reemplazar"
 
-#: src/app/library/autocue.rs:233
+#: src/app/library/autocue.rs:234
 msgid "Add missing"
 msgstr "Completar"
 
-#: src/app/library/autocue.rs:253
+#: src/app/library/autocue.rs:254
 msgid "Auto cue {} of {}…"
 msgstr "Cue automático {} de {}…"
 
-#: src/app/library/autocue.rs:281
+#: src/app/library/autocue.rs:282
 msgid "Auto cue stopped: cues set on {} of {} tracks"
 msgstr "Auto cue detenido: cues puestos en {} de {} pistas"
 
-#: src/app/library/autocue.rs:287
+#: src/app/library/autocue.rs:288
 msgid "Automatic cues set on {} tracks ({} kept, {} without sound above {} dB)"
 msgstr "Cues automáticos puestos en {} pistas ({} conservadas, {} sin sonido por encima de {} dB)"
 
-#: src/app/library/autocue.rs:296
+#: src/app/library/autocue.rs:297
 msgid "{}; {} without a beat grid got no hot cues: analyse them first"
 msgstr "{}; {} sin cuadrícula de beats no recibieron hot cues: analízalas primero"
 
-#: src/app/library/autocue.rs:303
+#: src/app/library/autocue.rs:304
 msgid "{}; {} could not be read"
 msgstr "{}; {} no se pudieron leer"
 
-#: src/app/library/autocue.rs:306
+#: src/app/library/autocue.rs:307
 msgid "{}; existing cues kept: Prohibit overwriting CUEs is on"
 msgstr "{}; cues existentes conservados: Prohibir sobrescribir CUEs está activado"
 
@@ -7454,7 +7448,7 @@ msgstr "Una carpeta de música: sus archivos y subcarpetas se sincronizan con la
 msgid "A library file another app wrote, read by an enabled library plugin: its tracks and playlists are synced into the Collection."
 msgstr "Un archivo de biblioteca escrito por otra aplicación, leído por un plugin de biblioteca activado: sus pistas y listas se sincronizan con la Colección."
 
-#: src/app/library/dialog.rs:303
+#: src/app/library/dialog.rs:301
 msgid "cannot open {}: {}"
 msgstr "no se puede abrir {}: {}"
 
@@ -8052,27 +8046,23 @@ msgstr "sin carpeta de configuración (define HOME)"
 msgid "{} is not a mapping file name"
 msgstr "{} no es un nombre de archivo de mapeo"
 
-#: src/app/midi/input.rs:100
-msgid "deck 3/4 layer ignored in the 2-deck layout (4 DECKS chip or D switches)"
-msgstr "capa de deck 3/4 ignorada en la disposición de 2 decks (chip 4 DECKS o interruptores D)"
-
-#: src/app/midi/input.rs:175
+#: src/app/midi/input.rs:171
 msgid "DUAL DECK {} + {} {}"
 msgstr "DUAL DECK {} + {} {}"
 
-#: src/app/midi/input.rs:179
+#: src/app/midi/input.rs:175
 msgid "on"
 msgstr "activado"
 
-#: src/app/midi/input.rs:179
+#: src/app/midi/input.rs:175
 msgid "off"
 msgstr "desactivado"
 
-#: src/app/midi/input.rs:223
+#: src/app/midi/input.rs:222
 msgid "controller decks: {}"
 msgstr "decks del controlador: {}"
 
-#: src/app/midi/layer.rs:44
+#: src/app/midi/layer.rs:38
 msgid "left {}, right {}"
 msgstr "izquierda {}, derecha {}"
 
@@ -8132,87 +8122,87 @@ msgstr "ningún puerto de salida MIDI coincide con {}"
 msgid "connected · {} · {}"
 msgstr "conectado · {} · {}"
 
-#: src/app/midi/session.rs:139
+#: src/app/midi/session.rs:141
 #: src/app/prefs/controller/drivers.rs:82
 msgid "no MIDI input ports"
 msgstr "sin puertos de entrada MIDI"
 
-#: src/app/midi/session.rs:148
-#: src/app/midi/wire.rs:103
+#: src/app/midi/session.rs:150
+#: src/app/midi/wire.rs:102
 msgid "MIDI unavailable: {}"
 msgstr "MIDI no disponible: {}"
 
-#: src/app/midi/session.rs:164
+#: src/app/midi/session.rs:166
 msgid "{} disconnected"
 msgstr "{} desconectado"
 
-#: src/app/midi/session.rs:186
+#: src/app/midi/session.rs:188
 msgid "audio unchanged"
 msgstr "audio sin cambios"
 
-#: src/app/midi/session.rs:187
+#: src/app/midi/session.rs:189
 msgid "no state dump"
 msgstr "sin volcado de estado"
 
-#: src/app/midi/session.rs:193
+#: src/app/midi/session.rs:195
 msgid "{} connected"
 msgstr "{} conectado"
 
-#: src/app/midi/session.rs:209
+#: src/app/midi/session.rs:211
 msgid "{}: {} bindings, {} LEDs"
 msgstr "{}: {} asignaciones, {} LED"
 
-#: src/app/midi/session.rs:224
+#: src/app/midi/session.rs:226
 msgid "no LED output: {}"
 msgstr "sin salida de LED: {}"
 
-#: src/app/midi/session.rs:241
+#: src/app/midi/session.rs:243
 msgid "no controller mapping for these ports (mappings/*.xml)"
 msgstr "sin mapeo de controlador para estos puertos (mappings/*.xml)"
 
-#: src/app/midi/session.rs:245
+#: src/app/midi/session.rs:247
 msgid "controller mapping failed"
 msgstr "error en el mapeo del controlador"
 
-#: src/app/midi/session.rs:255
-#: src/app/midi/session.rs:302
+#: src/app/midi/session.rs:257
+#: src/app/midi/session.rs:304
 msgid "audio unchanged (PREFS: controller audio off)"
 msgstr "audio sin cambios (PREFS: audio del controlador desactivado)"
 
-#: src/app/midi/session.rs:262
+#: src/app/midi/session.rs:264
 msgid "Audio output: {}"
 msgstr "Salida de audio: {}"
 
-#: src/app/midi/session.rs:266
+#: src/app/midi/session.rs:268
 msgid "audio unchanged (no output device of its own)"
 msgstr "audio sin cambios (sin dispositivo de salida propio)"
 
-#: src/app/midi/session.rs:267
+#: src/app/midi/session.rs:269
 msgid "Audio output: unchanged"
 msgstr "Salida de audio: sin cambios"
 
-#: src/app/midi/session.rs:282
+#: src/app/midi/session.rs:284
 msgid "Audio output: restored"
 msgstr "Salida de audio: restaurada"
 
-#: src/app/midi/session.rs:286
+#: src/app/midi/session.rs:288
 msgid "Audio output: could not restore"
 msgstr "Salida de audio: no se pudo restaurar"
 
-#: src/app/midi/session.rs:318
+#: src/app/midi/session.rs:320
 #: src/app/mixer/mod.rs:173
 msgid "Headphones: {}"
 msgstr "Auriculares: {}"
 
-#: src/app/midi/session.rs:334
+#: src/app/midi/session.rs:336
 msgid "state dump requested"
 msgstr "volcado de estado solicitado"
 
-#: src/app/midi/session.rs:369
+#: src/app/midi/session.rs:371
 msgid "no reply to the state dump: controls sync on their first move"
 msgstr "sin respuesta al volcado de estado: los controles se sincronizan al moverlos por primera vez"
 
-#: src/app/midi/session.rs:371
+#: src/app/midi/session.rs:373
 msgid "state dump: {} of {} reports applied"
 msgstr "volcado de estado: {} de {} informes aplicados"
 
@@ -8595,7 +8585,7 @@ msgstr "KEY DETECTOR"
 
 #: src/app/prefs/analysis.rs:147
 #: src/app/prefs/analysis.rs:40
-#: src/app/prefs/view.rs:256
+#: src/app/prefs/view.rs:262
 msgid "CLASSIC"
 msgstr "CLÁSICO"
 
@@ -8635,7 +8625,7 @@ msgstr "CREAR CUE DURANTE EL ANÁLISIS"
 
 #: src/app/prefs/analysis.rs:172
 #: src/app/prefs/analysis.rs:31
-#: src/app/prefs/view.rs:389
+#: src/app/prefs/view.rs:397
 msgid "MANUAL"
 msgstr "MANUAL"
 
@@ -9924,311 +9914,319 @@ msgstr "CARPETA…"
 msgid "CONSTANT"
 msgstr "CONSTANTE"
 
-#: src/app/prefs/view.rs:255
+#: src/app/prefs/view.rs:261
 msgid "KEY DISPLAY"
 msgstr "VISUALIZACIÓN DE KEY"
 
-#: src/app/prefs/view.rs:256
+#: src/app/prefs/view.rs:262
 msgid "ALPHANUMERIC"
 msgstr "ALFANUMÉRICO"
 
-#: src/app/prefs/view.rs:256
+#: src/app/prefs/view.rs:262
 msgid "OPEN KEY"
 msgstr "OPEN KEY"
 
-#: src/app/prefs/view.rs:256
+#: src/app/prefs/view.rs:262
 #: src/app/prefs/view.rs:20
 msgid "DATABASE"
 msgstr "BASE DE DATOS"
 
-#: src/app/prefs/view.rs:261
+#: src/app/prefs/view.rs:267
 msgid "DISPLAY TYPE"
 msgstr "TIPO DE VISUALIZACIÓN"
 
-#: src/app/prefs/view.rs:264
+#: src/app/prefs/view.rs:270
 msgid "LANGUAGE"
 msgstr "IDIOMA"
 
-#: src/app/prefs/view.rs:266
-#: src/app/prefs/view.rs:118
+#: src/app/prefs/view.rs:272
+#: src/app/prefs/view.rs:122
 msgid "SYSTEM"
 msgstr "SISTEMA"
 
-#: src/app/prefs/view.rs:277
+#: src/app/prefs/view.rs:283
 msgid "Tooltips"
 msgstr "Descripciones emergentes"
 
-#: src/app/prefs/view.rs:280
+#: src/app/prefs/view.rs:286
 msgid "TEMPO DECIMAL PLACES"
 msgstr "DECIMALES DE TEMPO"
 
-#: src/app/prefs/view.rs:286
+#: src/app/prefs/view.rs:292
 msgid "Tempo fader: + at the bottom"
 msgstr "Fader de tempo: + abajo"
 
-#: src/app/prefs/view.rs:289
+#: src/app/prefs/view.rs:295
 msgid "vertical faders only; a horizontal one keeps + at the right"
 msgstr "solo faders verticales; uno horizontal mantiene + a la derecha"
 
-#: src/app/prefs/view.rs:290
+#: src/app/prefs/view.rs:296
 msgid "BROWSE"
 msgstr "EXPLORAR"
 
-#: src/app/prefs/view.rs:291
+#: src/app/prefs/view.rs:297
 msgid "FONT SIZE"
 msgstr "TAMAÑO DE FUENTE"
 
-#: src/app/prefs/view.rs:292
+#: src/app/prefs/view.rs:298
 msgid "Bold characters"
 msgstr "Caracteres en negrita"
 
-#: src/app/prefs/view.rs:293
+#: src/app/prefs/view.rs:299
 msgid "LINE SPACE"
 msgstr "ESPACIADO DE LÍNEA"
 
-#: src/app/prefs/view.rs:296
+#: src/app/prefs/view.rs:302
 msgid "Show the selected track to the center"
 msgstr "Centrar la pista seleccionada"
 
-#: src/app/prefs/view.rs:299
+#: src/app/prefs/view.rs:305
 msgid "Coloring of played tracks"
 msgstr "Colorear las pistas reproducidas"
 
-#: src/app/prefs/view.rs:302
+#: src/app/prefs/view.rs:308
 msgid "Reset the colour of played tracks when quitting"
 msgstr "Restablecer el color de las pistas reproducidas al salir"
 
-#: src/app/prefs/view.rs:306
+#: src/app/prefs/view.rs:312
 msgid "PLAYED TRACKS"
 msgstr "PISTAS REPRODUCIDAS"
 
-#: src/app/prefs/view.rs:306
+#: src/app/prefs/view.rs:312
 msgid "RESET NOW"
 msgstr "RESTABLECER YA"
 
-#: src/app/prefs/view.rs:309
+#: src/app/prefs/view.rs:315
 msgid "WAVEFORM"
 msgstr "FORMA DE ONDA"
 
-#: src/app/prefs/view.rs:312
+#: src/app/prefs/view.rs:318
 msgid "RENDERER"
 msgstr "RENDER"
 
-#: src/app/prefs/view.rs:313
+#: src/app/prefs/view.rs:319
 #: src/app/prefs/view.rs:61
 msgid "GPU"
 msgstr "GPU"
 
-#: src/app/prefs/view.rs:313
+#: src/app/prefs/view.rs:319
 #: src/app/prefs/view.rs:61
 msgid "CPU"
 msgstr "CPU"
 
-#: src/app/prefs/view.rs:316
+#: src/app/prefs/view.rs:322
 msgid "DRAWING RATE"
 msgstr "FRECUENCIA DE DIBUJO"
 
-#: src/app/prefs/view.rs:316
+#: src/app/prefs/view.rs:322
 msgid "frames / s"
 msgstr "fotogramas / s"
 
-#: src/app/prefs/view.rs:319
+#: src/app/prefs/view.rs:325
 msgid "OVERVIEW / PREVIEW"
 msgstr "VISTA GENERAL / PREVIA"
 
-#: src/app/prefs/view.rs:320
+#: src/app/prefs/view.rs:326
 #: src/app/prefs/view.rs:65
 msgid "FULL"
 msgstr "COMPLETA"
 
-#: src/app/prefs/view.rs:320
+#: src/app/prefs/view.rs:326
 #: src/app/prefs/view.rs:65
 msgid "HALF"
 msgstr "MITAD"
 
-#: src/app/prefs/view.rs:323
+#: src/app/prefs/view.rs:329
 msgid "BEAT COUNT"
 msgstr "CONTEO DE BEATS"
 
-#: src/app/prefs/view.rs:324
+#: src/app/prefs/view.rs:330
 msgid "BEAT GRID"
 msgstr "CUADRÍCULA DE BEATS"
 
-#: src/app/prefs/view.rs:324
+#: src/app/prefs/view.rs:330
 msgid "Bold: thicker lines, wider downbeats"
 msgstr "Negrita: líneas más gruesas, tiempos fuertes más anchos"
 
-#: src/app/prefs/view.rs:325
+#: src/app/prefs/view.rs:331
 msgid "HOT CUE MARKERS"
 msgstr "MARCADORES DE HOT CUE"
 
-#: src/app/prefs/view.rs:326
+#: src/app/prefs/view.rs:332
 msgid "Large: double-size flags and letters"
 msgstr "Grande: banderas y letras de doble tamaño"
 
-#: src/app/prefs/view.rs:329
+#: src/app/prefs/view.rs:333
+msgid "DECK NUMBER"
+msgstr "NÚMERO DE DECK"
+
+#: src/app/prefs/view.rs:334
+msgid "Position of the deck number on the waveforms"
+msgstr "Posición del número del deck en las ondas"
+
+#: src/app/prefs/view.rs:337
 msgid "Click on the waveform for PLAY and CUE"
 msgstr "Clic en la forma de onda para PLAY y CUE"
 
-#: src/app/prefs/view.rs:334
+#: src/app/prefs/view.rs:342
 msgid "JOG DISPLAY"
 msgstr "PANTALLA DEL JOG"
 
-#: src/app/prefs/view.rs:335
+#: src/app/prefs/view.rs:343
 msgid "CUE / SLIP"
 msgstr "CUE / SLIP"
 
-#: src/app/prefs/view.rs:335
+#: src/app/prefs/view.rs:343
 msgid "HOT CUE COUNTDOWN"
 msgstr "CUENTA ATRÁS DE HOT CUE"
 
-#: src/app/prefs/view.rs:338
+#: src/app/prefs/view.rs:346
 msgid "TRAFFIC LIGHT"
 msgstr "SEMÁFORO"
 
-#: src/app/prefs/view.rs:339
+#: src/app/prefs/view.rs:347
 msgid "LAYOUT: MEDIA BROWSER"
 msgstr "DISPOSICIÓN: EXPLORADOR DE MEDIOS"
 
-#: src/app/prefs/view.rs:341
+#: src/app/prefs/view.rs:349
 msgid "Cue Bank"
 msgstr "Cue Bank"
 
-#: src/app/prefs/view.rs:344
+#: src/app/prefs/view.rs:352
 msgid "Track Suggestion"
 msgstr "Sugerencia de pistas"
 
-#: src/app/prefs/view.rs:348
+#: src/app/prefs/view.rs:356
 msgid "LAYOUT: BROWSER PANEL"
 msgstr "DISPOSICIÓN: PANEL DEL EXPLORADOR"
 
-#: src/app/prefs/view.rs:351
+#: src/app/prefs/view.rs:359
 msgid "CUE Analysis Playlist"
 msgstr "Lista de análisis de CUE"
 
-#: src/app/prefs/view.rs:357
+#: src/app/prefs/view.rs:365
 msgid "Display Cue Markers on Preview"
 msgstr "Mostrar marcadores de cue en la vista previa"
 
-#: src/app/prefs/view.rs:362
+#: src/app/prefs/view.rs:370
 msgid "Display All Tracks in the Playlists"
 msgstr "Mostrar todas las pistas en las listas"
 
-#: src/app/prefs/view.rs:365
+#: src/app/prefs/view.rs:373
 msgid "LAYOUT: DECK"
 msgstr "DISPOSICIÓN: DECK"
 
-#: src/app/prefs/view.rs:366
+#: src/app/prefs/view.rs:374
 msgid "Display SYNC RATE"
 msgstr "Mostrar SYNC RATE"
 
-#: src/app/prefs/view.rs:369
+#: src/app/prefs/view.rs:377
 msgid "Phrase (Enlarged Waveform)"
 msgstr "Frase (forma de onda ampliada)"
 
-#: src/app/prefs/view.rs:372
+#: src/app/prefs/view.rs:380
 msgid "Phrase (Full Waveform)"
 msgstr "Frase (forma de onda completa)"
 
-#: src/app/prefs/view.rs:375
+#: src/app/prefs/view.rs:383
 msgid "Always show the types of phrases"
 msgstr "Mostrar siempre los tipos de frases"
 
-#: src/app/prefs/view.rs:380
+#: src/app/prefs/view.rs:388
 msgid "Vocal (Enlarged Waveform)"
 msgstr "Voz (forma de onda ampliada)"
 
-#: src/app/prefs/view.rs:383
+#: src/app/prefs/view.rs:391
 msgid "Vocal (Full Waveform)"
 msgstr "Voz (forma de onda completa)"
 
-#: src/app/prefs/view.rs:384
+#: src/app/prefs/view.rs:392
 msgid "EFFECT PANEL"
 msgstr "PANEL DE EFECTOS"
 
-#: src/app/prefs/view.rs:385
+#: src/app/prefs/view.rs:393
 msgid "ENLARGED WAVEFORMS"
 msgstr "FORMAS DE ONDA AMPLIADAS"
 
-#: src/app/prefs/view.rs:385
+#: src/app/prefs/view.rs:393
 msgid "deck order, 4 decks"
 msgstr "orden de decks, 4 decks"
 
-#: src/app/prefs/view.rs:388
+#: src/app/prefs/view.rs:396
 #: src/app/welcome.rs:30
 msgid "PAD MODE"
 msgstr "MODO PAD"
 
-#: src/app/prefs/view.rs:392
+#: src/app/prefs/view.rs:400
 msgid "COLOR"
 msgstr "COLOR"
 
-#: src/app/prefs/view.rs:396
+#: src/app/prefs/view.rs:404
 msgid "WAVEFORM COLOR"
 msgstr "COLOR DE FORMA DE ONDA"
 
-#: src/app/prefs/view.rs:397
+#: src/app/prefs/view.rs:405
 msgid "3BAND"
 msgstr "3BAND"
 
-#: src/app/prefs/view.rs:397
+#: src/app/prefs/view.rs:405
 #: src/app/prefs/view.rs:39
 msgid "RGB"
 msgstr "RGB"
 
-#: src/app/prefs/view.rs:400
+#: src/app/prefs/view.rs:408
 msgid "HOT CUE COLOR"
 msgstr "COLOR DE HOT CUE"
 
-#: src/app/prefs/view.rs:401
+#: src/app/prefs/view.rs:409
 msgid "PAD FX COLOR"
 msgstr "COLOR DE PAD FX"
 
-#: src/app/prefs/view.rs:404
+#: src/app/prefs/view.rs:412
 msgid "SAMPLER COLOR"
 msgstr "COLOR DE SAMPLER"
 
-#: src/app/prefs/view.rs:405
+#: src/app/prefs/view.rs:413
 msgid "SYNC WITH FREQUENCY"
 msgstr "SINCRONIZAR CON FRECUENCIA"
 
-#: src/app/prefs/view.rs:405
-#: src/app/prefs/view.rs:98
+#: src/app/prefs/view.rs:413
 #: src/app/prefs/view.rs:102
+#: src/app/prefs/view.rs:106
 msgid "PURPLE"
 msgstr "MORADO"
 
-#: src/app/prefs/view.rs:408
+#: src/app/prefs/view.rs:416
 msgid "DECK LAYOUT"
 msgstr "DISPOSICIÓN DE DECKS"
 
-#: src/app/prefs/view.rs:408
+#: src/app/prefs/view.rs:416
 msgid "enlarged waveforms"
 msgstr "formas de onda ampliadas"
 
-#: src/app/prefs/view.rs:410
+#: src/app/prefs/view.rs:418
 msgid "EXPORT LAYOUT"
 msgstr "DISPOSICIÓN DE EXPORT"
 
-#: src/app/prefs/view.rs:411
-#: src/app/prefs/view.rs:414
+#: src/app/prefs/view.rs:419
+#: src/app/prefs/view.rs:422
 msgid "DECKS"
 msgstr "DECKS"
 
-#: src/app/prefs/view.rs:415
+#: src/app/prefs/view.rs:423
 msgid "2 DECKS"
 msgstr "2 DECKS"
 
-#: src/app/prefs/view.rs:415
+#: src/app/prefs/view.rs:423
 msgid "4 DECKS"
 msgstr "4 DECKS"
 
-#: src/app/prefs/view.rs:428
-#: src/app/prefs/view.rs:430
+#: src/app/prefs/view.rs:436
+#: src/app/prefs/view.rs:438
 msgid "SKIN"
 msgstr "TEMA"
 
-#: src/app/prefs/view.rs:430
+#: src/app/prefs/view.rs:438
 msgid "see THEMES"
 msgstr "ver TEMAS"
 
@@ -10296,114 +10294,122 @@ msgid "BOLD"
 msgstr "NEGRITA"
 
 #: src/app/prefs/view.rs:78
+msgid "LEFT"
+msgstr "IZQUIERDA"
+
+#: src/app/prefs/view.rs:78
+msgid "CENTER"
+msgstr "CENTRO"
+
+#: src/app/prefs/view.rs:82
 msgid "POSITION"
 msgstr "POSICIÓN"
 
-#: src/app/prefs/view.rs:78
+#: src/app/prefs/view.rs:82
 msgid "NEXT-BARS"
 msgstr "SIG-COMPASES"
 
-#: src/app/prefs/view.rs:78
+#: src/app/prefs/view.rs:82
 msgid "NEXT-BEATS"
 msgstr "SIG-BEATS"
 
-#: src/app/prefs/view.rs:82
+#: src/app/prefs/view.rs:86
 msgid "CUE-SLIP"
 msgstr "CUE-SLIP"
 
-#: src/app/prefs/view.rs:82
+#: src/app/prefs/view.rs:86
 msgid "HOT-CUE-COUNTDOWN"
 msgstr "HOT-CUE-CUENTA-ATRÁS"
 
-#: src/app/prefs/view.rs:86
+#: src/app/prefs/view.rs:90
 msgid "SAME"
 msgstr "IGUAL"
 
-#: src/app/prefs/view.rs:86
+#: src/app/prefs/view.rs:90
 msgid "RELATED1"
 msgstr "RELACIONADO1"
 
-#: src/app/prefs/view.rs:86
+#: src/app/prefs/view.rs:90
 msgid "RELATED2"
 msgstr "RELACIONADO2"
 
-#: src/app/prefs/view.rs:86
+#: src/app/prefs/view.rs:90
 msgid "RELATED3"
 msgstr "RELACIONADO3"
 
-#: src/app/prefs/view.rs:90
+#: src/app/prefs/view.rs:94
 msgid "BEAT-FX"
 msgstr "BEAT-FX"
 
-#: src/app/prefs/view.rs:90
+#: src/app/prefs/view.rs:94
 msgid "RELEASE-FX"
 msgstr "RELEASE-FX"
 
-#: src/app/prefs/view.rs:90
+#: src/app/prefs/view.rs:94
 msgid "MERGE-FX"
 msgstr "MERGE-FX"
 
-#: src/app/prefs/view.rs:98
+#: src/app/prefs/view.rs:102
 msgid "ORANGE"
 msgstr "NARANJA"
 
-#: src/app/prefs/view.rs:102
+#: src/app/prefs/view.rs:106
 msgid "FREQUENCY"
 msgstr "FRECUENCIA"
 
-#: src/app/prefs/view.rs:108
+#: src/app/prefs/view.rs:112
 msgid "HORIZONTAL"
 msgstr "HORIZONTAL"
 
-#: src/app/prefs/view.rs:108
+#: src/app/prefs/view.rs:112
 msgid "VERTICAL"
 msgstr "VERTICAL"
 
-#: src/app/prefs/view.rs:113
+#: src/app/prefs/view.rs:117
 msgid "1-PLAYER"
 msgstr "1-PLAYER"
 
-#: src/app/prefs/view.rs:113
+#: src/app/prefs/view.rs:117
 msgid "2-PLAYER"
 msgstr "2-PLAYER"
 
-#: src/app/prefs/view.rs:113
+#: src/app/prefs/view.rs:117
 msgid "DUAL-PLAYER"
 msgstr "DUAL-PLAYER"
 
-#: src/app/prefs/view.rs:113
+#: src/app/prefs/view.rs:117
 msgid "SIMPLE-PLAYER"
 msgstr "SIMPLE-PLAYER"
 
-#: src/app/prefs/view.rs:113
+#: src/app/prefs/view.rs:117
 msgid "FULL-BROWSER"
 msgstr "EXPLORADOR-COMPLETO"
 
-#: src/app/prefs/view.rs:118
+#: src/app/prefs/view.rs:122
 msgid "EN"
 msgstr "EN"
 
-#: src/app/prefs/view.rs:118
+#: src/app/prefs/view.rs:122
 msgid "FR"
 msgstr "FR"
 
-#: src/app/prefs/view.rs:118
+#: src/app/prefs/view.rs:122
 msgid "ES"
 msgstr "ES"
 
-#: src/app/prefs/view.rs:118
+#: src/app/prefs/view.rs:122
 msgid "DE"
 msgstr "DE"
 
-#: src/app/prefs/view.rs:118
+#: src/app/prefs/view.rs:122
 msgid "PT"
 msgstr "PT"
 
-#: src/app/prefs/view.rs:118
+#: src/app/prefs/view.rs:122
 msgid "IT"
 msgstr "IT"
 
-#: src/app/prefs/view.rs:118
+#: src/app/prefs/view.rs:122
 msgid "NL"
 msgstr "NL"
 

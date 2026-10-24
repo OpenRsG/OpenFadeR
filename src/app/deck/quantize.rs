@@ -2,11 +2,14 @@
 //! * SNAP: with Q on, set-points (cue, hot cue, memory cue, loop in, auto loop start) go to the nearest SNAP
 //!   fraction of a beat (`super::snap`, used by [`Deck::mark`]).
 //! * QUANTIZE HOT CUE / LOOP: calling a stored hot cue or loop while playing with Q on keeps the beat. IMMEDIATE jumps at
-//!   once to the point plus the playhead's phase inside a QUANTIZE-length beat ([`shifted`]; a loop is activated as stored and the
-//!   playhead goes into it, [`Call::landing`]); NEXT BEAT plays on to the next boundary and jumps there ([`next_boundary`], fired
-//!   by [`Deck::quantize_tick`], [`due`]; inside a loop the boundary is where the loop wraps). Both hand the player the position
-//!   heard when the target was worked out, so the jump catches up the output latency and the wait for the next audio
-//!   buffer (`Player::seek_in_phase`): repeated presses land on the same beat phase, not up to a buffer apart.
+//!   once; the call lands at its point plus how far into a QUANTIZE-length beat the player's own playhead is when it takes the
+//!   jump (the grid's beat under the playhead goes to the player, [`window`], `Player::seek_on_beat`): the phase is read at the
+//!   buffer the jump takes effect in, not at the press, so a beat boundary between the two never puts it a beat off. A loop is
+//!   activated as stored (moving it would move its seam off the beat it was stored on, and RELOOP would creep it on) and the
+//!   playhead goes into it, the phase wrapped round the loop when it is longer. NEXT BEAT plays on to the next boundary and
+//!   jumps there ([`next_boundary`], fired by [`Deck::quantize_tick`], [`due`]; inside a loop the boundary is where the loop
+//!   wraps) with the position heard at the boundary handed to the player to catch up the output latency and the wait for the
+//!   next audio buffer (`Player::seek_in_phase`).
 //! * QUANTIZE REVERSE: with Q on REVERSE engages slip, so releasing it returns to where forward play would be (slip.rs).
 //! * Q on all decks: the Q button of one deck switches every deck.
 //!
@@ -36,48 +39,52 @@ impl Call {
         }
     }
 
-    /// Where the call puts the playhead when the playhead's beat phase moves its start on to `ms`: a cue lands there; a loop is
-    /// activated as stored (moving it would move its seam off the beat it was stored on, and RELOOP would creep it on) and the
-    /// playhead goes into it, wrapped when the phase is longer than the loop.
-    fn landing(self, ms: u32) -> u32 {
+    /// ms the landing's phase wraps in: a loop's length, 0 (none) for a hot cue.
+    fn len(self) -> f64 {
         match self {
-            Call::Hot(_) => ms,
-            Call::Loop(s, e) => s + ms.saturating_sub(s) % (e - s).max(1),
+            Call::Hot(_) => 0.0,
+            Call::Loop(s, e) => e.saturating_sub(s) as f64,
         }
     }
 }
 
-/// What a quantized call does: at once (`Now`, landing at this ms) or at the boundary `At` (ms).
+/// What a quantized call does: it is handed the grid's `Beat` the playhead is in (`start` and `len`, ms) for the player to keep,
+/// or waits for the boundary `At` (ms).
 #[derive(Debug, PartialEq)]
 pub enum Plan {
-    Now(u32),
+    Beat { start: f64, len: f64 },
     At(f64),
 }
 
 /// `call` while playing at `pos_ms` with `q`-beat quantize; `None` without a usable grid (the call then runs as is).
 pub fn plan(beats: &[Beat], pos_ms: f64, mode: QuantizeMode, q: f64, call: Call) -> Option<Plan> {
-    match mode {
-        QuantizeMode::Immediate => {
-            shifted(beats, pos_ms, call.start(), q).map(|ms| Plan::Now(call.landing(ms)))
+    match (mode, call) {
+        (QuantizeMode::NextBeat, _) => next_boundary(beats, pos_ms, q).map(Plan::At),
+        (QuantizeMode::Immediate, _) => {
+            window(beats, pos_ms, q).map(|(start, len)| Plan::Beat { start, len })
         }
-        QuantizeMode::NextBeat => next_boundary(beats, pos_ms, q).map(Plan::At),
     }
 }
 
-/// Beats the playhead is into its current `q`-beat (0..q).
-fn phase(beats: &[Beat], pos_ms: f64, q: f64) -> Option<f64> {
-    Some(beat_at(beats, pos_ms)?.rem_euclid(q))
-}
-
-/// `target_ms` moved by the playhead's phase inside a `q`-beat: landing there, the next boundary comes when it would have.
-pub fn shifted(beats: &[Beat], pos_ms: f64, target_ms: u32, q: f64) -> Option<u32> {
-    let at = beat_at(beats, target_ms as f64)? + phase(beats, pos_ms, q)?;
-    ms_at(beats, at).map(|ms| ms.round().max(0.0) as u32)
+/// The `q`-beat of the grid the playhead `pos_ms` is in: its start and length (ms).
+pub fn window(beats: &[Beat], pos_ms: f64, q: f64) -> Option<(f64, f64)> {
+    let first = (beat_at(beats, pos_ms)? / q).floor() * q;
+    let start = ms_at(beats, first)?;
+    Some((start, ms_at(beats, first + q)? - start))
 }
 
 /// Time (ms) of the first `q`-beat boundary after `pos_ms`.
 pub fn next_boundary(beats: &[Beat], pos_ms: f64, q: f64) -> Option<f64> {
     ms_at(beats, ((beat_at(beats, pos_ms)? / q).floor() + 1.0) * q)
+}
+
+/// How a jump keeps the beat the listener hears while it waits for the audio thread: nothing (a plain seek), the position heard
+/// (ms) when the target was worked out (`Player::seek_in_phase`), or the grid's beat as `start` and `len` ms (`Player::seek_on_beat`).
+#[derive(Clone, Copy)]
+enum Keep {
+    No,
+    Heard(f64),
+    Beat(f64, f64),
 }
 
 impl Deck {
@@ -127,8 +134,8 @@ impl Deck {
             (planned.flatten(), pos)
         });
         match plan {
-            None => self.run(call, call.start(), None),
-            Some(Plan::Now(landing)) => self.run(call, landing, Some(pos)),
+            None => self.run(call, Keep::No),
+            Some(Plan::Beat { start, len }) => self.run(call, Keep::Beat(start, len)),
             Some(Plan::At(ms)) => {
                 self.pending.set(Some((ms, pos, call)));
                 self.say(tr!("quantize: jumping on the next beat…"));
@@ -136,25 +143,26 @@ impl Deck {
         }
     }
 
-    /// Jumps to `call`, the playhead landing at `landing`; `heard` (ms) = where the playhead was heard when a quantized target was
-    /// worked out, so the player catches up what plays before the jump takes effect
-    /// ([`openfader::audio::player::Player::seek_in_phase`]).
-    fn run(&self, call: Call, landing: u32, heard: Option<f64>) {
-        let seek = |ms: u32| {
-            self.with_player(|p| match heard {
-                Some(h) => p.seek_in_phase(ms, h),
-                None => p.seek(ms),
+    /// Jumps to `call` (a loop is activated as stored), the beat kept as `keep` says.
+    fn run(&self, call: Call, keep: Keep) {
+        let ms = call.start();
+        let seek = || {
+            self.with_player(|p| match keep {
+                Keep::No => p.seek(ms),
+                Keep::Heard(h) => p.seek_in_phase(ms, h),
+                // a loop wraps the phase round itself
+                Keep::Beat(start, len) => p.seek_on_beat(ms, start, len, call.len()),
             });
         };
         match call {
             Call::Hot(_) => {
-                seek(landing);
+                seek();
                 self.with_player(|p| p.play());
             }
             Call::Loop(s, e) => {
                 let l = self.loaded.borrow_mut();
                 self.apply_loop(l, Some((s, e)));
-                seek(landing);
+                seek();
             }
         }
     }
@@ -174,7 +182,7 @@ impl Deck {
             self.pending.set(None);
         } else if let Some(heard) = due(at, seen, pos, lp) {
             self.pending.set(None);
-            self.run(call, call.start(), Some(heard));
+            self.run(call, Keep::Heard(heard));
         } else {
             self.pending.set(Some((at, pos, call)));
         }
@@ -196,19 +204,6 @@ fn due(at: f64, seen: f64, pos: f64, lp: Option<(u32, u32)>) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::app::deck::tests::grid;
-
-    #[test]
-    fn immediate_keeps_the_phase_inside_the_quantize_beat() {
-        let g = grid(0, 16); // beats every 500 ms
-        // playhead 120 ms into beat 2 (1120 ms), cue at beat 6 (3000 ms): lands 120 ms after it
-        assert_eq!(shifted(&g, 1120.0, 3000, 1.0), Some(3120));
-        // quarter-beat quantize: 1200 ms is beat 2.4, 0.15 beat into its quarter → lands 75 ms after the cue
-        assert_eq!(shifted(&g, 1200.0, 3000, 0.25), Some(3075));
-        // half-beat quantize: 1370 ms is beat 2.74, 0.24 beat into its half
-        assert_eq!(shifted(&g, 1370.0, 3000, 0.5), Some(3120));
-        // on the beat: no shift
-        assert_eq!(shifted(&g, 1000.0, 3000, 1.0), Some(3000));
-    }
 
     #[test]
     fn next_beat_waits_for_the_boundary_after_the_playhead() {
@@ -234,7 +229,10 @@ mod tests {
                 1.0,
                 Call::Loop(3000, 5000)
             ),
-            Some(Plan::Now(3120))
+            Some(Plan::Beat {
+                start: 1000.0,
+                len: 500.0
+            })
         );
         assert_eq!(
             plan(&g, 1120.0, QuantizeMode::NextBeat, 1.0, Call::Hot(3000)),
@@ -247,26 +245,66 @@ mod tests {
     }
 
     #[test]
-    fn a_stored_loop_is_called_as_stored_and_only_the_playhead_goes_by_the_phase() {
+    fn a_hot_cue_is_handed_the_beat_under_the_playhead_not_a_landing() {
+        let g = grid(0, 16); // beats every 500 ms
+        let beat = |pos, q| plan(&g, pos, QuantizeMode::Immediate, q, Call::Hot(3000));
+        // the player adds the phase of the frame it takes the jump at: only the grid goes to it, so a press just before a boundary
+        // cannot land a beat late however long the jump takes
+        assert_eq!(
+            beat(1120.0, 1.0),
+            Some(Plan::Beat {
+                start: 1000.0,
+                len: 500.0
+            })
+        );
+        assert_eq!(
+            beat(1499.0, 1.0),
+            Some(Plan::Beat {
+                start: 1000.0,
+                len: 500.0
+            })
+        );
+        assert_eq!(
+            beat(1500.0, 1.0),
+            Some(Plan::Beat {
+                start: 1500.0,
+                len: 500.0
+            })
+        );
+        assert_eq!(
+            beat(1370.0, 0.5),
+            Some(Plan::Beat {
+                start: 1250.0,
+                len: 250.0
+            })
+        );
+        assert_eq!(
+            beat(2700.0, 2.0),
+            Some(Plan::Beat {
+                start: 2000.0,
+                len: 1000.0
+            })
+        );
+        // before the first beat and past the last one the grid goes on with its first / last interval
+        let g = grid(100, 16);
+        assert_eq!(window(&g, 20.0, 1.0), Some((-400.0, 500.0)));
+        assert_eq!(window(&g, 9000.0, 1.0), Some((8600.0, 500.0)));
+    }
+
+    #[test]
+    fn a_stored_loop_is_handed_the_beat_like_a_cue_and_wraps_its_landing_in_its_own_length() {
         let g = grid(0, 64);
         let call = Call::Loop(3000, 5000);
-        // RELOOP / the list / a bank call the same loop again and again: only the landing follows the playhead's phase
-        let landing = |pos| plan(&g, pos, QuantizeMode::Immediate, 1.0, call);
+        // RELOOP / the list / a bank call the same loop again and again: it is activated as stored, only the landing goes by the phase
+        let beat = |pos| plan(&g, pos, QuantizeMode::Immediate, 1.0, call);
         assert_eq!(
-            [1120.0, 1370.0, 1620.0].map(landing),
-            [3120, 3370, 3120].map(|ms| Some(Plan::Now(ms)))
+            beat(1370.0),
+            Some(Plan::Beat {
+                start: 1000.0,
+                len: 500.0
+            })
         );
-        // a phase longer than the loop goes round it
-        assert_eq!(
-            plan(
-                &g,
-                1370.0,
-                QuantizeMode::Immediate,
-                1.0,
-                Call::Loop(3000, 3200)
-            ),
-            Some(Plan::Now(3170))
-        );
+        assert_eq!((call.len(), Call::Hot(3000).len()), (2000.0, 0.0));
     }
 
     #[test]

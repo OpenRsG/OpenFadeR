@@ -13,7 +13,7 @@ export component Jacket inherits Rectangle {
     background: Theme.panel-raised;
     if !DeckState.decks[root.index].has-cover: Text { text: "♪"; color: Theme.panel-high; font-size: root.size * 0.6; horizontal-alignment: center; vertical-alignment: center; }
     if DeckState.decks[root.index].has-cover: Image { source: DeckState.decks[root.index].cover; image-fit: cover; width: root.size; height: root.size; }
-    DeckBadge { index: root.index; x: 0; y: 0; }
+    DeckBadge { index: root.index; size: max(14px, min(20px, root.size * 0.4)); x: 0; y: 0; }
     ta := TouchArea { clicked => { DeckState.load(root.index); } mouse-cursor: pointer; }
     Rectangle { background: Theme.text-bright.with-alpha(ta.has-hover ? 0.12 : 0); }
 }

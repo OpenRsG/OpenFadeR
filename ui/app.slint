@@ -337,7 +337,7 @@ export component App inherits Window {
         if root.show-fx: FxPanel { x: 0; y: root.y-fx; width: root.width; height: root.h-fx; }
         if root.show-mix && !root.studio: MixPointPanel { x: 0; y: root.y-mix; width: root.width; height: Theme.h-mixpoint; }
         for i in root.flat ? 0 : root.waves-n: DeckDetail {
-            index: PrefsState.wave-order[i];
+            index: DeckState.slots[PrefsState.wave-order[i]];
             x: 0;
             y: root.y-wave + i * (root.wave-hx + Theme.gap);
             width: root.width;
@@ -345,14 +345,14 @@ export component App inherits Window {
         }
         // Vertical layouts: one column per deck, left to right (4 decks: the left-hand decks 1, 3 first, as the deck columns stand).
         for s in root.vwaves-n: DeckDetailV {
-            index: PrefsState.wave-order[root.four ? [0, 2, 1, 3][s] : s];
+            index: DeckState.slots[PrefsState.wave-order[root.four ? [0, 2, 1, 3][s] : s]];
             x: root.wave-x(s);
             y: root.y-wave;
             width: root.vw;
             height: root.deck-h + root.bx;
         }
-        if root.decks-on && !root.four: DeckPanel { index: 0; x: 0; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-2; }
-        if root.decks-on && !root.four: DeckPanel { index: 1; x: root.col-r-x; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-2; }
+        if root.decks-on && !root.four: DeckPanel { index: DeckState.slots[0]; x: 0; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-2; }
+        if root.decks-on && !root.four: DeckPanel { index: DeckState.slots[1]; x: root.col-r-x; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-2; }
         if root.decks-on && root.four: DeckCompact { index: 0; x: 0; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-4; }
         if root.decks-on && root.four: DeckCompact { index: 2; x: 0; y: root.y-deck + root.dy-deck + Theme.h-deck-4 + Theme.gap; width: root.dw; height: Theme.h-deck-4; }
         if root.decks-on && root.four: DeckCompact { index: 1; x: root.col-r-x; y: root.y-deck + root.dy-deck; width: root.dw; height: Theme.h-deck-4; }

@@ -325,7 +325,7 @@ pub fn wire(app: &App, decks: &Decks) {
             }
         })
     });
-    // Back to the 2-deck layout: a unit on CH3 / CH4 goes to MASTER (those channels are silent).
+    // Back to the 2-deck layout: a unit on CH3 / CH4 goes to MASTER (those channels are silent) unless the controller reached them.
     let f = fx.clone();
     prefs::on_change(move |p| {
         f.show_prefs(p);
@@ -334,7 +334,7 @@ pub fn wire(app: &App, decks: &Decks) {
                 f.merge_end(n, true);
             }
             f.edit(n, |u| {
-                if (u.assign >= p.decks as i32 && u.assign < 4)
+                if (u.assign >= deck::active() as i32 && u.assign < 4)
                     || (u.assign == 5 && !p.audio.aux_on)
                 {
                     u.assign = 4;

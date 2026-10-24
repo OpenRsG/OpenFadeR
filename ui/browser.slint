@@ -456,9 +456,9 @@ export component Browser inherits Rectangle {
         }
         for i in DeckState.count: Chip {
             width: root.width < 480px ? Theme.touch-target : 80px; horizontal-stretch: 0;
-            text: root.width < 480px ? @tr("→ {}", ["A", "B", "C", "D"][i]) : @tr("Load {}", ["A", "B", "C", "D"][i]);
-            tooltip: @tr("Load the selected track to deck {}", ["A", "B", "C", "D"][i]);
-            clicked => { DeckState.load(i); }
+            text: root.width < 480px ? @tr("→ {}", ["A", "B", "C", "D"][DeckState.slots[i]]) : @tr("Load {}", ["A", "B", "C", "D"][DeckState.slots[i]]);
+            tooltip: @tr("Load the selected track to deck {}", ["A", "B", "C", "D"][DeckState.slots[i]]);
+            clicked => { DeckState.load(DeckState.slots[i]); }
         }
     }
     if TrackInfoState.editor-open && (!root.touch || root.detached): TrackInfoEditor {}

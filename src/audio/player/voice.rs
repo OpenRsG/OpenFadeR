@@ -173,7 +173,11 @@ pub(super) fn render(
         // A phase-kept seek moves on by what the deck played since the press was heard (latency + the wait for this buffer).
         // Forward only and within CATCH_UP: anything else (reverse, an older press time) does not apply. Inside the loop of the last
         // buffer that is the way round it, wrapped or not (a lap shorter than the latency is lost); the loop may be gone by now.
+        // A seek on the beat lands at its target plus the phase of the frame this buffer continues from: the same beat phase the
+        // listener hears the jump come in at, however long the press, the buffer and the output latency took.
         let from = sh.seek_from.swap(NO_SEEK, Relaxed);
+        let beat = super::unpack_beat(sh.seek_beat.swap(NO_SEEK, Relaxed));
+        let wrap = f32::from_bits(sh.seek_wrap.swap(0, Relaxed)) as f64;
         let (written, heard) = (f64::from_bits(sh.pos.load(Relaxed)), f64::from_bits(from));
         let played = match v.lp_was {
             Some((ls, le)) if (ls..le).contains(&written) && (ls..le).contains(&heard) => {
@@ -181,10 +185,15 @@ pub(super) fn render(
             }
             _ => written - heard,
         };
-        let s = if from != NO_SEEK && (0.0..CATCH_UP).contains(&played) && !sh.t.reverse() {
-            (f64::from_bits(s) + played).to_bits()
-        } else {
-            s
+        let s = match beat {
+            Some((start, len)) => {
+                let phase = (written - start).rem_euclid(len);
+                (f64::from_bits(s) + if wrap > 0.0 { phase % wrap } else { phase }).to_bits()
+            }
+            None if from != NO_SEEK && (0.0..CATCH_UP).contains(&played) && !sh.t.reverse() => {
+                (f64::from_bits(s) + played).to_bits()
+            }
+            None => s,
         };
         sh.pos.store(s, Relaxed);
         v.stretch.reset();

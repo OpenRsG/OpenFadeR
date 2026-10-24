@@ -1,8 +1,10 @@
 //! Up to four playback decks (`DeckState` in ui/deck.slint, one `DeckView` row per deck). One [`Deck`]
 //! type, instantiated [`DECKS`] times by [`wire`]: it loads a track's analysis (waveforms show at once),
 //! decodes its audio on a worker thread, and draws the waveforms 1:1 (physical pixels) from the
-//! audible position. The `decks` setting (PREFS, the 2/4 chip) decides how many are [`active`]: in 2-deck
-//! mode C and D are hidden, paused and out of every deck pick; the audio engine always carries four channels.
+//! audible position. The `decks` setting (PREFS, the 2/4 chip) decides how many the layout [`shown`] (2 or 4); the decks
+//! in use ([`active`]) are those, or all four once the controller's DECK 3 / 4 layer reached C and D in a 2-deck layout
+//! ([`slots`]: the two slots then show the layer's decks). Otherwise C and D are hidden, paused and out of every deck pick;
+//! the audio engine always carries four channels.
 //!
 //! Base: [`beatmath`] (beat-grid maths: [`grid_bpm`], [`tempo_at`], [`beat_at`], [`ms_at`], [`snap`]) and [`wire`] (creates the
 //! decks, routes the `DeckState` callbacks).
@@ -19,7 +21,7 @@
 //! the MIX OUT / MIX IN points of two decks, the panel, the automatic start of the MIX IN deck), [`groove`]
 //! (what BEAT LAB (`app/groove`) reads of a deck: the DRUM CAPTURE range, the tempo, whether a DRUM SWAP
 //! loop has the drums), [`exportedit`] (what EXPORT mode's GRID panel and cue panels (`app/exportmode`) add:
-//! grid range, widen / narrow, BPM entry, UNDO / REDO, Analysis Lock).
+//! grid range, widen / narrow, BPM entry, UNDO / REDO, Analysis Lock), [`slots`] (which deck each slot of the layout draws).
 //!
 //! Controller entry points (what `app/midi` calls on `decks[i]`, besides the `DeckState` callbacks):
 //! `play_pause`, `cue_press` / `cue_release`, `jump_to_start`, `sync_toggle`, `master_toggle`,
@@ -59,6 +61,7 @@ mod reedit;
 mod sequencer;
 mod slicer;
 mod slip;
+pub mod slots;
 mod stemdouble;
 mod stems;
 mod stemwave;
@@ -89,9 +92,18 @@ pub const DECKS: usize = audio::CHANNELS;
 pub const DECK_NAMES: [&str; DECKS] = ["A", "B", "C", "D"];
 pub type Decks = [Rc<Deck>; DECKS];
 
-/// Decks in use: the `decks` setting (2 or 4), at most [`DECKS`].
-pub fn active() -> usize {
+/// Decks the layout shows: the `decks` setting (2 or 4), at most [`DECKS`].
+pub fn shown() -> usize {
     prefs::with(|p| p.decks.clamp(2, DECKS))
+}
+
+/// Decks in use: the decks the layout shows, or all of them once the controller reached C / D in a 2-deck layout.
+pub fn active() -> usize {
+    if slots::reached() {
+        DECKS
+    } else {
+        shown()
+    }
 }
 
 /// The worker stays cancellable after playback starts, until optional analysis finishes.

@@ -123,6 +123,11 @@ export global DeckState {
     in property <bool> waveform-gpu;
     /// Decks shown: 2 (A, B) or 4 (A to D, the 4-deck layout; the `decks` setting, written by Rust).
     in property <int> count: 2;
+    /// The deck each slot of the layout draws (slot 0, 1 = left, right deck of the 2-deck layout; 4 decks: every slot its own
+    /// deck). A 2-deck layout draws deck C / D in its left / right slot while the controller's DECK 3 / 4 layer is selected
+    /// (src/app/deck/slots.rs). Components of a slot take their `index` from here, so everything the slot draws and every
+    /// callback follows.
+    in property <[int]> slots: [0, 1, 2, 3];
     /// Vertical tempo faders show + at the bottom (PREFS > VIEW); the fader position then runs the other way.
     in property <bool> tempo-reverse;
     /// Tempo position (1 = faster, what `tempo` takes) ↔ vertical fader position (1 = top); the same flip both ways.

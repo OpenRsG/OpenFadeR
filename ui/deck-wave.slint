@@ -56,19 +56,41 @@ export component WaveStrip inherits Rectangle {
     }
 }
 
-/// The 14×14 deck number badge: `panel-raised` square, bold digit in the deck's colour.
+/// The deck number box: `panel-raised` square, bold digit in the deck's colour. In a 2-deck layout whose slot draws this deck
+/// while the other deck of the side (1 ↔ 3, 2 ↔ 4: the controller's DECK 3 / 4 layer) plays hidden, a small box with that
+/// deck's number sits beside the number, or under it with `below`. `size` is the side of the box; `hidden-on` tells the
+/// parent whether the small box is shown.
 export component DeckBadge inherits Rectangle {
     in property <int> index;
-    width: 14px;
-    height: 14px;
+    in property <length> size: 22px;
+    in property <bool> below;
+    out property <bool> hidden-on: DeckState.count == 2 && DeckState.decks[root.other].playing;
+    property <int> other: root.index < 2 ? root.index + 2 : root.index - 2;
+    width: root.size;
+    height: root.size;
     background: Theme.panel-raised;
     Text {
         text: root.index + 1;
         color: [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][root.index];
-        font-size: Theme.font-sm;
+        font-size: root.size * 0.8;
         font-weight: Theme.weight-bold;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+    if root.hidden-on: Rectangle {
+        x: root.below ? (parent.width - self.width) / 2 : parent.width + 2px;
+        y: root.below ? parent.height + 2px : 0px;
+        width: 12px;
+        height: 12px;
+        background: Theme.panel-raised;
+        Text {
+            text: root.other + 1;
+            color: [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][root.other];
+            font-size: Theme.font-xs;
+            font-weight: Theme.weight-bold;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
     }
 }
 
@@ -103,7 +125,12 @@ export component DeckDetail inherits Rectangle {
         x: 0;
         width: 24px;
         background: Theme.panel;
-        DeckBadge { index: root.index; y: 4px; x: (parent.width - self.width) / 2; }
+        DeckBadge {
+            index: root.index;
+            below: true;
+            x: (parent.width - self.width) / 2;
+            y: Theme.deck-number == 1 ? max(0px, (parent.height - self.height - (self.hidden-on ? 14px : 0px)) / 2) : 2px;
+        }
     }
     // Middle: the wave, with the phase meter (4 beats; the other deck's marker orange, this deck's green in time, blue off) under it.
     wave := VerticalLayout {

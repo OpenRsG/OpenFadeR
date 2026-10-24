@@ -117,9 +117,12 @@ impl Transport {
         self.slip.load(Relaxed)
     }
 
-    /// The user manipulates the playhead: from now on the shadow runs on its own (slip only).
+    /// The user manipulates the playhead: from now on the shadow runs on its own (slip only). A return still waiting from an
+    /// earlier release is dropped: the new manipulation (a jump pressed in the buffer the pad was let go in) wins, and its own
+    /// release asks for the return again.
     pub fn diverge(&self) {
         if self.slip() {
+            self.back.store(false, Relaxed);
             self.diverged.store(true, Release);
         }
     }

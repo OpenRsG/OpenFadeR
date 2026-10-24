@@ -11,7 +11,7 @@
 use super::{dump, hotplug, led, mapfile, port, prefs_audio, App, Ev, LedRow, Midi, Outcome};
 use crate::app::{
     catalog,
-    deck::{active, DECKS},
+    deck::{active, slots, DECKS},
     toast, MidiState, MixerState,
 };
 use openfader::audio;
@@ -127,7 +127,9 @@ impl Midi {
         self.file_names.borrow_mut().clear();
         self.msb.borrow_mut().clear();
         self.layer.set(Default::default());
-        self.layer34_noted.set(false);
+        if slots::set_layer(Default::default()) {
+            slots::publish(app);
+        }
         self.snap_at.set(None);
 
         // The ports a controller plugin drives are its own; the rest are ours.

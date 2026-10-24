@@ -32,7 +32,7 @@ export component DeckDetailV inherits Rectangle {
     property <length> down-y;
     property <bool> scratching;
     property <bool> zoom-open;
-    property <length> top: 18px;
+    property <length> top: 24px;
     property <length> bottom: 14px;
     /// Length (time axis) and thickness of the picture.
     property <length> wl: root.height - root.top - root.bottom;
@@ -43,7 +43,7 @@ export component DeckDetailV inherits Rectangle {
         y: 0;
         height: root.top;
         background: Theme.panel;
-        DeckBadge { index: root.index; y: 2px; x: (parent.width - self.width) / 2; }
+        DeckBadge { index: root.index; size: 20px; y: 2px; x: Theme.deck-number == 1 ? (parent.width - self.width) / 2 : 2px; }
     }
     // The picture is `wl` × `wt`; turned about its centre it fills the `wt` × `wl` column.
     Rectangle {

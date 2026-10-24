@@ -64,11 +64,11 @@ export component StudioWorkspace inherits Rectangle {
             height: root.wave-h;
             border-radius: Theme.studio-radius-ctl;
             clip: true;
-            DeckDetail { index: PrefsState.wave-order[i]; width: parent.width; height: parent.height; }
+            DeckDetail { index: DeckState.slots[PrefsState.wave-order[i]]; width: parent.width; height: parent.height; }
         }
-        if !root.browse: StudioDeck { index: 0; x: root.g; y: root.y-deck; width: root.deck-w; height: root.deck-h; head-h: root.head-h; cover: root.cover; }
+        if !root.browse: StudioDeck { index: DeckState.slots[0]; x: root.g; y: root.y-deck; width: root.deck-w; height: root.deck-h; head-h: root.head-h; cover: root.cover; }
         if !root.browse: StudioMixer { x: 2 * root.g + root.deck-w; y: root.y-deck; width: root.mixer-w; height: root.deck-h; }
-        if !root.browse: StudioDeck { index: 1; x: 3 * root.g + root.deck-w + root.mixer-w; y: root.y-deck; width: root.deck-w; height: root.deck-h; head-h: root.head-h; cover: root.cover; }
+        if !root.browse: StudioDeck { index: DeckState.slots[1]; x: 3 * root.g + root.deck-w + root.mixer-w; y: root.y-deck; width: root.deck-w; height: root.deck-h; head-h: root.head-h; cover: root.cover; }
         if true: StudioLibrary { x: root.g; y: root.y-lib; width: root.width - 3 * root.g - root.side-w; height: root.lib-h; }
         if true: StudioAutomix { x: root.width - root.g - root.side-w; y: root.y-lib; width: root.side-w; height: root.lib-h; }
         // Status line: a device loading, a track being analysed, a device job; the browser's own messages are over the track list.

@@ -184,9 +184,9 @@ export component Mixer inherits Rectangle {
     background: Theme.line;
     HorizontalLayout {
         spacing: 1px;
-        Channel { index: 0; }
+        Channel { index: DeckState.slots[0]; }
         if DeckState.count == 4: Channel { index: 2; }
-        Channel { index: 1; }
+        Channel { index: DeckState.slots[1]; }
         if DeckState.count == 4: Channel { index: 3; }
         if MixerState.aux-shown: Channel { index: 4; }
     }
@@ -213,7 +213,7 @@ component XfGrid inherits VerticalLayout {
     for row in DeckState.count / 2: HorizontalLayout {
         spacing: 2px;
         for col in 2: Chip {
-            property <int> n: row * 2 + col;
+            property <int> n: DeckState.slots[row * 2 + col];
             text: n + 1;
             font-size: Theme.font-xs;
             width: 26px;

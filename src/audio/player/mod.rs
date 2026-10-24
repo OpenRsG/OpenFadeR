@@ -10,6 +10,8 @@
 
 mod clock;
 mod engine;
+#[cfg(test)]
+mod hotcue_tests;
 mod mix;
 mod output;
 mod scratch;
@@ -24,18 +26,18 @@ use super::fx;
 use super::groove;
 use super::metronome::{self, Hits};
 use super::transport::Transport;
-use super::{Pcm, STEM_COUNT, Stems, Track16, clamped_in, load_f32, store_clamped};
-use clock::{Anchor, Clock, audible, heard_frames};
-use engine::{ENGINE, Engine};
+use super::{clamped_in, load_f32, store_clamped, Pcm, Stems, Track16, STEM_COUNT};
+use clock::{audible, heard_frames, Anchor, Clock};
 pub use engine::{configure, live_bus, set_output};
-pub use output::{Status, controller, release_controller, status};
+use engine::{Engine, ENGINE};
+pub use output::{controller, release_controller, status, Status};
 use parking_lot::Mutex;
 use std::rc::{Rc, Weak};
-use std::sync::Arc;
 use std::sync::atomic::{
     AtomicBool, AtomicI64, AtomicU32, AtomicU64,
     Ordering::{Relaxed, Release},
 };
+use std::sync::Arc;
 use std::time::Instant;
 use voice::{Done, Voice, render};
 
@@ -73,6 +75,19 @@ fn unpack(v: u64) -> Option<(f64, f64)> {
     (v != 0).then_some((ms((v >> 32) as u32), ms(v as u32)))
 }
 
+/// A beat grid for a seek as one word (two f32, so a request cannot tear): `len` source frames per beat, and `start`, a frame a beat
+/// starts at, reduced to its offset into a beat.
+fn pack_beat(start: f64, len: f64) -> u64 {
+    let bits = |x: f64| (x as f32).to_bits() as u64;
+    bits(start.rem_euclid(len)) << 32 | bits(len)
+}
+
+/// `(offset, len)` of [`pack_beat`] in frames; `None` for NO_SEEK.
+fn unpack_beat(v: u64) -> Option<(f64, f64)> {
+    let f = |bits: u32| f32::from_bits(bits) as f64;
+    (v != NO_SEEK).then(|| (f((v >> 32) as u32), f(v as u32)))
+}
+
 struct Shared {
     /// Shared (not copied) with the stems job and the stem waveform.
     pcm: Mutex<Arc<Track16>>,
@@ -85,6 +100,10 @@ struct Shared {
     seek: AtomicU64,               // f64 bits or NO_SEEK, consumed by the callback
     /// f64 bits or NO_SEEK: the heard position (source frames) `seek` was worked out at ([`Player::seek_in_phase`]).
     seek_from: AtomicU64,
+    /// [`pack_beat`] or NO_SEEK: the beat grid a seek is kept on ([`Player::seek_on_beat`]), consumed with `seek`.
+    seek_beat: AtomicU64,
+    /// f32 bits: a loop's length in frames the landing of a seek on the beat wraps in (0 = none), consumed with `seek_beat`.
+    seek_wrap: AtomicU32,
     playing: AtomicBool,
     rate: AtomicU64,         // f64 bits, varispeed
     nudge: AtomicU32,        // f32 bits, temporary offset added to the rate (jog bend)
@@ -134,6 +153,8 @@ impl Shared {
             pos: AtomicU64::new(0),
             seek: AtomicU64::new(NO_SEEK),
             seek_from: AtomicU64::new(NO_SEEK),
+            seek_beat: AtomicU64::new(NO_SEEK),
+            seek_wrap: AtomicU32::new(0),
             steady: AtomicBool::new(true),
             playing: AtomicBool::new(false),
             rate: AtomicU64::new(1f64.to_bits()),
@@ -207,6 +228,21 @@ impl Shared {
             self.seek_from
                 .store(heard.map_or(NO_SEEK, f64::to_bits), Relaxed);
         }
+        self.seek_beat.store(NO_SEEK, Relaxed);
+        self.seek.store(f.to_bits(), Release);
+    }
+
+    /// Seek to source frame `f` plus how far into its beat the written playhead is when the callback takes the seek: the grid has
+    /// a beat of `len` frames starting at `start` ([`Voice`]'s `render`); a `wrap` > 0 (a loop's length in frames) wraps that
+    /// phase round the loop the seek lands in. Whatever the press timing, the jump continues the beat phase of the frames the
+    /// deck has written, so it is never a beat early or late. A later seek replaces it whole.
+    fn seek_on_beat(&self, f: f64, start: f64, len: f64, wrap: f64) {
+        if self.playing.load(Relaxed) {
+            self.t.diverge();
+        }
+        self.seek_from.store(NO_SEEK, Relaxed);
+        self.seek_wrap.store((wrap as f32).to_bits(), Relaxed);
+        self.seek_beat.store(pack_beat(start, len), Relaxed);
         self.seek.store(f.to_bits(), Release);
     }
 
@@ -336,6 +372,7 @@ impl Player {
         self.shared.src_rate.store(pcm.rate, Relaxed);
         drop(self.shared.beats.lock().take()); // the grid belongs to the old track
         self.frames = pcm.frames() as u64;
+        self.shared.seek_beat.store(NO_SEEK, Relaxed); // a seek of the old track's grid is not this one's
         self.shared.seek.store(0f64.to_bits(), Relaxed);
         self.shared.pos.store(0f64.to_bits(), Relaxed);
         let old_stems = self.shared.stems.lock().take();
@@ -682,13 +719,31 @@ impl Player {
         self.shared.seek_to(f);
     }
 
-    /// [`Player::seek`] keeping the beat: `ms` was worked out (target + the playhead's phase) while [`Player::position_ms`]
+    /// [`Player::seek`] for a jump worked out from where the deck was heard: `ms` was worked out while [`Player::position_ms`]
     /// was `heard_ms`. A seek only takes effect at the next buffer and is heard one output latency later, so the jump lands
-    /// as much past `ms` as the deck plays meanwhile: every press lands on the same beat phase whatever the buffer timing.
+    /// as much past `ms` as the deck plays meanwhile. (A jump that keeps a beat grid's phase is [`Player::seek_on_beat`].)
     pub fn seek_in_phase(&mut self, ms: u32, heard_ms: f64) {
         let r = self.src_rate as f64 / 1000.0;
         let f = (ms as f64 * r).min(self.frames as f64);
         self.shared.seek_from_heard(f, Some(heard_ms * r));
+    }
+
+    /// [`Player::seek`] keeping the beat (hot cue / stored loop with Q): the jump lands on `ms` plus how far into a beat of the
+    /// grid the deck's playhead is at the buffer the jump takes effect in, wrapped in `wrap_ms` when that is > 0 (a loop's length:
+    /// the landing stays inside it). The grid has a beat `beat_ms` long starting at `beat_start_ms` (any
+    /// beat of it: the grid is taken as even). The phase is read from the audio thread's own position when it takes the seek,
+    /// never from a position the caller heard earlier: the press, the next buffer and the output latency lie between them, and a
+    /// beat boundary in that gap would otherwise put the landing a whole beat off. A grid that is not usable seeks plainly.
+    /// shortcut: the grid is taken as even from the beat it starts at to the jump (tens of ms), a tempo change in that gap is not
+    /// followed; upgrade: hand the audio thread the beat list (`Shared::beats`) instead of one beat.
+    pub fn seek_on_beat(&mut self, ms: u32, beat_start_ms: f64, beat_ms: f64, wrap_ms: f64) {
+        let r = self.src_rate as f64 / 1000.0;
+        let (start, len) = (beat_start_ms * r, beat_ms * r);
+        if !(start.is_finite() && len.is_finite() && len >= 1.0) {
+            return self.seek(ms);
+        }
+        let f = (ms as f64 * r).min(self.frames as f64);
+        self.shared.seek_on_beat(f, start, len, wrap_ms * r);
     }
 
     pub fn duration_ms(&self) -> u32 {

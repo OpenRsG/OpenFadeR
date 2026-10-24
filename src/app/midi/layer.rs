@@ -11,17 +11,11 @@ use crate::app::deck::DECK_NAMES;
 /// Per side (left, right) the selected layer: 0 = deck 1 / 2 (A, B), 1 = deck 3 / 4 (C, D). `default()` = A and B.
 pub type Layer = [usize; 2];
 
-/// The decks the layout must show once deck `d` (0 = A … 3 = D) was selected on the controller with `shown` decks in
-/// the layout (2 or 4): DECK 3 / 4 switch a 2-deck layout to 4 decks (the controller's DECK 3 / 4 layer must
-/// reach decks C / D, which a 2-deck layout does not have); the controller's own DECK 1 / 2 never shrink it.
-pub fn layout_for(d: usize, shown: usize) -> usize {
-    if d < shown { shown } else { 4 }
-}
-
-/// The selection after deck `d` was selected on the controller, with `shown` decks in the layout (2 or 4).
-/// A deck the layout hides cannot be selected: `None`, the selection stays ([`layout_for`] widens the layout first).
-pub fn select(mut layer: Layer, d: usize, shown: usize) -> Option<Layer> {
-    (d < shown.min(4)).then(|| {
+/// The selection after deck `d` was selected on the controller, with `in_use` decks in use ([`crate::app::deck::active`]:
+/// DECK 3 / 4 reach C / D in a 2-deck layout first, [`crate::app::deck::slots::reach`]; the layout keeps its two slots, which
+/// then draw the layer's decks). A deck not in use cannot be selected: `None`, the selection stays.
+pub fn select(mut layer: Layer, d: usize, in_use: usize) -> Option<Layer> {
+    (d < in_use.min(4)).then(|| {
         layer[d % 2] = d / 2;
         layer
     })
@@ -75,27 +69,20 @@ mod tests {
     }
 
     #[test]
-    fn deck_3_or_4_widens_the_two_deck_layout_and_nothing_shrinks_it() {
+    fn deck_3_or_4_is_selected_once_it_is_in_use_and_the_layout_keeps_two_decks() {
         for (d, expected) in [(2, [1, 0]), (3, [0, 1])] {
             assert_eq!(
-                layout_for(d, 2),
-                4,
-                "deck {} needs the 4-deck layout",
+                select(Layer::default(), d, 2),
+                None,
+                "deck {} is not in use yet",
                 d + 1
             );
-            assert_eq!(
-                select(Layer::default(), d, layout_for(d, 2)),
-                Some(expected)
-            );
+            assert_eq!(select(Layer::default(), d, 4), Some(expected));
         }
         assert_eq!(
-            [
-                layout_for(0, 2),
-                layout_for(1, 2),
-                layout_for(3, 4),
-                layout_for(0, 4)
-            ],
-            [2, 2, 4, 4]
+            select([1, 1], 0, 4),
+            Some([0, 1]),
+            "DECK 1 brings A back; the decks in use stay four"
         );
     }
 

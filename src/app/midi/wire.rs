@@ -74,7 +74,6 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         dual: Cell::default(),
         started: Instant::now(),
         log: std::env::var_os("OPENFADER_MIDI_LOG").is_some_and(|v| !v.is_empty()),
-        layer34_noted: Cell::new(false),
         out: RefCell::new(None),
         leds: RefCell::new(Leds::new(Vec::new())),
         clock: RefCell::new(None),

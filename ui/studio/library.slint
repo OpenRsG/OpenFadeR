@@ -94,8 +94,8 @@ export component StudioLibrary inherits Rectangle {
                 font-family: Theme.font;
                 font-size: Theme.font-size;
             }
-            Chip { text: @tr("LOAD 1"); width: 62px; horizontal-stretch: 0; tooltip: @tr("Load the chosen track on deck 1"); clicked => { DeckState.load(0); } }
-            Chip { text: @tr("LOAD 2"); width: 62px; horizontal-stretch: 0; tooltip: @tr("Load the chosen track on deck 2"); clicked => { DeckState.load(1); } }
+            Chip { text: @tr("LOAD {}", DeckState.slots[0] + 1); width: 62px; horizontal-stretch: 0; tooltip: @tr("Load the chosen track on deck {}", DeckState.slots[0] + 1); clicked => { DeckState.load(DeckState.slots[0]); } }
+            Chip { text: @tr("LOAD {}", DeckState.slots[1] + 1); width: 62px; horizontal-stretch: 0; tooltip: @tr("Load the chosen track on deck {}", DeckState.slots[1] + 1); clicked => { DeckState.load(DeckState.slots[1]); } }
         }
     }
     table := StudioTable {
