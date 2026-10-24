@@ -6,6 +6,10 @@
 //! - an edit of a loaded track's cues, grid or phrases ([`track_edited`]) is written to its device copies a few seconds after
 //!   the last one ([`Ctx::run_pushes`]), in every format picked for the device.
 //!
+//! A track that lives only on a device (not in the collection, so no link) is its own device copy: an edit of it is written
+//! back to that device the same way, with the analysis the device holds and the edit on top, whether cue sync is on or not
+//! (it is saving the edit, not syncing two copies).
+//!
 //! What the collection takes is written to the store at once; what a device takes is an export of just those tracks, run as the
 //! window's job when no other job runs.
 
@@ -51,21 +55,36 @@ pub fn track_loading(t: &Track) {
     with_ctx(|cx| cx.settle_load(t));
 }
 
-/// The cues, grid or phrases of `t` were edited (and stored): its device copies are written soon.
+/// The cues, grid or phrases of `t` were edited (and stored): its device copies are written soon, and so is `t` itself when it
+/// is a track of a mounted device that the collection does not have.
 pub fn track_edited(t: &Track) {
-    with_ctx(|cx| {
-        let key = store::key(t);
-        let ids: Vec<String> = cx
-            .links
+    let Some(cx) = CTX.with(|c| c.borrow().upgrade()) else {
+        return;
+    };
+    let key = store::key(t);
+    let linked: Vec<String> = cx
+        .links
+        .borrow()
+        .iter()
+        .filter(|(_, l)| l.contains_key(&key))
+        .map(|(id, _)| id.clone())
+        .collect();
+    let sync = Behaviour::load(&cx.store).sync_cues;
+    if sync {
+        for id in &linked {
+            cx.queue_push(id, &key, None);
+        }
+    }
+    let home = t.file.as_deref().and_then(|f| {
+        cx.devices
             .borrow()
             .iter()
-            .filter(|(_, l)| l.contains_key(&key))
-            .map(|(id, _)| id.clone())
-            .collect();
-        for id in ids {
-            cx.queue_push(&id, &key);
-        }
+            .find(|d| f.starts_with(&d.mount))
+            .map(|d| d.id.clone())
     });
+    if let Some(id) = home.filter(|id| !(sync && linked.contains(id))) {
+        cx.queue_push(&id, &key, Some(t.clone()));
+    }
 }
 
 impl Ctx {
@@ -173,17 +192,21 @@ impl Ctx {
                 eprintln!("cue sync: {e}");
             }
             if !m.to_device.is_empty() {
-                self.queue_push(&id, &key);
+                self.queue_push(&id, &key, None);
             }
         }
     }
 
-    /// Writes `key`'s device copy on device `id` once the edits settle.
-    fn queue_push(&self, id: &str, key: &str) {
+    /// Writes `key`'s device copy on device `id` once the edits settle: the collection's copy (`own` = `None`, a linked track)
+    /// or the device's own track `own`.
+    fn queue_push(&self, id: &str, key: &str, own: Option<Track>) {
         let mut pushes = self.pushes.borrow_mut();
         let (at, keys) = pushes.entry(id.to_owned()).or_default();
         *at = Some(Instant::now());
-        keys.insert(key.to_owned());
+        let slot = keys.entry(key.to_owned()).or_default();
+        if own.is_some() {
+            *slot = own;
+        }
     }
 
     /// Starts writing the queued tracks of one device whose last edit settled, when no job runs (the window's timer).
@@ -202,7 +225,7 @@ impl Ctx {
             return;
         };
         let links = self.links.borrow().get(&id).cloned();
-        let (Some(d), Some(links)) = (self.device(&id), links) else {
+        let Some(d) = self.device(&id) else {
             return;
         };
         if !d.writable() {
@@ -210,9 +233,22 @@ impl Ctx {
         }
         let tracks: Vec<_> = keys
             .iter()
-            .filter_map(|k| links.get(k))
-            .map(|p| (p.collection.clone(), self.lib.analysis(&p.collection)))
+            .filter_map(
+                |(k, own)| match (links.as_ref().and_then(|l| l.get(k)), own) {
+                    (Some(p), _) => Some((p.collection.clone(), self.lib.analysis(&p.collection))),
+                    // The device's own track: what the device holds, the stored edit on top (none without the device's analysis,
+                    // which would leave it without a grid or waveform).
+                    (None, Some(t)) => library::load_ref(t).map(|mut a| {
+                        store::apply(&mut a, &self.store.edits(k).unwrap_or_default());
+                        (t.clone(), Some(a))
+                    }),
+                    (None, None) => None,
+                },
+            )
             .collect();
+        if tracks.is_empty() {
+            return;
+        }
         let Some(writers) = self.writers(&d) else {
             return;
         };
