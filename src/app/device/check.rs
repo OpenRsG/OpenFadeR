@@ -10,23 +10,15 @@
 //! The words of every verdict are here ([`words`], [`why`], [`line`]) so the window, the toasts and `openfader verify` say the
 //! same, translated.
 
-use super::{
-    App, CheckLib, CheckPlayer, CheckPreset, CheckProblem, Ctx, DeviceState, Pick, record_all,
-    toast,
-};
+use super::{App, CheckLib, CheckPlayer, CheckPreset, CheckProblem, Ctx, DeviceState, Pick, record_all, toast};
 use openfader::{
     device::{
         self, Device,
         check::{self, Facts, Fit, Overall, Step, Verdict, Why},
         export::export,
     },
-    plugin::device::{
-        self as plugins, Control, ExportOptions, Problem, Provider, Severity, commit,
-    },
-    store::{
-        Store,
-        device_settings::{self, Behaviour},
-    },
+    plugin::device::{self as plugins, Control, ExportOptions, Problem, Provider, Severity, commit},
+    store::{Store, device_settings::{self, Behaviour}},
 };
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use std::{
@@ -76,11 +68,7 @@ impl Default for State {
 /// "12 Oct 2026 21:03".
 fn when(ts: i64) -> String {
     chrono::DateTime::from_timestamp(ts, 0)
-        .map(|t| {
-            t.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M")
-                .to_string()
-        })
+        .map(|t| t.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
         .unwrap_or_default()
 }
 
@@ -101,16 +89,9 @@ pub(super) fn why(w: &Why) -> String {
         Why::FileSystem(fs) => tr!("cannot read {}", fs_name(fs)),
         Why::Table(t) => tr!(
             "cannot read a {} partition table",
-            if t == "dos" {
-                "MBR".to_owned()
-            } else {
-                t.to_uppercase()
-            }
+            if t == "dos" { "MBR".to_owned() } else { t.to_uppercase() }
         ),
-        Why::NoLibrary(reads) => tr!(
-            "needs {}, this stick has none",
-            reads.join(&format!(" {} ", tr!("or")))
-        ),
+        Why::NoLibrary(reads) => tr!("needs {}, this stick has none", reads.join(&format!(" {} ", tr!("or")))),
         Why::Unreadable(n) => tr!("cannot open the {} of this stick", n),
         Why::Damaged(n) => tr!("finds the {} of this stick damaged (see WHAT IS WRONG)", n),
     }
@@ -201,10 +182,7 @@ pub(super) fn line(v: &Verdict) -> String {
     let join = |a: String, b: String| if b.is_empty() { a } else { format!("{a} {b}") };
     match v.overall {
         Overall::Ready => {
-            let (n, ok) = (
-                v.players.len(),
-                v.players.iter().filter(|p| p.fit == Fit::Ok).count(),
-            );
+            let (n, ok) = (v.players.len(), v.players.iter().filter(|p| p.fit == Fit::Ok).count());
             let players = match n {
                 0 => String::new(),
                 _ if ok == n => tr_n!("{n} player reads it.", "{n} players read it.", n),
@@ -223,11 +201,7 @@ pub(super) fn line(v: &Verdict) -> String {
             let cause = first_cause(v);
             if cause.is_empty() {
                 tr!("No library of this stick can be read.").into()
-            } else if v
-                .problems
-                .first()
-                .is_some_and(|p| p.severity >= Severity::Error)
-            {
+            } else if v.problems.first().is_some_and(|p| p.severity >= Severity::Error) {
                 join(cause, action)
             } else {
                 cause
@@ -239,10 +213,7 @@ pub(super) fn line(v: &Verdict) -> String {
 
 /// What is said when a device that a cut-off export left half-written is mounted, and what was done about it (`None`: nothing to
 /// say).
-pub(super) fn recovery_text(
-    label: &str,
-    r: &Result<Option<commit::Recovered>, String>,
-) -> Option<String> {
+pub(super) fn recovery_text(label: &str, r: &Result<Option<commit::Recovered>, String>) -> Option<String> {
     match r {
         Ok(None) => None,
         Ok(Some(commit::Recovered::Finished { .. })) => Some(tr!(
@@ -319,11 +290,7 @@ impl Ctx {
     /// The verdict of device `id` now.
     fn verdict_of(&self, id: &str) -> Option<Verdict> {
         let booth = Behaviour::load(&self.store).booth_models();
-        self.check
-            .facts
-            .borrow()
-            .get(id)
-            .map(|f| check::judge(f, &booth))
+        self.check.facts.borrow().get(id).map(|f| check::judge(f, &booth))
     }
 
     /// Puts the verdicts into the window: the chip of each device row, and the card and details of the chosen one.
@@ -344,16 +311,11 @@ impl Ctx {
         let current = at.and_then(|i| verdicts.get(i)).cloned().flatten();
         let writable = at.is_some_and(|i| self.devices.borrow()[i].writable());
         let booth = Behaviour::load(&self.store).booth_models();
-        let known = current
-            .as_ref()
-            .map(|v| v.known.clone())
-            .unwrap_or_default();
+        let known = current.as_ref().map(|v| v.known.clone()).unwrap_or_default();
         let ticked = self.check.booth.ticked();
         if set(&ticked) != set(&booth) || self.check.booth.rows.row_count() != known.len() {
             let on = set(&booth);
-            self.check
-                .booth
-                .set_names(&known, &|n| on.contains(&n.to_lowercase()));
+            self.check.booth.set_names(&known, &|n| on.contains(&n.to_lowercase()));
         }
         self.with_state(|s| {
             s.set_device_checks(models(chips));
@@ -455,22 +417,14 @@ impl Ctx {
         let (Some(d), Some(v)) = (self.device(id), self.verdict_of(id)) else {
             return;
         };
-        let before = self
-            .check
-            .told
-            .borrow_mut()
-            .insert(id.to_owned(), v.overall);
+        let before = self.check.told.borrow_mut().insert(id.to_owned(), v.overall);
         if before != Some(v.overall)
             && matches!(v.overall, Overall::NeedsFixing | Overall::Unreadable)
             && let Some(app) = self.app()
         {
             toast::show(
                 &app,
-                &tr!(
-                    "{} needs fixing: {} Open DEVICES to fix it.",
-                    d.label,
-                    first_cause(&v)
-                ),
+                &tr!("{} needs fixing: {} Open DEVICES to fix it.", d.label, first_cause(&v)),
             );
         }
         let waiting = self.check.eject.borrow().clone();
@@ -485,11 +439,7 @@ impl Ctx {
             let text = tr!(
                 "{} needs fixing: {} Eject anyway?",
                 d.label,
-                if cause.is_empty() {
-                    title(v.overall).to_owned()
-                } else {
-                    cause
-                }
+                if cause.is_empty() { title(v.overall).to_owned() } else { cause }
             );
             let (anyway, fixing) = (d.clone(), d.clone());
             self.confirm(&text, tr!("EJECT ANYWAY"), move |c| {
@@ -537,10 +487,7 @@ impl Ctx {
         };
         let steps = v.steps();
         if steps.is_empty() {
-            return self.say(
-                &tr!("Nothing on {} that this app can repair.", dev.label),
-                true,
-            );
+            return self.say(&tr!("Nothing on {} that this app can repair.", dev.label), true);
         }
         if !self.writable(dev) {
             return;
@@ -549,10 +496,7 @@ impl Ctx {
         let ticked = self.store.sync_playlists(&dev.id).unwrap_or_default();
         if rebuild && !confirmed {
             let text = if ticked.is_empty() {
-                tr!(
-                    "Rebuild the library on {} from your collection: the whole collection?",
-                    dev.label
-                )
+                tr!("Rebuild the library on {} from your collection: the whole collection?", dev.label)
             } else {
                 tr!(
                     "Rebuild the library on {} from your collection: the playlists ticked in SYNC MANAGER?",
@@ -562,9 +506,7 @@ impl Ctx {
             let d = dev.clone();
             return self.confirm(&text, tr!("REBUILD"), move |c| c.fix(&d, true));
         }
-        let needs_collection = steps
-            .iter()
-            .any(|s| matches!(s, Step::Recopy(_) | Step::Rebuild));
+        let needs_collection = steps.iter().any(|s| matches!(s, Step::Recopy(_) | Step::Rebuild));
         let snap = if needs_collection {
             match self.snapshot() {
                 Some(s) => Some(s),
@@ -703,13 +645,7 @@ impl Fix {
         ctl.set_phase(tr!("Finishing what was cut off"));
         match commit::recover(&dev.mount) {
             Ok(r) => said.extend(recovery_text(&dev.label, &Ok(r))),
-            Err(e) => {
-                return Err(tr!(
-                    "{}: the cut-off export could not be put right ({}).",
-                    dev.label,
-                    e
-                ));
-            }
+            Err(e) => return Err(tr!("{}: the cut-off export could not be put right ({}).", dev.label, e)),
         }
         for s in &self.steps {
             let Step::Plugin { plugin, fix } = s else {
@@ -732,9 +668,7 @@ impl Fix {
         let v = check::check(&fresh(dev), &self.config, &[]);
         let details = said.join("\n");
         if matches!(v.overall, Overall::Ready | Overall::Empty) {
-            Ok(format!("{}\n{details}", tr!("{} is ready.", dev.label))
-                .trim_end()
-                .to_owned())
+            Ok(format!("{}\n{details}", tr!("{} is ready.", dev.label)).trim_end().to_owned())
         } else {
             Err(format!(
                 "{}\n{details}",
@@ -767,17 +701,10 @@ impl Fix {
         let snap = self.snap.as_ref().ok_or("no collection")?;
         let mut by_name: HashMap<String, PathBuf> = HashMap::new();
         for (t, _) in snap.tracks() {
-            let Some(f) = t
-                .file
-                .as_ref()
-                .filter(|f| !f.starts_with(&self.dev.mount) && f.is_file())
-            else {
+            let Some(f) = t.file.as_ref().filter(|f| !f.starts_with(&self.dev.mount) && f.is_file()) else {
                 continue;
             };
-            let name = f
-                .file_name()
-                .map(|n| n.to_string_lossy().to_lowercase())
-                .unwrap_or_default();
+            let name = f.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
             let clean = openfader_plugin::library::clean_name(&name, "track");
             by_name.entry(name).or_insert_with(|| f.clone());
             by_name.entry(clean).or_insert_with(|| f.clone());
@@ -792,11 +719,7 @@ impl Fix {
         ctl.set_phase(tr!("Copying missing music"));
         ctl.start(found.len());
         ctl.bytes_total.store(
-            found
-                .iter()
-                .filter_map(|(_, s)| std::fs::metadata(s).ok())
-                .map(|m| m.len())
-                .sum(),
+            found.iter().filter_map(|(_, s)| std::fs::metadata(s).ok()).map(|m| m.len()).sum(),
             Relaxed,
         );
         for (rel, src) in &found {
@@ -805,11 +728,7 @@ impl Fix {
         }
         let lost = files.len() - found.len();
         Ok(if lost == 0 {
-            tr_n!(
-                "Copied {n} missing audio file again from your collection.",
-                "Copied {n} missing audio files again from your collection.",
-                found.len()
-            )
+            tr_n!("Copied {n} missing audio file again from your collection.", "Copied {n} missing audio files again from your collection.", found.len())
         } else {
             tr!(
                 "Copied {} of {} missing audio files again. {} are not in your collection: copy them to the stick by hand or take them off its playlists.",
@@ -852,10 +771,7 @@ fn copy_audio(src: &Path, to: &Path, ctl: &Control) -> Result<(), String> {
         }
         out.sync_all().map_err(err(&tmp))?;
         if std::fs::metadata(&tmp).map_err(err(&tmp))?.len() != total {
-            return Err(tr!(
-                "{}: the copy is shorter than the original",
-                to.display()
-            ));
+            return Err(tr!("{}: the copy is shorter than the original", to.display()));
         }
         std::fs::rename(&tmp, to).map_err(err(to))
     };
@@ -914,19 +830,13 @@ mod tests {
     #[test]
     fn every_no_has_a_sentence_that_names_the_cause() {
         assert_eq!(why(&Why::FileSystem("exfat".into())), "cannot read exFAT");
-        assert_eq!(
-            why(&Why::Table("dos".into())),
-            "cannot read a MBR partition table"
-        );
+        assert_eq!(why(&Why::Table("dos".into())), "cannot read a MBR partition table");
         assert_eq!(
             why(&Why::NoLibrary(vec!["OneLibrary".into()])),
             "needs OneLibrary, this stick has none"
         );
         assert_eq!(
-            why(&Why::NoLibrary(vec![
-                "OneLibrary".into(),
-                "Device Library".into()
-            ])),
+            why(&Why::NoLibrary(vec!["OneLibrary".into(), "Device Library".into()])),
             "needs OneLibrary or Device Library, this stick has none"
         );
         let v = verdict(&healthy(), &[]);
@@ -936,28 +846,16 @@ mod tests {
         let mut f = healthy();
         f.players[0].status = "to_measure".into();
         f.players[0].note = "firmware 1.2".into();
-        assert_eq!(
-            reason(&verdict(&f, &[]).players[0]),
-            "Not confirmed: firmware 1.2"
-        );
+        assert_eq!(reason(&verdict(&f, &[]).players[0]), "Not confirmed: firmware 1.2");
     }
 
     #[test]
     fn the_card_says_what_matters_first() {
         let mut f = healthy();
-        assert_eq!(
-            line(&verdict(&f, &["CDJ-3000X"])),
-            "Ready for a set. 1 player reads it."
-        );
-        assert_eq!(
-            line(&verdict(&f, &[])),
-            "Ready for a set. 1 of 2 players read it."
-        );
+        assert_eq!(line(&verdict(&f, &["CDJ-3000X"])), "Ready for a set. 1 player reads it.");
+        assert_eq!(line(&verdict(&f, &[])), "Ready for a set. 1 of 2 players read it.");
         // A booth player that cannot read it is the first thing said.
-        assert_eq!(
-            line(&verdict(&f, &["CDJ-2000NXS2"])),
-            "CDJ-2000NXS2 needs Device Library, this stick has none."
-        );
+        assert_eq!(line(&verdict(&f, &["CDJ-2000NXS2"])), "CDJ-2000NXS2 needs Device Library, this stick has none.");
         f.problems.push(Problem {
             id: check::INTERRUPTED.into(),
             severity: Severity::Error,
@@ -965,18 +863,11 @@ mod tests {
         });
         let v = verdict(&f, &[]);
         assert_eq!(v.overall, Overall::NeedsFixing);
-        assert!(
-            line(&v).starts_with("An export to this stick was cut off"),
-            "{}",
-            line(&v)
-        );
+        assert!(line(&v).starts_with("An export to this stick was cut off"), "{}", line(&v));
         assert!(line(&v).ends_with("your music is not touched."));
         f.libs.clear();
         f.problems.clear();
-        assert_eq!(
-            line(&verdict(&f, &[])),
-            "No library on this stick yet. Export to it to use it."
-        );
+        assert_eq!(line(&verdict(&f, &[])), "No library on this stick yet. Export to it to use it.");
     }
 
     #[test]
@@ -987,10 +878,7 @@ mod tests {
             files: vec!["a.mp3".into(), "b.mp3".into()],
             ..Default::default()
         };
-        assert_eq!(
-            words(&gone).0,
-            "2 audio files that the OneLibrary lists are missing from this stick."
-        );
+        assert_eq!(words(&gone).0, "2 audio files that the OneLibrary lists are missing from this stick.");
         let theirs = Problem {
             id: "p:x".into(),
             cause: "c".into(),
@@ -1005,23 +893,13 @@ mod tests {
     fn a_cut_off_export_is_told_by_what_recovery_did() {
         let done = |r| recovery_text("STICK", &r);
         assert_eq!(done(Ok(None)), None);
-        assert!(
-            done(Ok(Some(commit::Recovered::Finished { owner: "p".into() })))
-                .unwrap()
-                .contains("was finished")
-        );
-        assert!(
-            done(Ok(Some(commit::Recovered::RolledBack {
-                owner: "p".into()
-            })))
+        assert!(done(Ok(Some(commit::Recovered::Finished { owner: "p".into() })))
             .unwrap()
-            .contains("previous library is in use again")
-        );
-        assert!(
-            done(Err("read-only".into()))
-                .unwrap()
-                .contains("press FIX THE STICK")
-        );
+            .contains("was finished"));
+        assert!(done(Ok(Some(commit::Recovered::RolledBack { owner: "p".into() })))
+            .unwrap()
+            .contains("previous library is in use again"));
+        assert!(done(Err("read-only".into())).unwrap().contains("press FIX THE STICK"));
     }
 
     #[test]
@@ -1031,18 +909,8 @@ mod tests {
         std::fs::create_dir_all(dir.join("src")).unwrap();
         std::fs::write(dir.join("src/a.mp3"), vec![7u8; 3_000_000]).unwrap();
         let ctl = Control::default();
-        copy_audio(
-            &dir.join("src/a.mp3"),
-            &dir.join("stick/Contents/A/B/a.mp3"),
-            &ctl,
-        )
-        .unwrap();
-        assert_eq!(
-            std::fs::read(dir.join("stick/Contents/A/B/a.mp3"))
-                .unwrap()
-                .len(),
-            3_000_000
-        );
+        copy_audio(&dir.join("src/a.mp3"), &dir.join("stick/Contents/A/B/a.mp3"), &ctl).unwrap();
+        assert_eq!(std::fs::read(dir.join("stick/Contents/A/B/a.mp3")).unwrap().len(), 3_000_000);
         assert_eq!(ctl.bytes_done.load(Relaxed), 3_000_000);
         assert!(!dir.join("stick/Contents/A/B/a.part").exists());
         // A cancel leaves no part.
