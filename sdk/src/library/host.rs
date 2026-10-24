@@ -6,7 +6,7 @@
 //! |---|---|---|
 //! | `analysis` | `track`, `computed` | `{"analysis": `[`Analysis`]` or null}`: `computed` false: what the track's own library holds (its `analysis_ref`); true: the host's analysis of the audio (grid, waveform, key; cached) |
 //! | `audio_info` | `file` | `{"sample_rate": Hz}`, 0 when unknown |
-//! | `progress` | `phase`, `done`, `total` | `{"cancel": bool}`: the user cancelled the job, stop at the next safe point |
+//! | `progress` | `phase`, `done`, `total`, `bytes_done`, `bytes_total` | `{"cancel": bool}`: the user cancelled the job, stop at the next safe point. The byte counts (0 when the plugin does not count bytes) let the host show the speed and the time left |
 //!
 //! The functions of this module call the table of the request being served on this thread; outside a request (or on another
 //! thread) they answer nothing.
@@ -39,11 +39,27 @@ pub enum HostRequest {
         phase: String,
         done: usize,
         total: usize,
+        #[serde(default)]
+        bytes_done: u64,
+        #[serde(default)]
+        bytes_total: u64,
     },
+}
+
+/// The job's last progress report and byte counts, so a byte count can be sent without the plugin naming its phase again.
+#[derive(Default)]
+struct Job {
+    phase: String,
+    done: usize,
+    total: usize,
+    bytes_done: u64,
+    bytes_total: u64,
+    sent: Option<std::time::Instant>,
 }
 
 thread_local! {
     static CURRENT: Cell<*const Host> = const { Cell::new(std::ptr::null()) };
+    static JOB: std::cell::RefCell<Job> = std::cell::RefCell::default();
 }
 
 /// Runs `f` with `host` as the table of this thread's requests.
@@ -56,6 +72,7 @@ pub fn serving<R>(host: *const Host, f: impl FnOnce() -> R) -> R {
         }
     }
     let _reset = Reset(CURRENT.with(|c| c.replace(host)));
+    JOB.with(|j| *j.borrow_mut() = Job::default());
     f()
 }
 
@@ -93,11 +110,46 @@ pub fn sample_rate(file: &Path) -> u32 {
 
 /// Tells the host the job is at `done` of `total` in `phase` ("Copying tracks"); `true` when the user cancelled it.
 pub fn progress(phase: &str, done: usize, total: usize) -> bool {
-    ask(&HostRequest::Progress {
-        phase: phase.to_owned(),
-        done,
-        total,
-    })
-    .and_then(|v| v.get("cancel")?.as_bool())
-    .unwrap_or(false)
+    JOB.with(|j| {
+        let mut j = j.borrow_mut();
+        phase.clone_into(&mut j.phase);
+        (j.done, j.total) = (done, total);
+    });
+    send()
+}
+
+/// Sets how many bytes the whole job will write (audio plus the estimate of the rest), and none written yet.
+pub fn set_bytes_total(total: u64) {
+    JOB.with(|j| {
+        let mut j = j.borrow_mut();
+        (j.bytes_done, j.bytes_total) = (0, total);
+    });
+}
+
+/// Counts `n` more bytes written; reports to the host at most every 200 ms. `true` when the user cancelled the job.
+pub fn add_bytes(n: u64) -> bool {
+    let due = JOB.with(|j| {
+        let mut j = j.borrow_mut();
+        j.bytes_done += n;
+        j.sent
+            .is_none_or(|t| t.elapsed() >= std::time::Duration::from_millis(200))
+    });
+    due && send()
+}
+
+fn send() -> bool {
+    let req = JOB.with(|j| {
+        let mut j = j.borrow_mut();
+        j.sent = Some(std::time::Instant::now());
+        HostRequest::Progress {
+            phase: j.phase.clone(),
+            done: j.done,
+            total: j.total,
+            bytes_done: j.bytes_done,
+            bytes_total: j.bytes_total,
+        }
+    });
+    ask(&req)
+        .and_then(|v| v.get("cancel")?.as_bool())
+        .unwrap_or(false)
 }

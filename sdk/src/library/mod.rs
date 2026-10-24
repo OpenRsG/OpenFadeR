@@ -26,6 +26,7 @@
 //! `<plugin>:<opaque>` ([`owned_ref`]): the plugin only ever sees its own opaque part. In Rust, implement [`LibraryPlugin`]
 //! and [`Source`] and call [`export_library!`]: it generates the C ABI and keeps panics from crossing it.
 
+pub mod commit;
 mod device;
 pub mod host;
 mod model;
@@ -176,6 +177,21 @@ pub enum Request {
         #[serde(default)]
         settings: Value,
     },
+    DeviceCheck {
+        root: PathBuf,
+        #[serde(default)]
+        config: BTreeMap<String, String>,
+        #[serde(default)]
+        settings: Value,
+    },
+    DeviceFix {
+        root: PathBuf,
+        fix: String,
+        #[serde(default)]
+        config: BTreeMap<String, String>,
+        #[serde(default)]
+        settings: Value,
+    },
 }
 
 /// Answer of `probe`.
@@ -297,6 +313,23 @@ pub trait LibraryPlugin {
     fn backup_tracks(_dir: &Path, _settings: &Value) -> Result<Vec<BackupTrack>, String> {
         Err("this plugin has no backups".into())
     }
+    /// The state of this plugin's libraries on the device (`Feature::Check`): read-only, quick enough to run on every plug-in.
+    fn device_check(
+        _root: &Path,
+        _config: &BTreeMap<String, String>,
+        _settings: &Value,
+    ) -> Result<CheckReport, String> {
+        Err("this plugin checks no devices".into())
+    }
+    /// Runs the fix `fix` a [`Problem::fix`] of [`LibraryPlugin::device_check`] named (`Feature::Check`).
+    fn device_fix(
+        _root: &Path,
+        _fix: &str,
+        _config: &BTreeMap<String, String>,
+        _settings: &Value,
+    ) -> Result<ActionAnswer, String> {
+        Err("this plugin fixes no devices".into())
+    }
 }
 
 type Handle = Arc<Mutex<Box<dyn Source>>>;
@@ -409,6 +442,17 @@ fn dispatch<P: LibraryPlugin>(req: &[u8]) -> Result<Value, String> {
             json!({ "tracks": P::backup_tracks(&dir, &settings)? })
         }
         Request::Capabilities { settings } => json!(P::capabilities(&settings)),
+        Request::DeviceCheck {
+            root,
+            config,
+            settings,
+        } => json!(P::device_check(&root, &config, &settings)?),
+        Request::DeviceFix {
+            root,
+            fix,
+            config,
+            settings,
+        } => json!(P::device_fix(&root, &fix, &config, &settings)?),
     })
 }
 

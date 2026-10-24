@@ -17,9 +17,14 @@
 //! | `settings_write` | `root`, `values` | [`SettingsWritten`] |
 //! | `backup_tracks` | `dir` (a backup of the plugin's `backup` paths) | `{"tracks": [`[`BackupTrack`]`]}` |
 //! | `analysis_ref` | `reference` | `{"analysis": `[`Analysis`]` or null}` |
+//! | `device_check` | `root`, `config` | [`CheckReport`] (only asked of a plugin listing [`Feature::Check`]) |
+//! | `device_fix` | `root`, `fix`, `config` | [`ActionAnswer`]: runs the fix a [`Problem::fix`] named |
 //!
-//! A long job (`export`, `update`, `remove`, `device_action`) runs inside the call, on a thread of the host; it reports its
-//! progress and learns about a cancel through the host callbacks of [`super::host`].
+//! A long job (`export`, `update`, `remove`, `device_action`, `device_fix`) runs inside the call, on a thread of the host; it
+//! reports its progress and learns about a cancel through the host callbacks of [`super::host`].
+//!
+//! Library files are written through [`super::commit::Commit`] so a device always holds one whole generation of them, and an
+//! export with [`ExportOptions::dry_run`] writes nothing (only asked of a plugin listing [`Feature::Plan`]).
 
 use super::{Analysis, Beat, Cue};
 use serde::{Deserialize, Serialize};
@@ -42,6 +47,11 @@ pub enum Feature {
     Backup,
     /// `settings_schema`, `settings_read`, `settings_write`.
     Settings,
+    /// `export` honours [`ExportOptions::dry_run`]: it answers [`ExportReport::plan`] and writes nothing. The host never asks a
+    /// dry run of a plugin that does not list this (an older plugin would write).
+    Plan,
+    /// `device_check` and `device_fix`.
+    Check,
 }
 
 /// One button of a device's panel (`device_action`), e.g. converting its library to a newer format.
@@ -115,6 +125,151 @@ pub struct ExportOptions {
     pub config: BTreeMap<String, String>,
     /// Cue Banks to put on the device; a list replaces the device's list of the same name.
     pub banks: Vec<Bank>,
+    /// Plan only: fill [`ExportReport::plan`] (and the counts it would reach) and write nothing at all.
+    pub dry_run: bool,
+    /// Largest file the device's file system holds (FAT32: 4 GiB - 1); `None`: no limit. A track over it is left out with a
+    /// warning (and listed in [`ExportPlan::blocked`] by a dry run), never copied in part.
+    pub max_file: Option<u64>,
+}
+
+/// What an export would do, answered by a dry run ([`ExportOptions::dry_run`]).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ExportPlan {
+    /// Tracks whose audio would be copied.
+    pub add: Vec<PlanItem>,
+    /// Tracks the device holds already: metadata, cues and grid refreshed, audio not copied.
+    pub update: Vec<PlanItem>,
+    /// Tracks that would get new analysis files (made by the host's analysis when the collection has none).
+    pub analyse: usize,
+    /// Playlists and folders written or refreshed.
+    pub playlists: usize,
+    /// Audio bytes to copy.
+    pub copy_bytes: u64,
+    /// Other bytes to write: analysis files, artwork and the library files (an estimate).
+    pub write_bytes: u64,
+    /// Files to create or rewrite (small files are what makes a slow stick slow).
+    pub files: usize,
+    /// Why the export cannot run as it is, one sentence each naming the cause, what it means and what to do ("Night Drive.wav
+    /// is 4.3 GB: FAT32 holds files up to 4 GB. It would be left out; convert it to FLAC or use an exFAT stick."). Tracks left
+    /// out are also in `ExportReport::warnings`.
+    pub blocked: Vec<String>,
+}
+
+/// One track of an [`ExportPlan`].
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PlanItem {
+    /// [`track_key`] of the snapshot track.
+    pub key: String,
+    pub title: String,
+    pub artist: String,
+    /// Audio bytes to copy (0 for an update).
+    pub bytes: u64,
+}
+
+/// How bad a [`Problem`] is.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Severity {
+    /// Worth knowing; the device plays as it is.
+    #[default]
+    Info,
+    /// Plays, but something is missing or will be (a track a player cannot read, an old library next to a new one).
+    Warning,
+    /// Needs fixing before a set: a player would show an incomplete or empty device.
+    Error,
+    /// The library cannot be read at all.
+    Unreadable,
+}
+
+/// One library of a plugin on a device, as `device_check` found it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LibraryState {
+    /// The name players and the host know it by ("Device Library", "OneLibrary"): the key of [`Player::reads`].
+    pub name: String,
+    pub present: bool,
+    /// Present and parsed without an error.
+    pub readable: bool,
+    /// Unix seconds it was last written.
+    pub modified: Option<i64>,
+    pub tracks: usize,
+    /// Playlists (not folders, not histories).
+    pub playlists: usize,
+    /// Hot cues, memory cues and loops of all its tracks.
+    pub cues: usize,
+}
+
+/// Something `device_check` found wrong, worded for the user: what is wrong, what it means at a gig, what to do.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Problem {
+    /// Stable id, prefixed with the plugin's name ("rekordbox-device:count_mismatch").
+    pub id: String,
+    pub severity: Severity,
+    /// [`LibraryState::name`] it is about; empty: the device as a whole.
+    pub library: String,
+    /// "The Device Library of this stick is incomplete (312 tracks instead of 1104)."
+    pub cause: String,
+    /// "Older players would show an empty stick."
+    pub consequence: String,
+    /// "FIX THE STICK rebuilds it from the OneLibrary in about a minute. Your audio files are not touched."
+    pub action: String,
+    /// The `device_fix` id that repairs it; `None`: the plugin cannot (the host may: [`Problem::files`] can be copied again
+    /// from the collection).
+    pub fix: Option<String>,
+    /// Audio files (relative to the root, `/` separators) the problem is about, e.g. listed but missing.
+    pub files: Vec<String>,
+}
+
+/// Answer of `device_check`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CheckReport {
+    /// Every library this plugin can hold, present or not.
+    pub libraries: Vec<LibraryState>,
+    pub problems: Vec<Problem>,
+}
+
+/// One player model a device plugin knows (its `players.json`, next to `plugin.json`, read by the host for the stick
+/// checker): what it needs to play a device. A new model is a line in that file, not a new app.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Player {
+    /// Model name as printed on the unit.
+    pub model: String,
+    /// [`LibraryState::name`]s it reads; one present, readable and without an [`Severity::Error`] is enough.
+    pub reads: Vec<String>,
+    /// Kernel file system names it reads (`vfat`, `exfat`, `hfsplus`).
+    pub file_systems: Vec<String>,
+    /// Partition tables it reads (`dos` = MBR, `gpt`); empty: not known, not checked.
+    pub partition_tables: Vec<String>,
+    /// `confirmed` (from the maker's documentation or a test), `to_measure` (not known yet: the checker says so instead of ✓).
+    pub status: String,
+    /// Firmware the facts were checked on, when known.
+    pub firmware: String,
+    /// One line shown with the verdict.
+    pub note: String,
+}
+
+/// A named set of [`Player::model`]s for the booth profile ("Older players").
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BoothPreset {
+    pub id: String,
+    pub label: String,
+    pub models: Vec<String>,
+}
+
+/// The whole `players.json` of a device plugin.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Players {
+    /// Bumped by every change, shown on the compatibility page.
+    pub version: u32,
+    pub players: Vec<Player>,
+    pub presets: Vec<BoothPreset>,
 }
 
 /// Answer of `export`: a new library is made when the device has none, else it is extended.
@@ -136,6 +291,11 @@ pub struct ExportReport {
     pub baselines: Vec<(String, i64)>,
     /// [`SettingsWritten::fingerprint`] of the settings files written with the library.
     pub fingerprint: Option<String>,
+    /// A dry run's answer ([`ExportOptions::dry_run`]); `None` after a real export.
+    pub plan: Option<ExportPlan>,
+    /// The library files written were read back and held what the export put in them (tracks, playlists, cues): `None` when
+    /// the plugin does not check, `Some(false)` never reaches the host (a failed check is an `Err` and leaves the old files).
+    pub verified: Option<bool>,
 }
 
 /// What `update` changed on one collection track (a part that is `None` did not change).
@@ -436,8 +596,10 @@ pub fn audio_slot(root: &Path, t: &super::Track) -> Result<(String, bool), Strin
     unreachable!()
 }
 
-/// [`audio_slot`], copying the audio there when the device does not hold it yet (through a temporary file, so a cut copy never
-/// looks whole). Returns the relative path and whether it was copied.
+/// [`audio_slot`], copying the audio there when the device does not hold it yet (through a temporary file flushed to the device
+/// before it is renamed, so a cut copy never looks whole). The bytes copied count in the job's progress
+/// ([`super::host::add_bytes`]); a cancel stops the copy and removes the part. Returns the relative path and whether it was
+/// copied.
 pub fn place_audio(root: &Path, t: &super::Track) -> Result<(String, bool), String> {
     let (rel, there) = audio_slot(root, t)?;
     if there {
@@ -449,11 +611,33 @@ pub fn place_audio(root: &Path, t: &super::Track) -> Result<(String, bool), Stri
     if let Some(dir) = dest.parent() {
         std::fs::create_dir_all(dir).map_err(err)?;
     }
-    std::fs::copy(src, &tmp)
-        .and_then(|_| std::fs::rename(&tmp, &dest))
-        .map_err(|e| {
-            let _ = std::fs::remove_file(&tmp);
-            err(e)
-        })?;
+    copy_counted(src, &tmp)
+        .and_then(|()| std::fs::rename(&tmp, &dest).map_err(err))
+        .inspect_err(|_| drop(std::fs::remove_file(&tmp)))?;
+    if let Some(dir) = dest.parent() {
+        super::commit::sync_dir(dir);
+    }
     Ok((rel, true))
+}
+
+/// Copies `src` to a new `to` in 1 MiB blocks, counting them in the job's bytes, and flushes `to` to the device.
+fn copy_counted(src: &Path, to: &Path) -> Result<(), String> {
+    use std::io::{Read, Write};
+    fn at(p: &Path) -> impl Fn(std::io::Error) -> String + '_ {
+        move |e| format!("{}: {e}", p.display())
+    }
+    let mut from = std::fs::File::open(src).map_err(at(src))?;
+    let mut out = std::fs::File::create(to).map_err(at(to))?;
+    let mut buf = vec![0; 1 << 20];
+    loop {
+        let n = from.read(&mut buf).map_err(at(src))?;
+        if n == 0 {
+            break;
+        }
+        out.write_all(&buf[..n]).map_err(at(to))?;
+        if super::host::add_bytes(n as u64) {
+            return Err("cancelled".into());
+        }
+    }
+    out.sync_all().map_err(at(to))
 }

@@ -512,6 +512,7 @@ mod tests {
             source: String::new(),
             label: label.into(),
             fs: "vfat".into(),
+            table: String::new(),
             kind: device::Kind::Usb,
             support: device::Support::Ok,
             read_only: false,

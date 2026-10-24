@@ -38,7 +38,28 @@ pub fn rows(store: &Store) -> Vec<Row> {
                 "Plugging a device in fills the copy that has none; loading a track makes the copy you loaded win"
             ),
         ),
+        Row::header(tr!("WRITING TO A DEVICE")),
+        Row::check(
+            "djs.beh.preview",
+            tr!("Show what an export will write before it starts"),
+            b.preview,
+        ),
+        Row::check(
+            "djs.beh.sync_ask",
+            tr!("Ask before syncing playlists to a device that is plugged in"),
+            b.sync_ask,
+        ),
+        Row::check(
+            "djs.beh.review_imports",
+            tr!("Show what a device would change in the collection before importing it"),
+            b.review_imports,
+        ),
         Row::header(tr!("DEVICE LIBRARY BACKUP")),
+        Row::check(
+            "djs.beh.backup_before_write",
+            tr!("Back up the device library before it is rewritten"),
+            b.backup_before_write,
+        ),
         Row::check(
             "djs.beh.auto_backup",
             tr!("Automatically backup device library upon removal"),

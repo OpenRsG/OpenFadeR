@@ -293,15 +293,18 @@ impl Ctx {
         })
     }
 
-    /// What an export to `dev` (or a plain folder) is configured with: the free space, the device's settings, the Cue Banks.
+    /// What an export to `dev` (or a plain folder) is configured with: the free space, the largest file its file system holds,
+    /// the device's settings, the Cue Banks.
     fn options(&self, dev: Option<&Device>) -> ExportOptions {
         ExportOptions {
             free: dev.and_then(|d| device::space(&d.mount)).map(|s| s.1),
+            max_file: dev.and_then(Device::max_file),
             config: device_settings::config(&self.store, dev.map_or("", |d| d.id.as_str())),
             banks: store::collect_banks(&self.store).unwrap_or_else(|e| {
                 eprintln!("cue banks: {e}");
                 Vec::new()
             }),
+            dry_run: false,
         }
     }
 

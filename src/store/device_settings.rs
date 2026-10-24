@@ -190,6 +190,17 @@ pub struct Behaviour {
     pub sync_cues: bool,
     /// Name of this computer, shown in the device backup list. Empty = the host name.
     pub computer_name: String,
+    /// Back up a device's library before a job rewrites it (export, sync, transfer, fix). On.
+    pub backup_before_write: bool,
+    /// Show what an export, sync or transfer will write (and wait for a go) before it starts. On.
+    pub preview: bool,
+    /// A device with synced playlists that is plugged in asks before syncing them (off: it syncs at once). On.
+    pub sync_ask: bool,
+    /// Show what UPDATE COLLECTION and IMPORT HISTORIES would change (and wait for a go) before they change the collection. On.
+    pub review_imports: bool,
+    /// The booth profile: the player models (`Player::model`) the stick checker judges devices for, comma separated. Empty:
+    /// every player the plugins know.
+    pub booth: String,
 }
 
 impl Default for Behaviour {
@@ -201,18 +212,28 @@ impl Default for Behaviour {
             auto_backup: false,
             sync_cues: true,
             computer_name: String::new(),
+            backup_before_write: true,
+            preview: true,
+            sync_ask: true,
+            review_imports: true,
+            booth: String::new(),
         }
     }
 }
 
 impl Behaviour {
-    const KEYS: [&'static str; 6] = [
+    const KEYS: [&'static str; 11] = [
         "delete_tracks",
         "import_history",
         "delete_history_after_import",
         "auto_backup",
         "sync_cues",
         "computer_name",
+        "backup_before_write",
+        "preview",
+        "sync_ask",
+        "review_imports",
+        "booth",
     ];
 
     pub fn load(store: &Store) -> Self {
@@ -235,7 +256,25 @@ impl Behaviour {
                 .get(&format!("{BEHAVIOUR}computer_name"))
                 .cloned()
                 .unwrap_or_default(),
+            backup_before_write: flag("backup_before_write", d.backup_before_write),
+            preview: flag("preview", d.preview),
+            sync_ask: flag("sync_ask", d.sync_ask),
+            review_imports: flag("review_imports", d.review_imports),
+            booth: rows
+                .get(&format!("{BEHAVIOUR}booth"))
+                .cloned()
+                .unwrap_or_default(),
         }
+    }
+
+    /// [`Self::booth`] as a list of models.
+    pub fn booth_models(&self) -> Vec<String> {
+        self.booth
+            .split(',')
+            .map(str::trim)
+            .filter(|m| !m.is_empty())
+            .map(str::to_owned)
+            .collect()
     }
 
     /// Sets one field by its name (`delete_tracks`, ..., `computer_name`; booleans `"0"` / `"1"`).

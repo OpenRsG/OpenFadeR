@@ -101,6 +101,8 @@ pub struct Device {
     pub label: String,
     /// Kernel file system name: `vfat`, `exfat`, `ntfs3`, …
     pub fs: String,
+    /// Partition table of the disk it is on: `dos` (MBR), `gpt`, empty while unknown.
+    pub table: String,
     pub kind: Kind,
     pub support: Support,
     pub read_only: bool,
@@ -128,6 +130,7 @@ impl Device {
             ),
             source: String::new(),
             fs,
+            table: String::new(),
             kind,
             support,
             read_only: false,
@@ -153,6 +156,12 @@ impl Device {
     /// Whether the plugin offers `f` for this device.
     pub fn can(&self, f: plugin::device::Feature) -> bool {
         self.info.features.contains(&f)
+    }
+
+    /// The largest file its file system holds: FAT (FAT16 / FAT32) stops at 4 GiB - 1.
+    pub fn max_file(&self) -> Option<u64> {
+        matches!(self.fs.as_str(), "vfat" | "msdos" | "fat" | "fat32")
+            .then_some(u64::from(u32::MAX))
     }
 
     /// The formats an export writes when the user picked none for this device: those whose library is on it, else all (a blank
