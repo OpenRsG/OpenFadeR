@@ -3,7 +3,7 @@ import { Icon } from "../icons.slint";
 import { DeckState, DeckView } from "../deck-state.slint";
 import { ChannelView, MixerState } from "../mixer.slint";
 import { StageButton, StageKnob, StagePanel, StageTone } from "controls.slint";
-import { StageBadge, StageHead, StageWave } from "deck-parts.slint";
+import { StageBadge, StageGeom, StageHead, StageWave } from "deck-parts.slint";
 
 /// Stage deck 2, controller: cover and title; with `stage-wave` 2 the waveform, overview and the span selector; the deck's channel knobs
 /// (LOW, MID, HIGH, TRIM, FILTER) and headphone CUE beside the big deck number; big CUE / PLAY / SYNC buttons with SLIP, Q and MT.
@@ -17,12 +17,12 @@ export component StageController inherits Rectangle {
     property <length> g: Theme.space-lg;
     property <length> iw: root.width - 2 * root.g;
     property <length> ih: root.height - 2 * root.g;
-    property <length> hh: max(min(Theme.stage-cover, root.ih * 0.26), 52px);
-    property <bool> waved: Theme.stage-wave == 2;
-    property <length> btn-h: min(Theme.stage-button, root.ih * 0.18);
-    property <length> wh: root.waved ? clamp(root.ih * 0.34, 64px, max(64px, Theme.stage-wave-h + 40px)) : 0px;
+    property <length> hh: StageGeom.head;
+    property <bool> waved: StageGeom.waved;
+    property <length> btn-h: min(Theme.stage-button, root.ih * 0.2);
+    property <length> wh: root.waved ? min(StageGeom.wave-ov, max(64px, root.ih * 0.34)) : 0px;
     property <length> kr-y: root.hh + root.g + (root.waved ? root.wh + root.g : 0px);
-    property <length> kr-h: max(40px, root.ih - root.kr-y - root.g - root.btn-h);
+    property <length> kr-h: max(40px, min(78px, root.ih - root.kr-y - root.g - root.btn-h));
     property <length> num-w: 30px;
     property <length> kw: root.iw - root.num-w - root.g;
     property <length> cell: root.kw / 6;

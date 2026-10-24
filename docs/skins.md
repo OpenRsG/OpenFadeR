@@ -305,8 +305,11 @@ What each token picks (values in the Tokens tables):
   MIXER / VIDEO / LIGHTING over the mixer. `stage-mixer-w` is its width.
 * `stage-strip` 1: a strip under the decks, EFFECTS (a BEAT FX drop-down, the effect, its knobs) on the left, SOUND COLOR FX and the
   SAMPLER pads on the right.
-* `stage-list-wave` 1: the track list gets a waveform preview column and a column with the cue badges. `stage-sidebar`: library side
-  bar with icon and label, or icons only.
+* `stage-mirror` 0: the right-hand deck has the left deck's arrangement; 1 (default): mirrored, its controls on the outer side.
+* `stage-list-wave` 1: the track list gets a waveform preview column and a badge naming the deck a track is loaded on. `stage-sidebar`: library side
+  bar with icon and label, or icons only. The list also shows ALBUM from 1000 px wide and DATE ADDED from 1180 px wide.
+* `wave-ruler` 1: a row of bar numbers (counted from the first downbeat of the grid; 1, 9, 17 … at wide zoom, every bar when zoomed in)
+  over the enlarged waveforms at the top or in the centre column.
 * Sizes: `stage-wave-h` (each enlarged waveform), `stage-gap`, `stage-radius` (panels), `stage-radius-ctl` (buttons, pads, tabs,
   fields), `stage-cover`, `stage-row` (track list row), `stage-button` (big CUE / PLAY / SYNC), `stage-jog`.
 * Looks (Style group): `button-style` filled, outlined (the lit one glows) or raised (bevelled caps); `jog-style` ring with the BPM
@@ -540,8 +543,10 @@ The tokens of the stage workspace, described under [Stage workspace](#stage-work
 | `stage-mixer` | int | `0` | `0` two channels, `1` four channels | Stage mixer: 0 = two channels, 1 = four channels (decks 3 and 4 follow the controller's layers). |
 | `stage-tabs` | int | `0` | `0` none, `1` MIXER FX REC, `2` MIXER VIDEO LIGHTING | Tabs over the Stage mixer: 0 = none, 1 = MIXER / FX / REC, 2 = MIXER / VIDEO / LIGHTING. |
 | `stage-strip` | int | `0` | `0` none, `1` effects and sampler | A strip under the Stage decks: 0 = none, 1 = EFFECTS (left), SOUND COLOR FX and SAMPLER (right). |
-| `stage-list-wave` | int | `0` | `0` off, `1` on | Stage track list: 1 = a waveform preview column and a hot cue bank column. |
+| `stage-list-wave` | int | `0` | `0` off, `1` on | Stage track list: 1 = a waveform preview column and a badge naming the deck a track is loaded on. |
 | `stage-sidebar` | int | `0` | `0` labels, `1` icons only | Stage library side bar: 0 = icon and label per entry, 1 = icons only. |
+| `stage-mirror` | int | `1` | `0` same, `1` mirrored | Stage right-hand deck: 0 = the same left-to-right arrangement as the left deck, 1 = mirrored (jog and buttons on the outer side). |
+| `wave-ruler` | int | `0` | `0` off, `1` on | Stage workspace: 1 = a bar ruler (the bar numbers, stepping with the zoom) along the top of the enlarged waveforms stacked across the top or in the centre column; hidden while a track has no beat grid. |
 | `stage-mixer-w` | length | `280px` |  | Width of the Stage mixer. |
 | `stage-wave-h` | length | `64px` |  | Height of each enlarged waveform in the Stage workspace. |
 | `stage-gap` | length | `8px` |  | Spacing between the Stage panels (and the window edge). |

@@ -18,9 +18,24 @@ export global StageTone {
     public pure function cue(i: int) -> color { return Theme.deck-tint == 1 ? StageTone.deck(i) : Theme.cue; }
     public pure function sync(i: int) -> color { return Theme.deck-tint == 1 ? StageTone.deck(i) : Theme.sync; }
     public pure function master(i: int) -> color { return Theme.deck-tint == 1 ? StageTone.deck(i) : Theme.master; }
-    /// Legible text on a fill of colour `c`: black on a light fill, white on a dark one.
+    /// Relative luminance (0..1) of a colour.
+    public pure function lum(c: color) -> float {
+        return 0.2126 * StageTone.lin(c.red / 255) + 0.7152 * StageTone.lin(c.green / 255) + 0.0722 * StageTone.lin(c.blue / 255);
+    }
+    pure function lin(v: float) -> float {
+        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    }
+    /// WCAG contrast ratio of two colours.
+    public pure function contrast(a: color, b: color) -> float {
+        return (max(StageTone.lum(a), StageTone.lum(b)) + 0.05) / (min(StageTone.lum(a), StageTone.lum(b)) + 0.05);
+    }
+    /// The label colour for a fill `c`: `text-bright`, or the opposite end (the dark `bg` / black on a light text-bright, else white) when that
+    /// contrasts more. Use it for every label on a filled, lit surface.
     public pure function on(c: color) -> color {
-        return c.to-oklch().lightness > 0.72 ? Colors.black : Colors.white;
+        return StageTone.contrast(c, Theme.text-bright) >= StageTone.contrast(c, StageTone.opposite()) ? Theme.text-bright : StageTone.opposite();
+    }
+    pure function opposite() -> color {
+        return StageTone.lum(Theme.text-bright) > 0.4 ? (StageTone.lum(Theme.bg) < 0.1 ? Theme.bg : Colors.black) : Colors.white;
     }
     /// The Camelot number (1..12) of a key such as "8A" / "11B"; 0 = not a Camelot name.
     public pure function camelot(k: string) -> float {
@@ -88,8 +103,10 @@ export component StageButton inherits Rectangle {
     property <bool> lit: root.active && root.enabled;
     property <bool> glowing: root.lit && Theme.glow > 0 && root.style != 2;
     property <color> rest: root.flat ? transparent : Theme.panel-raised;
+    /// What the lit face effectively looks like behind the label (style 1's tint is lifted by the glow bleeding through it).
+    property <color> lit-fill: root.style == 0 ? root.accent : root.style == 1 ? root.accent.mix(Theme.panel, 0.2 + 0.4 * Theme.glow) : Theme.panel-raised.darker(0.2);
     property <color> label: !root.enabled ? Theme.text-disabled
-        : root.lit ? (root.style == 0 ? StageTone.on(root.accent) : root.style == 1 ? root.accent.brighter(0.25) : root.accent)
+        : root.lit ? (root.style == 2 && StageTone.contrast(root.accent, root.lit-fill) > 3 ? root.accent : root.style == 1 && StageTone.contrast(root.accent.brighter(0.25), root.lit-fill) > 4.5 ? root.accent.brighter(0.25) : StageTone.on(root.lit-fill))
         : ta.has-hover ? Theme.text-bright : Theme.text;
     min-width: 12px;
     min-height: 12px;

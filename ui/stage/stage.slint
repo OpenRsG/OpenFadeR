@@ -1,7 +1,7 @@
 import { Theme } from "../theme.slint";
 import { AutomixState, BrowserState } from "../browser-state.slint";
 import { DeckDetail } from "../deck-wave.slint";
-import { DeckState } from "../deck-state.slint";
+import { DeckScroll, DeckState } from "../deck-state.slint";
 import { DeviceProgress } from "../device.slint";
 import { DragTracker } from "../dnd.slint";
 import { KeysState } from "../help.slint";
@@ -10,34 +10,53 @@ import { StudioState } from "../studio-state.slint";
 import { TrackInfoState } from "../trackinfo.slint";
 import { Glyph, Icon } from "../widgets.slint";
 import { StageBar } from "bar.slint";
-import { StageDeck } from "deck.slint";
+import { StageDeck, StageDeckSize } from "deck.slint";
 import { StageLibrary } from "library.slint";
 import { StageMixer } from "mixer.slint";
 import { StageColorSampler, StageEffects } from "strip.slint";
+import { StageMetrics } from "state.slint";
 
-/// What the window needs of the Stage workspace before it is built: the smallest window the tokens fit in.
-export global StageMetrics {
-    out property <length> bar-h: max(Theme.h-bar, 36px);
-    /// The enlarged waveforms of a window under 900 px high shrink to 3/4 of `stage-wave-h`.
-    out property <length> wave-min: max(40px, Theme.stage-wave-h * 0.75);
-    out property <length> deck-min: 300px;
-    out property <length> strip-min: 100px;
-    /// The mixer panel: its knob rows, faders, bus knobs and crossfader.
-    out property <length> mixer-min: 350px;
-    out property <length> lib-min: 170px;
-    /// Never narrower than four channels need.
-    out property <length> mixer-w: max(Theme.stage-mixer-w, Theme.stage-mixer == 1 ? 300px : 220px);
-    out property <length> body-min: max(root.deck-min + (Theme.stage-strip == 1 ? root.strip-min + Theme.stage-gap : 0px), root.mixer-min + (Theme.stage-wave == 1 ? 2 * 34px + 4px : 0px));
-    out property <length> min-w: max(1100px, 2 * 380px + root.mixer-w + 4 * Theme.stage-gap);
-    out property <length> min-h: max(720px, root.bar-h + Theme.stage-gap + (Theme.stage-wave == 0 ? 2 * root.wave-min + 4px + Theme.stage-gap : 0px) + root.body-min + Theme.stage-gap + root.lib-min + Theme.h-status);
+/// The row of bar numbers over one waveform: Rust gives the number of the first labelled bar, the x of its line and the distance
+/// between labels (`DeckScroll.ruler-*`, src/app/deck/ruler.rs); the row repeats one label at that distance, so a frame moves a few
+/// numbers and nothing is drawn by Rust. Empty while the track has no beat grid.
+component Ruler inherits Rectangle {
+    in property <int> deck;
+    property <DeckScroll> s: DeckState.scroll[root.deck];
+    clip: true;
+    background: Theme.bg-deep;
+    for k in 48: Rectangle {
+        property <int> bar: root.s.ruler-bar + k * root.s.ruler-step;
+        x: root.s.ruler-x + k * root.s.ruler-w;
+        width: 1px;
+        visible: root.s.ruler-w > 0px && self.bar <= root.s.ruler-last && self.x < root.width;
+        background: Theme.line-strong;
+        Text {
+            x: 3px;
+            width: 44px;
+            height: root.height;
+            text: parent.bar;
+            vertical-alignment: center;
+            color: Theme.text-dim;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+            font-weight: Theme.weight-bold;
+        }
+    }
 }
 
-/// One enlarged waveform in a rounded frame (click / drag / zoom as everywhere: the desktop's `DeckDetail`).
+/// One enlarged waveform in a rounded frame (click / drag / zoom as everywhere: the desktop's `DeckDetail`), with, under
+/// `Theme.wave-ruler`, the bar ruler over it.
 component Wave inherits Rectangle {
     in property <int> deck;
+    property <length> rh: StageMetrics.ruler-h;
+    /// The picture's own left edge and right gutter in the deck's waveform (its number gutter left, the expander right).
+    property <length> gl: 24px;
+    property <length> gr: 14px;
     border-radius: Theme.stage-radius-ctl;
     clip: true;
-    DeckDetail { index: root.deck; width: parent.width; height: parent.height; }
+    background: Theme.wave-bg;
+    DeckDetail { y: root.rh; index: root.deck; width: parent.width; height: parent.height - root.rh; }
+    Ruler { x: root.gl; y: 0px; width: parent.width - root.gl - root.gr; height: root.rh; deck: root.deck; visible: root.rh > 0px; }
 }
 
 /// The Stage presentation (`Theme.layout-profile` 3) of the PERFORMANCE mode with two decks: one window, laid out from the Stage tokens.
@@ -59,19 +78,22 @@ export component StageWorkspace inherits Rectangle {
     property <bool> strip-on: Theme.stage-strip == 1;
     property <length> y-top: root.bar-h + root.g;
     property <length> y-deck: root.y-top + (root.top-waves ? 2 * root.wave-h + 4px + root.g : 0px);
-    /// The library takes its share of the window but never what the decks and the mixer need at least.
-    property <length> lib-h: root.browse ? root.height - root.y-top - root.status-h : clamp(root.height * (root.roomy ? 0.31 : 0.25), StageMetrics.lib-min, max(StageMetrics.lib-min, root.height - root.status-h - root.y-deck - 2 * root.g - StageMetrics.body-min));
+    property <length> strip-part: root.strip-on ? StageMetrics.strip-h + root.g : 0px;
+    /// What the row of decks (with the strip) wants: the decks' natural height, and the mixer's minimum under the centre waveforms.
+    property <length> body-want: max(StageDeckSize.natural + root.strip-part, StageMetrics.mixer-min + (root.col-waves ? 2 * root.wave-h + 4px + root.g : 0px));
+    /// The decks stop at their natural height and the library gets the rest; a short window takes it from the decks first, down to
+    /// the least the window's minimum size left them.
+    property <length> body-h: root.browse ? 0px : min(root.body-want, max(StageMetrics.body-min, root.height - root.status-h - root.y-deck - 2 * root.g - StageMetrics.lib-min));
+    property <length> lib-h: root.browse ? root.height - root.y-top - root.status-h : root.height - root.status-h - root.y-deck - root.g - root.body-h;
     property <length> y-lib: root.height - root.status-h - root.lib-h;
-    /// Decks and strip together; the mixer takes the same height (under the centre waveforms, when those are there).
-    property <length> body-h: root.y-lib - root.g - root.y-deck;
-    property <length> strip-h: root.strip-on ? clamp(root.body-h * 0.3, StageMetrics.strip-min, 150px) : 0px;
-    property <length> deck-h: root.body-h - (root.strip-on ? root.strip-h + root.g : 0px);
-    property <length> mixer-w: min(StageMetrics.mixer-w, root.width * 0.4);
+    property <length> strip-h: root.strip-on ? StageMetrics.strip-h : 0px;
+    property <length> deck-h: root.body-h - root.strip-part;
+    property <length> mixer-w: StageMetrics.mixer-w;
     property <length> deck-w: (root.width - 4 * root.g - root.mixer-w) / 2;
     property <length> x-mixer: 2 * root.g + root.deck-w;
     property <length> x-right: 3 * root.g + root.deck-w + root.mixer-w;
-    /// The centre column's waveforms leave the mixer its minimum.
-    property <length> col-wave-h: max(34px, min(root.wave-h, (root.body-h - StageMetrics.mixer-min - 4px - root.g) / 2));
+    /// The centre column's waveforms leave the mixer its minimum (the faders keep their height before the waveforms do).
+    property <length> col-wave-h: max(StageMetrics.col-wave-min, min(root.wave-h, (root.body-h - StageMetrics.mixer-min - 4px - root.g) / 2));
     property <length> y-mixer: root.y-deck + (root.col-waves ? 2 * root.col-wave-h + 4px + root.g : 0px);
     background: Theme.bg;
     DragTracker { x: 0px; y: 0px; width: root.width; height: root.height; }

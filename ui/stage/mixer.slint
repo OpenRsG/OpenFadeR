@@ -6,7 +6,7 @@ import { LightingState } from "../lighting.slint";
 import { ChannelView, MixerState } from "../mixer.slint";
 import { VideoState } from "../video.slint";
 import { StageButton, StageFader, StageKnob, StageMeter, StagePanel, StageTabs } from "controls.slint";
-import { StageState } from "state.slint";
+import { StageMetrics, StageState } from "state.slint";
 
 /// A small dim caption (TRIM, HIGH, MASTER).
 component Cap inherits Text {
@@ -45,6 +45,8 @@ component Gutter inherits Rectangle {
 component Channel inherits Rectangle {
     in property <int> ch;
     in property <length> row-h;
+    /// Four channels: a narrower header.
+    in property <bool> compact;
     property <ChannelView> v: MixerState.channels[root.ch];
     property <color> tone: StageState.tone(root.ch);
     property <bool> stems: DeckState.decks[root.ch].stems && MixerState.iso-shown;
@@ -54,9 +56,9 @@ component Channel inherits Rectangle {
             height: 18px;
             spacing: 2px;
             alignment: center;
-            Text { text: root.ch + 1; width: 14px; horizontal-alignment: center; vertical-alignment: center; color: root.tone; font-family: Theme.display-font; font-size: Theme.font-md; font-weight: Theme.weight-display; }
+            Text { text: root.ch + 1; width: root.compact ? 12px : 14px; horizontal-alignment: center; vertical-alignment: center; color: root.tone; font-family: Theme.display-font; font-size: Theme.font-md; font-weight: Theme.weight-display; }
             for side[i] in [@tr("A"), @tr("B")]: StageButton {
-                width: 22px;
+                width: root.compact ? 20px : 22px;
                 text: side;
                 font-size: Theme.font-xs;
                 accent: root.tone;
@@ -87,7 +89,7 @@ component Channel inherits Rectangle {
         }
         Rectangle {
             vertical-stretch: 1;
-            min-height: 40px;
+            min-height: StageMetrics.fader-min;
             HorizontalLayout {
                 alignment: center;
                 spacing: 6px;
@@ -115,7 +117,7 @@ component MixerPage inherits Rectangle {
             if !root.four: Gutter { width: 46px; ch: root.chs[0]; row-h: root.row-h; master-meter: true; }
             if !root.four: Channel { ch: root.chs[1]; row-h: root.row-h; }
             if root.four: Gutter { width: 46px; ch: root.chs[0]; row-h: root.row-h; }
-            for c in root.four ? 4 : 0: Channel { ch: c; row-h: root.row-h; }
+            for c in root.four ? 4 : 0: Channel { ch: c; row-h: root.row-h; compact: true; }
         }
         HorizontalLayout {
             height: 32px;
@@ -228,8 +230,8 @@ export component StageMixer inherits Rectangle {
     /// The app's mode behind each tab of `stage-tabs` 2 (0 = this mixer, 4 VIDEO, 3 LIGHTING).
     property <[int]> modes: VideoState.enabled && LightingState.enabled ? [0, 4, 3] : VideoState.enabled ? [0, 4] : [0, 3];
     property <bool> tabs: root.names.length > 1;
-    /// What the knob rows get after the fixed rows (header, CUE, faders at least 40 px, the bus row, the crossfader, the tabs).
-    property <length> row-h: clamp((root.height - 175px - (root.tabs ? 29px : 0px)) / 5, 24px, 34px);
+    /// What the knob rows get after the fixed rows (header, CUE, faders at least `fader-min`, the bus row, the crossfader, the tabs).
+    property <length> row-h: clamp((root.height - StageMetrics.mixer-fixed - (root.tabs ? StageMetrics.tabs-h : 0px)) / 5, StageMetrics.row-min, 34px);
     property <int> page: Theme.stage-tabs == 1 && root.tab < root.names.length ? root.tab : 0;
     StagePanel {
         VerticalLayout {

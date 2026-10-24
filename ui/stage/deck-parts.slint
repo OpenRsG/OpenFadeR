@@ -47,10 +47,10 @@ export component StageHead inherits Rectangle {
     in property <bool> badge: true;
     property <DeckView> v: DeckState.decks[root.index];
     property <length> cover: min(Theme.stage-cover, root.height);
-    property <length> sync-w: root.syncs ? 54px : 0px;
+    property <length> sync-w: root.syncs ? 66px : 0px;
     property <length> tx: root.cover + Theme.space-lg;
     property <length> tw: max(0px, root.width - root.tx - (root.syncs ? root.sync-w + Theme.space-md : 0px));
-    property <length> ov-h: root.overview ? clamp(root.cover * 0.36, 18px, 34px) : 0px;
+    property <length> ov-h: root.overview ? StageGeom.ov : 0px;
     property <length> top-h: root.height - root.ov-h - (root.overview ? Theme.space-md : 0px);
     property <length> read-w: min(root.tw * 0.46, Theme.font-xl * 7.5);
     StageCover { x: 0px; y: 0px; width: root.cover; height: root.cover; index: root.index; }
@@ -77,7 +77,7 @@ export component StageHead inherits Rectangle {
             font-size: Theme.deck-sub;
             overflow: elide;
         }
-        if root.top-h >= 48px: HorizontalLayout {
+        if root.top-h >= 40px: HorizontalLayout {
             spacing: Theme.space-md;
             alignment: start;
             Text {
@@ -93,16 +93,26 @@ export component StageHead inherits Rectangle {
                 color: Theme.accent-hi;
                 font-family: Theme.font;
                 font-size: Theme.font-sm;
-                vertical-alignment: bottom;
+                vertical-alignment: center;
                 horizontal-stretch: 0;
+            }
+            Text {
+                text: root.v.genre;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+                vertical-alignment: center;
+                overflow: elide;
+                horizontal-stretch: 1;
+                min-width: 0px;
             }
             Text {
                 text: root.v.elapsed-text;
                 color: Theme.text-faint;
                 font-family: Theme.font;
                 font-size: Theme.font-sm;
-                vertical-alignment: bottom;
-                overflow: elide;
+                vertical-alignment: center;
+                horizontal-stretch: 0;
             }
         }
     }
@@ -156,7 +166,7 @@ export component StageWave inherits Rectangle {
     property <length> last-x;
     property <length> down-x;
     property <bool> scratching;
-    property <length> ov-h: root.overview ? clamp(root.height * 0.3, 20px, 36px) : 0px;
+    property <length> ov-h: root.overview ? StageGeom.ov : 0px;
     property <length> zoom-w: root.zoom ? 92px : 0px;
     property <length> detail-h: root.height - root.ov-h - (root.overview ? Theme.space-md : 0px);
     Rectangle {
@@ -505,10 +515,10 @@ export component StagePads inherits Rectangle {
         border-color: root.v.delete-mode && p.set && root.v.pad-mode == 0 ? Theme.danger
             : self.filled ? (p.set ? p.color : Theme.line) : self.lit && !root.list ? self.lit-c : root.list ? Theme.line : Theme.line-strong.with-alpha(0.8);
         background: self.filled && p.set ? p.color
-            : self.lit && !root.list ? self.lit-c.with-alpha(0.2)
+            : self.lit && !root.list ? (ta.pressed ? self.lit-c : self.lit-c.with-alpha(root.cues ? 0.2 : 0.4))
             : ta.pressed ? Theme.bg-deep : ta.has-hover ? Theme.panel-raised.with-alpha(0.7) : root.list ? Theme.bg-deep.with-alpha(0.5) : transparent;
-        drop-shadow-blur: self.lit && !root.list && !self.filled && Theme.glow > 0 ? 14px * Theme.glow : 0px;
-        drop-shadow-color: self.lit && !root.list && !self.filled && Theme.glow > 0 ? self.lit-c.with-alpha(0.8 * Theme.glow) : transparent;
+        drop-shadow-blur: (ta.pressed || (self.lit && !root.cues)) && !root.list && !self.filled && Theme.glow > 0 ? 14px * Theme.glow : 0px;
+        drop-shadow-color: (ta.pressed || (self.lit && !root.cues)) && !root.list && !self.filled && Theme.glow > 0 ? self.lit-c.with-alpha(0.7 * Theme.glow) : transparent;
         animate background { duration: Theme.t-fast; }
         // Grid: the number (hot cues) or the pad's own label, the cue time under it when filled.
         if !root.list: Text {
@@ -517,7 +527,7 @@ export component StagePads inherits Rectangle {
             width: parent.width;
             height: pad.filled && p.time != "" ? parent.height * 0.6 : parent.height;
             text: root.v.delete-mode && p.set && root.v.pad-mode == 0 ? "×" : root.cues ? "" + (i + 1) : p.label;
-            color: pad.filled && p.set ? Colors.black.with-alpha(0.75) : p.set ? pad.lit-c.brighter(0.3) : Theme.text-dim;
+            color: pad.filled && p.set ? StageTone.on(p.color) : ta.pressed && p.set && !pad.filled ? StageTone.on(pad.lit-c) : p.set ? pad.lit-c.brighter(0.3) : Theme.text-dim;
             font-family: Theme.font;
             font-size: root.v.pad-mode == 4 || root.v.pad-mode == 11 ? Theme.font-xs : Theme.font-md;
             font-weight: Theme.weight-bold;
@@ -837,4 +847,25 @@ export component StageBadge inherits Rectangle {
         horizontal-alignment: center;
         vertical-alignment: center;
     }
+}
+
+/// The sizes the Stage deck styles are laid out with, from the tokens: what a deck of the current `stage-deck` / `stage-wave` / `stage-jog`
+/// needs for no empty band (`natural`). Deck panels taller than that keep their parts compact at the top; shorter ones shrink the jog,
+/// the pads and the waveform.
+export global StageGeom {
+    out property <length> g: Theme.space-lg;
+    /// The overview strip.
+    out property <length> ov: 26px;
+    out property <bool> waved: Theme.stage-wave == 2;
+    /// Header with the overview strip beside the cover, and without.
+    out property <length> head-ov: max(Theme.stage-cover, 86px);
+    out property <length> head: max(Theme.stage-cover, 52px);
+    /// The waveform alone, and the waveform with its overview.
+    out property <length> wave: root.waved ? Theme.stage-wave-h : 0px;
+    out property <length> wave-ov: root.waved ? Theme.stage-wave-h + root.ov + Theme.space-md : 0px;
+    out property <length> perf: 2 * root.g + root.head-ov + root.g + (root.waved ? root.wave + root.g : 0px) + Theme.stage-jog + 22px + root.g;
+    out property <length> turntable: 2 * root.g + root.head + root.g + (root.waved ? root.wave-ov + root.g : 0px) + 24px + root.g + max(Theme.stage-jog, 170px);
+    out property <length> controller: 2 * root.g + root.head + root.g + (root.waved ? root.wave-ov + root.g : 0px) + 78px + root.g + Theme.stage-button;
+    out property <length> ring: 2 * root.g + root.head-ov + root.g + (root.waved ? root.wave + root.g : 0px) + 24px + root.g + Theme.stage-jog;
+    out property <length> natural: Theme.stage-deck == 0 ? root.perf : Theme.stage-deck == 1 ? root.turntable : Theme.stage-deck == 2 ? root.controller : root.ring;
 }

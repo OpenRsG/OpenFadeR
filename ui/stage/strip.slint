@@ -4,7 +4,7 @@ import { DeckState } from "../deck-state.slint";
 import { FxState, FxUnit } from "../fx.slint";
 import { MixerState } from "../mixer.slint";
 import { SamplerState, SlotView } from "../sampler.slint";
-import { StageButton, StageKnob, StagePanel } from "controls.slint";
+import { StageButton, StageKnob, StagePanel, StageTone } from "controls.slint";
 import { StageState } from "state.slint";
 
 /// A bold dim caption (EFFECTS, SAMPLER).
@@ -48,7 +48,7 @@ component Pad inherits Rectangle {
         text: (root.slot + 1) + (root.v.looped ? " ∞" : "");
         horizontal-alignment: center;
         vertical-alignment: center;
-        color: root.v.playing ? Theme.bg-deep : root.v.loaded ? Theme.text-bright : Theme.text-faint;
+        color: root.v.playing ? StageTone.on(root.tone) : root.v.loaded ? Theme.text-bright : Theme.text-faint;
         font-family: Theme.font;
         font-size: Theme.font-sm;
         font-weight: Theme.weight-bold;

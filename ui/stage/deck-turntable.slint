@@ -2,7 +2,7 @@ import { Theme } from "../theme.slint";
 import { Icon } from "../icons.slint";
 import { DeckState, DeckView } from "../deck-state.slint";
 import { StageButton, StagePanel, StageTone } from "controls.slint";
-import { StageHead, StageJog, StagePads, StageTempo, StageWave } from "deck-parts.slint";
+import { StageGeom, StageHead, StageJog, StagePads, StageTempo, StageWave } from "deck-parts.slint";
 
 /// Stage deck 1, turntable: cover and title over a SYNC / MASTER row, the hot cue area with its HOT CUE / BEAT LOOP / SLICER / SAMPLER
 /// tabs, the platter (PLAY and CUE in its lower corners), SLIP and the tempo fader with its range button. The platter row mirrors
@@ -15,13 +15,13 @@ export component StageTurntable inherits Rectangle {
     property <length> g: Theme.space-lg;
     property <length> iw: root.width - 2 * root.g;
     property <length> ih: root.height - 2 * root.g;
-    property <length> hh: max(min(Theme.stage-cover, root.ih * 0.26), 52px);
-    property <bool> waved: Theme.stage-wave == 2;
-    property <length> wh: root.waved ? clamp(root.ih * 0.26, 54px, max(54px, Theme.stage-wave-h + 30px)) : 0px;
+    property <length> hh: StageGeom.head;
+    property <bool> waved: StageGeom.waved;
+    property <length> wh: root.waved ? min(StageGeom.wave-ov, max(54px, root.ih * 0.26)) : 0px;
     property <length> row-y: root.hh + root.g + (root.waved ? root.wh + root.g : 0px);
     property <length> row-h: 24px;
     property <length> cy: root.row-y + root.row-h + root.g;
-    property <length> ch: max(0px, root.ih - root.cy);
+    property <length> ch: max(0px, min(root.ih - root.cy, max(Theme.stage-jog, 170px)));
     property <length> rc: 54px;
     property <length> d: max(60px, min(Theme.stage-jog, root.ch, root.iw * 0.46));
     property <length> pads-w: max(0px, root.iw - root.d - root.rc - 2 * root.g);

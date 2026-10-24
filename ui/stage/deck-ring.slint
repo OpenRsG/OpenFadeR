@@ -3,7 +3,7 @@ import { Icon } from "../icons.slint";
 import { DeckState, DeckView } from "../deck-state.slint";
 import { ChannelView, MixerState } from "../mixer.slint";
 import { StageButton, StagePanel, StageTone } from "controls.slint";
-import { StageBadge, StageDot, StageHead, StageJog, StageTempo, StageWave } from "deck-parts.slint";
+import { StageBadge, StageDot, StageGeom, StageHead, StageJog, StageTempo, StageWave } from "deck-parts.slint";
 
 /// Stage deck 3, ring: cover and title with the overview; the deck letter and lamps (CUE, SLIP, QUANTIZE, KEY SYNC); the big tempo ring
 /// with the BPM in the middle, round PLAY, CUE and back-to-start buttons, and the tempo fader. The row mirrors for the right-hand deck.
@@ -16,13 +16,13 @@ export component StageRing inherits Rectangle {
     property <length> g: Theme.space-lg;
     property <length> iw: root.width - 2 * root.g;
     property <length> ih: root.height - 2 * root.g;
-    property <length> hh: max(min(Theme.stage-cover, root.ih * 0.3), 76px);
-    property <bool> waved: Theme.stage-wave == 2;
-    property <length> wh: root.waved ? clamp(root.ih * 0.16, 30px, max(30px, Theme.stage-wave-h)) : 0px;
+    property <length> hh: StageGeom.head-ov;
+    property <bool> waved: StageGeom.waved;
+    property <length> wh: root.waved ? min(StageGeom.wave, max(30px, root.ih * 0.2)) : 0px;
     property <length> dot-y: root.hh + root.g + (root.waved ? root.wh + root.g : 0px);
     property <length> dot-h: 24px;
     property <length> cy: root.dot-y + root.dot-h + root.g;
-    property <length> ch: max(0px, root.ih - root.cy);
+    property <length> ch: max(0px, min(root.ih - root.cy, Theme.stage-jog));
     property <length> play: clamp(min(root.ch * 0.4, Theme.stage-button * 1.4), 36px, 64px);
     property <length> small: clamp(root.play * 0.7, 28px, 44px);
     property <length> lc: max(root.play, 2 * root.small + root.g);

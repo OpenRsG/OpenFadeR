@@ -3,7 +3,7 @@ import { Icon } from "../icons.slint";
 import { DeckState, DeckView } from "../deck-state.slint";
 import { MixerState } from "../mixer.slint";
 import { StageButton, StageKnob, StagePanel, StageTone } from "controls.slint";
-import { StageFx, StageHead, StageJog, StageLoop, StagePads, StageTempo, StageWave } from "deck-parts.slint";
+import { StageFx, StageGeom, StageHead, StageJog, StageLoop, StagePads, StageTempo, StageWave } from "deck-parts.slint";
 
 /// Stage deck 0, performance: cover and title with the overview, the pad area, LOOP, BEAT FX and the FILTER knob; the jog with SLIP / Q /
 /// MT under it, the tempo fader, and PLAY, CUE, SYNC and MASTER. The control row mirrors for the right-hand deck.
@@ -15,11 +15,11 @@ export component StagePerformance inherits Rectangle {
     property <length> g: Theme.space-lg;
     property <length> iw: root.width - 2 * root.g;
     property <length> ih: root.height - 2 * root.g;
-    property <length> hh: max(min(Theme.stage-cover, root.ih * 0.3), 76px);
-    property <bool> waved: Theme.stage-wave == 2;
-    property <length> wh: root.waved ? clamp(root.ih * 0.16, 30px, max(30px, Theme.stage-wave-h)) : 0px;
+    property <length> hh: StageGeom.head-ov;
+    property <bool> waved: StageGeom.waved;
+    property <length> wh: root.waved ? min(StageGeom.wave, max(30px, root.ih * 0.2)) : 0px;
     property <length> cy: root.hh + root.g + (root.waved ? root.wh + root.g : 0px);
-    property <length> ch: max(0px, root.ih - root.cy);
+    property <length> ch: max(0px, min(root.ih - root.cy, Theme.stage-jog + root.chips-h + root.g));
     property <length> bw: 62px;
     property <length> tw: 38px;
     property <length> chips-h: 22px;

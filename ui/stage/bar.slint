@@ -1,9 +1,9 @@
 import { Icon, IconButton, Meter } from "../widgets.slint";
 import { Theme } from "../theme.slint";
 import { DeckState } from "../deck-state.slint";
-import { DeviceChip } from "../device.slint";
+import { DeviceState } from "../device-state.slint";
 import { LightingState } from "../lighting.slint";
-import { MidiChip } from "../midi.slint";
+import { MidiState } from "../midi.slint";
 import { MixerState } from "../mixer.slint";
 import { PrefsState } from "../prefs-state.slint";
 import { StudioState } from "../studio-state.slint";
@@ -81,8 +81,8 @@ export component StageBar inherits Rectangle {
             clicked => { MixerState.rec-toggled(); }
         }
         if MixerState.bus.rec: Text { text: MixerState.bus.rec-text; vertical-alignment: center; horizontal-stretch: 0; color: Theme.rec.brighter(0.4); font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
-        MidiChip { width: 48px; height: Theme.h-ctl; horizontal-stretch: 0; }
-        DeviceChip { width: 78px; height: Theme.h-ctl; horizontal-stretch: 0; }
+        StageButton { width: 48px; horizontal-stretch: 0; text: "MIDI"; active: MidiState.mapped > 0; tooltip: @tr("Controller mapping and MIDI learn"); clicked => { MidiState.captured = ""; MidiState.visible = true; } }
+        StageButton { width: 78px; horizontal-stretch: 0; text: @tr("DEVICES"); active: DeviceState.busy; clicked => { DeviceState.visible = true; DeviceState.opened(); } }
         Text {
             text: StudioState.clock;
             width: 52px;

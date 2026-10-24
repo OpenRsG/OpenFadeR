@@ -107,6 +107,13 @@ impl Deck {
             if let Some(slip) = self.with_player(|p| p.slip_position()).flatten() {
                 row.slip_x = ((half + x(slip * 1000.0) - x(pos)) / f64::from(scale)) as f32;
             }
+            if let Some(r) = super::ruler::ruler(&l.analysis.beats, pos, span, f64::from(lw)) {
+                row.ruler_bar = r.first;
+                row.ruler_x = r.x;
+                row.ruler_w = r.pitch;
+                row.ruler_step = r.step;
+                row.ruler_last = r.last;
+            }
             if h >= 40 {
                 let mode = prefs::with(|p| p.view.beat_count);
                 row.beat_text =

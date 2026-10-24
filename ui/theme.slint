@@ -324,12 +324,15 @@ export global Theme {
     /// A strip under the Stage decks: 0 = none, 1 = EFFECTS (left), SOUND COLOR FX and SAMPLER (right).
     // @values none | effects and sampler
     in-out property <int> stage-strip: 0;
-    /// Stage track list: 1 = a waveform preview column and a hot cue bank column.
+    /// Stage track list: 1 = a waveform preview column and a badge naming the deck a track is loaded on.
     // @values off | on
     in-out property <int> stage-list-wave: 0;
     /// Stage library side bar: 0 = icon and label per entry, 1 = icons only.
     // @values labels | icons only
     in-out property <int> stage-sidebar: 0;
+    /// Stage right-hand deck: 0 = the same left-to-right arrangement as the left deck, 1 = mirrored (jog and buttons on the outer side).
+    // @values same | mirrored
+    in-out property <int> stage-mirror: 1;
     /// Width of the Stage mixer.
     in-out property <length> stage-mixer-w: 280px;
     /// Height of each enlarged waveform in the Stage workspace.
@@ -380,6 +383,9 @@ export global Theme {
     /// Waveform colours: 0 = the shared bands (`wave-low`, `wave-mid`, `wave-high`), 1 = per deck (low = `deckN`, mid = `deckN-hi`, high = `wave-high`).
     // @values shared | per deck
     in-out property <int> wave-style: 0;
+    /// Stage workspace: 1 = a bar ruler (the bar numbers, stepping with the zoom) along the top of the enlarged waveforms stacked across the top or in the centre column; hidden while a track has no beat grid.
+    // @values off | on
+    in-out property <int> wave-ruler: 0;
     /// Family of the big figures (BPM, times, deck numbers); empty = `font`.
     in-out property <string> font-display: "";
     /// Weight of the big figures.

@@ -59,465 +59,465 @@ msgstr ""
 msgid "Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."
 msgstr ""
 
-#: ui/app.slint:198
+#: ui/app.slint:199
 msgid "File"
 msgstr ""
 
-#: ui/app.slint:200
+#: ui/app.slint:201
 msgid "Import"
 msgstr ""
 
-#: ui/app.slint:201
+#: ui/app.slint:202
 msgid "Import Track…"
 msgstr ""
 
-#: ui/app.slint:202
+#: ui/app.slint:203
 msgid "Import Folder…"
 msgstr ""
 
-#: ui/app.slint:203
-#: ui/app.slint:275
+#: ui/app.slint:204
+#: ui/app.slint:276
 msgid "Import Playlist…"
 msgstr ""
 
-#: ui/app.slint:207
+#: ui/app.slint:208
 msgid "Display All Missing Files"
 msgstr ""
 
-#: ui/app.slint:208
+#: ui/app.slint:209
 msgid "Display All Duplicated Files"
 msgstr ""
 
-#: ui/app.slint:210
+#: ui/app.slint:211
 #: ui/touch.slint:85
 #: ui/touch.slint:99
 msgid "Library"
 msgstr ""
 
-#: ui/app.slint:211
+#: ui/app.slint:212
 msgid "Backup Library…"
 msgstr ""
 
-#: ui/app.slint:212
+#: ui/app.slint:213
 msgid "Restore Library…"
 msgstr ""
 
-#: ui/app.slint:213
+#: ui/app.slint:214
 msgid "Backed up device library management…"
 msgstr ""
 
-#: ui/app.slint:216
+#: ui/app.slint:217
 msgid "Export Collection"
 msgstr ""
 
-#: ui/app.slint:220
+#: ui/app.slint:221
 msgid "Preferences…"
 msgstr ""
 
-#: ui/app.slint:221
+#: ui/app.slint:222
 msgid "Exit"
 msgstr ""
 
-#: ui/app.slint:224
+#: ui/app.slint:225
 #: ui/touch.slint:81
 #: ui/touch.slint:81
 msgid "Edit"
 msgstr ""
 
-#: ui/app.slint:225
+#: ui/app.slint:226
 msgid "Undo (Ctrl+Z)"
 msgstr ""
 
-#: ui/app.slint:225
+#: ui/app.slint:226
 msgid "Undo {} (Ctrl+Z)"
 msgstr ""
 
-#: ui/app.slint:226
+#: ui/app.slint:227
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr ""
 
-#: ui/app.slint:226
+#: ui/app.slint:227
 msgid "Redo {} (Ctrl+Shift+Z)"
 msgstr ""
 
-#: ui/app.slint:229
+#: ui/app.slint:230
 msgid "Track"
 msgstr ""
 
-#: ui/app.slint:230
+#: ui/app.slint:231
 msgid "Edit Track Details…"
 msgstr ""
 
-#: ui/app.slint:231
+#: ui/app.slint:232
 msgid "Import To Collection"
 msgstr ""
 
-#: ui/app.slint:232
+#: ui/app.slint:233
 msgid "Analyze Track"
 msgstr ""
 
-#: ui/app.slint:233
+#: ui/app.slint:234
 msgid "Analysis Lock"
 msgstr ""
 
-#: ui/app.slint:234
+#: ui/app.slint:235
 #: src/app/library/track.rs:189
 msgid "Reload Tag"
 msgstr ""
 
-#: ui/app.slint:235
+#: ui/app.slint:236
 #: src/app/library/track.rs:191
 msgid "Reload Tag (discard edits)"
 msgstr ""
 
-#: ui/app.slint:236
+#: ui/app.slint:237
 msgid "Find Artwork…"
 msgstr ""
 
-#: ui/app.slint:237
+#: ui/app.slint:238
 msgid "Fetch Missing Artwork"
 msgstr ""
 
-#: ui/app.slint:238
+#: ui/app.slint:239
 msgid "Show in File Manager"
 msgstr ""
 
-#: ui/app.slint:240
+#: ui/app.slint:241
 #: ui/browser-table.slint:315
 msgid "Relocate…"
 msgstr ""
 
-#: ui/app.slint:241
+#: ui/app.slint:242
 msgid "Auto Relocate"
 msgstr ""
 
-#: ui/app.slint:242
+#: ui/app.slint:243
 #: ui/browser-table.slint:317
-#: ui/stage/table.slint:272
+#: ui/stage/table.slint:283
 msgid "Remove from Collection"
 msgstr ""
 
-#: ui/app.slint:244
+#: ui/app.slint:245
 msgid "Add to Tag List"
 msgstr ""
 
-#: ui/app.slint:245
+#: ui/app.slint:246
 msgid "Add to Playlist…"
 msgstr ""
 
-#: ui/app.slint:246
+#: ui/app.slint:247
 #: ui/browser-table.slint:302
-#: ui/stage/table.slint:267
+#: ui/stage/table.slint:278
 msgid "Tags…"
 msgstr ""
 
-#: ui/app.slint:249
+#: ui/app.slint:250
 msgid "Playlist"
 msgstr ""
 
-#: ui/app.slint:250
+#: ui/app.slint:251
 msgid "Create New Playlist"
 msgstr ""
 
-#: ui/app.slint:251
+#: ui/app.slint:252
 msgid "Create New Intelligent Playlist"
 msgstr ""
 
-#: ui/app.slint:252
+#: ui/app.slint:253
 msgid "Create New Folder"
 msgstr ""
 
-#: ui/app.slint:253
+#: ui/app.slint:254
 msgid "Delete Playlist"
 msgstr ""
 
-#: ui/app.slint:256
+#: ui/app.slint:257
 msgid "Sort Items"
 msgstr ""
 
-#: ui/app.slint:257
+#: ui/app.slint:258
 msgid "Track Title"
 msgstr ""
 
-#: ui/app.slint:258
+#: ui/app.slint:259
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:198
 msgid "Artist"
 msgstr ""
 
-#: ui/app.slint:259
+#: ui/app.slint:260
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:202
 msgid "Genre"
 msgstr ""
 
-#: ui/app.slint:261
+#: ui/app.slint:262
 #: ui/browser-tree.slint:102
 #: ui/touch-actions.slint:74
 msgid "Key"
 msgstr ""
 
-#: ui/app.slint:262
+#: ui/app.slint:263
 #: ui/touch-actions.slint:74
 msgid "Time"
 msgstr ""
 
-#: ui/app.slint:263
+#: ui/app.slint:264
 #: ui/touch-actions.slint:74
 msgid "Rating"
 msgstr ""
 
-#: ui/app.slint:264
+#: ui/app.slint:265
 #: ui/touch-actions.slint:74
 msgid "Comments"
 msgstr ""
 
-#: ui/app.slint:266
+#: ui/app.slint:267
 msgid "Renumber Track Order"
 msgstr ""
 
-#: ui/app.slint:269
+#: ui/app.slint:270
 msgid "Export a playlist to a file"
 msgstr ""
 
-#: ui/app.slint:272
+#: ui/app.slint:273
 #: ui/touch-actions.slint:76
 msgid "Text"
 msgstr ""
 
-#: ui/app.slint:274
+#: ui/app.slint:275
 msgid "Export Playlist (to a device)…"
 msgstr ""
 
-#: ui/app.slint:278
+#: ui/app.slint:279
 msgid "View"
 msgstr ""
 
-#: ui/app.slint:279
+#: ui/app.slint:280
 msgid "Full Screen"
 msgstr ""
 
-#: ui/app.slint:281
-#: ui/app.slint:474
+#: ui/app.slint:282
+#: ui/app.slint:475
 msgid "2Deck Horizontal"
 msgstr ""
 
-#: ui/app.slint:282
-#: ui/app.slint:474
+#: ui/app.slint:283
+#: ui/app.slint:475
 msgid "2Deck Vertical"
 msgstr ""
 
-#: ui/app.slint:283
-#: ui/app.slint:474
+#: ui/app.slint:284
+#: ui/app.slint:475
 msgid "4Deck Horizontal"
 msgstr ""
 
-#: ui/app.slint:284
-#: ui/app.slint:474
+#: ui/app.slint:285
+#: ui/app.slint:475
 msgid "4Deck Vertical"
 msgstr ""
 
-#: ui/app.slint:285
-#: ui/app.slint:474
-msgid "Browse"
-msgstr ""
-
 #: ui/app.slint:286
-#: ui/exportmode-state.slint:54
-msgid "1 PLAYER"
+#: ui/app.slint:475
+msgid "Browse"
 msgstr ""
 
 #: ui/app.slint:287
 #: ui/exportmode-state.slint:54
-msgid "2 PLAYER"
+msgid "1 PLAYER"
 msgstr ""
 
 #: ui/app.slint:288
 #: ui/exportmode-state.slint:54
-msgid "DUAL PLAYER"
+msgid "2 PLAYER"
 msgstr ""
 
 #: ui/app.slint:289
 #: ui/exportmode-state.slint:54
-msgid "SIMPLE PLAYER"
+msgid "DUAL PLAYER"
 msgstr ""
 
 #: ui/app.slint:290
 #: ui/exportmode-state.slint:54
+msgid "SIMPLE PLAYER"
+msgstr ""
+
+#: ui/app.slint:291
+#: ui/exportmode-state.slint:54
 msgid "FULL BROWSER"
 msgstr ""
 
-#: ui/app.slint:291
+#: ui/app.slint:292
 msgid "Close Split Screen"
 msgstr ""
 
-#: ui/app.slint:291
+#: ui/app.slint:292
 msgid "Split Screen"
 msgstr ""
 
-#: ui/app.slint:293
+#: ui/app.slint:294
 #: src/app/prefs/view.rs:417
 msgid "Mixer"
 msgstr ""
 
-#: ui/app.slint:294
+#: ui/app.slint:295
 msgid "Effect Panel"
 msgstr ""
 
-#: ui/app.slint:295
+#: ui/app.slint:296
 #: ui/touch.slint:85
 #: ui/touch.slint:99
 msgid "Sampler"
 msgstr ""
 
-#: ui/app.slint:296
-#: ui/app.slint:493
+#: ui/app.slint:297
+#: ui/app.slint:494
 #: ui/groove.slint:250
 msgid "BEAT LAB"
 msgstr ""
 
-#: ui/app.slint:298
+#: ui/app.slint:299
 #: ui/stage/library.slint:53
 #: src/app/prefs/view.rs:348
 msgid "Related Tracks"
 msgstr ""
 
-#: ui/app.slint:299
+#: ui/app.slint:300
 #: ui/browser-tree.slint:102
 msgid "Tags"
 msgstr ""
 
-#: ui/app.slint:300
+#: ui/app.slint:301
 #: ui/studio/automix.slint:181
 #: ui/touch-actions.slint:79
 msgid "Automix"
 msgstr ""
 
-#: ui/app.slint:303
+#: ui/app.slint:304
 msgid "Plugins"
 msgstr ""
 
-#: ui/app.slint:307
+#: ui/app.slint:308
 msgid "Help"
 msgstr ""
 
-#: ui/app.slint:308
+#: ui/app.slint:309
 msgid "Keyboard Shortcuts"
 msgstr ""
 
-#: ui/app.slint:309
+#: ui/app.slint:310
 #: ui/welcome.slint:69
 msgid "Welcome"
 msgstr ""
 
-#: ui/app.slint:310
+#: ui/app.slint:311
 msgid "Update to {}…"
 msgstr ""
 
-#: ui/app.slint:310
+#: ui/app.slint:311
 #: ui/touch-actions.slint:85
 msgid "Check for Updates"
 msgstr ""
 
-#: ui/app.slint:311
+#: ui/app.slint:312
 msgid "Roll Back to {}…"
 msgstr ""
 
-#: ui/app.slint:312
+#: ui/app.slint:313
 msgid "Report a Problem…"
 msgstr ""
 
-#: ui/app.slint:313
+#: ui/app.slint:314
 msgid "About OpenFadeR"
 msgstr ""
 
-#: ui/app.slint:433
+#: ui/app.slint:434
 msgid "Split screen: the browser in a window of its own"
 msgstr ""
 
-#: ui/app.slint:434
+#: ui/app.slint:435
 msgid "Switch the active window"
 msgstr ""
 
-#: ui/app.slint:462
 #: ui/app.slint:463
 #: ui/app.slint:464
+#: ui/app.slint:465
 msgid "EXPORT"
 msgstr ""
 
-#: ui/app.slint:462
 #: ui/app.slint:463
 #: ui/app.slint:464
+#: ui/app.slint:465
 msgid "PERFORMANCE"
 msgstr ""
 
-#: ui/app.slint:462
 #: ui/app.slint:463
 #: ui/app.slint:464
+#: ui/app.slint:465
 msgid "EDIT"
 msgstr ""
 
-#: ui/app.slint:462
 #: ui/app.slint:463
-#: ui/app.slint:505
+#: ui/app.slint:464
+#: ui/app.slint:506
 msgid "LIGHTING (BETA)"
 msgstr ""
 
-#: ui/app.slint:462
-#: ui/app.slint:464
-#: ui/app.slint:504
+#: ui/app.slint:463
+#: ui/app.slint:465
+#: ui/app.slint:505
 msgid "VIDEO (BETA)"
 msgstr ""
 
-#: ui/app.slint:492
-#: ui/stage/mixer.slint:222
+#: ui/app.slint:493
+#: ui/stage/mixer.slint:224
 msgid "FX"
 msgstr ""
 
-#: ui/app.slint:494
+#: ui/app.slint:495
 #: src/app/prefs/controller/mixpoint.rs:8
 msgid "MIX POINT LINK"
 msgstr ""
 
-#: ui/app.slint:495
-#: ui/stage/deck-parts.slint:468
+#: ui/app.slint:496
+#: ui/stage/deck-parts.slint:478
 #: ui/stage/strip.slint:164
 msgid "SAMPLER"
 msgstr ""
 
-#: ui/app.slint:496
-#: ui/stage/mixer.slint:222
+#: ui/app.slint:497
 #: ui/stage/mixer.slint:224
+#: ui/stage/mixer.slint:226
 msgid "MIXER"
 msgstr ""
 
-#: ui/app.slint:501
+#: ui/app.slint:502
 msgid "REC panel"
 msgstr ""
 
-#: ui/app.slint:501
+#: ui/app.slint:502
 #: ui/stage/bar.slint:80
 #: ui/studio/bar.slint:57
 msgid "REC (master out)"
 msgstr ""
 
-#: ui/app.slint:511
+#: ui/app.slint:512
 msgid "SHORTCUTS (?)"
 msgstr ""
 
-#: ui/app.slint:512
+#: ui/app.slint:513
 msgid "PREFS"
 msgstr ""
 
-#: ui/app.slint:525
+#: ui/app.slint:526
 msgid "Zoom out the waveforms"
 msgstr ""
 
-#: ui/app.slint:526
+#: ui/app.slint:527
 msgid "Default waveform zoom"
 msgstr ""
 
-#: ui/app.slint:527
+#: ui/app.slint:528
 msgid "Zoom in the waveforms"
 msgstr ""
 
@@ -539,7 +539,7 @@ msgid "AUTOMIX"
 msgstr ""
 
 #: ui/automix-panel.slint:34
-#: ui/stage/table.slint:137
+#: ui/stage/table.slint:145
 #: ui/studio/automix.slint:61
 msgid "LENGTH"
 msgstr ""
@@ -639,13 +639,13 @@ msgid "TRACK TITLE"
 msgstr ""
 
 #: ui/browser-table.slint:164
-#: ui/stage/table.slint:133
+#: ui/stage/table.slint:140
 #: ui/studio/table.slint:123
 msgid "ARTIST"
 msgstr ""
 
 #: ui/browser-table.slint:165
-#: ui/stage/table.slint:136
+#: ui/stage/table.slint:144
 #: ui/studio/table.slint:127
 msgid "GENRE"
 msgstr ""
@@ -655,7 +655,7 @@ msgid "COMMENT"
 msgstr ""
 
 #: ui/browser-table.slint:168
-#: ui/stage/table.slint:138
+#: ui/stage/table.slint:146
 #: ui/studio/table.slint:121
 msgid "RATING"
 msgstr ""
@@ -666,7 +666,7 @@ msgstr ""
 
 #: ui/browser-table.slint:170
 #: ui/deck-header.slint:74
-#: ui/stage/table.slint:135
+#: ui/stage/table.slint:143
 msgid "KEY"
 msgstr ""
 
@@ -677,49 +677,49 @@ msgid "STEMS"
 msgstr ""
 
 #: ui/browser-table.slint:215
-#: ui/stage/table.slint:195
+#: ui/stage/table.slint:205
 #: ui/studio/table.slint:160
 msgid "★★★★★"
 msgstr ""
 
 #: ui/browser-table.slint:270
-#: ui/stage/table.slint:240
+#: ui/stage/table.slint:251
 #: ui/studio/table.slint:204
 msgid "No tracks"
 msgstr ""
 
 #: ui/browser-table.slint:292
-#: ui/stage/table.slint:259
+#: ui/stage/table.slint:270
 #: ui/studio/table.slint:223
 msgid "{} tracks selected"
 msgstr ""
 
 #: ui/browser-table.slint:294
-#: ui/stage/table.slint:262
+#: ui/stage/table.slint:273
 #: ui/studio/table.slint:226
 msgid "Edit track details…"
 msgstr ""
 
 #: ui/browser-table.slint:295
-#: ui/stage/table.slint:263
+#: ui/stage/table.slint:274
 #: ui/studio/table.slint:227
 msgid "Add to Tag List (T)"
 msgstr ""
 
 #: ui/browser-table.slint:296
-#: ui/stage/table.slint:264
+#: ui/stage/table.slint:275
 #: ui/studio/table.slint:228
 msgid "Add to playlist…"
 msgstr ""
 
 #: ui/browser-table.slint:297
-#: ui/stage/table.slint:265
+#: ui/stage/table.slint:276
 #: ui/studio/table.slint:229
 msgid "New playlist from selection…"
 msgstr ""
 
 #: ui/browser-table.slint:298
-#: ui/stage/table.slint:266
+#: ui/stage/table.slint:277
 #: ui/studio/table.slint:230
 msgid "Transfer to {}"
 msgstr ""
@@ -737,7 +737,7 @@ msgid "Add to palette 3"
 msgstr ""
 
 #: ui/browser-table.slint:303
-#: ui/stage/table.slint:268
+#: ui/stage/table.slint:279
 #: ui/studio/table.slint:232
 msgid "Hide related tracks"
 msgstr ""
@@ -759,13 +759,13 @@ msgid "Move down"
 msgstr ""
 
 #: ui/browser-table.slint:307
-#: ui/stage/table.slint:269
+#: ui/stage/table.slint:280
 #: ui/studio/table.slint:233
 msgid "Analyze track"
 msgstr ""
 
 #: ui/browser-table.slint:308
-#: ui/stage/table.slint:270
+#: ui/stage/table.slint:281
 #: ui/studio/table.slint:234
 msgid "Make Auto Cue point"
 msgstr ""
@@ -793,7 +793,7 @@ msgid "Fetch missing artwork"
 msgstr ""
 
 #: ui/browser-table.slint:314
-#: ui/stage/table.slint:271
+#: ui/stage/table.slint:282
 #: ui/studio/table.slint:235
 msgid "Show in file manager"
 msgstr ""
@@ -1381,19 +1381,19 @@ msgstr ""
 
 #: ui/deck-controls.slint:212
 #: ui/exportmode-parts.slint:230
-#: ui/stage/deck-parts.slint:654
+#: ui/stage/deck-parts.slint:664
 msgid "RELOOP"
 msgstr ""
 
 #: ui/deck-controls.slint:218
 #: ui/exportmode-parts.slint:204
-#: ui/stage/deck-parts.slint:624
+#: ui/stage/deck-parts.slint:634
 msgid "Halve the loop"
 msgstr ""
 
 #: ui/deck-controls.slint:224
 #: ui/exportmode-parts.slint:225
-#: ui/stage/deck-parts.slint:640
+#: ui/stage/deck-parts.slint:650
 msgid "Double the loop"
 msgstr ""
 
@@ -1426,14 +1426,14 @@ msgid "KEY SYNC"
 msgstr ""
 
 #: ui/deck-header.slint:65
-#: ui/stage/deck-parts.slint:144
+#: ui/stage/deck-parts.slint:154
 #: ui/stage/deck-turntable.slint:53
 msgid "Match the key of the other deck"
 msgstr ""
 
 #: ui/deck-header.slint:66
 #: ui/stage/deck-controller.slint:107
-#: ui/stage/deck-parts.slint:145
+#: ui/stage/deck-parts.slint:155
 msgid "Beat sync to the master"
 msgstr ""
 
@@ -1544,7 +1544,7 @@ msgid "Remove the tempo section at the playhead"
 msgstr ""
 
 #: ui/deck-panel.slint:116
-#: ui/stage/deck-parts.slint:476
+#: ui/stage/deck-parts.slint:486
 #: ui/studio/deck-controls.slint:294
 msgid "Delete a hot cue: press its pad"
 msgstr ""
@@ -1660,13 +1660,13 @@ msgstr ""
 
 #: ui/deck-wave-v.slint:165
 #: ui/deck-wave.slint:236
-#: ui/stage/deck-parts.slint:216
+#: ui/stage/deck-parts.slint:226
 msgid "Zoom in"
 msgstr ""
 
 #: ui/deck-wave-v.slint:167
 #: ui/deck-wave.slint:234
-#: ui/stage/deck-parts.slint:214
+#: ui/stage/deck-parts.slint:224
 msgid "Zoom out"
 msgstr ""
 
@@ -2062,7 +2062,7 @@ msgid "Delete"
 msgstr ""
 
 #: ui/exportmode-cues.slint:148
-#: ui/stage/deck-parts.slint:468
+#: ui/stage/deck-parts.slint:478
 #: src/app/deck/pads/mod.rs:82
 msgid "HOT CUE"
 msgstr ""
@@ -2301,7 +2301,7 @@ msgid "Back to the track's key"
 msgstr ""
 
 #: ui/exportmode-parts.slint:152
-#: ui/stage/deck-parts.slint:145
+#: ui/stage/deck-parts.slint:155
 msgid "BEAT SYNC"
 msgstr ""
 
@@ -2397,13 +2397,13 @@ msgstr ""
 
 #: ui/exportmode.slint:175
 #: ui/mixer.slint:259
-#: ui/stage/mixer.slint:207
+#: ui/stage/mixer.slint:209
 msgid "● ARMED"
 msgstr ""
 
 #: ui/exportmode.slint:175
 #: ui/mixer.slint:259
-#: ui/stage/mixer.slint:207
+#: ui/stage/mixer.slint:209
 msgid "● REC"
 msgstr ""
 
@@ -2412,7 +2412,7 @@ msgid "Start / stop recording"
 msgstr ""
 
 #: ui/fx.slint:104
-#: ui/stage/deck-parts.slint:687
+#: ui/stage/deck-parts.slint:697
 #: ui/studio/deck-controls.slint:34
 msgid "FX{}-{} ON"
 msgstr ""
@@ -2433,8 +2433,8 @@ msgid "CH{}"
 msgstr ""
 
 #: ui/fx.slint:136
-#: ui/stage/mixer.slint:162
-#: ui/stage/mixer.slint:162
+#: ui/stage/mixer.slint:164
+#: ui/stage/mixer.slint:164
 msgid "FX{}"
 msgstr ""
 
@@ -2503,7 +2503,7 @@ msgid "BEAT up (the lit slot)"
 msgstr ""
 
 #: ui/fx.slint:223
-#: ui/stage/deck-parts.slint:772
+#: ui/stage/deck-parts.slint:782
 msgid "TEMPO"
 msgstr ""
 
@@ -2513,7 +2513,7 @@ msgstr ""
 
 #: ui/fx.slint:226
 #: ui/fx.slint:243
-#: ui/stage/mixer.slint:185
+#: ui/stage/mixer.slint:187
 msgid "CH"
 msgstr ""
 
@@ -2547,7 +2547,7 @@ msgid "FX PART: the stem the effect runs on"
 msgstr ""
 
 #: ui/fx.slint:325
-#: ui/stage/deck-parts.slint:675
+#: ui/stage/deck-parts.slint:685
 msgid "BEAT FX"
 msgstr ""
 
@@ -2590,7 +2590,7 @@ msgid "no plugin"
 msgstr ""
 
 #: ui/fxrack.slint:83
-#: ui/stage/deck-parts.slint:692
+#: ui/stage/deck-parts.slint:702
 #: ui/stage/strip.slint:85
 msgid "ON"
 msgstr ""
@@ -3051,7 +3051,7 @@ msgstr ""
 
 #: ui/mixer.slint:157
 #: ui/mixer.slint:162
-#: ui/stage/mixer.slint:86
+#: ui/stage/mixer.slint:88
 msgid "STEM"
 msgstr ""
 
@@ -3078,8 +3078,8 @@ msgid "HP LEVEL"
 msgstr ""
 
 #: ui/mixer.slint:244
-#: ui/stage/mixer.slint:132
-#: ui/stage/mixer.slint:212
+#: ui/stage/mixer.slint:134
+#: ui/stage/mixer.slint:214
 msgid "SPLIT"
 msgstr ""
 
@@ -3099,19 +3099,19 @@ msgid "Record master"
 msgstr ""
 
 #: ui/mixer.slint:289
-#: ui/stage/mixer.slint:133
+#: ui/stage/mixer.slint:135
 #: ui/studio/mixer.slint:147
 msgid "SMOOTH"
 msgstr ""
 
 #: ui/mixer.slint:289
-#: ui/stage/mixer.slint:133
+#: ui/stage/mixer.slint:135
 #: ui/studio/mixer.slint:147
 msgid "SHARP"
 msgstr ""
 
 #: ui/mixer.slint:289
-#: ui/stage/mixer.slint:133
+#: ui/stage/mixer.slint:135
 #: ui/studio/mixer.slint:147
 msgid "CONST"
 msgstr ""
@@ -3481,7 +3481,7 @@ msgid "REC…"
 msgstr ""
 
 #: ui/sampler.slint:152
-#: ui/stage/mixer.slint:222
+#: ui/stage/mixer.slint:224
 #: src/app/deck/padopts.rs:63
 msgid "REC"
 msgstr ""
@@ -3588,7 +3588,7 @@ msgstr ""
 
 #: ui/stage/bar.slint:22
 #: ui/stage/bar.slint:24
-#: ui/stage/mixer.slint:224
+#: ui/stage/mixer.slint:226
 msgid "VIDEO"
 msgstr ""
 
@@ -3600,6 +3600,10 @@ msgstr ""
 #: ui/stage/bar.slint:50
 #: src/app/prefs/view.rs:423
 msgid "4 DECKS"
+msgstr ""
+
+#: ui/stage/bar.slint:84
+msgid "Controller mapping and MIDI learn"
 msgstr ""
 
 #: ui/stage/deck-controller.slint:86
@@ -3614,43 +3618,43 @@ msgstr ""
 msgid "Play / pause"
 msgstr ""
 
-#: ui/stage/deck-parts.slint:468
+#: ui/stage/deck-parts.slint:478
 msgid "BEAT LOOP"
 msgstr ""
 
-#: ui/stage/deck-parts.slint:468
+#: ui/stage/deck-parts.slint:478
 #: src/app/deck/pads/mod.rs:89
 #: src/app/prefs/controller/sampler.rs:47
 msgid "SLICER"
 msgstr ""
 
-#: ui/stage/deck-parts.slint:614
+#: ui/stage/deck-parts.slint:624
 #: ui/studio/deck-controls.slint:142
 msgid "Loop in at the playhead"
 msgstr ""
 
-#: ui/stage/deck-parts.slint:615
+#: ui/stage/deck-parts.slint:625
 #: ui/studio/deck-controls.slint:143
 msgid "Loop out at the playhead: the loop starts"
 msgstr ""
 
-#: ui/stage/deck-parts.slint:649
+#: ui/stage/deck-parts.slint:659
 #: ui/studio/deck-controls.slint:145
 msgid "Leave the loop, or go back into the last one"
 msgstr ""
 
-#: ui/stage/deck-parts.slint:717
+#: ui/stage/deck-parts.slint:727
 msgid "DEPTH"
 msgstr ""
 
-#: ui/stage/deck-parts.slint:738
-#: ui/stage/deck-parts.slint:761
+#: ui/stage/deck-parts.slint:748
+#: ui/stage/deck-parts.slint:771
 #: ui/studio/deck-controls.slint:215
 msgid "Slower"
 msgstr ""
 
-#: ui/stage/deck-parts.slint:738
-#: ui/stage/deck-parts.slint:761
+#: ui/stage/deck-parts.slint:748
+#: ui/stage/deck-parts.slint:771
 #: ui/studio/deck-controls.slint:215
 msgid "Faster"
 msgstr ""
@@ -3704,22 +3708,22 @@ msgstr ""
 msgid "LOAD {}"
 msgstr ""
 
-#: ui/stage/mixer.slint:58
+#: ui/stage/mixer.slint:60
 #: ui/studio/mixer.slint:160
 msgid "A"
 msgstr ""
 
-#: ui/stage/mixer.slint:58
+#: ui/stage/mixer.slint:60
 #: ui/studio/mixer.slint:160
 msgid "B"
 msgstr ""
 
-#: ui/stage/mixer.slint:123
+#: ui/stage/mixer.slint:125
 #: ui/studio/mixer.slint:121
 msgid "MIX"
 msgstr ""
 
-#: ui/stage/mixer.slint:123
+#: ui/stage/mixer.slint:125
 #: ui/studio/mixer.slint:120
 msgid "PHONES"
 msgstr ""
@@ -3733,18 +3737,26 @@ msgstr ""
 msgid "SOUND COLOR FX"
 msgstr ""
 
-#: ui/stage/table.slint:131
+#: ui/stage/table.slint:138
 #: src/app/prefs/view.rs:315
 msgid "WAVEFORM"
 msgstr ""
 
-#: ui/stage/table.slint:132
+#: ui/stage/table.slint:139
 #: ui/studio/table.slint:122
 msgid "TITLE"
 msgstr ""
 
-#: ui/stage/table.slint:260
-#: ui/stage/table.slint:261
+#: ui/stage/table.slint:141
+msgid "ALBUM"
+msgstr ""
+
+#: ui/stage/table.slint:147
+msgid "DATE ADDED"
+msgstr ""
+
+#: ui/stage/table.slint:271
+#: ui/stage/table.slint:272
 #: ui/studio/table.slint:224
 msgid "Load to deck {}"
 msgstr ""
@@ -4626,11 +4638,11 @@ msgstr ""
 msgid "NEURAL key model unavailable: this run uses CLASSIC"
 msgstr ""
 
-#: src/app/analyze/mod.rs:237
+#: src/app/analyze/mod.rs:246
 msgid "analysis: library query failed: {}"
 msgstr ""
 
-#: src/app/analyze/mod.rs:335
+#: src/app/analyze/mod.rs:344
 msgid " · library grid in use: PREFS > ANALYSIS > BEAT GRID FROM > OPENFADER ANALYSIS shows ours"
 msgstr ""
 
@@ -6046,57 +6058,57 @@ msgid "key sync: {} st → {} (relative key)"
 msgstr ""
 
 #: src/app/deck/load.rs:58
-#: src/app/deck/load.rs:324
+#: src/app/deck/load.rs:325
 msgid "no file path"
 msgstr ""
 
-#: src/app/deck/load.rs:193
+#: src/app/deck/load.rs:194
 msgid "downloading…"
 msgstr ""
 
-#: src/app/deck/load.rs:195
-#: src/app/deck/load.rs:557
+#: src/app/deck/load.rs:196
+#: src/app/deck/load.rs:559
 msgid "not analysed"
 msgstr ""
 
-#: src/app/deck/load.rs:236
+#: src/app/deck/load.rs:237
 msgid "the download stopped"
 msgstr ""
 
-#: src/app/deck/load.rs:258
+#: src/app/deck/load.rs:259
 msgid "download failed: {}"
 msgstr ""
 
-#: src/app/deck/load.rs:430
+#: src/app/deck/load.rs:432
 msgid "loading… · {}"
 msgstr ""
 
-#: src/app/deck/load.rs:576
+#: src/app/deck/load.rs:581
 #: src/app/midi/session.rs:263
 msgid "audio: {}"
 msgstr ""
 
-#: src/app/deck/load.rs:657
+#: src/app/deck/load.rs:662
 msgid "eject lock: pause the deck before loading another track"
 msgstr ""
 
-#: src/app/deck/load.rs:682
+#: src/app/deck/load.rs:687
 msgid "continuous playing: no next track in the list"
 msgstr ""
 
-#: src/app/deck/load.rs:699
+#: src/app/deck/load.rs:704
 msgid "grid: analysed"
 msgstr ""
 
-#: src/app/deck/load.rs:704
+#: src/app/deck/load.rs:709
 msgid "waveform: analysed"
 msgstr ""
 
-#: src/app/deck/load.rs:718
+#: src/app/deck/load.rs:723
 msgid "{} — {} beats @ {}, {} automatic cues"
 msgstr ""
 
-#: src/app/deck/load.rs:726
+#: src/app/deck/load.rs:731
 msgid "{} — {} beats @ {}, {} cues"
 msgstr ""
 
@@ -6164,12 +6176,12 @@ msgstr ""
 msgid "MIX IN: pick a stopped deck"
 msgstr ""
 
-#: src/app/deck/mod.rs:283
+#: src/app/deck/mod.rs:284
 #: src/app/deck/pads/mod.rs:460
 msgid "Select a track, then LOAD"
 msgstr ""
 
-#: src/app/deck/mod.rs:285
+#: src/app/deck/mod.rs:286
 msgid "audio disabled: {}"
 msgstr ""
 

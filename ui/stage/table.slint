@@ -56,30 +56,37 @@ export component StageTable inherits Rectangle {
     out property <bool> has-focus: fs.has-focus;
     public function focus-list() { fs.focus(); }
     property <bool> wave: Theme.stage-list-wave == 1 && root.width >= 600px;
+    /// Optional columns drop out as the list narrows: GENRE from 760 px, ALBUM from 1000, DATE ADDED from 1180.
     property <bool> wide: root.width >= 760px;
+    property <bool> album: root.width >= 1000px;
+    property <bool> added: root.width >= 1180px;
     property <length> pad: Theme.stage-gap;
     property <length> w-num: 30px;
     property <length> w-badge: root.wave ? 26px : 0px;
     property <length> w-wave: root.wave ? 112px : 0px;
     property <length> w-thumb: root.row-h;
     property <length> w-artist: root.wide ? 150px : 110px;
+    property <length> w-album: root.album ? 150px : 0px;
     property <length> w-bpm: 56px;
     property <length> w-key: 48px;
     property <length> w-genre: root.wide ? 100px : 0px;
     property <length> w-time: 56px;
     property <length> w-rating: 78px;
+    property <length> w-added: root.added ? 92px : 0px;
     property <length> w-scroll: 14px;
-    property <length> w-title: max(80px, root.width - 2 * root.pad - root.w-scroll - root.w-num - root.w-badge - root.w-wave - root.w-thumb - root.w-artist - root.w-bpm - root.w-key - root.w-genre - root.w-time - root.w-rating);
+    property <length> w-title: max(80px, root.width - 2 * root.pad - root.w-scroll - root.w-num - root.w-badge - root.w-wave - root.w-thumb - root.w-artist - root.w-album - root.w-bpm - root.w-key - root.w-genre - root.w-time - root.w-rating - root.w-added);
     property <length> x-badge: root.pad + root.w-num;
     property <length> x-wave: root.x-badge + root.w-badge;
     property <length> x-thumb: root.x-wave + root.w-wave;
     property <length> x-title: root.x-thumb + root.w-thumb;
     property <length> x-artist: root.x-title + root.w-title;
-    property <length> x-bpm: root.x-artist + root.w-artist;
+    property <length> x-album: root.x-artist + root.w-artist;
+    property <length> x-bpm: root.x-album + root.w-album;
     property <length> x-key: root.x-bpm + root.w-bpm;
     property <length> x-genre: root.x-key + root.w-key;
     property <length> x-time: root.x-genre + root.w-genre;
     property <length> x-rating: root.x-time + root.w-time;
+    property <length> x-added: root.x-rating + root.w-rating;
     property <length> menu-x;
     property <length> menu-y;
     property <int> cover-generation: BrowserState.cover-generation;
@@ -131,11 +138,13 @@ export component StageTable inherits Rectangle {
                 if root.wave: Head { x: root.x-wave; width: root.w-wave; height: Theme.h-header; y: Theme.space-sm; title: @tr("WAVEFORM"); sortable: false; }
                 Head { x: root.x-title; width: root.w-title; height: Theme.h-header; y: Theme.space-sm; title: @tr("TITLE"); sorted: BrowserState.sort-col == 0; clicked => { StudioState.sort-by(0); } }
                 Head { x: root.x-artist; width: root.w-artist; height: Theme.h-header; y: Theme.space-sm; title: @tr("ARTIST"); sorted: BrowserState.sort-col == 1; clicked => { StudioState.sort-by(1); } }
+                if root.album: Head { x: root.x-album; width: root.w-album; height: Theme.h-header; y: Theme.space-sm; title: @tr("ALBUM"); sorted: BrowserState.sort-col == 12; clicked => { StudioState.sort-by(12); } }
                 Head { x: root.x-bpm; width: root.w-bpm; height: Theme.h-header; y: Theme.space-sm; title: "BPM"; right: true; sorted: BrowserState.sort-col == 4; clicked => { StudioState.sort-by(4); } }
                 Head { x: root.x-key; width: root.w-key; height: Theme.h-header; y: Theme.space-sm; title: @tr("KEY"); sorted: BrowserState.sort-col == 3; clicked => { StudioState.sort-by(3); } }
                 if root.w-genre > 0px: Head { x: root.x-genre; width: root.w-genre; height: Theme.h-header; y: Theme.space-sm; title: @tr("GENRE"); sorted: BrowserState.sort-col == 2; clicked => { StudioState.sort-by(2); } }
                 Head { x: root.x-time; width: root.w-time; height: Theme.h-header; y: Theme.space-sm; title: @tr("LENGTH"); right: true; sorted: BrowserState.sort-col == 5; clicked => { StudioState.sort-by(5); } }
                 Head { x: root.x-rating; width: root.w-rating; height: Theme.h-header; y: Theme.space-sm; title: @tr("RATING"); sorted: BrowserState.sort-col == 6; clicked => { StudioState.sort-by(6); } }
+                if root.added: Head { x: root.x-added; width: root.w-added; height: Theme.h-header; y: Theme.space-sm; title: @tr("DATE ADDED"); sorted: BrowserState.sort-col == 13; clicked => { StudioState.sort-by(13); } }
             }
             list := ListView {
                 for cells[i] in BrowserState.tracks: Rectangle {
@@ -188,12 +197,14 @@ export component StageTable inherits Rectangle {
                     }
                     Cell { x: root.x-title; width: root.w-title - Theme.space-md; text: cells[0].text; font-weight: Theme.weight-semi; color: on-deck >= 0 ? loaded-tone : cells[10].text == "1" ? Theme.text-dim : Theme.text-bright; }
                     Cell { x: root.x-artist; width: root.w-artist - Theme.space-md; text: cells[1].text; color: Theme.row-dim; }
+                    if root.album: Cell { x: root.x-album; width: root.w-album - Theme.space-md; text: cells[12].text; color: Theme.row-dim; }
                     Cell { x: root.x-bpm; width: root.w-bpm - Theme.space-md; text: cells[4].text; right: true; color: cells[9].text == "b" || cells[9].text == "kb" ? Theme.play : Theme.text; }
                     Cell { x: root.x-key + Theme.space-md; width: root.w-key - Theme.space-md; text: cells[3].text; font-weight: Theme.weight-bold; color: cells[8].text == "0" ? Theme.text-dim : Colors.hsv(cells[8].text.to-float() * 30, Theme.key-sat, Theme.key-val); }
                     if root.w-genre > 0px: Cell { x: root.x-genre; width: root.w-genre - Theme.space-md; text: cells[2].text; color: Theme.row-dim; }
                     Cell { x: root.x-time; width: root.w-time - Theme.space-md; text: cells[5].text; right: true; color: Theme.row-dim; }
                     Text { x: root.x-rating + Theme.space-md; height: parent.height; text: @tr("★★★★★"); vertical-alignment: center; color: Theme.text-disabled; font-size: 10px; letter-spacing: 1px; }
                     Text { x: root.x-rating + Theme.space-md; height: parent.height; text: cells[6].text; vertical-alignment: center; color: Theme.accent-hi; font-size: 10px; letter-spacing: 1px; }
+                    if root.added: Cell { x: root.x-added; width: root.w-added - Theme.space-md; text: cells[13].text; color: Theme.row-dim; }
                     DragArea {
                         data: BrowserState.drag-track(i);
                         allow-copy: true;

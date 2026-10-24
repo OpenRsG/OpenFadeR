@@ -496,6 +496,27 @@ mod tests {
         }
     }
 
+    /// The OpenFadeR-Themes checkout (`extension/skin/`, when present): every theme loads without a note and its layout hints are
+    /// valid settings (the promise of that repository's CONTRIBUTING.md).
+    #[test]
+    fn the_checked_out_themes_load_without_a_note() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("extension/skin");
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            return;
+        };
+        for path in entries.flatten().map(|e| e.path()) {
+            if path.extension().is_none_or(|x| x != "json") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            let (skin, notes) =
+                parse(&text, "x").unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            assert!(notes.is_empty(), "{}: {notes:?}", path.display());
+            let bad = crate::app::prefs::view::apply_layout(&mut Default::default(), &skin.layout);
+            assert!(bad.is_empty(), "{}: {bad:?}", path.display());
+        }
+    }
+
     #[test]
     fn a_file_that_is_no_skin_is_an_error_and_odd_headers_are_noted() {
         assert!(parse("{ nope", "x").unwrap_err().contains("not valid JSON"));

@@ -29,7 +29,11 @@ pub const KEY_HUE: usize = 8;
 pub const HINTS: usize = 9;
 pub const PLAYED: usize = 10;
 pub const STEM_FILE: usize = 11;
-pub const COLUMNS: usize = 12;
+/// Album and the day the track was added (`YYYY-MM-DD`): columns of the Stage track list (ui/stage/table.slint); the desktop and
+/// studio lists do not show them.
+pub const ALBUM: usize = 12;
+pub const ADDED: usize = 13;
+pub const COLUMNS: usize = 14;
 pub const KEY: usize = 3;
 
 /// BPM hint window: ± this fraction of the playing deck's BPM.
@@ -109,7 +113,7 @@ pub fn reference(app: &App) -> Reference {
         })
 }
 
-/// Text of column `col` (0..=7) for `t`.
+/// Text of column `col` (0..=7, `ALBUM`, `ADDED`) for `t`.
 pub fn cell_of(t: &Track, f: &Facts, col: usize, look: &Look) -> String {
     match col {
         0 => t.title.clone(),
@@ -119,6 +123,8 @@ pub fn cell_of(t: &Track, f: &Facts, col: usize, look: &Look) -> String {
         BPM if f.bpm_x100 > 0 => format!("{:.*}", look.tempo_digits, f.bpm),
         BPM => String::new(),
         TIME => t.length_text(),
+        ALBUM => t.album.clone(),
+        ADDED => t.date_added.get(..10).unwrap_or(&t.date_added).to_owned(),
         RATING => "★".repeat(t.rating.into()),
         _ => t.comment.clone(),
     }
@@ -170,6 +176,7 @@ fn shown_cell(t: &Track, f: &Facts, col: usize, r: &Reference, look: &Look) -> S
         1 => t.artist.as_str().into(),
         2 => t.genre.as_str().into(),
         7 => t.comment.as_str().into(),
+        ALBUM => t.album.as_str().into(),
         _ => cell_of(t, f, col, look).as_str().into(),
     }
 }
@@ -399,6 +406,28 @@ mod tests {
         assert_eq!(f.bpm_x100, 12696);
         let unknown = Track::default();
         assert_eq!(cell_of(&unknown, &Facts::of(&unknown), BPM, &look), "");
+    }
+
+    #[test]
+    fn album_and_the_day_added_are_cells_and_sort_like_text() {
+        let t = Track {
+            album: "Stage Demo".into(),
+            date_added: "2026-10-24 18:11:00".into(),
+            ..Track::default()
+        };
+        let (f, look) = (Facts::of(&t), Look::now());
+        assert_eq!(cell_of(&t, &f, ALBUM, &look), "Stage Demo");
+        assert_eq!(cell_of(&t, &f, ADDED, &look), "2026-10-24", "the day only");
+        let row = row(&t, &f, &Reference::default(), false, &look);
+        assert_eq!(row.row_count(), COLUMNS);
+        assert_eq!(texts(&row)[ALBUM], "Stage Demo");
+        assert_eq!(texts(&row)[ADDED], "2026-10-24");
+        let (a, b) = (Track { date_added: "2026-01-02".into(), ..Track::default() }, t);
+        let list = [b, a];
+        let facts: Vec<Facts> = list.iter().map(Facts::of).collect();
+        let mut shown = vec![0, 1];
+        super::super::filter::sort(&mut shown, &list, &facts, ADDED, true, &look);
+        assert_eq!(shown, [1, 0]);
     }
 
     fn tracks(count: usize) -> Rc<Vec<Track>> {

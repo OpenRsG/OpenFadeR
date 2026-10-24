@@ -146,6 +146,7 @@ impl Deck {
             self.show(|v| {
                 v.title = t.title.as_str().into();
                 v.artist = t.artist.as_str().into();
+                v.genre = t.genre.as_str().into();
             });
             if let Some(pending) = loaded.pending.as_mut() {
                 pending.title.clone_from(&edited.title);
@@ -423,6 +424,7 @@ impl Deck {
             v.pads = ModelRc::new(VecModel::from(pad_views));
             v.title = t.title.clone().into();
             v.artist = t.artist.clone().into();
+            v.genre = t.genre.clone().into();
             (v.elapsed_text, v.remain_text) =
                 (fmt_ms(0).into(), format!("-{}", fmt_ms(duration)).into());
             v.total_text = fmt_ms(duration).into();
@@ -561,6 +563,9 @@ impl Deck {
                     .and_then(|t| store::global().edits(&store::key(t)).ok())
                     .unwrap_or_default();
                 merge_analysis(&mut l, an, &edits, &mut pending.notes);
+                if let Some(t) = l.track.as_ref() {
+                    crate::app::analyze::noted(t, &l.analysis);
+                }
                 detail_update = render::detail::wave(&colors, &l.analysis, None);
                 analysis::auto::fill(&mut l.analysis);
                 let edited_cues = edits.cues.is_some();
