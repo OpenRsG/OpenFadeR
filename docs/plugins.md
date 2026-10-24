@@ -726,8 +726,8 @@ plugin's own settings; `config` the device's settings, key → text):
 
 | `op` | Fields | Answer |
 |---|---|---|
-| `device_probe` | `root` | `{"libraries": ["name", …], "can_write": bool, "features": […], "actions": [{"id", "label", "help", "enabled", "writes"}], "prefetch": [file…], "backup": [folder…], "modified": unix seconds or null, "title", "about", "options": [field…]}`. `libraries` names what the plugin found on the device (empty: nothing yet, it may still `can_write`). `features`: `export`, `update`, `remove`, `histories`, `backup`, `settings`; the app offers only those. `prefetch`: files (relative to `root`) read once with a progress bar before the library is opened; `backup`: folders a backup copies. `title`: the format's name in the device window (empty: the plugin name); `about`: one line on the software and players, with versions, that read it; `options`: settings fields (`bool` or `choice` only) shown under the format and kept per device, passed in `config`. |
-| `export` | `root`, `snapshot`, `options` (`free`, `config`, `banks`) | `{"tracks", "added", "updated", "playlists", "warnings": […], "notes": […], "baselines": [[key, n]…], "fingerprint"}`: writes the collection (or the playlists the user ticked) to the device: a new library when it has none, else it is extended. Audio and artwork are copied by the plugin. |
+| `device_probe` | `root` | `{"libraries": ["name", …], "can_write": bool, "features": […], "actions": [{"id", "label", "help", "enabled", "writes"}], "prefetch": [file…], "backup": [folder…], "modified": unix seconds or null, "title", "about", "options": [field…]}`. `libraries` names what the plugin found on the device (empty: nothing yet, it may still `can_write`). `features`: `export`, `update`, `remove`, `histories`, `backup`, `settings`, `plan` (`export` honours `dry_run`), `check` (`device_check`, `device_fix`); the app offers only those. `prefetch`: files (relative to `root`) read once with a progress bar before the library is opened; `backup`: folders a backup copies. `title`: the format's name in the device window (empty: the plugin name); `about`: one line on the software and players, with versions, that read it; `options`: settings fields (`bool` or `choice` only) shown under the format and kept per device, passed in `config`. |
+| `export` | `root`, `snapshot`, `options` (`free`, `config`, `banks`, `dry_run`, `max_file`) | `{"tracks", "added", "updated", "playlists", "warnings": […], "notes": […], "baselines": [[key, n]…], "fingerprint", "plan", "verified"}`: writes the collection (or the playlists the user ticked) to the device: a new library when it has none, else it is extended. Audio and artwork are copied by the plugin. `max_file`: the largest file the file system holds (FAT: 4 GiB - 1); a bigger track is left out with a warning, never copied in part. With `dry_run` (only sent to a plugin listing `plan`) nothing at all is written and `plan` answers what would be: `{"add": [{"key", "title", "artist", "bytes"}…], "update": […], "analyse", "playlists", "copy_bytes", "write_bytes", "files", "blocked": [text…]}`. `verified: true`: the library files were read back and held what was written. |
 | `update` | `root`, `snapshot`, `baselines` | `{"matched", "unmatched", "edits": [{"key", "rating", "comment", "color", "cues", "grid"}], "baselines": […]}`: "Update Collection": what was edited on the player since `baselines`. The app applies `edits` to its store. |
 | `remove` | `root`, `target`, `delete_tracks`, `config` | `{"tracks", "playlists", "histories", "warnings"}`; `target` is `{"kind": "playlist", "path": [names]}`, `{"kind": "histories", "names": […]}` or `{"kind": "track", "file": path}`. |
 | `device_action` | `root`, `action`, `confirmed`, `config` | `{"message"}` or `{"confirm": {"text", "yes"}}`: one of the buttons of `actions`. A `confirm` answer is asked of the user; on "yes" the request is repeated with `confirmed: true`. |
@@ -735,6 +735,8 @@ plugin's own settings; `config` the device's settings, key → text):
 | `settings_read` | `root` | `{"values": {key: text}, "fingerprint"}`: what the device holds now. |
 | `settings_write` | `root`, `values` | `{"fingerprint"}`: writes the settings to the device. |
 | `backup_tracks` | `dir` | `{"tracks": [{"title", "name", "size", "file"}]}`: the tracks the library inside a backup folder lists. |
+| `device_check` | `root`, `config` | `{"libraries": [{"name", "present", "readable", "modified", "tracks", "playlists", "cues"}…], "problems": [{"id", "severity", "library", "cause", "consequence", "action", "fix", "files"}…]}`: the state of the plugin's libraries, read-only and quick (it runs on every plug-in). `severity`: `info`, `warning`, `error` (a player would show an incomplete or empty device), `unreadable`. `cause` / `consequence` / `action` are three sentences for the user: what is wrong, what it means at a gig, what to do. `fix`: the `device_fix` id that repairs it, or null; `files`: the audio files (relative to `root`) it is about, which the app can copy again from the collection. |
+| `device_fix` | `root`, `fix`, `config` | `{"message"}`: runs a fix that `device_check` named (a job with progress). |
 
 **Several formats on one device.** Every device plugin is probed for every device. Those that hold a library there or `can_write`
 are its formats; the one holding a library with the most `features` reads it (browse, update, histories). The DEVICES tab of the
@@ -762,11 +764,26 @@ merges by (it replaces that playlist's content), so the snapshot lists the playl
 has too is written with the collection's analysis, its empty parts filled from the device copy; any other member with the analysis
 read from the device) and then the new tracks; a track the playlist holds already is skipped and counted.
 
-A job (`export`, `update`, `remove`, `device_action`) runs inside its call on a thread of the app. Meanwhile the plugin calls back
-through the `host` table every request receives (`openfader_plugin::library::host` in Rust): `analysis` (the beat grid, cues,
-waveforms of a track: `computed: false` what the track's own library holds, `true` the app's analysis of the audio, cached),
-`audio_info` (sample rate of a file) and `progress` (`phase`, `done`, `total`; the answer says whether the user cancelled, and the
-plugin then stops with an error and leaves the device as it was).
+A job (`export`, `update`, `remove`, `device_action`, `device_fix`) runs inside its call on a thread of the app. Meanwhile the plugin
+calls back through the `host` table every request receives (`openfader_plugin::library::host` in Rust): `analysis` (the beat grid,
+cues, waveforms of a track: `computed: false` what the track's own library holds, `true` the app's analysis of the audio, cached),
+`audio_info` (sample rate of a file) and `progress` (`phase`, `done`, `total`, and `bytes_done` / `bytes_total` when the plugin counts
+bytes, so the app shows the speed and the time left; the answer says whether the user cancelled, and the plugin then stops with an
+error and leaves the device as it was). In Rust, `place_audio` counts the audio it copies; add other bytes with `host::add_bytes`
+after `host::set_bytes_total`.
+
+**All or nothing.** A stick can be pulled out, and a computer can crash, at any moment. A plugin writes its library files through
+`openfader_plugin::library::commit::Commit`: each new file is staged next to the one it replaces (`<name>.ofnew`, flushed to the
+device), read back and checked, then `commit()` switches them all. The journal `/.openfader/journal.json` records where a change
+stands. While staging, an interruption leaves the old library in use, and the app deletes the staged files. While switching, every
+staged file is whole and checked, so the app finishes the renames. Either way the device holds one whole generation of its
+libraries, never a new one next to an old one. The app recovers a device when it shows up and before any job writes to it.
+
+**Players.** A device plugin may ship `players.json` next to its `plugin.json`: `{"version", "players": [{"model", "reads":
+[library names from device_check], "file_systems": ["vfat", "exfat", "hfsplus"], "partition_tables": ["dos", "gpt"], "status":
+"confirmed" | "to_measure", "firmware", "note"}…], "presets": [{"id", "label", "models"}…]}`. The stick checker judges a device for
+each player of the booth profile (PREFERENCES > DJ SYSTEM > DEVICE and the DEVICES tab). A model marked `to_measure` is never shown
+as working. A new model is a line in that file, shipped with the plugin, with no new app.
 
 **Settings pages.** `settings_schema` answers `{"tabs": [{"label", "scope", "groups": [{"label", "fields": […]}], "apply_label",
 "read_label", "auto_key"}]}`. A field is `{"key", "label", "hint", "default", "scope", "type": …}` with `type` one of `choice`
