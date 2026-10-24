@@ -127,9 +127,14 @@ fn help_line(r: &Row) -> HelpLine {
     }
 }
 
+/// The deck a row of "deck 1" / "deck 2" (any deck row) acts on: the one its slot draws.
+fn slot_deck(r: &Row) -> i32 {
+    super::deck::slots::deck_in(r.deck.unwrap_or(0) as usize) as i32
+}
+
 #[rustfmt::skip]
 fn dispatch(app: &App, r: &Row, n: usize) {
-    let (decks, deck) = (app.global::<DeckState>(), r.deck.unwrap_or(0));
+    let (decks, deck) = (app.global::<DeckState>(), slot_deck(r));
     match r.act {
         Act::PlayPause => decks.invoke_play_pause(deck),
         Act::Cue => decks.invoke_cue(deck),
@@ -288,7 +293,7 @@ pub fn wire(app: &App) {
         ) else {
             return false;
         };
-        let (state, deck) = (app.global::<DeckState>(), r.deck.unwrap_or(0));
+        let (state, deck) = (app.global::<DeckState>(), slot_deck(&r));
         if r.act == Act::Cue {
             state.invoke_cue_released(deck)
         } else {

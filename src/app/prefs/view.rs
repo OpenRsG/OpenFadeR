@@ -74,6 +74,10 @@ choice!(
     CueMarkers { #[default] Normal = "normal", Large = "large" }
 );
 choice!(
+    /// Deck Number: where the number of a deck sits in its box on the waveforms: at the top left, or centred.
+    DeckNumber { Left = "left", #[default] Center = "center" }
+);
+choice!(
     /// Beat Count Display: bars since the start of the track, or the bars / beats to the next memory cue.
     BeatCount { #[default] Position = "position", NextBars = "next-bars", NextBeats = "next-beats" }
 );
@@ -145,6 +149,8 @@ section!(
         /// Waveform beat grid visibility and hot cue letter box size.
         beat_grid: BeatGrid = BeatGrid::Normal;
         cue_markers: CueMarkers = CueMarkers::Normal;
+        /// Deck Number position in the waveform boxes; pushed to `Theme.deck-number`.
+        deck_number: DeckNumber = DeckNumber::Center;
         /// Beat Count Display, Click on the waveform for PLAY and CUE, JOG display.
         beat_count: BeatCount = BeatCount::Position;
         click_wave: bool = true;
@@ -324,6 +330,8 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         Row::of("beat_grid", tr!("BEAT GRID"), v.beat_grid).hint(tr!("Bold: thicker lines, wider downbeats")),
         Row::of("cue_markers", tr!("HOT CUE MARKERS"), v.cue_markers)
             .hint(tr!("Large: double-size flags and letters")),
+        Row::of("deck_number", tr!("DECK NUMBER"), v.deck_number)
+            .hint(tr!("Position of the deck number on the waveforms")),
         Row::check(
             "click_wave",
             tr!("Click on the waveform for PLAY and CUE"),

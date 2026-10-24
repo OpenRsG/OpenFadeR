@@ -5,8 +5,7 @@ use super::actions::{ACTIONS, Action, Kind};
 use super::{App, Binding, Ev, Midi, Outcome, combine14, describe, layer};
 use crate::app::{
     MidiState,
-    deck::{DECK_NAMES, active},
-    prefs,
+    deck::{DECK_NAMES, active, slots},
 };
 use slint::ComponentHandle;
 
@@ -78,7 +77,7 @@ impl Midi {
     /// come here too, `claim/control.rs`).
     pub(super) fn run(&self, app: &App, ev: Ev, b: &Binding) -> Outcome {
         let act = &ACTIONS[b.act];
-        // The controller's own layer keys come first: DECK 3 / 4 reach decks a 2-deck layout hides, so they widen it.
+        // The controller's own layer keys come first: DECK 3 / 4 reach decks a 2-deck layout hides (it keeps its two slots).
         match act.kind {
             Kind::Layer => {
                 if ev.on() {
@@ -95,13 +94,8 @@ impl Midi {
             _ => {}
         }
         if b.deck as usize >= active() {
-            if !self.layer34_noted.replace(true) {
-                app.global::<MidiState>().set_status(
-                    tr!("deck 3/4 layer ignored in the 2-deck layout (4 DECKS chip or D switches)")
-                        .into(),
-                );
-            }
-            return Outcome::Ignored(b.deck);
+            // A control of the DECK 3 / 4 layer whose select message was missed: the controller is on that layer.
+            self.select_layer(app, b.deck as usize);
         }
         for d in self.gang(act, b.deck as usize) {
             if let Some(done) = self.fire(app, ev, b, d) {
@@ -163,10 +157,12 @@ impl Midi {
     }
 
     /// SHIFT + DECK select of `side` (0 left, 1 right): DUAL DECK on / off. It needs both decks of the side, so a 2-deck
-    /// layout is widened first (as DECK 3 / 4 do).
+    /// layout keeps all four in use (as DECK 3 / 4 do).
     pub(super) fn toggle_dual(&self, app: &App, side: usize) {
         let side = side.min(1);
-        self.show_deck(side + 2);
+        if self.reach(side + 2) {
+            slots::publish(app);
+        }
         let mut dual = self.dual.get();
         dual[side] = !dual[side];
         self.dual.set(dual);
@@ -182,12 +178,15 @@ impl Midi {
         );
     }
 
-    /// Widens a 2-deck layout to 4 decks when the controller reaches deck `d`, which it hides ([`layer::layout_for`]).
-    fn show_deck(&self, d: usize) {
-        let want = layer::layout_for(d, active());
-        if want != active() {
-            prefs::update(|p| p.decks = want);
+    /// The controller reaches deck `d`, which a 2-deck layout hides: all four decks stay in use ([`slots::reach`]; the layout
+    /// and its two slots stay). `true` when that is new: the controls of the decks it adds were ignored until now, so ask
+    /// where they are.
+    fn reach(&self, d: usize) -> bool {
+        let new = slots::reach(d);
+        if new {
+            self.request_state_again();
         }
+        new
     }
 
     /// The LSB half of a 14-bit control: combine with the stored MSB and apply.
@@ -210,10 +209,10 @@ impl Midi {
         Outcome::Done(b.act, b.deck)
     }
 
-    /// The controller selected deck `d` on its side: the lights follow it (a layer just selected is sent in full). A deck
-    /// the layout hides widens the layout first.
+    /// The controller selected deck `d` on its side: the lights follow it (a layer just selected is sent in full) and the
+    /// slot of that side draws it. A deck a 2-deck layout hides is reached first.
     pub(super) fn select_layer(&self, app: &App, d: usize) {
-        self.show_deck(d);
+        let reached = self.reach(d);
         let Some(l) = layer::select(self.layer.get(), d, active()) else {
             return;
         };
@@ -221,6 +220,9 @@ impl Midi {
             self.snap_at.set(None);
             app.global::<MidiState>()
                 .set_status(tr!("controller decks: {}", layer::describe(l)).into());
+        }
+        if slots::set_layer(l) || reached {
+            slots::publish(app);
         }
     }
 }

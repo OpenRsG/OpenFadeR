@@ -46,6 +46,7 @@ where
     let t = window.global::<Theme>();
     t.set_tooltips(p.view.tooltips);
     t.set_tempo_decimals(p.view.tempo_decimals.digits() as i32);
+    t.set_deck_number(p.view.deck_number as i32);
     t.set_list_font(font_px(p.view.browse_font));
     t.set_list_weight(if p.view.browse_bold { 700 } else { 400 });
     t.set_h_row(row_px(p.view.line_space));

@@ -87,6 +87,8 @@ The interface is in English, French, Spanish, German, Portuguese (Brazil), Itali
 
 Press `D` to switch layouts. All four decks get their own pads, loops, slip, sync and stem buttons. The deck layout (horizontal or vertical) is a VIEW setting, and a theme can ask for it.
 
+A four-deck controller (the DDJ-FLX6, for one) has two physical decks and DECK 1 / 2 / 3 / 4 buttons for the layer each one controls. In the 2-deck layout, DECK 3 / 4 keep the two decks on screen: the left (right) deck then draws deck 3 (4), its waveform, panel, pads, mixer channel and number, and DECK 1 / 2 bring decks 1 / 2 back. All four decks keep playing; when the deck on the other layer of a side is playing, a small box with its number sits next to the deck number. The 4-deck layout shows every deck at once and does not change with the layer. The number of a deck is drawn large on its waveform box, centred; PREFERENCES > VIEW > WAVEFORM > DECK NUMBER moves it to the top left.
+
 ### Automix transition styles
 
 Start AUTOMIX on a three-track list (or any longer list), then click the style chip beside it to open the panel.

@@ -409,6 +409,23 @@ fn slip_return_after_a_seek_lands_on_the_shadow() {
 }
 
 #[test]
+fn a_press_in_the_buffer_of_the_previous_release_beats_the_slip_return() {
+    let (sh, mut v) = rig(1.0, false);
+    sh.t.set_slip(true);
+    run_buffers(&sh, &mut v, 4);
+    sh.seek_to(100_000.0); // hot cue pressed
+    run_buffers(&sh, &mut v, 6);
+    sh.t.slip_return(); // released ...
+    sh.seek_to(200_000.0); // ... and pressed again before the callback
+    run_buffers(&sh, &mut v, 1);
+    assert_eq!(pos(&sh), 200_000.0 + 512.0);
+    run_buffers(&sh, &mut v, 3);
+    sh.t.slip_return(); // its release goes to the shadow
+    run_buffers(&sh, &mut v, 1);
+    assert_eq!(pos(&sh), 15.0 * 512.0);
+}
+
+#[test]
 fn reverse_released_under_its_own_slip_returns_to_the_shadow_then_slip_goes_off() {
     let (sh, mut v) = rig(1.0, false);
     sh.t.set_slip(true); // QUANTIZE REVERSE: REVERSE engages slip itself

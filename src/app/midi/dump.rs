@@ -11,8 +11,8 @@
 //! A mapping file without `<stateRequest>` sends nothing: its values sync on the first move.
 
 use super::{
+    actions::{Kind, ACTIONS},
     Binding, Ev,
-    actions::{ACTIONS, Kind},
 };
 use std::time::{Duration, Instant};
 
@@ -80,7 +80,7 @@ pub fn plan(find: impl Fn((u8, u8)) -> Option<Binding>, ev: Ev, shown: usize) ->
         };
     };
     let d = b.deck as usize;
-    // The deck layer lights come before the layout check: a controller already on its DECK 3 / 4 layer widens a 2-deck layout.
+    // The deck layer lights come before the layout check: a controller already on its DECK 3 / 4 layer reaches decks C / D.
     if let Kind::Layer = ACTIONS[b.act].kind {
         return if on {
             Step::Layer(d)
@@ -193,7 +193,7 @@ mod tests {
         assert_eq!(
             plans(2, &[[0x92, 0x3C, 0x7F]]),
             [Layer(2)],
-            "the controller is on deck C: the layout widens"
+            "the controller is on deck C: the layout keeps two decks and reaches C"
         );
         assert_eq!(
             [p[1], p[2], p[4], p[5], p[9]],

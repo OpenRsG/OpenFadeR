@@ -1,7 +1,7 @@
 //! Creates the decks and routes the `DeckState` callbacks.
 
-use super::{DECKS, Deck, Decks, active, frame, mixpoint, padopts, sync, tick};
-use crate::app::{App, DeckScroll, DeckState, DeckView, prefs};
+use super::{active, frame, mixpoint, padopts, shown, slots, sync, tick, Deck, Decks, DECKS};
+use crate::app::{prefs, App, DeckScroll, DeckState, DeckView};
 use openfader::{
     analysis,
     library::{Library, Track},
@@ -94,8 +94,9 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
     on!(state, at decks, on_stem, |d, k| d.stem_press(k as usize));
     on!(state, at decks, on_stem_click, |d, k| d.stem_click(k as usize));
     on!(state, at decks, on_stem_double, |d, k| d.stem_double(k as usize));
-    // The 2/4-deck layout: the UI shows `count` decks; decks C and D leave the layout paused.
-    state.set_count(active() as i32);
+    // The 2/4-deck layout: the UI shows `count` decks; decks C and D leave the layout paused (until the controller reaches them).
+    state.set_count(shown() as i32);
+    slots::layout(app, shown());
     decks.iter().skip(active()).for_each(|d| d.park(active()));
     let (d, weak) = (decks.clone(), app.as_weak());
     prefs::on_change(move |p| {
@@ -109,9 +110,10 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
             deck.rewave();
         }
         if let Some(app) = weak.upgrade() {
-            app.global::<DeckState>().set_count(active() as i32);
+            app.global::<DeckState>().set_count(shown() as i32);
+            slots::layout(&app, shown());
         }
-        d.iter().skip(p.decks).for_each(|deck| deck.park(p.decks));
+        d.iter().skip(active()).for_each(|deck| deck.park(active()));
         d.iter().for_each(|deck| deck.stems_pref_changed());
         d.iter().for_each(|deck| {
             deck.sync.refresh(&p.controller);

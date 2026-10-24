@@ -24,8 +24,8 @@
 //! Deck 3/4 (a 4-deck controller): its deck 3 / 4 layer sends on MIDI channels 3 / 4, so
 //! those bindings drive decks C / D directly; the deck-select inputs say which deck of each side is selected
 //! ([`layer`]; the controller lights its own DECK buttons),
-//! and only that deck's lights are sent (a layer just selected is sent in full). DECK 3 / 4 widen a 2-deck layout to 4 decks;
-//! other controls of a hidden deck are ignored with a status note. SHIFT + DECK toggles
+//! and only that deck's lights are sent (a layer just selected is sent in full). In a 2-deck layout DECK 3 / 4 keep it: its
+//! left / right slot draws deck C / D while that layer is selected ([`crate::app::deck::slots`]); DECK 1 / 2 bring A / B back. SHIFT + DECK toggles
 //! DUAL DECK of a side: its transport, loop, cue and pad controls and the jog go to both decks of the pair ([`input`]).
 //! JOG CUTTER needs VINYL on and runs on one deck at a time ([`jog::cutters`]).
 //! `OPENFADER_MIDI_LOG=1` prints every incoming message with the action it hit, or `unmapped`.
@@ -86,8 +86,8 @@ use std::{
 /// A channel message without its value: status byte and data1.
 type Msg = (u8, u8);
 
-pub use wire::wire;
 pub use claim::ports;
+pub use wire::wire;
 
 /// PREFS "Use controller audio when connected".
 fn prefs_audio() -> bool {
@@ -268,7 +268,6 @@ enum Outcome {
     Done(usize, i32),
     /// MSB of a 14-bit pair: applied when the LSB arrives.
     Half,
-    Ignored(i32),
     /// A knob or fader waiting for soft takeover: action index and deck.
     Waiting(usize, i32),
     Unmapped,
@@ -286,7 +285,6 @@ impl fmt::Display for Outcome {
                 DECK_NAMES[*deck as usize]
             ),
             Outcome::Half => f.write_str("14-bit MSB held"),
-            Outcome::Ignored(deck) => write!(f, "deck {} layer ignored (2-deck layout)", deck + 1),
             Outcome::Waiting(act, deck) => write!(
                 f,
                 "{} {}: waiting for soft takeover",
@@ -325,7 +323,6 @@ struct Midi {
     dual: Cell<[bool; 2]>,
     started: Instant,
     log: bool,
-    layer34_noted: Cell<bool>,
     out: RefCell<Option<Sink>>,
     leds: RefCell<Leds>,
     /// The MIDI clock output (PREFS > CONTROLLER > MIDI CLOCK OUT), `None` while that setting is empty ([`clock`]).
