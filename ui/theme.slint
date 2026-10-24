@@ -209,7 +209,7 @@ export global Theme {
     in-out property <int> weight-semi: 600;
 
     // @group Sizes
-    /// Presentation profile: 0 desktop workspace, 1 touch workspace, 2 studio workspace (one window: stacked waveforms, a deck panel per side, a central mixer, the library and AUTOMIX under them), all with the same application features.
+    /// Presentation profile: 0 desktop workspace, 1 touch workspace, 2 studio workspace (one window: stacked waveforms, a deck panel per side, a central mixer, the library and AUTOMIX under them), 3 stage workspace (the same, built from the Stage tokens: waveform placement, deck panel style, mixer, strip, library), all with the same application features.
     in-out property <int> layout-profile: 0;
     /// Width below which the touch workspace presents one selected deck instead of two columns.
     in-out property <length> touch-breakpoint: 760px;
@@ -295,6 +295,69 @@ export global Theme {
     in-out property <length> studio-cover: 72px;
     /// Row height of the studio workspace's track list (a row carries a thumbnail).
     in-out property <length> studio-row: 36px;
+
+    // @group Stage
+    /// Stage workspace (layout-profile 3): where the enlarged waveforms sit. 0 = stacked across the top, 1 = in a centre column between the decks (above the mixer), 2 = inside each deck panel.
+    in-out property <int> stage-wave: 0;
+    /// Stage deck panel: 0 = performance (pad grid, LOOP, BEAT FX, jog ring), 1 = turntable (big platter with the cover art, hot cue list, tempo fader), 2 = controller (a row of EQ / filter knobs, big CUE / PLAY / SYNC buttons), 3 = ring (a large tempo ring with the BPM, round PLAY / CUE, tempo fader).
+    in-out property <int> stage-deck: 0;
+    /// Stage hot cue pads: 0 = numbered grid (1-8, outlined, the lit one in the deck colour), 1 = cue list (A-F rows with the cue time and a delete cross), 2 = grid filled in each cue's colour.
+    in-out property <int> stage-pads: 0;
+    /// Stage mixer: 0 = two channels, 1 = four channels (decks 3 and 4 follow the controller's layers).
+    in-out property <int> stage-mixer: 0;
+    /// Tabs over the Stage mixer: 0 = none, 1 = MIXER / FX / REC, 2 = MIXER / VIDEO / LIGHTING.
+    in-out property <int> stage-tabs: 0;
+    /// A strip under the Stage decks: 0 = none, 1 = EFFECTS (left), SOUND COLOR FX and SAMPLER (right).
+    in-out property <int> stage-strip: 0;
+    /// Stage track list: 1 = a waveform preview column and a hot cue bank column.
+    in-out property <int> stage-list-wave: 0;
+    /// Stage library side bar: 0 = icon and label per entry, 1 = icons only.
+    in-out property <int> stage-sidebar: 0;
+    /// Width of the Stage mixer.
+    in-out property <length> stage-mixer-w: 280px;
+    /// Height of each enlarged waveform in the Stage workspace.
+    in-out property <length> stage-wave-h: 64px;
+    /// Spacing between the Stage panels (and the window edge).
+    in-out property <length> stage-gap: 8px;
+    /// Corner radius of the Stage panels.
+    in-out property <length> stage-radius: 10px;
+    /// Corner radius of the Stage buttons, pads, tabs and fields.
+    in-out property <length> stage-radius-ctl: 6px;
+    /// Side of the cover art in the Stage deck panels.
+    in-out property <length> stage-cover: 80px;
+    /// Row height of the Stage track list.
+    in-out property <length> stage-row: 30px;
+    /// Height of the Stage big CUE / PLAY / SYNC buttons (diameter when round).
+    in-out property <length> stage-button: 44px;
+    /// Diameter of the Stage jog (ring or platter).
+    in-out property <length> stage-jog: 180px;
+
+    // @group Style
+    /// Neon glow (0..1) around lit controls, the jog ring and the playheads of the Stage workspace; 0 = none.
+    in-out property <float> glow: 0.0;
+    /// Raised / inset shading (0..1) of the Stage buttons, knobs and panels; 0 = flat.
+    in-out property <float> bevel: 0.0;
+    /// Stage buttons: 0 = filled, 1 = outlined (the lit one glows in its colour), 2 = raised (bevelled caps).
+    in-out property <int> button-style: 0;
+    /// Stage jog: 0 = ring with the BPM inside, 1 = vinyl platter showing the cover art, 2 = thin ring with the beat ticks.
+    in-out property <int> jog-style: 0;
+    /// Top colour of the Stage panels' vertical gradient (the bottom is `panel`); `panel` = no gradient.
+    in-out property <color> panel-top: root.panel;
+    /// Outline of the Stage panels; transparent = none.
+    in-out property <color> panel-border: #00000000;
+    /// 1 = each deck's controls take its deck colour (jog arc, PLAY / CUE rims, lit pads, knob arcs, meters, deck badge); 0 = the shared accents.
+    in-out property <int> deck-tint: 0;
+    /// Second colour of each deck: gradients and the mid band of its waveform when `wave-style` is 1.
+    in-out property <color> deck1-hi: root.light ? #04a5e5 : #b4befe;
+    in-out property <color> deck2-hi: root.light ? #df8e1d : #f9e2af;
+    in-out property <color> deck3-hi: root.light ? #ea76cb : #f5c2e7;
+    in-out property <color> deck4-hi: root.light ? #40a02b : #a6e3a1;
+    /// Waveform colours: 0 = the shared bands (`wave-low`, `wave-mid`, `wave-high`), 1 = per deck (low = `deckN`, mid = `deckN-hi`, high = `wave-high`).
+    in-out property <int> wave-style: 0;
+    /// Family of the big figures (BPM, times, deck numbers); empty = `font`.
+    in-out property <string> font-display: "";
+    /// Weight of the big figures.
+    in-out property <int> weight-display: 600;
 
     public pure function target-size(size: length) -> length {
         return root.layout-profile == 1 ? max(size, root.touch-target) : size;
