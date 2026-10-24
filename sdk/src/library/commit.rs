@@ -132,21 +132,19 @@ impl Commit {
     }
 
     /// Puts every staged file in place. Once the `switching` journal is on the device the change counts as made: a failure after
-    /// that is finished by [`recover`].
+    /// that (a rename refused, the stick pulled) leaves the journal and the remaining staged files for [`recover`] to finish.
     pub fn commit(mut self) -> Result<(), String> {
         self.journal(State::Switching)?;
+        self.done = true;
         if failing(0) {
-            self.done = true;
             return Err("injected failure".into());
         }
         for (n, (target, staged)) in self.files.iter().enumerate() {
             std::fs::rename(staged, target).map_err(at(target))?;
             if failing(n + 1) {
-                self.done = true;
                 return Err("injected failure".into());
             }
         }
-        self.done = true;
         sync_parents(self.files.iter().map(|(t, _)| t.as_path()));
         clear(&self.root)
     }

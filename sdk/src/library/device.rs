@@ -525,9 +525,11 @@ pub fn track_key(t: &super::Track) -> String {
     }
 }
 
-/// A file or folder name on a device: characters FAT file systems and players reject become `_`, at most 120 characters, no
-/// surrounding spaces or trailing dots; empty → `fallback`. Every device plugin names the audio it copies with it.
+/// A file or folder name on a device: characters FAT file systems and players reject become `_`, at most 120 characters (a
+/// longer name loses the end of its stem, never its extension: a player recognises audio by it), no surrounding spaces or
+/// trailing dots; empty → `fallback`. Every device plugin names the audio it copies with it.
 pub fn clean_name(s: &str, fallback: &str) -> String {
+    const MAX: usize = 120;
     let s: String = s
         .chars()
         .map(|c| {
@@ -537,8 +539,18 @@ pub fn clean_name(s: &str, fallback: &str) -> String {
                 c
             }
         })
-        .take(120)
         .collect();
+    let s = if s.chars().count() <= MAX {
+        s
+    } else {
+        let ext = s
+            .rsplit_once('.')
+            .map(|(_, e)| e)
+            .filter(|e| (1..=8).contains(&e.chars().count()) && !e.contains(' '))
+            .map_or(String::new(), |e| format!(".{e}"));
+        let stem: String = s.chars().take(MAX - ext.chars().count()).collect();
+        format!("{}{ext}", stem.trim_end())
+    };
     let s = s.trim().trim_end_matches('.');
     if s.is_empty() {
         fallback.into()

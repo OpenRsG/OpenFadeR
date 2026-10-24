@@ -101,3 +101,16 @@ fn beat_numbers_map_onto_the_grid_and_extend_past_it() {
     assert_eq!(p.span_ms(&beats), (600.0, 2600.0));
     assert_eq!(Phrase { beat: 3, ..p }.span_ms(&[]), (0.0, 0.0));
 }
+
+#[test]
+fn device_names_stay_fat_safe_and_keep_their_extension() {
+    assert_eq!(clean_name("AC/DC: Live?.mp3", "x"), "AC_DC_ Live_.mp3");
+    assert_eq!(clean_name("  ...  ", "track"), "track");
+    let long = format!("{}.flac", "é".repeat(200));
+    let short = clean_name(&long, "x");
+    assert_eq!(short.chars().count(), 120);
+    assert!(short.ends_with(".flac"));
+    // A dot inside a long title is no extension: the name is just cut.
+    let titled = format!("Mr. {}", "a".repeat(200));
+    assert_eq!(clean_name(&titled, "x").chars().count(), 120);
+}
