@@ -35,5 +35,15 @@ pub mod skin {
         Duration(i64),
     }
 
+    /// What a token's value may be besides its type (`// @values` / `// @range` before the property in ui/theme.slint).
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Rule {
+        Any,
+        /// A whole number: the index of one of these names (0, 1, ...).
+        Choice(&'static [&'static str]),
+        /// A number from `.0` to `.1`.
+        Range(f32, f32),
+    }
+
     include!(concat!(env!("OUT_DIR"), "/skin_tokens.rs"));
 }

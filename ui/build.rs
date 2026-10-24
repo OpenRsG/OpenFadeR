@@ -299,10 +299,11 @@ fn skin_tokens() -> String {
         );
     }
     s += "        _ => return false,\n    }\n    true\n}\n";
-    // The editor's group and hint of each token: `// @group <name>` markers and `///` docs of theme.slint, in token order.
+    // The editor's group and hint of each token, its value rule and the token it follows: `// @group <name>`, `///` docs and
+    // `// @values` / `// @range` of theme.slint, in token order.
     let info = token_info();
     assert_eq!(
-        info.iter().map(|t| t.0.as_str()).collect::<Vec<_>>(),
+        info.iter().map(|t| t.name.as_str()).collect::<Vec<_>>(),
         tokens
             .iter()
             .map(|d| d.name.replace('_', "-"))
@@ -310,35 +311,95 @@ fn skin_tokens() -> String {
         "theme.slint token scan out of step with the declarations"
     );
     s += "\n/// The theme editor's group (`// @group` in ui/theme.slint) and hint (the `///` doc) of each token of [`TOKENS`], in that order.\npub const TOKEN_INFO: &[(&str, &str)] = &[\n";
-    for (_, group, doc) in &info {
-        let _ = writeln!(s, "    ({group:?}, {doc:?}),");
+    for t in &info {
+        let _ = writeln!(s, "    ({:?}, {:?}),", t.group, t.doc);
+    }
+    s += "];\n\n/// The value rule of each token of [`TOKENS`] (`// @values`, `// @range`), in that order.\npub const TOKEN_RULES: &[Rule] = &[\n";
+    for (t, d) in info.iter().zip(&tokens) {
+        match t.rule.split_once(' ') {
+            None => s += "    Rule::Any,\n",
+            Some(("@values", v)) => {
+                assert_eq!(d.ty, "int", "Theme.{}: `@values` is for int tokens", t.name);
+                let names: Vec<String> = v.split('|').map(|n| format!("{:?}", n.trim())).collect();
+                let _ = writeln!(s, "    Rule::Choice(&[{}]),", names.join(", "));
+            }
+            Some(("@range", v)) => {
+                assert_eq!(
+                    d.ty, "float",
+                    "Theme.{}: `@range` is for float tokens",
+                    t.name
+                );
+                let (lo, hi) = v.split_once("..").expect("`@range lo..hi`");
+                let _ = writeln!(
+                    s,
+                    "    Rule::Range({:?}f32, {:?}f32),",
+                    lo.trim().parse::<f32>().unwrap(),
+                    hi.trim().parse::<f32>().unwrap()
+                );
+            }
+            Some(_) => panic!("Theme.{}: unknown rule `{}`", t.name, t.rule),
+        }
+    }
+    s += "];\n\n/// Tokens whose default is another token (`name: root.other;` in ui/theme.slint): (token, the token it follows). A skin that does not\n/// set the token gives it the value the skin gives the other one.\npub const FOLLOWS: &[(&str, &str)] = &[\n";
+    for t in &info {
+        if let Some(f) = &t.follows {
+            assert!(
+                info.iter().any(|o| &o.name == f),
+                "Theme.{}: follows `{f}`, which is not a token",
+                t.name
+            );
+            let _ = writeln!(s, "    ({:?}, {f:?}),", t.name);
+        }
     }
     s += "];\n";
     s
 }
+/// One `in-out` property of `Theme` as theme.slint describes it.
+struct Info {
+    name: String,
+    group: String,
+    doc: String,
+    /// The `// @values …` or `// @range …` line before it (empty: none).
+    rule: String,
+    /// The token its default names (`root.<token>`).
+    follows: Option<String>,
+}
 
-/// (name, group, doc) of every `in-out` property of `Theme`, scanned from ui/theme.slint line by line.
-fn token_info() -> Vec<(String, String, String)> {
+/// Every `in-out` property of `Theme`, scanned from ui/theme.slint line by line.
+fn token_info() -> Vec<Info> {
     let src = fs::read_to_string("theme.slint").expect("ui/theme.slint");
-    let (mut group, mut doc) = (String::new(), Vec::new());
+    let (mut group, mut doc, mut rule) = (String::new(), Vec::new(), String::new());
     let mut out = Vec::new();
     for line in src.lines().map(str::trim) {
         if let Some(g) = line.strip_prefix("// @group ") {
             group = g.trim().to_owned();
         } else if let Some(d) = line.strip_prefix("///") {
             doc.push(d.trim().to_owned());
+        } else if line.starts_with("// @values ") || line.starts_with("// @range ") {
+            rule = line[3..].trim().to_owned();
         } else if let Some((_, rest)) = line
             .strip_prefix("in-out property")
             .and_then(|r| r.split_once('>'))
         {
-            out.push((
-                ident(rest.trim_start()).replace('_', "-"),
-                group.clone(),
-                doc.join(" "),
-            ));
+            let rest = rest.trim_start();
+            let name = ident(rest).replace('_', "-");
+            let follows = rest
+                .split_once(':')
+                .and_then(|(_, d)| d.trim().strip_suffix(';')?.trim().strip_prefix("root."))
+                .filter(|t| !t.is_empty() && t.chars().all(|c| c.is_alphanumeric() || c == '-'))
+                .filter(|t| *t != "light")
+                .map(str::to_owned);
+            out.push(Info {
+                name,
+                group: group.clone(),
+                doc: doc.join(" "),
+                rule: std::mem::take(&mut rule),
+                follows,
+            });
             doc.clear();
         } else if !line.starts_with("//") {
             doc.clear();
+            rule.clear();
         }
     }
     out

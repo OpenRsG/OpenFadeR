@@ -39,6 +39,7 @@ import { CatalogState, GetMapping, GetPlugin, GetTheme, OfferBanner, RepoView } 
 import { TouchWorkspace } from "touch.slint";
 import { StudioState } from "studio-state.slint";
 import { StudioWorkspace } from "studio/workspace.slint";
+import { StageMetrics, StageWorkspace } from "stage/stage.slint";
 // Re-exported so Rust can reach them via `app.global::<…>()` and by name.
 export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowView, DeckState, DeckView, DeviceItem, DeviceState, DjEditor, DjItem, DjSystemState, DragState, DupeRow, EditState, ExportDeck, ExportModeState, FixtureView, FxState, FxUnit, HelpLine, KeymapState, KeysState, LayoutState, LibraryState, LightingState, MidiState, MissingRow, MixDeckView, MixPointState, MixerState, PadOpt, PadView, PadsState, PaneState, PluginState, PrefRowData, PrefsState, SamplerState, SlotView, SplitWindow, Theme, ToastState, TrackInfoState, VideoDeckView, VideoItem, VideoState, VideoWindow }
 export { DrumSlotView, GrooveDeckView, GrooveState, HotCue, PhraseSeg }
@@ -68,16 +69,18 @@ export component App inherits Window {
     icon: @image-url("../assets/icon.png");
     preferred-width: 1100px;
     preferred-height: 960px;
-    min-width: root.touch ? 320px + root.safe-area-insets.left + root.safe-area-insets.right : root.studio ? 1100px : root.vert ? 1100px : 1000px;
-    min-height: root.touch ? max(320px, touch-workspace.required-height + root.safe-area-insets.top + root.safe-area-insets.bottom) : root.studio ? 720px : root.y-browser + root.browser-min + Theme.h-status;
+    min-width: root.touch ? 320px + root.safe-area-insets.left + root.safe-area-insets.right : root.stage-ws ? StageMetrics.min-w : root.studio ? 1100px : root.vert ? 1100px : 1000px;
+    min-height: root.touch ? max(320px, touch-workspace.required-height + root.safe-area-insets.top + root.safe-area-insets.bottom) : root.stage-ws ? StageMetrics.min-h : root.studio ? 720px : root.y-browser + root.browser-min + Theme.h-status;
     background: Theme.bg;
     default-font-family: Theme.font;
     default-font-size: Theme.font-size;
 
     property <bool> touch: Theme.layout-profile == 1;
-    /// The studio workspace (ui/studio/, `layout-profile` 2) takes the PERFORMANCE mode with two decks; every other mode and the
-    /// 4-deck layouts keep the desktop workspace, with its own global bar to come back by.
-    property <bool> studio: Theme.layout-profile == 2 && root.mode == 1 && DeckState.count == 2;
+    /// The studio workspace (ui/studio/, `layout-profile` 2) and the stage workspace (ui/stage/, 3) take the PERFORMANCE mode with two
+    /// decks; every other mode and the 4-deck layouts keep the desktop workspace, with its own global bar to come back by. Both share
+    /// the window plumbing below (no desktop layout, the keyboard / MIDI entry points, the track-list rows); `stage-ws` picks the stage.
+    property <bool> studio: (Theme.layout-profile == 2 || Theme.layout-profile == 3) && root.mode == 1 && DeckState.count == 2;
+    property <bool> stage-ws: Theme.layout-profile == 3 && root.studio;
     /// Touch or studio: the desktop layout below builds none of its decks, waveforms or panels.
     property <bool> flat: root.touch || root.studio;
     property <length> browser-min: Theme.h-tab + Theme.h-toolbar + Theme.h-header + 6 * Theme.h-row;
@@ -120,7 +123,7 @@ export component App inherits Window {
     // The vertical stack, top to bottom.
     property <length> y-fx: Theme.h-bar + Theme.gap;
     /// The MIX POINT LINK panel (global-bar button, PREFS > Controller > MIX POINT LINK > Enable); it needs a deck layout, not Browse.
-    property <bool> show-mix: root.touch ? touch-workspace.mix-active : root.studio ? StudioState.linked-open && MixPointState.enabled : MixPointState.enabled && MixPointState.open && !root.browse-on && root.stage;
+    property <bool> show-mix: root.touch ? touch-workspace.mix-active : root.studio ? StudioState.linked-open && MixPointState.enabled && !root.stage-ws : MixPointState.enabled && MixPointState.open && !root.browse-on && root.stage;
     changed show-mix => { MixPointState.active = root.show-mix; }
     /// EXPORT layout (1 PLAYER … FULL BROWSER, `PrefsState.export-layout`): exportmode.slint draws the players for it.
     property <int> export-layout: PrefsState.export-layout;
@@ -525,8 +528,9 @@ export component App inherits Window {
         }
     }
     }
-    // The studio presentation (layout-profile 2): its panels are built while it shows.
-    if root.studio: StudioWorkspace { x: 0px; y: 0px; width: root.width; height: root.height; }
+    // The studio and stage presentations (layout-profile 2, 3): their panels are built while they show.
+    if root.studio && !root.stage-ws: StudioWorkspace { x: 0px; y: 0px; width: root.width; height: root.height; }
+    if root.stage-ws: StageWorkspace { x: 0px; y: 0px; width: root.width; height: root.height; }
     touch-workspace := TouchWorkspace {
         visible: root.touch;
         x: root.safe-area-insets.left; y: root.safe-area-insets.top;

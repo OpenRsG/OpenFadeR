@@ -1,0 +1,24 @@
+import { Theme } from "../theme.slint";
+import { EditState } from "../edit.slint";
+import { ExportModeState } from "../exportmode-state.slint";
+import { LightingState } from "../lighting.slint";
+import { VideoState } from "../video.slint";
+
+/// What the Stage workspace's parts (bar, mixer, strip, library) share: the colour of a deck's controls and the mode switch. No Rust side.
+export global StageState {
+    /// The colour a deck's controls wear: its `deckN` colour when the theme tints (`deck-tint` 1), else the shared accent.
+    public pure function tone(deck: int) -> color {
+        return Theme.deck-tint == 1 ? [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][deck] : Theme.accent;
+    }
+    /// The same for a meter: transparent keeps the meter's own green / amber / red.
+    public pure function meter-tone(deck: int) -> color {
+        return Theme.deck-tint == 1 ? [Theme.deck1, Theme.deck2, Theme.deck3, Theme.deck4][deck] : transparent;
+    }
+    /// Mode selector: 0 EXPORT, 1 PERFORMANCE, 2 EDIT, 3 LIGHTING, 4 VIDEO (the window's own switch in app.slint).
+    public function set-mode(n: int) {
+        ExportModeState.visible = n == 0;
+        EditState.visible = n == 2;
+        LightingState.visible = n == 3;
+        VideoState.visible = n == 4;
+    }
+}

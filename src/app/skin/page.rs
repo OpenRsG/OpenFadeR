@@ -8,11 +8,11 @@ use super::{
     values_of,
 };
 use crate::app::{
-    App, ThemeCard, ThemeState, TokenRow,
-    library::{Pick, browse, chooser, show_in_folder},
+    library::{browse, chooser, show_in_folder, Pick},
     prefs::{self, view},
+    App, ThemeCard, ThemeState, TokenRow,
 };
-use slint::{Color, ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
+use slint::{Color, ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use std::{
     cell::{Cell, RefCell},
     path::Path,
@@ -20,7 +20,7 @@ use std::{
 };
 
 /// The tokens a gallery card paints its miniature with, in the order ui/themes.slint `ThemeCard.colors` documents.
-const PREVIEW: [&str; 17] = [
+const PREVIEW: [&str; 18] = [
     "bg",
     "bg-deep",
     "panel",
@@ -38,6 +38,7 @@ const PREVIEW: [&str; 17] = [
     "select",
     "deck1",
     "deck2",
+    "panel-top",
 ];
 
 thread_local! {
@@ -68,10 +69,17 @@ pub(super) fn chosen() -> String {
     prefs::with(|p| view::skin_name(p).to_owned())
 }
 
-/// The colours a gallery card paints its miniature with, for skin `name` among `skins` (none before a window has been styled).
+/// The colours a gallery card paints its miniature with, for skin `name` among `skins` (none before a window has been styled). Under
+/// `wave-style` 1 the waveform bands are deck 1's.
 pub(super) fn colors(skins: &[Skin], name: &str) -> Vec<Color> {
     values_of(skins, name)
-        .map(|(_, v)| PREVIEW.iter().map(|n| color_of(&v, n)).collect())
+        .map(|(_, v)| {
+            let mut c: Vec<Color> = PREVIEW.iter().map(|n| color_of(&v, n)).collect();
+            if super::palette(&v).per_deck {
+                (c[11], c[12]) = (color_of(&v, "deck1"), color_of(&v, "deck1-hi"));
+            }
+            c
+        })
         .unwrap_or_default()
 }
 
@@ -139,6 +147,14 @@ fn row(r: draft::Row) -> TokenRow {
         text: r.text.into(),
         color: r.color,
         changed: r.changed,
+        options: ModelRc::new(VecModel::from(
+            r.options
+                .iter()
+                .map(|&o| o.into())
+                .collect::<Vec<SharedString>>(),
+        )),
+        current: r.current,
+        fraction: r.fraction,
     }
 }
 
@@ -491,6 +507,20 @@ pub fn wire(window: &App) -> Timer {
     });
     s.on_step(|i, dir| {
         draft::with(|d| d.step(i.max(0) as usize, dir));
+        if let Some(app) = app() {
+            show_row(&app.global::<ThemeState>(), i.max(0) as usize);
+        }
+        restyle();
+    });
+    s.on_choose(|i, n| {
+        draft::with(|d| d.choose(i.max(0) as usize, n));
+        if let Some(app) = app() {
+            show_row(&app.global::<ThemeState>(), i.max(0) as usize);
+        }
+        restyle();
+    });
+    s.on_slide(|i, f| {
+        draft::with(|d| d.slide(i.max(0) as usize, f));
         if let Some(app) = app() {
             show_row(&app.global::<ThemeState>(), i.max(0) as usize);
         }

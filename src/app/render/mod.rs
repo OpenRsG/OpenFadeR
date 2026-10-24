@@ -33,7 +33,8 @@ use std::{
 
 pub type Rgb = [u8; 3];
 
-/// The colours of the active skin that Rust draws itself: `Theme` tokens `wave-bg`, `wave-low`, `wave-mid`, `wave-high` and `cue`.
+/// The colours of the active skin that Rust draws itself: `Theme` tokens `wave-bg`, `wave-low`, `wave-mid`, `wave-high`, `cue`,
+/// `memory-cue`, `wave-style` with `deck1`..`deck4` and their `-hi` twins, and `wave-fade`.
 /// [`crate::app::skin`] stores them with [`set_palette`] whenever a skin is applied; the waveforms are rebuilt on every settings
 /// change ([`crate::app::deck`] `rewave`), so they follow at once.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -44,10 +45,22 @@ pub struct Palette {
     pub cue: Rgb,
     /// Memory cue marker (Theme.memory-cue).
     pub memory: Rgb,
+    /// Low and mid band of decks 1 to 4 (`deckN`, `deckN-hi`), used instead of `band` when `per_deck`.
+    pub decks: [[Rgb; 2]; 4],
+    /// `wave-style` 1: every deck draws its own low and mid band ([`Palette::for_deck`]).
+    pub per_deck: bool,
+    /// `wave-fade`: how much a band darkens towards its outer edge, 0..=1.
+    pub fade: f32,
 }
 
-/// Low, mid and high band colours (blue, amber, white) whose overlaps are fixed mixes ([`three_band_in`]).
+/// Low, mid and high band colours (blue, amber, white) whose overlaps are fixed mixes ([`three_band`]).
 const CLASSIC_BANDS: [Rgb; 3] = [[0, 0x55, 0xe1], [0xff, 0xa6, 0], [255, 255, 255]];
+
+/// The mono (BLUE) waveform's colour before whiteness is mixed in.
+const MONO: Rgb = [0, 104, 216];
+
+/// [`Palette`] as packed words: bg, low, mid, high, cue, memory, the four decks' low and mid, `per_deck`, `fade`.
+const WORDS: usize = 16;
 
 impl Palette {
     /// The built-in skins' values (ui/theme.slint, Catppuccin Mocha).
@@ -56,7 +69,79 @@ impl Palette {
         band: [[0x89, 0xb4, 0xfa], [0xfa, 0xb3, 0x87], [0xcd, 0xd6, 0xf4]],
         cue: [0xfa, 0xb3, 0x87],
         memory: [0xf5, 0xc2, 0xe7],
+        decks: [
+            [[0x89, 0xb4, 0xfa], [0xb4, 0xbe, 0xfe]],
+            [[0xfa, 0xb3, 0x87], [0xf9, 0xe2, 0xaf]],
+            [[0xcb, 0xa6, 0xf7], [0xf5, 0xc2, 0xe7]],
+            [[0x94, 0xe2, 0xd5], [0xa6, 0xe3, 0xa1]],
+        ],
+        per_deck: false,
+        fade: 0.0,
     };
+
+    /// This palette for the waveforms of deck `deck` (0-based, the deck itself, not the slot that shows it): with `per_deck` its
+    /// low and mid band are the deck's colours, else the palette is unchanged.
+    pub fn for_deck(&self, deck: usize) -> Palette {
+        let mut p = *self;
+        if let Some([lo, mid]) = self.decks.get(deck).filter(|_| self.per_deck) {
+            (p.band[0], p.band[1]) = (*lo, *mid);
+        }
+        p
+    }
+
+    /// A colour of the RGB waveform (R, G, B = how much low, mid, high) in the bands of a per-deck palette; unchanged otherwise.
+    fn tint(&self, rgb: [f32; 3]) -> [f32; 3] {
+        if !self.per_deck {
+            return rgb;
+        }
+        let (w, top) = (
+            rgb.map(|c| c / 255.0),
+            rgb.iter().fold(0f32, |m, c| m.max(*c)),
+        );
+        let sum = (w[0] + w[1] + w[2]).max(f32::EPSILON);
+        let mix = |k: usize| {
+            self.band
+                .iter()
+                .zip(w)
+                .map(|(b, w)| f32::from(b[k]) * w)
+                .sum::<f32>()
+                / sum
+        };
+        [mix(0), mix(1), mix(2)].map(|c| c * top / 255.0)
+    }
+
+    const fn words(&self) -> [u32; WORDS] {
+        let mut w = [0; WORDS];
+        w[0] = pack(self.bg);
+        let mut i = 0;
+        while i < 3 {
+            w[1 + i] = pack(self.band[i]);
+            i += 1;
+        }
+        w[4] = pack(self.cue);
+        w[5] = pack(self.memory);
+        i = 0;
+        while i < 4 {
+            w[6 + 2 * i] = pack(self.decks[i][0]);
+            w[7 + 2 * i] = pack(self.decks[i][1]);
+            i += 1;
+        }
+        w[14] = self.per_deck as u32;
+        w[15] = self.fade.to_bits();
+        w
+    }
+
+    fn from_words(w: [u32; WORDS]) -> Palette {
+        Palette {
+            bg: unpack(w[0]),
+            band: [unpack(w[1]), unpack(w[2]), unpack(w[3])],
+            cue: unpack(w[4]),
+            memory: unpack(w[5]),
+            decks: std::array::from_fn(|i| [unpack(w[6 + 2 * i]), unpack(w[7 + 2 * i])]),
+            per_deck: w[14] != 0,
+            fade: f32::from_bits(w[15]),
+        }
+    }
 }
 
 const fn pack(c: Rgb) -> u32 {
@@ -67,34 +152,38 @@ fn unpack(v: u32) -> Rgb {
     [(v >> 16) as u8, (v >> 8) as u8, v as u8]
 }
 
-/// [`Palette`] fields as packed `0xRRGGBB`: bg, low, mid, high, cue, memory. Atomics, so a frame reads them without a lock or allocation.
-static PALETTE: [AtomicU32; 6] = [
-    AtomicU32::new(pack(Palette::DEFAULT.bg)),
-    AtomicU32::new(pack(Palette::DEFAULT.band[0])),
-    AtomicU32::new(pack(Palette::DEFAULT.band[1])),
-    AtomicU32::new(pack(Palette::DEFAULT.band[2])),
-    AtomicU32::new(pack(Palette::DEFAULT.cue)),
-    AtomicU32::new(pack(Palette::DEFAULT.memory)),
-];
+/// [`Palette`] as words ([`Palette::words`]). Atomics, so a frame reads them without a lock or allocation.
+static PALETTE: [AtomicU32; WORDS] = {
+    let w = Palette::DEFAULT.words();
+    let mut a = [const { AtomicU32::new(0) }; WORDS];
+    let mut i = 0;
+    while i < WORDS {
+        a[i] = AtomicU32::new(w[i]);
+        i += 1;
+    }
+    a
+};
 
 /// Makes `p` the colours the renderers draw with.
 pub fn set_palette(p: Palette) {
-    let [bg, lo, mid, hi, cue, memory] =
-        [p.bg, p.band[0], p.band[1], p.band[2], p.cue, p.memory].map(pack);
-    for (slot, v) in PALETTE.iter().zip([bg, lo, mid, hi, cue, memory]) {
+    for (slot, v) in PALETTE.iter().zip(p.words()) {
         slot.store(v, Relaxed);
     }
 }
 
-fn palette() -> Palette {
-    let [bg, lo, mid, hi, cue, memory] =
-        [0, 1, 2, 3, 4, 5].map(|i| unpack(PALETTE[i].load(Relaxed)));
-    Palette {
-        bg,
-        band: [lo, mid, hi],
-        cue,
-        memory,
-    }
+/// The shared colours: the bands of `wave-low`, `wave-mid`, `wave-high`.
+pub fn palette() -> Palette {
+    Palette::from_words(std::array::from_fn(|i| PALETTE[i].load(Relaxed)))
+}
+
+/// The colours deck `deck`'s waveforms are drawn with ([`Palette::for_deck`] of the skin's).
+pub fn deck_palette(deck: usize) -> Palette {
+    palette().for_deck(deck)
+}
+
+/// `wave-fade` (read per waveform drawn, not per column).
+fn fade() -> f32 {
+    f32::from_bits(PALETTE[15].load(Relaxed))
 }
 
 /// Time↔pixel mapping of one view. `x(ms)` is the (fractional) left edge of `ms` in pixels.
@@ -150,6 +239,9 @@ struct Span {
     full: Range<usize>,
     solid: Rgba8Pixel,
     sensitive: bool,
+    /// `wave-fade`: (the row the layer is brightest at, its distance from there to its edge, the fade): a row is darker by
+    /// the fade times its distance over the edge distance.
+    fade: Option<(f32, f32, f32)>,
 }
 
 impl Span {
@@ -174,12 +266,26 @@ impl Span {
             full: c0..f1.min(h),
             solid: Rgba8Pixel::new(round_u8(c[0]), round_u8(c[1]), round_u8(c[2]), 255),
             sensitive,
+            fade: None,
         }
     }
 
+    /// This span with `wave-fade` `k` (0..=1), for a layer brightest at row `mid` and `half` rows from there to its edge.
+    fn faded(mut self, mid: f32, half: f32, k: f32) -> Self {
+        self.fade = (k > 0.0 && half > 0.0).then_some((mid, half.recip(), k));
+        self
+    }
     /// Draws the rows `ys` (within `self.rows`) of column `x` into `px` (`w` pixels per row). The full rows are stored
     /// strided with no per-row branch; the partly covered edge rows blend with coverage.
     fn paint(&self, px: &mut [Rgba8Pixel], w: usize, x: usize, ys: Range<usize>) {
+        if let Some((mid, inv_half, k)) = self.fade {
+            for y in ys {
+                let cov = (self.y1.min(y as f32 + 1.0) - self.y0.max(y as f32)).clamp(0.0, 1.0);
+                let dim = 1.0 - k * ((y as f32 + 0.5 - mid).abs() * inv_half).min(1.0);
+                blend(&mut px[y * w + x], self.c.map(|v| v * dim), cov);
+            }
+            return;
+        }
         let edge = |px: &mut [Rgba8Pixel], rows: Range<usize>| {
             for y in rows {
                 let cov = (self.y1.min(y as f32 + 1.0) - self.y0.max(y as f32)).clamp(0.0, 1.0);
@@ -407,6 +513,7 @@ impl Wave {
     /// (and so overwrites without reading) is not painted by the layers below it. Pixel-identical to painting every layer
     /// whole (`draw_matches_layer_by_layer`); measured −25…−45 % of the draw at 1562×56…2136×220 with the rounding changes.
     pub fn draw(&self, c: &mut Canvas, axis: &Axis, centered: bool) {
+        let fade = fade();
         let (w, ch) = (c.w, c.h);
         let h = ch as f32;
         let px = c.buf.make_mut_slice();
@@ -425,7 +532,12 @@ impl Wave {
                 } else {
                     (h * (1.0 - l.h), h)
                 };
-                *slot = Some(Span::new(ch, y0, y1, l.rgb));
+                let (mid, half) = if centered {
+                    (h / 2.0, h / 2.0 * l.h)
+                } else {
+                    (h, h * l.h)
+                };
+                *slot = Some(Span::new(ch, y0, y1, l.rgb).faded(mid, half, fade));
             }
             for (i, s) in spans.iter().enumerate() {
                 let Some(s) = s else { break };
@@ -469,14 +581,28 @@ pub fn single(rgb: Rgb, h: f32) -> Layers {
 /// Mono waveform byte: height 0..=31 in the low 5 bits, whiteness 0..=7 above.
 /// Blue mixed towards white by whiteness.
 pub fn mono_rgbh(v: u8) -> (Rgb, u8) {
-    let white = (v >> 5) as u32;
-    let mix = |base: u32| (base + (255 - base) * white / 7) as u8;
-    ([mix(0), mix(104), mix(216)], v & 31)
+    mono_rgbh_in(MONO, v)
 }
 
-pub fn mono_layers(v: u8) -> Layers {
-    let (rgb, h) = mono_rgbh(v);
+fn mono_rgbh_in(base: Rgb, v: u8) -> (Rgb, u8) {
+    let white = (v >> 5) as u32;
+    let mix = |base: u8| (base as u32 + (255 - base as u32) * white / 7) as u8;
+    (base.map(mix), v & 31)
+}
+
+/// The mono (BLUE) waveform layer: blue, or the low band of a per-deck palette ([`Palette::for_deck`]).
+pub fn mono_layers(p: &Palette, v: u8) -> Layers {
+    let (rgb, h) = mono_rgbh_in(if p.per_deck { p.band[0] } else { MONO }, v);
     single(rgb, h as f32 / 31.0)
+}
+
+/// The colour (RGB) waveform layer of `rgb` (a byte per channel) and height `h`: as stored, or mapped onto the bands of a
+/// per-deck palette ([`Palette::for_deck`]).
+pub fn color_layer(p: &Palette, rgb: [f32; 3], h: f32) -> Col {
+    Col {
+        h,
+        rgb: p.tint(rgb),
+    }
 }
 
 /// Stored waveform families a view can draw: 3-band, colour, mono blue.
@@ -497,19 +623,14 @@ pub fn sources(mode: WaveColors) -> [Src; 3] {
     }
 }
 
-/// 3-band entries (`[low, mid, high]`) → layers, tallest band first.
+/// 3-band entries (`[low, mid, high]`) → layers, tallest band first, in the band colours of `p`.
 /// Colour model:
 /// byte0 → blue (0,85,225), byte1 → amber (255,166,0), byte2 → white; each band is scaled against a fixed
 /// 128, low/mid linearly, high through (1 − cos(π·v/128))/2. Where bands overlap in a column
 /// the overlap span is blue∩amber (180,105,10), blue∩white (210,220,250), amber∩white (255,240,215) and the
-/// core where all three overlap (245,235,215). Per-band gains are 1.
-pub fn three_band(src: &[[u8; 3]]) -> Vec<Layers> {
-    three_band_in(&palette(), src)
-}
-
-/// [`three_band`] with the band colours of `p`. The [`CLASSIC_BANDS`] have fixed overlaps; a skin that changes a band
-/// gets the mean of the bands that overlap.
-fn three_band_in(p: &Palette, src: &[[u8; 3]]) -> Vec<Layers> {
+/// core where all three overlap (245,235,215). Per-band gains are 1. The [`CLASSIC_BANDS`] have fixed overlaps; a skin that
+/// changes a band gets the mean of the bands that overlap.
+pub fn three_band(p: &Palette, src: &[[u8; 3]]) -> Vec<Layers> {
     fn mean(cs: &[Rgb]) -> Rgb {
         std::array::from_fn(|i| {
             (cs.iter().map(|c| c[i] as u32).sum::<u32>() / cs.len() as u32) as u8
@@ -696,6 +817,77 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn a_per_deck_palette_colours_each_decks_waves_and_a_shared_one_does_not() {
+        let mut p = Palette::DEFAULT;
+        p.decks[0] = [[0, 255, 0], [1, 2, 3]];
+        p.decks[1] = [[200, 0, 255], [4, 5, 6]];
+        assert_eq!(
+            Palette::from_words(p.words()),
+            p,
+            "the atomics keep every field"
+        );
+        let low = |p: &Palette| three_band(p, &[[100, 0, 0]])[0][0].rgb;
+        assert_eq!(
+            low(&p.for_deck(0)),
+            low(&p.for_deck(1)),
+            "wave-style 0: every deck the same"
+        );
+        assert_eq!(low(&p.for_deck(0)), Palette::DEFAULT.band[0].map(f32::from));
+        p.per_deck = true;
+        assert_eq!(low(&p.for_deck(0)), [0.0, 255.0, 0.0]);
+        assert_eq!(low(&p.for_deck(1)), [200.0, 0.0, 255.0]);
+        let mid = three_band(&p.for_deck(1), &[[0, 100, 0]])[0][0].rgb;
+        assert_eq!(mid, [4.0, 5.0, 6.0], "mid is deckN-hi");
+        let high = |d| three_band(&p.for_deck(d), &[[0, 0, 100]])[0][0].rgb;
+        assert_eq!(high(0), high(1), "high is shared");
+        // BLUE scheme: the deck's colour, whiter with the stored whiteness; the RGB scheme: pure R is the low band
+        assert_eq!(mono_layers(&p.for_deck(1), 31)[0].rgb, [200.0, 0.0, 255.0]);
+        assert_eq!(
+            mono_layers(&Palette::DEFAULT, 31)[0].rgb,
+            [0.0, 104.0, 216.0]
+        );
+        assert_eq!(
+            color_layer(&p.for_deck(0), [255.0, 0.0, 0.0], 1.0).rgb,
+            [0.0, 255.0, 0.0]
+        );
+        assert_eq!(
+            color_layer(&p.for_deck(0), [0.0, 0.0, 0.0], 1.0).rgb,
+            [0.0; 3],
+            "silence stays dark"
+        );
+        assert_eq!(
+            color_layer(&Palette::DEFAULT, [9.0, 8.0, 7.0], 1.0).rgb,
+            [9.0, 8.0, 7.0]
+        );
+        assert_eq!(
+            p.for_deck(7),
+            p,
+            "a deck without colours draws the shared ones"
+        );
+    }
+
+    #[test]
+    fn wave_fade_darkens_a_band_towards_its_edge_and_zero_is_flat() {
+        let rows = |k: f32| {
+            let mut c = black_canvas(1, 21);
+            Span::new(21, 0.0, 21.0, [200.0; 3])
+                .faded(10.5, 10.5, k)
+                .paint(c.buf.make_mut_slice(), 1, 0, 0..21);
+            c.buf.as_slice().iter().map(|p| p.r).collect::<Vec<_>>()
+        };
+        let flat = rows(0.0);
+        assert!(flat.iter().all(|&r| r == 200));
+        let faded = rows(0.5);
+        assert_eq!(faded[10], 200, "the middle row keeps the colour");
+        assert_eq!(faded[0], faded[20], "symmetric");
+        assert!(faded[0] < faded[5] && faded[5] < faded[10], "{faded:?}");
+        assert_eq!(
+            faded[0], 105,
+            "half the fade at the edge: 200 * (1 - 0.5 * 0.95)"
+        );
     }
 
     fn wave(h: &[f32]) -> Wave {
@@ -930,7 +1122,7 @@ mod tests {
 
     #[test]
     fn three_band_order_scale_and_overlap() {
-        let px = |e: [u8; 3]| three_band_in(&classic(), &[e])[0];
+        let px = |e: [u8; 3]| three_band(&classic(), &[e])[0];
         // only byte0 (low): one blue layer, linear against 128
         let l = px([128, 0, 0]);
         assert_eq!((l[0].rgb, l[0].h, l[1].h), ([0.0, 85.0, 225.0], 1.0, 0.0));
@@ -956,7 +1148,7 @@ mod tests {
             band: [[200, 0, 0], [0, 200, 0], [0, 0, 200]],
             ..Palette::DEFAULT
         };
-        let px = |e: [u8; 3]| three_band_in(&skin, &[e])[0];
+        let px = |e: [u8; 3]| three_band(&skin, &[e])[0];
         assert_eq!(px([128, 0, 0])[0].rgb, [200.0, 0.0, 0.0]);
         // low 100 over mid 50: low alone, then the mean of the two, then (with high absent from the column) the three-way mean
         let o = px([100, 50, 0]);
@@ -966,7 +1158,7 @@ mod tests {
         );
         // the classic bands keep their fixed overlaps
         assert_eq!(
-            three_band_in(&classic(), &[[100, 50, 0]])[0][1].rgb,
+            three_band(&classic(), &[[100, 50, 0]])[0][1].rgb,
             [180.0, 105.0, 10.0]
         );
     }

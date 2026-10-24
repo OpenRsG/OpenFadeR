@@ -11,7 +11,8 @@
 //! `"#rrggbbaa"`; length a number or `"12px"`; string text; int a whole number; float a number; duration a number of ms,
 //! `"80ms"` or `"0.2s"`. [`serialize`] writes the same format back (the theme editor and installer use it).
 
-use super::{Base, Skin, TOKENS, Ty, Value};
+use super::{Base, Skin, Ty, Value, TOKENS, TOKEN_RULES};
+use openfader_ui::skin::Rule;
 use serde_json::Value as Json;
 use slint::Color;
 use std::path::{Path, PathBuf};
@@ -172,12 +173,12 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
         None => {}
         Some(Json::Object(map)) => {
             for (key, v) in map {
-                let Some(&(token, ty)) = TOKENS.iter().find(|(n, _)| n == key) else {
+                let Some(i) = TOKENS.iter().position(|(n, _)| n == key) else {
                     notes.push(tr!("unknown token {} (the names are the in-out properties of ui/theme.slint, docs/skins.md)", format!("{key:?}")));
                     continue;
                 };
-                match value(ty, v) {
-                    Ok(v) => tokens.push((token, v)),
+                match value(TOKENS[i].1, v).and_then(|v| check(i, &v).map(|()| v)) {
+                    Ok(v) => tokens.push((TOKENS[i].0, v)),
                     Err(e) => notes.push(tr!("token {}: {}", format!("{key:?}"), e)),
                 }
             }
@@ -199,6 +200,26 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
     Ok((skin, notes))
 }
 
+/// `v`, the value for token `i`, against its rule (`// @values` and `// @range` before the token in ui/theme.slint): the problem,
+/// naming what is allowed. Whatever the rule does not cover is let through.
+pub fn check(i: usize, v: &Value) -> Result<(), String> {
+    match (TOKEN_RULES[i], v) {
+        (Rule::Choice(names), Value::Int(n))
+            if usize::try_from(*n).map_or(true, |n| n >= names.len()) =>
+        {
+            let all = names
+                .iter()
+                .enumerate()
+                .map(|(k, name)| format!("{k} ({name})"))
+                .collect::<Vec<_>>();
+            Err(tr!("{} is not allowed, use {}", n, all.join(", ")))
+        }
+        (Rule::Range(lo, hi), Value::Float(x)) if !(lo..=hi).contains(x) => {
+            Err(tr!("{} is out of range, use {} to {}", x, lo, hi))
+        }
+        _ => Ok(()),
+    }
+}
 /// `j` as a value of type `ty`.
 fn value(ty: Ty, j: &Json) -> Result<Value, String> {
     let bad = |want: &str| tr!("expected {}, got {}", want, j);
@@ -424,6 +445,55 @@ mod tests {
             assert!(all.contains(want), "{want} not in {all}");
         }
         assert_eq!(notes.len(), 7, "{all}");
+    }
+
+    #[test]
+    fn a_value_outside_a_tokens_set_or_range_is_reported_naming_what_is_allowed_and_left_out() {
+        let (skin, notes) = parse(
+            r##"{"tokens":{"layout-profile":4,"stage-deck":-1,"button-style":1.5,"jog-style":2,"glow":1.5,"bevel":-0.1,"key-sat":0.5,
+                "wave-fade":2,"wave-style":1,"stage-tabs":3}}"##,
+            "mine",
+        )
+        .unwrap();
+        let names: Vec<_> = skin.tokens.iter().map(|t| t.0).collect();
+        assert_eq!(names, ["key-sat", "jog-style", "wave-style"], "{notes:?}");
+        let note = |token: &str| {
+            notes
+                .iter()
+                .find(|n| n.starts_with(&format!("token {token:?}")))
+                .unwrap_or_else(|| panic!("no note for {token}: {notes:?}"))
+                .as_str()
+        };
+        assert!(note("layout-profile")
+            .contains("4 is not allowed, use 0 (desktop), 1 (touch), 2 (studio), 3 (stage)"));
+        assert!(note("stage-deck").contains("-1 is not allowed"));
+        assert!(note("stage-tabs").contains(
+            "3 is not allowed, use 0 (none), 1 (MIXER FX REC), 2 (MIXER VIDEO LIGHTING)"
+        ));
+        assert!(
+            note("button-style").contains("whole number"),
+            "not an int at all: still the type's note"
+        );
+        assert!(note("glow").contains("1.5 is out of range, use 0 to 1"));
+        assert!(note("bevel").contains("-0.1 is out of range"));
+        assert!(note("wave-fade").contains("2 is out of range"));
+        assert_eq!(notes.len(), 7, "{notes:?}");
+    }
+
+    #[test]
+    fn every_json_example_of_the_docs_is_a_theme_that_loads_without_a_note() {
+        let docs = include_str!("../../../docs/skins.md");
+        let blocks: Vec<&str> = docs
+            .split("```json\n")
+            .skip(1)
+            .map(|b| b.split("```").next().unwrap())
+            .collect();
+        assert!(blocks.len() >= 5, "the format example and the recipes");
+        for b in blocks {
+            let (skin, notes) = parse(b, "example").unwrap_or_else(|e| panic!("{e}: {b}"));
+            assert!(notes.is_empty(), "{notes:?} in {b}");
+            assert!(!skin.tokens.is_empty(), "{b}");
+        }
     }
 
     #[test]

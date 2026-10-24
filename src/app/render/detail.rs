@@ -10,8 +10,8 @@
 //! With the STEM waveform on (PREFS) and a part muted, the 3-band wave of the stems heard ([`wave_3band`]) replaces these.
 
 use super::{
-    Axis, Canvas, Layers, Src, Wave, cue_letter, hot_cue_rgb, mono_layers, mono_rgbh,
-    phrase::phrase_band, single, sources, three_band,
+    color_layer, cue_letter, hot_cue_rgb, mono_layers, mono_rgbh, phrase::phrase_band, single,
+    sources, three_band, Axis, Canvas, Layers, Palette, Src, Wave,
 };
 use crate::app::prefs::{
     self,
@@ -56,22 +56,23 @@ pub fn beat_count_text(
     }
 }
 
-/// The detail wave in the current waveform mode ([`prefs::with`]); `pcm` (when the decode is done)
-/// is the last resort when the analysis has no waveform.
-pub fn wave(a: &Analysis, pcm: Option<&Pcm>) -> Option<Wave> {
+/// The detail wave in the current waveform mode ([`prefs::with`]) and the colours `p` ([`super::deck_palette`] of the deck that
+/// shows it); `pcm` (when the decode is done) is the last resort when the analysis has no waveform.
+pub fn wave(p: &Palette, a: &Analysis, pcm: Option<&Pcm>) -> Option<Wave> {
     let layers = sources(prefs::with(|p| p.waveform_colors))
         .into_iter()
         .map(|s| match s {
-            Src::ThreeBand => three_band(&a.three_band_detail),
+            Src::ThreeBand => three_band(p, &a.three_band_detail),
             Src::Color => a
                 .color_detail
                 .iter()
                 .map(|&v| {
                     let (rgb, h) = analysis::color_detail_rgbh(v);
-                    single(rgb, h as f32 / 31.0)
+                    let col = color_layer(p, rgb.map(f32::from), h as f32 / 31.0);
+                    [col, Default::default(), Default::default()]
                 })
                 .collect(),
-            Src::Mono => a.detail.iter().map(|&v| mono_layers(v)).collect(),
+            Src::Mono => a.detail.iter().map(|&v| mono_layers(p, v)).collect(),
         })
         .find(|l: &Vec<Layers>| !l.is_empty())
         .or_else(|| pcm.map(|p| peaks(&p.samples, p.rate)))?;
@@ -82,9 +83,9 @@ pub fn wave(a: &Analysis, pcm: Option<&Pcm>) -> Option<Wave> {
 }
 
 /// The detail wave of 3-band `[low, mid, high]` entries at 150/s (the STEM waveform, see `deck::stemwave`), whatever the waveform mode.
-pub fn wave_3band(detail: &[[u8; 3]]) -> Option<Wave> {
+pub fn wave_3band(p: &Palette, detail: &[[u8; 3]]) -> Option<Wave> {
     (!detail.is_empty()).then(|| Wave {
-        layers: three_band(detail),
+        layers: three_band(p, detail),
         per_ms: PER_MS,
     })
 }
@@ -395,7 +396,7 @@ mod mode_tests {
         };
         let first = |mode| {
             set_for_test(|p| p.waveform_colors = mode);
-            wave(&a, None).unwrap().layers[0]
+            wave(&Palette::DEFAULT, &a, None).unwrap().layers[0]
         };
         assert!(
             first(WaveColors::ThreeBand)[1].h > 0.0,
@@ -408,15 +409,18 @@ mod mode_tests {
             three_band_detail: a.three_band_detail.clone(),
             ..Default::default()
         };
-        assert!(wave(&b, None).unwrap().layers[0][1].h > 0.0);
+        assert!(wave(&Palette::DEFAULT, &b, None).unwrap().layers[0][1].h > 0.0);
         let pcm = Pcm {
             rate: 150,
             samples: vec![0.5; 300],
         };
         assert_eq!(
-            wave(&Analysis::default(), Some(&pcm)).unwrap().layers[0][0].h,
+            wave(&Palette::DEFAULT, &Analysis::default(), Some(&pcm))
+                .unwrap()
+                .layers[0][0]
+                .h,
             0.5
         );
-        assert!(wave(&Analysis::default(), None).is_none());
+        assert!(wave(&Palette::DEFAULT, &Analysis::default(), None).is_none());
     }
 }

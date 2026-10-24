@@ -1,0 +1,21 @@
+import { Theme } from "../theme.slint";
+import { DeckState } from "../deck-state.slint";
+import { DeckDropTarget } from "../dnd.slint";
+import { StageController } from "deck-controller.slint";
+import { StagePerformance } from "deck-performance.slint";
+import { StageRing } from "deck-ring.slint";
+import { StageTurntable } from "deck-turntable.slint";
+
+/// One deck panel of the Stage workspace (slot 0 left, 1 right), in the style `Theme.stage-deck` names: 0 performance, 1 turntable,
+/// 2 controller, 3 ring. It shows the deck `DeckState.slots[slot]` (decks 3 and 4 while the controller's DECK 3 / 4 layer is on), so
+/// every control and callback follows the slot. `mirrored` is the right-hand deck: its control rows run the other way round.
+export component StageDeck inherits Rectangle {
+    in property <int> slot;
+    in property <bool> mirrored;
+    property <int> index: DeckState.slots[root.slot];
+    if Theme.stage-deck == 0: StagePerformance { width: root.width; height: root.height; index: root.index; mirrored: root.mirrored; }
+    if Theme.stage-deck == 1: StageTurntable { width: root.width; height: root.height; index: root.index; mirrored: root.mirrored; }
+    if Theme.stage-deck == 2: StageController { width: root.width; height: root.height; index: root.index; mirrored: root.mirrored; }
+    if Theme.stage-deck == 3: StageRing { width: root.width; height: root.height; index: root.index; mirrored: root.mirrored; }
+    DeckDropTarget { index: root.index; }
+}

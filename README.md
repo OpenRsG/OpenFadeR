@@ -202,7 +202,7 @@ Track > Find Artwork… asks the artwork plugins (`cover-art` covers MusicBrainz
 
 <p align="center"><img src="docs/media/themes-grid.jpg" alt="The same view in Catppuccin Mocha, Latte, Rek, So Pro, Dracula, Nord, Tokyo Night and Gruvbox Dark" width="100%"></p>
 
-The app ships with Catppuccin Mocha (the default) and Latte. The [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) repository adds eleven more, so there are 13 in total. A theme can change colours, fonts, sizes and even the layout, and it applies at once. PREFERENCES > THEMES has an editor for every token with live preview, SAVE AS, and import.
+The app ships with Catppuccin Mocha (the default) and Latte. The [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) repository adds eleven more, so there are 13 in total. A theme is one JSON file that can change colours, fonts, sizes and even the workspace (desktop, touch, studio or stage, where the waveform placement, deck panel style, pads, mixer and a neon or bevelled look are tokens too), and it applies at once. PREFERENCES > THEMES has an editor for every token with live preview, SAVE AS, and import; [docs/skins.md](docs/skins.md) is the author guide.
 
 <p align="center"><img src="docs/media/themes-gallery.png" alt="PREFERENCES, THEMES page with the gallery and GET THEMES" width="100%"></p>
 
@@ -285,7 +285,7 @@ Everything the app prints is also written, with timestamps, to `logs/openfader.l
 ## Documentation
 
 - [docs/plugins.md](docs/plugins.md): plugin format and the library / device / controller ABIs, with the SDK in [`sdk/`](sdk/)
-- [docs/skins.md](docs/skins.md): theme files, every token, layout hints
+- [docs/skins.md](docs/skins.md): the theme author guide: file format, every token with its values, the four workspaces, recipes, layout hints
 - [docs/mappings.md](docs/mappings.md): controller mapping files
 - [docs/library-format.md](docs/library-format.md): the open JSON / CSV export and the library database tables
 - [docs/recording-files.md](docs/recording-files.md): the cue sheet, tracklist and control log REC writes next to a recording

@@ -1,0 +1,145 @@
+import { Theme } from "../theme.slint";
+import { AutomixState, BrowserState } from "../browser-state.slint";
+import { DeckDetail } from "../deck-wave.slint";
+import { DeckState } from "../deck-state.slint";
+import { DeviceProgress } from "../device.slint";
+import { DragTracker } from "../dnd.slint";
+import { KeysState } from "../help.slint";
+import { PrefsState } from "../prefs-state.slint";
+import { StudioState } from "../studio-state.slint";
+import { TrackInfoState } from "../trackinfo.slint";
+import { Glyph, Icon } from "../widgets.slint";
+import { StageBar } from "bar.slint";
+import { StageDeck } from "deck.slint";
+import { StageLibrary } from "library.slint";
+import { StageMixer } from "mixer.slint";
+import { StageColorSampler, StageEffects } from "strip.slint";
+
+/// What the window needs of the Stage workspace before it is built: the smallest window the tokens fit in.
+export global StageMetrics {
+    out property <length> bar-h: max(Theme.h-bar, 36px);
+    /// The enlarged waveforms of a window under 900 px high shrink to 3/4 of `stage-wave-h`.
+    out property <length> wave-min: max(40px, Theme.stage-wave-h * 0.75);
+    out property <length> deck-min: 300px;
+    out property <length> strip-min: 100px;
+    /// The mixer panel: its knob rows, faders, bus knobs and crossfader.
+    out property <length> mixer-min: 350px;
+    out property <length> lib-min: 170px;
+    /// Never narrower than four channels need.
+    out property <length> mixer-w: max(Theme.stage-mixer-w, Theme.stage-mixer == 1 ? 300px : 220px);
+    out property <length> body-min: max(root.deck-min + (Theme.stage-strip == 1 ? root.strip-min + Theme.stage-gap : 0px), root.mixer-min + (Theme.stage-wave == 1 ? 2 * 34px + 4px : 0px));
+    out property <length> min-w: max(1100px, 2 * 380px + root.mixer-w + 4 * Theme.stage-gap);
+    out property <length> min-h: max(720px, root.bar-h + Theme.stage-gap + (Theme.stage-wave == 0 ? 2 * root.wave-min + 4px + Theme.stage-gap : 0px) + root.body-min + Theme.stage-gap + root.lib-min + Theme.h-status);
+}
+
+/// One enlarged waveform in a rounded frame (click / drag / zoom as everywhere: the desktop's `DeckDetail`).
+component Wave inherits Rectangle {
+    in property <int> deck;
+    border-radius: Theme.stage-radius-ctl;
+    clip: true;
+    DeckDetail { index: root.deck; width: parent.width; height: parent.height; }
+}
+
+/// The Stage presentation (`Theme.layout-profile` 3) of the PERFORMANCE mode with two decks: one window, laid out from the Stage tokens.
+/// The top bar; the enlarged waveforms stacked across the top (`stage-wave` 0), in a column between the decks over the mixer (1) or
+/// inside the decks (2); a deck panel per side round the mixer; the optional strip of effects, colour FX and sampler under the decks;
+/// the library, its side bar and the status line. It drives the same globals as the desktop and studio workspaces, so switching
+/// profiles keeps every setting and the playing decks. Every big part is its own permanent `if true` item tree (docs/code-structure.md).
+export component StageWorkspace inherits Rectangle {
+    property <length> g: Theme.stage-gap;
+    /// Windows from 900 px high get the token sizes; shorter ones shrink the waveforms.
+    property <bool> roomy: root.height >= 900px;
+    /// The browse view (W): the library takes the window under the bar.
+    property <bool> browse: BrowserState.browse-max;
+    property <length> bar-h: StageMetrics.bar-h;
+    property <length> status-h: Theme.h-status;
+    property <length> wave-h: root.roomy ? Theme.stage-wave-h : StageMetrics.wave-min;
+    property <bool> top-waves: Theme.stage-wave == 0;
+    property <bool> col-waves: Theme.stage-wave == 1;
+    property <bool> strip-on: Theme.stage-strip == 1;
+    property <length> y-top: root.bar-h + root.g;
+    property <length> y-deck: root.y-top + (root.top-waves ? 2 * root.wave-h + 4px + root.g : 0px);
+    /// The library takes its share of the window but never what the decks and the mixer need at least.
+    property <length> lib-h: root.browse ? root.height - root.y-top - root.status-h : clamp(root.height * (root.roomy ? 0.31 : 0.25), StageMetrics.lib-min, max(StageMetrics.lib-min, root.height - root.status-h - root.y-deck - 2 * root.g - StageMetrics.body-min));
+    property <length> y-lib: root.height - root.status-h - root.lib-h;
+    /// Decks and strip together; the mixer takes the same height (under the centre waveforms, when those are there).
+    property <length> body-h: root.y-lib - root.g - root.y-deck;
+    property <length> strip-h: root.strip-on ? clamp(root.body-h * 0.3, StageMetrics.strip-min, 150px) : 0px;
+    property <length> deck-h: root.body-h - (root.strip-on ? root.strip-h + root.g : 0px);
+    property <length> mixer-w: min(StageMetrics.mixer-w, root.width * 0.4);
+    property <length> deck-w: (root.width - 4 * root.g - root.mixer-w) / 2;
+    property <length> x-mixer: 2 * root.g + root.deck-w;
+    property <length> x-right: 3 * root.g + root.deck-w + root.mixer-w;
+    /// The centre column's waveforms leave the mixer its minimum.
+    property <length> col-wave-h: max(34px, min(root.wave-h, (root.body-h - StageMetrics.mixer-min - 4px - root.g) / 2));
+    property <length> y-mixer: root.y-deck + (root.col-waves ? 2 * root.col-wave-h + 4px + root.g : 0px);
+    background: Theme.bg;
+    DragTracker { x: 0px; y: 0px; width: root.width; height: root.height; }
+    FocusScope {
+        init => { self.focus(); }
+        key-pressed(e) => {
+            // Arrows reach here only when neither the search box nor the track list has focus.
+            if (e.text == Key.UpArrow || e.text == Key.DownArrow) {
+                StudioState.browse(e.text == Key.DownArrow ? 1 : -1);
+                return accept;
+            }
+            // Held keys repeat; a shortcut fires once per press.
+            if (!e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+        }
+        key-released(e) => {
+            if (KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+        }
+        if true: StageBar { x: 0px; y: 0px; width: root.width; height: root.bar-h; }
+        for i in root.browse || !root.top-waves ? 0 : 2: Wave {
+            x: root.g;
+            y: root.y-top + i * (root.wave-h + 4px);
+            width: root.width - 2 * root.g;
+            height: root.wave-h;
+            deck: DeckState.slots[PrefsState.wave-order[i]];
+        }
+        for i in root.browse || !root.col-waves ? 0 : 2: Wave {
+            x: root.x-mixer;
+            y: root.y-deck + i * (root.col-wave-h + 4px);
+            width: root.mixer-w;
+            height: root.col-wave-h;
+            deck: DeckState.slots[PrefsState.wave-order[i]];
+        }
+        if !root.browse: StageDeck { slot: 0; x: root.g; y: root.y-deck; width: root.deck-w; height: root.deck-h; }
+        if !root.browse: StageMixer { x: root.x-mixer; y: root.y-mixer; width: root.mixer-w; height: root.y-deck + root.body-h - root.y-mixer; }
+        if !root.browse: StageDeck { slot: 1; mirrored: true; x: root.x-right; y: root.y-deck; width: root.deck-w; height: root.deck-h; }
+        if !root.browse && root.strip-on: StageEffects { x: root.g; y: root.y-deck + root.deck-h + root.g; width: root.deck-w; height: root.strip-h; }
+        if !root.browse && root.strip-on: StageColorSampler { x: root.x-right; y: root.y-deck + root.deck-h + root.g; width: root.deck-w; height: root.strip-h; }
+        if true: StageLibrary { x: root.g; y: root.y-lib; width: root.width - 2 * root.g; height: root.lib-h; }
+        // Status line: a device loading, a track being analysed, a device job; the browser's own messages are over the track list.
+        Rectangle {
+            x: 0px;
+            y: root.height - root.status-h;
+            width: root.width;
+            height: root.status-h;
+            background: Theme.bg-deep;
+            Text { x: root.g; width: 70px; height: parent.height; text: "OpenFadeR"; vertical-alignment: center; color: Theme.text-dim; font-size: Theme.font-size; font-weight: Theme.weight-bold; }
+            if BrowserState.load-progress >= 0: Rectangle {
+                x: 90px;
+                y: (parent.height - self.height) / 2;
+                width: 160px;
+                height: 10px;
+                background: Theme.panel-raised;
+                border-radius: self.height / 2;
+                Rectangle { width: parent.width * BrowserState.load-progress; background: Theme.accent; border-radius: parent.border-radius; }
+            }
+            Text {
+                x: BrowserState.load-progress >= 0 ? 260px : 90px;
+                width: parent.width - self.x - prog.width - 120px;
+                height: parent.height;
+                text: BrowserState.load-progress >= 0 ? BrowserState.load-text : AutomixState.running ? AutomixState.status : "";
+                vertical-alignment: center;
+                overflow: elide;
+                color: Theme.text-bright;
+                font-size: Theme.font-size;
+            }
+            if TrackInfoState.progress != "": Glyph { x: parent.width - prog.width - 28px - root.g; y: (parent.height - self.height) / 2; width: 14px; height: 14px; icon: Icon.info; tint: Theme.accent; }
+            prog := Text { x: parent.width - self.width - root.g; height: parent.height; text: TrackInfoState.progress; vertical-alignment: center; color: Theme.accent; font-size: Theme.font-size; }
+            DeviceProgress { x: parent.width - self.width - prog.width - 60px; y: (parent.height - self.height) / 2; }
+        }
+    }
+}

@@ -1,0 +1,114 @@
+import { Theme } from "../theme.slint";
+import { Icon } from "../icons.slint";
+import { DeckState, DeckView } from "../deck-state.slint";
+import { ChannelView, MixerState } from "../mixer.slint";
+import { StageButton, StagePanel, StageTone } from "controls.slint";
+import { StageBadge, StageDot, StageHead, StageJog, StageTempo, StageWave } from "deck-parts.slint";
+
+/// Stage deck 3, ring: cover and title with the overview; the deck letter and lamps (CUE, SLIP, QUANTIZE, KEY SYNC); the big tempo ring
+/// with the BPM in the middle, round PLAY, CUE and back-to-start buttons, and the tempo fader. The row mirrors for the right-hand deck.
+export component StageRing inherits Rectangle {
+    in property <int> index;
+    in property <bool> mirrored;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <ChannelView> chan: MixerState.channels[root.index];
+    property <color> tone: StageTone.deck(root.index);
+    property <length> g: Theme.space-lg;
+    property <length> iw: root.width - 2 * root.g;
+    property <length> ih: root.height - 2 * root.g;
+    property <length> hh: max(min(Theme.stage-cover, root.ih * 0.3), 76px);
+    property <bool> waved: Theme.stage-wave == 2;
+    property <length> wh: root.waved ? clamp(root.ih * 0.16, 30px, max(30px, Theme.stage-wave-h)) : 0px;
+    property <length> dot-y: root.hh + root.g + (root.waved ? root.wh + root.g : 0px);
+    property <length> dot-h: 24px;
+    property <length> cy: root.dot-y + root.dot-h + root.g;
+    property <length> ch: max(0px, root.ih - root.cy);
+    property <length> play: clamp(min(root.ch * 0.4, Theme.stage-button * 1.4), 36px, 64px);
+    property <length> small: clamp(root.play * 0.7, 28px, 44px);
+    property <length> lc: max(root.play, 2 * root.small + root.g);
+    property <length> tw: 46px;
+    property <length> d: max(60px, min(Theme.stage-jog, root.ch, root.iw - root.lc - root.tw - 4 * root.g));
+    property <length> ring-x: root.lc + root.g + (root.iw - root.lc - root.tw - 3 * root.g - root.d) / 2;
+    pure function px(x: length, w: length) -> length { return root.mirrored ? root.iw - x - w : x; }
+    StagePanel {
+        width: root.width;
+        height: root.height;
+        accent: root.tone;
+        lit: root.v.master;
+    }
+    if true: Rectangle {
+        x: root.g;
+        y: root.g;
+        width: root.iw;
+        height: root.ih;
+        if true: StageHead { x: 0px; y: 0px; width: root.iw; height: root.hh; index: root.index; overview: true; badge: false; }
+        if root.waved: StageWave { x: 0px; y: root.hh + root.g; width: root.iw; height: root.wh; index: root.index; }
+        if true: Rectangle {
+            x: 0px;
+            y: root.dot-y;
+            width: root.iw;
+            height: root.dot-h;
+            StageBadge { x: root.px(0px, 30px); width: 30px; height: parent.height; text: ["A", "B", "C", "D"][root.index]; tone: root.tone; }
+            HorizontalLayout {
+                x: root.px(30px + root.g, root.iw - 30px - root.g);
+                width: root.iw - 30px - root.g;
+                height: parent.height;
+                spacing: Theme.space-md;
+                StageDot { text: @tr("CUE"); active: root.chan.cue; accent: root.tone; clicked => { MixerState.cue-toggled(root.index); } }
+                StageDot { text: @tr("SLIP"); active: root.v.slip; enabled: root.v.loaded; accent: root.tone; clicked => { DeckState.slip(root.index); } }
+                StageDot { text: @tr("QUANTIZE"); active: root.v.quantize; accent: root.tone; clicked => { DeckState.quantize(root.index); } }
+                StageDot { text: @tr("KEY SYNC"); active: root.v.key-shifted; enabled: root.v.loaded; accent: root.tone; clicked => { DeckState.key-sync(root.index); } }
+            }
+        }
+        if true: Rectangle {
+            x: 0px;
+            y: root.cy;
+            width: root.iw;
+            height: root.ch;
+            StageButton {
+                tooltip: @tr("Play / pause");
+                x: root.px(0px, root.lc) + (root.lc - root.play) / 2;
+                y: (parent.height - root.play - root.g - root.small) / 2;
+                width: root.play;
+                height: root.play;
+                round: true;
+                glyph: root.v.playing ? Icon.pause : Icon.play;
+                active: root.v.playing;
+                enabled: root.v.loaded;
+                accent: StageTone.play(root.index);
+                rim: Theme.deck-tint == 1;
+                clicked => { DeckState.play-pause(root.index); }
+            }
+            StageButton {
+                tooltip: @tr("Cue: hold to preview, release to return");
+                x: root.px(0px, root.small);
+                y: (parent.height - root.play - root.g - root.small) / 2 + root.play + root.g;
+                width: root.small;
+                height: root.small;
+                round: true;
+                text: @tr("CUE");
+                font-size: Theme.font-xs;
+                active: root.v.at-cue;
+                enabled: root.v.loaded;
+                accent: StageTone.cue(root.index);
+                rim: Theme.deck-tint == 1;
+                pressed => { DeckState.cue(root.index); }
+                released => { DeckState.cue-released(root.index); }
+            }
+            StageButton {
+                tooltip: @tr("Back to the start of the track");
+                x: root.px(root.small + root.g, root.small);
+                y: (parent.height - root.play - root.g - root.small) / 2 + root.play + root.g;
+                width: root.small;
+                height: root.small;
+                round: true;
+                glyph: Icon.prev;
+                enabled: root.v.loaded;
+                accent: root.tone;
+                clicked => { DeckState.seek(root.index, 0.0); }
+            }
+            StageJog { x: root.px(root.ring-x, root.d); y: (parent.height - root.d) / 2; width: root.d; height: root.d; index: root.index; tone: root.tone; tone-hi: StageTone.hi(root.index); }
+            StageTempo { x: root.px(root.iw - root.tw, root.tw); y: 0px; width: root.tw; height: root.ch; index: root.index; tone: root.tone; caption: true; }
+        }
+    }
+}

@@ -17,17 +17,17 @@ mod text;
 mod view;
 
 use super::{
-    App, EditState,
     deck::Decks,
-    render::{Axis, Canvas, Layers, three_band},
+    render::{palette, three_band, Axis, Canvas, Layers},
+    App, EditState,
 };
 use openfader::{
     analysis::{self, Beat},
     edit::{
-        Edit, Edl,
         load::Loaded,
         play::Play,
         snap::{self, Line, Snap},
+        Edit, Edl,
     },
     library::{Library, Track},
 };
@@ -75,10 +75,13 @@ impl Open {
     fn refresh(&mut self) {
         let rate = self.edit.rate();
         self.lines = snap::lines(self.edit.edl(), &self.beats, rate);
-        self.layers = three_band(&self.edit.edl().remap(
-            &self.detail,
-            analysis::DETAIL_ENTRIES_PER_SEC as f64 / rate as f64,
-        ));
+        self.layers = three_band(
+            &palette(),
+            &self.edit.edl().remap(
+                &self.detail,
+                analysis::DETAIL_ENTRIES_PER_SEC as f64 / rate as f64,
+            ),
+        );
     }
 
     fn ms(&self, frame: usize) -> f64 {

@@ -1,0 +1,127 @@
+import { Theme } from "../theme.slint";
+import { Icon } from "../icons.slint";
+import { DeckState, DeckView } from "../deck-state.slint";
+import { ChannelView, MixerState } from "../mixer.slint";
+import { StageButton, StageKnob, StagePanel, StageTone } from "controls.slint";
+import { StageBadge, StageHead, StageWave } from "deck-parts.slint";
+
+/// Stage deck 2, controller: cover and title; with `stage-wave` 2 the waveform, overview and the span selector; the deck's channel knobs
+/// (LOW, MID, HIGH, TRIM, FILTER) and headphone CUE beside the big deck number; big CUE / PLAY / SYNC buttons with SLIP, Q and MT.
+/// The number sits at the outer edge, so the whole panel mirrors for the right-hand deck.
+export component StageController inherits Rectangle {
+    in property <int> index;
+    in property <bool> mirrored;
+    property <DeckView> v: DeckState.decks[root.index];
+    property <ChannelView> chan: MixerState.channels[root.index];
+    property <color> tone: StageTone.deck(root.index);
+    property <length> g: Theme.space-lg;
+    property <length> iw: root.width - 2 * root.g;
+    property <length> ih: root.height - 2 * root.g;
+    property <length> hh: max(min(Theme.stage-cover, root.ih * 0.26), 52px);
+    property <bool> waved: Theme.stage-wave == 2;
+    property <length> btn-h: min(Theme.stage-button, root.ih * 0.18);
+    property <length> wh: root.waved ? clamp(root.ih * 0.34, 64px, max(64px, Theme.stage-wave-h + 40px)) : 0px;
+    property <length> kr-y: root.hh + root.g + (root.waved ? root.wh + root.g : 0px);
+    property <length> kr-h: max(40px, root.ih - root.kr-y - root.g - root.btn-h);
+    property <length> num-w: 30px;
+    property <length> kw: root.iw - root.num-w - root.g;
+    property <length> cell: root.kw / 6;
+    property <length> ks: clamp(min(root.kr-h - 14px, root.cell - 18px), 24px, 46px);
+    property <length> by: root.kr-y + root.kr-h + root.g;
+    property <length> main-w: (root.iw - root.g) * 0.6;
+    pure function px(x: length, w: length) -> length { return root.mirrored ? root.iw - x - w : x; }
+    StagePanel {
+        width: root.width;
+        height: root.height;
+        accent: root.tone;
+        lit: root.v.master;
+    }
+    if true: Rectangle {
+        x: root.g;
+        y: root.g;
+        width: root.iw;
+        height: root.ih;
+        if true: StageHead { x: 0px; y: 0px; width: root.iw; height: root.hh; index: root.index; badge: false; }
+        if root.waved: StageWave { x: 0px; y: root.hh + root.g; width: root.iw; height: root.wh; index: root.index; overview: true; zoom: true; }
+        if true: Rectangle {
+            x: 0px;
+            y: root.kr-y;
+            width: root.iw;
+            height: root.kr-h;
+            StageBadge { x: root.px(0px, root.num-w); y: (parent.height - self.height) / 2; width: root.num-w; height: min(root.num-w * 1.6, parent.height); text: "" + (root.index + 1); tone: root.tone; boxed: false; }
+            for p[k] in [3, 2, 1, 0, 4]: StageKnob {
+                // STEM ISO turns HIGH / MID / LOW into the INST / VOCAL / DRUMS levels, as in the mixer.
+                property <bool> iso: root.chan.iso && p >= 1 && p <= 3;
+                x: root.px(root.num-w + root.g + k * root.cell, root.cell) + (root.cell - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                size: root.ks;
+                bipolar: !self.iso;
+                label: self.iso ? ["", @tr("INST"), @tr("VOCAL"), @tr("DRUMS")][p] : p == 4 ? MixerState.cfx-names[MixerState.cfx-type] : [@tr("TRIM"), @tr("HIGH"), @tr("MID"), @tr("LOW")][p];
+                accent: self.iso ? [Theme.accent, Theme.stem-inst, Theme.stem-vocal, Theme.stem-drums][p] : p == 4 ? (Theme.deck-tint == 1 ? root.tone : Theme.cue) : root.tone;
+                stop: p == 4 ? MixerState.cfx-stop : -1;
+                value: self.iso ? root.chan.iso-knobs[p - 1] : root.chan.knobs[p];
+                moved(v) => { MixerState.knob(root.index, p, v); }
+                reset() => { MixerState.knob(root.index, p, self.iso ? 1.0 : 0.5); }
+            }
+            StageButton {
+                tooltip: @tr("Headphone CUE");
+                x: root.px(root.num-w + root.g + 5 * root.cell, root.cell) + (root.cell - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: min(root.cell - 6px, 34px);
+                height: self.width;
+                round: true;
+                glyph: Icon.headphones;
+                active: root.chan.cue;
+                accent: root.tone;
+                clicked => { MixerState.cue-toggled(root.index); }
+            }
+        }
+        if true: HorizontalLayout {
+            x: root.px(0px, root.main-w);
+            y: root.by;
+            width: root.main-w;
+            height: root.btn-h;
+            spacing: root.g;
+            StageButton {
+                tooltip: @tr("Cue: hold to preview, release to return");
+                text: @tr("CUE");
+                font-size: Theme.font-md;
+                active: root.v.at-cue;
+                enabled: root.v.loaded;
+                accent: StageTone.cue(root.index);
+                rim: Theme.deck-tint == 1;
+                pressed => { DeckState.cue(root.index); }
+                released => { DeckState.cue-released(root.index); }
+            }
+            StageButton {
+                tooltip: @tr("Play / pause");
+                glyph: root.v.playing ? Icon.pause : Icon.play;
+                font-size: Theme.font-md;
+                active: root.v.playing;
+                enabled: root.v.loaded;
+                accent: StageTone.play(root.index);
+                rim: Theme.deck-tint == 1;
+                clicked => { DeckState.play-pause(root.index); }
+            }
+            StageButton {
+                tooltip: @tr("Beat sync to the master");
+                text: @tr("SYNC");
+                font-size: Theme.font-md;
+                active: root.v.synced;
+                enabled: root.v.loaded;
+                accent: StageTone.sync(root.index);
+                clicked => { DeckState.sync(root.index); }
+            }
+        }
+        if true: HorizontalLayout {
+            x: root.px(root.main-w + root.g, root.iw - root.main-w - root.g);
+            y: root.by + (root.btn-h - min(root.btn-h, 28px)) / 2;
+            width: root.iw - root.main-w - root.g;
+            height: min(root.btn-h, 28px);
+            spacing: Theme.space-sm;
+            StageButton { text: @tr("SLIP"); tooltip: @tr("Slip mode"); font-size: Theme.font-xs; active: root.v.slip; enabled: root.v.loaded; accent: Theme.deck-tint == 1 ? root.tone : Theme.danger; clicked => { DeckState.slip(root.index); } }
+            StageButton { text: "Q"; tooltip: @tr("Quantize"); font-size: Theme.font-xs; active: root.v.quantize; accent: root.tone; clicked => { DeckState.quantize(root.index); } }
+            StageButton { text: @tr("MT"); tooltip: @tr("Master tempo (key lock)"); font-size: Theme.font-xs; active: root.v.key-lock; accent: root.tone; clicked => { DeckState.key-lock(root.index); } }
+        }
+    }
+}

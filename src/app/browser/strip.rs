@@ -13,7 +13,7 @@ use super::View;
 use crate::app::{
     App, BrowserState, analyze, prefs,
     prefs::view::CueMarkers,
-    render::{Axis, Canvas, cue_color, cue_letter, overview},
+    render::{Axis, Canvas, cue_color, cue_letter, overview, palette},
 };
 use openfader::{
     analysis::{self, Analysis},
@@ -154,7 +154,7 @@ impl Model for StripRows {
 fn analysis_of(lib: &dyn Library, t: &Track) -> Analysis {
     let own = lib.analysis(t);
     match own {
-        Some(a) if overview::wave(&a, 1).is_some() => a,
+        Some(a) if overview::wave(&palette(), &a, 1).is_some() => a,
         own => {
             let cached = analysis::cache::load(t).ok().flatten();
             let mut a = cached.unwrap_or_default();
@@ -182,7 +182,7 @@ fn draw(a: &Analysis, duration_ms: u32, cues: bool, scale: usize) -> Image {
             start_ms: 0.0,
             px_per_ms: w as f64 / f64::from(duration_ms),
         };
-        if let Some(wave) = overview::wave(a, duration_ms) {
+        if let Some(wave) = overview::wave(&palette(), a, duration_ms) {
             wave.draw(&mut c, &axis, true);
         }
         let large = prefs::with(|p| p.view.cue_markers == CueMarkers::Large);

@@ -13,7 +13,7 @@ component ValueField inherits TextField {
 
 /// One theme of the gallery (src/app/skin/page.rs). `name` is what `ThemeState.apply` takes, `title` what the card shows. `colors` are
 /// the theme's own values for the mini preview, in this order: bg, bg-deep, panel, panel-raised, text, text-dim, accent, play, cue,
-/// danger, wave-bg, wave-low, wave-mid, wave-high, select, deck1, deck2.
+/// danger, wave-bg, wave-low, wave-mid, wave-high, select, deck1, deck2, panel-top.
 export struct ThemeCard {
     name: string,
     title: string,
@@ -24,7 +24,8 @@ export struct ThemeCard {
     colors: [color],
 }
 
-/// One token of the open editor group (src/app/skin/draft.rs `Row`). kind: 0 colour, 1 number, 2 text, 3 font family.
+/// One token of the open editor group (src/app/skin/draft.rs `Row`). kind: 0 colour, 1 number, 2 text, 3 font family, 4 a float with a
+/// range (`fraction`: its place in the range, 0..1), 5 a whole number from a fixed set (`options`, the chosen one is `current`).
 export struct TokenRow {
     index: int,
     name: string,
@@ -33,6 +34,9 @@ export struct TokenRow {
     text: string,
     color: color,
     changed: bool,
+    options: [string],
+    current: int,
+    fraction: float,
 }
 
 /// PREFS > THEMES state: the gallery, the theme actions and the editor. Rust owns it (src/app/skin/page.rs).
@@ -77,6 +81,8 @@ export global ThemeState {
     callback group-chosen(int);
     callback pick(int);
     callback edit(int, string);
+    callback choose(int, int);
+    callback slide(int, float);
     callback step(int, int);
     callback reset(int);
     callback set-hsva(float, float, float, float);
@@ -105,7 +111,7 @@ component ThemeCardView inherits Rectangle {
             y: 5px;
             width: 112px;
             height: 60px;
-            background: root.c[2];
+            background: @linear-gradient(180deg, root.c[17] 0%, root.c[2] 100%);
             border-radius: 2px;
             Text { x: 5px; y: 2px; text: "Aa"; color: root.c[4]; font-size: 11px; font-weight: 700; }
             Rectangle { x: 28px; y: 7px; width: 40px; height: 3px; background: root.c[5]; }
@@ -337,7 +343,35 @@ component TokenRowView inherits VerticalLayout {
                 }
                 Chip { text: @tr("+"); width: 22px; horizontal-stretch: 0; clicked => { ThemeState.step(root.r.index, 1); } }
             }
-            if root.r.kind >= 2: HorizontalLayout {
+            if root.r.kind == 4: HorizontalLayout {
+                spacing: Theme.space-md;
+                Rectangle {
+                    width: 140px;
+                    GradSlider {
+                        y: (parent.height - self.height) / 2;
+                        width: parent.width;
+                        track: Theme.panel-high;
+                        value: root.r.fraction;
+                        moved(v) => { ThemeState.slide(root.r.index, v); }
+                    }
+                }
+                ValueField {
+                    width: 84px;
+                    horizontal-stretch: 0;
+                    value: root.r.text;
+                    accepted(t) => { ThemeState.edit(root.r.index, t); }
+                }
+            }
+            if root.r.kind == 5: HorizontalLayout {
+                Dropdown {
+                    width: 226px;
+                    horizontal-stretch: 0;
+                    options: root.r.options;
+                    current: root.r.current;
+                    chose(n) => { ThemeState.choose(root.r.index, n); }
+                }
+            }
+            if root.r.kind >= 2 && root.r.kind <= 3: HorizontalLayout {
                 spacing: 2px;
                 ValueField {
                     width: root.r.kind == 3 ? 110px : 226px;
@@ -410,7 +444,7 @@ component Editor inherits Rectangle {
             height: Theme.h-ctl;
             for g[i] in ThemeState.groups: Chip {
                 text: g;
-                width: max(70px, g.character-count * 7px + 18px);
+                width: max(44px, g.character-count * 7px + 12px);
                 horizontal-stretch: 0;
                 active: ThemeState.group == i;
                 clicked => { ThemeState.group-chosen(i); }
