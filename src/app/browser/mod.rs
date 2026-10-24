@@ -71,6 +71,8 @@ const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 /// export snapshot names it (`store:<node>` for My Playlists, the library's own id otherwise; `None` for other lists).
 pub struct Context {
     pub track: Option<Track>,
+    /// The selected tracks in row order (the chosen one alone when a single row is selected; empty when none).
+    pub tracks: Vec<Track>,
     pub list: Vec<Track>,
     pub name: String,
     pub playlist: Option<String>,
@@ -98,6 +100,7 @@ pub fn context() -> Context {
     view.map_or(
         Context {
             track: None,
+            tracks: Vec::new(),
             list: Vec::new(),
             name: String::new(),
             playlist: None,
@@ -107,6 +110,7 @@ pub fn context() -> Context {
             let v = v.borrow();
             Context {
                 track: v.selected.clone(),
+                tracks: v.selected.iter().cloned().collect(),
                 list: v.shown.iter().map(|&i| v.list[i].clone()).collect(),
                 name: v.list_name(),
                 source: v.source_sel(),
