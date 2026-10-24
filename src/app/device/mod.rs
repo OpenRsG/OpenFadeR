@@ -15,6 +15,10 @@
 //! from the Devices tree), [`link`] (cue sync between the collection and the device copies of a track), [`formats`] (which
 //! library formats a device gets: UNIVERSAL or the ticked ones, and their options).
 //!
+//! Every write to a device (export, sync, transfer) goes through [`preview`] (the card that shows what it will write, and the question
+//! a plugged-in device asks) and then [`Ctx::write`] in [`job`]: [`safety`] first finishes an interrupted change and backs the
+//! library up, [`pace`] shows the speed and the time left and learns the device's write speed for the next preview.
+//!
 //! `Rc<dyn Library>` cannot leave the UI thread, so a press snapshots the cheap part there ([`Ctx::snapshot`]: the overlaid
 //! tracks, the store's colours / tags / user playlists, the decks' session edits) and the work runs on a worker with a
 //! [`Control`] the timer polls and the cancel button sets. Only one job runs at a time.
@@ -30,7 +34,10 @@ mod export;
 mod formats;
 mod job;
 mod link;
+mod pace;
 mod pick;
+mod preview;
+mod safety;
 mod scan;
 mod sync;
 mod transfer;
@@ -40,7 +47,7 @@ pub use transfer::{drop_playlist, drop_tracks, Dest, List};
 
 use super::{
     deck::Decks, toast, ActionItem, App, BackupItem, DeviceItem, DeviceState, FormatItem,
-    FormatOption, PickRow,
+    FormatOption, PickRow, PreviewRow,
 };
 use openfader::{
     device::{self, Device, export::Written},
@@ -70,6 +77,9 @@ struct Job {
     device: Option<String>,
     /// The status line and its error colour when the job started: shown again when the job has nothing to report.
     before: (String, bool),
+    pace: pace::Pace,
+    /// Started by the app itself (an [`Auto`]): its report goes under the one it follows ([`Ctx::report`]).
+    auto: bool,
     then: Then,
 }
 
@@ -114,6 +124,8 @@ pub(super) struct Ctx {
     /// Cue sync: per device id, the tracks whose device copy is to be written (by key; `Some` = a track only the device has,
     /// written from its own analysis) and the time of the last edit.
     pushes: RefCell<HashMap<String, (Option<Instant>, BTreeMap<String, Option<Track>>)>>,
+    /// The preview card, the sync question and what they start ([`preview`]).
+    prep: preview::Prep,
 }
 
 struct Models {
@@ -337,11 +349,13 @@ impl Ctx {
             let Some(dev) = self.device(&id) else {
                 continue;
             };
+            self.prep.automatic.set(true);
             match what {
                 Auto::History => actions::import_histories(self, &dev, true),
                 Auto::Sync => sync::run(self, &dev, true),
                 Auto::Link => self.link(&dev),
             }
+            self.prep.automatic.set(false);
         }
     }
 }
@@ -389,6 +403,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
         },
         links: RefCell::default(),
         pushes: RefCell::default(),
+        prep: preview::Prep::default(),
     });
     let s = app.global::<DeviceState>();
     s.set_devices(ModelRc::from(cx.models.devices.clone()));
@@ -407,6 +422,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     });
     s.set_export_rows(ModelRc::from(cx.export.rows.clone()));
     s.set_sync_rows(ModelRc::from(cx.sync.rows.clone()));
+    preview::wire(&cx, app);
     s.set_backup_dir(
         device::backup::default_dir()
             .map(|p| p.to_string_lossy().into_owned())

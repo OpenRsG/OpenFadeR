@@ -764,6 +764,16 @@ merges by (it replaces that playlist's content), so the snapshot lists the playl
 has too is written with the collection's analysis, its empty parts filled from the device copy; any other member with the analysis
 read from the device) and then the new tracks; a track the playlist holds already is skipped and counted.
 
+**Before a write.** EXPORT, SYNC NOW, the sync of a device that was just plugged in, and Transfer show a card first (Preferences > DJ
+SYSTEM > DEVICE, "Show what an export will write before it starts"): the tracks to copy and the ones refreshed, the analyses run
+first, the time, what is left out and why, then START or CANCEL. A format whose plugin lists the `plan` feature answers the same
+`export` request with `options.dry_run` set (nothing is written; the answer's `plan` is the card); for any other format the app
+estimates from the audio files. The device holds one copy of each track, so its bytes count once whatever formats are written. The time
+uses the write speed measured on earlier jobs on that device (8 MB/s and 20 ms per small file until there is one). Every write job
+then finishes or undoes a change a pulled stick left (`commit::recover`), backs the library up (kept as an automatic backup, the last
+five per device) unless Preferences say otherwise, writes, and reports the plugins' read-back (`verified`). Its status line shows the
+speed and the time left, and names what makes a slow stick slow.
+
 A job (`export`, `update`, `remove`, `device_action`, `device_fix`) runs inside its call on a thread of the app. Meanwhile the plugin
 calls back through the `host` table every request receives (`openfader_plugin::library::host` in Rust): `analysis` (the beat grid,
 cues, waveforms of a track: `computed: false` what the track's own library holds, `true` the app's analysis of the audio, cached),

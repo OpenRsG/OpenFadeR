@@ -207,6 +207,8 @@ const MIGRATIONS: &[&str] = &[
      CREATE TABLE IF NOT EXISTS inbox_seen (sig TEXT PRIMARY KEY, track INTEGER) WITHOUT ROWID;",
     // v20: cover art by album or track (src/store/artwork.rs); an empty `path` is a lookup that found nothing at `at` (unix s).
     "CREATE TABLE IF NOT EXISTS artwork (key TEXT PRIMARY KEY, path TEXT NOT NULL, at INTEGER NOT NULL) WITHOUT ROWID;",
+    // v21: backups the app took itself before it rewrote a device library (`auto`), pruned to the last few per device.
+    "ALTER TABLE device_backup ADD COLUMN auto INTEGER NOT NULL DEFAULT 0;",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as

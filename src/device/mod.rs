@@ -21,6 +21,7 @@ pub mod eject;
 pub mod export;
 pub mod history;
 pub mod link;
+pub mod plan;
 pub mod plug;
 pub mod sync;
 pub mod transfer;

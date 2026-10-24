@@ -22,6 +22,8 @@ pub struct DeviceBackup {
     pub path: String,
     pub fs: String,
     pub bg: u8,
+    /// Taken by the app before a write, not by the user: the last few per device are kept ([`Store::backups`] lists both).
+    pub auto: bool,
 }
 
 /// The columns of a backup [`Store::add_backup`] records (the others, `id`, the store makes).
@@ -33,6 +35,7 @@ pub struct NewBackup<'a> {
     pub path: &'a str,
     pub fs: &'a str,
     pub bg: u8,
+    pub auto: bool,
 }
 
 impl Store {
@@ -79,8 +82,8 @@ impl Store {
     /// Records a backup taken of a device; returns its id.
     pub fn add_backup(&self, b: &NewBackup) -> R<i64> {
         self.insert(
-            "INSERT INTO device_backup(device, taken_at, computer, name, path, fs, bg) VALUES (?1,?2,?3,?4,?5,?6,?7)",
-            params![b.device, b.taken_at, b.computer, b.name, b.path, b.fs, b.bg],
+            "INSERT INTO device_backup(device, taken_at, computer, name, path, fs, bg, auto) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            params![b.device, b.taken_at, b.computer, b.name, b.path, b.fs, b.bg, b.auto],
         )
     }
 
@@ -88,7 +91,7 @@ impl Store {
     pub fn backups(&self) -> R<Vec<DeviceBackup>> {
         query_all(
             &self.db(),
-            "SELECT id, device, taken_at, computer, name, path, fs, bg FROM device_backup ORDER BY taken_at DESC, id DESC",
+            "SELECT id, device, taken_at, computer, name, path, fs, bg, auto FROM device_backup ORDER BY taken_at DESC, id DESC",
             [],
             |r| {
                 Ok(DeviceBackup {
@@ -100,6 +103,7 @@ impl Store {
                     path: r.get(5)?,
                     fs: r.get(6)?,
                     bg: r.get(7)?,
+                    auto: r.get(8)?,
                 })
             },
         )
@@ -108,6 +112,16 @@ impl Store {
     /// Forgets a backup; the caller deletes the folder.
     pub fn delete_backup(&self, id: i64) -> R<()> {
         self.run("DELETE FROM device_backup WHERE id = ?1", [id])
+    }
+
+    /// The automatic backups of `device` beyond the newest `keep`; manual backups are never listed.
+    pub fn surplus_backups(&self, device: &str, keep: usize) -> R<Vec<DeviceBackup>> {
+        Ok(self
+            .backups()?
+            .into_iter()
+            .filter(|b| b.auto && b.device == device)
+            .skip(keep)
+            .collect())
     }
 
     /// Whether the history `history` of `device` was imported already.
@@ -148,5 +162,39 @@ impl Store {
             }
             Ok(())
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn add(s: &Store, device: &str, at: i64, auto: bool) {
+        s.add_backup(&NewBackup {
+            device,
+            taken_at: at,
+            computer: "pc",
+            name: "KEY",
+            path: "/b",
+            fs: "vfat",
+            bg: 0,
+            auto,
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn pruning_lists_only_old_automatic_backups_of_that_device() {
+        let s = Store::in_memory().unwrap();
+        for at in 1..=7 {
+            add(&s, "a", at, true);
+        }
+        add(&s, "a", 0, false); // oldest of all, but the user's
+        add(&s, "b", 1, true);
+        let old = s.surplus_backups("a", 5).unwrap();
+        assert_eq!(old.iter().map(|b| b.taken_at).collect::<Vec<_>>(), [2, 1]);
+        assert!(old.iter().all(|b| b.auto && b.device == "a"));
+        assert!(s.surplus_backups("b", 5).unwrap().is_empty());
+        assert_eq!(s.backups().unwrap().len(), 9);
     }
 }

@@ -106,7 +106,7 @@ impl Ctx {
         } else {
             Vec::new()
         };
-        let (o, store, dev) = (self.options(Some(d)), self.store.clone(), d.clone());
+        let (o, store, dev, safety) = (self.options(Some(d)), self.store.clone(), d.clone(), self.safety());
         let out: Arc<Mutex<Option<link::Links>>> = Arc::default();
         let (found, id) = (out.clone(), d.id.clone());
         self.start_then(
@@ -122,6 +122,7 @@ impl Ctx {
                 }
                 let pushed = push.len();
                 if pushed > 0 {
+                    safety.recover(&dev.mount, &dev.label)?;
                     let done = device::export::export(
                         &writers,
                         &dev.mount,
@@ -252,8 +253,9 @@ impl Ctx {
         let Some(writers) = self.writers(&d) else {
             return;
         };
-        let (o, store, n) = (self.options(Some(&d)), self.store.clone(), tracks.len());
+        let (o, store, n, safety) = (self.options(Some(&d)), self.store.clone(), tracks.len(), self.safety());
         self.start(Some(id), tr!("Writing cues"), move |ctl| {
+            safety.recover(&d.mount, &d.label)?;
             let done =
                 device::export::export(&writers, &d.mount, &Snapshot::of_tracks(tracks), &o, &ctl)?;
             record_all(&store, Some(&d), &done, &d.label)?;

@@ -41,7 +41,12 @@ pub(super) fn refresh(cx: &Rc<Ctx>) {
             .map(|b| BackupItem {
                 when: when(b.taken_at).into(),
                 computer: b.computer.clone().into(),
-                device: b.name.clone().into(),
+                device: if b.auto {
+                    format!("{} · {}", b.name, tr!("automatic, before a write"))
+                } else {
+                    b.name.clone()
+                }
+                .into(),
                 fs: b.fs.clone().into(),
                 selected: false,
             })
@@ -158,6 +163,7 @@ pub(super) fn now(
                 path: &made.dir.to_string_lossy(),
                 fs: &dev.fs,
                 bg,
+                auto: false,
             })?;
             Ok(tr!(
                 "Backed up the library of {} ({} files) to {}",

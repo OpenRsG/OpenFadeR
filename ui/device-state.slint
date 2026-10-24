@@ -67,6 +67,12 @@ export struct FormatItem {
     options: [FormatOption],
 }
 
+// Prepare: a track of the preview card's lists; `detail` is its size ("" = none).
+export struct PreviewRow {
+    title: string,
+    detail: string,
+}
+
 /// The device windows (src/app/device/): detection, EXPORT to a device (create / add / update), SYNC MANAGER, backups, eject.
 /// Rust owns every value; the callbacks are the user's actions.
 export global DeviceState {
@@ -143,6 +149,26 @@ export global DeviceState {
     callback export-playlists(string);
     /// File > Library > Backed up device library management.
     callback manage-backups();
+
+    // Prepare: the preview card before a write, and the question a plugged-in device asks (src/app/device/preview.rs).
+    in property <bool> preview-open;
+    in property <string> preview-title;
+    /// "FAT32 · 3.2 GB free of 14.9 GB · FORMAT + FORMAT".
+    in property <string> preview-device;
+    /// "12 new tracks to copy (480 MB)" and its list; `preview-update` "" = no list.
+    in property <string> preview-add;
+    in property <[PreviewRow]> preview-add-rows;
+    in property <string> preview-update;
+    in property <[PreviewRow]> preview-update-rows;
+    /// What else the write does: analyses, playlists, the time, the backup, that the music is not changed.
+    in property <[string]> preview-lines;
+    /// Why tracks are left out or the write cannot run (error colour).
+    in property <[string]> preview-blocked;
+    in property <bool> preview-can-start;
+    callback preview-answer(bool);
+    in property <bool> sync-ask-open;
+    in property <string> sync-ask-text;
+    callback sync-ask-answer(bool);
 }
 
 /// Checkbox rows for playlists and folders.

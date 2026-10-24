@@ -866,7 +866,7 @@ msgstr "SALVAR"
 
 #: ui/browser-tree.slint:114
 #: ui/browser.slint:304
-#: ui/device.slint:119
+#: ui/device-preview.slint:78
 msgid "CANCEL"
 msgstr "CANCELAR"
 
@@ -1749,7 +1749,7 @@ msgstr "Escolha um dispositivo à esquerda."
 
 #: ui/device-devices.slint:188
 #: ui/exportmode-dock.slint:70
-#: src/app/device/backup.rs:259
+#: src/app/device/backup.rs:265
 msgid "EJECT"
 msgstr "EJETAR"
 
@@ -1799,8 +1799,8 @@ msgid "Create or extend the libraries on this device"
 msgstr "Criar ou estender as bibliotecas neste dispositivo"
 
 #: ui/device-devices.slint:226
-#: ui/device.slint:65
-#: ui/device.slint:75
+#: ui/device.slint:66
+#: ui/device.slint:76
 msgid "SYNC MANAGER"
 msgstr "GERENCIADOR DE SYNC"
 
@@ -1833,8 +1833,8 @@ msgid "KEEP IT SAFE"
 msgstr "MANTER SEGURO"
 
 #: ui/device-devices.slint:235
-#: ui/device.slint:65
-#: ui/device.slint:75
+#: ui/device.slint:66
+#: ui/device.slint:76
 msgid "BACKUPS"
 msgstr "BACKUPS"
 
@@ -1899,17 +1899,34 @@ msgstr "PLAYLISTS PARA MANTER EM SYNC"
 msgid "SYNC NOW"
 msgstr "SYNC AGORA"
 
-#: ui/device.slint:12
-#: ui/device.slint:60
-#: ui/device.slint:65
+#: ui/device-preview.slint:48
+msgid "HIDE LIST"
+msgstr "OCULTAR LISTA"
+
+#: ui/device-preview.slint:48
+msgid "SHOW LIST"
+msgstr "MOSTRAR LISTA"
+
+#: ui/device-preview.slint:77
+#: ui/welcome.slint:111
+msgid "START"
+msgstr "INICIAR"
+
+#: ui/device-preview.slint:100
+msgid "NOT NOW"
+msgstr "AGORA NÃO"
+
+#: ui/device.slint:13
+#: ui/device.slint:61
+#: ui/device.slint:66
 msgid "DEVICES"
 msgstr "DISPOSITIVOS"
 
-#: ui/device.slint:52
+#: ui/device.slint:53
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: ui/device.slint:104
+#: ui/device.slint:105
 msgid "CONFIRM"
 msgstr "CONFIRMAR"
 
@@ -3369,7 +3386,7 @@ msgid "Shift selected item downward"
 msgstr "Mover o item selecionado para baixo"
 
 #: ui/prefs-djsystem.slint:130
-#: src/app/prefs/dj_system/behaviour.rs:55
+#: src/app/prefs/dj_system/behaviour.rs:76
 #: src/app/prefs/dj_system/mod.rs:265
 msgid "Reset to defaults"
 msgstr "Restaurar padrões"
@@ -4606,10 +4623,6 @@ msgstr "Você pode mudar isso depois em PREFERÊNCIAS > EXTENSÕES e reabrir est
 msgid "SWITCH ON {}"
 msgstr "ATIVAR {}"
 
-#: ui/welcome.slint:111
-msgid "START"
-msgstr "INICIAR"
-
 #: ui/widgets.slint:209
 msgid "Play"
 msgstr "Play"
@@ -5418,6 +5431,7 @@ msgstr[0] "{n} faixa"
 msgstr[1] "{n} faixas"
 
 #: src/app/browser/sources.rs:395
+#: src/app/device/sync.rs:71
 msgid "{n} playlist"
 msgid_plural "{n} playlists"
 msgstr[0] "{n} playlist"
@@ -6603,7 +6617,7 @@ msgid "Imported {} into My Playlists: {} track(s), {} added to the collection"
 msgstr "{} importada para Minhas playlists: {} faixa(s), {} adicionada(s) à coleção"
 
 #: src/app/device/actions.rs:231
-#: src/app/device/transfer.rs:274
+#: src/app/device/transfer.rs:292
 msgid "That playlist is not on the device any more"
 msgstr "Essa playlist não está mais no dispositivo"
 
@@ -6644,64 +6658,70 @@ msgstr "Excluir {} de {}? O arquivo e sua análise são removidos."
 msgid "Deleted {} track(s) from {}"
 msgstr "{} faixa(s) excluída(s) de {}"
 
-#: src/app/device/backup.rs:79
+#: src/app/device/backup.rs:45
+msgid "automatic, before a write"
+msgstr "automático, antes de gravar"
+
+#: src/app/device/backup.rs:84
 msgid "Choose a device and select one backup"
 msgstr "Escolha um dispositivo e selecione um backup"
 
-#: src/app/device/backup.rs:84
+#: src/app/device/backup.rs:89
 msgid "Restore the backup of {} ({}) onto {}? The library on the device is replaced."
 msgstr "Restaurar o backup de {} ({}) em {}? A biblioteca do dispositivo será substituída."
 
-#: src/app/device/backup.rs:91
+#: src/app/device/backup.rs:96
 #: src/app/library/backup.rs:64
 msgid "RESTORE"
 msgstr "RESTAURAR"
 
-#: src/app/device/backup.rs:97
+#: src/app/device/backup.rs:102
 msgid "Select the backups to delete"
 msgstr "Selecione os backups a excluir"
 
-#: src/app/device/backup.rs:100
+#: src/app/device/backup.rs:105
 msgid "Delete {} backup(s) from this computer?"
 msgstr "Excluir {} backup(s) deste computador?"
 
-#: src/app/device/backup.rs:113
+#: src/app/device/backup.rs:118
 msgid "Backups deleted"
 msgstr "Backups excluídos"
 
-#: src/app/device/backup.rs:134
+#: src/app/device/backup.rs:139
 msgid "{} holds no library to back up"
 msgstr "{} não tem biblioteca para fazer backup"
 
-#: src/app/device/backup.rs:140
+#: src/app/device/backup.rs:145
+#: src/app/device/safety.rs:90
 msgid "No backup folder: type one"
 msgstr "Sem pasta de backup: digite uma"
 
-#: src/app/device/backup.rs:150
+#: src/app/device/backup.rs:155
 msgid "Backing up"
 msgstr "Fazendo backup"
 
-#: src/app/device/backup.rs:162
+#: src/app/device/backup.rs:168
 msgid "Backed up the library of {} ({} files) to {}"
 msgstr "Backup da biblioteca de {} ({} arquivos) feito em {}"
 
-#: src/app/device/backup.rs:186
+#: src/app/device/backup.rs:192
 msgid "Restoring"
 msgstr "Restaurando"
 
-#: src/app/device/backup.rs:204
+#: src/app/device/backup.rs:210
 msgid "Restored the library onto {} and {} track(s){}"
 msgstr "Biblioteca restaurada em {} e {} faixa(s){}"
 
-#: src/app/device/backup.rs:211
+#: src/app/device/backup.rs:217
 msgid "; {} track(s) were not in the collection"
 msgstr "; {} faixa(s) não estavam na coleção"
 
-#: src/app/device/backup.rs:229
+#: src/app/device/backup.rs:235
+#: src/app/device/preview.rs:183
 msgid "… and {} more"
 msgstr "… e mais {}"
 
-#: src/app/device/backup.rs:232
+#: src/app/device/backup.rs:238
 msgid ""
 "The following tracks cannot be found. Continue to restore?\n"
 "{}"
@@ -6709,47 +6729,47 @@ msgstr ""
 "As faixas a seguir não foram encontradas. Continuar a restauração?\n"
 "{}"
 
-#: src/app/device/backup.rs:236
+#: src/app/device/backup.rs:242
 msgid "CONTINUE"
 msgstr "CONTINUAR"
 
-#: src/app/device/backup.rs:259
+#: src/app/device/backup.rs:265
 msgid "The library is loaded from {}: {} track(s) play from it and stop working when it is removed. Eject anyway?"
 msgstr "A biblioteca é carregada de {}: {} faixa(s) tocam dela e param de funcionar quando for removida. Ejetar mesmo assim?"
 
-#: src/app/device/backup.rs:263
+#: src/app/device/backup.rs:269
 msgid "A transfer to {} is running: cancel it (X) before ejecting"
 msgstr "Uma transferência para {} está em andamento: cancele-a (X) antes de ejetar"
 
-#: src/app/device/backup.rs:276
+#: src/app/device/backup.rs:282
 msgid "Ejecting"
 msgstr "Ejetando"
 
-#: src/app/device/backup.rs:287
+#: src/app/device/backup.rs:293
 msgid "Not ejected: the backup failed ({})"
 msgstr "Não ejetado: o backup falhou ({})"
 
-#: src/app/device/export.rs:25
+#: src/app/device/export.rs:26
 msgid "{} tracks, {} playlists in the collection"
 msgstr "{} faixas, {} playlists na coleção"
 
-#: src/app/device/export.rs:69
+#: src/app/device/export.rs:70
 msgid "Choose a device or type a folder"
 msgstr "Escolha um dispositivo ou digite uma pasta"
 
-#: src/app/device/export.rs:77
+#: src/app/device/export.rs:84
 msgid "No device plugin can write a library there"
 msgstr "Nenhum plugin de dispositivo pode gravar uma biblioteca ali"
 
-#: src/app/device/export.rs:83
+#: src/app/device/export.rs:90
 msgid "Nothing to export: reopen the window"
 msgstr "Nada para exportar: reabra a janela"
 
-#: src/app/device/export.rs:92
+#: src/app/device/export.rs:99
 msgid "None of the ticked playlists has tracks"
 msgstr "Nenhuma das playlists marcadas tem faixas"
 
-#: src/app/device/export.rs:102
+#: src/app/device/export.rs:113
 msgid "Exporting"
 msgstr "Exportando"
 
@@ -6757,11 +6777,21 @@ msgstr "Exportando"
 msgid "{}: switch on at least one library format"
 msgstr "{}: ative pelo menos um formato de biblioteca"
 
-#: src/app/device/job.rs:63
+#: src/app/device/job.rs:45
+msgid "Not checked after writing: {}"
+msgstr "Não verificado após gravar: {}"
+
+#: src/app/device/job.rs:53
+msgid "Checked: {} holds {n} track in {}"
+msgid_plural "Checked: {} holds {n} tracks in {}"
+msgstr[0] "Verificado: {} contém {n} faixa em {}"
+msgstr[1] "Verificado: {} contém {n} faixas em {}"
+
+#: src/app/device/job.rs:177
 msgid "the worker stopped"
 msgstr "o worker parou"
 
-#: src/app/device/job.rs:80
+#: src/app/device/job.rs:199
 msgid "Cancelled: the device was left as it was"
 msgstr "Cancelado: o dispositivo foi deixado como estava"
 
@@ -6769,61 +6799,180 @@ msgstr "Cancelado: o dispositivo foi deixado como estava"
 msgid "Matching tracks"
 msgstr "Correspondendo faixas"
 
-#: src/app/device/link.rs:135
+#: src/app/device/link.rs:136
 msgid "{}: cue sync filled {} track(s) here and {} on the device"
 msgstr "{}: o cue sync preencheu {} faixa(s) aqui e {} no dispositivo"
 
-#: src/app/device/link.rs:256
+#: src/app/device/link.rs:257
 msgid "Writing cues"
 msgstr "Gravando cues"
 
-#: src/app/device/link.rs:260
+#: src/app/device/link.rs:262
 msgid "cues of {} track(s) written to {}"
 msgstr "cues de {} faixa(s) gravados em {}"
 
-#: src/app/device/mod.rs:61
+#: src/app/device/mod.rs:68
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr "Outro trabalho está em andamento: aguarde ou cancele (X)"
 
-#: src/app/device/mod.rs:144
+#: src/app/device/mod.rs:156
 msgid " — {} warning(s), first: {}"
 msgstr " — {} aviso(s), primeiro: {}"
 
-#: src/app/device/mod.rs:146
+#: src/app/device/mod.rs:158
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr "{} faixas exportadas ({} novas, {} atualizadas) e {} playlists para {}{}{}"
 
-#: src/app/device/mod.rs:165
+#: src/app/device/mod.rs:177
 msgid " — Update Collection baseline not recorded: {}"
 msgstr " — Linha de base de Atualizar coleção não registrada: {}"
 
-#: src/app/device/mod.rs:190
+#: src/app/device/mod.rs:202
 msgid "failed: {}"
 msgstr "falhou: {}"
 
-#: src/app/device/mod.rs:244
+#: src/app/device/mod.rs:256
+#: src/app/device/sync.rs:111
 msgid "That device is not mounted any more"
 msgstr "Esse dispositivo não está mais montado"
 
-#: src/app/device/mod.rs:253
+#: src/app/device/mod.rs:265
 msgid "Choose a device first"
 msgstr "Escolha um dispositivo primeiro"
 
-#: src/app/device/mod.rs:265
+#: src/app/device/mod.rs:277
 msgid "mounted read-only"
 msgstr "montado somente leitura"
 
-#: src/app/device/mod.rs:274
+#: src/app/device/mod.rs:286
 msgid "cannot read the collection: {}"
 msgstr "não foi possível ler a coleção: {}"
 
-#: src/app/device/mod.rs:312
+#: src/app/device/mod.rs:327
 msgid "{}: its plugin does not offer that"
 msgstr "{}: seu plugin não oferece isso"
 
-#: src/app/device/mod.rs:436
+#: src/app/device/mod.rs:455
 msgid "Cancelling…"
 msgstr "Cancelando…"
+
+#: src/app/device/pace.rs:138
+msgid "{} left"
+msgstr "{} restantes"
+
+#: src/app/device/pace.rs:171
+msgid "This stick writes small files slowly (analysis files): {}. A faster stick helps"
+msgstr "Este pen drive grava arquivos pequenos devagar (arquivos de análise): {}. Um pen drive mais rápido ajuda"
+
+#: src/app/device/pace.rs:175
+msgid "This stick writes at {}"
+msgstr "Este pen drive grava a {}"
+
+#: src/app/device/pace.rs:184
+msgid "a few seconds"
+msgstr "alguns segundos"
+
+#: src/app/device/pace.rs:185
+msgid "about {} s"
+msgstr "cerca de {} s"
+
+#: src/app/device/pace.rs:186
+msgid "about {} min"
+msgstr "cerca de {} min"
+
+#: src/app/device/pace.rs:189
+msgid "about {} h {} min"
+msgstr "cerca de {} h {} min"
+
+#: src/app/device/preview.rs:207
+msgid "Not enough room: this needs {} and the stick has {} free. Leave some playlists out or free some space."
+msgstr "Espaço insuficiente: são necessários {} e o pen drive tem {} livres. Deixe algumas playlists de fora ou libere espaço."
+
+#: src/app/device/preview.rs:215
+msgid "{} is {}: this stick holds files up to {}. It would be left out; convert it to FLAC or use an exFAT stick."
+msgstr "{} tem {}: este pen drive aceita arquivos de até {}. Seria deixado de fora; converta para FLAC ou use um pen drive exFAT."
+
+#: src/app/device/preview.rs:223
+msgid "… and {} more tracks are too big for this stick"
+msgstr "… e mais {} faixas são grandes demais para este pen drive"
+
+#: src/app/device/preview.rs:229
+msgid "{n} track has no audio file and would be left out: {}"
+msgid_plural "{n} tracks have no audio file and would be left out: {}"
+msgstr[0] "{n} faixa não tem arquivo de áudio e seria deixada de fora: {}"
+msgstr[1] "{n} faixas não têm arquivo de áudio e seriam deixadas de fora: {}"
+
+#: src/app/device/preview.rs:259
+msgid "Preparing the preview"
+msgstr "Preparando a prévia"
+
+#: src/app/device/preview.rs:313
+msgid "{n} track is analysed first (beat grid and key): {}"
+msgid_plural "{n} tracks are analysed first (beat grid and key): {}"
+msgstr[0] "{n} faixa é analisada primeiro (grade de tempo e tom): {}"
+msgstr[1] "{n} faixas são analisadas primeiro (grade de tempo e tom): {}"
+
+#: src/app/device/preview.rs:321
+msgid "{n} playlist written"
+msgid_plural "{n} playlists written"
+msgstr[0] "{n} playlist gravada"
+msgstr[1] "{n} playlists gravadas"
+
+#: src/app/device/preview.rs:329
+msgid "Takes {} (from earlier jobs on this stick)"
+msgstr "Leva {} (com base em trabalhos anteriores neste pen drive)"
+
+#: src/app/device/preview.rs:331
+msgid "Takes {} (estimate)"
+msgstr "Leva {} (estimativa)"
+
+#: src/app/device/preview.rs:338
+msgid "The current library is backed up first"
+msgstr "A biblioteca atual é salva em backup primeiro"
+
+#: src/app/device/preview.rs:340
+msgid "Your music on this computer is not changed"
+msgstr "Sua música neste computador não é alterada"
+
+#: src/app/device/preview.rs:352
+msgid "Write to {}"
+msgstr "Gravar em {}"
+
+#: src/app/device/preview.rs:362
+msgid "No new track to copy"
+msgstr "Nenhuma faixa nova para copiar"
+
+#: src/app/device/preview.rs:364
+msgid "{n} new track to copy ({})"
+msgid_plural "{n} new tracks to copy ({})"
+msgstr[0] "{n} faixa nova para copiar ({})"
+msgstr[1] "{n} faixas novas para copiar ({})"
+
+#: src/app/device/preview.rs:377
+msgid "{n} track is there already: its marks are refreshed"
+msgid_plural "{n} tracks are there already: their marks are refreshed"
+msgstr[0] "{n} faixa já está lá: suas marcas são atualizadas"
+msgstr[1] "{n} faixas já estão lá: suas marcas são atualizadas"
+
+#: src/app/device/safety.rs:51
+msgid "An export to {} was cut off: it is now finished"
+msgstr "Uma exportação para {} foi interrompida: agora está concluída"
+
+#: src/app/device/safety.rs:52
+msgid "An export to {} was cut off: the previous library is back in use"
+msgstr "Uma exportação para {} foi interrompida: a biblioteca anterior voltou a ser usada"
+
+#: src/app/device/safety.rs:76
+msgid "{}: an earlier change was cut off and could not be put right: {}"
+msgstr "{}: uma alteração anterior foi interrompida e não pôde ser corrigida: {}"
+
+#: src/app/device/safety.rs:95
+msgid "Not written: the backup of the library of {} failed ({})"
+msgstr "Nada foi gravado: o backup da biblioteca de {} falhou ({})"
+
+#: src/app/device/safety.rs:117
+msgid "The library of {} was backed up first, to {}"
+msgstr "A biblioteca de {} foi salva em backup primeiro, em {}"
 
 #: src/app/device/scan.rs:17
 msgid "no library yet"
@@ -6853,55 +7002,65 @@ msgstr "{}: {} preferência(s) alterada(s) no player foram assumidas"
 msgid "{} removed"
 msgstr "{} removido"
 
-#: src/app/device/sync.rs:56
+#: src/app/device/sync.rs:59
+msgid "no new tracks"
+msgstr "nenhuma faixa nova"
+
+#: src/app/device/sync.rs:61
+msgid "{n} new track, {}"
+msgid_plural "{n} new tracks, {}"
+msgstr[0] "{n} faixa nova, {}"
+msgstr[1] "{n} faixas novas, {}"
+
+#: src/app/device/sync.rs:68
+msgid "{} is plugged in: sync {} ({})?"
+msgstr "{} está conectado: sincronizar {} ({})?"
+
+#: src/app/device/sync.rs:84
 msgid "No playlist is set to synchronize: tick some in the list"
 msgstr "Nenhuma playlist configurada para sincronizar: marque algumas na lista"
 
-#: src/app/device/sync.rs:73
+#: src/app/device/sync.rs:115
 msgid "Syncing"
 msgstr "Sincronizando"
 
-#: src/app/device/sync.rs:76
+#: src/app/device/sync.rs:120
 msgid "synced: {}"
 msgstr "sincronizado: {}"
 
-#: src/app/device/transfer.rs:174
+#: src/app/device/transfer.rs:191
 msgid "Nothing to transfer: choose some tracks first"
 msgstr "Nada para transferir: escolha primeiro algumas faixas"
 
-#: src/app/device/transfer.rs:191
+#: src/app/device/transfer.rs:208
 msgid "That playlist has no tracks to transfer"
 msgstr "Essa playlist não tem faixas para transferir"
 
-#: src/app/device/transfer.rs:205
+#: src/app/device/transfer.rs:222
 msgid "Analysing"
 msgstr "Analisando"
 
-#: src/app/device/transfer.rs:207
+#: src/app/device/transfer.rs:224
 msgid "Analysing {} of {}…"
 msgstr "Analisando {} de {}…"
 
-#: src/app/device/transfer.rs:255
-msgid "Transferring"
-msgstr "Transferindo"
-
-#: src/app/device/transfer.rs:257
-msgid "Transferring…"
-msgstr "Transferindo…"
-
-#: src/app/device/transfer.rs:286
+#: src/app/device/transfer.rs:304
 msgid "Nothing transferred: {n} track is in {} already"
 msgid_plural "Nothing transferred: {n} tracks are in {} already"
 msgstr[0] "Nada transferido: {n} faixa já está em {}"
 msgstr[1] "Nada transferido: {n} faixas já estão em {}"
 
-#: src/app/device/transfer.rs:300
+#: src/app/device/transfer.rs:332
+msgid "Transferring"
+msgstr "Transferindo"
+
+#: src/app/device/transfer.rs:336
 msgid "{n} track transferred to {}"
 msgid_plural "{n} tracks transferred to {}"
 msgstr[0] "{n} faixa transferida para {}"
 msgstr[1] "{n} faixas transferidas para {}"
 
-#: src/app/device/transfer.rs:307
+#: src/app/device/transfer.rs:343
 msgid " ({} already there)"
 msgstr " ({} já estavam lá)"
 
@@ -9642,26 +9801,46 @@ msgid "Plugging a device in fills the copy that has none; loading a track makes 
 msgstr "Conectar um dispositivo preenche a cópia que não tem dados; carregar uma faixa faz prevalecer a cópia carregada"
 
 #: src/app/prefs/dj_system/behaviour.rs:41
+msgid "WRITING TO A DEVICE"
+msgstr "GRAVAÇÃO EM UM DISPOSITIVO"
+
+#: src/app/prefs/dj_system/behaviour.rs:44
+msgid "Show what an export will write before it starts"
+msgstr "Mostrar o que uma exportação vai gravar antes de começar"
+
+#: src/app/prefs/dj_system/behaviour.rs:49
+msgid "Ask before syncing playlists to a device that is plugged in"
+msgstr "Perguntar antes de sincronizar playlists com um dispositivo conectado"
+
+#: src/app/prefs/dj_system/behaviour.rs:54
+msgid "Show what a device would change in the collection before importing it"
+msgstr "Mostrar o que um dispositivo mudaria na coleção antes de importar"
+
+#: src/app/prefs/dj_system/behaviour.rs:57
 msgid "DEVICE LIBRARY BACKUP"
 msgstr "BACKUP DA BIBLIOTECA DO DISPOSITIVO"
 
-#: src/app/prefs/dj_system/behaviour.rs:44
+#: src/app/prefs/dj_system/behaviour.rs:60
+msgid "Back up the device library before it is rewritten"
+msgstr "Fazer backup da biblioteca do dispositivo antes de reescrevê-la"
+
+#: src/app/prefs/dj_system/behaviour.rs:65
 msgid "Automatically backup device library upon removal"
 msgstr "Fazer backup da biblioteca do dispositivo automaticamente ao removê-lo"
 
-#: src/app/prefs/dj_system/behaviour.rs:48
+#: src/app/prefs/dj_system/behaviour.rs:69
 msgid "Backups"
 msgstr "Backups"
 
-#: src/app/prefs/dj_system/behaviour.rs:49
+#: src/app/prefs/dj_system/behaviour.rs:70
 msgid "Backup now and the list of backups are on each device's panel"
 msgstr "Fazer backup agora e a lista de backups ficam no painel de cada dispositivo"
 
-#: src/app/prefs/dj_system/behaviour.rs:51
+#: src/app/prefs/dj_system/behaviour.rs:72
 msgid "THIS COMPUTER"
 msgstr "ESTE COMPUTADOR"
 
-#: src/app/prefs/dj_system/behaviour.rs:52
+#: src/app/prefs/dj_system/behaviour.rs:73
 msgid "Computer Name"
 msgstr "Nome do computador"
 
