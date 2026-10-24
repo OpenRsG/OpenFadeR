@@ -167,5 +167,34 @@ fn a_transfer_keeps_what_the_device_holds_and_writes_the_new_tracks_whole() {
     let on_device = lib.tracks(None).unwrap();
     assert_eq!(on_device.len(), 5);
     assert_eq!(cues_of(&*lib, titled(&on_device, "e")), [(3, 4000)]);
+
+    // 4. b's device copy is edited as a track only the device has (Make Auto Cue point on the stick's list): written back
+    // from the device's own analysis with the new cues, it keeps its place, its playlist and its grid.
+    let b = titled(&on_device, "b").clone();
+    let mut a = library::load_ref(&b).expect("the device's analysis of b");
+    let beats = a.beats.len();
+    a.cues = vec![cue(0, 120), cue(1, 120), cue(2, 2120)];
+    export(
+        &writers,
+        &stick,
+        &Snapshot::of_tracks(vec![(b, Some(a))]),
+        &o,
+        &ctl,
+    )
+    .unwrap();
+    let lib = device::open_library(&scanned(&stick)).unwrap();
+    let on_device = lib.tracks(None).unwrap();
+    assert_eq!(on_device.len(), 5, "b is not copied a second time");
+    assert_eq!(
+        titles(&*lib, Some(&playlist(&lib.playlists().unwrap(), "Mix").id)),
+        ["a", "b", "c", "d"]
+    );
+    let b = titled(&on_device, "b");
+    assert_eq!(cues_of(&*lib, b), [(0, 120), (1, 120), (2, 2120)]);
+    assert_eq!(
+        lib.analysis(b).unwrap().beats.len(),
+        beats,
+        "the grid stays"
+    );
     std::fs::remove_dir_all(&root).unwrap();
 }

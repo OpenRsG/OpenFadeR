@@ -43,8 +43,8 @@ use super::{
     FormatOption, PickRow,
 };
 use openfader::{
-    device::{self, export::Written, Device},
-    library::{snapshot::Snapshot, Library},
+    device::{self, Device, export::Written},
+    library::{Library, Track, snapshot::Snapshot},
     plugin::device::{Control, ExportOptions, ExportReport, Feature, Provider},
     store::{self, device_settings, Store},
 };
@@ -52,7 +52,7 @@ use pick::Pick;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use std::{
     cell::{Cell, RefCell},
-    collections::{BTreeSet, HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, VecDeque},
     rc::Rc,
     sync::Arc,
     time::{Duration, Instant},
@@ -111,8 +111,9 @@ pub(super) struct Ctx {
     models: Models,
     /// Cue sync: the tracks each device shares with the collection, by device id ([`link`]).
     links: RefCell<HashMap<String, Rc<openfader::device::link::Links>>>,
-    /// Cue sync: per device id, the keys of the tracks whose device copy is to be written, and the time of the last edit.
-    pushes: RefCell<HashMap<String, (Option<Instant>, BTreeSet<String>)>>,
+    /// Cue sync: per device id, the tracks whose device copy is to be written (by key; `Some` = a track only the device has,
+    /// written from its own analysis) and the time of the last edit.
+    pushes: RefCell<HashMap<String, (Option<Instant>, BTreeMap<String, Option<Track>>)>>,
 }
 
 struct Models {
