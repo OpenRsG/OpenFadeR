@@ -750,7 +750,7 @@ msgstr "Analizza traccia"
 
 #: ui/browser-table.slint:308
 #: ui/studio/table.slint:234
-#: src/app/library/autocue.rs:88
+#: src/app/library/autocue.rs:129
 msgid "Make Auto Cue point"
 msgstr "Crea punto cue automatico"
 
@@ -1017,7 +1017,7 @@ msgstr "Analizza ogni traccia in elenco"
 
 #: ui/browser.slint:323
 #: ui/library.slint:211
-#: src/app/library/dialog.rs:133
+#: src/app/library/dialog.rs:134
 msgid "RELOCATE"
 msgstr "RICOLLEGA"
 
@@ -1877,7 +1877,7 @@ msgstr "Annulla"
 msgid "CONFIRM"
 msgstr "CONFERMA"
 
-#: ui/dnd.slint:118
+#: ui/dnd.slint:119
 msgid "Drop to install plugins and themes, or to import music"
 msgstr "Trascina qui per installare plugin e temi, o per importare musica"
 
@@ -4555,7 +4555,7 @@ msgstr "copertine: {} trovate, {} non trovate, {} già presenti, {} non riuscite
 
 #: src/app/artwork/picker.rs:38
 #: src/app/browser/health.rs:280
-#: src/app/library/autocue.rs:130
+#: src/app/library/autocue.rs:198
 msgid "choose a track first"
 msgstr "scegli prima una traccia"
 
@@ -5235,57 +5235,57 @@ msgstr "playlist intelligente: riga all/any mancante"
 msgid "smart playlist: bad line “{}”"
 msgstr "playlist intelligente: riga errata “{}”"
 
-#: src/app/browser/sources.rs:68
+#: src/app/browser/sources.rs:67
 msgid "{}  ({}, {} free)"
 msgstr "{}  ({}, {} liberi)"
 
-#: src/app/browser/sources.rs:78
+#: src/app/browser/sources.rs:77
 #: src/app/prefs/view.rs:347
 msgid "Explorer"
 msgstr "Explorer"
 
-#: src/app/browser/sources.rs:235
+#: src/app/browser/sources.rs:259
 msgid "Devices: choose a device to open it and its window (eject, sync, backup, update collection …)"
 msgstr "Dispositivi: scegli un dispositivo per aprirlo insieme alla sua finestra (espelli, sincronizza, backup, aggiorna collezione …)"
 
-#: src/app/browser/sources.rs:240
+#: src/app/browser/sources.rs:264
 msgid "Choose All tracks or a playlist; IMPORT TO COLLECTION (File and Track menus) adds what you choose to the Collection"
 msgstr "Scegli Tutte le tracce o una playlist; IMPORTA NELLA COLLEZIONE (menu File e Traccia) aggiunge alla collezione ciò che scegli"
 
-#: src/app/browser/sources.rs:244
+#: src/app/browser/sources.rs:268
 msgid "Folder of the source: choose a playlist inside it"
 msgstr "Cartella della sorgente: scegli una playlist al suo interno"
 
-#: src/app/browser/sources.rs:288
-#: src/app/browser/sources.rs:350
+#: src/app/browser/sources.rs:312
+#: src/app/browser/sources.rs:374
 msgid "{}: reading…"
 msgstr "{}: lettura…"
 
-#: src/app/browser/sources.rs:367
+#: src/app/browser/sources.rs:391
 msgid "{}: {}, {} ready ({} s)"
 msgstr "{}: {}, {} pronte ({} s)"
 
-#: src/app/browser/sources.rs:370
+#: src/app/browser/sources.rs:394
 msgid "{n} track"
 msgid_plural "{n} tracks"
 msgstr[0] "{n} traccia"
 msgstr[1] "{n} tracce"
 
-#: src/app/browser/sources.rs:371
+#: src/app/browser/sources.rs:395
 msgid "{n} playlist"
 msgid_plural "{n} playlists"
 msgstr[0] "{n} playlist"
 msgstr[1] "{n} playlist"
 
-#: src/app/browser/sources.rs:375
+#: src/app/browser/sources.rs:399
 msgid "{}: cannot read it: {}"
 msgstr "{}: impossibile leggerla: {}"
 
-#: src/app/browser/sources.rs:459
+#: src/app/browser/sources.rs:483
 msgid "{}: reading the library, {} of {}"
 msgstr "{}: lettura della libreria, {} di {}"
 
-#: src/app/browser/sources.rs:465
+#: src/app/browser/sources.rs:489
 msgid "{}: listing tracks and playlists"
 msgstr "{}: elenco di tracce e playlist"
 
@@ -7275,45 +7275,49 @@ msgstr "attiva la casella di ricerca"
 msgid "show / hide this help"
 msgstr "mostra / nascondi questa guida"
 
-#: src/app/library/autocue.rs:150
-msgid "“{}” already has a cue point. Replace it with the auto cue point?"
-msgstr "“{}” ha già un punto cue. Sostituirlo con il punto cue automatico?"
+#: src/app/library/autocue.rs:218
+msgid "“{}” already has cues. Replace its cue point and hot cues with the automatic ones?"
+msgstr "“{}” ha già dei cue. Sostituire il cue point e gli hot cue con quelli automatici?"
 
-#: src/app/library/autocue.rs:154
-msgid "{} of {} tracks already have a cue point. Replace it with the auto cue point?"
-msgstr "{} tracce su {} hanno già un punto cue. Sostituirlo con il punto cue automatico?"
+#: src/app/library/autocue.rs:222
+msgid "{} of {} tracks already have cues. Replace their cue point and hot cues with the automatic ones?"
+msgstr "{} tracce su {} hanno già dei cue. Sostituire il cue point e gli hot cue con quelli automatici?"
 
-#: src/app/library/autocue.rs:162
+#: src/app/library/autocue.rs:230
 msgid "MAKE AUTO CUE POINT"
 msgstr "CREA PUNTO CUE AUTOMATICO"
 
-#: src/app/library/autocue.rs:164
+#: src/app/library/autocue.rs:232
 msgid "Replace"
 msgstr "Sostituisci"
 
-#: src/app/library/autocue.rs:165
-msgid "Keep existing"
-msgstr "Mantieni l'esistente"
+#: src/app/library/autocue.rs:233
+msgid "Add missing"
+msgstr "Completa"
 
-#: src/app/library/autocue.rs:182
+#: src/app/library/autocue.rs:253
 msgid "Auto cue {} of {}…"
 msgstr "Cue automatico {} di {}…"
 
-#: src/app/library/autocue.rs:210
-msgid "Auto cue stopped: cue point set on {} of {} tracks"
-msgstr "Cue automatico interrotto: punto cue impostato su {} tracce su {}"
+#: src/app/library/autocue.rs:281
+msgid "Auto cue stopped: cues set on {} of {} tracks"
+msgstr "Auto cue interrotto: cue impostati su {} tracce su {}"
 
-#: src/app/library/autocue.rs:216
-msgid "Auto cue point set on {} tracks ({} kept, {} without sound above {} dB)"
-msgstr "Punto cue automatico impostato su {} tracce ({} mantenute, {} senza suono sopra {} dB)"
+#: src/app/library/autocue.rs:287
+msgid "Automatic cues set on {} tracks ({} kept, {} without sound above {} dB)"
+msgstr "Cue automatici impostati su {} tracce ({} mantenute, {} senza suono sopra {} dB)"
 
-#: src/app/library/autocue.rs:225
+#: src/app/library/autocue.rs:296
+msgid "{}; {} without a beat grid got no hot cues: analyse them first"
+msgstr "{}; {} senza griglia di battute non hanno ricevuto hot cue: analizzale prima"
+
+#: src/app/library/autocue.rs:303
 msgid "{}; {} could not be read"
 msgstr "{}; {} non leggibili"
 
-#: src/app/library/autocue.rs:228
-msgid "{}; existing cue points kept: Prohibit overwriting CUEs is on"
-msgstr "{}; punti cue esistenti mantenuti: Vieta la sovrascrittura dei CUE è attivo"
+#: src/app/library/autocue.rs:306
+msgid "{}; existing cues kept: Prohibit overwriting CUEs is on"
+msgstr "{}; cue esistenti mantenuti: Vieta la sovrascrittura dei CUE è attivo"
 
 #: src/app/library/backup.rs:19
 msgid "backing up the library and its music…"
@@ -7349,7 +7353,7 @@ msgid "Restore {}? The Collection, playlists, cues, grids, ratings, tags, histor
 msgstr "Ripristinare {}? La collezione, le playlist, i cue, le griglie, le valutazioni, i tag, la cronologia e le impostazioni vengono sostituiti da quelli del backup."
 
 #: src/app/library/backup.rs:62
-#: src/app/library/dialog.rs:117
+#: src/app/library/dialog.rs:118
 msgid "RESTORE LIBRARY"
 msgstr "RIPRISTINA LIBRERIA"
 
@@ -7373,84 +7377,84 @@ msgstr "Collezione ripristinata{}"
 msgid "restore failed: {}"
 msgstr "ripristino non riuscito: {}"
 
-#: src/app/library/dialog.rs:72
+#: src/app/library/dialog.rs:73
 msgid "IMPORT TRACK"
 msgstr "IMPORTA TRACCIA"
 
-#: src/app/library/dialog.rs:73
+#: src/app/library/dialog.rs:74
 msgid "Path of a music file, or several separated by | (mp3, m4a, aac, flac, wav, aiff)."
 msgstr "Percorso di un file musicale, o più separati da | (mp3, m4a, aac, flac, wav, aiff)."
 
-#: src/app/library/dialog.rs:79
+#: src/app/library/dialog.rs:80
 msgid "IMPORT FOLDER"
 msgstr "IMPORTA CARTELLA"
 
-#: src/app/library/dialog.rs:80
+#: src/app/library/dialog.rs:81
 msgid "Every music file below this folder joins the Collection."
 msgstr "Ogni file musicale sotto questa cartella entra nella collezione."
 
-#: src/app/library/dialog.rs:84
+#: src/app/library/dialog.rs:85
 msgid "IMPORT PLAYLIST"
 msgstr "IMPORTA PLAYLIST"
 
-#: src/app/library/dialog.rs:85
+#: src/app/library/dialog.rs:86
 msgid "An .m3u, .m3u8 or .pls file: its tracks join the Collection and a playlist of the same name lists them."
 msgstr "Un file .m3u, .m3u8 o .pls: le sue tracce entrano nella collezione e una playlist con lo stesso nome le elenca."
 
-#: src/app/library/dialog.rs:91
+#: src/app/library/dialog.rs:92
 msgid "IMPORT COLLECTION"
 msgstr "IMPORTA COLLEZIONE"
 
-#: src/app/library/dialog.rs:92
+#: src/app/library/dialog.rs:93
 msgid "A collection file of the library plugin you chose: its tracks, playlists, ratings, comments, cues and beat grids are imported."
 msgstr "Un file di collezione del plugin di libreria scelto: le sue tracce, playlist, valutazioni, commenti, cue e griglie dei beat vengono importati."
 
-#: src/app/library/dialog.rs:108
+#: src/app/library/dialog.rs:109
 #: src/app/library/mod.rs:328
 msgid "BACKUP LIBRARY"
 msgstr "BACKUP LIBRERIA"
 
-#: src/app/library/dialog.rs:109
+#: src/app/library/dialog.rs:110
 msgid "Folder for the backup zip (and for the music files, in a backup folder beside it)."
 msgstr "Cartella per lo zip di backup (e per i file musicali, in una cartella di backup accanto)."
 
-#: src/app/library/dialog.rs:118
+#: src/app/library/dialog.rs:119
 msgid "A backup zip made by Backup Library. The Collection, playlists, cues and every other stored edit are replaced."
 msgstr "Uno zip di backup creato da Backup della libreria. La collezione, le playlist, i cue e ogni altra modifica memorizzata vengono sostituiti."
 
-#: src/app/library/dialog.rs:125
+#: src/app/library/dialog.rs:126
 msgid "EXPORT PLAYLIST (M3U8)"
 msgstr "ESPORTA PLAYLIST (M3U8)"
 
-#: src/app/library/dialog.rs:126
+#: src/app/library/dialog.rs:127
 msgid "EXPORT PLAYLIST (PLS)"
 msgstr "ESPORTA PLAYLIST (PLS)"
 
-#: src/app/library/dialog.rs:127
+#: src/app/library/dialog.rs:128
 msgid "EXPORT PLAYLIST (TEXT)"
 msgstr "ESPORTA PLAYLIST (TESTO)"
 
-#: src/app/library/dialog.rs:129
+#: src/app/library/dialog.rs:130
 msgid "File to write (an existing file is never overwritten)."
 msgstr "File da scrivere (un file esistente non viene mai sovrascritto)."
 
-#: src/app/library/dialog.rs:134
+#: src/app/library/dialog.rs:135
 msgid "The new file of the first track — the others are looked for in its folder — or a folder to look in for all of them."
 msgstr "Il nuovo file della prima traccia — le altre vengono cercate nella sua cartella — oppure una cartella in cui cercarle tutte."
 
-#: src/app/library/dialog.rs:140
+#: src/app/library/dialog.rs:141
 msgid "ADD LIBRARY"
 msgstr "AGGIUNGI LIBRERIA"
 
-#: src/app/library/dialog.rs:142
+#: src/app/library/dialog.rs:143
 msgid "A folder of music: its files and sub-folders are synced into the Collection and follow the folder."
 msgstr "Una cartella di musica: i suoi file e sottocartelle vengono sincronizzati nella collezione e seguono la cartella."
 
-#: src/app/library/dialog.rs:146
+#: src/app/library/dialog.rs:147
 msgid "A library file another app wrote, read by an enabled library plugin: its tracks and playlists are synced into the Collection."
 msgstr "Un file di libreria scritto da un'altra app, letto da un plugin di libreria attivo: le sue tracce e playlist vengono sincronizzate nella collezione."
 
-#: src/app/library/dialog.rs:300
+#: src/app/library/dialog.rs:303
 msgid "cannot open {}: {}"
 msgstr "impossibile aprire {}: {}"
 
