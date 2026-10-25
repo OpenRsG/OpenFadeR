@@ -112,7 +112,7 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
 
 /// Lowers the calling thread's priority: nice 19 on Linux (niceness is per thread there), the background QoS class on macOS, the
 /// lowest thread priority on Windows.
-fn lower_priority() {
+pub(in crate::app) fn lower_priority() {
     #[cfg(target_os = "linux")]
     {
         unsafe extern "C" {

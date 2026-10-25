@@ -2,7 +2,10 @@
 //! for: import a playlist into My Playlists, delete a playlist / history / track from the device, the per-device settings.
 //! Eject is `Ctx::eject` in the `backup` child (it backs up first).
 
-use super::{App, Ctx, DeviceState};
+use super::{
+    review::{self, Planned},
+    toast, App, Ctx, DeviceState,
+};
 use openfader::{
     device::{self, Device, history, update},
     library::{Library, Playlist, is_history},
@@ -13,8 +16,9 @@ use openfader::{
         NodeKind, Store,
     },
 };
+use parking_lot::Mutex;
 use slint::ComponentHandle;
-use std::{collections::HashSet, path::PathBuf, rc::Rc};
+use std::{collections::HashSet, path::PathBuf, rc::Rc, sync::Arc};
 
 /// Marks a finished action job that stopped for a question (the "yes" label, a line break and the question follow).
 const ASK: &str = "\u{1}ask\n";
@@ -105,15 +109,38 @@ fn update_collection(cx: &Rc<Ctx>, d: &Device) {
         return;
     };
     let Some(snap) = cx.collection() else { return };
+    let review = Behaviour::load(&cx.store).review_imports;
     let (store, d) = (cx.store.clone(), d.clone());
-    cx.start(Some(d.id.clone()), tr!("Updating the collection"), move |ctl| {
-        let u = update::update_collection(&provider, &d.mount, &d.id, &snap, &store, &ctl)?;
-        let unmatched = if u.unmatched > 0 { tr!("; {} track(s) of the device are not in the collection and were not updated", u.unmatched) } else { String::new() };
-        Ok(tr!(
-            "Update Collection: {} of {} track(s) changed ({} ratings, {} comments, {} colours, {} cue lists, {} grids){}",
-            u.changed, u.matched, u.ratings, u.comments, u.colors, u.cues, u.grids, unmatched
-        ))
-    });
+    let slot: Arc<Mutex<Option<Planned<update::Plan>>>> = Arc::default();
+    let (out, dev) = (slot.clone(), d.clone());
+    cx.start_then(
+        Some(d.id.clone()),
+        tr!("Updating the collection"),
+        move |ctl| {
+            let plan = update::plan(&provider, &d.mount, &d.id, &snap, &store, &ctl)?;
+            if review && !plan.rows.is_empty() {
+                *out.lock() = Some(Planned::Review(plan));
+                return Ok(String::new()); // the review opens when the job ends; nothing is written before the go
+            }
+            let ticked = vec![true; plan.rows.len()];
+            let label = tr!("Update Collection of {}", d.label);
+            let a = update::apply(
+                &plan,
+                &ticked,
+                &d.id,
+                &label,
+                &store,
+                chrono::Utc::now().timestamp(),
+            )?;
+            *out.lock() = Some(Planned::Done(a.undo));
+            Ok(review::updated_text(&a.updated))
+        },
+        move |cx, r| match (slot.lock().take(), r) {
+            (Some(Planned::Review(plan)), _) => cx.open_update_review(&dev, plan),
+            (Some(Planned::Done(id)), Ok(text)) => cx.offer_undo(id, text),
+            _ => {}
+        },
+    );
 }
 
 /// Imports every history of `d` (`auto`: it was the app's own doing, so nothing is said when there is nothing to do).
@@ -128,24 +155,61 @@ fn import_histories_of(cx: &Rc<Ctx>, d: &Device, which: Option<String>, auto: bo
     let Some(snap) = cx.collection() else { return };
     let (store, d, provider) = (cx.store.clone(), d.clone(), d.provider());
     let config = device_settings::config(&cx.store, &d.id);
-    let delete_after = Behaviour::load(&cx.store).delete_history_after_import;
-    cx.start(Some(d.id.clone()), tr!("Importing histories"), move |ctl| {
-        let lib = device::open_library(&d)?;
-        let keys: HashSet<String> = snap.tracks().iter().map(|(t, _)| store::key(t)).collect();
-        let which = which.map(|w| vec![w]);
-        let r = history::import(&d.info, &d.id, &*lib, &keys, &store, which.as_deref())?;
-        let mut text = tr!("Imported {} history(ies) of {}: {} plays, {} of unknown tracks skipped, {} imported before", r.histories, d.label, r.plays, r.skipped, r.already);
-        if delete_after && !r.done.is_empty() {
-            match provider.ok_or(tr!("its plugin is not available").to_owned()).and_then(|p| history::delete(&p, &d.mount, &r.done, &config, &ctl)) {
-                Ok(n) => text.push_str(&tr!("; deleted {} from the device", n)),
-                Err(e) => text.push_str(&tr!("; not deleted from the device: {}", e)),
+    let behaviour = Behaviour::load(&cx.store);
+    let (review, delete_after) = (
+        behaviour.review_imports,
+        behaviour.delete_history_after_import,
+    );
+    let slot: Arc<Mutex<Option<Planned<history::Plan>>>> = Arc::default();
+    let (out, dev) = (slot.clone(), d.clone());
+    cx.start_then(
+        Some(d.id.clone()),
+        tr!("Importing histories"),
+        move |ctl| {
+            let lib = device::open_library(&d)?;
+            let keys: HashSet<String> = snap.tracks().iter().map(|(t, _)| store::key(t)).collect();
+            let which = which.map(|w| vec![w]);
+            let plan = history::plan(&d.info, &d.id, &*lib, &keys, &store, which.as_deref())?;
+            if review && plan.items.iter().any(|h| !h.already) {
+                *out.lock() = Some(Planned::Review(plan));
+                return Ok(String::new()); // the review opens when the job ends; nothing is written before the go
             }
-        }
-        if auto && r.histories == 0 && r.already == 0 && r.skipped == 0 {
-            return Ok(String::new());
-        }
-        Ok(text)
-    });
+            let ticked = vec![true; plan.items.len()];
+            let label = tr!("Histories of {}", d.label);
+            let r = history::apply(&plan, &ticked, &d.id, &label, &store, chrono::Utc::now().timestamp())?;
+            *out.lock() = Some(Planned::Done(r.undo));
+            let mut text = review::imported_text(&r, &d.label);
+            if delete_after && !r.done.is_empty() {
+                match provider.ok_or(tr!("its plugin is not available").to_owned()).and_then(|p| history::delete(&p, &d.mount, &r.done, &config, &ctl)) {
+                    Ok(n) => text.push_str(&tr!("; deleted {} from the device", n)),
+                    Err(e) => text.push_str(&tr!("; not deleted from the device: {}", e)),
+                }
+            }
+            if auto && r.histories == 0 && r.already == 0 && r.skipped == 0 {
+                return Ok(String::new());
+            }
+            Ok(text)
+        },
+        move |cx, r| match (slot.lock().take(), r) {
+            // An automatic import waits for the go like a manual one: it only says that there is something to look at.
+            (Some(Planned::Review(plan)), _) if auto => {
+                let n = plan.items.iter().filter(|h| !h.already).count();
+                let text = tr_n!(
+                    "{}: {n} history is waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows it first",
+                    "{}: {n} histories are waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows them first",
+                    n,
+                    dev.label
+                );
+                cx.say(&text, false);
+                if let Some(app) = cx.app() {
+                    toast::show(&app, &text);
+                }
+            }
+            (Some(Planned::Review(plan)), _) => cx.open_history_review(&dev, plan),
+            (Some(Planned::Done(id)), Ok(text)) => cx.offer_undo(id, text),
+            _ => {}
+        },
+    );
 }
 
 /// Tracks of device playlist `at` (and below it) become a My Playlists node; tracks the collection lacks are added to it.

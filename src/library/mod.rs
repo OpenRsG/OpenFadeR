@@ -17,6 +17,7 @@ pub mod import_report;
 pub mod open_format;
 pub mod own;
 pub mod playlist_file;
+pub mod print;
 pub mod relocate;
 pub mod snapshot;
 pub mod translate;

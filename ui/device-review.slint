@@ -1,0 +1,167 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, Glyph, Icon } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DialogFrame, Note } from "dialog.slint";
+import { DeviceState } from "device-state.slint";
+
+/// A row of the review dialog (src/app/device/review.rs): the title, what it changes, a dim line, and what the mode lets you do
+/// with it: a tick (modes 1 and 2), KEEP MINE / TAKE THE STICK'S / COMPARE (mode 3), UNDO (mode 4).
+component ReviewLine inherits Rectangle {
+    in property <int> index;
+    in property <int> mode;
+    in property <string> title;
+    in property <string> detail;
+    in property <string> note;
+    in property <bool> ticked;
+    in property <bool> row-enabled: true;
+    height: Theme.layout-profile == 1 ? 84px : 56px;
+    background: area.has-hover && root.mode < 3 ? Theme.hover-row : transparent;
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-md;
+        spacing: Theme.space-md;
+        if root.mode < 3: Rectangle {
+            width: 14px;
+            height: 14px;
+            y: (parent.height - self.height) / 2;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.radius;
+            background: root.ticked ? Theme.accent : Theme.panel-raised;
+            horizontal-stretch: 0;
+            if root.ticked: Glyph { width: 12px; height: 12px; icon: Icon.check; tint: Theme.text-bright; stroke-width: 2px; }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: Theme.space-xs;
+            Text { text: root.title; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; overflow: elide; }
+            Text { text: root.detail; color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; overflow: elide; }
+            if root.note != "": Text { text: root.note; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-sm; overflow: elide; }
+        }
+        if root.mode == 3: VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            HorizontalLayout {
+                spacing: Theme.space-sm;
+                Chip { text: @tr("COMPARE"); width: 104px; horizontal-stretch: 0; tooltip: @tr("Cues and grid of both copies, side by side"); clicked => { DeviceState.review-row(root.index, 2); } }
+                Chip { text: @tr("KEEP MINE"); width: 150px; horizontal-stretch: 0; enabled: root.row-enabled && DeviceState.review-can-write; tooltip: @tr("Write the collection's copy to the device; UNDO stays available"); clicked => { DeviceState.review-row(root.index, 0); } }
+                Chip { text: @tr("TAKE THE STICK'S"); width: 210px; horizontal-stretch: 0; enabled: root.row-enabled; tooltip: @tr("Copy the device's cues and grid into the collection; UNDO stays available"); clicked => { DeviceState.review-row(root.index, 1); } }
+            }
+        }
+        if root.mode == 4: VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Chip { text: @tr("UNDO"); width: 80px; horizontal-stretch: 0; enabled: root.row-enabled && !DeviceState.busy; clicked => { DeviceState.review-row(root.index, 0); } }
+        }
+    }
+    area := TouchArea { enabled: root.mode < 3; clicked => { DeviceState.review-toggle(root.index); } }
+}
+
+/// What an import would change, the cues that differ and the imports to undo, in one dialog (the mode is `DeviceState.review-mode`).
+component ReviewDialog inherits DialogFrame {
+    visible: DeviceState.review-mode > 0;
+    title: DeviceState.review-title;
+    card-width: 1040px;
+    card-height: 640px;
+    closed => { DeviceState.review-close(); }
+    Note { text: DeviceState.review-text; color: Theme.text; font-size: Theme.font-size; vertical-stretch: 0; }
+    Rectangle {
+        background: Theme.bg-deep;
+        border-color: Theme.line-strong;
+        border-width: 1px;
+        min-height: Theme.layout-profile == 1 ? 4 * 84px : 120px;
+        ListView {
+            for r[i] in DeviceState.review-rows: ReviewLine {
+                index: i;
+                mode: DeviceState.review-mode;
+                title: r.title;
+                detail: r.detail;
+                note: r.note;
+                ticked: r.ticked;
+                row-enabled: r.enabled;
+            }
+        }
+    }
+    if DeviceState.review-mode == 3 && DeviceState.review-why != "": Note { text: DeviceState.review-why; vertical-stretch: 0; }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        alignment: end;
+        vertical-stretch: 0;
+        if DeviceState.review-mode < 3: Chip { text: @tr("ALL"); width: 56px; horizontal-stretch: 0; clicked => { DeviceState.review-all(true); } }
+        if DeviceState.review-mode < 3: Chip { text: @tr("NONE"); width: 64px; horizontal-stretch: 0; clicked => { DeviceState.review-all(false); } }
+        Rectangle { horizontal-stretch: 1; }
+        if DeviceState.review-mode == 3: Chip { text: @tr("KEEP ALL MINE"); width: 220px; horizontal-stretch: 0; enabled: DeviceState.review-can-write && !DeviceState.busy; tooltip: @tr("Write the collection's cues and grid of every listed track to the device"); clicked => { DeviceState.review-bulk(0); } }
+        if DeviceState.review-mode == 3: Chip { text: @tr("TAKE ALL THE STICK'S"); width: 270px; horizontal-stretch: 0; enabled: !DeviceState.busy; tooltip: @tr("Copy the device's cues and grid of every listed track into the collection"); clicked => { DeviceState.review-bulk(1); } }
+        if DeviceState.review-mode < 3: Chip { text: @tr("APPLY ({})", DeviceState.review-ticked); width: 130px; horizontal-stretch: 0; active: DeviceState.review-ticked > 0; enabled: DeviceState.review-ticked > 0 && !DeviceState.busy; clicked => { DeviceState.review-apply(); } }
+        Chip { text: DeviceState.review-mode < 3 ? @tr("CANCEL") : @tr("CLOSE"); width: 90px; horizontal-stretch: 0; clicked => { DeviceState.review-close(); } }
+    }
+}
+
+/// The compare view of one track: the collection's copy against the device's.
+component CompareDialog inherits DialogFrame {
+    visible: DeviceState.compare-open;
+    title: DeviceState.compare-title;
+    card-width: 760px;
+    card-height: 330px;
+    closed => { DeviceState.compare-close(); }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        vertical-stretch: 0;
+        Text { text: ""; width: 110px; }
+        Text { text: @tr("YOUR COLLECTION"); horizontal-stretch: 1; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+        Text { text: @tr("THE STICK"); horizontal-stretch: 1; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; }
+    }
+    for c in DeviceState.compare-rows: HorizontalLayout {
+        spacing: Theme.space-md;
+        vertical-stretch: 0;
+        height: 44px;
+        Text { text: c.what; width: 110px; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: top; }
+        Text { text: c.mine; horizontal-stretch: 1; min-width: 0px; wrap: word-wrap; vertical-alignment: top; color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
+        Text { text: c.stick; horizontal-stretch: 1; min-width: 0px; wrap: word-wrap; vertical-alignment: top; color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
+    }
+    HorizontalLayout {
+        alignment: end;
+        vertical-stretch: 0;
+        Chip { text: @tr("CLOSE"); width: 90px; horizontal-stretch: 0; clicked => { DeviceState.compare-close(); } }
+    }
+}
+
+/// The bar that follows an import: what was done, and UNDO (src/app/device/review.rs). Bottom centre; until dismissed or the next one.
+component UndoBar inherits Rectangle {
+    visible: DeviceState.undo-shown;
+    width: min(900px, max(420px, label.preferred-width + 230px));
+    height: Theme.target-size(34px);
+    background: Theme.toast-bg;
+    border-color: Theme.overlay-border;
+    border-width: 1px;
+    border-radius: Theme.radius-xl;
+    drop-shadow-blur: 12px;
+    drop-shadow-color: Theme.toast-shadow;
+    drop-shadow-offset-y: 3px;
+    TouchArea {}
+    HorizontalLayout {
+        padding-left: Theme.space-xl;
+        padding-right: Theme.space-md;
+        spacing: Theme.space-md;
+        label := Text {
+            text: DeviceState.undo-text;
+            color: Theme.toast-text;
+            font-family: Theme.font;
+            font-size: Theme.font-size;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        VerticalLayout { alignment: center; horizontal-stretch: 0; Chip { text: @tr("UNDO"); width: 76px; horizontal-stretch: 0; active: true; enabled: !DeviceState.busy; clicked => { DeviceState.undo-now(); } } }
+        VerticalLayout { alignment: center; horizontal-stretch: 0; Chip { text: "×"; width: 32px; horizontal-stretch: 0; tooltip: @tr("Close"); clicked => { DeviceState.undo-dismiss(); } } }
+    }
+}
+
+/// The three pieces, placed once in the window (ui/device.slint).
+export component ReviewOverlay inherits Rectangle {
+    ReviewDialog {}
+    CompareDialog {}
+    UndoBar {
+        x: floor((parent.width - self.width) / 2px) * 1px;
+        y: parent.height - self.height - Theme.space-xl;
+    }
+}

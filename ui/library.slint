@@ -9,6 +9,8 @@ export { ImportReportState, ImportSkipRow } from "import-report.slint";
 export struct MissingRow {
     title: string,
     path: string,
+    /// Where RELOCATE would find the file ("found: <path>"), empty when unknown.
+    found: string,
     selected: bool,
 }
 
@@ -101,7 +103,7 @@ component Line inherits Text {
 component MissingLine inherits Rectangle {
     in property <MissingRow> item;
     callback toggled();
-    height: Theme.h-row;
+    height: root.item.found != "" ? 2 * Theme.h-row : Theme.h-row;
     background: area.has-hover ? Theme.hover-row : transparent;
     HorizontalLayout {
         padding-left: Theme.space-md;
@@ -109,7 +111,12 @@ component MissingLine inherits Rectangle {
         spacing: Theme.space-md;
         Check { y: 4px; on: root.item.selected; horizontal-stretch: 0; }
         Line { text: root.item.title; color: Theme.text-bright; horizontal-stretch: 2; }
-        Line { text: root.item.path; color: Theme.text-dim; horizontal-stretch: 3; }
+        VerticalLayout {
+            horizontal-stretch: 3;
+            alignment: center;
+            Line { text: root.item.path; color: Theme.text-dim; }
+            if root.item.found != "": Line { text: root.item.found; color: Theme.play; }
+        }
     }
     area := TouchArea { clicked => { root.toggled(); } }
 }

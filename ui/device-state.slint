@@ -107,6 +107,23 @@ export struct CheckPreset {
     on: bool,
 }
 
+/// One row of the review dialog (BringBack, DeviceState.review-rows): `title` a track or history, `detail` what changes, `note` a
+/// dim second line, `ticked` for the lists with ticks, `enabled` whether the row's buttons work.
+export struct ReviewRow {
+    title: string,
+    detail: string,
+    note: string,
+    ticked: bool,
+    enabled: bool,
+}
+
+/// One line of the compare view: what is compared, the collection's copy, the stick's copy.
+export struct CompareRow {
+    what: string,
+    mine: string,
+    stick: string,
+}
+
 /// The device windows (src/app/device/): detection, EXPORT to a device (create / add / update), SYNC MANAGER, backups, eject.
 /// Rust owns every value; the callbacks are the user's actions.
 export global DeviceState {
@@ -259,6 +276,42 @@ export global DeviceState {
     callback format-ask();
     callback format-go();
     callback format-cancel();
+
+    // BringBack: review before an import, the way back, and the cues that differ (src/app/device/review.rs, ui/device-review.slint).
+    /// What the review dialog shows: 0 closed, 1 UPDATE COLLECTION (ticks), 2 IMPORT HISTORIES (ticks), 3 CUES THAT DIFFER (a choice
+    /// per row), 4 RECENT IMPORTS (UNDO per row).
+    in property <int> review-mode;
+    in property <string> review-title;
+    in property <string> review-text;
+    in property <[ReviewRow]> review-rows;
+    /// Ticked rows (modes 1 and 2): the APPLY button counts them.
+    in property <int> review-ticked;
+    /// A conflict row's KEEP MINE writes to the device: false while it is read-only or busy (`review-why` says why).
+    in property <bool> review-can-write;
+    in property <string> review-why;
+    callback review-toggle(int);
+    callback review-all(bool);
+    callback review-apply();
+    callback review-close();
+    /// Modes 3 and 4: row, then 0 KEEP MINE / UNDO, 1 TAKE THE STICK'S, 2 COMPARE.
+    callback review-row(int, int);
+    /// Mode 3: 0 KEEP ALL MINE, 1 TAKE ALL THE STICK'S.
+    callback review-bulk(int);
+    /// The compare view of one track with different cues.
+    in property <bool> compare-open;
+    in property <string> compare-title;
+    in property <[CompareRow]> compare-rows;
+    callback compare-close();
+    /// The bar after an import, with UNDO.
+    in property <bool> undo-shown;
+    in property <string> undo-text;
+    callback undo-now();
+    callback undo-dismiss();
+    /// Of the chosen device: tracks whose cues differ between the collection and it; imports kept to undo.
+    in property <int> differ-count;
+    in property <int> undo-count;
+    callback open-differ();
+    callback open-recent();
 }
 
 /// Checkbox rows for playlists and folders.

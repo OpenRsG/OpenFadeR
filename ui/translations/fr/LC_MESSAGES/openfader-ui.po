@@ -947,7 +947,7 @@ msgid "New playlist / folder / smart playlist / Tags / Cue Bank / Stage"
 msgstr "Nouvelle playlist / dossier / playlist intelligente / tags / Cue Bank / étape"
 
 #: ui/browser.slint:191
-#: ui/device-devices.slint:249
+#: ui/device-devices.slint:251
 #: ui/plugins.slint:167
 msgid "MORE"
 msgstr "PLUS"
@@ -1075,7 +1075,7 @@ msgid "Analyse every listed track"
 msgstr "Analyser toutes les pistes listées"
 
 #: ui/browser.slint:326
-#: ui/library.slint:216
+#: ui/library.slint:223
 #: src/app/library/dialog.rs:143
 msgid "RELOCATE"
 msgstr "RELOCALISER"
@@ -1141,8 +1141,8 @@ msgid "List the tracks ignored for this check"
 msgstr "Lister les pistes ignorées pour cette vérification"
 
 #: ui/browser.slint:333
-#: ui/library.slint:214
-#: ui/library.slint:254
+#: ui/library.slint:221
+#: ui/library.slint:261
 msgid "RESCAN"
 msgstr "RESCANNER"
 
@@ -1570,7 +1570,7 @@ msgstr "Changement de tempo ici : TAP, ×2, ÷2 ne modifient que la section de t
 
 #: ui/deck-panel.slint:33
 #: ui/fx.slint:275
-#: ui/library.slint:252
+#: ui/library.slint:259
 msgid "MERGE"
 msgstr "MERGE"
 
@@ -1624,6 +1624,7 @@ msgstr "Édition de la grille de beats"
 
 #: ui/deck-panel.slint:151
 #: ui/device-check.slint:145
+#: src/app/device/review.rs:212
 msgid "CUES"
 msgstr "CUES"
 
@@ -1919,8 +1920,8 @@ msgid "Create or extend the libraries on this device"
 msgstr "Créer ou étendre les bibliothèques de cet appareil"
 
 #: ui/device-devices.slint:235
-#: ui/device.slint:69
-#: ui/device.slint:79
+#: ui/device.slint:70
+#: ui/device.slint:80
 msgid "SYNC MANAGER"
 msgstr "GESTIONNAIRE SYNC"
 
@@ -1948,35 +1949,51 @@ msgstr "IMPORTER LES HISTORIQUES"
 msgid "Import what the players played"
 msgstr "Importer ce que les lecteurs ont joué"
 
-#: ui/device-devices.slint:243
+#: ui/device-devices.slint:241
+msgid "CUES DIFFER ({})"
+msgstr "CUES DIFFÉRENTS ({})"
+
+#: ui/device-devices.slint:241
+msgid "Tracks whose cues or grid differ between your collection and this device: choose which copy to keep"
+msgstr "Pistes dont les cues ou la grille diffèrent entre votre collection et cet appareil : choisissez la copie à garder"
+
+#: ui/device-devices.slint:242
+msgid "UNDO…"
+msgstr "ANNULER…"
+
+#: ui/device-devices.slint:242
+msgid "The last imports and cue syncs, each with its way back"
+msgstr "Les derniers imports et synchros de cues, chacun avec son retour en arrière"
+
+#: ui/device-devices.slint:245
 msgid "KEEP IT SAFE"
 msgstr "PROTÉGER"
 
-#: ui/device-devices.slint:244
-#: ui/device.slint:69
-#: ui/device.slint:79
+#: ui/device-devices.slint:246
+#: ui/device.slint:70
+#: ui/device.slint:80
 msgid "BACKUPS"
 msgstr "SAUVEGARDES"
 
-#: ui/device-devices.slint:244
+#: ui/device-devices.slint:246
 msgid "Back up or restore this device's library"
 msgstr "Sauvegarder ou restaurer la bibliothèque de cet appareil"
 
-#: ui/device-devices.slint:245
+#: ui/device-devices.slint:247
 #: ui/exportmode-dock.slint:69
 #: ui/plugins.slint:167
 msgid "SETTINGS"
 msgstr "RÉGLAGES"
 
-#: ui/device-devices.slint:245
+#: ui/device-devices.slint:247
 msgid "The player settings this device carries (Preferences > DJ SYSTEM)"
 msgstr "Les réglages de lecteur que porte cet appareil (Préférences > DJ SYSTEM)"
 
-#: ui/device-devices.slint:246
+#: ui/device-devices.slint:248
 msgid "FORMAT…"
 msgstr "FORMATER…"
 
-#: ui/device-devices.slint:246
+#: ui/device-devices.slint:248
 msgid "Erase the whole stick or card and format it again (FAT32 plays on every player)"
 msgstr "Efface toute la clé ou la carte et la reformate (le FAT32 est lu par tous les lecteurs)"
 
@@ -2084,17 +2101,93 @@ msgstr "DÉMARRER"
 msgid "NOT NOW"
 msgstr "PAS MAINTENANT"
 
-#: ui/device.slint:16
-#: ui/device.slint:64
-#: ui/device.slint:69
+#: ui/device-review.slint:46
+msgid "COMPARE"
+msgstr "COMPARER"
+
+#: ui/device-review.slint:46
+msgid "Cues and grid of both copies, side by side"
+msgstr "Cues et grille des deux copies, côte à côte"
+
+#: ui/device-review.slint:47
+msgid "KEEP MINE"
+msgstr "GARDER LA MIENNE"
+
+#: ui/device-review.slint:47
+msgid "Write the collection's copy to the device; UNDO stays available"
+msgstr "Écrire la copie de la collection sur l'appareil ; ANNULER reste possible"
+
+#: ui/device-review.slint:48
+msgid "TAKE THE STICK'S"
+msgstr "PRENDRE CELLE DE LA CLÉ"
+
+#: ui/device-review.slint:48
+msgid "Copy the device's cues and grid into the collection; UNDO stays available"
+msgstr "Copier les cues et la grille de l'appareil dans la collection ; ANNULER reste possible"
+
+#: ui/device-review.slint:54
+#: ui/device-review.slint:154
+#: ui/edit.slint:161
+msgid "UNDO"
+msgstr "ANNULER"
+
+#: ui/device-review.slint:90
+#: ui/edit.slint:159
+#: ui/fx.slint:258
+msgid "ALL"
+msgstr "TOUT"
+
+#: ui/device-review.slint:91
+#: src/app/prefs/controller/mixer.rs:29
+#: src/app/prefs/dj_system/fields.rs:24
+msgid "NONE"
+msgstr "AUCUN"
+
+#: ui/device-review.slint:93
+msgid "KEEP ALL MINE"
+msgstr "GARDER TOUTES LES MIENNES"
+
+#: ui/device-review.slint:93
+msgid "Write the collection's cues and grid of every listed track to the device"
+msgstr "Écrire sur l'appareil les cues et la grille de la collection pour chaque piste listée"
+
+#: ui/device-review.slint:94
+msgid "TAKE ALL THE STICK'S"
+msgstr "PRENDRE TOUTES CELLES DE LA CLÉ"
+
+#: ui/device-review.slint:94
+msgid "Copy the device's cues and grid of every listed track into the collection"
+msgstr "Copier dans la collection les cues et la grille de l'appareil pour chaque piste listée"
+
+#: ui/device-review.slint:95
+msgid "APPLY ({})"
+msgstr "APPLIQUER ({})"
+
+#: ui/device-review.slint:96
+#: ui/device-review.slint:125
+#: ui/import-report.slint:75
+msgid "CLOSE"
+msgstr "FERMER"
+
+#: ui/device-review.slint:111
+msgid "YOUR COLLECTION"
+msgstr "VOTRE COLLECTION"
+
+#: ui/device-review.slint:112
+msgid "THE STICK"
+msgstr "LA CLÉ"
+
+#: ui/device.slint:17
+#: ui/device.slint:65
+#: ui/device.slint:70
 msgid "DEVICES"
 msgstr "APPAREILS"
 
-#: ui/device.slint:56
+#: ui/device.slint:57
 msgid "Cancel"
 msgstr "Annuler"
 
-#: ui/device.slint:108
+#: ui/device.slint:109
 msgid "CONFIRM"
 msgstr "CONFIRMER"
 
@@ -2213,16 +2306,6 @@ msgstr "+ SILENCE"
 #: ui/themes.slint:545
 msgid "DUPLICATE"
 msgstr "DUPLIQUER"
-
-#: ui/edit.slint:159
-#: ui/fx.slint:258
-msgid "ALL"
-msgstr "TOUT"
-
-#: ui/edit.slint:161
-#: ui/exportmode-grid.slint:46
-msgid "UNDO"
-msgstr "ANNULER"
 
 #: ui/edit.slint:162
 #: ui/exportmode-grid.slint:47
@@ -2903,55 +2986,49 @@ msgstr "La bibliothèque source n'a pas été modifiée."
 msgid "SAVE AS TEXT…"
 msgstr "ENREGISTRER EN TEXTE…"
 
-#: ui/import-report.slint:75
-#: ui/library.slint:219
-#: ui/library.slint:255
-msgid "CLOSE"
-msgstr "FERMER"
-
-#: ui/library.slint:48
+#: ui/library.slint:50
 #: src/app/library/mod.rs:332
 msgid "YES"
 msgstr "OUI"
 
-#: ui/library.slint:157
+#: ui/library.slint:164
 msgid "BROWSE…"
 msgstr "PARCOURIR…"
 
-#: ui/library.slint:188
+#: ui/library.slint:195
 msgid "MISSING FILE MANAGER"
 msgstr "GESTIONNAIRE DE FICHIERS MANQUANTS"
 
-#: ui/library.slint:192
+#: ui/library.slint:199
 msgid "Tracks whose audio file cannot be found. Tick tracks, then RELOCATE (choose the new file of the first one; the others are looked for in its folder), AUTO RELOCATE (search the Auto Relocate Search Folders from Preferences > Advanced > Database) or DELETE (remove from the Collection; files are never deleted). None ticked = all."
 msgstr "Pistes dont le fichier audio est introuvable. Cochez des pistes, puis RELOCALISER (choisissez le nouveau fichier de la première ; les autres sont cherchés dans son dossier), RELOC. AUTO (recherche dans les dossiers de recherche de la relocalisation auto de Préférences > Avancé > Base de données) ou SUPPRIMER (retirer de la collection ; les fichiers ne sont jamais supprimés). Aucune case cochée = toutes."
 
-#: ui/library.slint:201
-#: src/app/library/missing.rs:86
+#: ui/library.slint:208
+#: src/app/library/missing.rs:101
 msgid "Searching…"
 msgstr "Recherche…"
 
-#: ui/library.slint:201
+#: ui/library.slint:208
 msgid "No missing files"
 msgstr "Aucun fichier manquant"
 
-#: ui/library.slint:213
+#: ui/library.slint:220
 msgid "SELECT ALL"
 msgstr "TOUT SÉLECT."
 
-#: ui/library.slint:217
+#: ui/library.slint:224
 msgid "AUTO RELOCATE"
 msgstr "RELOC. AUTO"
 
-#: ui/library.slint:226
+#: ui/library.slint:233
 msgid "DUPLICATED FILE MANAGER"
 msgstr "GESTIONNAIRE DE FICHIERS EN DOUBLE"
 
-#: ui/library.slint:230
+#: ui/library.slint:237
 msgid "Tracks with the same title and artist (length within 1 s). The filled circle is the representative file. MERGE keeps it, adds the cues, playlist places, tags and plays of the others to it and removes the others from the Collection; DELETE removes the ticked tracks from the Collection. Files are never deleted."
 msgstr "Pistes de même titre et même artiste (durée à 1 s près). Le cercle plein est le fichier représentatif. MERGE le conserve, lui ajoute les cues, les emplacements de playlist, les tags et les lectures des autres, et retire les autres de la collection ; SUPPRIMER retire les pistes cochées de la collection. Les fichiers ne sont jamais supprimés."
 
-#: ui/library.slint:239
+#: ui/library.slint:246
 #: src/app/library/dupes.rs:161
 msgid "No duplicate track found"
 msgstr "Aucune piste en double trouvée"
@@ -4845,11 +4922,11 @@ msgstr "Le modèle de KEY NEURAL est encore en téléchargement : cette analyse 
 msgid "NEURAL key model unavailable: this run uses CLASSIC"
 msgstr "Modèle de KEY NEURAL indisponible : cette analyse utilise CLASSIC"
 
-#: src/app/analyze/mod.rs:255
+#: src/app/analyze/mod.rs:256
 msgid "analysis: library query failed: {}"
 msgstr "analyse : échec de la requête de bibliothèque : {}"
 
-#: src/app/analyze/mod.rs:353
+#: src/app/analyze/mod.rs:354
 msgid " · library grid in use: PREFS > ANALYSIS > BEAT GRID FROM > OPENFADER ANALYSIS shows ours"
 msgstr " · grille de la bibliothèque utilisée : PRÉFS > ANALYSE > GRILLE DE BEATS ET CUES ISSUS DE > ANALYSE OPENFADER affiche la nôtre"
 
@@ -6819,97 +6896,106 @@ msgstr "le beat jump requiert une grille de beats"
 msgid "select a track in the library first"
 msgstr "sélectionnez d'abord une piste dans la bibliothèque"
 
-#: src/app/device/actions.rs:57
+#: src/app/device/actions.rs:61
 msgid "{}: its extension no longer offers that action. Open DEVICES and press CHECK AGAIN."
 msgstr "{} : son extension ne propose plus cette action. Ouvrez APPAREILS et appuyez sur VÉRIFIER À NOUVEAU."
 
-#: src/app/device/actions.rs:65
+#: src/app/device/actions.rs:69
 msgid "{}: its extension is switched off. Switch it on in PREFERENCES > EXTENSIONS, then restart."
 msgstr "{} : son extension est désactivée. Activez-la dans PRÉFÉRENCES > EXTENSIONS, puis redémarrez."
 
-#: src/app/device/actions.rs:97
+#: src/app/device/actions.rs:101
 msgid "{} has no library to read from. Export to it first."
 msgstr "{} n'a pas de bibliothèque à lire. Exportez-y d'abord."
 
-#: src/app/device/actions.rs:109
+#: src/app/device/actions.rs:118
+#: src/app/device/review.rs:523
 msgid "Updating the collection"
 msgstr "Mise à jour de la collection"
 
-#: src/app/device/actions.rs:111
-msgid "; {} track(s) of the device are not in the collection and were not updated"
-msgstr "; {} piste(s) de l'appareil ne sont pas dans la collection et n'ont pas été mises à jour"
+#: src/app/device/actions.rs:126
+#: src/app/device/review.rs:525
+msgid "Update Collection of {}"
+msgstr "Mise à jour de la collection depuis {}"
 
-#: src/app/device/actions.rs:112
-msgid "Update Collection: {} of {} track(s) changed ({} ratings, {} comments, {} colours, {} cue lists, {} grids){}"
-msgstr "Mise à jour de la collection : {} piste(s) sur {} modifiée(s) ({} notes, {} commentaires, {} couleurs, {} listes de cues, {} grilles){}"
-
-#: src/app/device/actions.rs:132
+#: src/app/device/actions.rs:167
+#: src/app/device/review.rs:548
 msgid "Importing histories"
 msgstr "Import des historiques"
 
-#: src/app/device/actions.rs:137
-msgid "Imported {} history(ies) of {}: {} plays, {} of unknown tracks skipped, {} imported before"
-msgstr "{} historique(s) de {} importé(s) : {} lectures, {} de pistes inconnues ignorées, {} déjà importées"
+#: src/app/device/actions.rs:178
+#: src/app/device/review.rs:550
+msgid "Histories of {}"
+msgstr "Historiques de {}"
 
-#: src/app/device/actions.rs:139
+#: src/app/device/actions.rs:183
+#: src/app/device/review.rs:556
 msgid "its plugin is not available"
 msgstr "son plugin n'est pas disponible"
 
-#: src/app/device/actions.rs:140
+#: src/app/device/actions.rs:184
+#: src/app/device/review.rs:561
 msgid "; deleted {} from the device"
 msgstr "; {} supprimé de l'appareil"
 
-#: src/app/device/actions.rs:141
+#: src/app/device/actions.rs:185
+#: src/app/device/review.rs:563
 msgid "; not deleted from the device: {}"
 msgstr "; non supprimé de l'appareil : {}"
 
 #: src/app/device/actions.rs:197
+msgid "{}: {n} history is waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows it first"
+msgid_plural "{}: {n} histories are waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows them first"
+msgstr[0] "{} : {n} historique attend d'être importé. Rien n'a encore été importé : IMPORTER LES HISTORIQUES dans la fenêtre APPAREILS le montre d'abord"
+msgstr[1] "{} : {n} historiques attendent d'être importés. Rien n'a encore été importé : IMPORTER LES HISTORIQUES dans la fenêtre APPAREILS les montre d'abord"
+
+#: src/app/device/actions.rs:261
 msgid "that playlist is not on the device any more"
 msgstr "cette playlist n'est plus sur l'appareil"
 
-#: src/app/device/actions.rs:201
+#: src/app/device/actions.rs:265
 msgid "Imported {} into My Playlists: {} track(s), {} added to the collection"
 msgstr "{} importée dans Mes playlists : {} piste(s), {} ajoutée(s) à la collection"
 
-#: src/app/device/actions.rs:238
+#: src/app/device/actions.rs:302
 #: src/app/device/transfer.rs:292
 msgid "That playlist is not on the device any more"
 msgstr "Cette playlist n'est plus sur l'appareil"
 
-#: src/app/device/actions.rs:242
+#: src/app/device/actions.rs:306
 msgid "Delete the history {} from {}?"
 msgstr "Supprimer l'historique {} de {} ?"
 
-#: src/app/device/actions.rs:244
+#: src/app/device/actions.rs:308
 msgid "Delete {} from {}? Tracks that no other playlist lists are deleted too."
 msgstr "Supprimer {} de {} ? Les pistes qu'aucune autre playlist ne répertorie sont aussi supprimées."
 
-#: src/app/device/actions.rs:250
+#: src/app/device/actions.rs:314
 msgid "Delete {} from {}? Its tracks stay on the device."
 msgstr "Supprimer {} de {} ? Ses pistes restent sur l'appareil."
 
-#: src/app/device/actions.rs:258
-#: src/app/device/actions.rs:305
+#: src/app/device/actions.rs:322
+#: src/app/device/actions.rs:369
 msgid "Deleting"
 msgstr "Suppression"
 
-#: src/app/device/actions.rs:261
+#: src/app/device/actions.rs:325
 msgid "Deleted the history {} from {}"
 msgstr "Historique {} supprimé de {}"
 
-#: src/app/device/actions.rs:265
+#: src/app/device/actions.rs:329
 msgid "Deleted {} ({} list(s), {} track(s)) from {}{}"
 msgstr "{} supprimé ({} liste(s), {} piste(s)) de {}{}"
 
-#: src/app/device/actions.rs:271
+#: src/app/device/actions.rs:335
 msgid " — {} file(s) could not be deleted, first: {}"
 msgstr " — {} fichier(s) n'ont pas pu être supprimés, premier : {}"
 
-#: src/app/device/actions.rs:297
+#: src/app/device/actions.rs:361
 msgid "Delete {} from {}? The file and its analysis are removed."
 msgstr "Supprimer {} de {} ? Le fichier et son analyse sont supprimés."
 
-#: src/app/device/actions.rs:313
+#: src/app/device/actions.rs:377
 msgid "Deleted {} track(s) from {}"
 msgstr "{} piste(s) supprimée(s) de {}"
 
@@ -7433,63 +7519,77 @@ msgstr "le processus de travail s'est arrêté"
 msgid "Cancelled: the device was left as it was"
 msgstr "Annulé : l'appareil est resté tel quel"
 
-#: src/app/device/link.rs:114
+#: src/app/device/link.rs:119
 msgid "Matching tracks"
 msgstr "Association des pistes"
 
-#: src/app/device/link.rs:136
+#: src/app/device/link.rs:143
+msgid "{}: {n} track has different cues or grid than in your collection. Nothing was changed: choose which copy to keep with CUES DIFFER in the DEVICES window"
+msgid_plural "{}: {n} tracks have different cues or grid than in your collection. Nothing was changed: choose which copy to keep with CUES DIFFER in the DEVICES window"
+msgstr[0] "{} : {n} piste a des cues ou une grille différents de votre collection. Rien n'a été modifié : choisissez la copie à garder avec CUES DIFFÉRENTS dans la fenêtre APPAREILS"
+msgstr[1] "{} : {n} pistes ont des cues ou une grille différents de votre collection. Rien n'a été modifié : choisissez la copie à garder avec CUES DIFFÉRENTS dans la fenêtre APPAREILS"
+
+#: src/app/device/link.rs:149
 msgid "{}: cue sync filled {} track(s) here and {} on the device"
 msgstr "{} : la synchro des cues a rempli {} piste(s) ici et {} sur l'appareil"
 
-#: src/app/device/link.rs:257
+#: src/app/device/link.rs:155
+msgid "{}: cue sync filled {} track(s) here and {} on the device; {} track(s) have different cues or grid in both places and wait for your choice (CUES DIFFER)"
+msgstr "{} : la synchro des cues a rempli {} piste(s) ici et {} sur l'appareil ; {} piste(s) ont des cues ou une grille différents des deux côtés et attendent votre choix (CUES DIFFÉRENTS)"
+
+#: src/app/device/link.rs:224
+msgid "Cue sync: {}"
+msgstr "Synchro des cues : {}"
+
+#: src/app/device/link.rs:293
 msgid "Writing cues"
 msgstr "Écriture des cues"
 
-#: src/app/device/link.rs:262
+#: src/app/device/link.rs:298
 msgid "cues of {} track(s) written to {}"
 msgstr "cues de {} piste(s) écrits dans {}"
 
-#: src/app/device/mod.rs:72
+#: src/app/device/mod.rs:73
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr "Une autre tâche est en cours : attendez-la ou annulez-la (X)"
 
-#: src/app/device/mod.rs:162
+#: src/app/device/mod.rs:174
 msgid " — {} warning(s), first: {}"
 msgstr " — {} avertissement(s), premier : {}"
 
-#: src/app/device/mod.rs:164
+#: src/app/device/mod.rs:176
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr "{} pistes exportées ({} nouvelles, {} mises à jour) et {} playlists vers {}{}{}"
 
-#: src/app/device/mod.rs:183
+#: src/app/device/mod.rs:195
 msgid " — Update Collection baseline not recorded: {}"
 msgstr " — Référence de mise à jour de la collection non enregistrée : {}"
 
-#: src/app/device/mod.rs:208
+#: src/app/device/mod.rs:220
 msgid "failed: {}"
 msgstr "échec : {}"
 
-#: src/app/device/mod.rs:263
+#: src/app/device/mod.rs:275
 msgid "That stick is not connected any more. Plug it in again, then try once more."
 msgstr "Cette clé n'est plus connectée. Rebranchez-la, puis réessayez."
 
-#: src/app/device/mod.rs:275
+#: src/app/device/mod.rs:287
 msgid "No device is chosen. Pick one in the list on the left."
 msgstr "Aucun appareil n'est choisi. Choisissez-en un dans la liste de gauche."
 
-#: src/app/device/mod.rs:289
+#: src/app/device/mod.rs:301
 msgid "it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"
 msgstr "elle est montée en lecture seule : rien ne peut y être écrit. Vérifiez son interrupteur de protection en écriture, puis rebranchez-la"
 
-#: src/app/device/mod.rs:298
+#: src/app/device/mod.rs:310
 msgid "cannot read the collection: {}"
 msgstr "impossible de lire la collection : {}"
 
-#: src/app/device/mod.rs:339
+#: src/app/device/mod.rs:351
 msgid "{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports."
 msgstr "{} : son extension ne peut pas faire cela avec cet appareil. Activez l'extension dans PRÉFÉRENCES > EXTENSIONS, ou utilisez un appareil qu'elle prend en charge."
 
-#: src/app/device/mod.rs:479
+#: src/app/device/mod.rs:498
 msgid "Cancelling…"
 msgstr "Annulation…"
 
@@ -7583,6 +7683,187 @@ msgid_plural "{n} tracks are there already: their marks are refreshed"
 msgstr[0] "{n} morceau est déjà présent : ses repères sont actualisés"
 msgstr[1] "{n} morceaux sont déjà présents : leurs repères sont actualisés"
 
+#: src/app/device/review.rs:88
+#: src/app/device/review.rs:156
+#: src/app/device/review.rs:186
+msgid "none"
+msgstr "aucun"
+
+#: src/app/device/review.rs:95
+msgid "rating {} → {}"
+msgstr "note {} → {}"
+
+#: src/app/device/review.rs:96
+msgid "comment: {}"
+msgstr "commentaire : {}"
+
+#: src/app/device/review.rs:97
+msgid "comment cleared"
+msgstr "commentaire effacé"
+
+#: src/app/device/review.rs:98
+msgid "comment changed: {}"
+msgstr "commentaire modifié : {}"
+
+#: src/app/device/review.rs:99
+msgid "colour {} → {}"
+msgstr "couleur {} → {}"
+
+#: src/app/device/review.rs:113
+msgid "{} moved"
+msgstr "{} déplacé(s)"
+
+#: src/app/device/review.rs:116
+msgid "cue details changed"
+msgstr "détails des cues modifiés"
+
+#: src/app/device/review.rs:118
+msgid "cues {}"
+msgstr "cues {}"
+
+#: src/app/device/review.rs:133
+msgid "grid changed"
+msgstr "grille modifiée"
+
+#: src/app/device/review.rs:134
+msgid "grid moved {} ms"
+msgstr "grille décalée de {} ms"
+
+#: src/app/device/review.rs:135
+msgid "BPM {} → {}"
+msgstr "BPM {} → {}"
+
+#: src/app/device/review.rs:136
+msgid "grid moved {} ms, BPM {} → {}"
+msgstr "grille décalée de {} ms, BPM {} → {}"
+
+#: src/app/device/review.rs:158
+msgid "{} hot, {} memory, {} loops"
+msgstr "{} hot, {} mémoire, {} boucles"
+
+#: src/app/device/review.rs:187
+msgid "starts {} at {} BPM, {} beats"
+msgstr "commence à {} à {} BPM, {} temps"
+
+#: src/app/device/review.rs:199
+msgid "{} phrases"
+msgstr "{} phrases"
+
+#: src/app/device/review.rs:217
+msgid "CUE TIMES"
+msgstr "POSITIONS DES CUES"
+
+#: src/app/device/review.rs:227
+msgid "PHRASES"
+msgstr "PHRASES"
+
+#: src/app/device/review.rs:238
+msgid "cues: {} in your collection, {} on the stick"
+msgstr "cues : {} dans votre collection, {} sur la clé"
+
+#: src/app/device/review.rs:246
+msgid "grid: {} BPM, on the stick {} BPM"
+msgstr "grille : {} BPM, sur la clé {} BPM"
+
+#: src/app/device/review.rs:253
+msgid "phrases differ"
+msgstr "les phrases diffèrent"
+
+#: src/app/device/review.rs:261
+msgid "; {} track(s) of the device are not in the collection and were not updated"
+msgstr "; {} piste(s) de l'appareil ne sont pas dans la collection et n'ont pas été mises à jour"
+
+#: src/app/device/review.rs:268
+msgid "Update Collection: {} of {} track(s) changed ({} ratings, {} comments, {} colours, {} cue lists, {} grids){}"
+msgstr "Mise à jour de la collection : {} piste(s) sur {} modifiée(s) ({} notes, {} commentaires, {} couleurs, {} listes de cues, {} grilles){}"
+
+#: src/app/device/review.rs:276
+msgid "Imported {} history(ies) of {}: {} plays, {} of unknown tracks skipped, {} imported before"
+msgstr "{} historique(s) de {} importé(s) : {} lectures, {} de pistes inconnues ignorées, {} déjà importées"
+
+#: src/app/device/review.rs:343
+msgid "UPDATE COLLECTION FROM {}"
+msgstr "METTRE À JOUR LA COLLECTION DEPUIS {}"
+
+#: src/app/device/review.rs:344
+msgid "The player changed {} track(s) of your collection since the last export ({} more on the device are not in your collection and stay as they are). Tick what to bring into your collection: each tick replaces your value of that track with the player's. Nothing changes until you press APPLY, and UNDO afterwards restores exactly these fields."
+msgstr "Le lecteur a modifié {} piste(s) de votre collection depuis le dernier export ({} autres de l'appareil ne sont pas dans votre collection et restent telles quelles). Cochez ce qui doit entrer dans votre collection : chaque case remplace votre valeur pour cette piste par celle du lecteur. Rien ne change avant d'appuyer sur APPLIQUER, et ANNULER rétablit ensuite exactement ces champs."
+
+#: src/app/device/review.rs:365
+msgid "IMPORT HISTORIES FROM {}"
+msgstr "IMPORTER LES HISTORIQUES DE {}"
+
+#: src/app/device/review.rs:367
+msgid "{} history(ies) on the device are not in your play history yet. Importing adds their plays (tracks that are not in your collection are skipped); nothing changes until you press APPLY, and UNDO takes exactly those plays out again."
+msgstr "{} historique(s) de l'appareil ne sont pas encore dans votre historique de lecture. L'import ajoute leurs lectures (les pistes absentes de votre collection sont ignorées) ; rien ne change avant d'appuyer sur APPLIQUER, et ANNULER retire exactement ces lectures."
+
+#: src/app/device/review.rs:372
+msgid "Preferences ask for the imported histories to be deleted from {} afterwards: UNDO does not bring them back to the device."
+msgstr "Les préférences demandent de supprimer ensuite les historiques importés de {} : ANNULER ne les remet pas sur l'appareil."
+
+#: src/app/device/review.rs:383
+msgid "{} tracks, {} of them not in your collection"
+msgstr "{} pistes, dont {} absentes de votre collection"
+
+#: src/app/device/review.rs:401
+msgid "{} is read-only: KEEP MINE needs a device that can be written. TAKE THE STICK'S still works."
+msgstr "{} est en lecture seule : GARDER LA MIENNE demande un appareil inscriptible. PRENDRE CELLE DE LA CLÉ fonctionne quand même."
+
+#: src/app/device/review.rs:402
+#: src/app/device/sync.rs:111
+msgid "That device is not mounted any more"
+msgstr "Cet appareil n'est plus monté"
+
+#: src/app/device/review.rs:407
+msgid "CUES THAT DIFFER ON {}"
+msgstr "CUES DIFFÉRENTS SUR {}"
+
+#: src/app/device/review.rs:408
+msgid "{n} track has different cues or grid on {} than in your collection. Nothing was changed: neither copy wins by itself. KEEP MINE writes your collection's copy to the device, TAKE THE STICK'S copies the device's into your collection; UNDO stays available for both."
+msgid_plural "{n} tracks have different cues or grid on {} than in your collection. Nothing was changed: neither copy wins by itself. KEEP MINE writes your collection's copy to the device, TAKE THE STICK'S copies the device's into your collection; UNDO stays available for both."
+msgstr[0] "{n} piste a des cues ou une grille différents sur {} et dans votre collection. Rien n'a été modifié : aucune copie ne l'emporte d'elle-même. GARDER LA MIENNE écrit la copie de votre collection sur l'appareil, PRENDRE CELLE DE LA CLÉ copie celle de l'appareil dans votre collection ; ANNULER reste possible pour les deux."
+msgstr[1] "{n} pistes ont des cues ou une grille différents sur {} et dans votre collection. Rien n'a été modifié : aucune copie ne l'emporte d'elle-même. GARDER LA MIENNE écrit la copie de votre collection sur l'appareil, PRENDRE CELLE DE LA CLÉ copie celle de l'appareil dans votre collection ; ANNULER reste possible pour les deux."
+
+#: src/app/device/review.rs:432
+msgid "RECENT IMPORTS"
+msgstr "IMPORTS RÉCENTS"
+
+#: src/app/device/review.rs:433
+msgid "Each import and cue sync keeps the previous values of exactly the fields it changed. UNDO puts them back, except fields you edited since."
+msgstr "Chaque import et chaque synchro des cues garde les anciennes valeurs des champs qu'il a modifiés, et seulement ceux-là. ANNULER les remet, sauf les champs que vous avez modifiés depuis."
+
+#: src/app/device/review.rs:443
+msgid "{}: {} field(s), {} play(s), {} device copy(ies)"
+msgstr "{} : {} champ(s), {} lecture(s), {} copie(s) d'appareil"
+
+#: src/app/device/review.rs:611
+msgid "Undone: {} field(s) put back"
+msgstr "Annulé : {} champ(s) rétabli(s)"
+
+#: src/app/device/review.rs:613
+msgid "; {} field(s) edited since were left as they are"
+msgstr "; {} champ(s) modifié(s) depuis ont été laissés tels quels"
+
+#: src/app/device/review.rs:619
+msgid "; {} play(s) removed from the play history"
+msgstr "; {} lecture(s) retirée(s) de l'historique de lecture"
+
+#: src/app/device/review.rs:638
+msgid "; {} device copy(ies) are written back in a moment"
+msgstr "; {} copie(s) de l'appareil sont réécrites dans un instant"
+
+#: src/app/device/review.rs:742
+msgid "Kept your cues and grid of {} track(s); {} gets them in a moment"
+msgstr "Cues et grille de {} piste(s) conservés ; {} les reçoit dans un instant"
+
+#: src/app/device/review.rs:748
+msgid "Took the cues and grid of {} track(s) from {} into your collection"
+msgstr "Cues et grille de {} piste(s) de {} repris dans votre collection"
+
+#: src/app/device/review.rs:763
+msgid "COMPARE: {} ({})"
+msgstr "COMPARER : {} ({})"
+
 #: src/app/device/safety.rs:51
 msgid "An export to {} was cut off: it is now finished"
 msgstr "Un export vers {} a été interrompu : il est maintenant terminé"
@@ -7648,10 +7929,6 @@ msgstr "{} vient d'être connecté : synchroniser {} ({}) ?"
 #: src/app/device/sync.rs:84
 msgid "No playlist is set to synchronize: tick some in the list"
 msgstr "Aucune playlist n'est configurée pour la synchronisation : cochez-en dans la liste"
-
-#: src/app/device/sync.rs:111
-msgid "That device is not mounted any more"
-msgstr "Cet appareil n'est plus monté"
 
 #: src/app/device/sync.rs:115
 msgid "Syncing"
@@ -8419,7 +8696,7 @@ msgid "merged {} duplicate files · {} cues added to the representatives"
 msgstr "{} fichiers en double fusionnés · {} cues ajoutés aux pistes représentantes"
 
 #: src/app/library/dupes.rs:246
-#: src/app/library/missing.rs:279
+#: src/app/library/missing.rs:345
 #: src/app/library/track.rs:33
 msgid "remove tracks"
 msgstr "supprimer les pistes"
@@ -8642,53 +8919,57 @@ msgstr "{} déjà dans la collection (lié, non ajouté)"
 msgid "inbox: {}"
 msgstr "inbox : {}"
 
-#: src/app/library/missing.rs:81
+#: src/app/library/missing.rs:76
+msgid "found: {}"
+msgstr "trouvé : {}"
+
+#: src/app/library/missing.rs:96
 msgid "scan failed: {}"
 msgstr "échec de l'analyse : {}"
 
-#: src/app/library/missing.rs:97
+#: src/app/library/missing.rs:112
 msgid "File is not missing: every track has its file"
 msgstr "Aucun fichier manquant : chaque piste a son fichier"
 
-#: src/app/library/missing.rs:99
+#: src/app/library/missing.rs:114
 msgid "File is Missing: {n} track"
 msgid_plural "File is Missing: {n} tracks"
 msgstr[0] "Fichier manquant : {n} piste"
 msgstr[1] "Fichier manquant : {n} pistes"
 
-#: src/app/library/missing.rs:163
+#: src/app/library/missing.rs:211
 msgid "nothing relocated: no file found at {}"
 msgstr "rien de relocalisé : aucun fichier trouvé dans {}"
 
-#: src/app/library/missing.rs:168
+#: src/app/library/missing.rs:216
 msgid "relocated {} of {n} track"
 msgid_plural "relocated {} of {n} tracks"
 msgstr[0] "{} relocalisée sur {n} piste"
 msgstr[1] "{} relocalisées sur {n} pistes"
 
-#: src/app/library/missing.rs:176
+#: src/app/library/missing.rs:224
 msgid "relocate failed: {}"
 msgstr "échec de la relocalisation : {}"
 
-#: src/app/library/missing.rs:185
+#: src/app/library/missing.rs:233
 msgid "no search folder: add one in Preferences > Advanced > Database > Auto Relocate Search Folders"
 msgstr "aucun dossier de recherche : ajoutez-en un dans Préférences > Avancé > Base de données > Dossiers de recherche de la relocalisation auto"
 
-#: src/app/library/missing.rs:196
+#: src/app/library/missing.rs:244
 msgid "Searching {}…"
 msgstr "Recherche dans {}…"
 
-#: src/app/library/missing.rs:228
+#: src/app/library/missing.rs:266
 msgid "Auto Relocate: {} of {} found"
 msgstr "Relocalisation auto : {} trouvées sur {}"
 
-#: src/app/library/missing.rs:283
+#: src/app/library/missing.rs:349
 msgid "Remove {n} missing track from the Collection? Playlist places and edits of them are dropped; no file is touched."
 msgid_plural "Remove {n} missing tracks from the Collection? Playlist places and edits of them are dropped; no file is touched."
 msgstr[0] "Supprimer {n} piste manquante de la collection ? Ses emplacements dans les playlists et ses modifications seront perdus ; aucun fichier n'est touché."
 msgstr[1] "Supprimer {n} pistes manquantes de la collection ? Leurs emplacements dans les playlists et leurs modifications seront perdus ; aucun fichier n'est touché."
 
-#: src/app/library/missing.rs:288
+#: src/app/library/missing.rs:354
 msgid "DELETE FROM COLLECTION"
 msgstr "SUPPRIMER DE LA COLLECTION"
 
@@ -10259,11 +10540,6 @@ msgstr "Activer MERGE FX"
 #: src/app/prefs/controller/effect.rs:23
 msgid "Stop playing the operating deck after MERGE FX finishes"
 msgstr "Arrêter la lecture du deck actif après la fin de MERGE FX"
-
-#: src/app/prefs/controller/mixer.rs:29
-#: src/app/prefs/dj_system/fields.rs:24
-msgid "NONE"
-msgstr "AUCUN"
 
 #: src/app/prefs/controller/mixer.rs:43
 msgid "Auto Gain: even out the loudness of loaded tracks"

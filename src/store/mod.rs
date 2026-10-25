@@ -40,11 +40,13 @@ mod matching;
 mod node;
 mod overlay;
 mod phrase;
+mod print;
 mod rekey;
 mod saved_search;
 mod sequence;
 mod tag;
 mod track;
+mod undo;
 
 pub use artwork::{MISS_TTL, album_key};
 pub use backup::{Backup, MUSIC_DIR, Restored};
@@ -57,7 +59,8 @@ pub use overlay::{Overlay, apply, overlay};
 pub use saved_search::SavedSearch;
 pub use sequence::{MAX_SEQUENCES, Sequence};
 pub use tag::{Tag, TagGroup};
-pub use track::{AUTO_CUES, Edits, TRACK_COLORS};
+pub use track::{Edits, AUTO_CUES, TRACK_COLORS};
+pub use undo::UndoEntry;
 
 use crate::{analysis::Cue, library::Track, paths};
 use parking_lot::{Mutex, MutexGuard};
@@ -215,6 +218,15 @@ const MIGRATIONS: &[&str] = &[
     // v22: saved searches of the media browser (src/store/saved_search.rs); `spec` is the browser's own text form of the search box and filters.
     "CREATE TABLE IF NOT EXISTS saved_search (
         id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE, spec TEXT NOT NULL, created INTEGER NOT NULL);",
+    // v23: `file_print` = the content print of a Collection track's file (size + a
+    // hash of three fixed slices, src/library/print.rs: finds a file again after a move or a rename, and a device copy under
+    // another name); `import_undo` = what an import changed, to take it back (src/store/undo.rs, src/device/undo.rs).
+    "CREATE TABLE IF NOT EXISTS file_print (
+        track INTEGER PRIMARY KEY REFERENCES collection(id) ON DELETE CASCADE, print TEXT NOT NULL,
+        size INTEGER NOT NULL, mtime INTEGER NOT NULL);
+     CREATE INDEX IF NOT EXISTS file_print_by_print ON file_print(print);
+     CREATE TABLE IF NOT EXISTS import_undo (
+        id INTEGER PRIMARY KEY, at INTEGER NOT NULL, label TEXT NOT NULL, device TEXT NOT NULL, data TEXT NOT NULL);",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as

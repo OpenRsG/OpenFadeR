@@ -40,6 +40,7 @@ mod pace;
 mod pick;
 mod preview;
 mod safety;
+mod review;
 mod scan;
 mod sync;
 mod transfer;
@@ -132,6 +133,14 @@ pub(super) struct Ctx {
     prep: preview::Prep,
     /// The stick checks ([`check`]).
     check: check::State,
+    /// BringBack: what the review dialog shows now ([`review`]).
+    review: RefCell<Option<review::Review>>,
+    /// BringBack: per device id, the tracks whose cues differ between the collection and the device ([`review`]).
+    conflicts: RefCell<HashMap<String, Vec<openfader::device::link::Conflict>>>,
+    /// BringBack: device copies to write back with the next push, by (device id, key): what an undo of a cue sync restores.
+    restores: RefCell<HashMap<(String, String), openfader::device::link::Marks>>,
+    /// BringBack: the kept import the undo bar offers (0 = none).
+    undo_bar: Cell<i64>,
 }
 
 struct Models {
@@ -142,6 +151,9 @@ struct Models {
     formats: Rc<VecModel<FormatItem>>,
     /// The labels of the devices the track menu's "Transfer to" lists ([`transfer`]).
     targets: Rc<VecModel<SharedString>>,
+    /// BringBack: the rows of the review dialog and of the compare view ([`review`]).
+    review: Rc<VecModel<super::ReviewRow>>,
+    compare: Rc<VecModel<super::CompareRow>>,
 }
 
 /// Keeps the timer (and with it the whole window logic) alive for as long as the window runs.
@@ -413,11 +425,17 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
             backups: Rc::default(),
             formats: Rc::default(),
             targets: Rc::default(),
+            review: Rc::default(),
+            compare: Rc::default(),
         },
         links: RefCell::default(),
         pushes: RefCell::default(),
         prep: preview::Prep::default(),
         check: check::State::default(),
+        review: RefCell::default(),
+        conflicts: RefCell::default(),
+        restores: RefCell::default(),
+        undo_bar: Cell::new(0),
     });
     let s = app.global::<DeviceState>();
     s.set_devices(ModelRc::from(cx.models.devices.clone()));
@@ -458,6 +476,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
             c.recheck(&d.id);
         }
         sync::refresh(&c);
+        c.refresh_counts(); // BringBack
     });
     let c = cx.clone();
     s.on_opened(move || {
@@ -496,6 +515,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     link::register(&cx);
     transfer::wire(&cx, app);
     Ctx::wire_check(&cx, app);
+    review::wire(&cx, app); // BringBack
 
     let c = cx.clone();
     let timer = Timer::default();

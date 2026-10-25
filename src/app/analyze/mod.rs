@@ -27,8 +27,9 @@ mod progress;
 mod stale;
 mod sync;
 
-pub use cue::{Learnt, library_cues};
-pub use detected::{Detected, keys_differ};
+pub use cue::{library_cues, Learnt};
+pub use detected::{keys_differ, Detected};
+pub(in crate::app) use job::lower_priority;
 
 use super::{
     camelot,

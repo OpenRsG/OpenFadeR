@@ -282,8 +282,10 @@ pub fn judge(f: &Facts, booth: &[String]) -> Verdict {
     // A stick no player of the booth reads, whatever its libraries: the file system or the partition table is the cause.
     let device_no = |p: &PlayerFit| matches!(p.fit, Fit::No(Why::FileSystem(_) | Why::Table(_)));
     let all_no = |ok: fn(&PlayerFit) -> bool| !players.is_empty() && players.iter().all(ok);
+    // Without a booth profile the stick is judged on its own: a library no known player reads (one made for software on a
+    // laptop) is not a fault, a file system or partition table no player reads is.
     let booth_refused = if booth.is_empty() {
-        all_no(|p| matches!(p.fit, Fit::No(_)))
+        all_no(device_no)
     } else {
         players.iter().any(|p| matches!(p.fit, Fit::No(_)))
     };
@@ -668,6 +670,24 @@ mod tests {
         ];
         let v = judge(&f, &[]);
         assert_eq!(v.players[0].fit, Fit::Ok);
+    }
+
+    #[test]
+    fn without_a_booth_a_library_no_player_reads_is_no_fault() {
+        let mut f = facts();
+        f.libs = vec![LibraryState {
+            name: "Laptop library".into(),
+            present: true,
+            readable: true,
+            tracks: 3,
+            ..Default::default()
+        }
+        .into()];
+        let v = judge(&f, &[]);
+        assert!(fits(&v).iter().all(|x| matches!(x, Fit::No(Why::NoLibrary(_)))));
+        assert_eq!(v.overall, Overall::Ready, "made for software, not for players");
+        let model = f.players[0].model.clone();
+        assert_eq!(judge(&f, &[model]).overall, Overall::NeedsFixing, "the booth's player cannot read it");
     }
 
     #[test]

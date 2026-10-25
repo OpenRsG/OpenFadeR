@@ -28,6 +28,7 @@ pub mod plan;
 pub mod plug;
 pub mod sync;
 pub mod transfer;
+pub mod undo;
 pub mod update;
 
 #[cfg_attr(target_os = "linux", path = "linux.rs")]

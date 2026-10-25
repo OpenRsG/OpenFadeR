@@ -238,6 +238,8 @@ export component DevicesPage inherits HorizontalLayout {
             label: @tr("BRING BACK");
             Chip { text: @tr("UPDATE COLLECTION"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.has-library && root.can-update && !DeviceState.busy; tooltip: @tr("Import cues, grids, ratings, colours and comments edited on the player"); clicked => { DeviceState.update-collection(); } }
             Chip { text: @tr("IMPORT HISTORIES"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.has-library && root.can-histories && !DeviceState.busy; tooltip: @tr("Import what the players played"); clicked => { DeviceState.import-histories(); } }
+            if DeviceState.differ-count > 0: Chip { text: @tr("CUES DIFFER ({})", DeviceState.differ-count); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; active: true; enabled: !DeviceState.busy; tooltip: @tr("Tracks whose cues or grid differ between your collection and this device: choose which copy to keep"); clicked => { DeviceState.open-differ(); } }
+            if DeviceState.undo-count > 0: Chip { text: @tr("UNDO…"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; tooltip: @tr("The last imports and cue syncs, each with its way back"); clicked => { DeviceState.open-recent(); } }
         }
         ActionRow {
             label: @tr("KEEP IT SAFE");

@@ -1,13 +1,14 @@
 import { Chip, Dropdown, IconButton, Icon, SegmentedChips } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DialogFrame } from "dialog.slint";
-import { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow, PreviewRow } from "device-state.slint";
+import { ActionItem, BackupItem, CompareRow, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow, PreviewRow, ReviewRow } from "device-state.slint";
+import { ReviewOverlay } from "device-review.slint";
 import { DevicesPage } from "device-devices.slint";
 import { ExportPage, SyncPage } from "device-export.slint";
 import { BackupPage } from "device-backup.slint";
 import { DeviceFormat } from "device-format.slint";
 import { DevicePreview, DeviceSyncAsk } from "device-preview.slint";
-export { ActionItem, BackupItem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow, PreviewRow }
+export { ActionItem, BackupItem, CompareRow, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow, PreviewRow, ReviewRow }
 import { CheckLib, CheckPlayer, CheckPreset, CheckProblem } from "device-state.slint";
 export { CheckLib, CheckPlayer, CheckPreset, CheckProblem }
 
@@ -132,4 +133,5 @@ export component DeviceOverlay inherits Rectangle {
     DevicePreview {}
     DeviceSyncAsk {}
     DeviceFormat {}
+    ReviewOverlay {}
 }

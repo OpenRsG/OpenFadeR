@@ -499,10 +499,13 @@ pub fn reanalyze(t: &Track) -> Result<Analysis, String> {
 
 /// Gives a Collection track the fingerprint `print` of its decoded audio ([`super::fingerprint`], empty for no audio) when it
 /// has none yet: what finds the file again after it moved. Tracks outside the Collection (no id) and failed writes are
-/// skipped silently.
+/// skipped silently. The file's content print ([`crate::library::print`]) is filled here too.
 pub fn remember_fingerprint(t: &Track, print: &str) {
     let Some(id) = t.id else { return };
     let store = store::global();
+    if let Some(f) = &t.file {
+        crate::library::print::remember(&store, id, f); // the file's content print too (a no-op when it has one)
+    }
     if store.fingerprint(id).ok().flatten().is_some() {
         return;
     }
