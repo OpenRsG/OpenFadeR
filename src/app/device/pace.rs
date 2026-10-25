@@ -110,7 +110,9 @@ impl Pace {
 
     /// Seconds the job still takes.
     pub fn left(&self, now: Instant, r: &Reading) -> Option<f64> {
-        if r.bytes_total > 0 {
+        // Only audio is counted to the byte: the analysis and library bytes are an estimate, and a phase of small files moves
+        // too few bytes for a rate, so those phases fall back to the tracks left.
+        if r.bytes_total > 0 && stage(r.phase) == Stage::Audio {
             let rate = self.rate().filter(|v| *v > 0.0)?;
             return Some(r.bytes_total.saturating_sub(r.bytes_done) as f64 / rate);
         }
@@ -131,7 +133,7 @@ impl Pace {
             format!("{} {}/{}", r.phase, r.done, r.total)
         };
         let rate = self.rate();
-        if let (Some(v), true) = (rate, r.bytes_total > 0) {
+        if let (Some(v), true) = (rate, r.bytes_total > 0 && stage(r.phase) == Stage::Audio) {
             line += &format!(" - {}", speed(v));
         }
         if let Some(s) = self.left(now, r) {
@@ -284,6 +286,16 @@ mod tests {
         assert_eq!(line, "Copying audio 12/40 - 18.3 MB/s - about 2 min left");
         let r = read("Backing up the library", 0, 0, 0, 0);
         assert_eq!(Pace::default().status(base, &r).0, "Backing up the library");
+    }
+
+    #[test]
+    fn a_phase_of_small_files_shows_no_speed_and_no_time_from_estimated_bytes() {
+        let (base, mut p) = (Instant::now(), Pace::default());
+        for s in 0..=4 {
+            p.sample(at(base, f64::from(s)), &read("Writing the library", 0, 1, 1_000 + u64::from(s as u32) * 10, 9_000_000));
+        }
+        let r = read("Writing the library", 0, 1, 1_040, 9_000_000);
+        assert_eq!(p.status(at(base, 4.0), &r).0, "Writing the library 0/1");
     }
 
     #[test]
