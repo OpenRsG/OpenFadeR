@@ -107,7 +107,7 @@ export component StageHead inherits Rectangle {
                 min-width: 0px;
             }
             Text {
-                text: root.v.elapsed-text;
+                text: DeckState.live[root.index].elapsed-text;
                 color: Theme.text-faint;
                 font-family: Theme.font;
                 font-size: Theme.font-sm;
@@ -124,7 +124,7 @@ export component StageHead inherits Rectangle {
         alignment: start;
         spacing: 1px;
         StageFig {
-            text: root.v.remain-text != "" ? root.v.remain-text : "--:--.-";
+            text: DeckState.live[root.index].remain-text != "" ? DeckState.live[root.index].remain-text : "--:--.-";
             color: root.v.ending ? Theme.danger : Theme.text-bright;
             font-size: Theme.font-xl;
             horizontal-alignment: right;

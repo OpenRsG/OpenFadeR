@@ -24,7 +24,7 @@ export component DeckCompact inherits Rectangle {
             spacing: 4px;
             Jacket { index: root.index; size: 26px; y: 1px; }
             DeckTitle { index: root.index; title-size: Theme.font-md; sub-size: Theme.font-size; min-width: 0px; horizontal-stretch: 1; }
-            Text { text: root.v.remain-text; color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
+            Text { text: DeckState.live[root.index].remain-text; color: Theme.text-bright; font-size: Theme.font-lg; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
         }
         DeckOverview { index: root.index; height: 40px; }
         ctl := Rectangle {

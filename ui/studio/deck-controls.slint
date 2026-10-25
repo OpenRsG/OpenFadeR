@@ -188,7 +188,7 @@ export component StudioMid inherits Rectangle {
             x: 0px;
             y: parent.height * 0.75;
             width: parent.width;
-            text: root.v.elapsed-text;
+            text: DeckState.live[root.index].elapsed-text;
             color: Theme.jog-text;
             font-family: Theme.font;
             font-size: root.jog-d > 170px ? Theme.font-md : Theme.font-xs;
@@ -199,7 +199,7 @@ export component StudioMid inherits Rectangle {
             x: 0px;
             y: parent.height * 0.75 + (root.jog-d > 170px ? 16px : 12px);
             width: parent.width;
-            text: root.v.remain-text;
+            text: DeckState.live[root.index].remain-text;
             color: Theme.jog-text;
             font-family: Theme.font;
             font-size: root.jog-d > 170px ? Theme.font-md : Theme.font-xs;

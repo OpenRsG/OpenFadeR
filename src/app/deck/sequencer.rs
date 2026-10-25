@@ -110,7 +110,7 @@ impl Deck {
 mod tests {
     use super::super::{DECKS, sync};
     use super::*;
-    use crate::app::{App, DeckScroll, DeckView, headless};
+    use crate::app::{App, DeckLive, DeckScroll, DeckView, headless};
     use openfader::{
         library::{Library, own::Own},
         store::Store,
@@ -125,7 +125,8 @@ mod tests {
         let model = Rc::new(VecModel::from(vec![DeckView::default(); DECKS]));
         let scroll = Rc::new(VecModel::from(vec![DeckScroll::default(); DECKS]));
         let lib: Rc<dyn Library> = Rc::new(Own::new(Arc::new(Store::in_memory().unwrap())));
-        let deck = Deck::new(&app, 0, model, scroll, Rc::new(sync::Link::default()), lib);
+        let live = Rc::new(VecModel::from(vec![DeckLive::default(); DECKS]));
+        let deck = Deck::new(&app, 0, model, scroll, live, Rc::new(sync::Link::default()), lib);
         let log = Rc::new(RefCell::new(Vec::new()));
         let st = app.global::<SamplerState>();
         let l = log.clone();

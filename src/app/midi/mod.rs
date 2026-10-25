@@ -475,4 +475,124 @@ mod tests {
             "the controls of decks C and D were ignored while they were hidden"
         );
     }
+
+    /// Regression guard for the MIDI latency goal: `Midi::run` (what a decoded message costs once bound, on the UI
+    /// thread, including the engine's shared-state write) must stay cheap for every time-critical kind of control
+    /// (press, knob + soft takeover, jog, a mapped pad). Measured with a real `MIDILAT` virtual-ALSA-port run
+    /// (`examples/midi_latency.rs`, now removed): callback-to-UI p50 ~15-35 us, callback-to-engine p50 ~20-35 us on
+    /// this box; the occasional multi-ms p99 spikes traced to event-loop scheduling delay under heavy external CPU
+    /// contention (the dispatch itself, pinned here, is µs-scale). `#[ignore]`: prints with `--nocapture`.
+    #[test]
+    #[ignore]
+    fn bench_dispatch_latency() {
+        use super::actions::ACTIONS;
+        use openfader::{
+            library::{own::Own, Library},
+            store::Store,
+        };
+        use std::time::{Duration, Instant};
+
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let lib: Rc<dyn Library> =
+            Rc::new(Own::new(std::sync::Arc::new(Store::in_memory().unwrap())));
+        let decks = crate::app::deck::wire(&app, lib, Default::default());
+        crate::app::mixer::wire(&app, decks.clone());
+        let guard = wire(&app, decks);
+        let m = &guard.midi;
+        let index = |name| ACTIONS.iter().position(|a| a.name == name).unwrap();
+        let bind = |status, d1, act, hires| Binding {
+            status,
+            d1,
+            act: index(act),
+            deck: 0,
+            arg: 0,
+            hires,
+        };
+
+        let report = |name: &str, samples: &mut [u128]| {
+            samples.sort_unstable();
+            let at = |p: f64| samples[((samples.len() - 1) as f64 * p).round() as usize];
+            println!(
+                "{name}: p50={:.2}us p99={:.2}us max={:.2}us",
+                at(0.50) as f64 / 1e3,
+                at(0.99) as f64 / 1e3,
+                at(1.0) as f64 / 1e3
+            );
+            assert!(
+                (at(0.99) as f64) < Duration::from_micros(300).as_nanos() as f64,
+                "{name}: p99 {at99}us regressed past 300us",
+                at99 = at(0.99) as f64 / 1e3
+            );
+        };
+
+        let n = 2000;
+        // PLAY (press, no release).
+        let play = bind(0x90, 0x0B, "play", false);
+        let mut ts = Vec::with_capacity(n);
+        for i in 0..n {
+            let ev = Ev { status: if i % 2 == 0 { 0x90 } else { 0x80 }, d1: 0x0B, d2: 100 };
+            let t = Instant::now();
+            m.run(&app, ev, &play);
+            ts.push(t.elapsed().as_nanos());
+        }
+        report("play", &mut ts);
+
+        // CUE (press with a release handler).
+        let cue = bind(0x90, 0x0C, "cue", false);
+        let mut ts = Vec::with_capacity(n);
+        for i in 0..n {
+            let ev = Ev { status: if i % 2 == 0 { 0x90 } else { 0x80 }, d1: 0x0C, d2: 100 };
+            let t = Instant::now();
+            m.run(&app, ev, &cue);
+            ts.push(t.elapsed().as_nanos());
+        }
+        report("cue", &mut ts);
+
+        // HOT CUE pad (Kind::Arg, mapped-file-only action).
+        let pad = bind(0x97, 0x00, "hw-pad", false);
+        let mut ts = Vec::with_capacity(n);
+        for i in 0..n {
+            let ev = Ev { status: if i % 2 == 0 { 0x97 } else { 0x87 }, d1: 0x00, d2: 100 };
+            let t = Instant::now();
+            m.run(&app, ev, &pad);
+            ts.push(t.elapsed().as_nanos());
+        }
+        report("hotcue", &mut ts);
+
+        // JOG BEND (relative, two's complement).
+        let jog_bend = bind(0xB0, 0x23, "jog-bend", false);
+        let mut ts = Vec::with_capacity(n);
+        for i in 0..n {
+            let ev = Ev { status: 0xB0, d1: 0x23, d2: if i % 2 == 0 { 3 } else { 125 } };
+            let t = Instant::now();
+            m.run(&app, ev, &jog_bend);
+            ts.push(t.elapsed().as_nanos());
+        }
+        report("jog-bend", &mut ts);
+
+        // CHANNEL FADER: 14-bit hires knob through soft takeover (MSB then LSB; only the LSB writes the engine).
+        let fader = bind(0xB0, 0x13, "fader", true);
+        let fader_lsb = bind(0xB0, 0x33, "fader", true);
+        let mut ts = Vec::with_capacity(n);
+        for i in 0..n {
+            let v = ((i * 131) % 16384) as u32;
+            m.run(&app, Ev { status: 0xB0, d1: 0x13, d2: (v >> 7) as u8 }, &fader);
+            let t = Instant::now();
+            m.run(&app, Ev { status: 0xB0, d1: 0x33, d2: (v & 0x7F) as u8 }, &fader_lsb);
+            ts.push(t.elapsed().as_nanos());
+        }
+        report("fader (LSB, engine write)", &mut ts);
+
+        // EQ LOW: plain 7-bit knob (no soft takeover crossing needed from the default centred value).
+        let eq = bind(0xB0, 0x0B, "eq-low", false);
+        let mut ts = Vec::with_capacity(n);
+        for i in 0..n {
+            let ev = Ev { status: 0xB0, d1: 0x0B, d2: (i % 128) as u8 };
+            let t = Instant::now();
+            m.run(&app, ev, &eq);
+            ts.push(t.elapsed().as_nanos());
+        }
+        report("eq-low", &mut ts);
+    }
 }

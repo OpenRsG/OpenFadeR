@@ -1,7 +1,7 @@
 //! Creates the decks and routes the `DeckState` callbacks.
 
 use super::{active, frame, mixpoint, padopts, shown, slots, sync, tick, Deck, Decks, DECKS};
-use crate::app::{prefs, App, DeckScroll, DeckState, DeckView};
+use crate::app::{prefs, App, DeckLive, DeckScroll, DeckState, DeckView};
 use openfader::{
     analysis,
     library::{Library, Track},
@@ -17,6 +17,8 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
     state.set_decks(ModelRc::from(model.clone()));
     let scroll = Rc::new(VecModel::from(vec![DeckScroll::default(); DECKS]));
     state.set_scroll(ModelRc::from(scroll.clone()));
+    let live = Rc::new(VecModel::from(vec![DeckLive::default(); DECKS]));
+    state.set_live(ModelRc::from(live.clone()));
     state.set_cue_palette(ModelRc::new(VecModel::from(
         analysis::picker()
             .map(|[r, g, b]| slint::Color::from_rgb_u8(r, g, b))
@@ -31,6 +33,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
             i,
             model.clone(),
             scroll.clone(),
+            live.clone(),
             link.clone(),
             lib.clone(),
         )
