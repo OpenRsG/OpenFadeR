@@ -18,10 +18,65 @@ use openfader_plugin::library::{playlist_tree, Analysis, Playlist, PlaylistRow, 
 use rekordbox_common::list::{add_histories, analysis_ref, existing, history_raw, under};
 use rekordbox_common::sql::{open_encrypted, query, track_from_row};
 use rusqlite::{params, Connection};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex};
+use std::time::{Duration, Instant, SystemTime};
 
-/// Holds no connection between calls: an open `exportLibrary.db` cannot be replaced on Windows, and an export rewrites it
-/// while the host still has this source open.
+/// How long a derived connection stays shared: long enough that the browser's own read and the device's automatic
+/// cue-sync job (both start within a mount's first moment, `Auto::Link` in `app/device/scan.rs`) pay the SQLCipher key
+/// derivation (PBKDF2, the slow part of opening a OneLibrary) once between them instead of three or more times over;
+/// short enough that nothing here holds `exportLibrary.db` open once that burst is over (Windows cannot replace an open
+/// file, and a later export rewrites this one).
+/// shortcut: a 3 s window, not a real completion signal between the two readers; raise it if a slower stick needs it,
+/// or replace it with an explicit "reuse the browser's read" handoff if the duplicate read moves further apart in time.
+const CACHE_TTL: Duration = Duration::from_secs(3);
+
+struct Cached {
+    at: Instant,
+    sig: (u64, Option<SystemTime>),
+    conn: Arc<Mutex<Connection>>,
+}
+
+static CACHE: LazyLock<Mutex<HashMap<PathBuf, Cached>>> = LazyLock::new(Default::default);
+
+/// File length and mtime: a cache key that misses as soon as the stick is rewritten, even within [`CACHE_TTL`].
+fn signature(p: &Path) -> (u64, Option<SystemTime>) {
+    std::fs::metadata(p).map_or((0, None), |m| (m.len(), m.modified().ok()))
+}
+
+/// A connection to the OneLibrary at `path`, derived once per [`CACHE_TTL`] window and shared with any other opener of
+/// the same file in that window; a changed file (different length or mtime) is always a cache miss. A wrong key fails
+/// here and nothing is cached, as before.
+fn conn_cached(path: &Path, key: &str) -> Result<Arc<Mutex<Connection>>, String> {
+    let sig = signature(path);
+    if let Some(c) = CACHE.lock().unwrap().get(path) {
+        if c.sig == sig && c.at.elapsed() < CACHE_TTL {
+            return Ok(c.conn.clone());
+        }
+    }
+    let conn = Arc::new(Mutex::new(open_encrypted(path, key)?));
+    let at = Instant::now();
+    CACHE.lock().unwrap().insert(
+        path.to_owned(),
+        Cached {
+            at,
+            sig,
+            conn: conn.clone(),
+        },
+    );
+    let evict = path.to_owned();
+    std::thread::spawn(move || {
+        std::thread::sleep(CACHE_TTL);
+        let mut cache = CACHE.lock().unwrap();
+        if cache.get(&evict).is_some_and(|c| c.at == at) {
+            cache.remove(&evict);
+        }
+    });
+    Ok(conn)
+}
+
+/// Holds no connection of its own: [`Self::conn`] derives (or reuses a just-derived) one each call, see [`conn_cached`].
 pub struct OneLibrary {
     key: String,
     root: PathBuf,
@@ -37,8 +92,8 @@ impl OneLibrary {
         Ok(this)
     }
 
-    fn conn(&self) -> Result<Connection, String> {
-        open_encrypted(&self.root.join(ONE), &self.key)
+    fn conn(&self) -> Result<Arc<Mutex<Connection>>, String> {
+        conn_cached(&self.root.join(ONE), &self.key)
     }
 }
 
@@ -54,6 +109,7 @@ impl Source for OneLibrary {
     /// Siblings by `sequenceNo`; the `history` rows (same shape) follow under "Histories".
     fn playlists(&self) -> Result<Vec<Playlist>, String> {
         let conn = self.conn()?;
+        let conn = conn.lock().unwrap();
         let rows = |sql: &str| {
             query(&conn, sql, [], |r| {
                 Ok(PlaylistRow {
@@ -80,6 +136,7 @@ impl Source for OneLibrary {
     /// All tracks by title, or one playlist's tracks in `sequenceNo` order.
     fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {
         let conn = self.conn()?;
+        let conn = conn.lock().unwrap();
         let base = "select coalesce(c.title, ''), coalesce(a.name, ''), coalesce(k.name, ''), coalesce(g.name, ''), \
                     coalesce(c.bpmx100, 0), coalesce(c.length, 0), coalesce(c.rating, 0), coalesce(c.djComment, ''), \
                     coalesce(c.dateAdded, ''), coalesce(c.bitrate, 0), coalesce(c.samplingRate, 0), coalesce(al.name, ''), \
@@ -176,6 +233,38 @@ mod tests {
         assert_eq!(titles("history:2"), ["B", "A"]); // sequenceNo order
         assert_eq!(titles("history:3"), ["A"]);
         assert!(titles("1").is_empty()); // playlist 1 is not history 1
+        let _ = std::fs::remove_dir_all(&dir); // cleanup: Windows may still hold a handle
+    }
+
+    /// Two calls within the window share one derived connection (no repeat SQLCipher key derivation); a file rewritten
+    /// since (a different length) is never served from the cache.
+    #[test]
+    fn cache_shares_a_connection_until_the_file_changes() {
+        let dir =
+            std::env::temp_dir().join(format!("openfader-onelib-cache-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("lib.db");
+        let write = |extra: usize| {
+            let _ = std::fs::remove_file(&path);
+            let db = Connection::open(&path).unwrap();
+            db.pragma_update(None, "key", "k").unwrap();
+            for i in 0..extra {
+                db.execute_batch(&format!("create table t{i}(x)")).unwrap();
+            }
+        };
+        write(1);
+        let a = conn_cached(&path, "k").unwrap();
+        let b = conn_cached(&path, "k").unwrap();
+        assert!(
+            Arc::ptr_eq(&a, &b),
+            "a second call within the window reuses the first's connection"
+        );
+        write(6); // a later export rewrites the file: a longer file is a different signature
+        let c = conn_cached(&path, "k").unwrap();
+        assert!(
+            !Arc::ptr_eq(&a, &c),
+            "a changed file is never served from the cache"
+        );
         let _ = std::fs::remove_dir_all(&dir); // cleanup: Windows may still hold a handle
     }
 }

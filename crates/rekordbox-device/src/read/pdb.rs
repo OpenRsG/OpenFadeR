@@ -9,6 +9,58 @@ use rekordbox_common::list::{add_histories, analysis_ref, existing, history_raw,
 use rekordbox_common::pdb::{rows, string_at, u16_at, u32_at};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex};
+use std::time::{Duration, Instant, SystemTime};
+
+/// Dedupes repeat reads of the same `export.pdb` within a short window: the browser's own read and the device's
+/// automatic cue-sync job both start within a mount's first moment (`Auto::Link` in `app/device/scan.rs`), so the
+/// second reuses the first's bytes instead of pulling the whole file off the real stick again. A changed file (length
+/// or mtime) is always a cache miss.
+/// shortcut: a 3 s window, not a real completion signal between the two readers; see the matching cache in
+/// `read/onelibrary.rs` for the same reasoning.
+const CACHE_TTL: Duration = Duration::from_secs(3);
+
+struct Cached {
+    at: Instant,
+    sig: (u64, Option<SystemTime>),
+    bytes: Arc<Vec<u8>>,
+}
+
+static CACHE: LazyLock<Mutex<HashMap<PathBuf, Cached>>> = LazyLock::new(Default::default);
+
+fn signature(p: &Path) -> (u64, Option<SystemTime>) {
+    std::fs::metadata(p).map_or((0, None), |m| (m.len(), m.modified().ok()))
+}
+
+/// The bytes of `path`, read once per [`CACHE_TTL`] window and shared with any other reader of the same file in that
+/// window.
+fn read_cached(path: &Path) -> Result<Arc<Vec<u8>>, String> {
+    let sig = signature(path);
+    if let Some(c) = CACHE.lock().unwrap().get(path) {
+        if c.sig == sig && c.at.elapsed() < CACHE_TTL {
+            return Ok(c.bytes.clone());
+        }
+    }
+    let bytes = Arc::new(rekordbox_common::at(std::fs::read(path), path)?);
+    let at = Instant::now();
+    CACHE.lock().unwrap().insert(
+        path.to_owned(),
+        Cached {
+            at,
+            sig,
+            bytes: bytes.clone(),
+        },
+    );
+    let evict = path.to_owned();
+    std::thread::spawn(move || {
+        std::thread::sleep(CACHE_TTL);
+        let mut cache = CACHE.lock().unwrap();
+        if cache.get(&evict).is_some_and(|c| c.at == at) {
+            cache.remove(&evict);
+        }
+    });
+    Ok(bytes)
+}
 
 const T_TRACKS: u32 = 0;
 const T_GENRES: u32 = 1;
@@ -61,8 +113,8 @@ impl Export {
     /// Reads `<usb_root>/PIONEER/rekordbox/export.pdb`.
     pub fn open(usb_root: &Path) -> Result<Export, String> {
         let p = usb_root.join(PDB);
-        let d = rekordbox_common::at(std::fs::read(&p), &p)?;
-        Self::parse(&d, usb_root)
+        let d = read_cached(&p)?;
+        Self::parse(d.as_slice(), usb_root)
     }
 
     fn parse(d: &[u8], root: &Path) -> Result<Export, String> {
@@ -402,6 +454,33 @@ mod tests {
         assert_eq!(titles("history:3"), ["B", "A"]); // entry_index order
         assert!(titles("3").is_empty() && titles("history:").is_empty()); // ids do not cross namespaces
         assert_eq!((e.tracks.len(), e.tree.len(), e.entries.len()), (2, 1, 0)); // histories are not playlists
+    }
+
+    /// Two reads within the window share one `Arc` of bytes (no repeat disk read); a file rewritten since (a different
+    /// length here) is never served from the cache.
+    #[test]
+    fn byte_cache_reuses_until_the_file_changes() {
+        let dir = std::env::temp_dir().join(format!("openfader-pdb-cache-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("export.pdb");
+        std::fs::write(&path, with_track_and_artwork()).unwrap();
+        let a = read_cached(&path).unwrap();
+        let b = read_cached(&path).unwrap();
+        assert!(
+            Arc::ptr_eq(&a, &b),
+            "a second read within the window reuses the first's bytes"
+        );
+        std::fs::write(
+            &path,
+            build(&[(T_TRACKS, vec![track_row(1, "T"), track_row(2, "U")])]),
+        )
+        .unwrap();
+        let c = read_cached(&path).unwrap();
+        assert!(
+            !Arc::ptr_eq(&a, &c),
+            "a changed file is never served from the cache"
+        );
+        let _ = std::fs::remove_dir_all(&dir); // cleanup: Windows may still hold a handle
     }
 
     #[test]
