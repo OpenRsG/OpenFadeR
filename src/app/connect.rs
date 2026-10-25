@@ -59,6 +59,8 @@ struct State {
     watch: Option<Watch>,
     /// A change was reported while its connection was busy: read the stamps again at the next tick.
     rearm: bool,
+    /// Connections whose source stamp a worker is reading ([`tick`]).
+    stamping: HashSet<i64>,
 }
 
 thread_local! {
@@ -309,10 +311,10 @@ fn due(is_file: bool, watching: bool, changed: bool, since: Option<Duration>) ->
     changed || since.is_none_or(|t| t >= every)
 }
 
-/// Looks at every connection once: a changed source syncs, new edits of a two-way connection are planned for write-back.
+/// Looks at every connection once: a changed source syncs, new edits of a two-way connection are planned for write-back. A
+/// source's stamp (a whole folder walk for a folder) is read on a worker, so neither the start nor a tick waits for the disk.
 fn tick() {
-    let store = store::global();
-    let connections = store.connections().unwrap_or_default();
+    let connections = store::global().connections().unwrap_or_default();
     let (watching, changed) = with(|s| {
         let watching = s.watch.as_ref().is_some_and(Watch::alive);
         if let Some(w) = s.watch.as_mut().filter(|_| watching) {
@@ -337,16 +339,31 @@ fn tick() {
                 }
                 due
             });
-        let stamp = if read { connect::stamp(&c) } else { c.stamp.clone() };
-        let skip = stamp.is_empty() && c.last_sync != 0 // source gone (USB out): wait for it
-            || with(|s| s.failed.get(&c.id) == Some(&stamp));
-        if !skip && (c.last_sync == 0 || stamp != c.stamp) {
-            start_sync(c);
-        } else if c.mode == Mode::TwoWay && !skip && with(|s| s.plan.is_none() && !s.planning) {
-            let seq = store.journal_seq().unwrap_or(0);
-            if with(|s| s.seen.insert(c.id, seq)).is_some_and(|old| old != seq) {
-                start_plan(c);
-            }
+        if !read {
+            let stamp = c.stamp.clone();
+            decide(c, stamp);
+        } else if with(|s| s.stamping.insert(c.id)) {
+            std::thread::spawn(move || {
+                let stamp = connect::stamp(&c);
+                let _ = slint::invoke_from_event_loop(move || {
+                    with(|s| s.stamping.remove(&c.id));
+                    decide(c, stamp);
+                });
+            });
+        }
+    }
+}
+
+/// What [`tick`] does with connection `c` once its source's `stamp` is known: sync a changed source, else plan a write-back.
+fn decide(c: Connection, stamp: String) {
+    let skip = stamp.is_empty() && c.last_sync != 0 // source gone (USB out): wait for it
+        || with(|s| s.failed.get(&c.id) == Some(&stamp));
+    if !skip && (c.last_sync == 0 || stamp != c.stamp) {
+        start_sync(c);
+    } else if c.mode == Mode::TwoWay && !skip && with(|s| s.plan.is_none() && !s.planning) {
+        let seq = store::global().journal_seq().unwrap_or(0);
+        if with(|s| s.seen.insert(c.id, seq)).is_some_and(|old| old != seq) {
+            start_plan(c);
         }
     }
 }

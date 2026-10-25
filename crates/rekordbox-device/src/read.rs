@@ -15,11 +15,16 @@ use std::path::Path;
 const PDB: &str = "PIONEER/rekordbox/export.pdb";
 const ONE: &str = "PIONEER/rekordbox/exportLibrary.db";
 
-/// A device root holding either library file (the score 90 leaves room for plugins that know better).
+/// A device root holding either library file (the score 90 leaves room for plugins that know better). A OneLibrary's key
+/// starts deriving now, on a worker ([`onelibrary::warm`]).
 pub fn probe(path: &Path) -> Option<Probe> {
+    let one = path.join(ONE).is_file();
+    if one {
+        onelibrary::warm(path);
+    }
     let kind = if path.join(PDB).is_file() {
         "USB (Device Library)"
-    } else if path.join(ONE).is_file() {
+    } else if one {
         "USB (OneLibrary)"
     } else {
         return None;

@@ -13,70 +13,58 @@
 //! `history_content(history_id, content_id, sequenceNo)`; column names also match pyrekordbox
 //! `onelibrary/models.py` @ 43137cb91f8297c768d2a8bdce5b27b2225f0a2d.
 
-use super::{analysis, ONE};
+use super::{analysis, onelibrary_key, ONE};
 use openfader_plugin::library::{playlist_tree, Analysis, Playlist, PlaylistRow, Source, Track};
 use rekordbox_common::list::{add_histories, analysis_ref, existing, history_raw, under};
 use rekordbox_common::sql::{open_encrypted, query, track_from_row};
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
+use std::io::Read;
+use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{Duration, Instant, SystemTime};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
-/// How long a derived connection stays shared: long enough that the browser's own read and the device's automatic
-/// cue-sync job (both start within a mount's first moment, `Auto::Link` in `app/device/scan.rs`) pay the SQLCipher key
-/// derivation (PBKDF2, the slow part of opening a OneLibrary) once between them instead of three or more times over;
-/// short enough that nothing here holds `exportLibrary.db` open once that burst is over (Windows cannot replace an open
-/// file, and a later export rewrites this one).
-/// shortcut: a 3 s window, not a real completion signal between the two readers; raise it if a slower stick needs it,
-/// or replace it with an explicit "reuse the browser's read" handoff if the duplicate read moves further apart in time.
-const CACHE_TTL: Duration = Duration::from_secs(3);
-
-struct Cached {
-    at: Instant,
-    sig: (u64, Option<SystemTime>),
-    conn: Arc<Mutex<Connection>>,
+/// SQLCipher 4's key for `passphrase` on the database at `path`, as a raw key (`x'…'`): PBKDF2-HMAC-SHA512 over the 16-byte
+/// salt that starts the file, 256000 rounds, 32 bytes (SQLCipher's defaults, which [`open_encrypted`] uses with a passphrase).
+/// The derivation is the slow part of opening a OneLibrary (about 70 ms); it runs once per passphrase and salt in this
+/// process (two openers of a stick at once, the browser and the cue sync, wait for one derivation). A rewritten file has a new
+/// salt. `None` when the salt cannot be read (the passphrase is used as before).
+fn raw_key(path: &Path, passphrase: &str) -> Option<String> {
+    let (salt, cell) = key_cell(path, passphrase)?;
+    Some(cell.get_or_init(|| derive(passphrase, &salt)).clone())
 }
 
-static CACHE: LazyLock<Mutex<HashMap<PathBuf, Cached>>> = LazyLock::new(Default::default);
-
-/// File length and mtime: a cache key that misses as soon as the stick is rewritten, even within [`CACHE_TTL`].
-fn signature(p: &Path) -> (u64, Option<SystemTime>) {
-    std::fs::metadata(p).map_or((0, None), |m| (m.len(), m.modified().ok()))
+/// The salt of the database at `path` and the place its raw key for `passphrase` is kept once derived.
+fn key_cell(path: &Path, passphrase: &str) -> Option<([u8; 16], Arc<OnceLock<String>>)> {
+    type Keys = HashMap<(String, [u8; 16]), Arc<OnceLock<String>>>;
+    static KEYS: LazyLock<Mutex<Keys>> = LazyLock::new(Default::default);
+    let mut salt = [0u8; 16];
+    std::fs::File::open(path).and_then(|mut f| f.read_exact(&mut salt)).ok()?;
+    let cell = KEYS.lock().unwrap().entry((passphrase.to_owned(), salt)).or_default().clone();
+    Some((salt, cell))
 }
 
-/// A connection to the OneLibrary at `path`, derived once per [`CACHE_TTL`] window and shared with any other opener of
-/// the same file in that window; a changed file (different length or mtime) is always a cache miss. A wrong key fails
-/// here and nothing is cached, as before.
-fn conn_cached(path: &Path, key: &str) -> Result<Arc<Mutex<Connection>>, String> {
-    let sig = signature(path);
-    if let Some(c) = CACHE.lock().unwrap().get(path) {
-        if c.sig == sig && c.at.elapsed() < CACHE_TTL {
-            return Ok(c.conn.clone());
-        }
+fn derive(passphrase: &str, salt: &[u8; 16]) -> String {
+    let mut key = [0u8; 32];
+    let rounds = NonZeroU32::new(256_000).unwrap();
+    ring::pbkdf2::derive(ring::pbkdf2::PBKDF2_HMAC_SHA512, rounds, salt, passphrase.as_bytes(), &mut key);
+    format!("x'{}'", key.iter().map(|b| format!("{b:02x}")).collect::<String>())
+}
+
+/// Starts deriving the key of the OneLibrary under `usb_root` for the built-in passphrase on a worker when it is not derived
+/// yet ([`raw_key`]): called when the device is found, so the derivation runs while the device is scanned and its library
+/// files are read through, not after.
+pub(super) fn warm(usb_root: &Path) {
+    let passphrase = onelibrary_key(&serde_json::Value::Null);
+    if let Some((salt, cell)) = key_cell(&usb_root.join(ONE), &passphrase)
+        && cell.get().is_none()
+    {
+        std::thread::spawn(move || cell.get_or_init(|| derive(&passphrase, &salt)).len());
     }
-    let conn = Arc::new(Mutex::new(open_encrypted(path, key)?));
-    let at = Instant::now();
-    CACHE.lock().unwrap().insert(
-        path.to_owned(),
-        Cached {
-            at,
-            sig,
-            conn: conn.clone(),
-        },
-    );
-    let evict = path.to_owned();
-    std::thread::spawn(move || {
-        std::thread::sleep(CACHE_TTL);
-        let mut cache = CACHE.lock().unwrap();
-        if cache.get(&evict).is_some_and(|c| c.at == at) {
-            cache.remove(&evict);
-        }
-    });
-    Ok(conn)
 }
 
-/// Holds no connection of its own: [`Self::conn`] derives (or reuses a just-derived) one each call, see [`conn_cached`].
+/// Holds no connection between calls: an open `exportLibrary.db` cannot be replaced on Windows, and an export rewrites it
+/// while the host still has this source open. Each call opens the file with the raw key ([`raw_key`]).
 pub struct OneLibrary {
     key: String,
     root: PathBuf,
@@ -92,8 +80,11 @@ impl OneLibrary {
         Ok(this)
     }
 
-    fn conn(&self) -> Result<Arc<Mutex<Connection>>, String> {
-        conn_cached(&self.root.join(ONE), &self.key)
+    fn conn(&self) -> Result<Connection, String> {
+        let path = self.root.join(ONE);
+        // a key given raw already is used as it is
+        let raw = (!self.key.starts_with("x'")).then(|| raw_key(&path, &self.key)).flatten();
+        open_encrypted(&path, raw.as_deref().unwrap_or(&self.key))
     }
 }
 
@@ -109,7 +100,6 @@ impl Source for OneLibrary {
     /// Siblings by `sequenceNo`; the `history` rows (same shape) follow under "Histories".
     fn playlists(&self) -> Result<Vec<Playlist>, String> {
         let conn = self.conn()?;
-        let conn = conn.lock().unwrap();
         let rows = |sql: &str| {
             query(&conn, sql, [], |r| {
                 Ok(PlaylistRow {
@@ -136,7 +126,6 @@ impl Source for OneLibrary {
     /// All tracks by title, or one playlist's tracks in `sequenceNo` order.
     fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {
         let conn = self.conn()?;
-        let conn = conn.lock().unwrap();
         let base = "select coalesce(c.title, ''), coalesce(a.name, ''), coalesce(k.name, ''), coalesce(g.name, ''), \
                     coalesce(c.bpmx100, 0), coalesce(c.length, 0), coalesce(c.rating, 0), coalesce(c.djComment, ''), \
                     coalesce(c.dateAdded, ''), coalesce(c.bitrate, 0), coalesce(c.samplingRate, 0), coalesce(al.name, ''), \
@@ -236,35 +225,24 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir); // cleanup: Windows may still hold a handle
     }
 
-    /// Two calls within the window share one derived connection (no repeat SQLCipher key derivation); a file rewritten
-    /// since (a different length) is never served from the cache.
+    /// The raw key derived here opens what SQLCipher opens with the passphrase; a wrong passphrase still fails.
     #[test]
-    fn cache_shares_a_connection_until_the_file_changes() {
-        let dir =
-            std::env::temp_dir().join(format!("openfader-onelib-cache-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("lib.db");
-        let write = |extra: usize| {
-            let _ = std::fs::remove_file(&path);
-            let db = Connection::open(&path).unwrap();
-            db.pragma_update(None, "key", "k").unwrap();
-            for i in 0..extra {
-                db.execute_batch(&format!("create table t{i}(x)")).unwrap();
-            }
-        };
-        write(1);
-        let a = conn_cached(&path, "k").unwrap();
-        let b = conn_cached(&path, "k").unwrap();
-        assert!(
-            Arc::ptr_eq(&a, &b),
-            "a second call within the window reuses the first's connection"
-        );
-        write(6); // a later export rewrites the file: a longer file is a different signature
-        let c = conn_cached(&path, "k").unwrap();
-        assert!(
-            !Arc::ptr_eq(&a, &c),
-            "a changed file is never served from the cache"
-        );
+    fn the_raw_key_opens_what_the_passphrase_opens() {
+        let dir = std::env::temp_dir().join(format!("openfader-onelib-raw-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("PIONEER/rekordbox")).unwrap();
+        let path = dir.join(ONE);
+        let db = Connection::open(&path).unwrap();
+        db.pragma_update(None, "key", "k").unwrap();
+        db.execute_batch("create table t(x); insert into t values (7);").unwrap();
+        drop(db);
+        let raw = raw_key(&path, "k").unwrap();
+        assert_eq!(raw_key(&path, "k").as_deref(), Some(raw.as_str()));
+        let seven: i64 = open_encrypted(&path, &raw)
+            .unwrap()
+            .query_row("select x from t", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(seven, 7);
+        assert!(OneLibrary::open(&dir, "k").is_ok() && OneLibrary::open(&dir, "wrong").is_err());
         let _ = std::fs::remove_dir_all(&dir); // cleanup: Windows may still hold a handle
     }
 }

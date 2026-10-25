@@ -1,10 +1,11 @@
 //! A regression bench for the device read path (`PIONEER/rekordbox/{export.pdb,exportLibrary.db}` → tracks +
 //! playlists): how long opening a device library and listing everything on it takes, alone and when two openers race
 //! it the way a real mount does (the browser's own read, `app/browser/sources.rs`, and the device's automatic
-//! cue-sync job, `Auto::Link` in `app/device/scan.rs`, both start within the mount's first moment). The second number
-//! is what `read/onelibrary.rs`'s connection cache and `read/pdb.rs`'s byte cache exist to shrink: before them it was
-//! roughly twice the first number (each opener re-derived the SQLCipher key, or re-read the file, on its own);
-//! afterwards the second opener should mostly reuse the first's work.
+//! cue-sync job, `Auto::Link` in `app/device/scan.rs`, both start within the mount's first moment). The first opener pays
+//! the SQLCipher key derivation of a OneLibrary once (PBKDF2-HMAC-SHA512, 256000 rounds: about 70 ms on a Ryzen 9700X, the
+//! floor of a first read); every later connection to the same file uses the derived raw key (`read/onelibrary.rs`).
+//! Before that, the open, the playlists and the tracks each derived it: 234 ms for the owner's 24-track stick, 251 ms for
+//! the 5k fixture; after: 75 ms and 84 ms, and the second opener under 1 ms and 11 ms.
 //!
 //! Run with `cargo test -p rekordbox-device --release -- --ignored --nocapture bench_device_read`. Point
 //! `OPENFADER_USB` (the convention `tests/common` already uses) at a real device root to bench that library instead
@@ -112,9 +113,13 @@ fn build_fixture(dir: &Path, tracks: usize) -> PathBuf {
 
 /// Open the device library at `root` and list everything on it, the way `app/browser/sources.rs::read` does.
 fn read_once(root: &Path) -> (usize, usize) {
+    let t = Instant::now();
     let lib = common::open(root, None);
-    let tracks = lib.tracks(None).expect("tracks").len();
+    let open = t.elapsed();
     let playlists = lib.playlists().expect("playlists").len();
+    let lists = t.elapsed() - open;
+    let tracks = lib.tracks(None).expect("tracks").len();
+    println!("  open {open:?}, playlists {lists:?}, tracks {:?}", t.elapsed() - open - lists);
     (tracks, playlists)
 }
 
@@ -150,7 +155,6 @@ fn bench_device_read() {
     let concurrent = start.elapsed();
     assert_eq!(here, there, "both openers see the same library");
     println!(
-        "device read, two concurrent openers (browser + cue-sync): {concurrent:?} total, \
-         vs {cold:?} for one opener alone before the read-side cache made the second nearly free"
+        "device read again, two concurrent openers (browser + cue-sync): {concurrent:?} total (first read alone: {cold:?})"
     );
 }

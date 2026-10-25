@@ -451,6 +451,12 @@ fn migrate(conn: &mut Connection) -> R<()> {
         conn.execute_batch("ALTER TABLE device_backup ADD COLUMN auto INTEGER NOT NULL DEFAULT 0;")
             .s()?;
     }
+    // The rows [`rekey::backfill`] looks for at every start, found without reading the whole table (3 ms at 50k tracks, the
+    // whole file from disk when it is not cached). Not a schema version: an older build opens the store with it as well; a
+    // store that cannot take it (read-only) only reads slower.
+    let _ = conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS collection_unstamped ON collection(id) WHERE added_at = 0 OR size = 0;",
+    );
     Ok(())
 }
 
