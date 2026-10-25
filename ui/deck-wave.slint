@@ -18,7 +18,7 @@ export component WaveView inherits Image {
     changed height => { self.resized(self.width, self.height); }
 }
 
-/// The enlarged waveform of deck `index`: Rust's still picture (`DeckView.detail`, `DeckScroll.strip-w` wide) slid by
+/// The enlarged waveform of deck `index`: Rust's still picture (`DeckLive.detail`, `DeckScroll.strip-w` wide) slid by
 /// `strip-x` under the fixed playhead at the centre, with the slip ghost and the beat counter over it. Only `DeckScroll`
 /// changes while a deck plays (src/app/deck/frame.rs), so a frame moves one image and redraws nothing else. Reports its
 /// size like [`WaveView`]; Rust draws the picture at that height and three times that width.
@@ -36,7 +36,7 @@ export component WaveStrip inherits Rectangle {
         y: 0;
         width: DeckState.waveform-gpu ? root.width : root.s.strip-w;
         height: root.height;
-        source: DeckState.decks[root.index].detail;
+        source: DeckState.live[root.index].detail;
         source-clip-x: DeckState.waveform-gpu ? round(-root.s.strip-x / max(1px, root.s.strip-w) * self.source.width) : 0;
         source-clip-width: DeckState.waveform-gpu ? round(root.width / max(1px, root.s.strip-w) * self.source.width) : self.source.width;
         image-fit: fill;
@@ -261,7 +261,7 @@ export component DeckOverview inherits Rectangle {
     changed loaded => { DeckState.overview-resized(root.index, self.width, self.height); }
     changed index => { DeckState.overview-resized(root.index, self.width, self.height); }
     WaveView {
-        source: DeckState.decks[root.index].overview;
+        source: DeckState.live[root.index].overview;
         resized(w, h) => { DeckState.overview-resized(root.index, w, h); }
     }
     // Tiny physical-pixel textures reuse the CPU painter's marks, composed over a static overview.

@@ -456,9 +456,9 @@ impl Deck {
         self.show(|v| {
             (v.loaded, v.loading, v.playing, v.at_cue, v.ending) =
                 (false, false, false, false, false);
-            (v.detail, v.overview) = Default::default();
             v.status = tr!("Select a track, then LOAD").into();
         });
+        self.set_live(|r| (r.detail, r.overview) = Default::default());
         self.scroll.set_row_data(self.index, Default::default());
         openfader::plugin::event::fire(
             "track_unloaded",

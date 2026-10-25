@@ -8,14 +8,8 @@ export struct DeckView {
     /// Audio still decoding ("loading…"); waveforms from the analysis are already shown.
     loading: bool,
     playing: bool,
-    detail: image,
-    overview: image,
     overview-head: image,
     overview-ghost: image,
-    time-text: string,
-    /// Elapsed "02:06.4" and remaining "-05:43.9" time of the header; title and artist of the loaded track.
-    elapsed-text: string,
-    remain-text: string,
     /// Track length "05:50.2" (the readout under the remaining time).
     total-text: string,
     title: string,
@@ -84,9 +78,8 @@ export struct DeckView {
     /// ACTIVE STEM buttons shown (PREFS > Extensions > STEMS layout).
     stem-buttons: bool,
     /// JOG display: the cue point's angle on a 33⅓ rpm platter (degrees, 0 = top, clockwise; the playhead's is in
-    /// `DeckScroll`), the laps to the next hot cue (-1 = none within 5 laps), and whether VIEW > Switch JOG Display is HOT CUE COUNTDOWN.
+    /// `DeckScroll`), and whether VIEW > Switch JOG Display is HOT CUE COUNTDOWN.
     jog-cue: float,
-    jog-laps: float,
     jog-countdown: bool,
     /// Auto loop length from PREFS > Auto Beat Loop (beats; 0 = not set yet): what the idle LOOP number box shows and starts.
     auto-beats: int,
@@ -94,6 +87,18 @@ export struct DeckView {
     metronome: bool,
     /// HERE chip (GRID edit block): grid edits change only the tempo section from the playhead on.
     grid-here: bool,
+}
+
+/// What changes while a deck plays, but not every frame: the time readouts (ten times a second), the overview (its CPU-drawn
+/// playhead) and the enlarged waveform's still picture (`DeckScroll` slides it). Kept apart from `DeckView` so these pushes
+/// redraw only what shows them, not every binding of the deck (src/app/deck/tick.rs, frame.rs).
+export struct DeckLive {
+    detail: image,
+    overview: image,
+    time-text: string,
+    /// Elapsed "02:06.4" and remaining "-05:43.9" time of the header.
+    elapsed-text: string,
+    remain-text: string,
 }
 
 /// What moves every frame (src/app/deck/frame.rs sets it right before each frame is drawn, so it is kept apart from the
@@ -110,6 +115,8 @@ export struct DeckScroll {
     beat-text: string,
     /// Platter angle of the playhead (degrees, 0 = top, clockwise).
     jog-angle: float,
+    /// HOT CUE COUNTDOWN: laps to the next hot cue (-1 = none within 5 laps).
+    jog-laps: float,
     /// Beat phase meter (synced decks): this deck's and the other deck's place in the 4-beat bar (0..1), and
     /// this deck's offset from it in beats (−2..2).
     phase-show: bool,
@@ -129,6 +136,7 @@ export struct DeckScroll {
 export global DeckState {
     in property <[DeckView]> decks;
     in property <[DeckScroll]> scroll;
+    in property <[DeckLive]> live;
     in property <bool> waveform-gpu;
     /// Decks shown: 2 (A, B) or 4 (A to D, the 4-deck layout; the `decks` setting, written by Rust).
     in property <int> count: 2;

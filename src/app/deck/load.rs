@@ -425,8 +425,6 @@ impl Deck {
             v.title = t.title.clone().into();
             v.artist = t.artist.clone().into();
             v.genre = t.genre.clone().into();
-            (v.elapsed_text, v.remain_text) =
-                (fmt_ms(0).into(), format!("-{}", fmt_ms(duration)).into());
             v.total_text = fmt_ms(duration).into();
             v.status = if loading {
                 tr!("loading… · {}", status)
@@ -447,6 +445,10 @@ impl Deck {
             v.loop_active = false;
             v.grid_edit = false;
             v.grid_here = false;
+        });
+        self.set_live(|r| {
+            (r.elapsed_text, r.remain_text) =
+                (fmt_ms(0).into(), format!("-{}", fmt_ms(duration)).into());
         });
         self.show_cover(t);
         self.refresh_key();

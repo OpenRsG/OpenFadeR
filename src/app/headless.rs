@@ -6,7 +6,7 @@ use slint::platform::{
     Platform, WindowAdapter,
 };
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     rc::{Rc, Weak},
 };
 
@@ -14,11 +14,16 @@ struct Headless;
 
 thread_local! {
     static LAST_WINDOW: RefCell<Weak<MinimalSoftwareWindow>> = RefCell::default();
+    static REUSED: Cell<bool> = const { Cell::new(false) };
 }
 
 impl Platform for Headless {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
-        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        let window = MinimalSoftwareWindow::new(if REUSED.get() {
+            RepaintBufferType::ReusedBuffer
+        } else {
+            RepaintBufferType::NewBuffer
+        });
         LAST_WINDOW.with(|last| *last.borrow_mut() = Rc::downgrade(&window));
         Ok(window)
     }
@@ -27,6 +32,12 @@ impl Platform for Headless {
 /// Installs the platform (once per process; later calls are no-ops).
 pub fn init() {
     slint::platform::set_platform(Box::new(Headless)).ok();
+}
+
+/// Windows created on this thread from now on repaint only what changed into the buffer they were last drawn to (what a
+/// real software window does); the default repaints everything into a new buffer. For timing benches.
+pub fn repaint_changes_only() {
+    REUSED.set(true);
 }
 
 /// The most recently created window on this test thread, for pixel-level checks of the actual UI.

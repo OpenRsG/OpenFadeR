@@ -15,8 +15,9 @@ export component JogWheel inherits Rectangle {
     property <angle> spin: DeckState.scroll[root.index].jog-angle * 1deg - 90deg;
     property <bool> small: root.width < 80px;
     property <length> t: root.width * 0.054;
-    /// Share of the current lap (0..1) left before the next hot cue.
-    property <float> left: root.v.jog-laps - (Math.ceil(root.v.jog-laps) - 1);
+    /// Laps to the next hot cue (HOT CUE COUNTDOWN), and the share (0..1) of the current lap left before it.
+    property <float> laps: DeckState.scroll[root.index].jog-laps;
+    property <float> left: root.laps - (Math.ceil(root.laps) - 1);
     property <int> bpm-scale: Theme.tempo-decimals == 1 ? 10 : 100;
     property <int> bpm-rounded: Math.round(root.v.bpm * root.bpm-scale);
     property <int> bpm-int: Math.floor(root.bpm-rounded / root.bpm-scale);
@@ -59,7 +60,7 @@ export component JogWheel inherits Rectangle {
     }
     // HOT CUE COUNTDOWN: within 5 laps of the next hot cue the arc is what is left of the current lap (clockwise from the top)
     // and the pips count the laps still to go.
-    if root.v.jog-countdown && root.v.jog-laps >= 0: Path {
+    if root.v.jog-countdown && root.laps >= 0: Path {
         width: root.width;
         height: root.height;
         viewbox-width: 100;
@@ -68,12 +69,12 @@ export component JogWheel inherits Rectangle {
         stroke: Theme.cue;
         stroke-width: root.t;
     }
-    if root.v.jog-countdown && root.v.jog-laps >= 0: HorizontalLayout {
+    if root.v.jog-countdown && root.laps >= 0: HorizontalLayout {
         y: root.height - root.t - 7px;
         width: root.width;
         alignment: center;
         spacing: 2px;
-        for i in 5: Rectangle { width: 4px; height: 3px; background: i < Math.ceil(root.v.jog-laps) ? Theme.cue : Theme.line-strong; }
+        for i in 5: Rectangle { width: 4px; height: 3px; background: i < Math.ceil(root.laps) ? Theme.cue : Theme.line-strong; }
     }
     VerticalLayout {
         alignment: center;
