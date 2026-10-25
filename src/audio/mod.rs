@@ -54,7 +54,8 @@ pub use decode::{
 };
 pub use dsp::{EQ_KILL_DB, EQ_MAX_DB};
 pub use player::{
-    Player, Status, configure, controller, live_bus, release_controller, set_output, status,
+    Player, Status, Switch, configure, controller, live_bus, release_controller, set_output, set_waker,
+    settle, status, when_settled,
 };
 pub use rec::{new_path as rec_path, Options as RecOptions, Recorder, Take};
 pub use stems::{
@@ -128,29 +129,27 @@ impl Ring {
     }
 }
 
-/// The first output device whose name contains `want` (case-insensitive) and its name. Errors name `env` and
-/// list every available device; nothing falls back to another device.
+/// The first output device whose name contains `want` (case-insensitive) and its name. The host lists its devices one by one
+/// (ALSA opens each PCM as it goes): the search stops at the first match. Errors name `env` and list every available device;
+/// nothing falls back to another device.
 fn find_output(want: &str, env: &str) -> Result<(String, cpal::Device), String> {
     use cpal::traits::{DeviceTrait, HostTrait};
-    let mut devs: Vec<(String, cpal::Device)> = cpal::default_host()
-        .output_devices()
-        .map_err(|e| format!("{env}: cannot list output devices: {e}"))?
-        .filter_map(|d| Some((d.name().ok()?, d)))
-        .collect();
     let want_lc = want.to_lowercase();
-    match devs
-        .iter()
-        .position(|(n, _)| n.to_lowercase().contains(&want_lc))
-    {
-        Some(i) => Ok(devs.swap_remove(i)),
-        None => {
-            let names: Vec<_> = devs.iter().map(|(n, _)| n.as_str()).collect();
-            Err(format!(
-                "{env}={want:?}: no such output device; available: {}",
-                names.join(", ")
-            ))
+    let mut seen = Vec::new();
+    let devs = cpal::default_host()
+        .output_devices()
+        .map_err(|e| format!("{env}: cannot list output devices: {e}"))?;
+    for d in devs {
+        let Ok(n) = d.name() else { continue };
+        if n.to_lowercase().contains(&want_lc) {
+            return Ok((n, d));
         }
+        seen.push(n);
     }
+    Err(format!(
+        "{env}={want:?}: no such output device; available: {}",
+        seen.join(", ")
+    ))
 }
 
 /// Mean of a stereo frame.

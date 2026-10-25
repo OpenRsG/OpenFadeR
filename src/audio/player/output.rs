@@ -8,13 +8,21 @@
 //! does not support falls back to its default the same way. Headphones: `OPENFADER_CUE_DEVICE` / `OPENFADER_HP_CHANNELS`
 //! > the Preferences headphone pair > a controller interface with four outputs / a card listed in `audio-cards.json` > SPLIT on the master pair.
 //! The stream is opened with exactly the channels the layout needs ([`Plan::channels`]).
+//!
+//! A device is found by name, and finding it is slow (cpal's ALSA host opens every PCM to list them: 0.1 to 0.7 s), so with
+//! a waker set ([`set_waker`]) the lookup runs on a worker thread and the answer is cached: [`choose`] plays the system
+//! default meanwhile and [`Status::pending`] names the device being looked for; the engine moves the stream when the worker
+//! calls the waker (`super::engine::settle`). Without a waker (tests, tools) the lookup blocks the caller.
 
 use super::super::bus::{self, Headphones};
 use super::super::route::{self, Mixer, Plan, Settings};
 use super::super::{cue, device, find_output};
 use cpal::traits::DeviceTrait;
 use cpal::{BufferSize, SampleFormat, StreamConfig, SupportedBufferSize, SupportedStreamConfig};
+use parking_lot::Mutex;
 use std::cell::RefCell;
+use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 /// What the last stream open decided, for the Preferences page (see [`status`]).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -31,6 +39,8 @@ pub struct Status {
     pub notes: Vec<String>,
     /// The asked layout or device could not be had (the previous or default one plays instead).
     pub error: Option<String>,
+    /// The device being looked for on a worker thread: the stream keeps playing where it is and moves there when found.
+    pub pending: Option<String>,
 }
 
 /// What [`choose`] decided: the device, its stream config, the channel layout, and the second headphone device if one was asked for.
@@ -88,6 +98,11 @@ pub fn status() -> Status {
     STATUS.with_borrow(Clone::clone)
 }
 
+/// Shows (or clears) the device being looked for in the status of the stream that plays meanwhile.
+pub(super) fn set_pending(name: Option<String>) {
+    STATUS.with_borrow_mut(|s| s.pending = name);
+}
+
 pub(super) fn publish(s: Status) {
     STATUS.set(s);
 }
@@ -128,44 +143,139 @@ fn find_wanted(want: &str) -> Result<(String, cpal::Device), String> {
         .ok_or_else(|| format!("no output device named like {want:?}"))
 }
 
-/// Device, config and layout for the next stream (see the module doc for the precedence).
-pub(super) fn choose() -> Result<Output, String> {
-    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-    let wanted = WANTED.with_borrow(Clone::clone);
-    let set = settings();
-    let mut notes = Vec::new();
-    let (name, dev, source) = match (env(bus::OUTPUT_ENV), &wanted) {
-        (Some(want), _) => {
-            let (n, d) = find_output(&want, bus::OUTPUT_ENV)?;
-            (n, d, bus::OUTPUT_ENV)
-        }
-        (None, Some(want)) => {
-            let (n, d) = find_wanted(want)?;
-            (n, d, "controller")
-        }
-        (None, None) if !set.device.is_empty() => {
-            // An HDMI port without a screen opens fine and plays silence: the default plays until something is plugged in.
-            let unplugged = device::unplugged(&set.device);
-            match (!unplugged)
-                .then(|| device::output_named(&set.device))
-                .flatten()
-            {
-                Some(d) => (set.device.clone(), d, "settings"),
-                None => {
-                    notes.push(if unplugged {
-                        format!(
-                            "nothing is plugged into {:?} (no screen or receiver): the system default plays",
-                            set.device
-                        )
-                    } else {
-                        format!("{:?} is not available: the system default plays", set.device)
-                    });
-                    let (n, d) = device::default_output()?;
-                    (n, d, "system default")
+/// A device to open by name; the first of these that applies is the one asked for (the module doc's precedence).
+#[derive(Clone, Debug, PartialEq)]
+enum Lookup {
+    /// `OPENFADER_OUTPUT_DEVICE`: a part of the name ([`find_output`]).
+    Env(String),
+    /// The connected controller's interface ([`find_wanted`]).
+    Controller(String),
+    /// The Preferences' device: the exact cpal name.
+    Settings(String),
+}
+
+/// What a lookup found: the device and its name, or why not.
+type Found = Result<(String, cpal::Device), String>;
+
+impl Lookup {
+    fn name(&self) -> &str {
+        let (Lookup::Env(n) | Lookup::Controller(n) | Lookup::Settings(n)) = self;
+        n
+    }
+
+    /// The slow part: lists the host's devices.
+    fn find(&self) -> Found {
+        match self {
+            Lookup::Env(want) => find_output(want, bus::OUTPUT_ENV),
+            Lookup::Controller(want) => find_wanted(want),
+            Lookup::Settings(name) => {
+                // An HDMI port without a screen opens fine and plays silence: the default plays until something is plugged in.
+                if device::unplugged(name) {
+                    return Err(format!(
+                        "nothing is plugged into {name:?} (no screen or receiver): the system default plays"
+                    ));
                 }
+                device::output_named(name)
+                    .map(|d| (name.clone(), d))
+                    .ok_or_else(|| format!("{name:?} is not available: the system default plays"))
             }
         }
-        (None, None) => {
+    }
+}
+
+/// How long an answer is reused. It holds an open PCM until a stream takes it, so it must not outlive the moment it is wanted.
+const FRESH: Duration = Duration::from_secs(5);
+static FOUND: Mutex<Vec<(Lookup, Instant, Found)>> = Mutex::new(Vec::new());
+static RUNNING: Mutex<Vec<Lookup>> = Mutex::new(Vec::new());
+static WAKE: OnceLock<fn()> = OnceLock::new();
+
+/// Lets lookups run on a worker thread: `wake` is called from that thread when one ends, and must run `super::settle` on the
+/// UI thread. Without it every lookup blocks its caller.
+pub fn set_waker(wake: fn()) {
+    let _ = WAKE.set(wake);
+}
+
+fn cached(l: &Lookup) -> Option<Found> {
+    FOUND
+        .lock()
+        .iter()
+        .find(|(k, at, _)| k == l && at.elapsed() < FRESH)
+        .map(|(.., f)| f.clone())
+}
+
+fn store(l: &Lookup, f: &Found) {
+    let mut v = FOUND.lock();
+    v.retain(|(k, at, _)| k != l && at.elapsed() < FRESH);
+    v.push((l.clone(), Instant::now(), f.clone()));
+}
+
+/// The answer for `l`; `None` = a worker is looking (started here when none is yet). The environment's device is looked up at
+/// once: it is a developer's override, and its error lists the devices.
+fn resolve(l: &Lookup) -> Option<Found> {
+    if let Some(f) = cached(l) {
+        return Some(f);
+    }
+    if WAKE.get().is_none() || matches!(l, Lookup::Env(_)) {
+        let f = l.find();
+        store(l, &f);
+        return Some(f);
+    }
+    let mut running = RUNNING.lock();
+    if !running.contains(l) {
+        running.push(l.clone());
+        let l = l.clone();
+        std::thread::spawn(move || {
+            store(&l, &l.find());
+            RUNNING.lock().retain(|k| k != &l);
+            if let Some(wake) = WAKE.get() {
+                wake();
+            }
+        });
+    }
+    None
+}
+
+/// The device the next stream is asked to open by name, if any.
+fn lookup_now() -> Option<Lookup> {
+    if let Some(want) = std::env::var(bus::OUTPUT_ENV).ok().filter(|v| !v.is_empty()) {
+        return Some(Lookup::Env(want));
+    }
+    if let Some(want) = WANTED.with_borrow(Clone::clone) {
+        return Some(Lookup::Controller(want));
+    }
+    SETTINGS.with_borrow(|s| (!s.device.is_empty()).then(|| Lookup::Settings(s.device.clone())))
+}
+
+/// The name of the device the next stream wants when a worker is still looking for it (the lookup is running by now).
+pub(super) fn unresolved() -> Option<String> {
+    let l = lookup_now()?;
+    resolve(&l).is_none().then(|| l.name().to_owned())
+}
+
+/// Device, config and layout for the next stream (see the module doc for the precedence). A device not found yet is
+/// [`Status::pending`]: the system default is what this returns, the stream moves when the answer is there.
+pub(super) fn choose() -> Result<Output, String> {
+    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    let set = settings();
+    let mut notes = Vec::new();
+    let mut pending = None;
+    let look = lookup_now();
+    let (name, dev, source) = match (&look, look.as_ref().map(resolve)) {
+        (Some(Lookup::Env(_)), Some(Some(f))) => {
+            let (n, d) = f?;
+            (n, d, bus::OUTPUT_ENV)
+        }
+        (Some(Lookup::Controller(_)), Some(Some(f))) => {
+            let (n, d) = f?;
+            (n, d, "controller")
+        }
+        (_, Some(Some(Ok((n, d))))) => (n, d, "settings"),
+        (look, found) => {
+            match found {
+                Some(Some(Err(note))) => notes.push(note),
+                Some(None) => pending = look.as_ref().map(|l| l.name().to_owned()),
+                _ => {}
+            }
             let (n, d) = device::default_output()?;
             (n, d, "system default")
         }
@@ -193,7 +303,7 @@ pub(super) fn choose() -> Result<Output, String> {
         && !external
         && cue_want.is_none()
         && env(bus::OUTPUT_ENV).is_none()
-        && wanted.is_some()
+        && source == "controller"
         && config_for(&dev, &name, 4, None).is_ok()
     {
         multi = Ok(Some([2, 3]));
@@ -275,6 +385,7 @@ pub(super) fn choose() -> Result<Output, String> {
         buffer,
         notes,
         error,
+        pending,
     };
     Ok(Output {
         dev,

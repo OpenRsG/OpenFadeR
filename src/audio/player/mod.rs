@@ -28,9 +28,9 @@ use super::metronome::{self, Hits};
 use super::transport::Transport;
 use super::{clamped_in, load_f32, store_clamped, Pcm, Stems, Track16, STEM_COUNT};
 use clock::{audible, heard_frames, Anchor, Clock};
-pub use engine::{configure, live_bus, set_output};
+pub use engine::{configure, live_bus, set_output, settle, when_settled, Switch};
 use engine::{Engine, ENGINE};
-pub use output::{controller, release_controller, status, Status};
+pub use output::{controller, release_controller, set_waker, status, Status};
 use parking_lot::Mutex;
 use std::rc::{Rc, Weak};
 use std::sync::atomic::{

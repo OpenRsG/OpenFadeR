@@ -3,7 +3,9 @@
 //! The first `Player::new` opens the stream, later ones take the next free slot of the mixer ([`SLOTS`]: decks A to D).
 //! The callback is in [`super::mix`]. The device, rate, buffer and layout come from [`super::output`]; [`configure`]
 //! moves the running stream when the Preferences change them, [`set_output`] when a controller asks for its own
-//! interface. `Player::bus` gives the shared knobs.
+//! interface. A device is found by name on a worker thread ([`output::set_waker`]: listing ALSA devices takes up to a second):
+//! the stream plays on where it is, [`settle`] moves it when the device is found and [`when_settled`] tells the caller.
+//! `Player::bus` gives the shared knobs.
 
 use super::super::bus::{self, Bus};
 use super::super::cue;
@@ -137,6 +139,9 @@ impl Engine {
 
     fn build(shared: &[Arc<Shared>; SLOTS]) -> Result<Engine, String> {
         let mut out = choose()?;
+        if out.status.pending.is_some() {
+            PENDING.with_borrow_mut(|p| _ = p.get_or_insert_with(Pending::default)); // `settle` moves the stream when it is found
+        }
         let bus = Arc::new(Bus::new(out.cfg.sample_rate.0, out.headphones.clone()));
         bus.apply(&output::settings());
         let stream = start(&mut out, shared, &bus)?;
@@ -166,54 +171,178 @@ impl Engine {
     }
 }
 
+/// How a request to move the stream ended for now.
+#[derive(Debug, PartialEq)]
+pub enum Switch {
+    /// The stream plays on this device now.
+    Done(String),
+    /// The device is being looked up on a worker thread (ALSA opens every PCM to list them: far too long for the UI thread).
+    /// The stream plays on where it was and moves when the lookup ends ([`settle`]); [`when_settled`] tells the caller then.
+    Later,
+}
+
+/// A request that waits for its device lookup.
+#[derive(Default)]
+struct Pending {
+    /// Puts the request state back to that of the stream that plays now: the first request's, later ones build on it.
+    undo: Option<Box<dyn FnOnce()>>,
+    /// A failure is also noted in the status (a Preferences change; a controller's request only reports it).
+    note: bool,
+    waiters: Vec<Box<dyn FnOnce(Result<String, String>)>>,
+}
+
+thread_local! {
+    static PENDING: RefCell<Option<Pending>> = const { RefCell::new(None) };
+}
+
+/// Moves the stream to the device [`choose`] now picks (or, for no stream yet, just checks it), puts the request back with
+/// `p.undo` when that fails, and tells the waiters.
+fn finish(p: Pending) -> Result<String, String> {
+    output::set_pending(None);
+    let undo = || p.undo.into_iter().for_each(|u| u());
+    let r = match ENGINE.with_borrow(Weak::upgrade) {
+        None => choose().map(|o| o.status.device).inspect_err(|_| undo()),
+        Some(engine) => engine.reopen().or_else(|e| {
+            undo();
+            let back = engine.reopen();
+            if p.note {
+                output::note_error(e.clone());
+            }
+            match back {
+                Ok(was) => Err(format!("{e}; staying on {was}")),
+                Err(again) => Err(format!("{e}; and the previous output failed too: {again}")),
+            }
+        }),
+    };
+    p.waiters.into_iter().for_each(|w| w(r.clone()));
+    r
+}
+
+/// Moves the stream to what the request state now asks, at once when the device is known, else once a worker has found it.
+fn request(undo: impl FnOnce() + 'static, note: bool) -> Result<Switch, String> {
+    let mut p = PENDING.take().unwrap_or_default();
+    if p.undo.is_none() {
+        (p.undo, p.note) = (Some(Box::new(undo) as Box<dyn FnOnce()>), note);
+    }
+    if let Some(name) = output::unresolved() {
+        output::set_pending(Some(name));
+        PENDING.set(Some(p));
+        return Ok(Switch::Later);
+    }
+    finish(p).map(Switch::Done)
+}
+
+/// A device lookup ended (the waker of [`output::set_waker`] runs this on the UI thread): moves the stream to the device the
+/// requests so far asked for, and tells [`when_settled`]. Nothing to do when no request waits, or a newer one waits for
+/// another lookup.
+pub fn settle() {
+    let Some(p) = PENDING.take() else { return };
+    if let Some(name) = output::unresolved() {
+        output::set_pending(Some(name));
+        return PENDING.set(Some(p));
+    }
+    match finish(p) {
+        Ok(dev) => eprintln!("audio: output moved to {dev}"),
+        Err(e) => eprintln!("audio: output not moved: {e}"),
+    }
+}
+
+/// Calls `done` with the outcome (the device now in use, or why not) once the device [`Switch::Later`] / [`configure`] waits
+/// for is there and the stream has moved. Does nothing when no request is waiting.
+pub fn when_settled(done: impl FnOnce(Result<String, String>) + 'static) {
+    PENDING.with_borrow_mut(|p| {
+        if let Some(p) = p {
+            p.waiters.push(Box::new(done));
+        }
+    });
+}
+
 /// Asks for the output device named like `want` (a controller's name, matched without punctuation or case) or, with `None`, for the
-/// original one (`OPENFADER_OUTPUT_DEVICE`, else the Preferences' device, else the system default); the stream moves there at once,
-/// without a restart. Returns the device name now in use. An error leaves the previous device playing; `OPENFADER_OUTPUT_DEVICE` set
-/// keeps its device whatever is asked.
-pub fn set_output(want: Option<&str>) -> Result<String, String> {
+/// original one (`OPENFADER_OUTPUT_DEVICE`, else the Preferences' device, else the system default). The stream moves there at
+/// once, without a restart, when the device is known; else it plays on while a worker looks for it ([`Switch::Later`]). An error
+/// leaves the previous device playing; `OPENFADER_OUTPUT_DEVICE` set keeps its device whatever is asked.
+pub fn set_output(want: Option<&str>) -> Result<Switch, String> {
     if std::env::var_os(bus::OUTPUT_ENV).is_some_and(|v| !v.is_empty()) {
-        return choose().map(|o| o.status.device); // the env device is already the one playing
+        return choose().map(|o| Switch::Done(o.status.device)); // the env device is already the one playing
     }
     let previous = output::replace_wanted(want.map(str::to_owned));
-    let Some(engine) = ENGINE.with_borrow(Weak::upgrade) else {
-        return choose()
-            .map(|o| o.status.device)
-            .inspect_err(|_| _ = output::replace_wanted(previous)); // no stream yet: the first `Player` opens it on this device
-    };
-    engine.reopen().or_else(|e| {
-        output::set_wanted(previous);
-        match engine.reopen() {
-            Ok(was) => Err(format!("{e}; staying on {was}")),
-            Err(again) => Err(format!("{e}; and the previous device failed too: {again}")),
-        }
-    })
+    request(move || output::set_wanted(previous), false)
 }
 
 /// Applies the Preferences' audio settings ([`Settings`]): the live knobs at once ([`Bus::apply`]), the device, rate, buffer
-/// and channel layout by moving the running stream (decks keep their state; there is a short gap). With no stream yet the first
-/// `Player` opens it with these. An error leaves the previous stream playing (what failed is in `status().error`).
+/// and channel layout by moving the running stream (decks keep their state; there is a short gap; a device not looked up yet
+/// is waited for first, [`when_settled`]). With no stream yet the first `Player` opens it with these. An error leaves the
+/// previous stream playing (what failed is in `status().error`).
 pub fn configure(s: Settings) -> Result<(), String> {
     let old = output::replace_settings(s.clone());
     let Some(engine) = ENGINE.with_borrow(Weak::upgrade) else {
+        let _ = output::unresolved(); // starts the lookup while the window is built
         return Ok(());
     };
     engine.bus.apply(&s);
     if s.same_stream(&old) {
         return Ok(());
     }
-    engine.reopen().map(drop).or_else(|e| {
-        output::replace_settings(old);
-        let back = engine.reopen();
-        output::note_error(e.clone());
-        match back {
-            Ok(was) => Err(format!("{e}; staying on {was}")),
-            Err(again) => Err(format!("{e}; and the previous output failed too: {again}")),
-        }
-    })
+    request(move || _ = output::replace_settings(old), true).map(drop)
 }
 
 /// The bus of the running stream (`None` before the first `Player` opened it): the knobs, the preview player
 /// (`Bus::preview`) and the recorder tap, for code that has no `Player` at hand.
 pub fn live_bus() -> Option<Arc<Bus>> {
     ENGINE.with_borrow(Weak::upgrade).map(|e| e.bus.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::super::route::Settings;
+    use super::super::{status, Player};
+    use super::*;
+    use cpal::traits::{DeviceTrait, HostTrait};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::{Duration, Instant};
+
+    static LOOKED_UP: AtomicBool = AtomicBool::new(false);
+
+    /// Plays the UI thread: waits for the worker's waker, then runs what the app posts (`settle`).
+    fn settled() {
+        let t = Instant::now();
+        while !LOOKED_UP.swap(false, Ordering::AcqRel) {
+            assert!(t.elapsed() < Duration::from_secs(20), "the lookup never ended");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        settle();
+    }
+
+    /// Listing ALSA devices takes up to a second: the Preferences' device is looked up on a worker thread, the stream plays on the
+    /// default meanwhile and moves when the device is found; a device that is not there leaves the default with a note.
+    #[test]
+    fn a_preferences_device_is_looked_up_off_the_calling_thread() {
+        let Some(name) = cpal::default_host()
+            .output_devices()
+            .ok()
+            .and_then(|mut d| d.find_map(|d| d.name().ok().filter(|n| n == "pipewire" || n == "pulse")))
+        else {
+            return; // no sound server: no device to find that is safe to open
+        };
+        output::set_waker(|| LOOKED_UP.store(true, Ordering::Release));
+        let Ok(_player) = Player::new() else { return };
+        let (before, name_) = (status().device, name.clone());
+        let device = |d: &str| Settings { device: d.into(), ..Settings::default() };
+
+        let t = Instant::now();
+        configure(device(&name)).unwrap();
+        let took = t.elapsed();
+        eprintln!("configure returned after {took:?}");
+        assert!(took < Duration::from_millis(5), "the caller waited {took:?}");
+        assert_eq!((status().device, status().pending), (before, Some(name_)));
+        settled();
+        let st = status();
+        assert_eq!((st.device.as_str(), st.source, st.pending), (name.as_str(), "settings", None));
+
+        configure(device("no such pcm")).unwrap();
+        settled();
+        let st = status();
+        assert_eq!((st.source, st.pending), ("system default", None));
+        assert!(st.notes.iter().any(|n| n.contains("no such pcm")), "{:?}", st.notes);
+    }
 }

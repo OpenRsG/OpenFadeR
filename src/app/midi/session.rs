@@ -165,7 +165,7 @@ impl Midi {
         if let (Some(b), true) = (&before, changed) {
             self.notify(tr!("{} disconnected", b.controller));
             if b.switched {
-                self.restore_audio(app);
+                self.restore_audio();
             }
         }
         let Some(name) = loaded.controller else {
@@ -251,13 +251,33 @@ impl Midi {
         }
     }
 
-    /// The controller's audio interface becomes the output (PREFS "Use controller audio when connected").
-    fn switch_audio(&self, app: &App, link: &mut Link) {
+    /// The controller's audio interface becomes the output (PREFS "Use controller audio when connected"). The interface is looked
+    /// up on a worker thread (listing ALSA devices takes up to a second): the stream moves when it is found
+    /// ([`Midi::audio_settled`]), the UI thread does not wait.
+    fn switch_audio(self: &Rc<Self>, app: &App, link: &mut Link) {
         if !prefs_audio() {
             link.audio = tr!("audio unchanged (PREFS: controller audio off)").into();
             return;
         }
         match audio::set_output(Some(&link.controller)) {
+            Ok(audio::Switch::Done(dev)) => self.apply_switch(link, Ok(dev)),
+            Ok(audio::Switch::Later) => {
+                (link.audio, link.switched) = (tr!("audio: looking for {}…", link.controller), true);
+                let (weak, controller) = (Rc::downgrade(self), link.controller.clone());
+                audio::when_settled(move |r| {
+                    if let Some(m) = weak.upgrade() {
+                        m.audio_settled(&controller, r);
+                    }
+                });
+            }
+            Err(e) => self.apply_switch(link, Err(e)),
+        }
+        self.show_headphones(app);
+    }
+
+    /// What the audio switch did: the log line, the link's status text and the toast.
+    fn apply_switch(&self, link: &mut Link, r: Result<String, String>) {
+        match r {
             Ok(dev) => {
                 eprintln!("midi: audio output: {dev}");
                 (link.audio, link.switched) = (tr!("audio: {}", dev), true);
@@ -265,20 +285,49 @@ impl Midi {
             }
             Err(e) => {
                 eprintln!("midi: {}: audio output not switched: {e}", link.controller);
-                link.audio = tr!("audio unchanged (no output device of its own)").into();
+                (link.audio, link.switched) = (tr!("audio unchanged (no output device of its own)").into(), false);
                 self.notify(tr!("Audio output: unchanged").into());
             }
         }
-        self.show_headphones(app);
+    }
+
+    /// The interface of `controller` was looked up and the stream moved (or could not): the same as [`Midi::switch_audio`] does at once
+    /// when the device is known. Nothing when that controller left meanwhile.
+    fn audio_settled(&self, controller: &str, r: Result<String, String>) {
+        let Some(app) = self.app.upgrade() else {
+            return;
+        };
+        let mut link = self.link.borrow_mut();
+        let Some(link) = link.as_mut().filter(|l| l.controller == controller) else {
+            return;
+        };
+        self.apply_switch(link, r);
+        app.global::<MidiState>().set_link(link.text().into());
+        self.show_headphones(&app);
     }
 
     /// The previous output device comes back (controller unplugged, or PREFS switched off); nothing to do when a device picked in
     /// PREFS already replaced the controller's interface.
-    fn restore_audio(&self, app: &App) {
+    fn restore_audio(self: &Rc<Self>) {
         if audio::controller().is_none() {
             return;
         }
         match audio::set_output(None) {
+            Ok(audio::Switch::Later) => {
+                let weak = Rc::downgrade(self);
+                audio::when_settled(move |r| {
+                    if let Some(m) = weak.upgrade() {
+                        m.audio_restored(r);
+                    }
+                });
+            }
+            Ok(audio::Switch::Done(dev)) => self.audio_restored(Ok(dev)),
+            Err(e) => self.audio_restored(Err(e)),
+        }
+    }
+
+    fn audio_restored(&self, r: Result<String, String>) {
+        match r {
             Ok(dev) => {
                 eprintln!("midi: audio output restored: {dev}");
                 self.notify(tr!("Audio output: restored").into());
@@ -288,18 +337,20 @@ impl Midi {
                 self.notify(tr!("Audio output: could not restore").into());
             }
         }
-        self.show_headphones(app);
+        if let Some(app) = self.app.upgrade() {
+            self.show_headphones(&app);
+        }
     }
 
     /// PREFS "Use controller audio when connected" changed while a controller is connected.
-    pub(super) fn audio_pref_changed(&self, app: &App) {
+    pub(super) fn audio_pref_changed(self: &Rc<Self>, app: &App) {
         let Some(mut link) = self.link.borrow_mut().take() else {
             return;
         };
         match (prefs_audio(), link.switched) {
             (true, false) => self.switch_audio(app, &mut link),
             (false, true) => {
-                self.restore_audio(app);
+                self.restore_audio();
                 (link.audio, link.switched) = (
                     tr!("audio unchanged (PREFS: controller audio off)").into(),
                     false,
@@ -409,5 +460,74 @@ impl Midi {
         w.saw(Instant::now(), !matches!(step, Step::Skip(_)));
         self.dump.set(Some(w));
         Some(outcome)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::prefs::set_for_test;
+    use cpal::traits::{DeviceTrait, HostTrait};
+    use openfader::{
+        library::{own::Own, Library},
+        store::Store,
+    };
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    static LOOKED_UP: AtomicBool = AtomicBool::new(false);
+
+    /// A sound server's own output device: not the default one, and nothing that plays on real speakers.
+    fn sound_server_device() -> Option<String> {
+        cpal::default_host()
+            .output_devices()
+            .ok()?
+            .filter_map(|d| d.name().ok())
+            .find(|n| n == "pipewire" || n == "pulse")
+    }
+
+    /// Connecting a controller must not wait for ALSA to list its devices (up to a second): the switch returns at once, the stream
+    /// keeps playing where it is and moves to the controller's interface when the worker has found it. The test thread plays the UI
+    /// thread: it runs what the app's waker posts (`audio::settle`).
+    #[test]
+    fn a_controller_connect_returns_at_once_and_the_stream_lands_on_its_interface_later() {
+        let Some(want) = sound_server_device() else {
+            return; // no sound server: nothing to find
+        };
+        audio::set_waker(|| LOOKED_UP.store(true, Ordering::Release));
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let lib: Rc<dyn Library> = Rc::new(Own::new(std::sync::Arc::new(Store::in_memory().unwrap())));
+        let decks = crate::app::deck::wire(&app, lib, Default::default());
+        set_for_test(|p| p.controller_audio = true);
+        let guard = crate::app::midi::wire(&app, decks);
+        let midi = &guard.midi;
+        let before = audio::status().device;
+        let mut link = Link {
+            controller: want.clone(),
+            audio: String::new(),
+            dump: String::new(),
+            switched: false,
+        };
+
+        let t = Instant::now();
+        midi.switch_audio(&app, &mut link);
+        let took = t.elapsed();
+        eprintln!("switch_audio returned after {took:?}");
+        assert!(took < Duration::from_millis(5), "the UI thread waited {took:?}");
+        assert!(link.switched && link.audio.contains("looking for"), "{}", link.audio);
+        assert_eq!(audio::status().device, before, "the stream plays on while the device is looked up");
+        assert_eq!(audio::status().pending.as_deref(), Some(want.as_str()));
+        *midi.link.borrow_mut() = Some(link);
+
+        let t = Instant::now();
+        while !LOOKED_UP.load(Ordering::Acquire) {
+            assert!(t.elapsed() < Duration::from_secs(20), "the lookup never ended");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        audio::settle();
+        let st = audio::status();
+        assert_eq!((st.device.as_str(), st.source, st.pending), (want.as_str(), "controller", None));
+        let link = midi.link.borrow();
+        assert_eq!(link.as_ref().map(|l| l.audio.as_str()), Some(format!("audio: {want}").as_str()));
     }
 }
