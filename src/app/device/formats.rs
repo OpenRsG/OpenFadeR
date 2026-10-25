@@ -1,16 +1,17 @@
 //! The library formats of a device ↔ the FORMATS list of the DEVICES tab and the chips of EXPORT / SYNC MANAGER: which formats
 //! an export writes (UNIVERSAL = all of them), what reads each (the plugin's `title` / `about`) and its device options, stored
-//! per device ([`device_settings::formats`], the options as device settings under the plugin's keys).
+//! per device ([`device_settings::formats`] holds the user's switches, the options are device settings under the plugin's keys).
+//! On the EXPORT tab with a folder typed, the chips are the folder's ([`Ctx::format_target`]).
 
 use super::{Ctx, FormatItem, FormatOption};
 use openfader::{
-    device::Device,
+    device::{self, Device},
     plugin::device::{DeviceInfo, Feature, Provider},
     store::device_settings,
 };
 use openfader_plugin::library::{Field, FieldKind};
 use slint::{ModelRc, VecModel};
-use std::rc::Rc;
+use std::{collections::BTreeMap, path::Path, rc::Rc};
 
 /// The formats of `d` an export can write, in the device's order (the one handling it first).
 fn writable(d: &Device) -> impl Iterator<Item = &(String, DeviceInfo)> {
@@ -27,9 +28,43 @@ fn options(info: &DeviceInfo) -> impl Iterator<Item = &Field> {
 }
 
 impl Ctx {
-    /// The formats picked for `d` (its [`Device::default_formats`] until the user picks), in the device's order.
+    /// What the FORMATS chips are about: on the EXPORT tab with a folder typed, that folder; else the chosen device.
+    pub(super) fn format_target(&self) -> Option<Device> {
+        let folder = self
+            .with_state(|s| (s.get_tab() == 1).then(|| s.get_folder().trim().to_owned()))
+            .flatten()
+            .filter(|f| !f.is_empty());
+        match folder {
+            Some(f) => Some(device::folder(Path::new(&f))),
+            None => self.current(),
+        }
+    }
+
+    /// The user's format switches for `d` (plugin name → on), stored as `+name` / `-name`. A list of plain names (what older
+    /// versions stored: the whole pick) switches those on and the other formats writable there off.
+    fn switches(&self, d: &Device) -> BTreeMap<String, bool> {
+        let Some(list) = device_settings::formats(&self.store, &d.id) else {
+            return BTreeMap::new();
+        };
+        if list.iter().any(|n| n.starts_with(['+', '-'])) {
+            list.iter()
+                .filter_map(|n| Some((n.get(1..)?.to_owned(), n.starts_with('+'))))
+                .collect()
+        } else {
+            writable(d).map(|(n, _)| (n.clone(), list.contains(n))).collect()
+        }
+    }
+
+    /// The formats picked for `d`, in the device's order: the user's switches, [`Device::default_formats`] for the formats never
+    /// switched (so a format a plugin offers later follows the defaults instead of a list frozen at the first click).
     pub(super) fn picked(&self, d: &Device) -> Vec<String> {
-        device_settings::formats(&self.store, &d.id).unwrap_or_else(|| d.default_formats())
+        let (switched, default) = (self.switches(d), d.default_formats());
+        d.formats
+            .iter()
+            .map(|(n, _)| n)
+            .filter(|n| switched.get(*n).copied().unwrap_or_else(|| default.contains(n)))
+            .cloned()
+            .collect()
     }
 
     /// The plugins an export to `d` writes with: the picked formats that can export, the one handling the device first; says
@@ -52,7 +87,7 @@ impl Ctx {
 
     /// The FORMATS list of the chosen device, and whether it is universal.
     pub(super) fn show_formats(&self) {
-        let (items, universal) = self.current().map_or((Vec::new(), false), |d| {
+        let (items, universal) = self.format_target().map_or((Vec::new(), false), |d| {
             let picked = self.picked(&d);
             let config = device_settings::config(&self.store, &d.id);
             let items: Vec<FormatItem> = writable(&d)
@@ -91,44 +126,48 @@ impl Ctx {
         self.with_state(|s| s.set_universal(universal));
     }
 
-    /// Stores `picked` as the formats of `d` and redraws the list.
-    fn pick(&self, d: &Device, picked: &[String]) {
-        if let Err(e) = device_settings::set_formats(&self.store, &d.id, picked) {
+    /// Switches `names` on or off for `d` (the other switches stay) and redraws the list.
+    fn switch(&self, d: &Device, names: &[String], on: bool) {
+        let mut switched = self.switches(d);
+        for n in names {
+            switched.insert(n.clone(), on);
+        }
+        let list: Vec<String> = switched
+            .iter()
+            .map(|(n, on)| format!("{}{n}", if *on { '+' } else { '-' }))
+            .collect();
+        if let Err(e) = device_settings::set_formats(&self.store, &d.id, &list) {
             self.say(&e, true);
         }
         self.show_formats();
     }
 
-    /// Switches the `i`-th format of [`Self::show_formats`] for the chosen device.
+    /// Switches the `i`-th format of [`Self::show_formats`] for the chips' target.
     pub(super) fn toggle_format(&self, i: usize) {
-        let Some(d) = self.current() else { return };
+        let Some(d) = self.format_target() else { return };
         let Some((name, _)) = writable(&d).nth(i) else {
             return;
         };
-        let mut picked = self.picked(&d);
-        match picked.iter().position(|p| p == name) {
-            Some(at) => drop(picked.remove(at)),
-            None => picked.push(name.clone()),
-        }
-        self.pick(&d, &picked);
+        let on = !self.picked(&d).contains(name);
+        self.switch(&d, std::slice::from_ref(name), on);
     }
 
-    /// UNIVERSAL (`true`): every format of the chosen device on. DEDICATED: when it was universal, only the format handling
-    /// the device stays on (the user ticks the others); otherwise nothing changes.
+    /// UNIVERSAL (`true`): every format of the chips' target on. DEDICATED: when it was universal, only the format handling
+    /// it stays on (the user ticks the others); otherwise nothing changes.
     pub(super) fn set_universal(&self, on: bool) {
-        let Some(d) = self.current() else { return };
+        let Some(d) = self.format_target() else { return };
         let all: Vec<String> = writable(&d).map(|(n, _)| n.clone()).collect();
         let picked = self.picked(&d);
         if on {
-            self.pick(&d, &all);
+            self.switch(&d, &all, true);
         } else if all.iter().all(|n| picked.contains(n)) {
-            self.pick(&d, &all[..all.len().min(1)]);
+            self.switch(&d, &all[all.len().min(1)..], false);
         }
     }
 
     /// Sets option `k` of format `i` of the chosen device: 1 / 0 for a switch, the entry index for a choice.
     pub(super) fn set_option(&self, i: usize, k: usize, value: usize) {
-        let Some(d) = self.current() else { return };
+        let Some(d) = self.format_target() else { return };
         let Some(f) = writable(&d)
             .nth(i)
             .and_then(|(_, info)| options(info).nth(k))

@@ -19,6 +19,9 @@ use std::{path::PathBuf, sync::LazyLock};
 /// readers are not here: they are built into the app ([`super::builtin`]) and always on.
 pub const DEFAULT_ON: &[&str] = &[
     "engine-dj",
+    "serato",
+    "traktor",
+    "virtualdj",
     "beat-fx",
     "send-fx",
     "lever-fx",

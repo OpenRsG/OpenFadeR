@@ -4,6 +4,7 @@ import { Theme } from "theme.slint";
 import { BrowserState } from "browser-state.slint";
 import { DragState, TreeDropTarget } from "dnd.slint";
 import { DeviceState } from "device-state.slint";
+import { LibraryState } from "library.slint";
 
 /// The playlist tree: `h-row` rows with the glyph of what each list is, the selected one on `select`. Headings (My
 /// Playlists, History, Devices …) are taller and bold; a click on one folds or unfolds the rows under it.
@@ -96,12 +97,12 @@ export component TreeView inherits Rectangle {
                                 root.set-current-item(i);
                                 if (item.head) { BrowserState.tree-toggle(i); }
                             }
-                            // Right-click on a playlist of a device: its menu.
+                            // Right-click on a playlist of a device or of the collection: its menu.
                             if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right) {
                                 root.focused();
                                 fs.focus();
                                 root.set-current-item(i);
-                                if (BrowserState.side-kind == 12) {
+                                if (BrowserState.side-kind == 12 || BrowserState.side-kind == 3 || BrowserState.side-kind == 8) {
                                     root.menu-y = root.row-y(i) + root.row-h(i) + list.content-y;
                                     menu.show();
                                 }
@@ -128,7 +129,9 @@ export component TreeView inherits Rectangle {
             VerticalLayout {
                 padding: 1px;
                 // Copies its music onto this computer, with cues, grid and key, and lists the copies in My Playlists.
-                MenuItem { text: @tr("Import to Collection"); activated => { DeviceState.import-playlist(BrowserState.source-device, BrowserState.source-list); menu.close(); } }
+                if BrowserState.side-kind == 12: MenuItem { text: @tr("Import to Collection"); activated => { DeviceState.import-playlist(BrowserState.source-device, BrowserState.source-list); menu.close(); } }
+                // DEVICES > EXPORT with this playlist ticked, in every format picked for the device.
+                if BrowserState.side-kind == 3 || BrowserState.side-kind == 8: MenuItem { text: @tr("Export to a device"); activated => { LibraryState.action("playlist-export-device"); menu.close(); } }
             }
         }
     }

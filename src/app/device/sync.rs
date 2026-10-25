@@ -98,7 +98,7 @@ pub(super) fn run(cx: &Rc<Ctx>, dev: &Device, auto: bool) {
         Ok(s) => Arc::new(s),
         Err(e) => return cx.say(&e, true),
     };
-    let t = Target::new(cx, Some(dev), dev.mount.clone(), writers, false);
+    let t = Target::new(cx, dev, writers);
     let build = |snap: &Arc<Pending>| {
         let (snap, store) = (snap.clone(), cx.store.clone());
         move || -> Build { Box::new(move |_| Ok(Built::read(&snap, &store))) }

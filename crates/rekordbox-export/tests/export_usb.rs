@@ -173,3 +173,40 @@ fn pqt2_header_equals_the_real_one_and_the_fractions_are_thousandths() {
     }
     assert!(checked > 0, "no PQT2 on this USB");
 }
+
+/// What the waveform writer (`anlz::wave`) reproduces holds in every real file: PWAV heights span exactly 2..=25 with whiteness
+/// <= 5, PWV2 reaches 15; the covers are 80×80 and 240×240; table 19 of `export.pdb` holds one row with the track count.
+#[test]
+fn real_waveform_ranges_covers_and_library_row() {
+    let Some(root) = common::usb_root() else {
+        return;
+    };
+    let mut seen = 0;
+    for p in std::fs::read_dir(root.join("PIONEER/USBANLZ")).unwrap().flatten() {
+        for t in std::fs::read_dir(p.path()).unwrap().flatten() {
+            let dat = std::fs::read(t.path().join("ANLZ0000.DAT")).unwrap();
+            let body = |tag: &[u8; 4]| {
+                let (o, len) = section(&dat, tag).unwrap();
+                let header = u32::from_be_bytes(dat[o + 4..o + 8].try_into().unwrap()) as usize;
+                dat[o + header..o + len].to_vec()
+            };
+            let pwav = body(b"PWAV");
+            let h: Vec<u8> = pwav.iter().map(|v| v & 31).collect();
+            assert_eq!((h.iter().min(), h.iter().max()), (Some(&2), Some(&25)));
+            assert!(pwav.iter().all(|v| v >> 5 <= 5));
+            assert_eq!(body(b"PWV2").iter().max(), Some(&15));
+            seen += 1;
+        }
+    }
+    assert!(seen > 0);
+    let db = std::fs::read(root.join("PIONEER/rekordbox/export.pdb")).unwrap();
+    let info = rekordbox_common::pdb::rows(&db, 19).unwrap();
+    let tracks = rekordbox_common::pdb::rows(&db, 0).unwrap().len() as u32;
+    assert_eq!(info.len(), 1);
+    assert_eq!(rekordbox_common::pdb::u32_at(&db, info[0] + 4).unwrap(), tracks);
+    assert_eq!(rekordbox_common::pdb::u16_at(&db, info[0]).unwrap(), 0x0280);
+    for (name, side) in [("a1.jpg", 80), ("a1_m.jpg", 240)] {
+        let img = image::open(root.join("PIONEER/Artwork/00001").join(name)).unwrap();
+        assert_eq!((img.width(), img.height()), (side, side), "{name}");
+    }
+}

@@ -185,6 +185,20 @@ pub fn history_entry(entry_index: u32, track_id: u32, playlist_id: u32) -> Vec<u
     u32s(&[track_id, playlist_id, entry_index])
 }
 
+/// The one row of table 19 (observed in every rekordbox export.pdb; the twin of OneLibrary's `property`): `0x0280 u2,
+/// index_shift u2, track count u4, 0 u4`, the creation date `YYYY-MM-DD`, then the near offsets of the two strings after it:
+/// the database version "1000" and "".
+pub fn library_info(tracks: u32, date: &str) -> Vec<u8> {
+    let mut r = u32s(&[0x0280, tracks, 0]);
+    string(&mut r, date);
+    let version = r.len() + 2;
+    r.extend([version as u8, (version + 5) as u8]); // "1000" takes 5 bytes
+    string(&mut r, "1000");
+    string(&mut r, "");
+    pad4(&mut r);
+    r
+}
+
 pub fn columns() -> Vec<Vec<u8>> {
     COLUMNS
         .iter()
@@ -256,5 +270,16 @@ mod tests {
         assert_eq!(color(1, "Pink").len(), 16); // observed row length
         assert_eq!(columns()[0].len(), 24); // observed
         assert_eq!(tag(0, 0, 1, true, "Genre").len(), 48); // observed
+    }
+
+    /// Byte for byte the row of a real rekordbox 7 export (24 tracks), index shift aside.
+    #[test]
+    fn library_info_is_the_observed_row() {
+        let mut want = vec![0x80, 0x02, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0x17];
+        want.extend(b"2026-09-13");
+        want.extend([0x19, 0x1e, 0x0b]);
+        want.extend(b"1000");
+        want.extend([0x03, 0]);
+        assert_eq!(library_info(24, "2026-09-13"), want);
     }
 }

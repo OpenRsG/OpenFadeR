@@ -23,9 +23,8 @@ pub struct Files {
     pub ex2: Vec<u8>,
 }
 
-/// `PWAV` / `PWV2` columns (observed).
+/// `PWAV` columns (observed; `PWV2` has 100).
 const PWAV_COLUMNS: usize = 400;
-const PWV2_COLUMNS: usize = 100;
 /// Hot cues stored in the `.DAT` `PCOB` (A..C); the `.EXT` `PCOB` holds the rest (observed 3 + 5).
 const DAT_HOT_CUES: u16 = 3;
 
@@ -37,15 +36,14 @@ pub fn encode(a: &Analysis, audio_path: &str) -> Files {
     let (dat_hot, ext_hot): (Vec<&Cue>, Vec<&Cue>) =
         hot.iter().partition(|c| c.hot_cue <= DAT_HOT_CUES);
 
-    let pre = wave::mono_of(&a.preview, &a.three_band_preview);
     let det = wave::mono_of(&a.detail, &a.three_band_detail);
-    let overview: &[u8] = if pre.is_empty() { &det } else { &pre };
-    let resampled = |n| wave::resample(overview, n, |v| v & 31);
-    let pwav = resampled(PWAV_COLUMNS);
-    let pwv2: Vec<u8> = resampled(PWV2_COLUMNS)
-        .iter()
-        .map(|v| (v & 31) >> 1)
-        .collect();
+    // A real preview (read from a rekordbox file) stays as it is; else it is derived from the detail, rekordbox's way.
+    let pwav = match (&a.preview[..], &det[..]) {
+        ([], []) => wave::preview_of(&wave::mono_of(&[], &a.three_band_preview), PWAV_COLUMNS),
+        ([], det) => wave::preview_of(det, PWAV_COLUMNS),
+        (real, _) => wave::resample(real, PWAV_COLUMNS, |v| v & 31),
+    };
+    let pwv2 = wave::tiny_of(&pwav);
     let color_detail = wave::color_detail(a);
     let color_preview = wave::color_preview(a);
 
@@ -68,7 +66,7 @@ pub fn encode(a: &Analysis, audio_path: &str) -> Files {
         sec(
             b"PWV2",
             20,
-            &words(&[PWV2_COLUMNS as u32, 0x0001_0000]),
+            &words(&[pwv2.len() as u32, 0x0001_0000]),
             &pwv2,
         ),
         pcob(1, &dat_hot),
@@ -414,6 +412,34 @@ mod tests {
         assert_eq!(mono(&[127, 0, 0]), 31);
         assert_eq!(color(&[127, 0, 0]), 7 << 13 | 31 << 2);
         assert_eq!(mono(&[0, 0, 0]), 0);
+    }
+
+    /// The ranges every waveform tag of a real rekordbox 7 export keeps (see `wave`): PWAV heights 2..=25 with both ends
+    /// used and whiteness <= 5, PWV2 1..=15 reaching 15, PWV4 bytes <= 127 but byte 1, byte 0 + byte 1 = 256.
+    #[test]
+    fn derived_waveforms_keep_the_real_ranges() {
+        let f = encode(&track(), "/Contents/a.mp3");
+        let body = |file: &[u8], i: usize| {
+            let (_, o, len) = walk(file)[i];
+            let header = u32::from_be_bytes(file[o + 4..o + 8].try_into().unwrap()) as usize;
+            file[o + header..o + len].to_vec()
+        };
+        let pwav = body(&f.dat, 3);
+        let heights: Vec<u8> = pwav.iter().map(|v| v & 31).collect();
+        assert_eq!((heights.iter().min(), heights.iter().max()), (Some(&2), Some(&25)));
+        assert!(pwav.iter().all(|v| v >> 5 <= 5));
+        let pwv2 = body(&f.dat, 4);
+        assert_eq!((pwv2.len(), pwv2.iter().min(), pwv2.iter().max()), (100, Some(&1), Some(&15)));
+        let pwv4 = body(&f.ext, 8);
+        for c in pwv4.chunks(6).filter(|c| c.iter().any(|&b| b > 0)) {
+            assert!([0, 2, 3, 4, 5].iter().all(|&i| c[i] <= 127), "{c:?}");
+            assert_eq!(u32::from(c[0]) + u32::from(c[1]), 256, "{c:?}");
+        }
+        assert_eq!(super::wave::color_preview_column([0, 0, 0]), [0; 6]);
+        // A real preview passes through untouched.
+        let real: Vec<u8> = (0..400).map(|i| (i % 32) as u8).collect();
+        let f = encode(&Analysis { preview: real.clone(), ..track() }, "/x.mp3");
+        assert_eq!(body(&f.dat, 3), real);
     }
 
     #[test]

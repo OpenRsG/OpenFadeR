@@ -39,12 +39,14 @@ export component ExportPage inherits VerticalLayout {
             chose(i) => { DeviceState.select(i); }
         }
     }
-    if DeviceState.folder == "" && DeviceState.formats.length > 0: FormatChips {}
     FormRow {
         label: @tr("OR A FOLDER");
         vertical-stretch: 0;
-        TextField { text <=> DeviceState.folder; placeholder-text: @tr("any folder, e.g. a mounted share"); horizontal-stretch: 1; }
+        TextField { text <=> DeviceState.folder; placeholder-text: @tr("any folder, e.g. a mounted share"); horizontal-stretch: 1; edited => { DeviceState.folder-edited(); } }
     }
+    if DeviceState.folder != "": Note { text: @tr("The folder is written, not the device above. Clear it to export to the device."); vertical-stretch: 0; }
+    // The formats of the target: the folder's when one is typed, else the device's.
+    if DeviceState.formats.length > 0: FormatChips {}
     HorizontalLayout {
         spacing: Theme.space-sm;
         vertical-stretch: 0;

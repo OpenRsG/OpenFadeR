@@ -50,7 +50,7 @@ fn checked(t: &Target, done: &[Written]) -> Option<String> {
         .filter_map(|(n, r)| Some((n.as_str(), r.as_ref().ok()?)))
         .collect();
     let first = ok.first()?.0;
-    let label = |n: &str| format_label(t.dev.as_ref(), n);
+    let label = |n: &str| format_label(Some(&t.dev), n);
     let unchecked: Vec<String> = ok
         .iter()
         .filter(|(_, r)| r.verified != Some(true))
@@ -135,16 +135,18 @@ impl Ctx {
     ) {
         let (safety, phase_text) = (self.safety(), format!("{phase}…"));
         self.start_then(
-            t.dev.as_ref().map(|d| d.id.clone()),
+            Some(t.dev.id.clone()),
             phase,
             move |ctl| {
                 let built = build(&ctl)?;
                 if let Some(m) = &built.idle {
                     return Ok(m.clone());
                 }
-                let notes: Vec<String> = match &t.dev {
-                    Some(d) => safety.before_write(d, &ctl)?,
-                    None => safety.recover(&t.dest, &t.name)?.into_iter().collect(),
+                // A plain folder is recovered, not backed up (its backups would list under no device).
+                let notes: Vec<String> = if t.dev.is_folder() {
+                    safety.recover(&t.dest, &t.name)?.into_iter().collect()
+                } else {
+                    safety.before_write(&t.dev, &ctl)?
                 };
                 ctl.set_phase(&phase_text);
                 // A job that fails may have been cut off mid-switch: what a change left is finished or undone again, and the
@@ -159,7 +161,7 @@ impl Ctx {
                         (true, None) => e,
                         (true, Some(f)) => f,
                         (false, f) => {
-                            let hint = usb_hint(&e, t.dev.as_ref().is_some_and(|d| d.via_hub));
+                            let hint = usb_hint(&e, t.dev.via_hub);
                             with_lines(e, hint.into_iter().chain(notes.iter().cloned()).chain(f))
                         }
                     }

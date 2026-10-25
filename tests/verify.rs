@@ -13,6 +13,8 @@ use std::sync::Arc;
 
 /// Runs `openfader verify args…`; `stick` is a folder to count as a mounted device. Returns the exit code and what it printed.
 fn verify(args: &[&str], stick: Option<&Path>) -> (i32, String, String) {
+    // Initialise the private config before spawning any child, including the no-device/error cases.
+    common::device_plugin();
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_openfader"));
     cmd.arg("verify").args(args);
     match stick {
@@ -167,9 +169,8 @@ fn the_builtin_rekordbox_reader_is_on_with_an_empty_home() {
         .output()
         .unwrap();
     let text = String::from_utf8_lossy(&out.stdout);
-    let j: Value = serde_json::from_str(&text).unwrap_or_else(|e| {
-        panic!("{e}: {text}{}", String::from_utf8_lossy(&out.stderr))
-    });
+    let j: Value = serde_json::from_str(&text)
+        .unwrap_or_else(|e| panic!("{e}: {text}{}", String::from_utf8_lossy(&out.stderr)));
     assert_eq!(j["verdict"], "ready", "{text}");
     assert!(j["libraries"]
         .as_array()

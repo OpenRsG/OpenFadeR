@@ -370,7 +370,10 @@ fn one_playlist_scope_exports_only_its_tracks() {
 fn onelibrary_matches_export_pdb_and_carries_snapshot_data() {
     let (d, mut snap) = setup("onelib");
     let cover = d.src.join("cover.jpg");
-    std::fs::write(&cover, b"\xff\xd8 not a real jpeg \xff\xd9").unwrap();
+    // A 300×200 cover: the device gets rekordbox's two square sizes.
+    image::RgbImage::from_pixel(300, 200, image::Rgb([200, 30, 60]))
+        .save(&cover)
+        .unwrap();
     snap.tracks[0].0.artwork = Some(cover);
     snap.colors = vec![(0, 3)];
     snap.mytags = vec![("Mood".into(), vec!["Dark".into()])];
@@ -479,6 +482,10 @@ fn onelibrary_matches_export_pdb_and_carries_snapshot_data() {
         assert!(d.dest.join(p.trim_start_matches('/')).is_file(), "{p}");
     }
     assert!(paths[0].2.ends_with("/b1.jpg"));
+    for (p, side) in [(paths[0].2.clone(), 80), (paths[0].2.replace(".jpg", "_m.jpg"), 240)] {
+        let img = image::open(d.dest.join(p.trim_start_matches('/'))).unwrap();
+        assert_eq!((img.width(), img.height()), (side, side), "{p}");
+    }
     assert!(
         db.tracks[0]
             .artwork

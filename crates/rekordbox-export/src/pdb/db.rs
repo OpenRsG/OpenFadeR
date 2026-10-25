@@ -75,7 +75,7 @@ fn table(ty: u32, rows: Vec<Vec<u8>>) -> Table {
     Table {
         ty,
         rows,
-        shift: matches!(ty, 0 | 2 | 3),
+        shift: matches!(ty, 0 | 2 | 3 | 19),
     }
 }
 
@@ -207,7 +207,13 @@ impl Db {
             table(16, rows::columns()),
             table(17, rows::u16_rows(&self.config.table17())),
             table(18, rows::u16_rows(&self.config.table18())),
-            table(19, Vec::new()),
+            table(
+                19,
+                vec![rows::library_info(
+                    self.tracks.len() as u32,
+                    &self.analyze_date,
+                )],
+            ),
         ])
     }
 }

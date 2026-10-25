@@ -26,31 +26,55 @@ impl Covers {
     }
 
     /// The device path of `src`: the one it got already, else the path the device track `old` has, else the next free one. The
-    /// image is written on first sight, as is for both sizes (there is no image resizer in the build); `b` is OneLibrary's copy.
+    /// image is written on first sight in rekordbox's two sizes ([`thumbnails`]); `b` is OneLibrary's copy. `None` (and a
+    /// warning) when the image cannot be decoded.
     pub(super) fn place(
         &mut self,
         w: &mut Writer,
         src: &Path,
         old: Option<&str>,
-    ) -> Result<String, String> {
-        let rel = match (self.placed.get(src), old) {
-            (Some(r), _) => r.clone(),
-            (None, Some(r)) => r.trim_start_matches('/').to_owned(),
-            (None, None) => {
+        warnings: &mut Vec<String>,
+    ) -> Result<Option<String>, String> {
+        if let Some(r) = self.placed.get(src) {
+            return Ok(Some(r.clone()));
+        }
+        let (small, medium) = match thumbnails(&at(std::fs::read(src), src)?) {
+            Ok(t) => t,
+            Err(e) => {
+                warnings.push(format!("{}: cover not written ({e})", src.display()));
+                return Ok(None);
+            }
+        };
+        let rel = match old {
+            Some(r) => r.trim_start_matches('/').to_owned(),
+            None => {
                 let n = self.next;
                 self.next += 1;
                 format!("PIONEER/Artwork/{:05}/a{n}.jpg", (n - 1) / 100 + 1)
             }
         };
-        if self.placed.insert(src.to_owned(), rel.clone()).is_none() {
-            let bytes = at(std::fs::read(src), src)?;
-            for rel in [rel.clone(), image_variant(&rel)] {
-                w.place(&w.dest.join(rel.replace(".jpg", "_m.jpg")), &bytes)?;
-                w.place(&w.dest.join(&rel), &bytes)?;
-            }
+        self.placed.insert(src.to_owned(), rel.clone());
+        for rel in [rel.clone(), image_variant(&rel)] {
+            w.place(&w.dest.join(rel.replace(".jpg", "_m.jpg")), &medium)?;
+            w.place(&w.dest.join(&rel), &small)?;
         }
-        Ok(rel)
+        Ok(Some(rel))
     }
+}
+
+/// The covers of a real rekordbox 7 export: `a<n>.jpg` 80×80 and `a<n>_m.jpg` 240×240 baseline JPEG (observed), here cropped
+/// to the square.
+pub(crate) fn thumbnails(bytes: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let img = image::load_from_memory(bytes).map_err(|e| e.to_string())?;
+    let jpeg = |side: u32| {
+        let mut out = Vec::new();
+        img.resize_to_fill(side, side, image::imageops::FilterType::Lanczos3)
+            .to_rgb8()
+            .write_with_encoder(image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 90))
+            .map(|()| out)
+            .map_err(|e| e.to_string())
+    };
+    Ok((jpeg(80)?, jpeg(240)?))
 }
 
 /// 1 mp3, 4 m4a, 5 flac, 0x0b wav, 0x0c aiff (observed: 1 and 4; the rest rekordcrate's `FileType`); 0 unknown.
@@ -169,17 +193,16 @@ impl Job<'_> {
             ext: back[1].clone(),
             want: rekordbox_common::anlz::count_cues(&files.dat, Some(&files.ext))?,
         });
-        let jpeg = t.artwork.as_deref().filter(|p| {
-            p.extension()
-                .is_some_and(|e| e.eq_ignore_ascii_case("jpg") || e.eq_ignore_ascii_case("jpeg"))
-        });
-        let artwork = match jpeg {
+        let artwork = match t.artwork.as_deref() {
             Some(p) => {
                 let old_rel = old.and_then(|t| t.artwork.as_deref());
-                Some(format!("/{}", covers.place(&mut self.w, p, old_rel)?))
+                covers
+                    .place(&mut self.w, p, old_rel, &mut self.report.warnings)?
+                    .map(|r| format!("/{r}"))
             }
-            None => old.and_then(|t| t.artwork.clone()),
-        };
+            None => None,
+        }
+        .or_else(|| old.and_then(|t| t.artwork.clone()));
         Ok(Item {
             id,
             title: t.title.clone(),

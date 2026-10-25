@@ -3,8 +3,9 @@
 //! are the ones [`super::rows`] encodes (spec: crate-digger `rekordbox_pdb.ksy`; observed: real rekordbox 7 exports); page and
 //! string decoding is `rekordbox_common::pdb`'s.
 //!
-//! What is not carried (inferred: our writer does not model it, so rewriting `export.pdb` drops it): tables 4, 9, 10, 14, 15 and
-//! 19, which rekordbox leaves empty in a fresh export, and the per-track constants the writer always sets.
+//! What is not carried (inferred: our writer does not model it, so rewriting `export.pdb` drops it): tables 4, 9, 10, 14 and 15,
+//! which rekordbox leaves empty in a fresh export, and the per-track constants the writer always sets. Table 19 (one row: track
+//! count, creation date, version) is rewritten from the library; its date is kept.
 
 use super::db::{Db, History, Item, Node, Tags};
 use crate::settings::DeviceConfig;
@@ -56,8 +57,15 @@ pub(crate) fn parse(d: &[u8]) -> Result<Db, String> {
         histories: histories(d)?,
         ..Db::default()
     };
-    if let Some(first) = db.tracks.iter().find(|t| !t.analyze_date.is_empty()) {
-        db.analyze_date.clone_from(&first.analyze_date);
+    // The library's creation date (table 19, written by rekordbox and by us), else the first track's analysis date.
+    let created = match rows(d, 19)?.first() {
+        Some(&r) => string_at(d, r + 12)?,
+        None => String::new(),
+    };
+    match db.tracks.iter().find(|t| !t.analyze_date.is_empty()) {
+        _ if !created.is_empty() => db.analyze_date = created,
+        Some(first) => db.analyze_date.clone_from(&first.analyze_date),
+        None => {}
     }
     Ok(db)
 }

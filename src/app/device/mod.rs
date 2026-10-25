@@ -119,6 +119,8 @@ pub(super) struct Ctx {
     snap: RefCell<Option<Pending>>,
     /// Playlist ids to tick the next time the EXPORT list loads (the browser's "export to device").
     preselect: RefCell<Vec<String>>,
+    /// Looks for `preselect` so far while the collection does not list it yet (`export::wait_for`).
+    preselect_tries: Cell<u8>,
     /// The backups of the BACKUPS tab, row by row.
     backups: RefCell<Vec<store::DeviceBackup>>,
     sync: Pick,
@@ -428,6 +430,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
         export: Pick::default(),
         snap: RefCell::default(),
         preselect: RefCell::default(),
+        preselect_tries: Cell::new(0),
         backups: RefCell::default(),
         sync: Pick::default(),
         mirror: Cell::new(false),

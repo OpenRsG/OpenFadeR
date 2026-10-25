@@ -4407,6 +4407,7 @@ name = "rekordbox-export"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "image",
  "openfader-plugin",
  "rekordbox-common",
  "rusqlite",

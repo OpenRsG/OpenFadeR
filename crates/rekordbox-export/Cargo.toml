@@ -9,3 +9,5 @@ rekordbox-common.workspace = true
 serde_json.workspace = true
 rusqlite.workspace = true
 chrono.workspace = true
+# Cover thumbnails (80×80 and 240×240 JPEG, as rekordbox writes them); already in the app's build through Slint.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
