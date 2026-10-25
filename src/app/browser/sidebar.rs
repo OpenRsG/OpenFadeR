@@ -204,6 +204,51 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
     rows.into_iter().unzip()
 }
 
+/// Headings that fold the rows under them away; they all start folded.
+pub fn is_heading(e: &Entry) -> bool {
+    matches!(
+        e,
+        Entry::UserRoot
+            | Entry::BankRoot
+            | Entry::StageRoot
+            | Entry::HistoryRoot
+            | Entry::TagsRoot
+            | Entry::LibRoot
+            | Entry::HealthRoot
+            | Entry::DevicesRoot
+    )
+}
+
+/// Nesting depth of a label (its leading indent).
+pub fn depth(label: &str) -> usize {
+    (label.len() - label.trim_start_matches(' ').len()) / 4
+}
+
+/// The heading row `at` sits under (not `at` itself), when that heading is one of [`is_heading`].
+pub fn heading_of<'a>(entries: &'a [Entry], labels: &[String], at: usize) -> Option<&'a Entry> {
+    if at >= labels.len() || depth(&labels[at]) == 0 {
+        return None;
+    }
+    let top = (0..at).rev().find(|&k| depth(&labels[k]) == 0)?;
+    Some(&entries[top]).filter(|e| is_heading(e))
+}
+
+/// The rows left once every heading not in `open` hides the rows nested under it.
+pub fn fold(entries: Vec<Entry>, labels: Vec<String>, open: &[Entry]) -> (Vec<Entry>, Vec<String>) {
+    let mut shut = false;
+    entries
+        .into_iter()
+        .zip(labels)
+        .filter(|(e, l)| {
+            if depth(l) == 0 {
+                shut = is_heading(e) && !open.contains(e);
+                return true;
+            }
+            !shut
+        })
+        .unzip()
+}
+
 /// The library playlist `at` with everything nested under it, as (index, depth below `at`); `at` itself first.
 /// Empty when `at` is out of range.
 pub fn subtree(lib: &[Playlist], at: usize) -> Vec<(usize, usize)> {
@@ -347,6 +392,33 @@ mod tests {
         assert_eq!(entries[14], Entry::Day("2026-10-13".into()));
         assert_eq!(entries[18], Entry::Tag(9));
         assert_eq!(entries[23], Entry::Lib(1));
+
+        // Folded: a closed heading hides everything nested under it, an open one shows all of it (categories too).
+        assert_eq!(heading_of(&entries, &labels, 20), Some(&Entry::TagsRoot)); // "Dark", two levels in
+        assert_eq!(heading_of(&entries, &labels, 16), None); // a heading is under nothing
+        assert_eq!(heading_of(&entries, &labels, 1), None);
+        let (e, l) = fold(entries.clone(), labels.clone(), &[Entry::TagsRoot]);
+        assert_eq!(e.len(), l.len());
+        assert_eq!(
+            l,
+            [
+                "All tracks",
+                "Tag List (2)",
+                "Session history (4)",
+                "Duplicate tracks",
+                "▸ My Playlists",
+                "▸ Cue Bank",
+                "▸ Stages",
+                "▸ History",
+                "▸ Tags",
+                "    ▸ Genre",
+                "        Deep",
+                "    ▸ Mood",
+                "        Dark",
+                "▸ Library (read-only)",
+            ]
+        );
+        assert_eq!(e[TAG_ROW], Entry::Tags, "the fixed rows above keep their numbers");
     }
 
     #[test]

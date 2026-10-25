@@ -10,6 +10,7 @@ export enum Icon {
     layout-2h, layout-2v, layout-4h, layout-4v, browse,
     layout-1p, layout-2p, layout-dual, layout-simple, layout-full,
     eject, star, tag, lock, info, expand, trash, zoom-in, zoom-out, zoom-reset, stems, more, usb,
+    clock, inbox, smart, cue, pulse,
 }
 
 /// One icon in `color`, `width`/`height` 16 px by default (the viewbox is 16×16, so a bigger box scales the shape;
@@ -44,6 +45,10 @@ export component Glyph inherits Rectangle {
         if i == Icon.layout-2p { return "M 2.5 4 H 4.5 V 6 H 2.5 Z M 2.5 10.5 H 4.5 V 12.5 H 2.5 Z"; }
         if i == Icon.more { return "M 9.5 3 A 1.5 1.5 0 1 1 6.5 3 A 1.5 1.5 0 1 1 9.5 3 Z M 9.5 8 A 1.5 1.5 0 1 1 6.5 8 A 1.5 1.5 0 1 1 9.5 8 Z M 9.5 13 A 1.5 1.5 0 1 1 6.5 13 A 1.5 1.5 0 1 1 9.5 13 Z"; }
         if i == Icon.usb { return "M 6.6 2.6 H 7.6 V 3.6 H 6.6 Z M 8.4 2.6 H 9.4 V 3.6 H 8.4 Z"; }
+        // A smart playlist: its lines and a spark (rules fill it).
+        if i == Icon.smart { return "M 12.5 1 L 13.4 3.6 L 16 4.5 L 13.4 5.4 L 12.5 8 L 11.6 5.4 L 9 4.5 L 11.6 3.6 Z"; }
+        // A cue: the flag of a cue marker on its pole.
+        if i == Icon.cue { return "M 4.5 2 L 13 5 L 4.5 8 Z"; }
         return "";
     }
 
@@ -88,6 +93,13 @@ export component Glyph inherits Rectangle {
         // A USB stick: the plug on top of the body.
         if i == Icon.usb { return "M 5.5 5 V 1.5 H 10.5 V 5 M 4 5 H 12 V 13.5 A 1.5 1.5 0 0 1 10.5 15 H 5.5 A 1.5 1.5 0 0 1 4 13.5 Z M 6.5 9.5 H 9.5"; }
         // STEM mode: the track as three stacked layers (INST / VOCAL / DRUMS).
+        if i == Icon.clock { return "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 Z M 8 4.5 V 8 L 10.5 9.5"; }
+        // A tray: new music waits in it (Stages).
+        if i == Icon.inbox { return "M 2 9 L 4 3 H 12 L 14 9 V 13.5 H 2 Z M 2 9 H 5.5 L 6.5 11 H 9.5 L 10.5 9 H 14"; }
+        if i == Icon.smart { return "M 2 4 H 8 M 2 8 H 9 M 2 12 H 13"; }
+        if i == Icon.cue { return "M 4.5 2 V 14"; }
+        // Library health: a pulse line.
+        if i == Icon.pulse { return "M 1 8.5 H 4 L 6 3.5 L 9.5 13 L 11.5 8.5 H 15"; }
         if i == Icon.stems { return "M 8 2 L 14 5 L 8 8 L 2 5 Z M 2 8 L 8 11 L 14 8 M 2 11 L 8 14 L 14 11"; }
         return "";
     }

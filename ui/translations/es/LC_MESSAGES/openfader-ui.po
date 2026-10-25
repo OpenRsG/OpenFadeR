@@ -191,7 +191,7 @@ msgid "Show in File Manager"
 msgstr "Mostrar en el gestor de archivos"
 
 #: ui/app.slint:245
-#: ui/browser-table.slint:315
+#: ui/track-menu.slint:73
 msgid "Relocate…"
 msgstr "Reubicar…"
 
@@ -200,8 +200,8 @@ msgid "Auto Relocate"
 msgstr "Reubicar automáticamente"
 
 #: ui/app.slint:247
-#: ui/browser-table.slint:317
-#: ui/stage/table.slint:283
+#: ui/track-menu.slint:75
+#: src/app/library/mod.rs:118
 msgid "Remove from Collection"
 msgstr "Quitar de la colección"
 
@@ -214,8 +214,7 @@ msgid "Add to Playlist…"
 msgstr "Añadir a lista…"
 
 #: ui/app.slint:251
-#: ui/browser-table.slint:302
-#: ui/stage/table.slint:278
+#: ui/track-menu.slint:66
 msgid "Tags…"
 msgstr "Etiquetas…"
 
@@ -260,7 +259,7 @@ msgid "Genre"
 msgstr "Género"
 
 #: ui/app.slint:266
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 #: ui/touch-actions.slint:74
 msgid "Key"
 msgstr "KEY"
@@ -391,7 +390,7 @@ msgid "Related Tracks"
 msgstr "Pistas relacionadas"
 
 #: ui/app.slint:304
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 msgid "Tags"
 msgstr "Etiquetas"
 
@@ -584,12 +583,12 @@ msgid "Drop a playlist or tracks here"
 msgstr "Suelta una lista o pistas aquí"
 
 #: ui/browser-palette.slint:181
-#: ui/browser-table.slint:293
+#: ui/track-menu.slint:36
 msgid "Load to deck"
 msgstr "Cargar en el deck"
 
 #: ui/browser-palette.slint:182
-#: ui/browser-table.slint:306
+#: ui/track-menu.slint:49
 msgid "Remove from list"
 msgstr "Quitar de la lista"
 
@@ -598,7 +597,7 @@ msgid "SAVED SEARCHES"
 msgstr "BÚSQUEDAS GUARDADAS"
 
 #: ui/browser-saved.slint:24
-#: ui/browser-tree.slint:113
+#: ui/browser-tree.slint:145
 #: ui/sampler.slint:161
 msgid "SAVE"
 msgstr "GRABAR"
@@ -626,12 +625,12 @@ msgstr "¿SEGURO?"
 msgid "DELETE"
 msgstr "ELIMINAR"
 
-#: ui/browser-state.slint:74
+#: ui/browser-state.slint:88
 #: src/app/browser/suggest/view.rs:176
 msgid "LIST"
 msgstr "LISTA"
 
-#: ui/browser-state.slint:74
+#: ui/browser-state.slint:88
 #: ui/deck-compact.slint:74
 #: ui/deck-header.slint:67
 msgid "MASTER"
@@ -669,244 +668,129 @@ msgstr "Voces incluidas / no incluidas (clic para cambiar)"
 msgid "FOR"
 msgstr "PARA"
 
-#: ui/browser-table.slint:162
+#: ui/browser-table.slint:160
 #: ui/stage/library.slint:168
 #: src/app/prefs/audio/page.rs:164
 msgid "PREVIEW"
 msgstr "ESCUCHAR"
 
-#: ui/browser-table.slint:163
+#: ui/browser-table.slint:161
 msgid "TRACK TITLE"
 msgstr "TÍTULO"
 
-#: ui/browser-table.slint:164
+#: ui/browser-table.slint:162
 #: ui/stage/table.slint:140
 #: ui/studio/table.slint:123
 msgid "ARTIST"
 msgstr "ARTISTA"
 
-#: ui/browser-table.slint:165
+#: ui/browser-table.slint:163
 #: ui/stage/table.slint:144
 #: ui/studio/table.slint:127
 msgid "GENRE"
 msgstr "GÉNERO"
 
-#: ui/browser-table.slint:166
+#: ui/browser-table.slint:164
 msgid "COMMENT"
 msgstr "COMENTARIO"
 
-#: ui/browser-table.slint:168
+#: ui/browser-table.slint:166
 #: ui/stage/table.slint:146
 #: ui/studio/table.slint:121
 msgid "RATING"
 msgstr "VALORACIÓN"
 
-#: ui/browser-table.slint:169
+#: ui/browser-table.slint:167
 msgid "TIME"
 msgstr "DURACIÓN"
 
-#: ui/browser-table.slint:170
+#: ui/browser-table.slint:168
 #: ui/deck-header.slint:74
 #: ui/stage/table.slint:143
 msgid "KEY"
 msgstr "KEY"
 
-#: ui/browser-table.slint:209
+#: ui/browser-table.slint:207
 #: src/app/deck/pads/mod.rs:93
 #: src/app/prefs/extensions.rs:87
 msgid "STEMS"
 msgstr "STEMS"
 
-#: ui/browser-table.slint:215
+#: ui/browser-table.slint:213
 #: ui/stage/table.slint:205
 #: ui/studio/table.slint:160
 msgid "★★★★★"
 msgstr "★★★★★"
 
-#: ui/browser-table.slint:270
+#: ui/browser-table.slint:268
 #: ui/stage/table.slint:251
 #: ui/studio/table.slint:204
 msgid "No tracks"
 msgstr "Sin pistas"
 
-#: ui/browser-table.slint:292
-#: ui/stage/table.slint:270
-#: ui/studio/table.slint:223
-msgid "{} tracks selected"
-msgstr "{} pistas seleccionadas"
-
-#: ui/browser-table.slint:294
-#: ui/stage/table.slint:273
-#: ui/studio/table.slint:226
-msgid "Edit track details…"
-msgstr "Editar detalles de la pista…"
-
-#: ui/browser-table.slint:295
-#: ui/stage/table.slint:274
-#: ui/studio/table.slint:227
-msgid "Add to Tag List (T)"
-msgstr "Añadir a la lista de etiquetas (T)"
-
-#: ui/browser-table.slint:296
-#: ui/stage/table.slint:275
-#: ui/studio/table.slint:228
-msgid "Add to playlist…"
-msgstr "Añadir a lista…"
-
-#: ui/browser-table.slint:297
-#: ui/stage/table.slint:276
-#: ui/studio/table.slint:229
-msgid "New playlist from selection…"
-msgstr "Nueva lista desde la selección…"
-
-#: ui/browser-table.slint:298
-#: ui/stage/table.slint:277
-#: ui/studio/table.slint:230
-msgid "Transfer to {}"
-msgstr "Transferir a {}"
-
-#: ui/browser-table.slint:299
-msgid "Add to palette 1"
-msgstr "Añadir a la paleta 1"
-
-#: ui/browser-table.slint:300
-msgid "Add to palette 2"
-msgstr "Añadir a la paleta 2"
-
-#: ui/browser-table.slint:301
-msgid "Add to palette 3"
-msgstr "Añadir a la paleta 3"
-
-#: ui/browser-table.slint:303
-#: ui/stage/table.slint:279
-#: ui/studio/table.slint:232
-msgid "Hide related tracks"
-msgstr "Ocultar pistas relacionadas"
-
-#: ui/browser-table.slint:303
-#: ui/browser.slint:151
-#: ui/stage/library.slint:53
-msgid "Related tracks"
-msgstr "Pistas relacionadas"
-
-#: ui/browser-table.slint:304
-#: ui/browser.slint:408
-msgid "Move up"
-msgstr "Subir"
-
-#: ui/browser-table.slint:305
-#: ui/browser.slint:409
-msgid "Move down"
-msgstr "Bajar"
-
-#: ui/browser-table.slint:307
-#: ui/stage/table.slint:280
-#: ui/studio/table.slint:233
-msgid "Analyze track"
-msgstr "Analizar pista"
-
-#: ui/browser-table.slint:308
-#: ui/stage/table.slint:281
-#: ui/studio/table.slint:234
-msgid "Make Auto Cue point"
-msgstr "Crear punto de cue automático"
-
-#: ui/browser-table.slint:309
-#: ui/touch-actions.slint:57
-msgid "Analysis lock"
-msgstr "Bloqueo de análisis"
-
-#: ui/browser-table.slint:310
-msgid "Reload tag"
-msgstr "Recargar etiqueta"
-
-#: ui/browser-table.slint:311
-msgid "Reload tag (discard edits)"
-msgstr "Recargar etiqueta (descartar ediciones)"
-
-#: ui/browser-table.slint:312
-msgid "Find artwork…"
-msgstr "Buscar carátula…"
-
-#: ui/browser-table.slint:313
-#: ui/touch-actions.slint:61
-msgid "Fetch missing artwork"
-msgstr "Obtener carátulas que faltan"
-
-#: ui/browser-table.slint:314
-#: ui/stage/table.slint:282
-#: ui/studio/table.slint:235
-msgid "Show in file manager"
-msgstr "Mostrar en el gestor de archivos"
-
-#: ui/browser-table.slint:316
-#: ui/touch-actions.slint:64
-msgid "Auto relocate"
-msgstr "Reubicar automáticamente"
-
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 msgid "Rating ≥"
 msgstr "Valoración ≥"
 
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 msgid "Genre contains"
 msgstr "El género contiene"
 
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 msgid "Date added"
 msgstr "Fecha de alta"
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "BPM min"
 msgstr "BPM mín."
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "1-5 stars"
 msgstr "1-5 estrellas"
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "text"
 msgstr "texto"
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "tag name"
 msgstr "nombre de etiqueta"
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "from YYYY-MM-DD"
 msgstr "desde AAAA-MM-DD"
 
-#: ui/browser-tree.slint:104
+#: ui/browser-tree.slint:136
 msgid "BPM max"
 msgstr "BPM máx."
 
-#: ui/browser-tree.slint:104
+#: ui/browser-tree.slint:136
 msgid "to YYYY-MM-DD"
 msgstr "hasta AAAA-MM-DD"
 
-#: ui/browser-tree.slint:110
+#: ui/browser-tree.slint:142
 msgid "SMART PLAYLIST: {}"
 msgstr "LISTA INTELIGENTE: {}"
 
-#: ui/browser-tree.slint:111
+#: ui/browser-tree.slint:143
 msgid "MATCH ANY"
 msgstr "CUALQUIERA"
 
-#: ui/browser-tree.slint:111
+#: ui/browser-tree.slint:143
 msgid "MATCH ALL"
 msgstr "TODAS"
 
-#: ui/browser-tree.slint:112
+#: ui/browser-tree.slint:144
 msgid "+ CONDITION"
 msgstr "+ CONDICIÓN"
 
-#: ui/browser-tree.slint:114
+#: ui/browser-tree.slint:146
 #: ui/browser.slint:307
 #: ui/device-format.slint:73
 msgid "CANCEL"
 msgstr "CANCELAR"
 
-#: ui/browser-tree.slint:125
+#: ui/browser-tree.slint:157
 msgid "Remove condition"
 msgstr "Quitar condición"
 
@@ -930,6 +814,12 @@ msgstr "Historial de sesiones"
 #: ui/studio/library.slint:33
 msgid "Duplicate tracks"
 msgstr "Pistas duplicadas"
+
+#: ui/browser.slint:151
+#: ui/stage/library.slint:53
+#: ui/studio/library.slint:34
+msgid "Related tracks"
+msgstr "Pistas relacionadas"
 
 #: ui/browser.slint:156
 #: ui/stage/library.slint:62
@@ -1215,6 +1105,16 @@ msgstr "Previa en auriculares: toca la forma de onda para desplazarte"
 #: src/app/prefs/view.rs:362
 msgid "Playlist Palette"
 msgstr "Paleta de listas"
+
+#: ui/browser.slint:408
+#: ui/track-menu.slint:47
+msgid "Move up"
+msgstr "Subir"
+
+#: ui/browser.slint:409
+#: ui/track-menu.slint:48
+msgid "Move down"
+msgstr "Bajar"
 
 #: ui/browser.slint:410
 #: ui/studio/automix.slint:96
@@ -1649,7 +1549,7 @@ msgid "Key +"
 msgstr "KEY +"
 
 #: ui/deck-touch.slint:47
-#: ui/widgets.slint:209
+#: ui/widgets.slint:211
 msgid "Transport"
 msgstr "Transporte"
 
@@ -1806,6 +1706,7 @@ msgid "LAST WRITTEN"
 msgstr "ÚLTIMA ESCRITURA"
 
 #: ui/device-check.slint:145
+#: ui/track-menu.slint:40
 msgid "PLAYLISTS"
 msgstr "LISTAS"
 
@@ -3687,6 +3588,7 @@ msgstr "AUDIO"
 
 #: ui/prefs.slint:49
 #: ui/prefs.slint:68
+#: ui/track-menu.slint:60
 msgid "ANALYSIS"
 msgstr "ANÁLISIS"
 
@@ -4033,12 +3935,6 @@ msgstr "ÁLBUM"
 #: ui/stage/table.slint:147
 msgid "DATE ADDED"
 msgstr "AÑADIDO"
-
-#: ui/stage/table.slint:271
-#: ui/stage/table.slint:272
-#: ui/studio/table.slint:224
-msgid "Load to deck {}"
-msgstr "Cargar en el deck {}"
 
 #: ui/stems-model.slint:30
 msgid "STEMS model download failed"
@@ -4445,6 +4341,16 @@ msgstr "Editar detalles de la pista"
 msgid "Import to collection"
 msgstr "Importar a la colección"
 
+#: ui/touch-actions.slint:56
+#: ui/track-menu.slint:61
+msgid "Analyze track"
+msgstr "Analizar pista"
+
+#: ui/touch-actions.slint:57
+#: ui/track-menu.slint:63
+msgid "Analysis lock"
+msgstr "Bloqueo de análisis"
+
 #: ui/touch-actions.slint:58
 msgid "Reload tags"
 msgstr "Recargar etiquetas"
@@ -4457,9 +4363,24 @@ msgstr "Recargar etiquetas (descartar ediciones)"
 msgid "Find artwork"
 msgstr "Buscar carátula"
 
+#: ui/touch-actions.slint:61
+#: ui/track-menu.slint:70
+msgid "Fetch missing artwork"
+msgstr "Obtener carátulas que faltan"
+
+#: ui/touch-actions.slint:62
+#: ui/track-menu.slint:72
+msgid "Show in file manager"
+msgstr "Mostrar en el gestor de archivos"
+
 #: ui/touch-actions.slint:63
 msgid "Relocate track"
 msgstr "Reubicar pista"
+
+#: ui/touch-actions.slint:64
+#: ui/track-menu.slint:74
+msgid "Auto relocate"
+msgstr "Reubicar automáticamente"
 
 #: ui/touch-actions.slint:65
 msgid "Remove from collection"
@@ -4686,6 +4607,84 @@ msgstr "Alejar los carriles de MIX POINT"
 msgid "Mix point lanes zoom in"
 msgstr "Acercar los carriles de MIX POINT"
 
+#: ui/track-menu.slint:37
+#: ui/track-menu.slint:38
+msgid "Load to deck {}"
+msgstr "Cargar en el deck {}"
+
+#: ui/track-menu.slint:39
+msgid "Hide related tracks"
+msgstr "Ocultar pistas relacionadas"
+
+#: ui/track-menu.slint:41
+msgid "Add to Tag List (T)"
+msgstr "Añadir a la lista de etiquetas (T)"
+
+#: ui/track-menu.slint:42
+msgid "Add to playlist…"
+msgstr "Añadir a lista…"
+
+#: ui/track-menu.slint:43
+msgid "New playlist from selection…"
+msgstr "Nueva lista desde la selección…"
+
+#: ui/track-menu.slint:44
+msgid "Add to palette 1"
+msgstr "Añadir a la paleta 1"
+
+#: ui/track-menu.slint:45
+msgid "Add to palette 2"
+msgstr "Añadir a la paleta 2"
+
+#: ui/track-menu.slint:46
+msgid "Add to palette 3"
+msgstr "Añadir a la paleta 3"
+
+#: ui/track-menu.slint:50
+msgid "USB STICK / SD CARD"
+msgstr "MEMORIA USB / TARJETA SD"
+
+#: ui/track-menu.slint:51
+msgid "Transfer to {}"
+msgstr "Transferir a {}"
+
+#: ui/track-menu.slint:52
+msgid "Plug one in to send tracks to it"
+msgstr "Conecta una para enviarle pistas"
+
+#: ui/track-menu.slint:62
+#: src/app/library/autocue.rs:129
+msgid "Make Auto Cue point"
+msgstr "Crear punto de cue automático"
+
+#: ui/track-menu.slint:64
+msgid "TRACK INFO"
+msgstr "DATOS DE LA PISTA"
+
+#: ui/track-menu.slint:65
+msgid "Edit track details…"
+msgstr "Editar detalles de la pista…"
+
+#: ui/track-menu.slint:67
+msgid "Reload tag"
+msgstr "Recargar etiqueta"
+
+#: ui/track-menu.slint:68
+msgid "Reload tag (discard edits)"
+msgstr "Recargar etiqueta (descartar ediciones)"
+
+#: ui/track-menu.slint:69
+msgid "Find artwork…"
+msgstr "Buscar carátula…"
+
+#: ui/track-menu.slint:71
+msgid "FILE"
+msgstr "ARCHIVO"
+
+#: ui/track-menu.slint:100
+msgid "{} tracks selected"
+msgstr "{} pistas seleccionadas"
+
 #: ui/trackinfo.slint:72
 msgid "Select a track"
 msgstr "Selecciona una pista"
@@ -4894,11 +4893,11 @@ msgstr "Puedes cambiarlo más tarde en PREFERENCIAS > EXTENSIONES y volver a abr
 msgid "SWITCH ON {}"
 msgstr "ACTIVAR {}"
 
-#: ui/widgets.slint:209
+#: ui/widgets.slint:211
 msgid "Play"
 msgstr "PLAY"
 
-#: ui/widgets.slint:209
+#: ui/widgets.slint:211
 msgid "Pause"
 msgstr "Pausa"
 
@@ -4967,12 +4966,12 @@ msgid "under a minute"
 msgstr "menos de un minuto"
 
 #: src/app/analyze/stale.rs:75
-#: src/app/device/pace.rs:186
+#: src/app/device/pace.rs:188
 msgid "about {} min"
 msgstr "unos {} min"
 
 #: src/app/analyze/stale.rs:76
-#: src/app/device/pace.rs:189
+#: src/app/device/pace.rs:191
 msgid "about {} h {} min"
 msgstr "unas {} h {} min"
 
@@ -5257,7 +5256,7 @@ msgstr "{} de {} pistas"
 msgid " · BPM ±6% / KEY MATCH wait for a loaded deck"
 msgstr " · BPM ±6% / KEY MATCH esperan a un deck cargado"
 
-#: src/app/browser/mod.rs:375
+#: src/app/browser/mod.rs:377
 msgid "{} selected"
 msgstr "{} seleccionadas"
 
@@ -5275,12 +5274,12 @@ msgstr "esa pista ya no existe"
 
 #: src/app/browser/palette/edit.rs:74
 #: src/app/browser/palette/edit.rs:110
-#: src/app/browser/wire.rs:319
+#: src/app/browser/wire.rs:326
 msgid "{} tracks added to the Tag List"
 msgstr "{} pistas añadidas a la lista de etiquetas"
 
 #: src/app/browser/palette/edit.rs:90
-#: src/app/browser/wire.rs:299
+#: src/app/browser/wire.rs:306
 msgid "“{}” is already in the Tag List"
 msgstr "«{}» ya está en la lista de etiquetas"
 
@@ -5289,7 +5288,7 @@ msgid "the Tag List holds up to {} tracks"
 msgstr "la lista de etiquetas admite hasta {} pistas"
 
 #: src/app/browser/palette/edit.rs:97
-#: src/app/browser/wire.rs:301
+#: src/app/browser/wire.rs:308
 msgid "tagged “{}” ({} in the Tag List)"
 msgstr "«{}» etiquetada ({} en la lista de etiquetas)"
 
@@ -5512,59 +5511,59 @@ msgstr "“{}” no está en la Colección: impórtalo primero"
 msgid "Library Protection is on: cannot {} (Preferences > Advanced > Browse)"
 msgstr "La protección de la biblioteca está activada: no se puede {} (Preferencias > Avanzado > Explorar)"
 
-#: src/app/browser/playlists/tree.rs:60
+#: src/app/browser/playlists/tree.rs:61
 msgid "Edit conditions…"
 msgstr "Editar condiciones…"
 
-#: src/app/browser/playlists/tree.rs:63
+#: src/app/browser/playlists/tree.rs:64
 msgid "▲ Move up"
 msgstr "▲ Subir"
 
-#: src/app/browser/playlists/tree.rs:66
+#: src/app/browser/playlists/tree.rs:67
 msgid "▼ Move down"
 msgstr "▼ Bajar"
 
-#: src/app/browser/playlists/tree.rs:69
+#: src/app/browser/playlists/tree.rs:70
 msgid "Move to the top level"
 msgstr "Mover al nivel superior"
 
-#: src/app/browser/playlists/tree.rs:76
+#: src/app/browser/playlists/tree.rs:77
 msgid "Move into ▸ {}"
 msgstr "Mover a ▸ {}"
 
-#: src/app/browser/playlists/tree.rs:140
+#: src/app/browser/playlists/tree.rs:141
 msgid "My Playlists: + NEW makes a playlist, folder or smart playlist; ADD TO PLAYLIST puts the chosen track in a playlist"
 msgstr "Mis listas: + NUEVO crea una lista, carpeta o lista inteligente; AÑADIR A LISTA pone la pista elegida en una lista"
 
-#: src/app/browser/playlists/tree.rs:145
+#: src/app/browser/playlists/tree.rs:146
 msgid "History: tracks that stayed on air for 60 s, one list per day"
 msgstr "Historial: pistas que estuvieron en el aire durante 60 s, una lista por día"
 
-#: src/app/browser/playlists/tree.rs:148
+#: src/app/browser/playlists/tree.rs:149
 msgid "Stages: new music from the watched folders waits in INBOX; drag a track onto the next stage or use MORE; + NEW adds a stage before COLLECTION"
 msgstr "Etapas: la música nueva de las carpetas vigiladas espera en INBOX; arrastra una pista a la etapa siguiente o usa MÁS; + NEW añade una etapa antes de COLECCIÓN"
 
-#: src/app/browser/playlists/tree.rs:153
+#: src/app/browser/playlists/tree.rs:154
 msgid "Cue Bank: + NEW makes a list of up to 8 cues (A–H) of different tracks; the device export carries the lists"
 msgstr "Cue Bank: + NUEVO crea una lista de hasta 8 CUE (A–H) de distintas pistas; la exportación al dispositivo incluye las listas"
 
-#: src/app/browser/playlists/tree.rs:158
+#: src/app/browser/playlists/tree.rs:159
 msgid "Tags: + NEW adds a category; choose a category and + NEW adds a tag to it"
 msgstr "Etiquetas: + NUEVO añade una categoría; elige una categoría y + NUEVO le añade una etiqueta"
 
-#: src/app/browser/playlists/tree.rs:161
+#: src/app/browser/playlists/tree.rs:162
 msgid "Library: read-only; DUPLICATE TO MY PLAYLISTS copies a playlist you can edit"
 msgstr "Biblioteca: solo lectura; DUPLICAR EN MIS LISTAS copia una lista que puedes editar"
 
-#: src/app/browser/playlists/tree.rs:164
+#: src/app/browser/playlists/tree.rs:165
 msgid "Folder of the library (read-only): DUPLICATE TO MY PLAYLISTS copies it with its playlists"
 msgstr "Carpeta de la biblioteca (solo lectura): DUPLICAR EN MIS LISTAS la copia con sus listas"
 
-#: src/app/browser/playlists/tree.rs:169
+#: src/app/browser/playlists/tree.rs:170
 msgid "Folder: + NEW makes a playlist, folder or smart playlist inside it"
 msgstr "Carpeta: + NUEVO crea dentro una lista, carpeta o lista inteligente"
 
-#: src/app/browser/playlists/tree.rs:172
+#: src/app/browser/playlists/tree.rs:173
 msgid "Category: + NEW adds a tag; choose a tag to list its tracks"
 msgstr "Categoría: + NUEVO añade una etiqueta; elige una etiqueta para ver sus pistas"
 
@@ -5628,17 +5627,17 @@ msgstr "no se puede leer la búsqueda guardada «{}»"
 msgid "deleted the saved search “{}”"
 msgstr "búsqueda guardada «{}» eliminada"
 
-#: src/app/browser/session.rs:31
+#: src/app/browser/session.rs:37
 #: src/app/browser/sidebar.rs:116
 msgid "Tag List ({})"
 msgstr "Lista de etiquetas ({})"
 
-#: src/app/browser/session.rs:61
+#: src/app/browser/session.rs:64
 #: src/app/browser/sidebar.rs:117
 msgid "Session history ({})"
 msgstr "Historial de la sesión ({})"
 
-#: src/app/browser/session.rs:75
+#: src/app/browser/session.rs:77
 msgid "history: {}"
 msgstr "historial: {}"
 
@@ -6015,7 +6014,7 @@ msgid " · reading {}/{}"
 msgstr " · leyendo {}/{}"
 
 #: src/app/browser/tagging.rs:141
-#: src/app/browser/wire.rs:298
+#: src/app/browser/wire.rs:305
 msgid "select a track to tag"
 msgstr "selecciona una pista para etiquetar"
 
@@ -6051,21 +6050,21 @@ msgstr "{} pistas añadidas a la etiqueta «{}»"
 msgid "every deck is playing; pause one to load"
 msgstr "todos los decks están en reproducción; pausa uno para cargar"
 
-#: src/app/browser/wire.rs:226
+#: src/app/browser/wire.rs:227
 msgid "saved {n} track to {}"
 msgid_plural "saved {n} tracks to {}"
 msgstr[0] "{n} pista guardada en {}"
 msgstr[1] "{n} pistas guardadas en {}"
 
-#: src/app/browser/wire.rs:232
+#: src/app/browser/wire.rs:233
 msgid "save failed: {}"
 msgstr "falló el guardado: {}"
 
-#: src/app/browser/wire.rs:290
+#: src/app/browser/wire.rs:297
 msgid "select a track to see what relates to it"
 msgstr "selecciona una pista para ver qué se relaciona con ella"
 
-#: src/app/browser/wire.rs:353
+#: src/app/browser/wire.rs:360
 msgid "AUTOMIX stopped"
 msgstr "AUTOMIX detenido"
 
@@ -7593,23 +7592,23 @@ msgstr "{}: su extensión no puede hacer eso con este dispositivo. Activa la ext
 msgid "Cancelling…"
 msgstr "Cancelando…"
 
-#: src/app/device/pace.rs:138
+#: src/app/device/pace.rs:140
 msgid "{} left"
 msgstr "{} restantes"
 
-#: src/app/device/pace.rs:171
+#: src/app/device/pace.rs:173
 msgid "This stick writes small files slowly (analysis files): {}. A faster stick helps"
 msgstr "Esta memoria USB escribe lentamente los archivos pequeños (archivos de análisis): {}. Una memoria más rápida ayuda"
 
-#: src/app/device/pace.rs:175
+#: src/app/device/pace.rs:177
 msgid "This stick writes at {}"
 msgstr "Esta memoria USB escribe a {}"
 
-#: src/app/device/pace.rs:184
+#: src/app/device/pace.rs:186
 msgid "a few seconds"
 msgstr "unos segundos"
 
-#: src/app/device/pace.rs:185
+#: src/app/device/pace.rs:187
 msgid "about {} s"
 msgstr "unos {} s"
 

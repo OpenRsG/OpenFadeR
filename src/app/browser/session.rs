@@ -16,7 +16,7 @@ use openfader::{
     store,
 };
 use serde_json::json;
-use slint::{ComponentHandle, Model, StandardListViewItem, TimerMode};
+use slint::{ComponentHandle, Model, TimerMode};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -25,11 +25,16 @@ use std::{
 
 impl View {
     /// The Tag List changed: update its sidebar count and, when it is on screen, the rows.
+    /// New text for one of the fixed rows at the top of the tree (its count changed).
+    fn relabel(&self, row: usize, text: String) {
+        if let Some(mut r) = self.sidebar.row_data(row) {
+            r.text = text.into();
+            self.sidebar.set_row_data(row, r);
+        }
+    }
+
     pub(super) fn tags_changed(&mut self, app: &App) {
-        self.sidebar.set_row_data(
-            TAG_ROW,
-            StandardListViewItem::from(tr!("Tag List ({})", self.tags.len()).as_str()),
-        );
+        self.relabel(TAG_ROW, tr!("Tag List ({})", self.tags.len()));
         let keys: Vec<String> = self.tags.iter().map(store::key).collect();
         if let Err(e) = self.store.set_taglist(&keys) {
             self.say(app, tr!("store: {}", e));
@@ -56,10 +61,7 @@ impl View {
     /// A track reached 30 s on air: list it, update the sidebar count and, when shown, the rows.
     fn log(&mut self, app: &App, t: Track) {
         self.history.push(t);
-        self.sidebar.set_row_data(
-            HISTORY_ROW,
-            StandardListViewItem::from(tr!("Session history ({})", self.history.len()).as_str()),
-        );
+        self.relabel(HISTORY_ROW, tr!("Session history ({})", self.history.len()));
         if self.related.is_none() && matches!(self.home, Home::History) {
             self.load(app);
         }

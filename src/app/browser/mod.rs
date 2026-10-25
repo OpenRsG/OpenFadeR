@@ -56,7 +56,7 @@ mod wire;
 pub use sources::SourceType;
 pub use wire::wire;
 
-use super::{App, BrowserState, deck::Decks};
+use super::{App, BrowserState, TreeRow, deck::Decks};
 use filter::Filter;
 use openfader::{
     library::{Library, Playlist, Track},
@@ -201,7 +201,7 @@ struct View {
     lib: Rc<dyn Library>,
     store: Arc<Store>,
     rows: Rc<table::Rows>,
-    sidebar: Rc<VecModel<StandardListViewItem>>,
+    sidebar: Rc<VecModel<TreeRow>>,
     panel_rows: Rc<VecModel<StandardListViewItem>>,
     list: Rc<Vec<Track>>,
     /// Visible row → index into `list`.
@@ -239,6 +239,8 @@ struct View {
     /// Sidebar row → what it is; `entry` is the chosen one.
     entries: Vec<Entry>,
     entry: Entry,
+    /// Headings unfolded this session ([`sidebar::fold`]); every other one shows only itself.
+    open: Vec<Entry>,
     lib_playlists: Vec<Playlist>,
     nodes: Vec<Node>,
     cats: Vec<TagGroup>,

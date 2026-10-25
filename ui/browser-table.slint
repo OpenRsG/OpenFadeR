@@ -1,9 +1,9 @@
+import { TrackMenu } from "track-menu.slint";
 import { ListView } from "std-widgets.slint";
-import { Glyph, Icon, MenuItem, Splitter } from "widgets.slint";
+import { Glyph, Icon, Splitter } from "widgets.slint";
 import { PaneState } from "panes.slint";
 import { Theme } from "theme.slint";
 import { BrowserState } from "browser-state.slint";
-import { LibraryState } from "library.slint";
 import { DragState } from "dnd.slint";
 import { DeckState } from "deck-state.slint";
 
@@ -120,13 +120,11 @@ export component TrackTable inherits Rectangle {
     property <length> menu-y;
     /// A press on one of several selected rows waits for the release: a drag from it carries the whole selection.
     property <int> collapse-row: -1;
-    property <bool> list-view: BrowserState.tag-view || BrowserState.user-view;
     property <bool> multi: BrowserState.selected-count > 1;
-    /// Rows of the right-click menu (the library entries come last).
-    property <int> menu-rows: 18 + (root.list-view ? 3 : 0) + (BrowserState.palette-enabled ? 3 : 0) + (root.multi ? 1 : 0) + BrowserState.transfer-targets.length;
+    // The menu keeps itself inside the table (its x / y bindings).
     function place-menu(x: length, y: length) {
-        root.menu-x = min(x, root.width - 190px);
-        root.menu-y = min(y, max(0px, root.height - root.menu-rows * Theme.h-row - 4px));
+        root.menu-x = x;
+        root.menu-y = y;
     }
     // Holding a track for a second opens the same menu (Preferences > Advanced > Browse > Drop-down menu).
     hold := Timer {
@@ -278,44 +276,10 @@ export component TrackTable inherits Rectangle {
 
     // Right-click: the row is already the chosen one. LOAD presses it twice (Rust reads two quick presses as a double click).
     menu := PopupWindow {
-        x: root.menu-x;
-        y: root.menu-y;
-        width: 190px;
-        height: root.menu-rows * Theme.h-row + 4px;
-        Rectangle {
-            background: Theme.panel-raised;
-            border-width: 1px;
-            border-color: Theme.line-strong;
-            border-radius: Theme.radius;
-            VerticalLayout {
-                padding: 1px;
-                if root.multi: MenuItem { text: @tr("{} tracks selected", BrowserState.selected-count); enabled: false; }
-                MenuItem { text: @tr("Load to deck"); enabled: !root.multi; activated => { BrowserState.track-pressed(BrowserState.current-row); BrowserState.track-pressed(BrowserState.current-row); menu.close(); } }
-                MenuItem { text: @tr("Edit track details…"); enabled: !root.multi; activated => { LibraryState.action("track-edit"); menu.close(); } }
-                MenuItem { text: @tr("Add to Tag List (T)"); activated => { BrowserState.tag-add(); menu.close(); } }
-                MenuItem { text: @tr("Add to playlist…"); activated => { BrowserState.panel-request(0); menu.close(); } }
-                MenuItem { text: @tr("New playlist from selection…"); activated => { BrowserState.playlist-op("new-from-selection"); menu.close(); } }
-                for label[i] in BrowserState.transfer-targets: MenuItem { text: @tr("Transfer to {}", label); activated => { BrowserState.transfer-to(i); menu.close(); } }
-                if BrowserState.palette-enabled: MenuItem { text: @tr("Add to palette 1"); activated => { BrowserState.palette-add-chosen(1); menu.close(); } }
-                if BrowserState.palette-enabled: MenuItem { text: @tr("Add to palette 2"); activated => { BrowserState.palette-add-chosen(2); menu.close(); } }
-                if BrowserState.palette-enabled: MenuItem { text: @tr("Add to palette 3"); activated => { BrowserState.palette-add-chosen(3); menu.close(); } }
-                MenuItem { text: @tr("Tags…"); enabled: !root.multi; activated => { BrowserState.panel-request(1); menu.close(); } }
-                MenuItem { text: BrowserState.related ? @tr("Hide related tracks") : @tr("Related tracks"); enabled: !root.multi; activated => { BrowserState.related-toggled(!BrowserState.related); menu.close(); } }
-                if root.list-view: MenuItem { text: @tr("Move up"); enabled: !root.multi; activated => { BrowserState.list-move(-1); menu.close(); } }
-                if root.list-view: MenuItem { text: @tr("Move down"); enabled: !root.multi; activated => { BrowserState.list-move(1); menu.close(); } }
-                if root.list-view: MenuItem { text: @tr("Remove from list"); activated => { BrowserState.list-remove(); menu.close(); } }
-                MenuItem { text: @tr("Analyze track"); activated => { LibraryState.action("track-analyze"); menu.close(); } }
-                MenuItem { text: @tr("Make Auto Cue point"); activated => { LibraryState.action("track-autocue"); menu.close(); } }
-                MenuItem { text: @tr("Analysis lock"); activated => { LibraryState.action("track-lock"); menu.close(); } }
-                MenuItem { text: @tr("Reload tag"); activated => { LibraryState.action("track-reload-tag"); menu.close(); } }
-                MenuItem { text: @tr("Reload tag (discard edits)"); activated => { LibraryState.action("track-reload-tag-discard"); menu.close(); } }
-                MenuItem { text: @tr("Find artwork…"); enabled: !root.multi; activated => { LibraryState.action("track-artwork"); menu.close(); } }
-                MenuItem { text: @tr("Fetch missing artwork"); activated => { LibraryState.action("track-artwork-missing"); menu.close(); } }
-                MenuItem { text: @tr("Show in file manager"); enabled: !root.multi; activated => { LibraryState.action("track-show"); menu.close(); } }
-                MenuItem { text: @tr("Relocate…"); enabled: !root.multi; activated => { LibraryState.action("track-relocate"); menu.close(); } }
-                MenuItem { text: @tr("Auto relocate"); activated => { LibraryState.action("track-auto-relocate"); menu.close(); } }
-                MenuItem { text: @tr("Remove from Collection"); activated => { LibraryState.action("track-remove"); menu.close(); } }
-            }
-        }
+        x: min(root.menu-x, max(0px, root.width - self.width));
+        y: min(root.menu-y, max(0px, root.height - self.height));
+        width: body.menu-w;
+        height: body.menu-h;
+        body := TrackMenu { two-decks: false; palettes: BrowserState.palette-enabled; narrow: root.width < 440px; radius: Theme.radius; done => { menu.close(); } }
     }
 }

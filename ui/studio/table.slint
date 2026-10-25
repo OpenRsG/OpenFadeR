@@ -1,10 +1,10 @@
+import { TrackMenu } from "../track-menu.slint";
 import { ListView } from "std-widgets.slint";
-import { Chip, Glyph, Icon, MenuItem } from "../widgets.slint";
+import { Chip, Glyph, Icon } from "../widgets.slint";
 import { Theme } from "../theme.slint";
 import { BrowserState } from "../browser-state.slint";
 import { DeckState } from "../deck-state.slint";
 import { DragState } from "../dnd.slint";
-import { LibraryState } from "../library.slint";
 import { StudioState } from "../studio-state.slint";
 
 /// A sortable column title of the track list.
@@ -92,10 +92,10 @@ export component StudioTable inherits Rectangle {
     /// A press on one of several selected rows waits for the release: a drag from it carries the whole selection.
     property <int> collapse-row: -1;
     property <bool> multi: BrowserState.selected-count > 1;
-    property <int> menu-rows: 12 + (root.multi ? 1 : 0) + BrowserState.transfer-targets.length;
+    // The menu keeps itself inside the table (its x / y bindings).
     function place-menu(x: length, y: length) {
-        root.menu-x = min(x, root.width - 200px);
-        root.menu-y = min(y, max(0px, root.height - root.menu-rows * Theme.h-row - 4px));
+        root.menu-x = x;
+        root.menu-y = y;
     }
     init => { StudioState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
     changed height => { StudioState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
@@ -209,32 +209,10 @@ export component StudioTable inherits Rectangle {
         font-size: Theme.font-size;
     }
     menu := PopupWindow {
-        x: root.menu-x;
-        y: root.menu-y;
-        width: 200px;
-        height: root.menu-rows * Theme.h-row + 4px;
-        Rectangle {
-            background: Theme.panel-raised;
-            border-width: 1px;
-            border-color: Theme.line-strong;
-            border-radius: Theme.studio-radius-ctl;
-            VerticalLayout {
-                padding: 1px;
-                if root.multi: MenuItem { text: @tr("{} tracks selected", BrowserState.selected-count); enabled: false; }
-                MenuItem { text: @tr("Load to deck {}", DeckState.slots[0] + 1); enabled: !root.multi; activated => { DeckState.load(DeckState.slots[0]); menu.close(); } }
-                MenuItem { text: @tr("Load to deck {}", DeckState.slots[1] + 1); enabled: !root.multi; activated => { DeckState.load(DeckState.slots[1]); menu.close(); } }
-                MenuItem { text: @tr("Edit track details…"); enabled: !root.multi; activated => { LibraryState.action("track-edit"); menu.close(); } }
-                MenuItem { text: @tr("Add to Tag List (T)"); activated => { BrowserState.tag-add(); menu.close(); } }
-                MenuItem { text: @tr("Add to playlist…"); activated => { BrowserState.panel-request(0); menu.close(); } }
-                MenuItem { text: @tr("New playlist from selection…"); activated => { BrowserState.playlist-op("new-from-selection"); menu.close(); } }
-                for label[i] in BrowserState.transfer-targets: MenuItem { text: @tr("Transfer to {}", label); activated => { BrowserState.transfer-to(i); menu.close(); } }
-                MenuItem { text: @tr("Tags…"); enabled: !root.multi; activated => { BrowserState.panel-request(1); menu.close(); } }
-                MenuItem { text: BrowserState.related ? @tr("Hide related tracks") : @tr("Related tracks"); enabled: !root.multi; activated => { BrowserState.related-toggled(!BrowserState.related); menu.close(); } }
-                MenuItem { text: @tr("Analyze track"); activated => { LibraryState.action("track-analyze"); menu.close(); } }
-                MenuItem { text: @tr("Make Auto Cue point"); activated => { LibraryState.action("track-autocue"); menu.close(); } }
-                MenuItem { text: @tr("Show in file manager"); enabled: !root.multi; activated => { LibraryState.action("track-show"); menu.close(); } }
-                MenuItem { text: @tr("Remove from Collection"); activated => { LibraryState.action("track-remove"); menu.close(); } }
-            }
-        }
+        x: min(root.menu-x, max(0px, root.width - self.width));
+        y: min(root.menu-y, max(0px, root.height - self.height));
+        width: body.menu-w;
+        height: body.menu-h;
+        body := TrackMenu { two-decks: true; palettes: false; narrow: root.width < 440px; radius: Theme.studio-radius-ctl; done => { menu.close(); } }
     }
 }

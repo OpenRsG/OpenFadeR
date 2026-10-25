@@ -108,6 +108,7 @@ pub fn wire(
         sel_at: None,
         entries: Vec::new(),
         entry: Entry::All,
+        open: Vec::new(),
         lib_playlists,
         nodes: Vec::new(),
         cats: Vec::new(),
@@ -239,6 +240,12 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
     state.on_playlist_selected(move |i| {
         if let Ok(i) = usize::try_from(i) {
             v.borrow_mut().select(&weak.unwrap(), i);
+        }
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
+    state.on_tree_toggle(move |i| {
+        if let Ok(i) = usize::try_from(i) {
+            v.borrow_mut().toggle(&weak.unwrap(), i);
         }
     });
     let (v, weak) = (view.clone(), app.as_weak());
