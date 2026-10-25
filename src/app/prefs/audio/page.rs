@@ -137,6 +137,9 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     for n in &st.notes {
         rows.push(Row::info(tr!("NOTE"), n));
     }
+    if let Some(d) = &st.pending {
+        rows.push(Row::info(tr!("NOTE"), &tr!("looking for {}…", d)));
+    }
     if let Some(e) = &st.error {
         rows.push(Row::info(tr!("PROBLEM"), e));
     }

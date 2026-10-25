@@ -264,6 +264,7 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
                     audio::release_controller();
                     if n == a.output_device {
                         let _ = audio::set_output(None);
+                        refresh_when_settled();
                     }
                 }
                 a.output_device = n;
@@ -337,10 +338,21 @@ fn aux_choices(a: &Audio) -> Vec<(String, String)> {
     out
 }
 
+/// The status (device, rate, notes) changes again when a device being looked for is found and the stream moves: redraw then.
+fn refresh_when_settled() {
+    audio::when_settled(|_| {
+        super::refresh();
+        cards::sync();
+    });
+}
+
 /// Hands the settings to the audio engine now and after every change ([`audio::configure`]: live knobs at once, the device /
 /// rate / buffer / layout by moving the stream). Call after `prefs::wire` has loaded the file and before the decks are created
 /// (the first `Player` opens the stream with these settings).
 pub fn wire() {
+    // A device is looked up on a worker thread; the UI thread moves the stream when it is found.
+    audio::set_waker(|| _ = slint::invoke_from_event_loop(audio::settle));
+    device::never_block_here(); // the page reads the lists the background refresh keeps (cards::sync)
     let ins = super::get().audio;
     mic::open(ins.mic_on, &ins.input_device, ins.mic_pair);
     let last = Rc::new(RefCell::new(super::get().audio.settings()));
@@ -357,6 +369,7 @@ pub fn wire() {
         if let Err(e) = audio::configure(s) {
             eprintln!("prefs: audio: {e}");
         }
+        refresh_when_settled();
         super::refresh(); // the status (device, rate, latency, notes) changed with the stream
     });
     super::on_change(|_| cards::sync()); // after the closure above: the cards show the status it produced
