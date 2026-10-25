@@ -1,5 +1,6 @@
 //! Device actions: the plugin's buttons, Update Collection, import the play histories, and what the browser's Devices tree asks
-//! for: import a playlist into My Playlists, delete a playlist / history / track from the device, the per-device settings.
+//! for: import a playlist into My Playlists ([`super::import`]), delete a playlist / history / track from the device, the per-device
+//! settings.
 //! Eject is `Ctx::eject` in the `backup` child (it backs up first).
 
 use super::{
@@ -8,12 +9,11 @@ use super::{
 };
 use openfader::{
     device::{self, Device, history, update},
-    library::{Library, Playlist, is_history},
+    library::is_history,
     plugin::device::{Feature, RemoveTarget},
     store::{
         self,
         device_settings::{self, Behaviour},
-        NodeKind, Store,
     },
 };
 use parking_lot::Mutex;
@@ -40,7 +40,7 @@ pub(super) fn wire(cx: &Rc<Ctx>, app: &App) {
         }
     });
     let c = cx.clone();
-    s.on_import_playlist(move |dev, id| import_playlist(&c, &dev, &id));
+    s.on_import_playlist(move |dev, id| c.import_playlist(&dev, &id));
     let c = cx.clone();
     s.on_delete_playlist(move |dev, id| delete_playlist(&c, &dev, &id));
     let c = cx.clone();
@@ -136,7 +136,7 @@ fn update_collection(cx: &Rc<Ctx>, d: &Device) {
             Ok(review::updated_text(&a.updated))
         },
         move |cx, r| match (slot.lock().take(), r) {
-            (Some(Planned::Review(plan)), _) => cx.open_update_review(&dev, plan),
+            (Some(Planned::Review(plan)), _) => cx.open_update_review(&dev, plan, false),
             (Some(Planned::Done(id)), Ok(text)) => cx.offer_undo(id, text),
             _ => {}
         },
@@ -210,67 +210,6 @@ fn import_histories_of(cx: &Rc<Ctx>, d: &Device, which: Option<String>, auto: bo
             _ => {}
         },
     );
-}
-
-/// Tracks of device playlist `at` (and below it) become a My Playlists node; tracks the collection lacks are added to it.
-fn import_node(
-    store: &Store,
-    lib: &dyn Library,
-    pls: &[Playlist],
-    at: usize,
-    parent: Option<i64>,
-    known: &mut HashSet<String>,
-    stats: &mut (usize, usize),
-) -> Result<(), String> {
-    let p = &pls[at];
-    if p.is_folder {
-        let node = store.add_node(parent, &p.name, NodeKind::Folder)?;
-        for j in (at + 1..pls.len())
-            .take_while(|&j| pls[j].depth > p.depth)
-            .filter(|&j| pls[j].depth == p.depth + 1)
-        {
-            import_node(store, lib, pls, j, Some(node), known, stats)?;
-        }
-        return Ok(());
-    }
-    let tracks = lib.tracks(Some(&p.id))?;
-    let fresh: Vec<_> = tracks
-        .iter()
-        .filter(|t| t.file.as_deref().is_some_and(|f| f.is_file()) && known.insert(store::key(t)))
-        .cloned()
-        .collect();
-    store.collection_put(&fresh, false)?;
-    let keys: Vec<String> = tracks.iter().map(store::key).collect();
-    let node = store.add_node(parent, &p.name, NodeKind::Playlist)?;
-    store.set_entries(node, &keys)?;
-    stats.0 += keys.len();
-    stats.1 += fresh.len();
-    Ok(())
-}
-
-fn import_playlist(cx: &Rc<Ctx>, dev: &str, id: &str) {
-    let Some(d) = cx.device_or_say(dev) else {
-        return;
-    };
-    let run = || -> Result<String, String> {
-        let lib = device::open_library(&d)?;
-        let pls = lib.playlists()?;
-        let at = pls
-            .iter()
-            .position(|p| p.id == id)
-            .ok_or(tr!("that playlist is not on the device any more"))?;
-        let mut known: HashSet<String> = cx.lib.tracks(None)?.iter().map(store::key).collect();
-        let mut stats = (0, 0);
-        import_node(&cx.store, &*lib, &pls, at, None, &mut known, &mut stats)?;
-        Ok(tr!(
-            "Imported {} into My Playlists: {} track(s), {} added to the collection",
-            pls[at].name, stats.0, stats.1
-        ))
-    };
-    match run() {
-        Ok(m) => cx.say(&m, false),
-        Err(e) => cx.say(&e, true),
-    }
 }
 
 fn delete_playlist(cx: &Rc<Ctx>, dev: &str, id: &str) {

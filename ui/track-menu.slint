@@ -81,7 +81,9 @@ component MenuUse inherits VerticalLayout {
     if root.list-view: NavItem { idx: root.i-order + 2; text: @tr("Remove from list"); activated => { BrowserState.list-remove(); root.done(); } }
     MenuHead { icon: Icon.usb; text: @tr("USB STICK / SD CARD"); }
     for label[i] in BrowserState.transfer-targets: NavItem { idx: root.i-devices + i; text: @tr("Transfer to {}", label); activated => { BrowserState.transfer-to(i); root.done(); } }
-    if BrowserState.transfer-targets.length == 0: MenuItem { text: @tr("Plug one in to send tracks to it"); enabled: false; }
+    // Tracks of a stick: copied onto this computer with their cues, grid and key.
+    if BrowserState.on-device: NavItem { idx: root.i-devices + BrowserState.transfer-targets.length; text: @tr("Import to Collection"); activated => { LibraryState.action("track-import"); root.done(); } }
+    if BrowserState.transfer-targets.length == 0 && !BrowserState.on-device: MenuItem { text: @tr("Plug one in to send tracks to it"); enabled: false; }
 }
 
 /// Right column: what the app knows about the track (ANALYSIS), its tags and artwork (TRACK INFO), its file (FILE).
@@ -126,7 +128,7 @@ export component TrackMenu inherits Rectangle {
     property <bool> one-column: root.narrow || Theme.menu-layout == 1;
     property <length> col-w: Theme.menu-col-w;
     /// Items of the left column; the right one has 13.
-    property <int> left: (root.two-decks ? 2 : 1) + 4 + (root.palettes ? 3 : 0) + (root.list-view ? 3 : 0) + BrowserState.transfer-targets.length;
+    property <int> left: (root.two-decks ? 2 : 1) + 4 + (root.palettes ? 3 : 0) + (root.list-view ? 3 : 0) + BrowserState.transfer-targets.length + (BrowserState.on-device ? 1 : 0);
     out property <length> menu-w: root.one-column ? root.col-w + 2px : 2 * root.col-w + 3px;
     out property <length> menu-h: lay.preferred-height + 2px;
     init => {

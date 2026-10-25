@@ -19,6 +19,12 @@ use std::{
 };
 
 /// `text` and under it `lines`, one per row.
+/// What to do when a write failed with EIO (`os error 5`): the kernel lost the device mid-write (a USB link that resets, a
+/// stick that fails), which no retry in the app mends.
+fn usb_hint(e: &str) -> Option<String> {
+    e.contains("(os error 5)").then(|| tr!("The device stopped answering while it was written (a USB input/output error, not a format problem): plug it straight into the computer, without a hub, or into another port, then export again. If it keeps happening, the stick is failing.").to_owned())
+}
+
 fn with_lines(mut text: String, lines: impl IntoIterator<Item = String>) -> String {
     for l in lines {
         text.push('\n');
@@ -143,7 +149,10 @@ impl Ctx {
                     match (e == "cancelled", fixed) {
                         (true, None) => e,
                         (true, Some(f)) => f,
-                        (false, f) => with_lines(e, notes.iter().cloned().chain(f)),
+                        (false, f) => {
+                            let hint = usb_hint(&e);
+                            with_lines(e, hint.into_iter().chain(notes.iter().cloned()).chain(f))
+                        }
                     }
                 };
                 let done = export(&t.writers, &t.dest, &built.snap, &t.o, &ctl).map_err(&failed)?;

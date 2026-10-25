@@ -365,6 +365,18 @@ impl Store {
     }
 
     /// Stores the audio fingerprint of row `id`. The cached track list and file index stay current: they do not hold it.
+    /// The musical key text of Collection row `key` (`t<id>`, [`super::id_key`]); `None` when `key` names no row.
+    pub fn row_tkey(&self, key: &str) -> R<Option<String>> {
+        let Some(id) = row_of_key(key) else { return Ok(None) };
+        scalar(&self.db(), "SELECT tkey FROM collection WHERE id = ?1", [id])
+    }
+
+    /// Sets the musical key text of Collection row `key` (and the `key_id` the filters search by).
+    pub fn set_row_tkey(&self, key: &str, text: &str) -> R<()> {
+        let id = row_of_key(key).ok_or_else(|| format!("{key}: not a Collection row"))?;
+        self.write(|tx| exec(tx, "UPDATE collection SET tkey = ?2, key_id = ?3 WHERE id = ?1", params![id, text, key_id(text)]))
+    }
+
     pub fn set_fingerprint(&self, id: i64, fingerprint: &str) -> R<()> {
         let mut cache = self.cache.lock();
         let db = self.db();
@@ -429,6 +441,11 @@ fn bind<'a>(
     last: &'a dyn ToSql,
 ) -> rusqlite::ParamsFromIter<Vec<&'a dyn ToSql>> {
     params_from_iter(row.iter().copied().chain([last]).collect::<Vec<_>>())
+}
+
+/// The row id of a Collection key (`t<id>`).
+fn row_of_key(key: &str) -> Option<i64> {
+    key.strip_prefix('t')?.parse().ok()
 }
 
 #[cfg(test)]

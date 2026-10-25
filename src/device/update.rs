@@ -18,7 +18,8 @@
 
 use super::link::{same_beats, same_cues};
 use super::undo::{self, Change, Entry, Field};
-use crate::analysis::{Beat, Cue};
+use crate::analysis::{key, Analysis, Beat, Cue};
+use crate::library::Track;
 use crate::library::snapshot::Snapshot;
 use crate::plugin::device::{Control, Provider, TrackEdit, UpdateReport};
 use crate::store::Store;
@@ -40,6 +41,7 @@ pub struct Updated {
     pub colors: usize,
     pub cues: usize,
     pub grids: usize,
+    pub keys: usize,
 }
 
 /// One thing that would change on a track.
@@ -53,6 +55,8 @@ pub enum Diff {
     Cues { added: usize, removed: usize, moved: usize },
     /// The first beat moved by `moved_ms` (device minus collection); `bpm` = (collection, device) in 1/100 BPM when it differs.
     Grid { moved_ms: i64, bpm: Option<(u16, u16)> },
+    /// The musical key (as each side writes it).
+    Key { from: String, to: String },
 }
 
 /// One track of a [`Plan`].
@@ -65,6 +69,8 @@ pub struct Row {
     pub artist: String,
     pub diff: Vec<Diff>,
     edit: TrackEdit,
+    /// The device's musical key, to write ([`row_of`]; UPDATE COLLECTION does not carry one).
+    key: Option<String>,
 }
 
 /// What the player changed: nothing is written until [`apply`].
@@ -182,7 +188,7 @@ pub fn plan_of(report: UpdateReport, snap: &Snapshot, store: &Store) -> Plan {
             }
         };
         if !diff.is_empty() {
-            rows.push(Row { keys, title, artist, diff, edit: e.clone() });
+            rows.push(Row { keys, title, artist, diff, edit: e.clone(), key: None });
         }
     }
     Plan {
@@ -191,6 +197,44 @@ pub fn plan_of(report: UpdateReport, snap: &Snapshot, store: &Store) -> Plan {
         rows,
         baselines: report.baselines,
     }
+}
+
+/// A device track `dev` that the collection holds as `col` (row `key`, with the store's edits applied; `col_a` its analysis with
+/// them, `color` its colour) as an import from the device sees it: every value the device has that the collection's copy does not
+/// share, taking the device's (no baselines: the device holds what it holds). `None` when the copies agree.
+pub fn row_of(key: String, col: &Track, col_a: &Analysis, color: Option<u8>, dev: &Track, dev_a: Option<&Analysis>) -> Option<Row> {
+    let marks = |f: fn(&Analysis) -> bool| dev_a.filter(|a| f(a));
+    let edit = TrackEdit {
+        key: key.clone(),
+        rating: (dev.rating > 0).then_some(dev.rating),
+        comment: (!dev.comment.is_empty()).then(|| dev.comment.clone()),
+        color: None,
+        cues: marks(|a| !a.cues.is_empty()).map(|a| a.cues.clone()),
+        grid: marks(|a| !a.beats.is_empty()).map(|a| (a.beats.clone(), col_a.beats.clone())),
+    };
+    let mut diff = diffs(&edit, col.rating, &col.comment, color, &col_a.cues, &col_a.beats);
+    // The same key in two notations (8A, Am) is no difference.
+    let same = |a: &str, b: &str| match (key::key_id(a), key::key_id(b)) {
+        (Some(x), Some(y)) => x == y,
+        _ => a == b,
+    };
+    let new_key = (!dev.key.is_empty() && !same(&dev.key, &col.key)).then(|| dev.key.clone());
+    if let Some(k) = &new_key {
+        diff.push(Diff::Key { from: col.key.clone(), to: k.clone() });
+    }
+    (!diff.is_empty()).then(|| Row {
+        keys: vec![key],
+        title: col.title.clone(),
+        artist: col.artist.clone(),
+        diff,
+        edit,
+        key: new_key,
+    })
+}
+
+/// [`row_of`]'s rows as a plan for [`apply`]: no baselines to remember.
+pub fn of_rows(rows: Vec<Row>) -> Plan {
+    Plan { matched: rows.len(), unmatched: 0, rows, baselines: Vec::new() }
 }
 
 /// Asks `provider` what changed on the player since the baselines of `device_id`; writes nothing.
@@ -245,6 +289,7 @@ pub fn apply(
                 fields.extend(e.color.filter(|c| (1..=8).contains(c)).map(|c| Field::Color(Some(c))));
                 fields.extend(e.cues.clone().map(|c| Field::Cues(Some(c))));
                 fields.extend(e.grid.as_ref().map(|(now, _)| Field::Grid(Some(now.clone()))));
+                fields.extend(row.key.clone().map(|k| Field::Key(Some(k))));
                 for f in fields {
                     let Some(c) = Change::of(store, key, f)? else { continue };
                     match (&c.after, &e.grid) {
@@ -261,6 +306,7 @@ pub fn apply(
                     Diff::Color { .. } => u.colors += 1,
                     Diff::Cues { .. } => u.cues += 1,
                     Diff::Grid { .. } => u.grids += 1,
+                    Diff::Key { .. } => u.keys += 1,
                 }
             }
             u.changed += 1;
@@ -359,7 +405,7 @@ mod tests {
         let a = apply(&p, &[true, false], "dev", "Update Collection of KEY", &store, 1).unwrap();
         assert_eq!(
             a.updated,
-            Updated { matched: 2, changed: 1, unmatched: 1, ratings: 1, comments: 1, colors: 1, cues: 1, grids: 1 }
+            Updated { matched: 2, changed: 1, unmatched: 1, ratings: 1, comments: 1, colors: 1, cues: 1, grids: 1, keys: 0 }
         );
         let e = store.edits("t7").unwrap();
         assert_eq!((e.rating, e.comment.as_deref(), e.color), (Some(5), Some("hi"), Some(2)));

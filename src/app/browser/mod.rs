@@ -82,6 +82,8 @@ pub struct Context {
     pub playlist: Option<String>,
     /// An opened iTunes / xml / Explorer list on screen: where to read it again from (for IMPORT TO COLLECTION).
     pub source: Option<(std::path::PathBuf, sources::SourceType, Option<String>)>,
+    /// The id of the device whose tracks are on screen (for IMPORT TO COLLECTION, which copies them).
+    pub device: Option<String>,
 }
 
 thread_local! {
@@ -109,6 +111,7 @@ pub fn context() -> Context {
             name: String::new(),
             playlist: None,
             source: None,
+            device: None,
         },
         |v| {
             let v = v.borrow();
@@ -118,6 +121,7 @@ pub fn context() -> Context {
                 list: v.shown.iter().map(|&i| v.list[i].clone()).collect(),
                 name: v.list_name(),
                 source: v.source_sel(),
+                device: v.device_target(&v.entry).map(|d| d.device),
                 playlist: match &v.entry {
                     Entry::User(id) => Some(format!("store:{id}")),
                     Entry::Lib(i) => Some(v.lib_playlists[*i].id.clone()),

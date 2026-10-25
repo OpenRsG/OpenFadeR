@@ -93,7 +93,7 @@ pub fn drop_playlist(to: Dest, id: String) {
     with_ctx(|cx| cx.go(&to, Pack::Playlist(id)));
 }
 
-fn with_ctx(f: impl FnOnce(&Rc<Ctx>)) {
+pub(super) fn with_ctx(f: impl FnOnce(&Rc<Ctx>)) {
     if let Some(cx) = CTX.with(|c| c.borrow().upgrade()) {
         f(&cx);
     }

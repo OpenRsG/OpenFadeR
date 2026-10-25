@@ -742,7 +742,7 @@ impl Fix {
 
 /// Copies `src` to `to`, which does not exist: into a `.part` file that is flushed to the stick, checked against the source's
 /// size and renamed, so a copy that is cut short never looks whole. The bytes count in the job's progress.
-fn copy_audio(src: &Path, to: &Path, ctl: &Control) -> Result<(), String> {
+pub(super) fn copy_audio(src: &Path, to: &Path, ctl: &Control) -> Result<(), String> {
     use std::io::{Read, Write};
     let err = |p: &Path| {
         let p = p.display().to_string();

@@ -202,7 +202,7 @@ Added by schema version 21 (renumbered when merged). `file_print(track, print, s
 track's file, `<size in hex>-<FNV-1a 64 of the first, middle and last 64 KiB>` (the whole file when it is no longer than
 192 KiB; `src/library/print.rs`). The same bytes under another name or in another folder have the same print, so a file that
 moved is found again without decoding, and so is the copy of a track on a device whose file name differs; it goes with its row.
-`import_undo(id, at, label, device, data)`: the way back of UPDATE COLLECTION, IMPORT HISTORIES and a cue sync that replaced a
+`import_undo(id, at, label, device, data)`: the way back of UPDATE COLLECTION, an import from a device, IMPORT HISTORIES and a cue sync that replaced a
 copy's marks; `data` is the JSON of `device::undo::Entry` (per track the previous value and the written value of exactly the
 fields the import changed, the plays it added, the histories it marked as imported, the device copies whose marks it
 overwrote). The last five are kept; an undone one is deleted.

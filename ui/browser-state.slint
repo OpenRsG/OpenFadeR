@@ -64,6 +64,8 @@ export global BrowserState {
     in property <string> source-device;
     in property <string> source-list;
     in property <bool> source-history;
+    /// The tracks on screen are a device's (All tracks or one of its playlists): the track menu offers to import them.
+    in property <bool> on-device;
     /// Track filter bar ("Track Filter"): BPM bounds as typed (empty = open), ±6 % around the master deck's BPM,
     /// only keys compatible with the master deck's effective key, and a minimum star rating (0 = any).
     in-out property <string> bpm-min;

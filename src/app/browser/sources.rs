@@ -345,6 +345,7 @@ impl View {
         };
         let s = app.global::<BrowserState>();
         s.set_source_history(library::is_history(&list));
+        s.set_on_device(self.device_target(&self.entry).is_some());
         s.set_source_device(dev.into());
         s.set_source_list(list.into());
     }

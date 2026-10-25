@@ -169,12 +169,12 @@ msgid "Analysis Lock"
 msgstr "Bloqueo de análisis"
 
 #: ui/app.slint:262
-#: src/app/library/track.rs:189
+#: src/app/library/track.rs:192
 msgid "Reload Tag"
 msgstr "Recargar etiqueta"
 
 #: ui/app.slint:263
-#: src/app/library/track.rs:191
+#: src/app/library/track.rs:194
 msgid "Reload Tag (discard edits)"
 msgstr "Recargar etiqueta (descartar ediciones)"
 
@@ -191,7 +191,7 @@ msgid "Show in File Manager"
 msgstr "Mostrar en el gestor de archivos"
 
 #: ui/app.slint:268
-#: ui/track-menu.slint:109
+#: ui/track-menu.slint:111
 msgid "Relocate…"
 msgstr "Reubicar…"
 
@@ -200,7 +200,7 @@ msgid "Auto Relocate"
 msgstr "Reubicar automáticamente"
 
 #: ui/app.slint:270
-#: ui/track-menu.slint:111
+#: ui/track-menu.slint:113
 #: src/app/library/mod.rs:118
 msgid "Remove from Collection"
 msgstr "Quitar de la colección"
@@ -214,7 +214,7 @@ msgid "Add to Playlist…"
 msgstr "Añadir a lista…"
 
 #: ui/app.slint:274
-#: ui/track-menu.slint:102
+#: ui/track-menu.slint:104
 msgid "Tags…"
 msgstr "Etiquetas…"
 
@@ -259,7 +259,7 @@ msgid "Genre"
 msgstr "Género"
 
 #: ui/app.slint:289
-#: ui/browser-tree.slint:138
+#: ui/browser-tree.slint:166
 #: ui/touch-actions.slint:74
 msgid "Key"
 msgstr "KEY"
@@ -390,7 +390,7 @@ msgid "Related Tracks"
 msgstr "Pistas relacionadas"
 
 #: ui/app.slint:327
-#: ui/browser-tree.slint:138
+#: ui/browser-tree.slint:166
 msgid "Tags"
 msgstr "Etiquetas"
 
@@ -597,7 +597,7 @@ msgid "SAVED SEARCHES"
 msgstr "BÚSQUEDAS GUARDADAS"
 
 #: ui/browser-saved.slint:24
-#: ui/browser-tree.slint:149
+#: ui/browser-tree.slint:177
 #: ui/sampler.slint:161
 msgid "SAVE"
 msgstr "GRABAR"
@@ -625,12 +625,12 @@ msgstr "¿SEGURO?"
 msgid "DELETE"
 msgstr "ELIMINAR"
 
-#: ui/browser-state.slint:90
+#: ui/browser-state.slint:92
 #: src/app/browser/suggest/view.rs:176
 msgid "LIST"
 msgstr "LISTA"
 
-#: ui/browser-state.slint:90
+#: ui/browser-state.slint:92
 #: ui/deck-compact.slint:74
 #: ui/deck-header.slint:67
 msgid "MASTER"
@@ -728,69 +728,75 @@ msgstr "★★★★★"
 msgid "No tracks"
 msgstr "Sin pistas"
 
-#: ui/browser-tree.slint:138
+#: ui/browser-tree.slint:131
+#: ui/browser.slint:426
+#: ui/track-menu.slint:85
+msgid "Import to Collection"
+msgstr "Importar a la colección"
+
+#: ui/browser-tree.slint:166
 msgid "Rating ≥"
 msgstr "Valoración ≥"
 
-#: ui/browser-tree.slint:138
+#: ui/browser-tree.slint:166
 msgid "Genre contains"
 msgstr "El género contiene"
 
-#: ui/browser-tree.slint:138
+#: ui/browser-tree.slint:166
 msgid "Date added"
 msgstr "Fecha de alta"
 
-#: ui/browser-tree.slint:139
+#: ui/browser-tree.slint:167
 msgid "BPM min"
 msgstr "BPM mín."
 
-#: ui/browser-tree.slint:139
+#: ui/browser-tree.slint:167
 msgid "1-5 stars"
 msgstr "1-5 estrellas"
 
-#: ui/browser-tree.slint:139
+#: ui/browser-tree.slint:167
 msgid "text"
 msgstr "texto"
 
-#: ui/browser-tree.slint:139
+#: ui/browser-tree.slint:167
 msgid "tag name"
 msgstr "nombre de etiqueta"
 
-#: ui/browser-tree.slint:139
+#: ui/browser-tree.slint:167
 msgid "from YYYY-MM-DD"
 msgstr "desde AAAA-MM-DD"
 
-#: ui/browser-tree.slint:140
+#: ui/browser-tree.slint:168
 msgid "BPM max"
 msgstr "BPM máx."
 
-#: ui/browser-tree.slint:140
+#: ui/browser-tree.slint:168
 msgid "to YYYY-MM-DD"
 msgstr "hasta AAAA-MM-DD"
 
-#: ui/browser-tree.slint:146
+#: ui/browser-tree.slint:174
 msgid "SMART PLAYLIST: {}"
 msgstr "LISTA INTELIGENTE: {}"
 
-#: ui/browser-tree.slint:147
+#: ui/browser-tree.slint:175
 msgid "MATCH ANY"
 msgstr "CUALQUIERA"
 
-#: ui/browser-tree.slint:147
+#: ui/browser-tree.slint:175
 msgid "MATCH ALL"
 msgstr "TODAS"
 
-#: ui/browser-tree.slint:148
+#: ui/browser-tree.slint:176
 msgid "+ CONDITION"
 msgstr "+ CONDICIÓN"
 
-#: ui/browser-tree.slint:150
+#: ui/browser-tree.slint:178
 #: ui/browser.slint:319
 #: ui/device-format.slint:73
 msgid "CANCEL"
 msgstr "CANCELAR"
 
-#: ui/browser-tree.slint:161
+#: ui/browser-tree.slint:189
 msgid "Remove condition"
 msgstr "Quitar condición"
 
@@ -1128,10 +1134,6 @@ msgstr "Duplicar en Mis listas"
 #: ui/browser.slint:425
 msgid "Export to a device"
 msgstr "Exportar a un dispositivo"
-
-#: ui/browser.slint:426
-msgid "Import to Collection"
-msgstr "Importar a la colección"
 
 #: ui/browser.slint:427
 msgid "Connect: keep this library synced into the Collection"
@@ -1524,7 +1526,7 @@ msgstr "Edición de la cuadrícula de beats"
 
 #: ui/deck-panel.slint:151
 #: ui/device-check.slint:145
-#: src/app/device/review.rs:212
+#: src/app/device/review.rs:216
 msgid "CUES"
 msgstr "CUES"
 
@@ -2246,7 +2248,7 @@ msgstr "Color"
 
 #: ui/exportmode-cues.slint:204
 #: ui/trackinfo.slint:186
-#: src/app/library/track.rs:174
+#: src/app/library/track.rs:177
 msgid "Comment"
 msgstr "Comentario"
 
@@ -3588,7 +3590,7 @@ msgstr "AUDIO"
 
 #: ui/prefs.slint:49
 #: ui/prefs.slint:68
-#: ui/track-menu.slint:96
+#: ui/track-menu.slint:98
 msgid "ANALYSIS"
 msgstr "ANÁLISIS"
 
@@ -4342,12 +4344,12 @@ msgid "Import to collection"
 msgstr "Importar a la colección"
 
 #: ui/touch-actions.slint:56
-#: ui/track-menu.slint:97
+#: ui/track-menu.slint:99
 msgid "Analyze track"
 msgstr "Analizar pista"
 
 #: ui/touch-actions.slint:57
-#: ui/track-menu.slint:99
+#: ui/track-menu.slint:101
 msgid "Analysis lock"
 msgstr "Bloqueo de análisis"
 
@@ -4364,12 +4366,12 @@ msgid "Find artwork"
 msgstr "Buscar carátula"
 
 #: ui/touch-actions.slint:61
-#: ui/track-menu.slint:106
+#: ui/track-menu.slint:108
 msgid "Fetch missing artwork"
 msgstr "Obtener carátulas que faltan"
 
 #: ui/touch-actions.slint:62
-#: ui/track-menu.slint:108
+#: ui/track-menu.slint:110
 msgid "Show in file manager"
 msgstr "Mostrar en el gestor de archivos"
 
@@ -4378,7 +4380,7 @@ msgid "Relocate track"
 msgstr "Reubicar pista"
 
 #: ui/touch-actions.slint:64
-#: ui/track-menu.slint:110
+#: ui/track-menu.slint:112
 msgid "Auto relocate"
 msgstr "Reubicar automáticamente"
 
@@ -4420,7 +4422,7 @@ msgstr "Eliminar lista"
 
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:196
-#: src/app/library/track.rs:169
+#: src/app/library/track.rs:172
 msgid "Title"
 msgstr "Título"
 
@@ -4648,40 +4650,40 @@ msgstr "MEMORIA USB / TARJETA SD"
 msgid "Transfer to {}"
 msgstr "Transferir a {}"
 
-#: ui/track-menu.slint:84
+#: ui/track-menu.slint:86
 msgid "Plug one in to send tracks to it"
 msgstr "Conecta una para enviarle pistas"
 
-#: ui/track-menu.slint:98
+#: ui/track-menu.slint:100
 #: src/app/library/autocue.rs:129
 msgid "Make Auto Cue point"
 msgstr "Crear punto de cue automático"
 
-#: ui/track-menu.slint:100
+#: ui/track-menu.slint:102
 msgid "TRACK INFO"
 msgstr "DATOS DE LA PISTA"
 
-#: ui/track-menu.slint:101
+#: ui/track-menu.slint:103
 msgid "Edit track details…"
 msgstr "Editar detalles de la pista…"
 
-#: ui/track-menu.slint:103
+#: ui/track-menu.slint:105
 msgid "Reload tag"
 msgstr "Recargar etiqueta"
 
-#: ui/track-menu.slint:104
+#: ui/track-menu.slint:106
 msgid "Reload tag (discard edits)"
 msgstr "Recargar etiqueta (descartar ediciones)"
 
-#: ui/track-menu.slint:105
+#: ui/track-menu.slint:107
 msgid "Find artwork…"
 msgstr "Buscar carátula…"
 
-#: ui/track-menu.slint:107
+#: ui/track-menu.slint:109
 msgid "FILE"
 msgstr "ARCHIVO"
 
-#: ui/track-menu.slint:154
+#: ui/track-menu.slint:156
 msgid "{} tracks selected"
 msgstr "{} pistas seleccionadas"
 
@@ -4742,12 +4744,12 @@ msgid "comment (Enter saves)"
 msgstr "comentario (Intro guarda)"
 
 #: ui/trackinfo.slint:200
-#: src/app/library/track.rs:171
+#: src/app/library/track.rs:174
 msgid "Album"
 msgstr "Álbum"
 
 #: ui/trackinfo.slint:204
-#: src/app/library/track.rs:173
+#: src/app/library/track.rs:176
 msgid "Label"
 msgstr "Sello"
 
@@ -5256,7 +5258,7 @@ msgstr "{} de {} pistas"
 msgid " · BPM ±6% / KEY MATCH wait for a loaded deck"
 msgstr " · BPM ±6% / KEY MATCH esperan a un deck cargado"
 
-#: src/app/browser/mod.rs:377
+#: src/app/browser/mod.rs:381
 msgid "{} selected"
 msgstr "{} seleccionadas"
 
@@ -5747,36 +5749,36 @@ msgid "Folder of the source: choose a playlist inside it"
 msgstr "Carpeta de la fuente: elige una lista dentro de ella"
 
 #: src/app/browser/sources.rs:312
-#: src/app/browser/sources.rs:374
+#: src/app/browser/sources.rs:375
 msgid "{}: reading…"
 msgstr "{}: leyendo…"
 
-#: src/app/browser/sources.rs:391
+#: src/app/browser/sources.rs:392
 msgid "{}: {}, {} ready ({} s)"
 msgstr "{}: {}, {} listas ({} s)"
 
-#: src/app/browser/sources.rs:394
+#: src/app/browser/sources.rs:395
 msgid "{n} track"
 msgid_plural "{n} tracks"
 msgstr[0] "{n} pista"
 msgstr[1] "{n} pistas"
 
-#: src/app/browser/sources.rs:395
+#: src/app/browser/sources.rs:396
 #: src/app/device/sync.rs:71
 msgid "{n} playlist"
 msgid_plural "{n} playlists"
 msgstr[0] "{n} lista"
 msgstr[1] "{n} listas"
 
-#: src/app/browser/sources.rs:399
+#: src/app/browser/sources.rs:400
 msgid "{}: cannot read it: {}"
 msgstr "{}: no se puede leer: {}"
 
-#: src/app/browser/sources.rs:483
+#: src/app/browser/sources.rs:484
 msgid "{}: reading the library, {} of {}"
 msgstr "{}: leyendo la biblioteca, {} de {}"
 
-#: src/app/browser/sources.rs:489
+#: src/app/browser/sources.rs:490
 msgid "{}: listing tracks and playlists"
 msgstr "{}: listando pistas y listas"
 
@@ -6895,106 +6897,98 @@ msgstr "beat jump necesita una cuadrícula de beats"
 msgid "select a track in the library first"
 msgstr "selecciona primero una pista en la biblioteca"
 
-#: src/app/device/actions.rs:61
+#: src/app/device/actions.rs:60
 msgid "{}: its extension no longer offers that action. Open DEVICES and press CHECK AGAIN."
 msgstr "{}: su extensión ya no ofrece esa acción. Abre DISPOSITIVOS y pulsa COMPROBAR DE NUEVO."
 
-#: src/app/device/actions.rs:69
+#: src/app/device/actions.rs:68
 msgid "{}: its extension is switched off. Switch it on in PREFERENCES > EXTENSIONS, then restart."
 msgstr "{}: su extensión está desactivada. Actívala en PREFERENCIAS > EXTENSIONES y reinicia."
 
-#: src/app/device/actions.rs:101
+#: src/app/device/actions.rs:100
 msgid "{} has no library to read from. Export to it first."
 msgstr "{} no tiene biblioteca que leer. Exporta primero a él."
 
-#: src/app/device/actions.rs:118
-#: src/app/device/review.rs:523
+#: src/app/device/actions.rs:117
+#: src/app/device/review.rs:548
 msgid "Updating the collection"
 msgstr "Actualizando la colección"
 
-#: src/app/device/actions.rs:126
-#: src/app/device/review.rs:525
+#: src/app/device/actions.rs:125
+#: src/app/device/review.rs:553
 msgid "Update Collection of {}"
 msgstr "Actualizar colección desde {}"
 
-#: src/app/device/actions.rs:167
-#: src/app/device/review.rs:548
+#: src/app/device/actions.rs:166
+#: src/app/device/review.rs:577
 msgid "Importing histories"
 msgstr "Importando historiales"
 
-#: src/app/device/actions.rs:178
-#: src/app/device/review.rs:550
+#: src/app/device/actions.rs:177
+#: src/app/device/review.rs:579
 msgid "Histories of {}"
 msgstr "Historiales de {}"
 
-#: src/app/device/actions.rs:183
-#: src/app/device/review.rs:556
+#: src/app/device/actions.rs:182
+#: src/app/device/review.rs:585
 msgid "its plugin is not available"
 msgstr "su plugin no está disponible"
 
-#: src/app/device/actions.rs:184
-#: src/app/device/review.rs:561
+#: src/app/device/actions.rs:183
+#: src/app/device/review.rs:590
 msgid "; deleted {} from the device"
 msgstr "; {} eliminado(s) del dispositivo"
 
-#: src/app/device/actions.rs:185
-#: src/app/device/review.rs:563
+#: src/app/device/actions.rs:184
+#: src/app/device/review.rs:592
 msgid "; not deleted from the device: {}"
 msgstr "; no eliminado del dispositivo: {}"
 
-#: src/app/device/actions.rs:197
+#: src/app/device/actions.rs:196
 msgid "{}: {n} history is waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows it first"
 msgid_plural "{}: {n} histories are waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows them first"
 msgstr[0] "{}: {n} historial espera ser importado. Aún no se ha importado nada: IMPORTAR HISTORIALES en la ventana DISPOSITIVOS lo muestra antes"
 msgstr[1] "{}: {n} historiales esperan ser importados. Aún no se ha importado nada: IMPORTAR HISTORIALES en la ventana DISPOSITIVOS los muestra antes"
 
-#: src/app/device/actions.rs:261
-msgid "that playlist is not on the device any more"
-msgstr "esa lista ya no está en el dispositivo"
-
-#: src/app/device/actions.rs:265
-msgid "Imported {} into My Playlists: {} track(s), {} added to the collection"
-msgstr "Importada {} en Mis listas: {} pista(s), {} añadidas a la colección"
-
-#: src/app/device/actions.rs:302
+#: src/app/device/actions.rs:240
 #: src/app/device/transfer.rs:292
 msgid "That playlist is not on the device any more"
 msgstr "Esa lista ya no está en el dispositivo"
 
-#: src/app/device/actions.rs:306
+#: src/app/device/actions.rs:244
 msgid "Delete the history {} from {}?"
 msgstr "¿Eliminar el historial {} de {}?"
 
-#: src/app/device/actions.rs:308
+#: src/app/device/actions.rs:246
 msgid "Delete {} from {}? Tracks that no other playlist lists are deleted too."
 msgstr "¿Eliminar {} de {}? También se eliminan las pistas que ninguna otra lista contiene."
 
-#: src/app/device/actions.rs:314
+#: src/app/device/actions.rs:252
 msgid "Delete {} from {}? Its tracks stay on the device."
 msgstr "¿Eliminar {} de {}? Sus pistas permanecen en el dispositivo."
 
-#: src/app/device/actions.rs:322
-#: src/app/device/actions.rs:369
+#: src/app/device/actions.rs:260
+#: src/app/device/actions.rs:307
 msgid "Deleting"
 msgstr "Eliminando"
 
-#: src/app/device/actions.rs:325
+#: src/app/device/actions.rs:263
 msgid "Deleted the history {} from {}"
 msgstr "Historial {} eliminado de {}"
 
-#: src/app/device/actions.rs:329
+#: src/app/device/actions.rs:267
 msgid "Deleted {} ({} list(s), {} track(s)) from {}{}"
 msgstr "Eliminada {} ({} lista(s), {} pista(s)) de {}{}"
 
-#: src/app/device/actions.rs:335
+#: src/app/device/actions.rs:273
 msgid " — {} file(s) could not be deleted, first: {}"
 msgstr " — no se pudieron eliminar {} archivo(s), el primero: {}"
 
-#: src/app/device/actions.rs:361
+#: src/app/device/actions.rs:299
 msgid "Delete {} from {}? The file and its analysis are removed."
 msgstr "¿Eliminar {} de {}? Se eliminan el archivo y su análisis."
 
-#: src/app/device/actions.rs:377
+#: src/app/device/actions.rs:315
 msgid "Deleted {} track(s) from {}"
 msgstr "{} pista(s) eliminadas de {}"
 
@@ -7500,21 +7494,53 @@ msgstr "{} formateado como {} en lugar de FAT32: en una tarjeta tan pequeña el 
 msgid "{}: switch on at least one library format"
 msgstr "{}: activa al menos un formato de biblioteca"
 
-#: src/app/device/job.rs:45
+#: src/app/device/import.rs:67
+msgid "No Music folder to copy into: set XDG_MUSIC_DIR"
+msgstr "No hay carpeta Música donde copiar: define XDG_MUSIC_DIR"
+
+#: src/app/device/import.rs:83
+msgid "Copying from {}"
+msgstr "Copiando desde {}"
+
+#: src/app/device/import.rs:101
+msgid "that playlist is not on the device any more"
+msgstr "esa lista ya no está en el dispositivo"
+
+#: src/app/device/import.rs:110
+msgid "Imported {} from {} into My Playlists"
+msgstr "{} importada de {} en Mis listas"
+
+#: src/app/device/import.rs:115
+msgid "Imported from {}"
+msgstr "Importado desde {}"
+
+#: src/app/device/import.rs:117
+msgid ": {} track(s) copied to {}, {} already in your collection"
+msgstr ": {} pista(s) copiada(s) en {}, {} ya en tu colección"
+
+#: src/app/device/import.rs:124
+msgid "; {} file(s) missing on the device"
+msgstr "; {} archivo(s) ausente(s) en el dispositivo"
+
+#: src/app/device/job.rs:25
+msgid "The device stopped answering while it was written (a USB input/output error, not a format problem): plug it straight into the computer, without a hub, or into another port, then export again. If it keeps happening, the stick is failing."
+msgstr "El dispositivo dejó de responder mientras se escribía (un error de entrada/salida USB, no un problema de formato): conéctalo directamente al ordenador, sin hub, o a otro puerto, y exporta de nuevo. Si se repite, la memoria está fallando."
+
+#: src/app/device/job.rs:51
 msgid "Not checked after writing: {}"
 msgstr "Sin comprobar tras escribir: {}"
 
-#: src/app/device/job.rs:53
+#: src/app/device/job.rs:59
 msgid "Checked: {} holds {n} track in {}"
 msgid_plural "Checked: {} holds {n} tracks in {}"
 msgstr[0] "Comprobado: {} contiene {n} pista en {}"
 msgstr[1] "Comprobado: {} contiene {n} pistas en {}"
 
-#: src/app/device/job.rs:177
+#: src/app/device/job.rs:186
 msgid "the worker stopped"
 msgstr "el proceso de trabajo se detuvo"
 
-#: src/app/device/job.rs:199
+#: src/app/device/job.rs:208
 msgid "Cancelled: the device was left as it was"
 msgstr "Cancelado: el dispositivo se dejó como estaba"
 
@@ -7548,47 +7574,47 @@ msgstr "Escribiendo cues"
 msgid "cues of {} track(s) written to {}"
 msgstr "cues de {} pista(s) escritos en {}"
 
-#: src/app/device/mod.rs:73
+#: src/app/device/mod.rs:75
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr "Hay otra tarea en curso: espera o cancélala (X)"
 
-#: src/app/device/mod.rs:174
+#: src/app/device/mod.rs:176
 msgid " — {} warning(s), first: {}"
 msgstr " — {} advertencia(s), la primera: {}"
 
-#: src/app/device/mod.rs:176
+#: src/app/device/mod.rs:178
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr "exportadas {} pistas ({} nuevas, {} actualizadas) y {} listas a {}{}{}"
 
-#: src/app/device/mod.rs:195
+#: src/app/device/mod.rs:197
 msgid " — Update Collection baseline not recorded: {}"
 msgstr " — línea base de Actualizar colección no registrada: {}"
 
-#: src/app/device/mod.rs:220
+#: src/app/device/mod.rs:222
 msgid "failed: {}"
 msgstr "error: {}"
 
-#: src/app/device/mod.rs:275
+#: src/app/device/mod.rs:277
 msgid "That stick is not connected any more. Plug it in again, then try once more."
 msgstr "Ese pendrive ya no está conectado. Vuelve a conectarlo y prueba otra vez."
 
-#: src/app/device/mod.rs:287
+#: src/app/device/mod.rs:289
 msgid "No device is chosen. Pick one in the list on the left."
 msgstr "No hay ningún dispositivo elegido. Elige uno en la lista de la izquierda."
 
-#: src/app/device/mod.rs:301
+#: src/app/device/mod.rs:303
 msgid "it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"
 msgstr "está montado como solo lectura, así que no se puede escribir nada. Comprueba su interruptor de protección contra escritura y vuelve a conectarlo"
 
-#: src/app/device/mod.rs:310
+#: src/app/device/mod.rs:312
 msgid "cannot read the collection: {}"
 msgstr "no se puede leer la colección: {}"
 
-#: src/app/device/mod.rs:351
+#: src/app/device/mod.rs:353
 msgid "{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports."
 msgstr "{}: su extensión no puede hacer eso con este dispositivo. Activa la extensión en PREFERENCIAS > EXTENSIONES o usa un dispositivo que admita."
 
-#: src/app/device/mod.rs:498
+#: src/app/device/mod.rs:500
 msgid "Cancelling…"
 msgstr "Cancelando…"
 
@@ -7682,184 +7708,208 @@ msgid_plural "{n} tracks are there already: their marks are refreshed"
 msgstr[0] "{n} pista ya está: se actualizan sus marcas"
 msgstr[1] "{n} pistas ya están: se actualizan sus marcas"
 
-#: src/app/device/review.rs:88
-#: src/app/device/review.rs:156
-#: src/app/device/review.rs:186
+#: src/app/device/review.rs:90
+#: src/app/device/review.rs:160
+#: src/app/device/review.rs:190
 msgid "none"
 msgstr "ninguno"
 
-#: src/app/device/review.rs:95
+#: src/app/device/review.rs:97
 msgid "rating {} → {}"
 msgstr "valoración {} → {}"
 
-#: src/app/device/review.rs:96
+#: src/app/device/review.rs:98
 msgid "comment: {}"
 msgstr "comentario: {}"
 
-#: src/app/device/review.rs:97
+#: src/app/device/review.rs:99
 msgid "comment cleared"
 msgstr "comentario borrado"
 
-#: src/app/device/review.rs:98
+#: src/app/device/review.rs:100
 msgid "comment changed: {}"
 msgstr "comentario cambiado: {}"
 
-#: src/app/device/review.rs:99
+#: src/app/device/review.rs:101
 msgid "colour {} → {}"
 msgstr "color {} → {}"
 
-#: src/app/device/review.rs:113
+#: src/app/device/review.rs:115
 msgid "{} moved"
 msgstr "{} movido(s)"
 
-#: src/app/device/review.rs:116
+#: src/app/device/review.rs:118
 msgid "cue details changed"
 msgstr "detalles de los cues cambiados"
 
-#: src/app/device/review.rs:118
+#: src/app/device/review.rs:120
 msgid "cues {}"
 msgstr "cues {}"
 
-#: src/app/device/review.rs:133
+#: src/app/device/review.rs:135
 msgid "grid changed"
 msgstr "cuadrícula cambiada"
 
-#: src/app/device/review.rs:134
+#: src/app/device/review.rs:136
 msgid "grid moved {} ms"
 msgstr "cuadrícula desplazada {} ms"
 
-#: src/app/device/review.rs:135
+#: src/app/device/review.rs:137
 msgid "BPM {} → {}"
 msgstr "BPM {} → {}"
 
-#: src/app/device/review.rs:136
+#: src/app/device/review.rs:138
 msgid "grid moved {} ms, BPM {} → {}"
 msgstr "cuadrícula desplazada {} ms, BPM {} → {}"
 
-#: src/app/device/review.rs:158
+#: src/app/device/review.rs:141
+msgid "key {}"
+msgstr "tonalidad {}"
+
+#: src/app/device/review.rs:142
+msgid "key {} → {}"
+msgstr "tonalidad {} → {}"
+
+#: src/app/device/review.rs:162
 msgid "{} hot, {} memory, {} loops"
 msgstr "{} hot, {} memoria, {} loops"
 
-#: src/app/device/review.rs:187
+#: src/app/device/review.rs:191
 msgid "starts {} at {} BPM, {} beats"
 msgstr "empieza en {} a {} BPM, {} pulsos"
 
-#: src/app/device/review.rs:199
+#: src/app/device/review.rs:203
 msgid "{} phrases"
 msgstr "{} frases"
 
-#: src/app/device/review.rs:217
+#: src/app/device/review.rs:221
 msgid "CUE TIMES"
 msgstr "POSICIÓN DE LOS CUES"
 
-#: src/app/device/review.rs:227
+#: src/app/device/review.rs:231
 msgid "PHRASES"
 msgstr "FRASES"
 
-#: src/app/device/review.rs:238
+#: src/app/device/review.rs:242
 msgid "cues: {} in your collection, {} on the stick"
 msgstr "cues: {} en tu colección, {} en la memoria"
 
-#: src/app/device/review.rs:246
+#: src/app/device/review.rs:250
 msgid "grid: {} BPM, on the stick {} BPM"
 msgstr "cuadrícula: {} BPM, en la memoria {} BPM"
 
-#: src/app/device/review.rs:253
+#: src/app/device/review.rs:257
 msgid "phrases differ"
 msgstr "las frases difieren"
 
-#: src/app/device/review.rs:261
+#: src/app/device/review.rs:265
 msgid "; {} track(s) of the device are not in the collection and were not updated"
 msgstr "; {} pista(s) del dispositivo no están en la colección y no se actualizaron"
 
-#: src/app/device/review.rs:268
+#: src/app/device/review.rs:272
 msgid "Update Collection: {} of {} track(s) changed ({} ratings, {} comments, {} colours, {} cue lists, {} grids){}"
 msgstr "Actualizar colección: {} de {} pista(s) modificadas ({} valoraciones, {} comentarios, {} colores, {} listas de cues, {} cuadrículas){}"
 
-#: src/app/device/review.rs:276
+#: src/app/device/review.rs:280
+msgid "Took the values of {} on {} track(s) ({} ratings, {} comments, {} cue lists, {} grids, {} keys); the others keep yours"
+msgstr "Se tomaron los valores de {} en {} pista(s) ({} valoraciones, {} comentarios, {} listas de cues, {} cuadrículas, {} tonalidades); las demás conservan los tuyos"
+
+#: src/app/device/review.rs:288
 msgid "Imported {} history(ies) of {}: {} plays, {} of unknown tracks skipped, {} imported before"
 msgstr "Importados {} historial(es) de {}: {} reproducciones, {} de pistas desconocidas omitidas, {} importadas antes"
 
-#: src/app/device/review.rs:343
+#: src/app/device/review.rs:357
+msgid "ALREADY IN YOUR COLLECTION: {}"
+msgstr "YA EN TU COLECCIÓN: {}"
+
+#: src/app/device/review.rs:359
 msgid "UPDATE COLLECTION FROM {}"
 msgstr "ACTUALIZAR COLECCIÓN DESDE {}"
 
-#: src/app/device/review.rs:344
+#: src/app/device/review.rs:362
+msgid "{} track(s) you imported from {} are already in your collection, with other cues, grid, key, rating or comment than on the device. Tick the tracks whose values you want to take from the device: each tick replaces yours. Unticked tracks, or CANCEL, keep yours. Nothing changes until you press APPLY, and UNDO afterwards restores exactly these fields."
+msgstr "{} pista(s) importada(s) de {} ya están en tu colección, con otros cues, cuadrícula, tonalidad, valoración o comentario que en el dispositivo. Marca las pistas cuyos valores quieres tomar del dispositivo: cada marca reemplaza los tuyos. Las pistas sin marcar, o CANCELAR, conservan los tuyos. Nada cambia hasta que pulses APLICAR, y DESHACER restaura después exactamente estos campos."
+
+#: src/app/device/review.rs:367
 msgid "The player changed {} track(s) of your collection since the last export ({} more on the device are not in your collection and stay as they are). Tick what to bring into your collection: each tick replaces your value of that track with the player's. Nothing changes until you press APPLY, and UNDO afterwards restores exactly these fields."
 msgstr "El reproductor cambió {} pista(s) de tu colección desde la última exportación ({} más del dispositivo no están en tu colección y se quedan como están). Marca lo que quieres traer a tu colección: cada marca sustituye tu valor de esa pista por el del reproductor. No cambia nada hasta que pulses APLICAR, y DESHACER después restaura exactamente esos campos."
 
-#: src/app/device/review.rs:365
+#: src/app/device/review.rs:389
 msgid "IMPORT HISTORIES FROM {}"
 msgstr "IMPORTAR HISTORIALES DE {}"
 
-#: src/app/device/review.rs:367
+#: src/app/device/review.rs:391
 msgid "{} history(ies) on the device are not in your play history yet. Importing adds their plays (tracks that are not in your collection are skipped); nothing changes until you press APPLY, and UNDO takes exactly those plays out again."
 msgstr "{} historial(es) del dispositivo aún no están en tu historial de reproducción. Importar añade sus reproducciones (las pistas que no están en tu colección se omiten); no cambia nada hasta que pulses APLICAR, y DESHACER quita exactamente esas reproducciones."
 
-#: src/app/device/review.rs:372
+#: src/app/device/review.rs:396
 msgid "Preferences ask for the imported histories to be deleted from {} afterwards: UNDO does not bring them back to the device."
 msgstr "Las preferencias piden borrar después de {} los historiales importados: DESHACER no los devuelve al dispositivo."
 
-#: src/app/device/review.rs:383
+#: src/app/device/review.rs:407
 msgid "{} tracks, {} of them not in your collection"
 msgstr "{} pistas, {} de ellas no están en tu colección"
 
-#: src/app/device/review.rs:401
+#: src/app/device/review.rs:425
 msgid "{} is read-only: KEEP MINE needs a device that can be written. TAKE THE STICK'S still works."
 msgstr "{} es de solo lectura: CONSERVAR LA MÍA necesita un dispositivo en el que se pueda escribir. TOMAR LA DE LA MEMORIA sigue funcionando."
 
-#: src/app/device/review.rs:402
+#: src/app/device/review.rs:426
 #: src/app/device/sync.rs:111
 msgid "That device is not mounted any more"
 msgstr "Ese dispositivo ya no está montado"
 
-#: src/app/device/review.rs:407
+#: src/app/device/review.rs:431
 msgid "CUES THAT DIFFER ON {}"
 msgstr "CUES DISTINTOS EN {}"
 
-#: src/app/device/review.rs:408
+#: src/app/device/review.rs:432
 msgid "{n} track has different cues or grid on {} than in your collection. Nothing was changed: neither copy wins by itself. KEEP MINE writes your collection's copy to the device, TAKE THE STICK'S copies the device's into your collection; UNDO stays available for both."
 msgid_plural "{n} tracks have different cues or grid on {} than in your collection. Nothing was changed: neither copy wins by itself. KEEP MINE writes your collection's copy to the device, TAKE THE STICK'S copies the device's into your collection; UNDO stays available for both."
 msgstr[0] "{n} pista tiene cues o cuadrícula distintos en {} y en tu colección. No se cambió nada: ninguna copia gana por sí sola. CONSERVAR LA MÍA escribe la copia de tu colección en el dispositivo, TOMAR LA DE LA MEMORIA copia la del dispositivo en tu colección; DESHACER sigue disponible para ambas."
 msgstr[1] "{n} pistas tienen cues o cuadrícula distintos en {} y en tu colección. No se cambió nada: ninguna copia gana por sí sola. CONSERVAR LA MÍA escribe la copia de tu colección en el dispositivo, TOMAR LA DE LA MEMORIA copia la del dispositivo en tu colección; DESHACER sigue disponible para ambas."
 
-#: src/app/device/review.rs:432
+#: src/app/device/review.rs:456
 msgid "RECENT IMPORTS"
 msgstr "IMPORTACIONES RECIENTES"
 
-#: src/app/device/review.rs:433
+#: src/app/device/review.rs:457
 msgid "Each import and cue sync keeps the previous values of exactly the fields it changed. UNDO puts them back, except fields you edited since."
 msgstr "Cada importación y sincronización de cues guarda los valores anteriores de exactamente los campos que cambió. DESHACER los restaura, salvo los campos que hayas editado desde entonces."
 
-#: src/app/device/review.rs:443
+#: src/app/device/review.rs:467
 msgid "{}: {} field(s), {} play(s), {} device copy(ies)"
 msgstr "{}: {} campo(s), {} reproducción(es), {} copia(s) del dispositivo"
 
-#: src/app/device/review.rs:611
+#: src/app/device/review.rs:551
+msgid "Import from {}"
+msgstr "Importación desde {}"
+
+#: src/app/device/review.rs:640
 msgid "Undone: {} field(s) put back"
 msgstr "Deshecho: {} campo(s) restaurado(s)"
 
-#: src/app/device/review.rs:613
+#: src/app/device/review.rs:642
 msgid "; {} field(s) edited since were left as they are"
 msgstr "; {} campo(s) editado(s) desde entonces se dejaron como están"
 
-#: src/app/device/review.rs:619
+#: src/app/device/review.rs:648
 msgid "; {} play(s) removed from the play history"
 msgstr "; {} reproducción(es) quitada(s) del historial de reproducción"
 
-#: src/app/device/review.rs:638
+#: src/app/device/review.rs:667
 msgid "; {} device copy(ies) are written back in a moment"
 msgstr "; {} copia(s) del dispositivo se escribirán de nuevo en un momento"
 
-#: src/app/device/review.rs:742
+#: src/app/device/review.rs:771
 msgid "Kept your cues and grid of {} track(s); {} gets them in a moment"
 msgstr "Se conservaron tus cues y cuadrícula de {} pista(s); {} los recibe en un momento"
 
-#: src/app/device/review.rs:748
+#: src/app/device/review.rs:777
 msgid "Took the cues and grid of {} track(s) from {} into your collection"
 msgstr "Se tomaron los cues y la cuadrícula de {} pista(s) de {} para tu colección"
 
-#: src/app/device/review.rs:763
+#: src/app/device/review.rs:792
 msgid "COMPARE: {} ({})"
 msgstr "COMPARAR: {} ({})"
 
@@ -8128,12 +8178,12 @@ msgid "BPM: type a tempo between 30 and 300"
 msgstr "BPM: escribe un tempo entre 30 y 300"
 
 #: src/app/exportmode/mod.rs:185
-#: src/app/library/track.rs:63
+#: src/app/library/track.rs:66
 msgid "this track has an Analysis Lock: unlock it first"
 msgstr "esta pista tiene un bloqueo de análisis: desbloquéala primero"
 
 #: src/app/exportmode/mod.rs:189
-#: src/app/library/track.rs:64
+#: src/app/library/track.rs:67
 msgid "analysing “{}”…{}"
 msgstr "analizando «{}»…{}"
 
@@ -8696,7 +8746,7 @@ msgstr "{} archivos duplicados fusionados · {} cues añadidos a los representan
 
 #: src/app/library/dupes.rs:246
 #: src/app/library/missing.rs:345
-#: src/app/library/track.rs:33
+#: src/app/library/track.rs:36
 msgid "remove tracks"
 msgstr "quitar pistas"
 
@@ -9197,76 +9247,76 @@ msgstr "BITRATE BAJO DEBAJO DE (KBPS)"
 msgid "0 = off"
 msgstr "0 = desactivado"
 
-#: src/app/library/track.rs:28
-#: src/app/library/track.rs:92
+#: src/app/library/track.rs:31
+#: src/app/library/track.rs:95
 msgid "this track has no file"
 msgstr "esta pista no tiene archivo"
 
-#: src/app/library/track.rs:35
+#: src/app/library/track.rs:38
 msgid "Remove “{}” from the Collection? Its playlist places and edits are dropped; the file is not deleted."
 msgstr "¿Quitar «{}» de la Colección? Se pierden sus lugares en listas y sus ediciones; el archivo no se borra."
 
-#: src/app/library/track.rs:39
+#: src/app/library/track.rs:42
 msgid "Remove {} tracks from the Collection? Their playlist places and edits are dropped; the files are not deleted."
 msgstr "¿Quitar {} pistas de la Colección? Se pierden sus lugares en listas y sus ediciones; los archivos no se borran."
 
-#: src/app/library/track.rs:46
+#: src/app/library/track.rs:49
 msgid "REMOVE FROM COLLECTION"
 msgstr "QUITAR DE LA COLECCIÓN"
 
-#: src/app/library/track.rs:53
+#: src/app/library/track.rs:56
 msgid "unknown track action {}"
 msgstr "acción de pista desconocida {}"
 
-#: src/app/library/track.rs:73
+#: src/app/library/track.rs:76
 msgid "analysing {} tracks…"
 msgstr "analizando {} pistas…"
 
-#: src/app/library/track.rs:79
+#: src/app/library/track.rs:82
 msgid "{} skipped (Analysis Lock)"
 msgstr "{} omitidas (bloqueo de análisis)"
 
-#: src/app/library/track.rs:95
+#: src/app/library/track.rs:98
 msgid "already in the Collection"
 msgstr "ya está en la Colección"
 
-#: src/app/library/track.rs:99
+#: src/app/library/track.rs:102
 msgid "“{}” imported to the Collection"
 msgstr "«{}» importada a la Colección"
 
-#: src/app/library/track.rs:118
+#: src/app/library/track.rs:121
 msgid "Analysis Lock on for “{}”"
 msgstr "Bloqueo de análisis activado para «{}»"
 
-#: src/app/library/track.rs:120
+#: src/app/library/track.rs:123
 msgid "Analysis Lock off for “{}”"
 msgstr "Bloqueo de análisis desactivado para «{}»"
 
-#: src/app/library/track.rs:122
+#: src/app/library/track.rs:125
 msgid "Analysis Lock on for {} tracks"
 msgstr "Bloqueo de análisis activado para {} pistas"
 
-#: src/app/library/track.rs:123
+#: src/app/library/track.rs:126
 msgid "Analysis Lock off for {} tracks"
 msgstr "Bloqueo de análisis desactivado para {} pistas"
 
-#: src/app/library/track.rs:186
+#: src/app/library/track.rs:189
 msgid "the file is missing: relocate it first"
 msgstr "falta el archivo: reubícalo primero"
 
-#: src/app/library/track.rs:200
+#: src/app/library/track.rs:203
 msgid "tags of “{}” reloaded"
 msgstr "etiquetas de «{}» recargadas"
 
-#: src/app/library/track.rs:201
+#: src/app/library/track.rs:204
 msgid "Reload Tag: kept your edits of {}"
 msgstr "Recargar etiqueta: se conservan tus ediciones de {}"
 
-#: src/app/library/track.rs:202
+#: src/app/library/track.rs:205
 msgid "tags of {} tracks reloaded"
 msgstr "etiquetas de {} pistas recargadas"
 
-#: src/app/library/track.rs:205
+#: src/app/library/track.rs:208
 msgid "{} files are missing"
 msgstr "faltan {} archivos"
 

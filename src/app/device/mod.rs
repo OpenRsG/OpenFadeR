@@ -34,6 +34,7 @@ mod check;
 mod export;
 mod format; // Formatter
 mod formats;
+mod import;
 mod job;
 mod link;
 mod pace;
@@ -46,6 +47,7 @@ mod sync;
 mod transfer;
 mod verify;
 
+pub use import::import_tracks;
 pub use link::{track_edited, track_loading};
 pub use transfer::{drop_playlist, drop_tracks, Dest, List};
 pub use verify::verify;

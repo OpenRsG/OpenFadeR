@@ -39,6 +39,8 @@ pub(super) enum Review {
         device: Device,
         plan: update::Plan,
         ticked: Vec<bool>,
+        /// An import from the device ([`super::import`]): its tracks the collection already has with other values.
+        import: bool,
     },
     Histories {
         device: Device,
@@ -136,6 +138,8 @@ pub(super) fn diff_text(d: &Diff) -> String {
                 (_, Some((a, b))) => tr!("grid moved {} ms, BPM {} → {}", shift, a, b),
             }
         }
+        Diff::Key { from, to } if from.is_empty() => tr!("key {}", to),
+        Diff::Key { from, to } => tr!("key {} → {}", from, to),
     }
 }
 
@@ -271,6 +275,14 @@ pub(super) fn updated_text(u: &update::Updated) -> String {
     )
 }
 
+/// The result line of the review of an import from the device.
+fn took_text(u: &update::Updated, label: &str) -> String {
+    tr!(
+        "Took the values of {} on {} track(s) ({} ratings, {} comments, {} cue lists, {} grids, {} keys); the others keep yours",
+        label, u.changed, u.ratings, u.comments, u.cues, u.grids, u.keys
+    )
+}
+
 /// The result line of IMPORT HISTORIES.
 pub(super) fn imported_text(r: &history::Imported, label: &str) -> String {
     tr!(
@@ -280,13 +292,14 @@ pub(super) fn imported_text(r: &history::Imported, label: &str) -> String {
 }
 
 impl Ctx {
-    /// A review of what UPDATE COLLECTION would change on `d`: every row ticked.
-    pub(super) fn open_update_review(&self, d: &Device, plan: update::Plan) {
+    /// A review of what UPDATE COLLECTION (`import`: an import from the device) would change on `d`: every row ticked.
+    pub(super) fn open_update_review(&self, d: &Device, plan: update::Plan, import: bool) {
         let ticked = vec![true; plan.rows.len()];
         *self.review.borrow_mut() = Some(Review::Update {
             device: d.clone(),
             plan,
             ticked,
+            import,
         });
         self.show_review();
     }
@@ -338,13 +351,24 @@ impl Ctx {
                 self.with_state(|s| s.set_review_mode(0));
                 return;
             }
-            Some(Review::Update { device, plan, ticked }) => (
+            Some(Review::Update { device, plan, ticked, import }) => (
                 1,
-                tr!("UPDATE COLLECTION FROM {}", device.label),
-                tr!(
-                    "The player changed {} track(s) of your collection since the last export ({} more on the device are not in your collection and stay as they are). Tick what to bring into your collection: each tick replaces your value of that track with the player's. Nothing changes until you press APPLY, and UNDO afterwards restores exactly these fields.",
-                    plan.rows.len(), plan.unmatched
-                ),
+                if *import {
+                    tr!("ALREADY IN YOUR COLLECTION: {}", device.label)
+                } else {
+                    tr!("UPDATE COLLECTION FROM {}", device.label)
+                },
+                if *import {
+                    tr!(
+                        "{} track(s) you imported from {} are already in your collection, with other cues, grid, key, rating or comment than on the device. Tick the tracks whose values you want to take from the device: each tick replaces yours. Unticked tracks, or CANCEL, keep yours. Nothing changes until you press APPLY, and UNDO afterwards restores exactly these fields.",
+                        plan.rows.len(), device.label
+                    )
+                } else {
+                    tr!(
+                        "The player changed {} track(s) of your collection since the last export ({} more on the device are not in your collection and stay as they are). Tick what to bring into your collection: each tick replaces your value of that track with the player's. Nothing changes until you press APPLY, and UNDO afterwards restores exactly these fields.",
+                        plan.rows.len(), plan.unmatched
+                    )
+                },
                 plan.rows
                     .iter()
                     .zip(ticked)
@@ -516,16 +540,21 @@ impl Ctx {
                 device,
                 plan,
                 ticked,
+                import,
             } => {
                 let id = device.id.clone();
                 self.start_then(
                     Some(id),
                     tr!("Updating the collection"),
                     move |_| {
-                        let label = tr!("Update Collection of {}", device.label);
+                        let label = if import {
+                            tr!("Import from {}", device.label)
+                        } else {
+                            tr!("Update Collection of {}", device.label)
+                        };
                         let a = update::apply(&plan, &ticked, &device.id, &label, &store, now())?;
                         *done.lock() = a.undo;
-                        Ok(updated_text(&a.updated))
+                        Ok(if import { took_text(&a.updated, &device.label) } else { updated_text(&a.updated) })
                     },
                     move |cx, r| {
                         if let Ok(text) = r {
@@ -578,7 +607,7 @@ impl Ctx {
     }
 
     /// The track list shows the store's ratings, comments and cues again (an import or its undo changed them).
-    fn reload_browser(&self) {
+    pub(super) fn reload_browser(&self) {
         if let Some(app) = self.app() {
             app.global::<crate::app::BrowserState>().invoke_reload(-1);
         }

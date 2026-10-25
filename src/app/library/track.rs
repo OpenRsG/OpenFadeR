@@ -17,7 +17,10 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
     let tracks = ctx.tracks;
     match id {
         "track-edit" => crate::app::trackinfo::open_editor(&c.app(), &t),
-        "track-import" => import(c, t),
+        "track-import" => match ctx.device {
+            Some(d) => crate::app::device::import_tracks(&d, &tracks),
+            None => import(c, t),
+        },
         "track-analyze" => analyze_tracks(c, tracks),
         "track-autocue" => autocue::start(c, tracks),
         "track-lock" => lock(c, &tracks),
@@ -86,7 +89,7 @@ fn analyze_tracks(c: &Rc<Ctx>, tracks: Vec<Track>) {
     }
 }
 
-/// Import To Collection: a track of a device or another library joins ours.
+/// Import To Collection: a track of another library joins ours (a device's is copied: [`crate::app::device::import_tracks`]).
 fn import(c: &Rc<Ctx>, t: Track) {
     let Some(file) = t.file.clone() else {
         return c.say(tr!("this track has no file"));
