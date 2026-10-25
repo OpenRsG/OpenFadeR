@@ -105,3 +105,59 @@ fn bench_listing_100k_collection_tracks() {
         "a warm shared listing of {N} tracks should take < 20 ms, took {shared_warm:?}"
     );
 }
+
+/// What the window reads of the own library before it shows, on a store `examples/big_library` filled (cues, 200
+/// playlists, history, MyTags, gain and print rows): `cargo run --release --example big_library -- 50000` into a private
+/// HOME, then `BIG_STORE=<that HOME>/.local/share/openfader/store.db cargo test --release --test library_speed
+/// bench_startup -- --ignored --nocapture`. Works on a copy; skips without `BIG_STORE`.
+#[test]
+#[ignore = "bench: needs BIG_STORE"]
+fn bench_startup_reads_of_a_big_store() {
+    let Some(src) = std::env::var_os("BIG_STORE") else {
+        eprintln!("BIG_STORE not set: skipped");
+        return;
+    };
+    let dir = std::env::temp_dir().join(format!("openfader-bench-startup-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("store.db");
+    std::fs::copy(&src, &path).unwrap();
+    let mut wal = src.clone();
+    wal.push("-wal");
+    if std::path::Path::new(&wal).is_file() {
+        std::fs::copy(&wal, dir.join("store.db-wal")).unwrap();
+    }
+    let total = Instant::now();
+    let (store, open) = time(|| Arc::new(Store::open_at(&path).unwrap()));
+    let lib = overlay(&store);
+    let (all, list) = time(|| lib.tracks_all().unwrap());
+    let (keys, keys_t) = time(|| {
+        let keys: Vec<String> = all.iter().map(store::key).collect();
+        let mut by_key = std::collections::HashMap::new();
+        for (i, k) in keys.iter().enumerate() {
+            by_key.entry(k.clone()).or_insert(i);
+        }
+        (keys, by_key)
+    });
+    let (tags, tags_t) = time(|| store.all_track_mytags().unwrap());
+    let (tree, tree_t) = time(|| {
+        (
+            store.nodes().unwrap().len(),
+            store.mytag_categories().unwrap().len() + store.mytags().unwrap().len(),
+            store.banks().unwrap().len() + store.stages().unwrap().len(),
+            store.stage_counts().unwrap(),
+            store.history_day_counts().unwrap().len(),
+        )
+    });
+    let total = total.elapsed();
+    eprintln!(
+        "{} tracks: open {open:?}, list with edits {list:?}, keys {keys_t:?}, MyTags of {} tracks {tags_t:?}, tree ({} nodes, {} history days) {tree_t:?}; total {total:?}",
+        all.len(),
+        tags.len(),
+        tree.0,
+        tree.4
+    );
+    assert_eq!(keys.0.len(), all.len());
+    assert_eq!(tree.3.values().sum::<usize>(), all.len());
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(total.as_millis() < 100, "the start-up reads took {total:?}");
+}

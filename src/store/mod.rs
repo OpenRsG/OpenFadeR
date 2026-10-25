@@ -238,6 +238,8 @@ pub struct Store {
     collection_changes: Arc<AtomicU64>,
     /// The track list and the file-name index of the Collection, each as of a [`Store::collection_generation`].
     cache: Mutex<collection::Cache>,
+    /// The Collection with the text and rating edits on ([`Store::collection_edited`]). Lock order: before `db`.
+    edited: Mutex<Option<overlay::EditedList>>,
 }
 
 /// SQLite errors as the `String`s the rest of the core uses.
@@ -378,6 +380,7 @@ impl Store {
             db: Mutex::new(conn),
             collection_changes,
             cache: Mutex::default(),
+            edited: Mutex::default(),
         })
     }
 
@@ -448,6 +451,12 @@ fn migrate(conn: &mut Connection) -> R<()> {
         conn.execute_batch("ALTER TABLE device_backup ADD COLUMN auto INTEGER NOT NULL DEFAULT 0;")
             .s()?;
     }
+    // The rows [`rekey::backfill`] looks for at every start, found without reading the whole table (3 ms at 50k tracks, the
+    // whole file from disk when it is not cached). Not a schema version: an older build opens the store with it as well; a
+    // store that cannot take it (read-only) only reads slower.
+    let _ = conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS collection_unstamped ON collection(id) WHERE added_at = 0 OR size = 0;",
+    );
     Ok(())
 }
 

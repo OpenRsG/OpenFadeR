@@ -76,15 +76,19 @@ impl Store {
         {
             return Ok(t.clone());
         }
-        let rows: Vec<Track> = query_all(
+        let t = Arc::new(self.collection_rows()?);
+        cache.tracks = Some((g, t.clone()));
+        Ok(t)
+    }
+
+    /// [`Store::collection_tracks`] read now, uncached.
+    pub(super) fn collection_rows(&self) -> R<Vec<Track>> {
+        query_all(
             &self.db(),
             &format!("SELECT id, {COLS} FROM collection WHERE stage IS NULL ORDER BY id"),
             [],
             from_row,
-        )?;
-        let t = Arc::new(rows);
-        cache.tracks = Some((g, t.clone()));
-        Ok(t)
+        )
     }
 
     /// Track `id`; `None` when there is no such row.

@@ -332,7 +332,7 @@ impl View {
         }
         let tracks = self.lib.tracks_all()?;
         let keys: Vec<String> = tracks.iter().map(store::key).collect();
-        let mut by_key = HashMap::new();
+        let mut by_key = HashMap::with_capacity(keys.len());
         for (i, k) in keys.iter().enumerate() {
             by_key.entry(k.clone()).or_insert(i);
         }

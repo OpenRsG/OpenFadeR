@@ -4397,6 +4397,7 @@ dependencies = [
  "openfader-plugin",
  "rekordbox-common",
  "rekordbox-export",
+ "ring",
  "rusqlite",
  "serde_json",
 ]

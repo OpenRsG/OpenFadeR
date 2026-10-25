@@ -184,11 +184,7 @@ impl View {
         self.mytags = self.ok(app, store.mytags(), Vec::new());
         self.banks = self.ok(app, store.banks(), Vec::new());
         self.read_stages(app);
-        let days = self.ok(app, store.history_days(), Vec::new());
-        let days: Vec<(String, usize)> = days
-            .into_iter()
-            .map(|d| (d.clone(), store.history_day(&d).map_or(0, |v| v.len())))
-            .collect();
+        let days = self.ok(app, store.history_day_counts(), Vec::new());
         let src_rows = self.source_rows();
         let (cue_on, all_tracks, banks_on) = crate::app::prefs::with(|p| {
             let v = &p.view;

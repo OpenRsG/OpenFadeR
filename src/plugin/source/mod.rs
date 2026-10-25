@@ -208,6 +208,11 @@ impl Library for Sources {
         Ok(all)
     }
 
+    /// The whole library is `inner`'s (no source adds to it): its shared list, not a copy.
+    fn tracks_all(&self) -> Result<std::sync::Arc<Vec<Track>>, String> {
+        self.inner.tracks_all()
+    }
+
     fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {
         let Some(id) = playlist.filter(|id| id.starts_with(PREFIX)) else {
             return self.inner.tracks(playlist);

@@ -10,3 +10,4 @@ rekordbox-export.workspace = true
 serde_json.workspace = true
 rusqlite.workspace = true
 chrono.workspace = true
+ring = "0.17" # the OneLibrary key derivation, done once per stick (src/read/onelibrary.rs); already in the tree

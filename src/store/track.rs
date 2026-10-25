@@ -62,7 +62,7 @@ impl Edits {
 }
 
 /// The cheap fields of one track ([`Store::track_fields`]): what a track list needs, without cues and grids.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(super) struct Fields {
     pub rating: Option<u8>,
     pub comment: Option<String>,

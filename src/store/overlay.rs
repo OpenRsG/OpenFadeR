@@ -2,7 +2,7 @@
 //! analysis carries the store's cue list and beat grid. The store wins; what it has no edit for stays
 //! the library's. Playlists are the library's own (user playlists are read from the store by the browser).
 
-use super::{Edits, Store, global, key, track::Fields};
+use super::{Edits, R, Store, global, key, track::Fields};
 use crate::{
     analysis::Analysis,
     library::{Library, Playlist, Track},
@@ -17,7 +17,7 @@ pub fn overlay(inner: Box<dyn Library>) -> Box<dyn Library> {
 
 /// Text / rating edits by track: a Collection track's by its id (no key string built per track on a 100k listing), the
 /// rest by [`key`].
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 struct Edited {
     by_id: HashMap<i64, Fields>,
     by_key: HashMap<String, Fields>,
@@ -83,6 +83,47 @@ pub(super) fn edited(store: &Store, tracks: &mut [Track]) {
 
 /// The library's list, the edits it was merged with and the result.
 type Merged = (Arc<Vec<Track>>, Arc<Edited>, Arc<Vec<Track>>);
+
+/// What [`Store::collection_edited`] keeps: the list, the edits on it, and the [`Store::generation`] and
+/// [`Store::collection_generation`] they were last found current at.
+pub(super) struct EditedList {
+    generation: u64,
+    rows: u64,
+    edits: Edited,
+    tracks: Arc<Vec<Track>>,
+}
+
+impl Store {
+    /// The Collection ([`Store::collection_tracks`]) with the text and rating edits on, the edits put on the rows as they are
+    /// read (no copy of the list): what [`crate::library::own::Own`] lists. Kept while no Collection row changes and the edits
+    /// stay the same (a write elsewhere, a play or a setting, costs one read of the edits, not of the list).
+    pub fn collection_edited(&self) -> R<Arc<Vec<Track>>> {
+        let mut kept = self.edited.lock();
+        // Read before the data: a write in between makes the next call look again.
+        let (generation, rows) = (self.generation(), self.collection_generation());
+        if let Some(k) = kept.as_mut().filter(|k| k.rows == rows) {
+            if k.generation == generation {
+                return Ok(k.tracks.clone());
+            }
+            let edits = Edited::of(self.track_fields()?);
+            if edits == k.edits {
+                k.generation = generation;
+                return Ok(k.tracks.clone());
+            }
+        }
+        let edits = Edited::of(self.track_fields()?);
+        let mut tracks = self.collection_rows()?;
+        edits.apply(&mut tracks);
+        let tracks = Arc::new(tracks);
+        *kept = Some(EditedList {
+            generation,
+            rows,
+            edits,
+            tracks: tracks.clone(),
+        });
+        Ok(tracks)
+    }
+}
 
 /// `42` of the key `t42` ([`super::id_key`]).
 fn id_of_key(k: &str) -> Option<i64> {
@@ -172,6 +213,9 @@ impl Library for Overlay {
     }
 
     fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {
+        if self.inner.edited() {
+            return self.inner.tracks(playlist);
+        }
         let mut tracks = self.inner.tracks(playlist)?;
         let fields = self.fields();
         if !fields.is_empty() {
@@ -182,6 +226,9 @@ impl Library for Overlay {
 
     /// The library's list with the edits on, copied once per change of the library or the store, not per call.
     fn tracks_all(&self) -> Result<Arc<Vec<Track>>, String> {
+        if self.inner.edited() {
+            return self.inner.tracks_all();
+        }
         let (inner, fields) = (self.inner.tracks_all()?, self.fields());
         if fields.is_empty() {
             return Ok(inner);
@@ -341,5 +388,42 @@ mod tests {
         assert_eq!(shown(), ("From File".into(), "File Artist".into(), "File Album".into(), "".into(), 4));
         s.undo().unwrap();
         assert_eq!(shown(), edited);
+    }
+
+    #[test]
+    fn the_edited_collection_is_kept_across_other_writes_and_read_again_after_an_edit() {
+        let s = Store::in_memory().unwrap();
+        let t = |n: &str| crate::library::Track {
+            title: n.into(),
+            file: Some(format!("/m/{n}.mp3").into()),
+            ..Default::default()
+        };
+        s.collection_put(&[t("a"), t("b")], false).unwrap();
+        let first = s.collection_edited().unwrap();
+        let key = crate::store::id_key(first[1].id.unwrap());
+        s.history_append("2026-10-25", &key, 1).unwrap(); // not an edit: the same list
+        assert!(Arc::ptr_eq(&first, &s.collection_edited().unwrap()));
+        s.set_rating(&key, Some(5)).unwrap();
+        let rated = s.collection_edited().unwrap();
+        assert_eq!((rated[0].rating, rated[1].rating), (0, 5));
+        s.collection_put(&[t("c")], false).unwrap(); // a new row: read again, the edit still on
+        let more = s.collection_edited().unwrap();
+        assert_eq!((more.len(), more[1].rating), (3, 5));
+        assert_eq!(*more, *Overlay::new(Box::new(Raw(s.collection_tracks().unwrap())), Arc::new(s)).tracks_all().unwrap());
+    }
+
+    /// The raw Collection as a plain library: what the generic overlay merges the edits onto.
+    struct Raw(Arc<Vec<Track>>);
+
+    impl Library for Raw {
+        fn kind(&self) -> &str {
+            "raw"
+        }
+        fn playlists(&self) -> Result<Vec<Playlist>, String> {
+            Ok(Vec::new())
+        }
+        fn tracks(&self, _: Option<&str>) -> Result<Vec<Track>, String> {
+            Ok(self.0.to_vec())
+        }
     }
 }
