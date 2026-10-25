@@ -353,7 +353,8 @@ mod tests {
             r.skipped.iter().map(|s| s.reason).collect::<Vec<_>>(),
             [Reason::Duplicate, Reason::Duplicate, Reason::MissingFile]
         );
-        assert_eq!(r.skipped[2].name, "/gone/x.mp3");
+        // Windows reads "/gone/x.mp3" as a path on the current drive.
+        assert!(Path::new(&r.skipped[2].name).ends_with("gone/x.mp3"), "{}", r.skipped[2].name);
         let node = &store.nodes().unwrap()[0];
         assert_eq!(node.name, "set");
         let keys = store.entries(node.id).unwrap();

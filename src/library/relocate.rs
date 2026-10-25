@@ -353,7 +353,8 @@ mod tests {
         std::fs::write(root.join("new/sub/song.mp3"), &other[1..]).unwrap(); // same name, other bytes
         std::fs::write(root.join("new/sub/renamed.mp3"), &data).unwrap();
         let idx = index(&[root.join("new")]);
-        let new = root.join("new/sub/renamed.mp3");
+        // Joined part by part: the store keeps the path as text, and a "/" inside one part would not match a walked path on Windows.
+        let new = root.join("new").join("sub").join("renamed.mp3");
         assert_eq!(ByPrint::new(&idx).find(&store, &lost), Some(new.as_path()));
         // The name stage takes the file of that name (it does not look inside); the print stage is the fallback.
         let mut by_print = ByPrint::new(&idx);

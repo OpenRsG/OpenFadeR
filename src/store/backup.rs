@@ -517,6 +517,7 @@ mod tests {
             .query_row("SELECT rating FROM track WHERE key = 'k'", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rating, 5, "the newer library is kept whole");
+        drop(newer); // Windows cannot delete or replace a file a connection holds open
 
         // A second roll-back keeps the first one's file: names never collide.
         store_file(&db, "k", 1);
