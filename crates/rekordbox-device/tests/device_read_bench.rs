@@ -1,11 +1,12 @@
 //! A regression bench for the device read path (`PIONEER/rekordbox/{export.pdb,exportLibrary.db}` → tracks +
 //! playlists): how long opening a device library and listing everything on it takes, alone and when two openers race
 //! it the way a real mount does (the browser's own read, `app/browser/sources.rs`, and the device's automatic
-//! cue-sync job, `Auto::Link` in `app/device/scan.rs`, both start within the mount's first moment). The first opener pays
-//! the SQLCipher key derivation of a OneLibrary once (PBKDF2-HMAC-SHA512, 256000 rounds: about 70 ms on a Ryzen 9700X, the
-//! floor of a first read); every later connection to the same file uses the derived raw key (`read/onelibrary.rs`).
-//! Before that, the open, the playlists and the tracks each derived it: 234 ms for the owner's 24-track stick, 251 ms for
-//! the 5k fixture; after: 75 ms and 84 ms, and the second opener under 1 ms and 11 ms.
+//! cue-sync job, `Auto::Link` in `app/device/scan.rs`, both start within the mount's first moment). A device whose
+//! `export.pdb` is as new as its OneLibrary is read from `export.pdb` (`read.rs`, no key derivation): 0.14 ms for the owner's
+//! 24-track stick, 4.3 ms for the 5k fixture (Ryzen 9700X). Read from the OneLibrary (the only or the newer library), the
+//! first opener pays the SQLCipher key derivation once (PBKDF2-HMAC-SHA512, 256000 rounds, about 70 ms) and later
+//! connections use the derived raw key (`read/onelibrary.rs`): 75 ms and 84 ms. Before both, the open, the playlists and the
+//! tracks each derived it: 234 ms and 251 ms.
 //!
 //! Run with `cargo test -p rekordbox-device --release -- --ignored --nocapture bench_device_read`. Point
 //! `OPENFADER_USB` (the convention `tests/common` already uses) at a real device root to bench that library instead
