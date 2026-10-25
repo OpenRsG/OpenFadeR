@@ -409,7 +409,8 @@ pub fn writeback_answer(yes: bool) {
     });
 }
 
-/// Connects the start-up libraries: `legacy` (the path given at start or the old Database setting) and the own music folder.
+/// Connects the start-up libraries: `legacy` (the path given at start or the old Database setting) and the own music folder,
+/// then reads the Collection on a worker while the window is built: the browser finds the list ready.
 pub fn adopt_startup(store: &Store, legacy: Option<PathBuf>, music: Option<PathBuf>) {
     if let Some(p) = legacy {
         if let Err(e) = connect::adopt(store, &p) {
@@ -421,6 +422,11 @@ pub fn adopt_startup(store: &Store, legacy: Option<PathBuf>, music: Option<PathB
             eprintln!("{}: {e}", m.display());
         }
     }
+    std::thread::spawn(|| {
+        if let Err(e) = store::global().collection_edited() {
+            eprintln!("store: {e}");
+        }
+    });
 }
 
 /// Starts the live sync and offers detected libraries on a first run (UI thread, once).

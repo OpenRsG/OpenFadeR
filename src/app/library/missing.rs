@@ -353,14 +353,15 @@ pub fn wire(c: &Rc<Ctx>) {
         );
         k.confirm(Confirm::RemoveMissing(t), tr!("DELETE FROM COLLECTION"), &text, tr!("OK"), "");
     });
-    // Mark missing files from the start; no dialog, no status.
-    let tracks = c.lib.tracks(None).unwrap_or_default();
+    // Mark missing files from the start; no dialog, no status. The shared list (no copy on the UI thread).
+    let tracks = c.lib.tracks_all().unwrap_or_default();
     c.spawn(
         move || {
             tracks
-                .into_iter()
-                .filter_map(|t| t.file)
+                .iter()
+                .filter_map(|t| t.file.as_ref())
                 .filter(|f| !f.exists())
+                .cloned()
                 .collect::<HashSet<PathBuf>>()
         },
         |c, gone| {

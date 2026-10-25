@@ -136,13 +136,22 @@ impl Store {
 
     /// Tracks in each stage (the Collection's too), by stage id.
     pub fn stage_counts(&self) -> R<HashMap<i64, usize>> {
-        let rows: Vec<(i64, i64)> = query_all(
+        // Grouped by the bare column, the count reads the `collection_stage` index alone; NULL (the Collection) is then added
+        // to its stage, as the same stage set explicitly is.
+        let rows: Vec<(Option<i64>, i64)> = query_all(
             &self.db(),
-            "SELECT COALESCE(stage, (SELECT id FROM stage WHERE role = 2)), COUNT(*) FROM collection GROUP BY 1",
+            "SELECT stage, COUNT(*) FROM collection GROUP BY stage",
             [],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )?;
-        Ok(rows.into_iter().map(|(s, n)| (s, n as usize)).collect())
+        let own: Option<i64> = scalar(&self.db(), "SELECT id FROM stage WHERE role = 2", [])?;
+        let mut counts = HashMap::new();
+        for (s, n) in rows {
+            if let Some(s) = s.or(own) {
+                *counts.entry(s).or_default() += n as usize;
+            }
+        }
+        Ok(counts)
     }
 
     /// The tracks waiting in a stage before the Collection, in arrival order (empty for the Collection's), with the user's text

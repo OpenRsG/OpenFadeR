@@ -238,6 +238,8 @@ pub struct Store {
     collection_changes: Arc<AtomicU64>,
     /// The track list and the file-name index of the Collection, each as of a [`Store::collection_generation`].
     cache: Mutex<collection::Cache>,
+    /// The Collection with the text and rating edits on ([`Store::collection_edited`]). Lock order: before `db`.
+    edited: Mutex<Option<overlay::EditedList>>,
 }
 
 /// SQLite errors as the `String`s the rest of the core uses.
@@ -378,6 +380,7 @@ impl Store {
             db: Mutex::new(conn),
             collection_changes,
             cache: Mutex::default(),
+            edited: Mutex::default(),
         })
     }
 

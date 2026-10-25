@@ -84,6 +84,11 @@ pub trait Library {
     fn tracks_all(&self) -> Result<std::sync::Arc<Vec<Track>>, String> {
         self.tracks(None).map(std::sync::Arc::new)
     }
+    /// The tracks already carry the store's text and rating edits (the Collection reads them with its rows): the store's
+    /// overlay hands them on as they are.
+    fn edited(&self) -> bool {
+        false
+    }
     /// Runs the search `query` in the search entry `playlist` (a playlist id this library listed) in the background;
     /// the results appear in `tracks(Some(playlist))` once the source has answered. `false`: `playlist` is no search entry.
     fn search(&self, _playlist: &str, _query: &str) -> bool {
