@@ -72,7 +72,8 @@ pub fn serving<R>(host: *const Host, f: impl FnOnce() -> R) -> R {
         }
     }
     let _reset = Reset(CURRENT.with(|c| c.replace(host)));
-    JOB.with(|j| *j.borrow_mut() = Job::default());
+    // A library dropped while its thread exits (the app keeps them in thread-locals) is served after JOB is gone.
+    let _ = JOB.try_with(|j| *j.borrow_mut() = Job::default());
     f()
 }
 

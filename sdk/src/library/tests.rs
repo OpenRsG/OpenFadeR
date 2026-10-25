@@ -214,3 +214,21 @@ fn an_input_output_error_is_tried_once_more_and_nothing_else_is() {
     );
     assert_eq!(calls, 1);
 }
+
+/// The app keeps libraries in thread-locals; one dropped while the thread exits still answers its Close.
+#[test]
+fn a_call_served_while_the_thread_exits_does_not_panic() {
+    struct CloseOnExit;
+    impl Drop for CloseOnExit {
+        fn drop(&mut self) {
+            host::serving(std::ptr::null(), || ());
+        }
+    }
+    thread_local!(static LIB: CloseOnExit = const { CloseOnExit });
+    std::thread::spawn(|| {
+        LIB.with(|_| ()); // registered first, so destroyed after the SDK's own thread-locals
+        host::serving(std::ptr::null(), || ());
+    })
+    .join()
+    .expect("the thread exits cleanly");
+}
