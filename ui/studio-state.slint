@@ -19,8 +19,16 @@ export global StudioState {
         root.focus-target = target;
         root.focus-pulse += 1;
     }
-    /// Moves the track selection by `d` rows, clamped, and tells Rust (the list scrolls to follow `BrowserState.current-row`).
+    /// Moves the track selection (the tree's row while the tree has the focus) by `d` rows, clamped, and tells Rust (the list scrolls to follow `BrowserState.current-row`).
     public function browse(d: int) {
+        if root.tree-focus {
+            // The folder tree has the focus: the knob walks its rows.
+            if BrowserState.playlists.length > 0 {
+                BrowserState.tree-row = max(0, min(BrowserState.playlists.length - 1, BrowserState.tree-row + d));
+                BrowserState.playlist-selected(BrowserState.tree-row);
+            }
+            return;
+        }
         if BrowserState.tracks.length == 0 { return; }
         BrowserState.current-row = max(0, min(BrowserState.tracks.length - 1, BrowserState.current-row + d));
         BrowserState.track-selected(BrowserState.current-row);

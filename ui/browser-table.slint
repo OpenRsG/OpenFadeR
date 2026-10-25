@@ -1,4 +1,4 @@
-import { TrackMenu } from "track-menu.slint";
+import { TrackMenu, TrackMenuState } from "track-menu.slint";
 import { ListView } from "std-widgets.slint";
 import { Glyph, Icon, Splitter } from "widgets.slint";
 import { PaneState } from "panes.slint";
@@ -61,6 +61,8 @@ component Cell inherits Text {
 /// master-deck hints. Rows are the `BrowserState.tracks` models (src/app/browser/table.rs: cells 0..7 text, 8 key hue, 9 hints).
 export component TrackTable inherits Rectangle {
     in property <int> sorted-col: -1;
+    /// The table on screen: only it opens its menu for the controller's menu button (TrackMenuState.toggle).
+    in property <bool> live: true;
     in property <bool> sorted-asc;
     callback sort-clicked(int);
     /// A mouse click or key moved the focus here.
@@ -136,6 +138,7 @@ export component TrackTable inherits Rectangle {
     fs := FocusScope {
         key-pressed(e) => {
             if (e.modifiers.control && (e.text == "a" || e.text == "\u{1}")) { BrowserState.select-all(); return accept; }
+            if (e.text == Key.Menu) { TrackMenuState.toggle += 1; return accept; }
             if (e.text == Key.Escape && root.multi) { BrowserState.select-collapse(); return accept; }
             if (e.modifiers.shift) {
                 if (e.text == Key.UpArrow) { root.extend-to-row(BrowserState.current-row - 1); return accept; }
@@ -280,6 +283,19 @@ export component TrackTable inherits Rectangle {
         y: min(root.menu-y, max(0px, root.height - self.height));
         width: body.menu-w;
         height: body.menu-h;
-        body := TrackMenu { two-decks: false; palettes: BrowserState.palette-enabled; narrow: root.width < 440px; radius: Theme.radius; done => { menu.close(); } }
+        body := TrackMenu { two-decks: false; palettes: BrowserState.palette-enabled; narrow: root.width < 440px; radius: Theme.radius; done => { menu.close(); fs.focus(); } }
+    }
+    // The controller (or the Menu key) opens the menu under the chosen row; the knob then walks it (TrackMenuState).
+    property <bool> menu-open: menu.is-open;
+    changed menu-open => { TrackMenuState.open = root.menu-open; TrackMenuState.sel = -1; }
+    property <int> menu-toggle: TrackMenuState.toggle;
+    changed menu-toggle => {
+        if (!root.live) { return; }
+        if (menu.is-open) { menu.close(); fs.focus(); }
+        else if (BrowserState.tracks.length > 0) {
+            if (BrowserState.current-row < 0) { root.set-current-row(0); } // no track chosen yet: the first one
+            root.place-menu(root.width / 4, Theme.h-header + (BrowserState.current-row + 1) * Theme.h-row + list.content-y);
+            menu.show();
+        }
     }
 }

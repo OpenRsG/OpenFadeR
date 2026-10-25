@@ -25,6 +25,8 @@ export global BrowserState {
     callback playlist-selected(int);
     /// A click on a heading of the tree (or Left / Right on it): its rows unfold or fold away.
     callback tree-toggle(int);
+    /// BACK (or Left) on tree row `i`: its section folds and the heading is chosen. Returns the heading's row (`i` when there is none).
+    callback tree-back(int) -> int;
     /// Row index in `tracks` (the filtered, sorted view).
     callback track-selected(int);
     /// Ctrl+click (mode 1) / Shift+click and Shift+arrows (mode 2) on row `i`: the multi-selection grows, shrinks or spans a range.

@@ -132,6 +132,7 @@ export component TouchWorkspace inherits Rectangle {
                 }
             }
             browser := Browser {
+                live: Theme.layout-profile == 1;
                 visible: root.section == 1;
                 width: viewport.content-width; height: viewport.content-height;
                 dock: root.mode == 0;

@@ -397,6 +397,37 @@ export global Theme {
         return root.layout-profile == 1 ? max(size, root.touch-target) : size;
     }
 
+    // @group Library tree and track menu
+    // Library tree and track menu
+    /// How much bigger than a list row the text of a tree heading (My Playlists, History, Devices …) is.
+    in-out property <length> tree-heading-grow: 2px;
+    /// How much taller than a list row a tree heading is.
+    in-out property <length> tree-heading-extra: 10px;
+    /// Text of the tree headings.
+    in-out property <color> tree-heading: root.text-bright;
+    /// Glyph of the tree headings.
+    in-out property <color> tree-heading-icon: root.accent-hi;
+    /// Indent of each level of the tree.
+    in-out property <length> tree-indent: 14px;
+    /// The glyph before every list of the tree (playlist, folder, history day, stick …); headings keep theirs.
+    // @values off | on
+    in-out property <int> tree-icons: 1;
+    /// A hairline above each tree heading.
+    // @values off | on
+    in-out property <int> tree-lines: 1;
+    /// Track right-click menu: its six groups side by side in two columns, or one under the other.
+    // @values two columns | one column
+    in-out property <int> menu-layout: 0;
+    /// Width of a column of the track menu.
+    in-out property <length> menu-col-w: 210px;
+    /// Group titles of the track menu (PLAY, PLAYLISTS, USB …) and their glyphs.
+    in-out property <color> menu-heading: root.accent-hi;
+    /// The item the controller's browse knob (or the arrow keys) is on in an open menu.
+    in-out property <color> menu-focus: root.accent;
+    /// A line between the groups of the track menu.
+    // @values off | on
+    in-out property <int> menu-lines: 1;
+
     // @group Motion
     // Motion
     /// Hover and press fades of buttons.

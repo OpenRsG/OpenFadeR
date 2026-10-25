@@ -1,4 +1,5 @@
 import { AutomixState, Browser, BrowserState } from "browser.slint";
+import { TrackMenuState } from "track-menu.slint";
 import { DeckCompact, DeckDetail, DeckDetailV, DeckPanel, DeckState, DeckView } from "deck.slint";
 import { FxPanel, FxSlot, FxState, FxUnit } from "fx.slint";
 import { FxRackState, RackView } from "fxrack.slint";
@@ -161,18 +162,40 @@ export component App inherits Window {
 
     /// Ctrl+F (src/app/keys.rs).
     public function focus-search() { if root.touch { touch-workspace.focus-search(); } else if root.studio { StudioState.focus(0); } else { browser.focus-search(); } }
-    /// MIDI browse encoder (src/app/midi): move the track selection by `d` rows.
-    public function browse(d: int) { if root.touch { touch-workspace.browse(d); } else if root.studio { StudioState.browse(d); } else { browser.select-delta(d); } }
-    /// MIDI BACK / browse push / sort buttons (see Browser).
-    public function browse-back() { if root.touch { touch-workspace.browse-back(); } else if root.studio { StudioState.focus(1); } else { browser.browse-back(); } }
+    /// MIDI browse encoder (src/app/midi): move the track selection by `d` rows (the tree's row when it has the focus, the
+    /// item of the track menu while it is open).
+    public function browse(d: int) {
+        if TrackMenuState.open { TrackMenuState.move(d); }
+        else if root.touch { touch-workspace.browse(d); } else if root.studio { StudioState.browse(d); } else { browser.select-delta(d); }
+    }
+    /// MIDI BACK / browse push / sort buttons (see Browser). BACK closes an open track menu; in the tree it folds the section
+    /// the chosen row is in and goes to its heading.
+    public function browse-back() {
+        if TrackMenuState.open { TrackMenuState.toggle += 1; }
+        else if root.touch { touch-workspace.browse-back(); }
+        else if root.studio {
+            if StudioState.tree-focus {
+                BrowserState.tree-row = BrowserState.tree-back(BrowserState.tree-row);
+                BrowserState.playlist-selected(BrowserState.tree-row);
+            } else { StudioState.focus(1); }
+        } else { browser.browse-back(); }
+    }
+    /// Push: runs the item of an open track menu; on a tree heading it folds or unfolds the section; on a list it goes to the
+    /// tracks (false); on the tracks the caller loads the chosen one (true).
     public function browse-push() -> bool {
+        if TrackMenuState.open { TrackMenuState.fire += 1; return false; }
         if root.touch { return touch-workspace.browse-push(); }
         if root.studio {
-            if StudioState.tree-focus { StudioState.focus(2); return false; }
+            if StudioState.tree-focus {
+                if BrowserState.playlists[BrowserState.tree-row].head { BrowserState.tree-toggle(BrowserState.tree-row); } else { StudioState.focus(2); }
+                return false;
+            }
             return true;
         }
         return browser.browse-push();
     }
+    /// MIDI menu button (DDJ-FLX6: SHIFT + browse push) / Menu key: opens the track menu of the chosen track, or closes it.
+    public function browse-menu() { TrackMenuState.toggle += 1; }
     public function sort-by(col: int) { if root.touch { touch-workspace.sort-by(col); } else if root.studio { StudioState.sort-by(col); } else { browser.sort-by(col); } }
     /// MIDI VIEW (SwitchActiveWindow) / W: browse view on / off.
     public function browse-view() { if root.touch { touch-workspace.browse-view(); } else { BrowserState.browse-max = !BrowserState.browse-max; } }
@@ -372,6 +395,7 @@ export component App inherits Window {
         // EXPORT mode: the player panels over the browser, whose tree column carries the device dock.
         if !root.touch && ExportModeState.visible && ExportModeState.panel-h > 0px: ExportPlayers { x: 0; y: Theme.h-bar; width: root.width; height: ExportModeState.panel-h + root.bx; }
         browser := Browser {
+            live: !root.touch && !root.studio;
             x: 0;
             y: root.y-browser + root.bx;
             width: root.width;

@@ -176,9 +176,11 @@ export component MenuItem inherits Rectangle {
     in property <bool> enabled: true;
     /// Removes or deletes something: the danger colour.
     in property <bool> danger;
+    /// The controller's browse knob or the arrow keys are on this item.
+    in property <bool> highlighted;
     callback activated;
     height: Theme.h-row;
-    background: ta.has-hover && root.enabled ? Theme.select : transparent;
+    background: root.highlighted ? Theme.menu-focus : ta.has-hover && root.enabled ? Theme.select : transparent;
     Text {
         x: Theme.space-lg;
         width: parent.width - 2 * Theme.space-lg;

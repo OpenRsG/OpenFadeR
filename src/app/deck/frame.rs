@@ -189,7 +189,13 @@ pub(super) fn wire(app: &App, decks: &Decks) {
                 started.set(Instant::now());
                 moving.set(decks[..active()].iter().fold(false, |m, d| d.frame() | m));
             }
-            RenderingState::AfterRendering if moving.get() => {
+            RenderingState::AfterRendering => {
+                if let Some(app) = weak.upgrade() {
+                    crate::app::log_first_frame(&app);
+                }
+                if !moving.get() {
+                    return;
+                }
                 let due = started.get() + MIN_FRAME.get();
                 let now = Instant::now();
                 let w = weak.clone();
@@ -212,6 +218,12 @@ pub(super) fn wire(app: &App, decks: &Decks) {
             "Slint renderer: software / no graphics notifier ({e:?}); waveform renderer: CPU"
         );
         crate::app::diag::software(&format!("{e:?}"));
+        let weak = app.as_weak();
+        Timer::single_shot(Duration::ZERO, move || {
+            if let Some(app) = weak.upgrade() {
+                crate::app::log_first_frame(&app);
+            }
+        });
     }
     let weak = app.as_weak();
     prefs::on_change(move |_| {

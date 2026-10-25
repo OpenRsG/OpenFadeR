@@ -249,6 +249,11 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
         }
     });
     let (v, weak) = (view.clone(), app.as_weak());
+    state.on_tree_back(move |i| match usize::try_from(i) {
+        Ok(row) => v.borrow_mut().tree_back(&weak.unwrap(), row) as i32,
+        Err(_) => i,
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
     state.on_search_edited(move |text| {
         let mut v = v.borrow_mut();
         v.query = text.to_string();
