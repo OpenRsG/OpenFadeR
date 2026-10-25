@@ -18,6 +18,8 @@ pub enum Ask {
     },
     Restore,
     ExportList(Format),
+    /// SAVE AS TEXT of the import report: the file to write.
+    SaveImportReport,
     /// Missing tracks to relocate: the file (or folder) to take them from.
     Relocate(Vec<Track>),
     /// Preferences > Libraries > ADD: a library file, or a folder.
@@ -56,7 +58,7 @@ impl Ask {
             Ask::ImportFolder | Ask::BackupTo { .. } | Ask::Connect { folder: true } => {
                 Pick::Folder
             }
-            Ask::ExportList(_) => Pick::Save,
+            Ask::ExportList(_) | Ask::SaveImportReport => Pick::Save,
             _ => Pick::File,
         }
     }
@@ -129,6 +131,13 @@ impl Ask {
                 },
                 tr!("File to write (an existing file is never overwritten)."),
                 String::new(),
+            ),
+            Ask::SaveImportReport => (
+                tr!("SAVE IMPORT REPORT"),
+                tr!("File to write (an existing file is never overwritten)."),
+                openfader::paths::output_dir("OPENFADER_EXPORT_DIR")
+                    .map(|p| p.join("import-report.txt").display().to_string())
+                    .unwrap_or_default(),
             ),
             Ask::Relocate(_) => (
                 tr!("RELOCATE"),

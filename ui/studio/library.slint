@@ -79,6 +79,7 @@ export component StudioLibrary inherits Rectangle {
             padding: Theme.space-md;
             spacing: Theme.space-md;
             search := TextField {
+                text <=> BrowserState.search-text;
                 horizontal-stretch: 1;
                 max-width: 360px;
                 icon: Icon.search;

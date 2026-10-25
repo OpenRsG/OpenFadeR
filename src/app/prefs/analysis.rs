@@ -39,6 +39,11 @@ choice!(
     /// Key Analysis detector: the chroma/profile method, or a small neural network (a model downloaded on first use).
     KeyDetector { #[default] Classic = "classic", Neural = "neural" }
 );
+choice!(
+    /// When an update changes the analysis, the tracks analysed by the older version: ask first (a notice with the number of
+    /// tracks and the time it takes), re-analyse them in the background, or leave each until it is loaded on a deck.
+    AnalysisUpdate { #[default] Ask = "ask", Background = "background", OnLoad = "on-load" }
+);
 
 impl BpmRange {
     /// Lowest and highest BPM of the range.
@@ -74,6 +79,8 @@ section!(
         grid_source: GridSource = GridSource::Library;
         /// Key Analysis > detector.
         key_detector: KeyDetector = KeyDetector::Classic;
+        /// What happens to tracks analysed by an older version of the analysis (src/app/analyze/stale.rs).
+        analysis_update: AnalysisUpdate = AnalysisUpdate::Ask;
         /// Key Analysis > Write the value to the ID3 tag.
         key_write_tag: bool = false;
         /// Analysis Process.
@@ -140,6 +147,17 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             &[tr!("ANALYZE NOW")],
             usize::MAX,
         ),
+        Row::chips(
+            "analysis_update",
+            tr!("WHEN AN UPDATE CHANGES THE ANALYSIS"),
+            &[
+                tr!("ASK"),
+                tr!("IN THE BACKGROUND"),
+                tr!("WHEN A TRACK IS LOADED"),
+            ],
+            a.analysis_update as usize,
+        )
+        .hint(tr!("tracks analysed by an older version")),
         Row::header(tr!("KEY ANALYSIS")),
         Row::chips(
             "key_detector",
@@ -258,6 +276,7 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::prefs::Section;
 
     fn row(p: &Prefs, key: &str) -> Row {
         rows(p).into_iter().find(|r| r.key == key).unwrap()
@@ -307,6 +326,26 @@ mod tests {
         assert!(
             !row(&p, "key_write_tag").enabled,
             "no key analysis, no key to write"
+        );
+    }
+
+    #[test]
+    fn an_analysis_update_asks_first_until_the_user_chooses_otherwise() {
+        let mut p = Prefs::default();
+        assert_eq!(p.analysis.analysis_update, AnalysisUpdate::Ask);
+        assert_eq!(row(&p, "analysis_update").current, 0);
+        assert!(choose(&mut p, "analysis_update", 1));
+        assert_eq!(p.analysis.analysis_update, AnalysisUpdate::Background);
+        assert!(choose(&mut p, "analysis_update", 2));
+        assert_eq!(p.analysis.analysis_update, AnalysisUpdate::OnLoad);
+        assert_eq!(row(&p, "analysis_update").current, 2);
+        assert_eq!(
+            Section::parse(&mut p.analysis, "analysis_update", "on-load"),
+            Some(true)
+        );
+        assert_eq!(
+            Section::parse(&mut p.analysis, "analysis_update", "later"),
+            Some(false)
         );
     }
 }

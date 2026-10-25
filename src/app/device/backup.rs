@@ -41,7 +41,12 @@ pub(super) fn refresh(cx: &Rc<Ctx>) {
             .map(|b| BackupItem {
                 when: when(b.taken_at).into(),
                 computer: b.computer.clone().into(),
-                device: b.name.clone().into(),
+                device: if b.auto {
+                    format!("{} · {}", b.name, tr!("automatic, before a write"))
+                } else {
+                    b.name.clone()
+                }
+                .into(),
                 fs: b.fs.clone().into(),
                 selected: false,
             })
@@ -131,7 +136,7 @@ pub(super) fn now(
     then: impl FnOnce(&Rc<Ctx>, &Result<String, String>) + 'static,
 ) {
     if !dev.can(Feature::Backup) || !dev.has_library() {
-        return cx.say(&tr!("{} holds no library to back up", dev.label), true);
+        return cx.say(&tr!("{}: there is no library on it to back up. Export to it first.", dev.label), true);
     }
     let typed = cx
         .with_state(|s| s.get_backup_dir().trim().to_owned())
@@ -158,6 +163,7 @@ pub(super) fn now(
                 path: &made.dir.to_string_lossy(),
                 fs: &dev.fs,
                 bg,
+                auto: false,
             })?;
             Ok(tr!(
                 "Backed up the library of {} ({} files) to {}",
@@ -250,13 +256,19 @@ impl Ctx {
         })
     }
 
-    /// Ejects `dev` (a stick or card): after the automatic backup when Preferences ask for one, refused while a job writes to it.
-    /// `confirmed` = the user already agreed to eject the device the library is loaded from.
+    /// Ejects `dev` (a stick or card): after a check of the stick when Preferences ask for one, and after the automatic backup
+    /// when they ask for that, refused while a job writes to it. `confirmed` = the user already agreed to eject the device the
+    /// library is loaded from.
     pub(super) fn eject(self: &Rc<Self>, dev: &Device, confirmed: bool) {
+        self.eject_from(dev, confirmed, false);
+    }
+
+    /// [`Self::eject`]; `checked`: the stick was looked at for this eject already (or the user said to go on).
+    pub(super) fn eject_from(self: &Rc<Self>, dev: &Device, confirmed: bool, checked: bool) {
         let loaded = self.loaded_from(dev);
         if loaded > 0 && !confirmed {
             let d = dev.clone();
-            return self.confirm(&tr!("The library is loaded from {}: {} track(s) play from it and stop working when it is removed. Eject anyway?", dev.label, loaded), tr!("EJECT"), move |c| c.eject(&d, true));
+            return self.confirm(&tr!("The library is loaded from {}: {} track(s) play from it and stop working when it is removed. Eject anyway?", dev.label, loaded), tr!("EJECT"), move |c| c.eject_from(&d, true, checked));
         }
         let refusal = self.job.borrow().as_ref().map(|j| {
             if j.device.as_deref() == Some(dev.id.as_str()) {
@@ -271,6 +283,9 @@ impl Ctx {
         if let Some(msg) = refusal {
             return self.say(&msg, true);
         }
+        if !checked && device_settings::Behaviour::load(&self.store).check_on_eject {
+            return self.check_before_eject(dev, confirmed);
+        }
         let go = |cx: &Rc<Ctx>, dev: &Device| {
             let d = dev.clone();
             cx.start(Some(dev.id.clone()), tr!("Ejecting"), move |_| {
@@ -284,7 +299,7 @@ impl Ctx {
             let d = dev.clone();
             now(self, dev, move |cx, r| match r {
                 Ok(_) => go(cx, &d),
-                Err(e) => cx.say(&tr!("Not ejected: the backup failed ({})", e), true),
+                Err(e) => cx.say(&tr!("Not ejected: the backup failed ({}). Fix that, or switch the backup off in PREFERENCES > DJ SYSTEM, then eject again.", e), true),
             });
         } else {
             go(self, dev);

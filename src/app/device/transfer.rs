@@ -8,18 +8,19 @@
 //! of its own, "Analysing {} of {}…", the Analysis Lock respected), so the cues, grid, waveform and key reach the device; then
 //! the export job ("Transferring…") builds its snapshot from what the collection holds by then. Both show in the status bar.
 
-use super::{BUSY, Ctx, DeviceState, record_all, toast};
-use crate::app::{BrowserState, analyze, browser};
+use super::preview::{Build, Built, Target};
+use super::{record_all, toast, Ctx, DeviceState, BUSY};
+use crate::app::{analyze, browser, BrowserState};
 use openfader::{
     analysis::{Analysis, cache},
     device::{
-        self, Device,
-        export::export,
-        link,
+        self, link,
+        plan::Speeds,
         transfer::{self, Plan},
+        Device,
     },
-    library::{Track, snapshot::Snapshot},
-    plugin::device::{Feature, Provider},
+    library::{snapshot::Snapshot, Track},
+    plugin::device::Feature,
     store,
 };
 use parking_lot::Mutex;
@@ -29,6 +30,7 @@ use std::{
     collections::HashMap,
     rc::{Rc, Weak},
     sync::Arc,
+    time::Instant,
 };
 
 /// A playlist of a device as the browser's tree shows it: its id in the device's library and its names from the top level down.
@@ -53,10 +55,12 @@ enum Pack {
     Playlist(String),
 }
 
-/// [`Pack`] read from the library: what the export job writes, with the analysis the library has now.
+/// [`Pack`] read from the library: what the export job writes, with the analysis the library has now. Cheap to clone: the
+/// preview and the write each build from it.
+#[derive(Clone)]
 enum Gathered {
-    Tracks(Vec<(Track, Option<Analysis>)>),
-    Playlist(Snapshot),
+    Tracks(Arc<Vec<(Track, Option<Analysis>)>>),
+    Playlist(Arc<Snapshot>),
 }
 
 impl Gathered {
@@ -146,8 +150,8 @@ impl Ctx {
         }
     }
 
-    /// Checks the device and what is sent, analyses what needs it (`analysed`: that has been done), then writes. `None`: refused,
-    /// and said so in the window's status line.
+    /// Checks the device and what is sent; then, unless it was analysed and confirmed before (`analysed`), the preview card, the
+    /// analysis of what needs it and the write. `None`: refused, and said so in the window's status line.
     fn transfer(self: &Rc<Self>, to: &Dest, pack: Pack, analysed: bool) -> Option<()> {
         if self.busy() {
             self.say(crate::app::i18n::tr_dyn(BUSY), true);
@@ -159,11 +163,24 @@ impl Ctx {
         }
         let writers = self.writers(&d)?;
         let g = self.gather(&pack)?;
-        if !analysed && let Some(batch) = analyze::batch(&g.todo()) {
-            self.analyse(&d, batch, to.clone(), pack);
+        let t = Target::new(self, Some(&d), d.mount.clone(), writers, false);
+        if analysed {
+            self.write_transfer(d, t, to, g);
             return Some(());
         }
-        self.write(d, writers, to, g);
+        let batch = analyze::batch(&g.todo());
+        let analyse = batch.as_ref().map_or(0, |b| b.len());
+        let (bd, bto, bg) = (d.clone(), to.clone(), g.clone());
+        let (go_t, dest) = (t.clone(), to.clone());
+        self.gate(
+            &t,
+            analyse,
+            || self.transfer_build(&bd, &bto, bg),
+            move |cx| match batch {
+                Some(batch) => cx.analyse(&d, batch, dest, pack),
+                None => cx.write_transfer(d, go_t, &dest, g),
+            },
+        );
         Some(())
     }
 
@@ -183,14 +200,14 @@ impl Ctx {
                 for (t, beats, cues) in self.decks.iter().filter_map(|d| d.session()) {
                     s.override_session(&t, beats, cues);
                 }
-                Some(Gathered::Tracks(s.into_tracks()))
+                Some(Gathered::Tracks(Arc::new(s.into_tracks())))
             }
             Pack::Playlist(id) => {
                 let narrowed = self.snapshot()?.narrowed(&[id.as_str()]);
                 if narrowed.is_none() {
                     self.say(tr!("That playlist has no tracks to transfer"), true);
                 }
-                narrowed.map(Gathered::Playlist)
+                narrowed.map(|s| Gathered::Playlist(Arc::new(s)))
             }
         }
     }
@@ -198,7 +215,7 @@ impl Ctx {
     /// Job 1: the analysis of `batch`; the transfer goes on when it ends.
     fn analyse(self: &Rc<Self>, d: &Device, batch: analyze::Batch, to: Dest, pack: Pack) {
         let found = Arc::new(Mutex::new(Vec::new()));
-        let (out, store, n) = (found.clone(), self.store.clone(), batch.len());
+        let (out, store, n, id) = (found.clone(), self.store.clone(), batch.len(), d.id.clone());
         self.mirror.set(true);
         self.start_then(
             Some(d.id.clone()),
@@ -206,9 +223,14 @@ impl Ctx {
             move |ctl| {
                 let say = |done: usize| ctl.set_phase(&tr!("Analysing {} of {}…", done, n));
                 say(0);
-                let r = batch.run(store, &|| ctl.cancelled(), &say);
+                let started = Instant::now();
+                let r = batch.run(store.clone(), &|| ctl.cancelled(), &say);
                 if ctl.cancelled() {
                     return Err("cancelled".into());
+                }
+                if n > 0 {
+                    let analyse_s = Some(started.elapsed().as_secs_f64() / n as f64);
+                    Speeds::remember(&store, &id, Speeds { analyse_s, ..Speeds::default() });
                 }
                 *out.lock() = r;
                 Ok(String::new())
@@ -240,71 +262,85 @@ impl Ctx {
         }
     }
 
-    /// Job 2: builds the snapshot (a playlist target: the playlist's current members, then the new tracks) and exports it.
-    fn write(self: &Rc<Self>, d: Device, writers: Vec<Provider>, to: &Dest, g: Gathered) {
+    /// What a transfer writes, built on the worker: a playlist target is the playlist's current members, then the new tracks.
+    /// Used by the preview and by the write, which both start from the collection as it is then.
+    fn transfer_build(&self, d: &Device, to: &Dest, g: Gathered) -> Build {
         let list = to.list.clone();
         let collection = list.as_ref().and_then(|_| self.lib.tracks_all().ok());
         let reader = self
             .lib
             .analysis_reader()
             .unwrap_or_else(|| Arc::new(|_: &Track| None));
-        let (o, store, id) = (self.options(Some(&d)), self.store.clone(), d.id.clone());
+        let (store, d) = (self.store.clone(), d.clone());
+        Box::new(move |_| {
+            let picked = matches!(g, Gathered::Tracks(_));
+            let mut plan = match (g, list) {
+                (Gathered::Playlist(snapshot), _) => Plan {
+                    added: snapshot.len(),
+                    skipped: 0,
+                    snapshot: (*snapshot).clone(),
+                },
+                (Gathered::Tracks(picks), None) => Plan {
+                    added: picks.len(),
+                    skipped: 0,
+                    snapshot: Snapshot::of_tracks((*picks).clone()),
+                },
+                (Gathered::Tracks(picks), Some(list)) => {
+                    let lib = device::open_library(&d)?;
+                    let pls = lib.playlists()?;
+                    let at = transfer::find(&pls, &list.id, &list.path)
+                        .ok_or(tr!("That playlist is not on the device any more"))?;
+                    let all = collection.unwrap_or_default();
+                    let own: HashMap<String, &Track> =
+                        all.iter().map(|t| (store::key(t), t)).collect();
+                    let current = transfer::members(&*lib, &at.id, &own, &|t| {
+                        Some(link::collection_analysis(&reader, &store, t))
+                    })?;
+                    let (name, folders) = list.path.split_last().ok_or("a playlist without a name")?;
+                    transfer::append((*picks).clone(), current, folders, name)
+                }
+            };
+            let idle = (plan.added == 0).then(|| {
+                tr_n!(
+                    "Nothing transferred: {n} track is in {} already",
+                    "Nothing transferred: {n} tracks are in {} already",
+                    plan.skipped,
+                    d.label
+                )
+            });
+            // Colours and tags of picked tracks go along (a playlist snapshot has its own); a track the collection does not
+            // know has none.
+            if picked && idle.is_none() && let Err(e) = plan.snapshot.add_store_marks(&store) {
+                eprintln!("transfer: {e}");
+            }
+            Ok(Built {
+                snap: Arc::new(plan.snapshot),
+                added: plan.added,
+                skipped: plan.skipped,
+                idle,
+            })
+        })
+    }
+
+    /// Job 2: the write (backup first, then the export).
+    fn write_transfer(self: &Rc<Self>, d: Device, t: Target, to: &Dest, g: Gathered) {
+        let build = self.transfer_build(&d, to, g);
+        let (store, id) = (self.store.clone(), d.id.clone());
         self.mirror.set(true);
-        self.start_then(
-            Some(id.clone()),
+        self.write(
+            t,
             tr!("Transferring"),
-            move |ctl| {
-                ctl.set_phase(tr!("Transferring…"));
-                let picked = matches!(g, Gathered::Tracks(_));
-                let mut plan = match (g, list) {
-                    (Gathered::Playlist(snapshot), _) => Plan {
-                        added: snapshot.len(),
-                        skipped: 0,
-                        snapshot,
-                    },
-                    (Gathered::Tracks(picks), None) => Plan {
-                        added: picks.len(),
-                        skipped: 0,
-                        snapshot: Snapshot::of_tracks(picks),
-                    },
-                    (Gathered::Tracks(picks), Some(list)) => {
-                        let lib = device::open_library(&d)?;
-                        let pls = lib.playlists()?;
-                        let at = transfer::find(&pls, &list.id, &list.path)
-                            .ok_or(tr!("That playlist is not on the device any more"))?;
-                        let all = collection.unwrap_or_default();
-                        let own: HashMap<String, &Track> =
-                            all.iter().map(|t| (store::key(t), t)).collect();
-                        let current = transfer::members(&*lib, &at.id, &own, &|t| {
-                            Some(link::collection_analysis(&reader, &store, t))
-                        })?;
-                        let (name, folders) = list.path.split_last().ok_or("a playlist without a name")?;
-                        transfer::append(picks, current, folders, name)
-                    }
-                };
-                if plan.added == 0 {
-                    return Ok(tr_n!(
-                        "Nothing transferred: {n} track is in {} already",
-                        "Nothing transferred: {n} tracks are in {} already",
-                        plan.skipped,
-                        d.label
-                    ));
-                }
-                // Colours and tags of picked tracks go along (a playlist snapshot has its own); a track the collection does not
-                // know has none.
-                if picked && let Err(e) = plan.snapshot.add_store_marks(&store) {
-                    eprintln!("transfer: {e}");
-                }
-                let done = export(&writers, &d.mount, &plan.snapshot, &o, &ctl)?;
-                let detail = record_all(&store, Some(&d), &done, &d.label)?;
+            build,
+            move |b, done| {
+                let detail = record_all(&store, Some(&d), done, &d.label)?;
                 let mut text = tr_n!(
                     "{n} track transferred to {}",
                     "{n} tracks transferred to {}",
-                    plan.added,
+                    b.added,
                     d.label
                 );
-                if plan.skipped > 0 {
-                    text += &tr!(" ({} already there)", plan.skipped);
+                if b.skipped > 0 {
+                    text += &tr!(" ({} already there)", b.skipped);
                 }
                 let noisy = done
                     .iter()

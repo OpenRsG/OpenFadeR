@@ -4,8 +4,39 @@
 //! (`/dev/disk4s1`), [`Device::id`] the mount path (the volume UUID would need DiskArbitration). An SD card cannot be told from a
 //! stick here, so every device is [`Kind::Usb`].
 
-use super::{Device, Kind, Support};
-use std::ffi::CStr;
+use super::{format::parse, Device, Kind, Support};
+use parking_lot::Mutex;
+use std::{
+    collections::HashMap,
+    ffi::CStr,
+    process::Command,
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
+
+/// The partition table per whole disk, asked from `diskutil` at most once a minute (the scan runs every second).
+static TABLES: LazyLock<Mutex<HashMap<String, (Instant, String)>>> = LazyLock::new(Mutex::default);
+
+/// Forgets the cached tables (after a disk was formatted).
+pub(super) fn forget_tables() {
+    TABLES.lock().clear();
+}
+
+/// `dos` / `gpt` of the disk behind BSD device `source` (`/dev/disk4s1`); empty while unknown.
+fn table(source: &str) -> String {
+    let Some(whole) = parse::mac_whole(source) else {
+        return String::new();
+    };
+    if let Some((at, t)) = TABLES.lock().get(&whole)
+        && at.elapsed() < Duration::from_secs(60)
+    {
+        return t.clone();
+    }
+    let out = Command::new("diskutil").args(["info", "-plist", &format!("/dev/{whole}")]).output();
+    let t = out.map_or_else(|_| String::new(), |o| parse::table_from_diskutil(&String::from_utf8_lossy(&o.stdout)));
+    TABLES.lock().insert(whole, (Instant::now(), t.clone()));
+    t
+}
 
 fn text(c: &[libc::c_char]) -> String {
     // SAFETY: the kernel fills these fixed buffers with NUL-terminated strings.
@@ -41,8 +72,10 @@ pub(super) fn mounted() -> Vec<Device> {
             point.starts_with("/Volumes/").then(|| {
                 let fs = text(&m.f_fstypename);
                 let support = Support::of(&fs, Kind::Usb);
+                let source = text(&m.f_mntfromname);
                 Device {
-                    source: text(&m.f_mntfromname),
+                    table: table(&source),
+                    source,
                     read_only: m.f_flags & libc::MNT_RDONLY as u32 != 0,
                     ..Device::new(point.clone(), point.into(), fs, Kind::Usb, support)
                 }

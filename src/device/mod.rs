@@ -14,16 +14,21 @@
 //! Children: [`eject`] (unmount + power off), [`backup`] (copy the plugin's backup folders, restore them), [`export`] (several
 //! library formats on one device), [`sync`] (Sync Manager), [`update`] (Update Collection: apply what the plugin read back),
 //! [`link`] (cue sync between the collection and the device copy of a track), [`history`] (import the players' play
-//! histories), [`plug`] (mount a stick nobody mounted, read its library files with progress).
+//! histories), [`plug`] (mount a stick nobody mounted, read its library files with progress), [`format`] (erase a whole stick
+//! or card and make one MBR partition, FAT32 or exFAT; the partition table each device is on is read at the scan: `Device::table`).
 
 pub mod backup;
+pub mod check;
 pub mod eject;
 pub mod export;
+pub mod format;
 pub mod history;
 pub mod link;
+pub mod plan;
 pub mod plug;
 pub mod sync;
 pub mod transfer;
+pub mod undo;
 pub mod update;
 
 #[cfg_attr(target_os = "linux", path = "linux.rs")]
@@ -101,6 +106,8 @@ pub struct Device {
     pub label: String,
     /// Kernel file system name: `vfat`, `exfat`, `ntfs3`, …
     pub fs: String,
+    /// Partition table of the disk it is on: `dos` (MBR), `gpt`, empty while unknown.
+    pub table: String,
     pub kind: Kind,
     pub support: Support,
     pub read_only: bool,
@@ -128,6 +135,7 @@ impl Device {
             ),
             source: String::new(),
             fs,
+            table: String::new(),
             kind,
             support,
             read_only: false,
@@ -153,6 +161,12 @@ impl Device {
     /// Whether the plugin offers `f` for this device.
     pub fn can(&self, f: plugin::device::Feature) -> bool {
         self.info.features.contains(&f)
+    }
+
+    /// The largest file its file system holds: FAT (FAT16 / FAT32) stops at 4 GiB - 1.
+    pub fn max_file(&self) -> Option<u64> {
+        matches!(self.fs.as_str(), "vfat" | "msdos" | "fat" | "fat32")
+            .then_some(u64::from(u32::MAX))
     }
 
     /// The formats an export writes when the user picked none for this device: those whose library is on it, else all (a blank
@@ -199,7 +213,7 @@ impl Device {
         !self.read_only && !matches!(self.support, Support::Unsupported(_))
     }
 
-    /// "FAT32 · 3.2 GB free of 14.9 GB".
+    /// "FAT32 · MBR · 3.2 GB free of 14.9 GB" (the partition table when it is known).
     pub fn summary(&self) -> String {
         let fs = match self.fs.as_str() {
             "vfat" => "FAT32".to_owned(),
@@ -209,6 +223,12 @@ impl Device {
             "ntfs" | "ntfs3" | "fuseblk" => "NTFS".into(),
             other => other.to_uppercase(),
         };
+        let table = match self.table.as_str() {
+            "dos" => " · MBR",
+            "gpt" => " · GPT",
+            _ => "",
+        };
+        let fs = fs + table;
         if self.total == 0 {
             fs
         } else {
@@ -388,6 +408,25 @@ mod tests {
         let v = pretend_devices(&spec);
         assert_eq!(v.len(), 1);
         assert!(v[0].writable() && v[0].fs == "vfat" && v[0].mount == dir);
+    }
+
+    #[test]
+    fn the_summary_names_the_partition_table_when_it_is_known() {
+        let mut d = Device::new(
+            "id".into(),
+            "/run/media/dj/KEY".into(),
+            "vfat".into(),
+            Kind::Usb,
+            Support::Ok,
+        );
+        (d.total, d.free) = (14_900_000_000, 3_200_000_000);
+        assert_eq!(d.summary(), "FAT32 · 3.2 GB free of 14.9 GB");
+        d.table = "dos".into();
+        assert_eq!(d.summary(), "FAT32 · MBR · 3.2 GB free of 14.9 GB");
+        d.table = "gpt".into();
+        assert_eq!(d.summary(), "FAT32 · GPT · 3.2 GB free of 14.9 GB");
+        d.total = 0;
+        assert_eq!(d.summary(), "FAT32 · GPT");
     }
 
     #[test]

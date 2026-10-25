@@ -8,13 +8,14 @@ import { ArtCandidate, ArtworkState } from "artwork.slint";
 import { CueRowView, PadOpt, PadView, PadsState } from "pads.slint";
 import { HelpOverlay, HelpLine, KeysState } from "help.slint";
 import { AboutOverlay, AboutState } from "about.slint";
-import { UpdateOverlay, UpdateState } from "update.slint";
+import { AnalysisNotice, AnalysisNoticeState, UpdateOverlay, UpdateState } from "update.slint";
 import { ReportOverlay, ReportState } from "report.slint";
 import { WelcomeOverlay, WelcomeState, SuggestView } from "welcome.slint";
 import { StemsModelCard, StemsModelState } from "stems-model.slint";
 import { MidiChip, MidiOverlay, MidiState } from "midi.slint";
-import { ActionItem, BackupItem, DeviceChip, DeviceItem, DeviceOverlay, DeviceProgress, DeviceState, FormatItem, FormatOption, PickRow } from "device.slint";
-import { DupeRow, LibraryOverlays, LibraryState, MissingRow } from "library.slint";
+import { ActionItem, BackupItem, CompareRow, DeviceChip, DeviceItem, DeviceOverlay, DeviceProgress, DeviceState, FormatItem, FormatOption, PickRow, ReviewRow } from "device.slint";
+import { CheckLib, CheckPlayer, CheckPreset, CheckProblem } from "device.slint";
+import { DupeRow, ImportReportState, ImportSkipRow, LibraryOverlays, LibraryState, MissingRow } from "library.slint";
 import { PrefsOverlay, PrefsState, PrefRowData } from "prefs.slint";
 import { KeymapState } from "prefs-keyboard.slint";
 import { DjEditor, DjItem, DjSystemState } from "prefs-djsystem.slint";
@@ -46,6 +47,7 @@ export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowVie
 export { DrumSlotView, GrooveDeckView, GrooveState, HotCue, PhraseSeg }
 export { FxRackState, RackView, FxSlot }
 export { ActionItem, FormatItem, FormatOption }
+export { CheckLib, CheckPlayer, CheckPreset, CheckProblem }
 export { ArtCandidate, ArtworkState } // FIND ARTWORK (ui/artwork.slint, src/app/artwork)
 export { Palette } // the std widgets' colour scheme follows the skin's base (src/app/skin)
 export { FileDropState } // files dragged in from the desktop (src/app/drop)
@@ -53,10 +55,11 @@ export { ThemeCard, ThemeState, TokenRow } // PREFS > THEMES (ui/themes.slint, s
 export { StudioState } // the studio workspace's clock (ui/studio/, src/app/studio.rs)
 export { CatalogState, GetMapping, GetPlugin, GetTheme, RepoView } // GET PLUGINS / THEMES / MAPPINGS (ui/catalog.slint, src/app/catalog)
 export { AboutState } // Help > About (ui/about.slint, src/app/about.rs)
-export { UpdateState } // the update check and one-click update (ui/update.slint, src/app/update.rs)
+export { UpdateState, AnalysisNoticeState } // the update check and one-click update, the notice of an update changing the analysis (ui/update.slint, src/app/update.rs, src/app/analyze/stale.rs)
 export { ReportState } // Help > Report a Problem and the crash offer (ui/report.slint, src/app/diag.rs)
 export { WelcomeState, SuggestView } // first start and Help > Welcome (ui/welcome.slint, src/app/welcome.rs)
 export { StemsModelState } // STEMS model download (ui/stems-model.slint, src/app/stems_model.rs)
+export { ImportReportState, ImportSkipRow } // the report that ends an import, File > Library > Last Import Report… (ui/import-report.slint, src/app/library/report.rs)
 
 /// PERFORMANCE layouts: global bar, [FX], then either the enlarged waveforms stacked full width
 /// above the deck row (2Deck / 4Deck Horizontal) or standing side by side between the decks (2Deck / 4Deck Vertical), the deck row (decks
@@ -212,6 +215,7 @@ export component App inherits Window {
                 MenuItem { title: @tr("Backup Library…"); activated => { LibraryState.action("backup"); } }
                 MenuItem { title: @tr("Restore Library…"); activated => { LibraryState.action("restore"); } }
                 MenuItem { title: @tr("Backed up device library management…"); activated => { DeviceState.manage-backups(); } }
+                MenuItem { title: ImportReportState.has-report ? @tr("Last Import Report…") : @tr("Last Import Report: no import yet"); enabled: ImportReportState.has-report; activated => { ImportReportState.show(); } }
             }
             Menu {
                 title: @tr("Export Collection");
@@ -555,6 +559,7 @@ export component App inherits Window {
     AboutOverlay {}
     ReportOverlay {}
     UpdateOverlay {}
+    AnalysisNotice {}
     WelcomeOverlay {}
     StemsModelCard { x: root.width - self.width - Theme.space-xl; y: root.height - self.height - Theme.h-bar - Theme.space-xl; } // above the dialogs: it runs on while they are open
     }

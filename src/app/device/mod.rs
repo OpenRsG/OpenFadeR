@@ -15,6 +15,10 @@
 //! from the Devices tree), [`link`] (cue sync between the collection and the device copies of a track), [`formats`] (which
 //! library formats a device gets: UNIVERSAL or the ticked ones, and their options).
 //!
+//! Every write to a device (export, sync, transfer) goes through [`preview`] (the card that shows what it will write, and the question
+//! a plugged-in device asks) and then [`Ctx::write`] in [`job`]: [`safety`] first finishes an interrupted change and backs the
+//! library up, [`pace`] shows the speed and the time left and learns the device's write speed for the next preview.
+//!
 //! `Rc<dyn Library>` cannot leave the UI thread, so a press snapshots the cheap part there ([`Ctx::snapshot`]: the overlaid
 //! tracks, the store's colours / tags / user playlists, the decks' session edits) and the work runs on a worker with a
 //! [`Control`] the timer polls and the cancel button sets. Only one job runs at a time.
@@ -26,21 +30,29 @@
 
 mod actions;
 mod backup;
+mod check;
 mod export;
+mod format; // Formatter
 mod formats;
 mod job;
 mod link;
+mod pace;
 mod pick;
+mod preview;
+mod safety;
+mod review;
 mod scan;
 mod sync;
 mod transfer;
+mod verify;
 
 pub use link::{track_edited, track_loading};
 pub use transfer::{drop_playlist, drop_tracks, Dest, List};
+pub use verify::verify;
 
 use super::{
-    deck::Decks, toast, ActionItem, App, BackupItem, DeviceItem, DeviceState, FormatItem,
-    FormatOption, PickRow,
+    deck::Decks, toast, ActionItem, App, BackupItem, CheckLib, CheckPlayer, CheckPreset,
+    CheckProblem, DeviceItem, DeviceState, FormatItem, FormatOption, PickRow, PreviewRow,
 };
 use openfader::{
     device::{self, Device, export::Written},
@@ -70,6 +82,9 @@ struct Job {
     device: Option<String>,
     /// The status line and its error colour when the job started: shown again when the job has nothing to report.
     before: (String, bool),
+    pace: pace::Pace,
+    /// Started by the app itself (an [`Auto`]): its report goes under the one it follows ([`Ctx::report`]).
+    auto: bool,
     then: Then,
 }
 
@@ -114,6 +129,18 @@ pub(super) struct Ctx {
     /// Cue sync: per device id, the tracks whose device copy is to be written (by key; `Some` = a track only the device has,
     /// written from its own analysis) and the time of the last edit.
     pushes: RefCell<HashMap<String, (Option<Instant>, BTreeMap<String, Option<Track>>)>>,
+    /// The preview card, the sync question and what they start ([`preview`]).
+    prep: preview::Prep,
+    /// The stick checks ([`check`]).
+    check: check::State,
+    /// BringBack: what the review dialog shows now ([`review`]).
+    review: RefCell<Option<review::Review>>,
+    /// BringBack: per device id, the tracks whose cues differ between the collection and the device ([`review`]).
+    conflicts: RefCell<HashMap<String, Vec<openfader::device::link::Conflict>>>,
+    /// BringBack: device copies to write back with the next push, by (device id, key): what an undo of a cue sync restores.
+    restores: RefCell<HashMap<(String, String), openfader::device::link::Marks>>,
+    /// BringBack: the kept import the undo bar offers (0 = none).
+    undo_bar: Cell<i64>,
 }
 
 struct Models {
@@ -124,6 +151,9 @@ struct Models {
     formats: Rc<VecModel<FormatItem>>,
     /// The labels of the devices the track menu's "Transfer to" lists ([`transfer`]).
     targets: Rc<VecModel<SharedString>>,
+    /// BringBack: the rows of the review dialog and of the compare view ([`review`]).
+    review: Rc<VecModel<super::ReviewRow>>,
+    compare: Rc<VecModel<super::CompareRow>>,
 }
 
 /// Keeps the timer (and with it the whole window logic) alive for as long as the window runs.
@@ -241,7 +271,10 @@ impl Ctx {
     fn device_or_say(&self, id: &str) -> Option<Device> {
         let d = self.device(id);
         if d.is_none() {
-            self.say(tr!("That device is not mounted any more"), true);
+            self.say(
+                tr!("That stick is not connected any more. Plug it in again, then try once more."),
+                true,
+            );
         }
         d
     }
@@ -250,7 +283,10 @@ impl Ctx {
     fn on_current(self: &Rc<Self>, f: impl FnOnce(&Rc<Self>, &Device)) {
         match self.current() {
             Some(d) => f(self, &d),
-            None => self.say(tr!("Choose a device first"), true),
+            None => self.say(
+                tr!("No device is chosen. Pick one in the list on the left."),
+                true,
+            ),
         }
     }
 
@@ -262,7 +298,7 @@ impl Ctx {
                 &format!(
                     "{}: {}",
                     d.label,
-                    d.support.message().unwrap_or(tr!("mounted read-only"))
+                    d.support.message().unwrap_or(tr!("it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"))
                 ),
                 true,
             );
@@ -293,15 +329,18 @@ impl Ctx {
         })
     }
 
-    /// What an export to `dev` (or a plain folder) is configured with: the free space, the device's settings, the Cue Banks.
+    /// What an export to `dev` (or a plain folder) is configured with: the free space, the largest file its file system holds,
+    /// the device's settings, the Cue Banks.
     fn options(&self, dev: Option<&Device>) -> ExportOptions {
         ExportOptions {
             free: dev.and_then(|d| device::space(&d.mount)).map(|s| s.1),
+            max_file: dev.and_then(Device::max_file),
             config: device_settings::config(&self.store, dev.map_or("", |d| d.id.as_str())),
             banks: store::collect_banks(&self.store).unwrap_or_else(|e| {
                 eprintln!("cue banks: {e}");
                 Vec::new()
             }),
+            dry_run: false,
         }
     }
 
@@ -309,13 +348,14 @@ impl Ctx {
     fn provider_for(&self, d: &Device, f: Feature) -> Option<Provider> {
         let p = d.provider().filter(|_| d.can(f));
         if p.is_none() {
-            self.say(&tr!("{}: its plugin does not offer that", d.label), true);
+            self.say(&tr!("{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports.", d.label), true);
         }
         p
     }
 
     /// Asks `text`; "yes" (button `yes`) runs `then`.
     fn confirm(&self, text: &str, yes: &str, then: impl FnOnce(&Rc<Ctx>) + 'static) {
+        self.drop_alt();
         *self.ask.borrow_mut() = Some(Box::new(then));
         self.with_state(|s| {
             s.set_confirm_text(text.into());
@@ -334,11 +374,13 @@ impl Ctx {
             let Some(dev) = self.device(&id) else {
                 continue;
             };
+            self.prep.automatic.set(true);
             match what {
                 Auto::History => actions::import_histories(self, &dev, true),
                 Auto::Sync => sync::run(self, &dev, true),
                 Auto::Link => self.link(&dev),
             }
+            self.prep.automatic.set(false);
         }
     }
 }
@@ -383,9 +425,17 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
             backups: Rc::default(),
             formats: Rc::default(),
             targets: Rc::default(),
+            review: Rc::default(),
+            compare: Rc::default(),
         },
         links: RefCell::default(),
         pushes: RefCell::default(),
+        prep: preview::Prep::default(),
+        check: check::State::default(),
+        review: RefCell::default(),
+        conflicts: RefCell::default(),
+        restores: RefCell::default(),
+        undo_bar: Cell::new(0),
     });
     let s = app.global::<DeviceState>();
     s.set_devices(ModelRc::from(cx.models.devices.clone()));
@@ -404,6 +454,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     });
     s.set_export_rows(ModelRc::from(cx.export.rows.clone()));
     s.set_sync_rows(ModelRc::from(cx.sync.rows.clone()));
+    preview::wire(&cx, app);
     s.set_backup_dir(
         device::backup::default_dir()
             .map(|p| p.to_string_lossy().into_owned())
@@ -420,11 +471,22 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
             .map(|d| d.id.clone());
         *c.current.borrow_mut() = id;
         c.show_current();
+        c.show_check();
+        if let Some(d) = c.current().filter(|d| !c.seen(&d.id)) {
+            c.recheck(&d.id);
+        }
         sync::refresh(&c);
+        c.refresh_counts(); // BringBack
     });
     let c = cx.clone();
     s.on_opened(move || {
         c.refresh_devices();
+        if let Some(d) = c
+            .current()
+            .filter(|_| c.with_state(|s| s.get_tab()) == Some(0))
+        {
+            c.recheck(&d.id);
+        }
         export::refresh(&c, true);
         sync::refresh(&c);
         backup::refresh(&c);
@@ -440,6 +502,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     s.on_confirmed(move |yes| {
         let then = c.ask.borrow_mut().take();
         c.with_state(|s| s.set_confirm_open(false));
+        c.drop_alt();
         if let (true, Some(then)) = (yes, then) {
             then(&c);
         }
@@ -447,9 +510,12 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     export::wire(&cx, app);
     sync::wire(&cx, app);
     backup::wire(&cx, app);
+    format::wire(&cx, app); // Formatter
     actions::wire(&cx, app);
     link::register(&cx);
     transfer::wire(&cx, app);
+    Ctx::wire_check(&cx, app);
+    review::wire(&cx, app); // BringBack
 
     let c = cx.clone();
     let timer = Timer::default();
@@ -460,6 +526,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
             c.refresh_devices();
         }
         c.run_autos();
+        c.run_checks();
         c.run_pushes();
     });
     Guard {

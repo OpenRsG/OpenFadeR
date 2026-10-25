@@ -33,6 +33,84 @@ fn zip_error(e: zip::Error) -> String {
     }
 }
 
+/// Automatic backups (before an update) are named `OpenFadeR-backup-auto-<stamp>-v<version>-s<schema>.zip`: the stamp sorts by
+/// time, the version and the store schema say which build wrote the library in it.
+const AUTO: &str = "OpenFadeR-backup-auto-";
+
+/// The store schema this build reads and writes (what `PRAGMA user_version` counts).
+pub fn schema() -> usize {
+    MIGRATIONS.len()
+}
+
+/// The schema of the store file `db`; `None` when it is missing or is no store.
+pub fn file_schema(db: &Path) -> Option<usize> {
+    let c = Connection::open_with_flags(db, OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
+    c.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+        .ok()
+        .map(|v| v as usize)
+}
+
+/// `<data folder>/backups`: where automatic backups go.
+pub fn auto_dir() -> Option<PathBuf> {
+    Some(crate::paths::data_dir()?.join("backups"))
+}
+
+/// The store `db` was migrated by a newer build than the one being rolled back to (`schema` is the highest it reads):
+/// the automatic backup `backup` took its place and the newer store stays beside it as `kept`.
+#[derive(Debug, PartialEq)]
+pub struct RolledBack {
+    pub backup: PathBuf,
+    pub kept: PathBuf,
+}
+
+/// Puts the library of `backup` in the place of the store `db` when `db` is newer than `schema`; `Ok(None)` when it is not
+/// (nothing to do) and an error, with everything as it was, when the backup cannot be used. The newer store is renamed
+/// `store.v<its schema>.db` (with its `-wal` / `-shm`), never deleted. Works on the files, so the app may still have the
+/// store open: it ends right after.
+pub fn roll_back_store(db: &Path, backup: &Path, schema: usize) -> R<Option<RolledBack>> {
+    let Some(have) = file_schema(db).filter(|&h| h > schema) else {
+        return Ok(None);
+    };
+    let mut z = Zip::open(backup).map_err(zip_error)?;
+    let bytes = z.read(STORE).map_err(zip_error)?;
+    let staged = db.with_extension("restore.tmp");
+    at(std::fs::write(&staged, bytes), &staged)?;
+    if file_schema(&staged).is_none_or(|s| s > schema) {
+        let _ = std::fs::remove_file(&staged);
+        return Err(format!(
+            "{}: the backup's library is not readable by the version rolled back to",
+            backup.display()
+        ));
+    }
+    // Folds the write-ahead log into the file, so the file alone is the whole newer library.
+    if let Ok(c) = Connection::open(db) {
+        let _ = c.pragma_update(None, "wal_checkpoint", "TRUNCATE");
+    }
+    let kept = (1..)
+        .map(|n| match n {
+            1 => db.with_file_name(format!("store.v{have}.db")),
+            n => db.with_file_name(format!("store.v{have}-{n}.db")),
+        })
+        .find(|p| !p.exists())
+        .expect("an unused name");
+    let side = |p: &Path, s: &str| {
+        let mut n = p.as_os_str().to_owned();
+        n.push(s);
+        PathBuf::from(n)
+    };
+    for s in ["", "-wal", "-shm"] {
+        let from = side(db, s);
+        if from.exists() {
+            at(std::fs::rename(&from, side(&kept, s)), &from)?;
+        }
+    }
+    at(std::fs::rename(&staged, db), &staged)?;
+    Ok(Some(RolledBack {
+        backup: backup.to_owned(),
+        kept,
+    }))
+}
+
 /// What [`Store::backup`] made.
 #[derive(Debug)]
 pub struct Backup {
@@ -106,6 +184,36 @@ impl Store {
             music: copied,
             music_failed: failed,
         })
+    }
+
+    /// The backup UPDATE NOW makes first: [`Store::backup`] named by [`AUTO`] (no music), then only the newest `keep`
+    /// automatic backups stay in `dir`. Returns the zip.
+    pub fn backup_auto(
+        &self,
+        dir: &Path,
+        settings: Option<&Path>,
+        version: &str,
+        stamp: &str,
+        keep: usize,
+    ) -> R<PathBuf> {
+        let tag = format!("auto-{stamp}-v{version}-s{}", schema());
+        let zip = self.backup(dir, settings, &[], &tag)?.zip;
+        let mut old: Vec<(std::time::SystemTime, PathBuf)> = std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|e| {
+                let n = e.file_name();
+                let n = n.to_string_lossy();
+                n.starts_with(AUTO) && n.ends_with(".zip")
+            })
+            .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
+            .collect();
+        old.sort();
+        for (_, p) in old.iter().rev().skip(keep.max(1)) {
+            let _ = std::fs::remove_file(p);
+        }
+        Ok(zip)
     }
 
     /// Replaces our data with the backup in `zip`; music is copied back from `MUSIC_DIR` beside the zip where the original
@@ -320,6 +428,101 @@ mod tests {
         let b = s.backup(&d, None, &[], "t").unwrap();
         s.restore(&b.zip).unwrap();
         assert_eq!(s.connections().unwrap()[0].last_seq, 0);
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn automatic_backups_are_named_by_build_and_only_the_last_three_stay() {
+        let d = std::env::temp_dir().join(format!("openfader-backup-auto-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let s = Store::in_memory().unwrap();
+        let mut made = Vec::new();
+        for i in 0..5 {
+            let zip = s
+                .backup_auto(&d, None, "0.2.5", &format!("20260101-00000{i}"), 3)
+                .unwrap();
+            // Distinct, increasing times whatever the file system's clock grain.
+            let at = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000 + i);
+            std::fs::File::options()
+                .write(true)
+                .open(&zip)
+                .unwrap()
+                .set_modified(at)
+                .unwrap();
+            made.push(zip);
+        }
+        let left: Vec<bool> = made.iter().map(|z| z.exists()).collect();
+        assert_eq!(left, [false, false, true, true, true]);
+        assert_eq!(
+            made[4].file_name().unwrap().to_string_lossy(),
+            format!(
+                "OpenFadeR-backup-auto-20260101-000004-v0.2.5-s{}.zip",
+                schema()
+            )
+        );
+        // A manual backup in the same folder is never pruned.
+        let manual = s.backup(&d, None, &[], "mine").unwrap().zip;
+        s.backup_auto(&d, None, "0.2.5", "20260101-000009", 3)
+            .unwrap();
+        assert!(manual.exists());
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    /// A store file at `db` holding rating 5 for `k`, then marked as written by a build with `extra` more migrations.
+    fn store_file(db: &Path, k: &str, extra: i64) {
+        let s = Store::open_at(db).unwrap();
+        s.set_rating(k, Some(5)).unwrap();
+        drop(s);
+        Connection::open(db)
+            .unwrap()
+            .pragma_update(None, "user_version", MIGRATIONS.len() as i64 + extra)
+            .unwrap();
+    }
+
+    #[test]
+    fn rolling_back_puts_the_backup_in_place_of_a_newer_store_and_keeps_the_newer_one() {
+        let d = std::env::temp_dir().join(format!("openfader-backup-roll-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let old = Store::in_memory().unwrap();
+        old.set_rating("k", Some(2)).unwrap();
+        let zip = old.backup_auto(&d, None, "0.2.5", "t", 3).unwrap();
+        let db = d.join("store.db");
+        let here = schema();
+
+        // The store is not newer than the version rolled back to: nothing happens.
+        store_file(&db, "k", 0);
+        assert_eq!(roll_back_store(&db, &zip, here).unwrap(), None);
+        assert_eq!(file_schema(&db), Some(here));
+
+        // A newer store, a backup that cannot be read: the store stays as it is.
+        store_file(&db, "k", 1);
+        let bad = d.join("bad.zip");
+        std::fs::write(&bad, b"not a zip").unwrap();
+        assert!(roll_back_store(&db, &bad, here).is_err());
+        assert!(roll_back_store(&db, &d.join("missing.zip"), here).is_err());
+        assert_eq!(file_schema(&db), Some(here + 1));
+        assert!(!d.join("store.restore.tmp").exists());
+
+        let r = roll_back_store(&db, &zip, here).unwrap().unwrap();
+        assert_eq!(r.kept, d.join(format!("store.v{}.db", here + 1)));
+        assert_eq!(file_schema(&db), Some(here));
+        assert_eq!(
+            Store::open_at(&db).unwrap().edits("k").unwrap().rating,
+            Some(2)
+        );
+        assert_eq!(file_schema(&r.kept), Some(here + 1));
+        let newer = Connection::open(&r.kept).unwrap();
+        let rating: i64 = newer
+            .query_row("SELECT rating FROM track WHERE key = 'k'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rating, 5, "the newer library is kept whole");
+        drop(newer); // Windows cannot delete or replace a file a connection holds open
+
+        // A second roll-back keeps the first one's file: names never collide.
+        store_file(&db, "k", 1);
+        let again = roll_back_store(&db, &zip, here).unwrap().unwrap();
+        assert_eq!(again.kept, d.join(format!("store.v{}-2.db", here + 1)));
         std::fs::remove_dir_all(&d).unwrap();
     }
 }

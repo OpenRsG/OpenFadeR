@@ -1,8 +1,9 @@
 //! Cue sync ([`openfader::device::link`]) in the app (Preferences > DJ SYSTEM > DEVICE > CUE SYNC, on by default):
 //! - a device that appears is matched against the collection on a worker ([`Ctx::link`]): the links are kept for the run, and
-//!   each copy that lacks cues, a grid or phrases is filled from the other;
+//!   each copy that lacks cues, a grid or phrases is filled from the other, and the tracks whose copies both have marks and
+//!   differ are listed as conflicts (nothing moves: the user chooses in the DEVICES window, [`Ctx::resolve`]);
 //! - a track loaded on a deck ([`track_loading`], called by the deck before it reads the analysis) settles with its other copy:
-//!   the copy loaded wins;
+//!   the copy loaded wins, and what the losing copy had is kept so that the way back ([`openfader::device::undo`]) can restore it;
 //! - an edit of a loaded track's cues, grid or phrases ([`track_edited`]) is written to its device copies a few seconds after
 //!   the last one ([`Ctx::run_pushes`]), in every format picked for the device.
 //!
@@ -15,7 +16,11 @@
 
 use super::{Auto, Ctx, record_all};
 use openfader::{
-    device::{self, Device, link},
+    device::{
+        self, Device,
+        link::{self, Conflict},
+        undo::Entry,
+    },
     library::{self, Track, snapshot::Snapshot},
     plugin::device::Feature,
     store::{self, device_settings::Behaviour},
@@ -106,22 +111,24 @@ impl Ctx {
         } else {
             Vec::new()
         };
-        let (o, store, dev) = (self.options(Some(d)), self.store.clone(), d.clone());
-        let out: Arc<Mutex<Option<link::Links>>> = Arc::default();
+        let (o, store, dev, safety) = (self.options(Some(d)), self.store.clone(), d.clone(), self.safety());
+        let out: Arc<Mutex<Option<(link::Links, Vec<Conflict>)>>> = Arc::default();
         let (found, id) = (out.clone(), d.id.clone());
         self.start_then(
             Some(d.id.clone()),
             tr!("Matching tracks"),
             move |ctl| {
                 let lib = device::open_library(&dev)?;
-                let links = link::links(&*lib, &dev.mount, collection)?;
-                let (pulled, mut push) = link::fill(&links, &*lib, &reader, &store)?;
-                *found.lock() = Some(links);
+                let links = link::links(&*lib, &dev.mount, collection, &store)?;
+                let filled = link::fill(&links, &*lib, &reader, &store)?;
+                let (pulled, mut push, conflicts) = (filled.pulled, filled.push, filled.conflicts.len());
+                *found.lock() = Some((links, filled.conflicts));
                 if writers.is_empty() {
                     push.clear();
                 }
                 let pushed = push.len();
                 if pushed > 0 {
+                    safety.recover(&dev.mount, &dev.label)?;
                     let done = device::export::export(
                         &writers,
                         &dev.mount,
@@ -131,20 +138,33 @@ impl Ctx {
                     )?;
                     record_all(&store, Some(&dev), &done, &dev.label)?;
                 }
-                Ok(if pulled + pushed > 0 {
-                    tr!(
+                Ok(match (pulled + pushed, conflicts) {
+                    (0, 0) => String::new(),
+                    (0, c) => tr_n!(
+                        "{}: {n} track has different cues or grid than in your collection. Nothing was changed: choose which copy to keep with CUES DIFFER in the DEVICES window",
+                        "{}: {n} tracks have different cues or grid than in your collection. Nothing was changed: choose which copy to keep with CUES DIFFER in the DEVICES window",
+                        c,
+                        dev.label
+                    ),
+                    (_, 0) => tr!(
                         "{}: cue sync filled {} track(s) here and {} on the device",
                         dev.label,
                         pulled,
                         pushed
-                    )
-                } else {
-                    String::new()
+                    ),
+                    (_, c) => tr!(
+                        "{}: cue sync filled {} track(s) here and {} on the device; {} track(s) have different cues or grid in both places and wait for your choice (CUES DIFFER)",
+                        dev.label,
+                        pulled,
+                        pushed,
+                        c
+                    ),
                 })
             },
             move |cx, _| {
-                if let Some(links) = out.lock().take() {
-                    cx.links.borrow_mut().insert(id, Rc::new(links));
+                if let Some((links, conflicts)) = out.lock().take() {
+                    cx.links.borrow_mut().insert(id.clone(), Rc::new(links));
+                    cx.set_conflicts(&id, conflicts);
                 }
             },
         );
@@ -185,21 +205,31 @@ impl Ctx {
                 Some(_) => continue, // loaded from another device: this one waits for its own turn
                 None => link::Winner::Collection,
             };
+            let ckey = store::key(&p.collection);
             let dev = library::load_ref(&p.device).unwrap_or_default();
             let col = self.lib.analysis(&p.collection).unwrap_or_default();
             let m = link::settle(&link::Marks::from(&dev), &link::Marks::from(&col), winner);
-            if let Err(e) = link::pull(&self.store, &key, &m.to_collection, &col.beats) {
+            let mut entry = Entry::default();
+            if let Err(e) =
+                link::pull_recorded(&self.store, &ckey, &m.to_collection, &col.beats, &mut entry)
+            {
                 eprintln!("cue sync: {e}");
             }
             if !m.to_device.is_empty() {
-                self.queue_push(&id, &key, None);
+                self.queue_push(&id, &ckey, None);
             }
+            // A copy that had other marks and lost them: the way back. Filling an empty part loses nothing.
+            if !m.lost_collection.is_empty() || !m.lost_device.is_empty() {
+                entry.restore.extend(link::restore_of(&id, &ckey, &m.lost_device));
+                self.keep_undo(&entry, &tr!("Cue sync: {}", p.collection.title), &id);
+            }
+            self.drop_conflict(&id, &ckey);
         }
     }
 
     /// Writes `key`'s device copy on device `id` once the edits settle: the collection's copy (`own` = `None`, a linked track)
     /// or the device's own track `own`.
-    fn queue_push(&self, id: &str, key: &str, own: Option<Track>) {
+    pub(super) fn queue_push(&self, id: &str, key: &str, own: Option<Track>) {
         let mut pushes = self.pushes.borrow_mut();
         let (at, keys) = pushes.entry(id.to_owned()).or_default();
         *at = Some(Instant::now());
@@ -235,7 +265,14 @@ impl Ctx {
             .iter()
             .filter_map(
                 |(k, own)| match (links.as_ref().and_then(|l| l.get(k)), own) {
-                    (Some(p), _) => Some((p.collection.clone(), self.lib.analysis(&p.collection))),
+                    (Some(p), _) => {
+                        let mut a = self.lib.analysis(&p.collection);
+                        let back = self.restores.borrow_mut().remove(&(id.clone(), store::key(&p.collection)));
+                        if let (Some(a), Some(m)) = (a.as_mut(), back) {
+                            m.put_on(a);
+                        }
+                        Some((p.collection.clone(), a))
+                    }
                     // The device's own track: what the device holds, the stored edit on top (none without the device's analysis,
                     // which would leave it without a grid or waveform).
                     (None, Some(t)) => library::load_ref(t).map(|mut a| {
@@ -252,8 +289,9 @@ impl Ctx {
         let Some(writers) = self.writers(&d) else {
             return;
         };
-        let (o, store, n) = (self.options(Some(&d)), self.store.clone(), tracks.len());
+        let (o, store, n, safety) = (self.options(Some(&d)), self.store.clone(), tracks.len(), self.safety());
         self.start(Some(id), tr!("Writing cues"), move |ctl| {
+            safety.recover(&d.mount, &d.label)?;
             let done =
                 device::export::export(&writers, &d.mount, &Snapshot::of_tracks(tracks), &o, &ctl)?;
             record_all(&store, Some(&d), &done, &d.label)?;

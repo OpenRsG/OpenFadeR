@@ -24,10 +24,12 @@ mod detected;
 mod job;
 mod key_model;
 mod progress;
+mod stale;
 mod sync;
 
-pub use cue::{Learnt, library_cues};
-pub use detected::{Detected, keys_differ};
+pub use cue::{library_cues, Learnt};
+pub use detected::{keys_differ, Detected};
+pub(in crate::app) use job::lower_priority;
 
 use super::{
     camelot,
@@ -166,12 +168,22 @@ pub fn wire(app: &App, lib: Rc<dyn Library>) -> Analyzer {
     key_model::wire(app);
     prefs::on_action("analyze_now", run_pending);
     let auto = prefs::with(|p| p.analysis.auto_analysis);
+    stale::wire(app);
     if cache::legacy_dir().is_some_and(|d| d.is_dir()) {
         migrate_then(auto);
-    } else if auto {
-        run_pending();
+    } else {
+        startup(auto);
     }
     Analyzer
+}
+
+/// The runs at start: the background run for tracks lacking a BPM or key when Auto Analysis is on, then the check for
+/// tracks an older analysis made ([`stale`]); that one also runs with Auto Analysis off.
+fn startup(auto: bool) {
+    if auto {
+        run_pending();
+    }
+    stale::check();
 }
 
 /// Moves the old per-path analysis entries into the data folder on a worker thread ([`cache::migrate`]); the background run
@@ -194,9 +206,7 @@ fn migrate_then(then_run: bool) {
         }
         finished.set(true);
         weak_timer.upgrade().inspect(|t| t.stop());
-        if then_run {
-            run_pending();
-        }
+        startup(then_run);
     });
     RUNS.with(|r| {
         r.borrow_mut().push(Run {
@@ -395,6 +405,7 @@ fn jobs(lib: &dyn Library, tracks: &[&Track], explicit: bool) -> Vec<Job> {
                 track: (*t).clone(),
                 key,
                 explicit,
+                refresh: false,
                 library_key: !t.key.is_empty(),
                 guide,
             })

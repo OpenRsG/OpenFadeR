@@ -34,6 +34,9 @@ pub enum Ask {
     NewStage,
     /// A playlist (top level of My Playlists) holding these tracks, made from the selection.
     NewFrom(Vec<openfader::library::Track>),
+    /// A saved search ([`super::saved`]): the name for the search box and filters, or the new name of one.
+    SaveSearch,
+    RenameSearch(i64),
 }
 
 /// The picker panel on the table's right edge; each row's id is a playlist node or a tag (`None`: a heading).
@@ -134,7 +137,13 @@ impl View {
         .unwrap_or_default()
     }
 
-    fn ask(&mut self, app: &App, ask: Ask, prompt: &str, initial: String) {
+    pub(in crate::app::browser) fn ask(
+        &mut self,
+        app: &App,
+        ask: Ask,
+        prompt: &str,
+        initial: String,
+    ) {
         let s = app.global::<BrowserState>();
         self.ask = Some(ask);
         s.set_name_prompt(prompt.into());

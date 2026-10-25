@@ -4,10 +4,11 @@
 //! `Snapshot` playlist ids), ticking none exports everything. After a device export the baselines for Update Collection and the
 //! settings fingerprint are kept ([`record_all`]).
 
-use super::{App, Ctx, DeviceState, record_all};
-use openfader::{device, plugin::device as plugins};
+use super::preview::{Built, Target};
+use super::{record_all, App, Ctx, DeviceState};
+use openfader::plugin::device as plugins;
 use slint::ComponentHandle;
-use std::{path::PathBuf, rc::Rc};
+use std::{path::PathBuf, rc::Rc, sync::Arc};
 
 /// Reloads the playlist list when the window is open on a tab that needs the collection (EXPORT, SYNC MANAGER, BACKUPS).
 /// `count` also shows the collection size in the status line (not after a job, which has just put its result there).
@@ -71,12 +72,18 @@ fn start(cx: &Rc<Ctx>) {
     if dev.as_ref().is_some_and(|d| !cx.writable(d)) {
         return;
     }
+    let mut folder_plans = false;
     let writers = match &dev {
         Some(d) => cx.writers(d),
-        None => plugins::find(&dest).map(|f| vec![f.0]).or_else(|| {
-            cx.say(tr!("No device plugin can write a library there"), true);
-            None
-        }),
+        None => plugins::find(&dest)
+            .map(|(p, info)| {
+                folder_plans = info.features.contains(&plugins::Feature::Plan);
+                vec![p]
+            })
+            .or_else(|| {
+                cx.say(tr!("No device plugin can write a library there"), true);
+                None
+            }),
     };
     let Some(writers) = writers else { return };
     let Some(full) = cx.snap.borrow().clone() else {
@@ -92,23 +99,27 @@ fn start(cx: &Rc<Ctx>) {
             None => return cx.say(tr!("None of the ticked playlists has tracks"), true),
         }
     };
-    let (o, store) = (cx.options(dev.as_ref()), cx.store.clone());
-    let name = dev
-        .as_ref()
-        .map_or_else(|| dest.display().to_string(), |d| d.label.clone());
-    let target = dev.clone();
-    cx.start_then(
-        dev.as_ref().map(|d| d.id.clone()),
-        tr!("Exporting"),
-        move |ctl| {
-            let done = device::export::export(&writers, &dest, &snap, &o, &ctl)?;
-            record_all(&store, target.as_ref(), &done, &name)
-        },
-        move |cx, _| {
-            refresh(cx, false);
-            if let Some(d) = &dev {
-                cx.relink(&d.id);
-            }
+    let snap = Arc::new(snap);
+    let t = Target::new(cx, dev.as_ref(), dest, writers, folder_plans);
+    let (store, target, name) = (cx.store.clone(), dev.clone(), t.name.clone());
+    let (build, go_snap, go_t) = (snap.clone(), snap, t.clone());
+    cx.gate(
+        &t,
+        0,
+        move || Box::new(move |_| Ok(Built::of(build))),
+        move |cx| {
+            cx.write(
+                go_t,
+                tr!("Exporting"),
+                Box::new(move |_| Ok(Built::of(go_snap))),
+                move |_, done| record_all(&store, target.as_ref(), done, &name),
+                move |cx, _| {
+                    refresh(cx, false);
+                    if let Some(d) = &dev {
+                        cx.relink(&d.id);
+                    }
+                },
+            )
         },
     );
 }

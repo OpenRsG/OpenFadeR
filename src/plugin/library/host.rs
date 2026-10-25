@@ -47,12 +47,21 @@ fn answer(req: &[u8]) -> Value {
         Ok(HostRequest::AudioInfo { file }) => {
             json!({ "sample_rate": crate::audio::probe_rate(&file).unwrap_or(0) })
         }
-        Ok(HostRequest::Progress { phase, done, total }) => {
+        Ok(HostRequest::Progress {
+            phase,
+            done,
+            total,
+            bytes_done,
+            bytes_total,
+        }) => {
+            use std::sync::atomic::Ordering::Relaxed;
             let cancel = JOB.with(|j| {
                 j.borrow().as_ref().is_some_and(|c| {
                     c.set_phase(&phase);
-                    c.total.store(total, std::sync::atomic::Ordering::Relaxed);
-                    c.done.store(done, std::sync::atomic::Ordering::Relaxed);
+                    c.total.store(total, Relaxed);
+                    c.done.store(done, Relaxed);
+                    c.bytes_total.store(bytes_total, Relaxed);
+                    c.bytes_done.store(bytes_done, Relaxed);
                     c.cancelled()
                 })
             });

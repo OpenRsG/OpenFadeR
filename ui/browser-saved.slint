@@ -1,0 +1,52 @@
+import { ListView } from "std-widgets.slint";
+import { Chip, IconButton, Icon } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { BrowserState } from "browser-state.slint";
+
+/// The saved searches of the browser (src/app/browser/saved.rs) on the table's right edge: SAVE keeps the search box and the filters
+/// under a name, a click on a name recalls it, RENAME and DELETE (a second press confirms) apply to that row.
+export component SavedPanel inherits Rectangle {
+    /// A saved search was recalled: the filter row may need to open to show what it set.
+    callback recalled();
+    /// The row whose DELETE was pressed once.
+    property <int> armed: -1;
+    background: Theme.panel-raised;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    // Swallows clicks between the rows so they do not choose the table row under the panel.
+    TouchArea { }
+    VerticalLayout {
+        padding: Theme.space-sm;
+        spacing: Theme.space-sm;
+        HorizontalLayout {
+            spacing: Theme.space-sm;
+            Text { text: @tr("SAVED SEARCHES"); color: Theme.text; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; overflow: elide; }
+            Chip { text: @tr("SAVE"); width: 54px; horizontal-stretch: 0; active: true; tooltip: @tr("Keep the search box and the filters under a name"); clicked => { BrowserState.saved-save(); } }
+            IconButton { icon: Icon.close; tooltip: @tr("Close"); clicked => { BrowserState.saved-open = false; } }
+        }
+        if BrowserState.saved-names.length == 0: Text {
+            text: @tr("Nothing saved yet: type a search or set a filter, then SAVE.");
+            color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; vertical-stretch: 0;
+        }
+        ListView {
+            for name[i] in BrowserState.saved-names: Rectangle {
+                height: Theme.h-row;
+                background: ta.has-hover ? Theme.select : transparent;
+                ta := TouchArea { clicked => { root.armed = -1; BrowserState.saved-recall(i); root.recalled(); } }
+                HorizontalLayout {
+                    spacing: Theme.space-sm;
+                    Text { text: name; horizontal-stretch: 1; min-width: 0px; vertical-alignment: center; overflow: elide; color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
+                    Chip { text: @tr("RENAME"); width: 66px; horizontal-stretch: 0; font-size: Theme.font-xs; clicked => { root.armed = -1; BrowserState.saved-rename(i); } }
+                    Chip {
+                        text: root.armed == i ? @tr("SURE?") : @tr("DELETE");
+                        width: 60px; horizontal-stretch: 0; font-size: Theme.font-xs; active: root.armed == i;
+                        clicked => {
+                            if (root.armed == i) { root.armed = -1; BrowserState.saved-delete(i); }
+                            else { root.armed = i; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

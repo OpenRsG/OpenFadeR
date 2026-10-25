@@ -32,6 +32,22 @@ impl Pick {
         self.rows.set_vec(rows);
     }
 
+    /// A flat list of `names` (their own ids), ticked where `ticked` says so: the booth's player models.
+    pub(super) fn set_names(&self, names: &[String], ticked: &dyn Fn(&str) -> bool) {
+        *self.ids.borrow_mut() = names.to_vec();
+        self.rows.set_vec(
+            names
+                .iter()
+                .map(|n| PickRow {
+                    name: n.as_str().into(),
+                    depth: 0,
+                    folder: false,
+                    ticked: ticked(n),
+                })
+                .collect::<Vec<_>>(),
+        );
+    }
+
     /// Flips row `i`; returns its playlist id and the new tick.
     pub(super) fn toggle(&self, i: usize) -> Option<(String, bool)> {
         let mut r = self.rows.row_data(i)?;

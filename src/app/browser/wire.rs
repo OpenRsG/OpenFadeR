@@ -92,6 +92,7 @@ pub fn wire(
         query: String::new(),
         filter: Filter::default(),
         tag_filter: Vec::new(),
+        saved: Vec::new(),
         sort: None,
         home: Home::Playlist(None),
         related: None,
@@ -147,6 +148,7 @@ pub fn wire(
     session::start_poll(app, &view, decks);
     wire_prefs(app, &view);
     super::health::wire(app, &view);
+    super::saved::wire(app, &view);
     wire_list(app, &view);
     wire_selection(app, &view, automix, on_track);
     Ok(())

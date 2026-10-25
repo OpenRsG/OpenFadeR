@@ -72,7 +72,7 @@ impl Ctx {
                     match r {
                         Ok(at) => eprintln!("{}: mounted at {}", u.label, at.display()),
                         Err(e) => {
-                            let text = tr!("{}: cannot mount /dev/{}: {}", u.label, u.part, e);
+                            let text = tr!("{}: cannot mount /dev/{}: {}. Mount it from your file manager, then it shows up here.", u.label, u.part, e);
                             eprintln!("{text}");
                             toast::show(&app, &text);
                         }
@@ -100,6 +100,7 @@ impl Ctx {
         };
         let before = self.devices.replace(now.clone());
         for d in now.iter().filter(|d| !before.iter().any(|b| b.id == d.id)) {
+            self.on_mounted(d);
             say(&tr!("{} connected ({})", d.label, d.summary()));
             if let Some(w) = d.support.message() {
                 say(w);
@@ -142,10 +143,18 @@ impl Ctx {
                 .borrow_mut()
                 .push_back((d.id.clone(), Auto::Link));
         }
+        // Something wrote to a stick (its free space or what its plugin finds changed): the verdict is looked at again.
+        for d in now
+            .iter()
+            .filter(|d| before.iter().any(|b| b.id == d.id && b != *d))
+        {
+            self.recheck(&d.id);
+        }
         for d in before.iter().filter(|d| !now.iter().any(|n| n.id == d.id)) {
             say(&tr!("{} removed", d.label));
             self.links.borrow_mut().remove(&d.id);
             self.pushes.borrow_mut().remove(&d.id);
+            self.forget_check(&d.id);
         }
         self.models
             .devices
@@ -160,6 +169,7 @@ impl Ctx {
             *self.current.borrow_mut() = now.first().map(|d| d.id.clone());
         }
         self.show_current();
+        self.show_check();
     }
 
     /// Puts the chosen device's index and the buttons its plugin lists into the window.

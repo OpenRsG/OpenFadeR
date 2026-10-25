@@ -1,0 +1,190 @@
+import { Chip } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { Note } from "dialog.slint";
+import { Caption, CheckLib, CheckPlayer, CheckPreset, CheckProblem, DeviceState, PickList } from "device-state.slint";
+
+/// The answer to "can I play from this stick tonight?": one big word readable from across a dark booth, the line that matters
+/// under it, and the buttons.
+export component VerdictCard inherits Rectangle {
+    property <color> tint: DeviceState.state-color(DeviceState.check-state);
+    property <length> btn: Theme.target-size(Theme.h-ctl);
+    vertical-stretch: 0;
+    background: Theme.bg-deep;
+    border-radius: Theme.radius-lg;
+    border-width: 2px;
+    border-color: root.tint;
+    min-height: layout.preferred-height;
+    layout := VerticalLayout {
+        padding: Theme.space-xl;
+        spacing: Theme.space-md;
+        Text {
+            text: DeviceState.check-title;
+            color: root.tint;
+            font-family: Theme.display-font;
+            font-size: Theme.layout-profile == 1 ? 34px : 28px;
+            font-weight: Theme.weight-bold;
+            overflow: elide;
+        }
+        Text {
+            text: DeviceState.check-line;
+            color: Theme.text-bright;
+            font-family: Theme.font;
+            font-size: Theme.layout-profile == 1 ? Theme.font-xl : Theme.font-lg;
+            wrap: word-wrap;
+        }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            alignment: start;
+            if DeviceState.fixable: Chip {
+                text: @tr("FIX THE STICK");
+                active: true;
+                active-color: Theme.accent;
+                enabled: !DeviceState.busy;
+                height: root.btn;
+                min-width: Theme.target-size(Theme.layout-profile == 1 ? 140px : 116px);
+                horizontal-stretch: 0;
+                tooltip: @tr("Repair this stick: finish what was cut off, copy missing music from your collection, rebuild a library that cannot be read. A backup comes first and nothing is deleted.");
+                clicked => { DeviceState.fix-stick(); }
+            }
+            Chip {
+                text: @tr("CHECK AGAIN");
+                enabled: !DeviceState.busy;
+                height: root.btn;
+                min-width: Theme.target-size(Theme.layout-profile == 1 ? 130px : 100px);
+                horizontal-stretch: 0;
+                tooltip: @tr("Look at the stick again");
+                clicked => { DeviceState.check-again(); }
+            }
+            Chip {
+                text: DeviceState.check-details ? @tr("SETUP") : @tr("DETAILS");
+                height: root.btn;
+                min-width: Theme.target-size(Theme.layout-profile == 1 ? 110px : 80px);
+                horizontal-stretch: 0;
+                tooltip: DeviceState.check-details ? @tr("Back to formats and actions") : @tr("Libraries, problems, which players read this stick, the booth profile");
+                clicked => { DeviceState.check-details = !DeviceState.check-details; }
+            }
+        }
+    }
+}
+
+/// A fixed-width table cell.
+component Cell inherits Text {
+    color: Theme.text;
+    font-family: Theme.font;
+    font-size: Theme.font-size;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+component LibRow inherits Rectangle {
+    in property <CheckLib> l;
+    in property <bool> head;
+    height: Theme.target-size(Theme.h-row);
+    background: root.head ? Theme.list-head : transparent;
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        padding-right: Theme.space-md;
+        spacing: Theme.space-md;
+        Cell { text: root.l.name; width: 160px; horizontal-stretch: 0; color: root.head ? Theme.text-dim : root.l.state == 0 ? Theme.text-bright : root.l.state == 2 ? Theme.danger : Theme.text-faint; font-weight: root.head || root.l.state == 0 ? Theme.weight-bold : Theme.weight; }
+        Cell { text: root.l.written; horizontal-stretch: 1; color: root.head ? Theme.text-dim : Theme.text; }
+        Cell { text: root.l.tracks; horizontal-alignment: right; width: 64px; horizontal-stretch: 0; color: root.head ? Theme.text-dim : Theme.text; }
+        Cell { text: root.l.playlists; horizontal-alignment: right; width: 72px; horizontal-stretch: 0; color: root.head ? Theme.text-dim : Theme.text; }
+        Cell { text: root.l.cues; horizontal-alignment: right; width: 56px; horizontal-stretch: 0; color: root.head ? Theme.text-dim : Theme.text; }
+    }
+}
+
+component ProblemRow inherits Rectangle {
+    in property <CheckProblem> p;
+    property <color> tint: p.severity >= 3 ? Theme.danger : p.severity == 2 ? Theme.cue : p.severity == 1 ? Theme.bpm-sync : Theme.text-dim;
+    min-height: col.preferred-height;
+    Rectangle { x: 0; width: 4px; height: parent.height; background: root.tint; }
+    col := VerticalLayout {
+        padding: Theme.space-md;
+        padding-left: Theme.space-xl;
+        spacing: Theme.space-xs;
+        Text { text: root.p.cause; wrap: word-wrap; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+        if root.p.consequence != "": Text { text: root.p.consequence; wrap: word-wrap; color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; }
+        if root.p.action != "": Text { text: root.p.action; wrap: word-wrap; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-size; }
+    }
+}
+
+component PlayerRow inherits Rectangle {
+    in property <CheckPlayer> p;
+    property <color> tint: p.fit == 0 ? Theme.play : p.fit == 2 ? Theme.danger : Theme.bpm-sync;
+    height: Theme.target-size(Theme.h-row) + (root.p.reason != "" ? 14px : 0px);
+    HorizontalLayout {
+        padding-left: Theme.space-md;
+        spacing: Theme.space-lg;
+        Rectangle {
+            width: 44px;
+            horizontal-stretch: 0;
+            Text { text: p.fit == 0 ? @tr("OK") : p.fit == 2 ? @tr("NO") : "?"; width: parent.width; height: parent.height; horizontal-alignment: center; vertical-alignment: center; color: root.tint; font-family: Theme.font; font-size: Theme.font-lg; font-weight: Theme.weight-bold; }
+        }
+        VerticalLayout {
+            alignment: center;
+            Text { text: root.p.model; overflow: elide; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+            if root.p.reason != "": Text { text: root.p.reason; overflow: elide; color: p.fit == 2 ? Theme.text : Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; }
+        }
+    }
+}
+
+/// DETAILS of the DEVICES tab: the libraries the stick holds, what is wrong, which players read it, and the booth profile.
+export component CheckDetails inherits Flickable {
+    content-width: self.width;
+    content-height: col.preferred-height;
+    col := VerticalLayout {
+        width: root.width;
+        spacing: Theme.space-md;
+        alignment: start;
+        Caption { text: @tr("LIBRARIES ON THE STICK"); }
+        Rectangle {
+            background: Theme.bg-deep;
+            border-color: Theme.line-strong;
+            border-width: 1px;
+            VerticalLayout {
+                LibRow { head: true; l: { name: @tr("LIBRARY"), written: @tr("LAST WRITTEN"), tracks: @tr("TRACKS"), playlists: @tr("PLAYLISTS"), cues: @tr("CUES"), state: 0 }; }
+                for l in DeviceState.check-libs: LibRow { l: l; }
+                if DeviceState.check-libs.length == 0: Text { text: @tr("No library yet. EXPORT to it from the EXPORT tab."); color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-size; height: Theme.target-size(Theme.h-row); vertical-alignment: center; x: Theme.space-md; }
+            }
+        }
+        if DeviceState.check-problems.length > 0: Caption { text: @tr("WHAT IS WRONG"); }
+        for p in DeviceState.check-problems: ProblemRow { p: p; }
+        Caption { text: @tr("YOUR BOOTH"); }
+        Note { text: @tr("Tick the players you will find in the booth: the verdict is then for those only. Nothing ticked: every player the plugins know."); }
+        HorizontalLayout {
+            spacing: Theme.space-md;
+            alignment: start;
+            Chip {
+                text: @tr("ALL PLAYERS");
+                active: DeviceState.booth-all;
+                height: Theme.target-size(Theme.h-ctl);
+                min-width: Theme.target-size(100px);
+                horizontal-stretch: 0;
+                clicked => { DeviceState.booth-everything(); }
+            }
+            for pre in DeviceState.check-presets: Chip {
+                text: pre.label;
+                active: pre.on;
+                height: Theme.target-size(Theme.h-ctl);
+                min-width: Theme.target-size(self.fit-width);
+                horizontal-stretch: 0;
+                clicked => { DeviceState.booth-preset(pre.id); }
+            }
+        }
+        PickList {
+            rows: DeviceState.booth-rows;
+            height: Theme.layout-profile == 1 ? 220px : 140px;
+            toggled(i) => { DeviceState.booth-toggle(i); }
+        }
+        Caption { text: @tr("PLAYERS"); }
+        Rectangle {
+            background: Theme.bg-deep;
+            border-color: Theme.line-strong;
+            border-width: 1px;
+            VerticalLayout {
+                for p in DeviceState.check-players: PlayerRow { p: p; }
+                if DeviceState.check-players.length == 0: Text { text: @tr("No plugin lists player models yet."); color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-size; height: Theme.target-size(Theme.h-row); vertical-alignment: center; x: Theme.space-md; }
+            }
+        }
+    }
+}

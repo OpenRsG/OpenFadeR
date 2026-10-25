@@ -7,8 +7,28 @@
 
 use super::{folder, playlist_file, today, Library, Playlist, Track};
 use crate::store::{NodeKind, Store, R};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+
+/// Why an entry of the source did not join the Collection.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Reason {
+    /// The entry names no file, or the playlist file lists one that is not there.
+    MissingFile,
+    /// The file's extension is not a format the app decodes.
+    UnsupportedFormat,
+    /// The Collection lists that file already (or the source lists it twice).
+    Duplicate,
+}
+
+/// One entry that was not imported: the file's path (the track's title when it has no file) and why.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Skipped {
+    pub name: String,
+    pub reason: Reason,
+}
 
 /// What an import did.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -17,17 +37,44 @@ pub struct Report {
     pub added: usize,
     /// Tracks the Collection had already.
     pub known: usize,
-    /// Entries that could not be imported (file not found / not music).
+    /// Entries that could not be imported (file not found).
     pub failed: usize,
+    /// Tracks whose file is not a format the app decodes.
+    pub unsupported: usize,
     /// Playlists and folders made in My Playlists.
     pub playlists: usize,
+    /// Cue points and beat grids (tracks with one) the source held for the new tracks.
+    pub cues: usize,
+    pub grids: usize,
+    /// New tracks whose file is not at its path now: they are listed (with their edits) and show as missing.
+    pub absent: usize,
+    /// Every entry not imported, in source order; the counts above are these by reason.
+    pub skipped: Vec<Skipped>,
     /// The files that were added, for analysis.
     pub files: Vec<PathBuf>,
     /// The playlist a playlist file made (store node id), to show it.
     pub node: Option<i64>,
 }
 
+/// How the report names an entry: its path, else "artist — title".
+fn label(t: &Track) -> String {
+    match (&t.file, t.artist.is_empty()) {
+        (Some(f), _) => f.display().to_string(),
+        (None, true) => t.title.clone(),
+        (None, false) => format!("{} — {}", t.artist, t.title),
+    }
+}
+
 impl Report {
+    fn skip(&mut self, name: String, reason: Reason) {
+        match reason {
+            Reason::MissingFile => self.failed += 1,
+            Reason::UnsupportedFormat => self.unsupported += 1,
+            Reason::Duplicate => self.known += 1,
+        }
+        self.skipped.push(Skipped { name, reason });
+    }
+
     pub fn text(&self) -> String {
         let mut s = format!(
             "imported {} track{}",
@@ -38,6 +85,7 @@ impl Report {
             (self.playlists, "playlists"),
             (self.known, "already in the Collection"),
             (self.failed, "not found"),
+            (self.unsupported, "not a supported format"),
         ] {
             if n > 0 {
                 s += &format!(" · {n} {what}");
@@ -76,7 +124,7 @@ pub fn files(
     for (i, f) in all.iter().enumerate() {
         progress(i, all.len());
         if known.contains(f) {
-            r.known += 1;
+            r.skip(f.display().to_string(), Reason::Duplicate);
             continue;
         }
         let mut t = folder::read_track(f);
@@ -99,15 +147,13 @@ pub fn playlist_file(
     progress: &dyn Fn(usize, usize),
 ) -> R<Report> {
     let parsed = playlist_file::read(path)?;
-    let found: Vec<PathBuf> = parsed
-        .files
-        .iter()
-        .filter(|f| f.is_file())
-        .cloned()
-        .collect();
+    let (found, lost): (Vec<PathBuf>, Vec<PathBuf>) =
+        parsed.files.iter().cloned().partition(|f| f.is_file());
     store.action("Import playlist", || {
         let mut r = files(store, known, &found, progress)?;
-        r.failed = parsed.files.len() - found.len();
+        for f in lost {
+            r.skip(f.display().to_string(), Reason::MissingFile);
+        }
         let keys: Vec<String> = found
             .iter()
             .map(|f| {
@@ -161,11 +207,15 @@ fn import_library(
     })?;
     let mut r = Report::default();
     let mut fresh = Vec::new();
+    // The Collection keys a file by its path, so that is what makes two entries one (shortcut: a moved or re-encoded copy
+    // is a new track, as everywhere else in the Collection).
+    let mut seen = HashSet::new();
     for (i, t) in all.iter().enumerate() {
         progress(i, all.len());
         match &t.file {
-            None => r.failed += 1,
-            Some(f) if known.contains(f) => r.known += 1,
+            None => r.skip(label(t), Reason::MissingFile),
+            Some(f) if !folder::is_audio(f) => r.skip(label(t), Reason::UnsupportedFormat),
+            Some(f) if known.contains(f) || !seen.insert(f) => r.skip(label(t), Reason::Duplicate),
             Some(_) => fresh.push(Track {
                 date_added: if t.date_added.is_empty() {
                     today()
@@ -177,6 +227,10 @@ fn import_library(
         }
     }
     r.added = store.collection_put(&fresh, false)?;
+    r.absent = fresh
+        .iter()
+        .filter(|t| t.file.as_deref().is_some_and(|f| !f.exists()))
+        .count();
     for t in &fresh {
         let k = store.key_of(t);
         if t.rating > 0 {
@@ -188,9 +242,11 @@ fn import_library(
         if let Some(a) = src.analysis(t) {
             if !a.cues.is_empty() {
                 store.set_cues(&k, Some(&a.cues))?;
+                r.cues += a.cues.len();
             }
             if !a.beats.is_empty() {
                 store.set_grid(&k, &a.beats, &a.beats)?;
+                r.grids += 1;
             }
         }
     }
@@ -277,6 +333,9 @@ mod tests {
         let known: HashSet<PathBuf> = tracks.iter().filter_map(|t| t.file.clone()).collect();
         let again = files(&store, &known, &[d.clone()], &none).unwrap();
         assert_eq!((again.added, again.known), (0, 2));
+        assert!(
+            again.skipped.iter().all(|s| s.reason == Reason::Duplicate) && again.skipped.len() == 2
+        );
 
         std::fs::write(
             d.join("set.m3u8"),
@@ -289,6 +348,13 @@ mod tests {
         .unwrap();
         let r = playlist_file(&store, &known, &d.join("set.m3u8"), &none).unwrap();
         assert_eq!((r.playlists, r.failed), (1, 1));
+        // The two listed files are in the Collection already; the entry that is not there is skipped for good.
+        assert_eq!(
+            r.skipped.iter().map(|s| s.reason).collect::<Vec<_>>(),
+            [Reason::Duplicate, Reason::Duplicate, Reason::MissingFile]
+        );
+        // Windows reads "/gone/x.mp3" as a path on the current drive.
+        assert!(Path::new(&r.skipped[2].name).ends_with("gone/x.mp3"), "{}", r.skipped[2].name);
         let node = &store.nodes().unwrap()[0];
         assert_eq!(node.name, "set");
         let keys = store.entries(node.id).unwrap();
@@ -316,6 +382,25 @@ mod tests {
                 self.0[..1].to_vec()
             } else {
                 self.0.clone()
+            })
+        }
+        fn analysis(&self, t: &Track) -> Option<crate::analysis::Analysis> {
+            use crate::analysis::{Analysis, Beat, Cue};
+            let cue = |ms| Cue {
+                hot_cue: 1,
+                time_ms: ms,
+                loop_end_ms: None,
+                color: None,
+                comment: None,
+            };
+            (t.title == "Real").then(|| Analysis {
+                cues: vec![cue(100), cue(200)],
+                beats: vec![Beat {
+                    bar_pos: 1,
+                    bpm_x100: 12000,
+                    time_ms: 0,
+                }],
+                ..Analysis::default()
             })
         }
     }
@@ -388,6 +473,51 @@ mod tests {
             &|_, _| {}
         )
         .is_err());
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn the_report_lists_every_skipped_entry_with_its_reason_and_counts_what_came_in() {
+        let d = tmp("report");
+        let (real, mine, ogg) = (d.join("real.mp3"), d.join("mine.mp3"), d.join("x.ogg"));
+        for f in [&real, &mine, &ogg] {
+            std::fs::write(f, b"x").unwrap();
+        }
+        let t = |n: &str, f: Option<&Path>| Track {
+            title: n.into(),
+            artist: "Art".into(),
+            file: f.map(Path::to_path_buf),
+            ..Track::default()
+        };
+        let src = Source(vec![
+            t("Real", Some(&real)),
+            t("Lost", Some(Path::new("/gone/lost.mp3"))),
+            t("Real twice", Some(&real)),
+            t("Mine", Some(&mine)),
+            t("Ogg", Some(&ogg)),
+            t("None", None),
+        ]);
+        let known = HashSet::from([mine.clone()]);
+        let store = Store::in_memory().unwrap();
+        let all = Scope::All { playlists: false };
+        let r = library(&store, &src, &known, all, &|_, _| {}).unwrap();
+        let skip = |name: String, reason| Skipped { name, reason };
+        assert_eq!(
+            r.skipped,
+            [
+                skip(real.display().to_string(), Reason::Duplicate),
+                skip(mine.display().to_string(), Reason::Duplicate),
+                skip(ogg.display().to_string(), Reason::UnsupportedFormat),
+                skip("Art — None".into(), Reason::MissingFile),
+            ]
+        );
+        // The counts are the list by reason; the two imported tracks are the first "Real" and "Lost" (its file is not there).
+        assert_eq!(
+            (r.added, r.known, r.unsupported, r.failed, r.absent),
+            (2, 2, 1, 1, 1)
+        );
+        assert_eq!((r.cues, r.grids), (2, 1)); // only "Real" has an analysis
+        assert_eq!(store.collection_tracks().unwrap().len(), 2);
         std::fs::remove_dir_all(&d).unwrap();
     }
 }

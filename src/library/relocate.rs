@@ -62,6 +62,85 @@ pub fn beside(chosen: &Path, lost: &Path) -> Option<PathBuf> {
     p.is_file().then_some(p)
 }
 
+/// Finds the files of lost tracks by their content print ([`super::print`]): a renamed AND moved file, without decoding. Only
+/// candidates whose size equals the size the lost track's print was made at are read; prints of candidates are kept for the
+/// whole search.
+pub struct ByPrint<'a> {
+    index: &'a Index,
+    by_size: Option<HashMap<u64, Vec<&'a Path>>>,
+    prints: HashMap<&'a Path, Option<String>>,
+}
+
+impl<'a> ByPrint<'a> {
+    pub fn new(index: &'a Index) -> Self {
+        Self {
+            index,
+            by_size: None,
+            prints: HashMap::new(),
+        }
+    }
+
+    /// The indexed file with the print of `lost` that is not another Collection row's (a bare duplicate row's counts as free), the
+    /// one closest to the old path of several. A track without a print is not found this way.
+    pub fn find(&mut self, store: &Store, lost: &Track) -> Option<&'a Path> {
+        let want = store.file_print(lost.id?).ok()??;
+        let size = u64::from_str_radix(want.split('-').next()?, 16).ok()?;
+        let index = self.index;
+        let by_size = self.by_size.get_or_insert_with(|| {
+            let mut m: HashMap<u64, Vec<&Path>> = HashMap::new();
+            for c in index.values().flatten() {
+                if let Ok(md) = std::fs::metadata(c) {
+                    m.entry(md.len()).or_default().push(c);
+                }
+            }
+            m
+        });
+        let prints = &mut self.prints;
+        by_size
+            .get(&size)?
+            .iter()
+            .copied()
+            .filter(|c| {
+                prints
+                    .entry(*c)
+                    .or_insert_with(|| super::print::of_file(c).ok())
+                    .as_deref()
+                    == Some(want.as_str())
+            })
+            .filter(|c| {
+                // A file another row lists is that row's, unless the row is a fresh duplicate of this very track (the connected
+                // folder imported the moved file as a new track): relocating then replaces the duplicate and keeps the lost row.
+                store
+                    .id_of_path(c)
+                    .ok()
+                    .flatten()
+                    .is_none_or(|o| Some(o) == lost.id || store.is_bare(o).unwrap_or(false))
+            })
+            .max_by_key(|c| lost.file.as_deref().map_or(0, |l| shared_tail(c, l)))
+    }
+}
+
+/// Where `lost` went, without decoding: the file of the same name, else the file with the same content print. What the Missing
+/// File Manager shows and AUTO RELOCATE applies first.
+pub fn locate<'a>(
+    index: &'a Index,
+    by_print: &mut ByPrint<'a>,
+    store: &Store,
+    lost: &Track,
+) -> Option<&'a Path> {
+    let other = |p: &Path| {
+        store
+            .id_of_path(p)
+            .ok()
+            .flatten()
+            .is_some_and(|o| Some(o) != lost.id)
+    };
+    lost.file
+        .as_deref()
+        .and_then(|f| find(index, f, other))
+        .or_else(|| by_print.find(store, lost))
+}
+
 /// Candidates whose tags one [`ByAudio`] reads (the cheap length check before decoding), over all the tracks it looks for.
 const MAX_TAG_READS: usize = 5000;
 /// Candidates decoded and fingerprinted per lost track: the same extension, a tag length within [`LENGTH_SLACK_S`] and not
@@ -242,6 +321,83 @@ mod tests {
             )
             .unwrap();
         assert_eq!(ByAudio::new(&idx).find(&store, &lost), None);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_moved_and_renamed_file_is_found_by_its_print_among_decoys() {
+        let root =
+            std::env::temp_dir().join(format!("openfader-reloc-print-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for d in ["old", "new/sub"] {
+            std::fs::create_dir_all(root.join(d)).unwrap();
+        }
+        let data: Vec<u8> = (0..400_000u32).map(|i| (i * 7 + i / 251) as u8).collect();
+        let mut other = data.clone();
+        other[10] ^= 1;
+        let lost_file = root.join("old/song.mp3");
+        std::fs::write(&lost_file, &data).unwrap();
+        let store = Store::in_memory().unwrap();
+        let track = Track {
+            file: Some(lost_file.clone()),
+            ..Default::default()
+        };
+        let id = store.collection_upsert(&track, None).unwrap();
+        let lost = Track {
+            id: Some(id),
+            ..track
+        };
+        crate::library::print::remember(&store, id, &lost_file);
+        std::fs::remove_file(&lost_file).unwrap();
+        std::fs::write(root.join("new/same_size.mp3"), &other).unwrap(); // same size, other bytes
+        std::fs::write(root.join("new/sub/song.mp3"), &other[1..]).unwrap(); // same name, other bytes
+        std::fs::write(root.join("new/sub/renamed.mp3"), &data).unwrap();
+        let idx = index(&[root.join("new")]);
+        // Joined part by part: the store keeps the path as text, and a "/" inside one part would not match a walked path on Windows.
+        let new = root.join("new").join("sub").join("renamed.mp3");
+        assert_eq!(ByPrint::new(&idx).find(&store, &lost), Some(new.as_path()));
+        // The name stage takes the file of that name (it does not look inside); the print stage is the fallback.
+        let mut by_print = ByPrint::new(&idx);
+        assert_eq!(
+            locate(&idx, &mut by_print, &store, &lost),
+            Some(root.join("new/sub/song.mp3").as_path())
+        );
+        // A file that is another Collection row's is not taken, unless that row is a fresh duplicate nobody worked on (the
+        // connected folder imported the moved file as a new track): it is the same track, relocating replaces the duplicate.
+        let dup = store
+            .collection_upsert(
+                &Track {
+                    file: Some(new.clone()),
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(ByPrint::new(&idx).find(&store, &lost), Some(new.as_path()));
+        store
+            .set_rating(&crate::store::id_key(dup), Some(4))
+            .unwrap();
+        assert_eq!(
+            ByPrint::new(&idx).find(&store, &lost),
+            None,
+            "the duplicate has the user's rating"
+        );
+        store.set_rating(&crate::store::id_key(dup), None).unwrap();
+        store.relocate(&lost, &new).unwrap();
+        assert_eq!(
+            store.id_of_path(&new).unwrap(),
+            Some(id),
+            "the lost row took the place"
+        );
+        assert!(
+            store.file_print(dup).unwrap().is_none()
+                && store.id_of_path(&lost_file).unwrap().is_none()
+        );
+        let plain = Track {
+            id: Some(id + 1),
+            ..lost.clone()
+        };
+        assert_eq!(ByPrint::new(&idx).find(&store, &plain), None);
         std::fs::remove_dir_all(&root).unwrap();
     }
 }

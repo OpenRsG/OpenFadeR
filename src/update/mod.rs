@@ -11,6 +11,7 @@ pub mod install;
 pub mod state;
 
 use serde::Deserialize;
+use std::path::Path;
 use std::time::Duration;
 
 /// The release asset's name suffix for `(std::env::consts::OS, ARCH)`; the part before it is the product and version.
@@ -50,6 +51,11 @@ pub struct Release {
     pub notes: Option<String>,
     #[serde(default)]
     pub assets: Vec<Asset>,
+    /// A pre-release (GitHub's flag): only the Beta channel offers it.
+    #[serde(default)]
+    pub prerelease: bool,
+    #[serde(default)]
+    pub draft: bool,
 }
 
 impl Release {
@@ -88,34 +94,114 @@ pub fn api_base() -> String {
         .unwrap_or_else(|| "https://api.github.com".to_owned())
 }
 
-/// The latest published release (GitHub's `releases/latest`: no draft, no pre-release) from the API at `base`.
-pub fn latest(base: &str) -> Result<Release, String> {
+/// What the updater follows: the latest stable release, or the latest of all releases including pre-releases.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Channel {
+    Stable,
+    Beta,
+}
+
+/// Of a releases list (GitHub's `releases`, newest date first) the one the `channel` offers: no draft, a tag that is a
+/// semantic version, a pre-release only on Beta; the highest version, not the newest date (a fix of an old line can come
+/// after a newer line's release). `0.3.0-rc.1` therefore beats `0.2.5` and loses to `0.3.0`.
+pub fn pick(list: Vec<Release>, channel: Channel) -> Option<Release> {
+    list.into_iter()
+        .filter(|r| !r.draft && (channel == Channel::Beta || !r.prerelease))
+        .filter_map(|r| Some((r.version()?, r)))
+        .max_by(|a, b| a.0.cmp(&b.0))
+        .map(|(_, r)| r)
+}
+
+/// GET `path` of the API at `base`, the answer's text.
+fn get(base: &str, path: &str) -> Result<String, String> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(15)))
         .build()
         .into();
-    let url = format!(
-        "{}/repos/{REPO}/releases/latest",
-        base.trim_end_matches('/')
-    );
-    let body = agent
+    let url = format!("{}/repos/{REPO}/{path}", base.trim_end_matches('/'));
+    agent
         .get(&url)
         .header("Accept", "application/vnd.github+json")
         .call()
         .map_err(|e| format!("{url}: {e}"))?
         .body_mut()
         .read_to_string()
-        .map_err(|e| format!("{url}: {e}"))?;
-    serde_json::from_str(&body).map_err(|e| format!("{url}: not a release ({e})"))
+        .map_err(|e| format!("{url}: {e}"))
+}
+
+/// The release `channel` offers, from the API at `base`: Stable is GitHub's `releases/latest` (no draft, no pre-release),
+/// Beta the best of the `releases` list ([`pick`]).
+pub fn latest(base: &str, channel: Channel) -> Result<Release, String> {
+    match channel {
+        Channel::Stable => {
+            let body = get(base, "releases/latest")?;
+            serde_json::from_str(&body).map_err(|e| format!("not a release ({e})"))
+        }
+        Channel::Beta => {
+            let body = get(base, "releases?per_page=30")?;
+            let list: Vec<Release> =
+                serde_json::from_str(&body).map_err(|e| format!("not a list of releases ({e})"))?;
+            pick(list, channel).ok_or_else(|| "no release found".to_owned())
+        }
+    }
+}
+
+/// What [`roll_back`] did.
+#[derive(Debug)]
+pub struct RolledBack {
+    pub install: install::Install,
+    /// The library from before the update was put back (the new version had migrated the store past what the old one reads).
+    pub library: Option<crate::store::backup::RolledBack>,
 }
 
 /// Goes back to the version kept in `<install>.prev` and forgets that an update was installed; the caller restarts the
-/// program from the returned install.
-pub fn roll_back() -> Result<install::Install, String> {
+/// program from the returned install. When the new version migrated the store past what the old one reads, the library
+/// made before the update is put back first (the newer store stays beside it); without such a backup the roll-back is
+/// refused, because the old version could not open the store.
+pub fn roll_back() -> Result<RolledBack, String> {
     let install = install::locate().map_err(|w| w.to_string())?;
-    install::rollback(&install)?;
+    let applied = state::file().and_then(|f| state::read(&f).applied);
+    let db = crate::paths::data_dir().map(|d| d.join("store.db"));
+    let done = roll_back_at(install, applied.as_ref(), db.as_deref())?;
     state::update(|s| s.applied = None);
-    Ok(install)
+    Ok(done)
+}
+
+/// [`roll_back`] with the install, the record of the update and the store file given.
+fn roll_back_at(
+    install: install::Install,
+    applied: Option<&state::Applied>,
+    db: Option<&Path>,
+) -> Result<RolledBack, String> {
+    use crate::store::backup;
+    // The store is beyond what the old version reads (its schema is known from the record): it needs the backup.
+    let newer = db
+        .zip(applied.filter(|a| a.schema > 0))
+        .and_then(|(db, a)| {
+            let have = backup::file_schema(db).filter(|&h| h > a.schema)?;
+            Some((db, a, have))
+        });
+    if let Some((_, a, have)) = newer {
+        if !Path::new(&a.backup).is_file() {
+            return Err(format!(
+                "the library was changed by the newer version (store v{have}, version {} reads v{}) and no backup from before the update is kept: the old version could not open it, nothing was changed",
+                a.from, a.schema
+            ));
+        }
+    }
+    install::rollback(&install)?;
+    let library = match newer {
+        Some((db, a, _)) => backup::roll_back_store(db, Path::new(&a.backup), a.schema)
+            .inspect_err(|_| {
+                // The old version would not open the store: stay on the new one.
+                let _ = install::rollback(&install);
+            })
+            .map_err(|e| {
+                format!("the library from before the update could not be put back ({e}), nothing was changed")
+            })?,
+        None => None,
+    };
+    Ok(RolledBack { install, library })
 }
 
 #[cfg(test)]
@@ -171,6 +257,8 @@ pub(crate) mod tests {
             tag: tag.into(),
             page: "https://example.test/release".into(),
             notes: None,
+            prerelease: false,
+            draft: false,
             assets: names
                 .iter()
                 .map(|n| Asset {
@@ -180,6 +268,159 @@ pub(crate) mod tests {
                     digest: None,
                 })
                 .collect(),
+        }
+    }
+
+    /// The tags `pick` offers `channel` from releases of `(tag, prerelease, draft)`.
+    fn offered(list: &[(&str, bool, bool)], channel: Channel) -> Option<String> {
+        let list = list
+            .iter()
+            .map(|&(tag, prerelease, draft)| Release {
+                prerelease,
+                draft,
+                ..release(tag, &[])
+            })
+            .collect();
+        pick(list, channel).map(|r| r.tag)
+    }
+
+    #[test]
+    fn a_release_candidate_sorts_after_the_last_stable_and_before_its_release() {
+        let v = |t: &str| semver::Version::parse(t).unwrap();
+        assert!(v("0.2.5") < v("0.3.0-rc.1") && v("0.3.0-rc.1") < v("0.3.0"));
+        assert!(v("0.3.0-rc.1") < v("0.3.0-rc.2") && v("0.3.0-beta.2") < v("0.3.0-rc.1"));
+        assert!(release("v0.3.0-rc.1", &[]).newer_than("0.2.5"));
+        assert!(!release("v0.3.0-rc.1", &[]).newer_than("0.3.0"));
+        assert!(release("v0.3.0", &[]).newer_than("0.3.0-rc.1"));
+    }
+
+    #[test]
+    fn each_channel_offers_its_own_release() {
+        let list = [
+            ("v0.2.5", false, false),
+            ("v0.3.0-rc.1", true, false),
+            ("v0.9.0", false, true),  // a draft is nobody's
+            ("preview", true, false), // no version
+            ("v0.2.4", false, false),
+        ];
+        assert_eq!(offered(&list, Channel::Stable).as_deref(), Some("v0.2.5"));
+        assert_eq!(
+            offered(&list, Channel::Beta).as_deref(),
+            Some("v0.3.0-rc.1")
+        );
+        // The release of the candidate is the newest for both.
+        let done = [list.as_slice(), &[("v0.3.0", false, false)]].concat();
+        assert_eq!(offered(&done, Channel::Beta).as_deref(), Some("v0.3.0"));
+        assert_eq!(offered(&done, Channel::Stable).as_deref(), Some("v0.3.0"));
+        // Highest version, not newest date: a fix of the old line published last does not win.
+        let late = [("v0.3.0", false, false), ("v0.2.6", false, false)];
+        assert_eq!(offered(&late, Channel::Stable).as_deref(), Some("v0.3.0"));
+        assert_eq!(offered(&[("v1.0.0", false, true)], Channel::Beta), None);
+        assert_eq!(offered(&[], Channel::Stable), None);
+    }
+
+    /// An install of `1.0.0` (the old one, in `.prev`) and `2.0.0` (running) in a fresh folder.
+    fn installs(name: &str) -> (std::path::PathBuf, install::Install) {
+        let d =
+            std::env::temp_dir().join(format!("openfader-update-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let install = install::Install {
+            root: d.join("app"),
+            exe: "bin".into(),
+        };
+        for (dir, v) in [(install.root.clone(), "2.0.0"), (install.prev(), "1.0.0")] {
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("bin"), v).unwrap();
+        }
+        (d, install)
+    }
+
+    /// A store file in `db` written by a build `extra` migrations ahead of this one.
+    fn store_ahead(db: &Path, extra: usize) {
+        drop(crate::store::Store::open_at(db).unwrap());
+        rusqlite::Connection::open(db)
+            .unwrap()
+            .pragma_update(
+                None,
+                "user_version",
+                (crate::store::backup::schema() + extra) as i64,
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn a_roll_back_never_leaves_the_old_version_a_store_it_cannot_open() {
+        use crate::store::backup::{file_schema, schema};
+        let (d, install) = installs("roll");
+        let (db, running) = (d.join("store.db"), |i: &install::Install| {
+            std::fs::read_to_string(i.exe_path()).unwrap()
+        });
+        let backup = crate::store::Store::in_memory()
+            .unwrap()
+            .backup_auto(&d, None, "1.0.0", "t", 3)
+            .unwrap();
+        let applied = |schema, backup: &Path| state::Applied {
+            from: "1.0.0".into(),
+            to: "2.0.0".into(),
+            schema,
+            backup: backup.display().to_string(),
+            ..Default::default()
+        };
+
+        // The new version migrated the store but no backup is kept: refused, nothing moves.
+        store_ahead(&db, 1);
+        let none = applied(schema(), &d.join("gone.zip"));
+        let e = roll_back_at(install.clone(), Some(&none), Some(&db)).unwrap_err();
+        assert!(e.contains("no backup"), "{e}");
+        assert_eq!(
+            (running(&install).as_str(), file_schema(&db)),
+            ("2.0.0", Some(schema() + 1))
+        );
+
+        // A backup that cannot be used: the swap is undone, the new version stays.
+        let bad = d.join("bad.zip");
+        std::fs::write(&bad, b"junk").unwrap();
+        let e =
+            roll_back_at(install.clone(), Some(&applied(schema(), &bad)), Some(&db)).unwrap_err();
+        assert!(e.contains("could not be put back"), "{e}");
+        assert_eq!(
+            (running(&install).as_str(), file_schema(&db)),
+            ("2.0.0", Some(schema() + 1))
+        );
+
+        // With the backup: the old version, its library back, the newer one kept.
+        let done = roll_back_at(
+            install.clone(),
+            Some(&applied(schema(), &backup)),
+            Some(&db),
+        )
+        .unwrap();
+        let library = done.library.expect("the library was put back");
+        assert_eq!(
+            (running(&install).as_str(), file_schema(&db)),
+            ("1.0.0", Some(schema()))
+        );
+        assert_eq!(file_schema(&library.kept), Some(schema() + 1));
+
+        // A store the old version reads, or an update whose schema was not recorded: only the program goes back.
+        let (d2, install2) = installs("roll-plain");
+        let db2 = d2.join("store.db");
+        store_ahead(&db2, 0);
+        let plain = roll_back_at(
+            install2.clone(),
+            Some(&applied(schema(), &backup)),
+            Some(&db2),
+        )
+        .unwrap();
+        assert!(plain.library.is_none() && running(&install2) == "1.0.0");
+        let (d3, install3) = installs("roll-unknown");
+        let db3 = d3.join("store.db");
+        store_ahead(&db3, 1);
+        let unknown =
+            roll_back_at(install3.clone(), Some(&applied(0, &backup)), Some(&db3)).unwrap();
+        assert!(unknown.library.is_none() && running(&install3) == "1.0.0");
+        for d in [d, d2, d3] {
+            std::fs::remove_dir_all(d).unwrap();
         }
     }
 
@@ -251,6 +492,7 @@ pub(crate) mod tests {
 #[cfg(test)]
 mod serve_tests {
     use super::tests::{asset_of, release, serve};
+    use super::Channel;
 
     #[test]
     fn the_latest_release_is_read_from_the_api_base() {
@@ -266,18 +508,49 @@ mod serve_tests {
             "/repos/OpenRsG/OpenFadeR/releases/latest",
             json.to_string().into_bytes(),
         )]);
-        assert_eq!(super::latest(&base).unwrap(), r);
+        assert_eq!(super::latest(&base, Channel::Stable).unwrap(), r);
         assert_eq!(
-            super::latest(&format!("{base}/")).unwrap().tag,
+            super::latest(&format!("{base}/"), Channel::Stable)
+                .unwrap()
+                .tag,
             "v9.9.9",
             "a closing slash is fine"
         );
-        let down = super::latest("http://127.0.0.1:9");
+        let down = super::latest("http://127.0.0.1:9", Channel::Stable);
         assert!(
             down.is_err(),
             "offline is an error the caller shows or ignores"
         );
         let nothing = serve(Vec::new());
-        assert!(super::latest(&nothing).is_err(), "no release (404)");
+        assert!(
+            super::latest(&nothing, Channel::Stable).is_err(),
+            "no release (404)"
+        );
+    }
+
+    #[test]
+    fn the_beta_channel_reads_the_releases_list() {
+        let list = serde_json::json!([
+            {"tag_name": "v0.4.0", "draft": true, "prerelease": false},
+            {"tag_name": "v0.3.0-rc.1", "prerelease": true, "html_url": "rc"},
+            {"tag_name": "v0.2.6", "prerelease": false},
+            {"tag_name": "nightly", "prerelease": true},
+        ]);
+        let base = serve(vec![(
+            "/repos/OpenRsG/OpenFadeR/releases?per_page=30",
+            list.to_string().into_bytes(),
+        )]);
+        let rc = super::latest(&base, Channel::Beta).unwrap();
+        assert_eq!((rc.tag.as_str(), rc.page.as_str()), ("v0.3.0-rc.1", "rc"));
+        assert!(rc.newer_than("0.2.6"), "offered to a stable 0.2.6");
+        assert!(
+            super::latest(&serve(vec![("/x", Vec::new())]), Channel::Beta).is_err(),
+            "a 404 is an error"
+        );
+        let empty = serve(vec![(
+            "/repos/OpenRsG/OpenFadeR/releases?per_page=30",
+            b"[]".to_vec(),
+        )]);
+        assert!(super::latest(&empty, Channel::Beta).is_err(), "no release");
     }
 }

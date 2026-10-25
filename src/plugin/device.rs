@@ -11,22 +11,27 @@ use super::library::{Loaded, enabled, with_job};
 use crate::library::snapshot::Snapshot;
 use openfader_plugin::library::Request;
 pub use openfader_plugin::library::{
-    ActionAnswer, BackupTrack, Bank, BankCue, Confirm, DeviceAction, DeviceInfo, ExportOptions,
-    ExportReport, Feature, MAX_BANKS, RemoveReport, RemoveTarget, SettingsRead, SettingsSchema,
-    SettingsWritten, TrackEdit, UpdateReport,
+    ActionAnswer, BackupTrack, Bank, BankCue, BoothPreset, CheckReport, Confirm, DeviceAction,
+    DeviceInfo, ExportOptions, ExportPlan, ExportReport, Feature, LibraryState, MAX_BANKS,
+    PlanItem, Player, Players, Problem, RemoveReport, RemoveTarget, SettingsRead, SettingsSchema,
+    SettingsWritten, Severity, TrackEdit, UpdateReport, commit,
 };
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering::Relaxed};
 use std::sync::{Arc, LazyLock};
 
 /// Progress and cancel of one job, shared between the worker and whoever shows it: the plugin reports `done` of `total` in a
-/// named phase and stops at the next safe point once [`Control::cancel`] was called; a cancelled job returns `Err("cancelled")`.
+/// named phase (and the bytes written of those it will write, when it counts them) and stops at the next safe point once
+/// [`Control::cancel`] was called; a cancelled job returns `Err("cancelled")`.
 #[derive(Default)]
 pub struct Control {
     pub done: AtomicUsize,
     pub total: AtomicUsize,
+    /// Bytes written so far and in all; 0 when the plugin does not count bytes.
+    pub bytes_done: AtomicU64,
+    pub bytes_total: AtomicU64,
     cancel: AtomicBool,
     phase: Mutex<String>,
 }
@@ -53,6 +58,8 @@ impl Control {
     pub fn start(&self, total: usize) {
         self.total.store(total, Relaxed);
         self.done.store(0, Relaxed);
+        self.bytes_done.store(0, Relaxed);
+        self.bytes_total.store(0, Relaxed);
     }
 }
 
@@ -271,6 +278,52 @@ impl Provider {
             None,
         )
         .map(|t| t.tracks)
+    }
+
+    /// The state of the plugin's libraries on the device (only for a plugin listing [`Feature::Check`]).
+    pub fn check(
+        &self,
+        root: &Path,
+        config: &BTreeMap<String, String>,
+    ) -> Result<CheckReport, String> {
+        self.call(
+            |settings| Request::DeviceCheck {
+                root: root.to_owned(),
+                config: config.clone(),
+                settings,
+            },
+            None,
+        )
+    }
+
+    /// Runs the fix `fix` a [`Problem::fix`] of [`Provider::check`] named.
+    pub fn fix(
+        &self,
+        root: &Path,
+        fix: &str,
+        config: &BTreeMap<String, String>,
+        ctl: &Arc<Control>,
+    ) -> Result<ActionAnswer, String> {
+        self.call(
+            |settings| Request::DeviceFix {
+                root: root.to_owned(),
+                fix: fix.to_owned(),
+                config: config.clone(),
+                settings,
+            },
+            Some(ctl),
+        )
+    }
+
+    /// The player models the plugin knows (`players.json` next to its `plugin.json`); empty when it ships none. A file that
+    /// does not parse is an `Err` naming it.
+    pub fn players(&self) -> Result<Players, String> {
+        let path = self.0.plugin.dir.join("players.json");
+        match std::fs::read(&path) {
+            Ok(b) => serde_json::from_slice(&b).map_err(|e| format!("{}: {e}", path.display())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Players::default()),
+            Err(e) => Err(format!("{}: {e}", path.display())),
+        }
     }
 }
 

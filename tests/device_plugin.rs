@@ -111,8 +111,8 @@ fn the_plugin_exports_reads_updates_edits_and_backs_up_a_device() {
     // Update Collection: nothing was edited on the player, so nothing changes.
     let store = Store::in_memory().unwrap();
     store.set_device_sigs(&dev.id, &report.baselines).unwrap();
-    let u = update::update_collection(&provider, &stick, &dev.id, &snap, &store, &ctl).unwrap();
-    assert_eq!((u.matched, u.changed, u.unmatched), (3, 0, 0));
+    let u = update::plan(&provider, &stick, &dev.id, &snap, &store, &ctl).unwrap();
+    assert_eq!((u.matched, u.rows.len(), u.unmatched), (3, 0, 0));
 
     // Settings pages come from the plugin; values written to the device read back, with the fingerprint the write answered.
     let schema = provider.schema().unwrap();

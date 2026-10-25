@@ -1,0 +1,102 @@
+import { ListView } from "std-widgets.slint";
+import { Chip } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { DialogFrame } from "dialog.slint";
+import { DeviceState, PreviewRow } from "device-state.slint";
+
+/// The tracks of one section of the card, as a small virtual list (a long list stays cheap to draw).
+component TrackList inherits Rectangle {
+    in property <[PreviewRow]> rows;
+    height: 6 * Theme.h-row;
+    background: Theme.bg-deep;
+    border-color: Theme.line-strong;
+    border-width: 1px;
+    ListView {
+        for r in root.rows: Rectangle {
+            height: Theme.h-row;
+            HorizontalLayout {
+                padding-left: Theme.space-md;
+                padding-right: Theme.space-md;
+                spacing: Theme.space-md;
+                Text { text: r.title; color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; vertical-alignment: center; overflow: elide; }
+                Text { text: r.detail; width: 80px; horizontal-alignment: right; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; vertical-alignment: center; horizontal-stretch: 0; }
+            }
+        }
+    }
+}
+
+/// One line of the card ("12 new tracks to copy (480 MB)") with the list of its tracks under a SHOW LIST button.
+component Section inherits VerticalLayout {
+    in property <string> text;
+    in property <[PreviewRow]> rows;
+    property <bool> shown;
+    spacing: Theme.space-sm;
+    vertical-stretch: 0;
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        Text {
+            text: root.text;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.font-md;
+            font-weight: Theme.weight-bold;
+            wrap: word-wrap;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        if root.rows.length > 0: Chip {
+            text: root.shown ? @tr("HIDE LIST") : @tr("SHOW LIST");
+            width: 110px;
+            horizontal-stretch: 0;
+            clicked => { root.shown = !root.shown; }
+        }
+    }
+    if root.shown && root.rows.length > 0: TrackList { rows: root.rows; }
+}
+
+/// What a write will do, shown before it does it (src/app/device/preview.rs): the formats, the tracks it copies and the ones it
+/// refreshes (each with a list), the analyses, the time, what is left out and why (error colour), then START or CANCEL.
+export component DevicePreview inherits DialogFrame {
+    visible: DeviceState.preview-open;
+    title: DeviceState.preview-title;
+    card-width: Theme.layout-profile == 1 ? min(640px, root.width - 16px) : 640px;
+    closed => { DeviceState.preview-answer(false); }
+    if DeviceState.preview-open: VerticalLayout {
+        spacing: Theme.space-md;
+        vertical-stretch: 0;
+        Text { text: DeviceState.preview-device; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; }
+        Section { text: DeviceState.preview-add; rows: DeviceState.preview-add-rows; }
+        if DeviceState.preview-update != "": Section { text: DeviceState.preview-update; rows: DeviceState.preview-update-rows; }
+        for line in DeviceState.preview-lines: Text { text: line; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; }
+        for line in DeviceState.preview-blocked: Text { text: line; color: Theme.danger; font-family: Theme.font; font-size: Theme.font-size; wrap: word-wrap; }
+    }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        alignment: end;
+        vertical-stretch: 0;
+        Chip { text: @tr("START"); width: 120px; horizontal-stretch: 0; active: DeviceState.preview-can-start; enabled: DeviceState.preview-can-start; clicked => { DeviceState.preview-answer(true); } }
+        Chip { text: @tr("CANCEL"); width: 80px; horizontal-stretch: 0; clicked => { DeviceState.preview-answer(false); } }
+    }
+}
+
+/// "KEY is plugged in: sync 3 playlists (12 new tracks, 480 MB)?" for a device that is set to sync (src/app/device/sync.rs).
+export component DeviceSyncAsk inherits DialogFrame {
+    visible: DeviceState.sync-ask-open;
+    title: @tr("SYNC");
+    card-width: Theme.layout-profile == 1 ? min(460px, root.width - 16px) : 460px;
+    closed => { DeviceState.sync-ask-answer(false); }
+    Text {
+        text: DeviceState.sync-ask-text;
+        wrap: word-wrap;
+        color: Theme.text;
+        font-family: Theme.font;
+        font-size: Theme.font-md;
+    }
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        alignment: end;
+        vertical-stretch: 0;
+        Chip { text: @tr("SYNC"); width: 100px; horizontal-stretch: 0; active: true; clicked => { DeviceState.sync-ask-answer(true); } }
+        Chip { text: @tr("NOT NOW"); width: 100px; horizontal-stretch: 0; clicked => { DeviceState.sync-ask-answer(false); } }
+    }
+}

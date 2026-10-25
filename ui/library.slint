@@ -2,11 +2,15 @@ import { ListView } from "std-widgets.slint";
 import { Chip, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DialogFrame, FormRow, Note } from "dialog.slint";
+import { ImportReportOverlay } from "import-report.slint";
+export { ImportReportState, ImportSkipRow } from "import-report.slint";
 
 /// One track of the Missing File Manager.
 export struct MissingRow {
     title: string,
     path: string,
+    /// Where RELOCATE would find the file ("found: <path>"), empty when unknown.
+    found: string,
     selected: bool,
 }
 
@@ -99,7 +103,7 @@ component Line inherits Text {
 component MissingLine inherits Rectangle {
     in property <MissingRow> item;
     callback toggled();
-    height: Theme.h-row;
+    height: root.item.found != "" ? 2 * Theme.h-row : Theme.h-row;
     background: area.has-hover ? Theme.hover-row : transparent;
     HorizontalLayout {
         padding-left: Theme.space-md;
@@ -107,7 +111,12 @@ component MissingLine inherits Rectangle {
         spacing: Theme.space-md;
         Check { y: 4px; on: root.item.selected; horizontal-stretch: 0; }
         Line { text: root.item.title; color: Theme.text-bright; horizontal-stretch: 2; }
-        Line { text: root.item.path; color: Theme.text-dim; horizontal-stretch: 3; }
+        VerticalLayout {
+            horizontal-stretch: 3;
+            alignment: center;
+            Line { text: root.item.path; color: Theme.text-dim; }
+            if root.item.found != "": Line { text: root.item.found; color: Theme.play; }
+        }
     }
     area := TouchArea { clicked => { root.toggled(); } }
 }
@@ -134,6 +143,9 @@ component DupeLine inherits Rectangle {
 
 /// Every dialog of LibraryState; instantiate once in the window.
 export component LibraryOverlays inherits Rectangle {
+    // The import report sits under the path dialog SAVE AS TEXT opens.
+    ImportReportOverlay {}
+
     // Path / name entry.
     DialogFrame {
         visible: LibraryState.path-open;

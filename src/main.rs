@@ -16,17 +16,45 @@ fn own_folder() -> Option<PathBuf> {
 /// `openfader --rollback`: puts back the version an in-app update kept in `<install>.prev`, without opening a window (for a
 /// new version that does not start). Prints the result.
 fn roll_back() -> Result<(), Box<dyn std::error::Error>> {
-    let install = openfader::update::roll_back()?;
-    println!("rolled back: start {} again", install.exe_path().display());
+    let done = openfader::update::roll_back()?;
+    println!(
+        "rolled back: start {} again",
+        done.install.exe_path().display()
+    );
+    if let Some(library) = done.library {
+        println!(
+            "the library from before the update was put back ({}); the newer library is kept as {}",
+            library.backup.display(),
+            library.kept.display()
+        );
+    }
     Ok(())
 }
 
+/// `openfader verify <mount>`: the stick checker, no window and no audio (src/app/device/verify.rs). Exits with its code.
+fn verify() -> ! {
+    std::process::exit(app::verify(std::env::args_os().skip(2).collect()).into())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args_os().nth(1).is_some_and(|a| a == "verify") {
+        verify();
+    }
+    app::started();
     if std::env::args_os()
         .nth(1)
         .is_some_and(|a| a == "--rollback")
     {
         return roll_back();
+    }
+    // The elevated relaunch of the built-in formatter (src/device/format/windows.rs): no window, no app.
+    #[cfg(windows)]
+    if std::env::args_os()
+        .nth(1)
+        .is_some_and(|a| a == "--format-disk")
+    {
+        let args: Vec<_> = std::env::args_os().skip(2).collect();
+        std::process::exit(openfader::device::format::elevated_main(&args));
     }
     low_memory_malloc();
     openfader::diag::init(); // after the malloc settings (it starts threads): the log file and the crash reports
