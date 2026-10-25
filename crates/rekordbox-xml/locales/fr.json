@@ -1,0 +1,17 @@
+{
+ "C:/Users/x/Music=>/home/y/Music;… (empty: $OPENFADER_PATH_MAP)": "C:/Users/x/Music=>/home/y/Music;… (vide : $OPENFADER_PATH_MAP)",
+ "Export BeatGrid information": "Exporter les informations de grille de beats",
+ "Export Collection in xml format": "Exporter la collection au format xml",
+ "Import from rekordbox xml…": "Importer depuis rekordbox xml…",
+ "Imported Library": "Bibliothèque importée",
+ "Path map": "Correspondance des chemins",
+ "Reads and writes rekordbox's \"Export Collection in xml format\" (rekordbox.xml): tracks, playlists, beat grids and cues.": "Lit et écrit l'« Export Collection in xml format » de rekordbox (rekordbox.xml) : pistes, playlists, grilles de beats et cues.",
+ "path map entry '{}' is not <from>=><to>": "l'entrée de correspondance de chemins '{}' n'est pas de la forme <de>=><vers>",
+ "path of a rekordbox xml, listed in the Media Browser": "chemin d'un xml rekordbox, affiché dans le navigateur de médias",
+ "the plugin panicked": "le plugin a planté",
+ "{}: bad attribute in <{}>": "{} : attribut incorrect dans <{}>",
+ "{}: not a rekordbox XML export (no <DJ_PLAYLISTS>)": "{} : ce n'est pas un export XML rekordbox (pas de <DJ_PLAYLISTS>)",
+ "{}: unquoted attribute {}": "{} : attribut sans guillemets {}",
+ "{}: unterminated attribute value": "{} : valeur d'attribut non terminée",
+ "{}: unterminated tag": "{} : balise non terminée"
+}

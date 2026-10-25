@@ -15,10 +15,9 @@ use std::{path::PathBuf, sync::LazyLock};
 
 /// The plugins that are on until the user decides: the readers of the devices and libraries other DJ software writes and
 /// the effect packs. Only bundled names count (a plugin cannot ask to be on by itself), and only while there is no
-/// `plugins.json` ([`seed`]): a file that exists, even one listing none of them, is the user's choice.
+/// `plugins.json` ([`seed`]): a file that exists, even one listing none of them, is the user's choice. The rekordbox
+/// readers are not here: they are built into the app ([`super::builtin`]) and always on.
 pub const DEFAULT_ON: &[&str] = &[
-    "rekordbox-device",
-    "rekordbox-xml",
     "engine-dj",
     "beat-fx",
     "send-fx",
@@ -172,15 +171,15 @@ mod tests {
 
     #[test]
     fn defaults_apply_only_before_the_user_decided() {
-        let found = ["beat-fx", "engine-dj", "now-playing", "rekordbox-device"];
+        let found = ["beat-fx", "engine-dj", "now-playing", "mic-fx"];
         // No plugins.json yet: the defaults among the found plugins are on, once; others stay off.
         let mut c = Config { fresh: true, ..Config::default() };
         assert!(c.seed(&found));
-        assert_eq!(c.enabled, ["beat-fx", "engine-dj", "rekordbox-device"]);
+        assert_eq!(c.enabled, ["beat-fx", "engine-dj", "mic-fx"]);
         assert!(!c.seed(&found), "once");
         // A switch the user makes afterwards wins, and is what the file then says.
-        c.set_enabled("rekordbox-device", false);
-        assert!(!c.seed(&found) && !c.enabled("rekordbox-device"));
+        c.set_enabled("mic-fx", false);
+        assert!(!c.seed(&found) && !c.enabled("mic-fx"));
         // An existing file, whatever it lists, is the user's choice: even one that lists none of them.
         for text in [r#"{"enabled": ["now-playing"]}"#, r#"{"settings": {}}"#, "{}"] {
             let mut c: Config = serde_json::from_str(text).unwrap();

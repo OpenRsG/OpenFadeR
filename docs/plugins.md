@@ -44,9 +44,11 @@ The app reads plugins from
 
 An entry of that search path is either one plugin folder or a folder of plugin folders; the first plugin of a name wins.
 
-PREFERENCES > EXTENSIONS lists every plugin as a card: a switch to turn it on or off (a plugin starts off and installing one switches it on; the exception is a fresh
-profile with no `plugins.json`, where the readers `rekordbox-device`, `rekordbox-xml` and `engine-dj` and the effect packs `beat-fx`,
-`send-fx`, `lever-fx`, `mic-fx`, `soft-mix` and `cross-pass` start on, so a plugged-in rekordbox or Engine DJ stick is read at once;
+PREFERENCES > EXTENSIONS lists every plugin as a card. The rekordbox extensions `rekordbox-device`, `rekordbox-xml` and `rekordbox-db`
+come first, marked **BUILT IN**: they are compiled into the app ([The built-in rekordbox extensions](#the-built-in-rekordbox-extensions)),
+always on, with no switch, folder or uninstall, and their settings work as any plugin's. The other cards have a switch to turn the plugin on or off (a plugin starts off and installing one switches it on; the exception is a fresh
+profile with no `plugins.json`, where the reader `engine-dj` and the effect packs `beat-fx`,
+`send-fx`, `lever-fx`, `mic-fx`, `soft-mix` and `cross-pass` start on, so a plugged-in Engine DJ stick is read at once;
 once the file exists it is your choice and nothing is switched on behind it), what it runs on (LUA, PYTHON, PROGRAM or
 JSON), what it brings, its settings (**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`), then whatever went wrong while
 reading the plugins. The card's **⋮** menu opens its folder or **uninstalls** it: an installed plugin's folder is deleted, and a
@@ -55,7 +57,11 @@ again (after you edit a plugin). Actions, events and settings apply at once; eff
 mixer and the browser from start-up, so a change to those shows a **RESTART NOW** banner. The switches, the uninstalled plugins and
 the settings are kept in `~/.config/openfader/plugins.json`.
 
-When a stick is plugged in whose library only an extension that is off can read (`PIONEER/`: `rekordbox-device`, `Engine Library/`:
+A plugin folder named like a built-in extension (an old copy in the plugin folders, or one from GET PLUGINS) is not read: the card
+list shows the folder with a note to delete it, and installing a plugin of that name is refused. Built-ins are not offered or updated
+by GET PLUGINS either; they change with the app.
+
+When a stick is plugged in whose library only an extension that is off can read (`Engine Library/`:
 `engine-dj`, `_Serato_/`: `serato`, `VirtualDJ/`: `virtualdj`, `Traktor/`: `traktor`), the welcome window opens with just that extension
 and SWITCH ON turns it on (its library loads at the next start: RESTART NOW). Each extension is offered once per device per run.
 
@@ -807,7 +813,7 @@ stands. While staging, an interruption leaves the old library in use, and the ap
 staged file is whole and checked, so the app finishes the renames. Either way the device holds one whole generation of its
 libraries, never a new one next to an old one. The app recovers a device when it shows up and before any job writes to it.
 
-**Players.** A device plugin may ship `players.json` next to its `plugin.json`: `{"version", "players": [{"model", "reads":
+**Players.** A device plugin may ship `players.json` next to its `plugin.json` (a built-in one embeds it): `{"version", "players": [{"model", "reads":
 [library names from device_check], "file_systems": ["vfat", "exfat", "hfsplus"], "partition_tables": ["dos", "gpt"], "status":
 "confirmed" | "to_measure", "firmware", "note"}…], "presets": [{"id", "label", "models"}…]}`. The stick checker judges a device for
 each player of the booth profile (PREFERENCES > DJ SYSTEM > DEVICE and the DEVICES tab). A model marked `to_measure` is never shown
@@ -829,17 +835,60 @@ analysis of a stored track without the library being open, asks that plugin with
 plugin that declares `"legacy_analysis_refs": true` also answers references stored before they carried a plugin name (bare paths):
 the app prefixes them with its name at start-up.
 
+### The built-in rekordbox extensions
+
+`crates/` of the core repository holds the rekordbox extensions as crates of the app's Cargo workspace: `rekordbox-device` (the device
+libraries on USB sticks and SD cards, Device Library `export.pdb` and OneLibrary `exportLibrary.db`: reads them, exports to them,
+updates the collection from them, backs them up, converts them and edits their settings), `rekordbox-xml` (reads and writes a
+rekordbox XML collection file), `rekordbox-db` (the desktop collection `master.db`, a key as a `secret` setting), and the crates
+`rekordbox-common` and `rekordbox-export` they share (`itunes` and `sample-pack` of the plugins repository use `rekordbox-common` too).
+
+They are the same library plugins as the ones below, with one difference: they are linked into the app, so they cannot go missing or be
+switched off. A crate does not export `openfader_library_v2`; it implements `LibraryPlugin` and the host (`src/plugin/builtin.rs`)
+holds a table per extension: its `plugin.json` (without `lib`), its `locales/`, its `players.json`, and the static
+`openfader_plugin::library::api::<Plugin>()`. Requests go through that table's JSON `call` exactly as through a loaded library: there
+is one protocol. The registry lists the built-ins first and on, whatever `plugins.json` says; their settings are stored there under
+their names as before. A plugin folder of the same name is skipped with a note in the plugin list. They are behind the `rekordbox` feature of the `openfader` crate, which the `app` feature turns on (so
+Pi builds with `--no-default-features --features app` have them). It also swaps the bundled SQLite for SQLCipher with its own
+OpenSSL; a build without it, like the mobile crate, has no built-in plugins, plain SQLite and no OpenSSL. Their tests run with the app's:
+`cargo test --release --workspace`.
+
+What `rekordbox-device` guarantees when it writes a stick, and how that is checked:
+
+- **All or nothing.** One user action (export, sync, remove, player settings) is one transaction. New audio and analysis files are
+  written and fsynced first, the changed library files are staged beside their targets, then switched in one journalled step. Pulled
+  out at any point, the stick holds the old libraries or the new ones, never a mix; the next write or `device_check` finishes or rolls
+  back an interrupted switch first. A cancel or an error leaves the folder as it was.
+- **Read back before it counts.** Before the switch the staged Device Library and OneLibrary are read again and compared with what
+  was meant to be written (titles, counts, playlists and their entries, cue counts in the analysis files). A difference stops the
+  export with a plain sentence and nothing changed; a clean export reports `verified`.
+- **Dry run.** An export with `dry_run` writes nothing and returns the plan: tracks to add or update, bytes to copy and write, files,
+  and what is blocked (no room, a file over the file system's limit, a name the stick cannot hold, too many playlists).
+- **Names the file system accepts.** Long, accented, emoji and reserved (`CON`, `NUL`, ...) names are cleaned; a device path never
+  exceeds the 255 characters a Device Library row holds.
+- **Check and fix.** `device_check` reads what is on a stick without writing and lists problems (missing or unreadable library, the two
+  libraries disagreeing, missing audio or analysis files, leftovers of an interrupted write) with cause, consequence and action.
+  `device_fix` repairs one of them: rebuild one library from the other, rewrite the analysis files, clean leftovers.
+- **Players.** `crates/rekordbox-device/players.json` lists the players the checker knows, what each reads and what is only inferred.
+  `crates/rekordbox-device/COMPATIBILITY.md` says which rows are confirmed on hardware (none yet) and which are not; the test
+  `compatibility_lists_every_player_and_library` keeps the two together.
+
+Readers that are not ours check the output in CI (job `readers` of `ci.yml`): `crates/rekordbox-export/examples/fixture.rs` writes a
+small stick (unicode, emoji and long names, cues, loops, a playlist folder), and `.github/check_stick.py` reads it with pyrekordbox
+(the analysis files and `exportLibrary.db`), with a small DeviceSQL reader and with `rekordcrate` (`export.pdb`), and fails on any
+difference from the manifest. Locally: `cargo run --release -p rekordbox-export --example fixture -- /tmp/fx && pip install
+pyrekordbox==0.5.0 && python .github/check_stick.py /tmp/fx`. rekordcrate 0.3.0 cannot parse cue entries of type 1, so it is used for
+`export.pdb` only.
+
 ### The bundled library plugins
 
 Rust crates of one Cargo workspace, the plugins repository's `Cargo.toml` (`extension/plugin/Cargo.toml` in a core checkout), are library plugins: `itunes` (reads a media player's
-library file), a collection-file plugin (reads and writes a collection file), a plugin for the device libraries on USB sticks and
-SD cards (reads them, exports to them, updates the collection from them, backs them up, converts them and edits their settings), four
-more device plugins that write the libraries of other players and apps beside it on the same stick and also read those apps' desktop
-libraries (with `detect` patterns, so PREFERENCES > LIBRARIES offers to connect them), one for a desktop collection
-database (a key as a `secret` setting), and one for sampler packs (a zip of audio and a list file; the
+library file), four device plugins that write the libraries of other players and apps beside the built-in rekordbox one on the same stick and also read those apps' desktop
+libraries (with `detect` patterns, so PREFERENCES > LIBRARIES offers to connect them), and one for sampler packs (a zip of audio and a list file; the
 samples are extracted to the plugin's cache folder and served as a library; with `"samples": true` the first list also fills the
-sampler after File > Import). Crates for what they share sit beside them. They need building once: `extension/plugin/build.sh` builds
-the workspace in release mode and copies each library next to its `plugin.json` (`start.sh` runs it first). Their settings are on their
+sampler after File > Import). They need building once: `extension/plugin/build.sh` builds
+the workspace in release mode and copies each library next to its `plugin.json` (`start.sh` runs it first); the workspace builds against
+`sdk/` and `crates/rekordbox-common` of the core checkout. Their settings are on their
 cards in PREFERENCES > EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
 
 ## Controller plugins

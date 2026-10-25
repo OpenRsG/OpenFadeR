@@ -167,6 +167,7 @@ pub(super) fn refresh(app: &App) {
                 provides: provides(p).into(),
                 folder: p.dir.to_string_lossy().as_ref().into(),
                 enabled: *on,
+                builtin: p.builtin.is_some(),
                 removable: install::removable(p),
                 restart: restart.contains(&m.name),
                 open: open.iter().any(|n| n == m.name.as_str()),
@@ -279,6 +280,9 @@ pub(super) fn wire(app: &App) {
         let (Some(app), Some((p, on))) = (w.upgrade(), nth(i)) else {
             return;
         };
+        if p.builtin.is_some() {
+            return; // always on
+        }
         changed(
             &app,
             config::update(|c| c.set_enabled(&p.manifest.name, !on)),
@@ -347,6 +351,7 @@ pub(super) fn wire(app: &App) {
     });
     s.on_open_folder(move |i| {
         let dir = match nth(i) {
+            Some((p, _)) if p.builtin.is_some() => return, // no folder
             Some((p, _)) => p.dir,
             None => match install::user_dir() {
                 Some(d) => d,

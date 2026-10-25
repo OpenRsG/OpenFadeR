@@ -2,7 +2,8 @@ name: CI
 
 # Build, test and run the app on Linux, Windows and macOS (arm64), with the companion repositories checked out in place:
 # the plugins are built and tested, then the built app is started with a private home, left running, screenshotted and closed
-# (.github/smoke.sh). The screenshot and the app's output are uploaded.
+# (.github/smoke.sh). The screenshot and the app's output are uploaded. The rekordbox extensions are part of the app
+# (crates/rekordbox-*): `--workspace` tests them, and the `readers` job checks what they write with other programs' readers.
 on:
   push:
     branches: [main]
@@ -59,6 +60,13 @@ jobs:
             extension/plugin
           key: ${{ matrix.name }}
           cache-on-failure: true
+      # The app links SQLCipher with its own OpenSSL (the rekordbox extensions): Git Bash's perl lacks modules, Strawberry Perl (on
+      # the runners) has them.
+      - name: OpenSSL build tools (Windows)
+        if: matrix.name == 'windows'
+        run: |
+          echo "OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl.exe" >> "$GITHUB_ENV"
+          echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
       - name: Build the plugins
         run: extension/plugin/build.sh --quiet
       - run: cargo build --release
@@ -69,7 +77,7 @@ jobs:
         if: matrix.name == 'windows'
       - name: Tests
         run: |
-          if [ "${{ matrix.name }}" = windows ]; then cargo nextest run --release --no-fail-fast; else cargo test --release; fi
+          if [ "${{ matrix.name }}" = windows ]; then cargo nextest run --release --workspace --no-fail-fast; else cargo test --release --workspace; fi
       - name: Plugin tests
         run: cargo test --release --no-fail-fast --manifest-path extension/plugin/Cargo.toml
       - name: Smoke test (Linux, under Xvfb)
@@ -92,3 +100,30 @@ jobs:
             smoke/
             smoke-startup/
           if-no-files-found: ignore
+
+  # Other programs' readers (pyrekordbox, and rekordcrate for export.pdb) read a small stick the rekordbox extension wrote and must
+  # find in it what was put on it: titles, track and cue counts, playlists. Any difference fails the job.
+  readers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: readers
+      - run: pip install pyrekordbox==0.5.0
+      - name: Write the fixture stick
+        run: cargo run --release -p rekordbox-export --example fixture -- "$RUNNER_TEMP/fixture"
+      # A second, independent reader of export.pdb; the job goes on without it when it does not install.
+      - name: Install rekordcrate
+        id: rekordcrate
+        continue-on-error: true
+        run: cargo install rekordcrate --version 0.3.0 --locked
+      - name: Read the stick with the other readers
+        run: |
+          args=()
+          if [ "${{ steps.rekordcrate.outcome }}" = success ]; then args=(--rekordcrate rekordcrate); fi
+          python .github/check_stick.py "$RUNNER_TEMP/fixture" "${args[@]}"

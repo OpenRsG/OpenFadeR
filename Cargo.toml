@@ -3,9 +3,28 @@ name = "openfader"
 version = "0.2.5"
 edition = "2024"
 
+# The rekordbox extensions are compiled into the app (crates/, src/plugin/builtin.rs). Path dependencies (sdk, ui) are members
+# too. The companion checkouts and the Android project are separate workspaces.
+[workspace]
+members = ["crates/*"]
+exclude = ["extension", "mobile", "mappings"]
+
+[workspace.dependencies]
+openfader-plugin = { path = "sdk", features = ["library"] }
+rekordbox-common = { path = "crates/rekordbox-common" }
+rekordbox-export = { path = "crates/rekordbox-export" }
+serde_json = "1"
+# SQLCipher: rekordbox's databases are encrypted. `openfader` takes it only with its `rekordbox` feature (it opens plain SQLite
+# files too, so the app's own databases then use it as well).
+rusqlite = { version = "0.40", features = ["bundled-sqlcipher-vendored-openssl"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
 [features]
 default = ["app", "stems-gpu"]
-app = ["stems", "dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend", "dep:sys-locale"]
+app = ["stems", "rekordbox", "dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend", "dep:sys-locale"]
+# The rekordbox extensions built into the app (crates/, src/plugin/builtin.rs). They read SQLCipher databases, so this swaps the
+# bundled SQLite for SQLCipher with its own OpenSSL; a build without it (the mobile crate) keeps plain SQLite and needs no OpenSSL.
+rekordbox = ["dep:rekordbox-device", "dep:rekordbox-db", "dep:rekordbox-xml", "rusqlite/bundled-sqlcipher-vendored-openssl"]
 stems = ["dep:ort"]
 # STEMS on the GPU (ONNX Runtime's WebGPU provider, Dawn). ONNX Runtime ships no WebGPU build for ARM Linux: the Raspberry
 # Pi build (`--no-default-features --features app`, docs/raspberry-pi.md) separates on the CPU only.
@@ -20,7 +39,7 @@ required-features = ["app"]
 rusqlite = { version = "0.40", features = ["bundled", "functions", "hooks"] }
 symphonia = { version = "0.5.5", default-features = false, features = ["mp3", "aac", "isomp4", "flac", "wav", "aiff", "pcm"] }
 cpal = "0.15"
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono.workspace = true
 parking_lot = "0.12"
 # winit access: files dropped on the window (X11 / Windows / macOS) and the Wayland display for our own drag-and-drop (src/app/drop/).
 slint = { version = "1.17", optional = true, features = ["unstable-winit-030", "raw-window-handle-06"] }
@@ -28,15 +47,18 @@ midir = { version = "0.11.1", optional = true }
 ort = { version = "2.0.0-rc.14", optional = true, default-features = false, features = ["std", "download-binaries", "tls-native", "copy-dylibs", "api-31"] }
 ureq = "3"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json.workspace = true
 ring = "0.17" # sha256 of downloaded model files (src/models.rs); already in the tree through ureq's TLS
 semver = "1" # the version compare of the update check (src/update); already in the tree
 tar = "0.4" # the Linux release archives (src/update/install.rs); already in the tree
 hmac-sha256 = "1" # SHA-256 of the downloaded update, against the digest GitHub gives the asset; already in the tree
 flate2 = "1"
 libloading = "0.8" # Beat FX plugin libraries (src/plugin/effect.rs)
-openfader-plugin = { path = "sdk", features = ["library"] } # the plugin ABIs (effects, track libraries) and the shared library types: one definition for host and plugins
+openfader-plugin.workspace = true # the plugin ABIs (effects, track libraries) and the shared library types: one definition for host and plugins
 mlua = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"] } # Lua plugins, run in-process (src/plugin/lua.rs)
+rekordbox-device = { path = "crates/rekordbox-device", optional = true } # the built-in rekordbox extensions (src/plugin/builtin.rs)
+rekordbox-db = { path = "crates/rekordbox-db", optional = true }
+rekordbox-xml = { path = "crates/rekordbox-xml", optional = true }
 openfader-ui = { path = "ui", optional = true } # the Slint UI, built as its own crate
 sys-locale = { version = "0.3", optional = true } # the system's language for PREFS > VIEW > LANGUAGE = SYSTEM (src/app/i18n.rs); already in the tree through Slint
 
@@ -51,6 +73,23 @@ zbus = "5" # udisks2 over the system D-Bus: the built-in formatter (src/device/f
 
 [target.'cfg(target_os = "android")'.dependencies]
 cpal = { version = "0.15", features = ["oboe-shared-stdcxx"] }
+
+# These need the built-in rekordbox extensions.
+[[test]]
+name = "device_plugin"
+required-features = ["rekordbox"]
+
+[[test]]
+name = "transfer"
+required-features = ["rekordbox"]
+
+[[test]]
+name = "verify"
+required-features = ["rekordbox", "app"]
+
+[[test]]
+name = "library_plugin"
+required-features = ["rekordbox"]
 
 [[example]]
 name = "stems_bench"

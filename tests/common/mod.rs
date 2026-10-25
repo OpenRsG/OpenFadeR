@@ -1,6 +1,6 @@
 //! Shared helpers for the integration tests. Tests against a real device skip unless `OPENFADER_USB` names a mounted device whose
-//! library a bundled plugin reads (the plugins are built by `extension/plugin/build.sh`; the ignored `.local/device-key` holds the
-//! key of its encrypted library, if any), so machine paths and keys stay out of the repository.
+//! library a plugin reads (the ignored `.local/device-key` holds the key of its encrypted library, if any), so machine paths and
+//! keys stay out of the repository.
 #![allow(dead_code)] // each test binary uses a subset
 
 use openfader::library::{self, Library};
@@ -12,33 +12,14 @@ fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
 }
 
-/// The manifests of the bundled plugins: their folder and `plugin.json`.
-fn manifests() -> Vec<(PathBuf, Value)> {
-    std::fs::read_dir(root().join("extension/plugin"))
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|e| {
-            let text = std::fs::read_to_string(e.path().join("plugin.json")).ok()?;
-            Some((e.path(), serde_json::from_str(&text).ok()?))
-        })
-        .collect()
-}
-
-/// Makes the bundled plugins the app's plugins for this test binary and returns the name of the device plugin: the one whose
-/// manifest says `library.device`. `None` when it is not built (this OS's library file is missing). The `secret` settings of
-/// that plugin are filled from `.local/device-key`. Call before anything reads the plugin registry.
-pub fn device_plugin() -> Option<&'static str> {
-    static READY: LazyLock<Option<String>> = LazyLock::new(|| {
-        let (dir, manifest) = manifests()
-            .into_iter()
-            .find(|(_, m)| m["library"]["device"] == true)?;
-        let lib = manifest["library"]["lib"][std::env::consts::OS].as_str()?;
-        if !dir.join(lib).is_file() {
-            eprintln!("skip: run extension/plugin/build.sh first");
-            return None;
-        }
-        let name = manifest["name"].as_str()?.to_owned();
+/// Points the app's config, data and cache at a temp folder (never the user's) and returns the name of the device plugin: the
+/// built-in `rekordbox-device`, always there ([`openfader::plugin::builtin`]). Its `secret` settings are filled from the
+/// ignored `.local/device-key`. Call before anything reads the plugin registry.
+pub fn device_plugin() -> &'static str {
+    const NAME: &str = "rekordbox-device";
+    static READY: LazyLock<()> = LazyLock::new(|| {
+        let manifest: Value =
+            serde_json::from_str(include_str!("../../crates/rekordbox-device/plugin.json")).unwrap();
         let key = std::fs::read_to_string(root().join(".local/device-key")).unwrap_or_default();
         let secrets: serde_json::Map<String, Value> = manifest["settings"]
             .as_array()
@@ -50,32 +31,27 @@ pub fn device_plugin() -> Option<&'static str> {
         let config =
             std::env::temp_dir().join(format!("openfader-test-config-{}", std::process::id()));
         std::fs::create_dir_all(config.join("openfader")).unwrap();
-        let all: Vec<Value> = manifests()
-            .into_iter()
-            .map(|(_, m)| m["name"].clone())
-            .collect();
         std::fs::write(
             config.join("openfader/plugins.json"),
-            json!({"enabled": all, "settings": {&name: secrets}}).to_string(),
+            json!({"settings": {NAME: secrets}}).to_string(),
         )
         .unwrap();
         // SAFETY: set once, before the plugin registry is first read; the tests of a binary share this value. The store and
         // the analysis of the tests go to the same temp folder, never the user's.
         unsafe {
-            std::env::set_var("OPENFADER_PLUGINS", root().join("extension/plugin"));
             std::env::set_var("XDG_CONFIG_HOME", &config);
             std::env::set_var("XDG_DATA_HOME", config.join("data"));
             std::env::set_var("XDG_CACHE_HOME", config.join("cache"));
         }
-        Some(name)
     });
-    READY.as_deref()
+    *READY;
+    NAME
 }
 
-/// The mounted device `OPENFADER_USB` names, when a bundled plugin finds a library on it.
+/// The mounted device `OPENFADER_USB` names, when a plugin finds a library on it.
 pub fn usb_root() -> Option<PathBuf> {
     let r = PathBuf::from(std::env::var_os("OPENFADER_USB").filter(|v| !v.is_empty())?);
-    device_plugin()?;
+    device_plugin();
     let found =
         openfader::plugin::device::find(&r).is_some_and(|(_, info)| !info.libraries.is_empty());
     if !found {

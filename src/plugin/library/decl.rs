@@ -6,7 +6,9 @@ use std::collections::BTreeMap;
 /// `"library"` of `plugin.json`.
 #[derive(Deserialize, Clone, Debug)]
 pub struct LibraryDecl {
-    /// The native library, relative to the plugin folder: a file name, or one per OS (`linux`, `windows`, `macos`).
+    /// The native library, relative to the plugin folder: a file name, or one per OS (`linux`, `windows`, `macos`). A
+    /// built-in plugin ([`super::super::builtin`]) has none.
+    #[serde(default)]
     pub lib: LibFile,
     /// What the plugin reads: lower-case file extensions without the dot, and `dir` for folders. Empty: probed for every path.
     #[serde(default)]
@@ -52,6 +54,12 @@ pub enum LibFile {
     PerOs(BTreeMap<String, String>),
 }
 
+impl Default for LibFile {
+    fn default() -> Self {
+        LibFile::PerOs(BTreeMap::new())
+    }
+}
+
 impl LibFile {
     /// The file for this OS (`linux`, `windows`, `macos`).
     pub fn file(&self) -> Option<&str> {
@@ -90,9 +98,6 @@ impl Detect {
 
 /// Manifest rules of [`LibraryDecl`]; `settings` are the plugin's setting ids with their kinds.
 pub fn check(d: &LibraryDecl, settings: &[crate::plugin::SettingDecl]) -> Result<(), String> {
-    if d.lib.file().is_none_or(str::is_empty) {
-        return Err("library: `lib` must name a file for this OS".into());
-    }
     if d.formats
         .iter()
         .any(|f| f.is_empty() || *f != f.to_lowercase() || f.contains('.'))

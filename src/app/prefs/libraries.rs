@@ -59,12 +59,7 @@ pub fn rows(_: &Prefs) -> Vec<Row> {
     rows.push(Row::header(tr!("DETECTED")));
     let found = connect::found();
     if found.is_empty() {
-        let text = if openfader::plugin::registry().libraries.is_empty() {
-            tr!("No library plugin is on: switch one on in EXTENSIONS, then restart, to find other apps' libraries.")
-        } else {
-            tr!("No library of another app found in its usual place.")
-        };
-        rows.push(Row::info("", text));
+        rows.push(Row::info("", tr!("No library of another app found in its usual place.")));
     }
     for (i, f) in found.iter().enumerate() {
         rows.push(

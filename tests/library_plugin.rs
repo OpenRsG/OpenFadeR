@@ -1,6 +1,7 @@
-//! The library plugins through the host: the bundled plugins (built by `extension/plugin/build.sh`; the test skips when
-//! they are not) are probed for a path, answer playlists, tracks and analysis over the C ABI, write the Collection back as
-//! a file that opens again, and list a library of their own setting in the Media Browser.
+//! The library plugins through the host: the built-in rekordbox xml reader and the folder plugins of the plugins checkout
+//! (built by `extension/plugin/build.sh`; their part is skipped when they are not) are probed for a path, answer playlists,
+//! tracks and analysis through the JSON `call`, write the Collection back as a file that opens again, and list a library of
+//! their own setting in the Media Browser.
 
 use openfader::library::{self, snapshot::Snapshot, Library};
 use openfader::plugin;
@@ -33,24 +34,19 @@ fn titles(l: &dyn Library, playlist: Option<&str>) -> Vec<String> {
 }
 
 #[test]
-fn bundled_plugins_read_and_write_over_the_abi() {
+fn builtin_and_folder_plugins_read_and_write_over_the_abi() {
     let plugins = Path::new(env!("CARGO_MANIFEST_DIR")).join("extension/plugin");
-    // Every bundled library plugin must be built (extension/plugin/build.sh), else the test has nothing to read with; without the
-    // plugins checkout (start.sh fetches it) there is nothing to test.
-    let Ok(entries) = std::fs::read_dir(&plugins) else {
-        eprintln!("skipped: no extension/plugin checkout");
-        return;
-    };
-    let manifests: Vec<serde_json::Value> = entries
+    // The rekordbox xml reader is built into the app. iTunes is a folder plugin of the plugins checkout (start.sh fetches it,
+    // extension/plugin/build.sh builds it): its part of the test runs when the checkout is there and built.
+    let manifests: Vec<serde_json::Value> = std::fs::read_dir(&plugins)
+        .into_iter()
+        .flatten()
         .flatten()
         .filter_map(|e| {
-            let m: serde_json::Value =
+            let mut m: serde_json::Value =
                 serde_json::from_slice(&std::fs::read(e.path().join("plugin.json")).ok()?).ok()?;
-            Some((e.path(), m))
-        })
-        .map(|(dir, mut m)| {
-            m["dir"] = serde_json::json!(dir);
-            m
+            m["dir"] = serde_json::json!(e.path());
+            Some(m)
         })
         .collect();
     let unbuilt = manifests.iter().any(|m| {
@@ -58,9 +54,9 @@ fn bundled_plugins_read_and_write_over_the_abi() {
             .as_str()
             .is_some_and(|lib| !Path::new(m["dir"].as_str().unwrap()).join(lib).is_file())
     });
-    if unbuilt {
-        eprintln!("skipped: run extension/plugin/build.sh first");
-        return;
+    let folders = !manifests.is_empty() && !unbuilt;
+    if !folders {
+        eprintln!("no built extension/plugin checkout: only the built-in plugins are tested");
     }
     let dir = std::env::temp_dir().join(format!("openfader-libplugin-{}", std::process::id()));
     let plist = dir.join("Library.xml");
@@ -77,7 +73,11 @@ fn bundled_plugins_read_and_write_over_the_abi() {
     .unwrap();
     // SAFETY: the only test of this binary; set before the plugin registry and its settings are first read.
     unsafe {
-        std::env::set_var("OPENFADER_PLUGINS", &plugins);
+        if folders {
+            std::env::set_var("OPENFADER_PLUGINS", &plugins);
+        } else {
+            std::env::remove_var("OPENFADER_PLUGINS");
+        }
         std::env::set_var("XDG_CONFIG_HOME", dir.join("config"));
         std::env::set_var("XDG_DATA_HOME", dir.join("data"));
         std::env::set_var("XDG_CACHE_HOME", dir.join("cache"));
@@ -114,14 +114,16 @@ fn bundled_plugins_read_and_write_over_the_abi() {
     assert!(plugin::library::write_collection(&writer.plugin, &out, &snap).is_err());
 
     // iTunes is told apart by content, and its `file` setting lists it in the Media Browser.
-    let it = library::open(&plist).unwrap();
-    assert_eq!(
-        (it.kind(), titles(&*it, None)),
-        ("iTunes", vec!["Tune".to_owned()])
-    );
-    assert!(plugin::library::sources()
-        .iter()
-        .any(|s| s.plugin == "itunes" && s.path == plist));
+    if folders {
+        let it = library::open(&plist).unwrap();
+        assert_eq!(
+            (it.kind(), titles(&*it, None)),
+            ("iTunes", vec!["Tune".to_owned()])
+        );
+        assert!(plugin::library::sources()
+            .iter()
+            .any(|s| s.plugin == "itunes" && s.path == plist));
+    }
 
     // Nothing claims a text file; the error says so.
     let txt = dir.join("notes.txt");

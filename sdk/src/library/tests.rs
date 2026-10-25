@@ -49,6 +49,17 @@ fn call(req: Value) -> Value {
 }
 
 #[test]
+fn the_api_table_is_the_one_the_entry_point_returns() {
+    static API: LibraryApi = api::<Fake>();
+    let body = br#"{"op": "probe", "path": "/a/x.fake"}"#;
+    let buf = unsafe { (API.call)(body.as_ptr(), body.len(), std::ptr::null()) };
+    let v: Value =
+        serde_json::from_slice(unsafe { std::slice::from_raw_parts(buf.ptr, buf.len) }).unwrap();
+    unsafe { (API.free)(buf) };
+    assert_eq!((API.abi, v["score"].clone()), (LIBRARY_ABI, json!(80)));
+}
+
+#[test]
 fn ops_round_trip_and_failures_stay_answers() {
     assert_eq!(
         call(json!({"op": "probe", "path": "/a/x.fake"}))["score"],

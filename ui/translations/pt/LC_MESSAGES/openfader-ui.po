@@ -29,7 +29,7 @@ msgid "SOURCE"
 msgstr "CÓDIGO"
 
 #: ui/about.slint:53
-#: ui/plugins.slint:211
+#: ui/plugins.slint:215
 msgid "PLUGINS"
 msgstr "PLUGINS"
 
@@ -844,7 +844,7 @@ msgstr "Nova playlist / pasta / playlist inteligente / Tags / Cue Bank / etapa"
 
 #: ui/browser.slint:203
 #: ui/device-devices.slint:251
-#: ui/plugins.slint:167
+#: ui/plugins.slint:171
 msgid "MORE"
 msgstr "MAIS"
 
@@ -1204,7 +1204,7 @@ msgid "owner/repo or https://github.com/owner/repo"
 msgstr "owner/repo ou https://github.com/owner/repo"
 
 #: ui/catalog.slint:125
-#: src/app/prefs/libraries.rs:75
+#: src/app/prefs/libraries.rs:70
 msgid "ADD"
 msgstr "ADICIONAR"
 
@@ -1234,18 +1234,18 @@ msgstr "Pesquisar por nome do controlador ou da porta"
 
 #: ui/catalog.slint:166
 #: ui/catalog.slint:194
-#: ui/plugins.slint:283
+#: ui/plugins.slint:287
 msgid "INSTALL"
 msgstr "INSTALAR"
 
 #: ui/catalog.slint:166
 #: ui/exportmode-dock.slint:68
-#: ui/plugins.slint:283
+#: ui/plugins.slint:287
 msgid "UPDATE"
 msgstr "ATUALIZAR"
 
 #: ui/catalog.slint:166
-#: ui/plugins.slint:283
+#: ui/plugins.slint:287
 #: ui/themes.slint:485
 msgid "INSTALLED"
 msgstr "INSTALADO"
@@ -1888,7 +1888,7 @@ msgstr "Fazer backup ou restaurar a biblioteca deste dispositivo"
 
 #: ui/device-devices.slint:247
 #: ui/exportmode-dock.slint:69
-#: ui/plugins.slint:167
+#: ui/plugins.slint:171
 msgid "SETTINGS"
 msgstr "AJUSTES"
 
@@ -3374,115 +3374,119 @@ msgstr "SALVAR"
 msgid "Cue color and comment"
 msgstr "Cor e comentário do cue"
 
-#: ui/plugins.slint:101
+#: ui/plugins.slint:103
 msgid "More"
 msgstr "Mais"
 
-#: ui/plugins.slint:115
+#: ui/plugins.slint:117
 msgid "Open folder"
 msgstr "Abrir pasta"
 
-#: ui/plugins.slint:116
+#: ui/plugins.slint:118
 msgid "Uninstall"
 msgstr "Desinstalar"
 
-#: ui/plugins.slint:154
+#: ui/plugins.slint:157
+msgid "BUILT IN"
+msgstr "INTEGRADO"
+
+#: ui/plugins.slint:158
 msgid "BUNDLED"
 msgstr "INCLUÍDO"
 
-#: ui/plugins.slint:155
+#: ui/plugins.slint:159
 msgid "RESTART"
 msgstr "REINICIAR"
 
-#: ui/plugins.slint:167
+#: ui/plugins.slint:171
 msgid "LESS"
 msgstr "MENOS"
 
-#: ui/plugins.slint:178
+#: ui/plugins.slint:182
 #: ui/themes.slint:168
 msgid "by {}"
 msgstr "por {}"
 
-#: ui/plugins.slint:198
+#: ui/plugins.slint:202
 #: ui/themes.slint:548
 msgid "OPEN FOLDER"
 msgstr "ABRIR PASTA"
 
-#: ui/plugins.slint:199
+#: ui/plugins.slint:203
 msgid "WEB PAGE"
 msgstr "PÁGINA WEB"
 
-#: ui/plugins.slint:213
+#: ui/plugins.slint:217
 msgid "INSTALL FILE…"
 msgstr "INSTALAR ARQ.…"
 
-#: ui/plugins.slint:213
+#: ui/plugins.slint:217
 msgid "A plugin .zip or its plugin.json"
 msgstr "Um .zip de plugin ou seu plugin.json"
 
-#: ui/plugins.slint:214
+#: ui/plugins.slint:218
 msgid "INSTALL FOLDER…"
 msgstr "INSTALAR PASTA…"
 
-#: ui/plugins.slint:215
+#: ui/plugins.slint:219
 msgid "OPEN PLUGINS FOLDER"
 msgstr "ABRIR PASTA DE PLUGINS"
 
-#: ui/plugins.slint:216
+#: ui/plugins.slint:220
 msgid "RELOAD"
 msgstr "RECARREG."
 
-#: ui/plugins.slint:216
+#: ui/plugins.slint:220
 msgid "Read the plugin folders again"
 msgstr "Ler as pastas de plugins novamente"
 
-#: ui/plugins.slint:225
+#: ui/plugins.slint:229
 msgid "Drop a plugin folder, .zip or plugin.json (or a theme .json, or audio files) anywhere on the window to install it."
 msgstr "Solte uma pasta de plugin, .zip ou plugin.json (ou um tema .json, ou arquivos de áudio) em qualquer lugar da janela para instalar."
 
-#: ui/plugins.slint:244
+#: ui/plugins.slint:248
 #: ui/welcome.slint:110
 msgid "RESTART NOW"
 msgstr "REINICIAR AGORA"
 
-#: ui/plugins.slint:248
+#: ui/plugins.slint:252
 msgid "No plugin found. Install one, or put plugin folders in {}."
 msgstr "Nenhum plugin encontrado. Instale um ou coloque pastas de plugins em {}."
 
-#: ui/plugins.slint:272
+#: ui/plugins.slint:276
 msgid "{} → {}"
 msgstr "{} → {}"
 
-#: ui/plugins.slint:273
+#: ui/plugins.slint:277
 #: src/app/plugins/manager.rs:20
 msgid "NATIVE"
 msgstr "NATIVO"
 
-#: ui/plugins.slint:287
+#: ui/plugins.slint:291
 msgid "Downloads the prebuilt library for this computer when the repository has one"
 msgstr "Baixa a biblioteca pré-compilada para este computador quando o repositório tiver uma"
 
-#: ui/plugins.slint:298
+#: ui/plugins.slint:302
 msgid "GET PLUGINS"
 msgstr "OBTER PLUGINS"
 
-#: ui/plugins.slint:299
+#: ui/plugins.slint:303
 msgid "Plugins and themes come from GitHub repositories. Add a repository (owner/repo), then install what it holds with one click."
 msgstr "Plugins e temas vêm de repositórios do GitHub. Adicione um repositório (owner/repo) e instale o que ele contém com um clique."
 
-#: ui/plugins.slint:305
+#: ui/plugins.slint:309
 msgid "1 plugin in your repositories"
 msgstr "1 plugin nos seus repositórios"
 
-#: ui/plugins.slint:305
+#: ui/plugins.slint:309
 msgid "{} plugins in your repositories"
 msgstr "{} plugins nos seus repositórios"
 
-#: ui/plugins.slint:313
+#: ui/plugins.slint:317
 msgid "INSTALL ALL"
 msgstr "INSTALAR TUDO"
 
-#: ui/plugins.slint:318
+#: ui/plugins.slint:322
 msgid "Install or update every plugin below"
 msgstr "Instalar ou atualizar todos os plugins abaixo"
 
@@ -6171,8 +6175,8 @@ msgstr "; não foi possível ler {}"
 msgid "Removed {}"
 msgstr "{} removido"
 
-#: src/app/catalog/plugin.rs:91
-#: src/app/catalog/plugin.rs:99
+#: src/app/catalog/plugin.rs:93
+#: src/app/catalog/plugin.rs:101
 msgid "Installing {}…"
 msgstr "Instalando {}…"
 
@@ -8046,11 +8050,11 @@ msgstr[1] "{n} faixas transferidas para {}"
 msgid " ({} already there)"
 msgstr " ({} já estavam lá)"
 
-#: src/app/diag.rs:127
+#: src/app/diag.rs:128
 msgid "report copied to the clipboard"
 msgstr "relatório copiado para a área de transferência"
 
-#: src/app/diag.rs:141
+#: src/app/diag.rs:142
 msgid "report copied: paste it into the issue"
 msgstr "relatório copiado: cole-o na issue"
 
@@ -9700,29 +9704,29 @@ msgstr[1] "{n} efeitos {0}"
 msgid "nothing yet"
 msgstr "nada ainda"
 
-#: src/app/plugins/manager.rs:183
+#: src/app/plugins/manager.rs:184
 msgid "Restart to finish: {}"
 msgstr "Reinicie para concluir: {}"
 
-#: src/app/plugins/manager.rs:211
+#: src/app/plugins/manager.rs:212
 msgid "plugin {} installed{}"
 msgid_plural "plugins {} installed{}"
 msgstr[0] "plugin {} instalado{}"
 msgstr[1] "plugins {} instalados{}"
 
-#: src/app/plugins/manager.rs:217
+#: src/app/plugins/manager.rs:218
 msgid "; restart to load its effects or sources"
 msgstr "; reinicie para carregar seus efeitos ou fontes"
 
-#: src/app/plugins/manager.rs:271
+#: src/app/plugins/manager.rs:272
 msgid "{}: not a number"
 msgstr "{}: não é um número"
 
-#: src/app/plugins/manager.rs:294
+#: src/app/plugins/manager.rs:298
 msgid "plugin {} uninstalled"
 msgstr "plugin {} desinstalado"
 
-#: src/app/plugins/manager.rs:368
+#: src/app/plugins/manager.rs:373
 msgid "plugin folders read again"
 msgstr "pastas de plugins lidas novamente"
 
@@ -11323,23 +11327,19 @@ msgstr "DESCONECTAR"
 msgid "DETECTED"
 msgstr "DETECTADAS"
 
-#: src/app/prefs/libraries.rs:63
-msgid "No library plugin is on: switch one on in EXTENSIONS, then restart, to find other apps' libraries."
-msgstr "Nenhum plugin de biblioteca está ativo: ative um em EXTENSÕES e reinicie para encontrar bibliotecas de outros apps."
-
-#: src/app/prefs/libraries.rs:65
+#: src/app/prefs/libraries.rs:62
 msgid "No library of another app found in its usual place."
 msgstr "Nenhuma biblioteca de outro app encontrada no local habitual."
 
-#: src/app/prefs/libraries.rs:71
+#: src/app/prefs/libraries.rs:66
 msgid "CONNECT"
 msgstr "CONECTAR"
 
-#: src/app/prefs/libraries.rs:75
+#: src/app/prefs/libraries.rs:70
 msgid "FILE…"
 msgstr "ARQUIVO…"
 
-#: src/app/prefs/libraries.rs:75
+#: src/app/prefs/libraries.rs:70
 msgid "FOLDER…"
 msgstr "PASTA…"
 
@@ -12204,81 +12204,81 @@ msgstr "Frases: {} · {}"
 msgid "Stem file: {}"
 msgstr "Arquivo de stems: {}"
 
-#: src/app/update.rs:80
+#: src/app/update.rs:81
 msgid "No release notes."
 msgstr "Sem notas da versão."
 
-#: src/app/update.rs:94
+#: src/app/update.rs:95
 msgid "Checking for updates…"
 msgstr "Verificando atualizações…"
 
-#: src/app/update.rs:122
+#: src/app/update.rs:123
 msgid "Could not check for updates: {}"
 msgstr "Não foi possível verificar atualizações: {}"
 
-#: src/app/update.rs:131
+#: src/app/update.rs:132
 msgid "OpenFadeR {} is the latest version."
 msgstr "O OpenFadeR {} é a versão mais recente."
 
-#: src/app/update.rs:148
+#: src/app/update.rs:149
 msgid "This release has no archive for this system: UPDATE opens its page."
 msgstr "Esta versão não tem pacote para este sistema: ATUALIZAR abre a página."
 
-#: src/app/update.rs:150
+#: src/app/update.rs:151
 msgid "Not updated here ({}): UPDATE opens the release page."
 msgstr "Não atualizado aqui ({}): ATUALIZAR abre a página da versão."
 
-#: src/app/update.rs:159
+#: src/app/update.rs:160
 msgid "OpenFadeR {} is available: Help > Update"
 msgstr "O OpenFadeR {} está disponível: Ajuda > Atualizar"
 
-#: src/app/update.rs:171
+#: src/app/update.rs:172
 msgid "{n} plugin has an update (GET PLUGINS): {}"
 msgid_plural "{n} plugins have updates (GET PLUGINS): {}"
 msgstr[0] "{n} plugin tem atualização (GET PLUGINS): {}"
 msgstr[1] "{n} plugins têm atualizações (GET PLUGINS): {}"
 
-#: src/app/update.rs:202
+#: src/app/update.rs:203
 msgid "The release page is open in your browser."
 msgstr "A página da versão está aberta no seu navegador."
 
-#: src/app/update.rs:222
+#: src/app/update.rs:223
 msgid "Backing up the library…"
 msgstr "Fazendo backup da biblioteca…"
 
-#: src/app/update.rs:224
+#: src/app/update.rs:225
 msgid "Downloading…"
 msgstr "Baixando…"
 
-#: src/app/update.rs:258
+#: src/app/update.rs:259
 msgid "Installing…"
 msgstr "Instalando…"
 
-#: src/app/update.rs:275
+#: src/app/update.rs:276
 msgid "Downloading… {} of {} MB"
 msgstr "Baixando… {} de {} MB"
 
-#: src/app/update.rs:307
+#: src/app/update.rs:308
 msgid "Installed. Restarting…"
 msgstr "Instalado. Reiniciando…"
 
-#: src/app/update.rs:310
+#: src/app/update.rs:311
 msgid "Cancelled."
 msgstr "Cancelado."
 
-#: src/app/update.rs:311
+#: src/app/update.rs:312
 msgid "The update failed, nothing was changed: {}"
 msgstr "A atualização falhou, nada foi alterado: {}"
 
-#: src/app/update.rs:327
+#: src/app/update.rs:328
 msgid "Rolled back. The library from before the update was put back; the newer one is kept as {}. Restarting…"
 msgstr "Reversão feita. A biblioteca anterior à atualização foi restaurada; a mais nova foi mantida como {}. Reiniciando…"
 
-#: src/app/update.rs:335
+#: src/app/update.rs:336
 msgid "Could not roll back: {}"
 msgstr "Não foi possível voltar: {}"
 
-#: src/app/update.rs:406
+#: src/app/update.rs:407
 msgid "The last start did not finish: Help > Roll Back goes to the version before"
 msgstr "A última inicialização não terminou: Ajuda > Voltar vai para a versão anterior"
 

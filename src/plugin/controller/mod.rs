@@ -298,6 +298,7 @@ pub fn linked(name: &str, api: &'static ControllerApi) -> Loaded {
         plugin: Plugin {
             dir: Default::default(),
             manifest: serde_json::from_value(serde_json::json!({"name": name})).unwrap(),
+            builtin: None,
         },
         api,
     }

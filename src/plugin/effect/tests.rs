@@ -373,6 +373,7 @@ fn plugin(dir: &Path, name: &str, lib: &str) -> Plugin {
     Plugin {
         dir: dir.into(),
         manifest,
+        builtin: None,
     }
 }
 

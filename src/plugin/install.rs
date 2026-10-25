@@ -51,6 +51,9 @@ pub fn install_into(from: &Path, root: &Path) -> Result<String, String> {
     let _ = std::fs::remove_dir_all(&staging);
     let result = stage(from, &staging).and_then(|()| {
         let m = read_manifest(&staging)?;
+        if super::builtin::is(&m.name) {
+            return Err(format!("{}: built into the app, nothing to install", m.name));
+        }
         let dest = root.join(folder_name(&m.name));
         if dest.exists() {
             crate::paths::at(std::fs::remove_dir_all(&dest), &dest)?;
@@ -158,11 +161,14 @@ fn unzip(from: &Path, to: &Path) -> Result<(), String> {
 
 /// Whether `p` was installed by the user (it lives in [`user_dir`]); a bundled one is hidden by [`uninstall`] instead.
 pub fn removable(p: &Plugin) -> bool {
-    user_dir().is_some_and(|u| p.dir.starts_with(u))
+    p.builtin.is_none() && user_dir().is_some_and(|u| p.dir.starts_with(u))
 }
 
 /// Uninstalls a plugin: the user's copy is deleted and the name listed as removed, which hides a bundled copy too.
 pub fn uninstall(p: &Plugin) -> Result<(), String> {
+    if p.builtin.is_some() {
+        return Err(format!("{}: built into the app", p.manifest.name));
+    }
     if removable(p) {
         crate::paths::at(std::fs::remove_dir_all(&p.dir), &p.dir)?;
     }
@@ -252,6 +258,12 @@ mod tests {
         fs::write(src.join("plugin.json"), JSON).unwrap(); // main.lua is missing
         assert!(install_into(&src, &root).unwrap_err().contains("main.lua"));
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+        // A plugin of the app itself is not installed again as a folder.
+        if cfg!(feature = "rekordbox") {
+            fs::write(src.join("plugin.json"), r#"{"name": "rekordbox-device"}"#).unwrap();
+            assert!(install_into(&src, &root).unwrap_err().contains("built into the app"));
+            assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+        }
         fs::remove_dir_all(t).ok();
     }
 }

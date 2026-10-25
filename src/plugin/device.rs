@@ -315,9 +315,13 @@ impl Provider {
         )
     }
 
-    /// The player models the plugin knows (`players.json` next to its `plugin.json`); empty when it ships none. A file that
-    /// does not parse is an `Err` naming it.
+    /// The player models the plugin knows (`players.json` next to its `plugin.json`, or embedded in a built-in plugin);
+    /// empty when it ships none. A file that does not parse is an `Err` naming it.
     pub fn players(&self) -> Result<Players, String> {
+        if let Some(b) = self.0.plugin.builtin {
+            let text = b.players().unwrap_or("{}");
+            return serde_json::from_str(text).map_err(|e| format!("{}: players.json: {e}", self.0.name()));
+        }
         let path = self.0.plugin.dir.join("players.json");
         match std::fs::read(&path) {
             Ok(b) => serde_json::from_slice(&b).map_err(|e| format!("{}: {e}", path.display())),

@@ -191,13 +191,14 @@ pub fn run(
     let _skin = skin::wire(&app); // PREFS > THEMES and the skin folder watcher; the guard holds the watcher's timer
     let _studio = studio::wire(&app); // the studio workspace's clock; the timer lives until the window closes
     catalog::wire(&app); // GET PLUGINS / THEMES / MAPPINGS; before the controller session, which asks it about a controller with no mapping
-                         // plugin effects join every FX unit, so they load before the engine makes its units; the count is what the smoke test reads
+                         // plugin effects join every FX unit, so they load before the engine makes its units; the "found" count (folders only) is what the smoke test reads
     let r = openfader::plugin::registry();
-    eprintln!(
-        "plugins: {} found, {} on",
-        r.plugins.len() + r.disabled.len(),
-        r.plugins.len()
+    let (on, off) = (
+        r.plugins.iter().filter(|p| p.builtin.is_none()).count(),
+        r.disabled.len(),
     );
+    eprintln!("plugins: {} found, {on} on", on + off);
+    eprintln!("plugins: {} built in", openfader::plugin::builtin::plugins().len());
     prefs::audio::wire(); // hands the AUDIO settings to the engine before the decks open the output
     let _diag = diag::wire(&app); // Help > Report a Problem and the crash offer; the guard holds the timer that reads the audio facts
     let lib: Rc<dyn Library> = openfader::plugin::source::wrap(inner, plugins::notify(&app)).into(); // plugin sources join the tree, outside the store's overlay

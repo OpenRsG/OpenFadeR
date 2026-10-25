@@ -59,6 +59,19 @@ fn discovery_takes_plugin_folders_and_folders_of_them_first_name_wins() {
     assert_eq!(r.errors.len(), 2, "{:?}", r.errors); // the bad manifest and the duplicate
 }
 
+#[cfg(feature = "rekordbox")]
+#[test]
+fn a_folder_named_like_a_built_in_plugin_is_skipped_with_a_note() {
+    let d = temp("builtin-name");
+    plugin(&d, "rekordbox-device", "");
+    plugin(&d, "other", "");
+    let r = discover(&[d.clone()]);
+    let names: Vec<&str> = r.plugins.iter().map(|p| p.manifest.name.as_str()).collect();
+    assert_eq!(names, ["other"]);
+    assert_eq!(r.errors.len(), 1, "{:?}", r.errors);
+    assert!(r.errors[0].contains("built into the app"), "{:?}", r.errors);
+}
+
 #[test]
 fn manifests_need_a_command_for_process_features_and_a_plain_name() {
     let d = temp("manifest");

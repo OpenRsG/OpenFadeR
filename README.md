@@ -51,7 +51,7 @@ To install it for your user on Linux instead (the `openfader` command and an app
 
 ### Raspberry Pi
 
-For a Raspberry Pi 3, 4 or CM4 (64-bit Raspberry Pi OS, Debian 13), `docker buildx build -f Dockerfile.pi -o dist/pi .` cross-compiles an optimised archive on any x86_64 machine. See [docs/raspberry-pi.md](docs/raspberry-pi.md) for memory use (about 200 MB with two tracks playing, software renderer) and settings.
+For a Raspberry Pi 3, 4 or CM4 (64-bit Raspberry Pi OS, Debian 13), `docker buildx build -f Dockerfile.pi -o dist/pi .` cross-compiles an optimised archive on any x86_64 machine. See [docs/raspberry-pi.md](docs/raspberry-pi.md) for memory use (about 200 MB with two tracks playing, software renderer) and settings. On a Pi (or any ARM Linux machine with 8 GB of RAM or less) PREFS > ADVANCED > LOW-POWER MODE switches on by itself: smaller sampler slots and fewer analysis workers.
 
 ### Android
 
@@ -62,7 +62,7 @@ The standalone phone/tablet app lives in [`mobile/`](mobile/): two decks, local 
 
 ### Analysis that is ready when you load
 
-BPM, beat grid, downbeat, key, a three-band waveform, phrases (intro, up, chorus, down) and automatic cues are computed in the background and cached. The pictures above show them: coloured phrase bars over the enlarged waveforms, hot cues A to H under each deck, and a key colour in the track list. Decks sync tempo and beats, key sync follows the key, and key lock keeps the pitch while you push the tempo.
+BPM, beat grid, downbeat, key, a three-band waveform, phrases (intro, up, chorus, down) and automatic cues are computed in the background and cached. The pictures above show them: coloured phrase bars over the enlarged waveforms, hot cues A to H under each deck, and a key colour in the track list. Decks sync tempo and beats, key sync follows the key, and key lock keeps the pitch while you push the tempo (its time stretch places each grain at the drum hits, so kicks stay sharp far from the original tempo). Tracks whose sample rate differs from the sound card's are resampled with a windowed-sinc filter, not linear interpolation. Grids keep their meter: a 3/4 grid counts bars of three beats in automix, the ruler, beat sync phase and the slicer.
 
 Loading publishes playable audio after decoding and preparing its initial gain and auto-cue position. Missing waveform, grid and key analysis can finish during playback without replacing cue or grid edits made meanwhile. Bulk analysis requests share a worker budget; replacing a deck load or preview cancels obsolete work.
 
@@ -111,7 +111,7 @@ Raspberry Pi. Plugins can add [JSON recipes](docs/plugins.md#automix-styles) usi
 
 <p align="center"><img src="docs/media/fx.png" alt="Beat FX units with echo, reverb and flanger above the decks, and the color FX row" width="100%"></p>
 
-Beat FX has several units with three slots each. A unit's tempo comes from the deck on its channel (CH, the default), from the master deck (MST), or from taps (TAP); a unit on MASTER follows the master deck. COLOR FX (filter, space, dub echo, sweep, noise, crush, cross-pass) sits on every channel and MERGE FX works on the whole mix. More effects arrive through effect plugins.
+Beat FX has several units with three slots each. A unit's tempo comes from the deck on its channel (CH, the default), from the master deck (MST), or from taps (TAP); a unit on MASTER follows the master deck. COLOR FX (filter, space, dub echo, sweep, noise, crush, cross-pass) sits on every channel and MERGE FX works on the whole mix. More effects arrive through effect plugins; the beat, send, lever and mic effect packs are on from the first start.
 
 Effect replacements are prepared outside the audio callback. While a replacement is pending, that unit passes dry audio. Turning the selected effect off keeps its tail.
 
@@ -151,6 +151,8 @@ The browser reads folders (subfolders become playlists) or library plugins, and 
 
 The tree on the left marks each list with a glyph (playlist, folder, smart playlist, history day, tag, stage, USB stick …). Its sections (My Playlists, Cue Bank, Stages, History, Tags, Library health, Library, Devices) start folded: click a heading, or press Right / Left on it, to unfold or fold what is under it. A list you open from elsewhere (a playlist just made, a stick just opened) unfolds its section. From a controller: the browse knob walks the tree, its push on a heading folds or unfolds it (on a list it goes to the tracks), BACK in the tree folds the section you are in and goes to its heading.
 
+A History day, or the Session history, saves as an M3U8 playlist or, with SAVE SET LIST, as a set list in two files: a `.csv` table (position, time, title, artist, BPM, key, length) and a `.txt` with one `HH:MM  Artist - Title` line per track, ready to paste into a track-list post.
+
 The right-click menu on a track groups its actions under six headings, in two columns: PLAY (load, related tracks), PLAYLISTS (Tag List, playlists, palettes, the order of the list), USB STICK / SD CARD (Transfer to each plugged-in device; Import to Collection on the tracks of a stick), ANALYSIS (Analyze track, Make Auto Cue point, Analysis lock), TRACK INFO (details, tags, reloading the tags, artwork) and FILE (show, relocate, remove from the Collection). Every layout (classic, Studio, Stage) has the same menu. It works without the mouse too: the Menu key, or the controller's menu button (DDJ-FLX6: SHIFT + browse push; any controller: map `browse-menu` with MIDI LEARN), opens it on the chosen track; the browse knob or Up / Down moves through it, the knob's push or Enter runs the item, BACK or Esc closes it. Themes can restyle the tree and the menu (headings, glyphs, lines, one or two columns: docs/skins.md, "Library tree and track menu").
 
 Select several tracks like in a file manager: Ctrl+click adds or removes a row, Shift+click (or Shift+Up/Down/PageUp/PageDown/Home/End) selects the range from the last row you clicked, Ctrl+A selects every row shown and Esc goes back to the chosen row. A search or filter drops the rows it hides from the selection; a re-sort keeps it. Drag any selected row to carry the whole selection onto a playlist (tracks the playlist already holds are skipped and counted), the Tag List, a tag, a stage or a palette; a deck still loads just the dragged track. The right-click menu then starts with "N tracks selected" and acts on all of them (Add to Tag List, Add to playlist, New playlist from selection, palettes, Remove from list, Analyze, Analysis lock, Reload tag, Fetch missing artwork, Auto relocate, Remove from Collection with one confirmation); the items that need one track (Load to deck, Edit track details, Tags, Related tracks, Move up/down, Find artwork, Show in file manager, Relocate) are greyed out. The status line counts the selection.
@@ -176,7 +178,7 @@ EDIT shows the whole track with its beat grid. Select with snap to beat or bar, 
 
 ### Recording
 
-REC writes the master mix (or an audio input) to WAV files, started and split by silence if you like. Next to each file it also writes a cue sheet and a tracklist of what led the mix (by the master deck, the channel faders and the crossfader), and, if you switch it on, a JSON-lines log of every deck, mixer and effect control you touched. See [docs/recording-files.md](docs/recording-files.md); the three are switched in PREFERENCES > ADVANCED > RECORDINGS.
+REC writes the master mix (or an audio input) to WAV files, started and split by silence if you like. Next to each file it also writes a cue sheet (kept up to date during the recording, so a crash does not lose it) and a tracklist of what led the mix (by the master deck, the channel faders and the crossfader), and, if you switch it on, a JSON-lines log of every deck, mixer and effect control you touched. See [docs/recording-files.md](docs/recording-files.md); the three are switched in PREFERENCES > ADVANCED > RECORDINGS.
 
 ### Lighting mode (beta)
 
@@ -210,6 +212,8 @@ Track > Find Artwork… asks the artwork plugins (`cover-art` covers MusicBrainz
 
 Every USB stick or SD card the app handles has a verdict at the top of its DEVICES tab, in big letters you can read in a dark booth: READY, NEEDS FIXING, UNREADABLE or EMPTY. It is found in the background when the stick is mounted, after anything writes to it and when the tab opens; the device list shows it as a chip. DETAILS lists the libraries on the stick (when written, tracks, playlists, cues), what is wrong as cause / consequence / action, and for each player model OK / NO / ? with the reason ("needs OneLibrary, this stick has none", "cannot read exFAT"; a model nobody has measured yet is never a plain OK). Tick the players of your booth there (or pick a preset) and the verdict is for those only: one of them that cannot read the stick makes it NEEDS FIXING. With none ticked the players are listed and the verdict is about the stick itself, so a stick made for software on a laptop is not called broken (a file system no player reads still is). FIX THE STICK repairs what it can, after a backup of the stick's library: it finishes or undoes an export a pulled stick cut off, runs the extensions' own repairs, copies audio files a library lists but the stick lost from your collection again, and rebuilds a library nothing can repair from your collection after asking. Nothing is ever deleted. A stick that an export cut off is put right when it is mounted, and with PREFERENCES > DJ SYSTEM > DEVICE > "Check the stick before it is ejected" an eject of a stick that needs fixing asks first.
 
+A stick plugged in through a USB hub gets a warning in the device list: hubs that reset their link make long exports fail with an input/output error. An export cut off that way keeps the audio already copied; export again and it carries on with the rest (each file is retried once after a link reset).
+
 `openfader verify <mount> [--players "CDJ-3000X,CDJ-2000NXS2"] [--json]` does the same check from a terminal, with no window and no audio, and never writes (a cut-off export is reported, not put right). It prints the verdict, libraries, problems and players, or JSON, and its exit code is the verdict: 0 ready, 1 needs fixing or empty, 2 unreadable, 3 it could not be checked (no such folder, not a stick the app lists, no device extension on). `openfader verify --help` shows the usage; `OPENFADER_DEVICE_ROOTS=<folder>` makes a folder a pretend stick for trying it out.
 
 ## Themes
@@ -226,17 +230,17 @@ Three companion repositories feed the app, and PREFERENCES lists them from the f
 
 | Repository | Holds | Where in the app |
 | --- | --- | --- |
-| [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins) | library, device, effect, action, source and controller plugins (17 at the time of writing; `mixxx` runs Mixxx's `.midi.xml` mappings with their scripts from your own Mixxx folders) | PREFERENCES > EXTENSIONS > GET PLUGINS |
+| [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins) | library, device, effect, action, source and controller plugins (19 at the time of writing; `mixxx` runs Mixxx's `.midi.xml` mappings with their scripts from your own Mixxx folders) | PREFERENCES > EXTENSIONS > GET PLUGINS |
 | [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) | themes | PREFERENCES > THEMES > GET THEMES |
 | [OpenFadeR-Map](https://github.com/OpenRsG/OpenFadeR-Map) | MIDI controller mappings (more than 170 files) | PREFERENCES > CONTROLLER > GET MAPPINGS |
 
 INSTALL installs one. Add any repository by its GitHub path (`user/name`) and the app finds the plugins, themes or mappings in it too, so sharing a theme is publishing a GitHub repository.
 
-Plugins start switched off. At the first start a welcome window offers the suggested ones (the plugins that read and write other DJ software's libraries, devices and effects) and STEMS; ACCEPT switches them on, SKIP leaves them off. Help > Welcome opens it again.
+The rekordbox extensions (USB sticks and SD cards in rekordbox's Device Library and OneLibrary formats, rekordbox XML, the rekordbox collection) are part of the app: always on, nothing to install. A fresh profile also starts with the Engine DJ reader and the effect packs on (`beat-fx`, `send-fx`, `lever-fx`, `mic-fx`, `soft-mix`, `cross-pass`); the other plugins start switched off. At the first start a welcome window offers the suggested ones and STEMS; ACCEPT switches them on, SKIP leaves them off. Help > Welcome opens it again. Plugging in a stick written by another DJ program (Serato, VirtualDJ, Traktor) whose reader is off opens the same window with that reader.
 
 At each start the app asks GitHub for the newest release; when it is newer than the running version a window offers to open its download page. Offline, nothing is shown.
 
-Plug in a controller that has no mapping yet and the app offers the matching file from the mapping repository: one click on INSTALL and the controller works. Mapping files cover the default layer of each controller; MIDI learn and LED feedback are built in, and hot-plug detection picks controllers up while the app runs. The format is described in [docs/mappings.md](docs/mappings.md).
+Plug in a controller that has no mapping yet and the app offers the matching file from the mapping repository: one click on INSTALL and the controller works. Mapping files cover the default layer of each controller; MIDI learn and LED feedback are built in, and hot-plug detection picks controllers up while the app runs (on Linux at once, from the system's own announcements; sticks and connected libraries are noticed the same way, with a slow check left as a safety net). The format is described in [docs/mappings.md](docs/mappings.md).
 
 External gear can follow the mix: name an output port in PREFERENCES > CONTROLLER > MIDI CLOCK OUT and it receives a 24 PPQN MIDI clock locked to the playing master deck's beat grid, with START on its next bar line and STOP when no deck plays. A deck without a beat grid sends no clock.
 

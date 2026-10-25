@@ -1,7 +1,8 @@
-//! Suggesting a reader by what a device holds: a stick with `PIONEER/` on it has a rekordbox library, but with
-//! `rekordbox-device` off no plugin handles the stick and the device list does not show it at all. [`devices`] looks at the
+//! Suggesting a reader by what a device holds: a stick with `Engine Library/` on it has an Engine DJ library, but with
+//! `engine-dj` off no plugin handles the stick and the device list does not show it at all. [`devices`] looks at the
 //! top-level folders of every mounted device (cheap: one directory listing, once per device per run) and, for a reader that
-//! is installed and off, opens the welcome window with just that extension ([`crate::app::welcome::offer`]).
+//! is installed and off, opens the welcome window with just that extension ([`crate::app::welcome::offer`]). The rekordbox
+//! readers are built into the app and always on, so `PIONEER/` is never offered.
 
 use crate::app::{App, welcome};
 use openfader::{device::Device, plugin::current};
@@ -9,7 +10,6 @@ use std::{cell::RefCell, collections::HashSet};
 
 /// A top-level folder of a device, and the extension that reads the library inside it.
 const FOLDERS: &[(&str, &str)] = &[
-    ("PIONEER", "rekordbox-device"),
     ("Engine Library", "engine-dj"),
     ("_Serato_", "serato"),
     ("VirtualDJ", "virtualdj"),
@@ -70,17 +70,17 @@ mod tests {
 
     #[test]
     fn a_folder_names_the_extension_that_reads_it() {
-        assert_eq!(readers(&["PIONEER", "Contents"]), ["rekordbox-device"]);
+        assert!(readers(&["PIONEER", "Contents"]).is_empty(), "rekordbox is built in");
         assert_eq!(readers(&["Engine Library"]), ["engine-dj"]);
         assert_eq!(readers(&["_Serato_"]), ["serato"]);
         assert_eq!(readers(&["VirtualDJ"]), ["virtualdj"]);
         assert_eq!(readers(&["Traktor"]), ["traktor"]);
         // FAT keeps the case it was given but other systems do not: the match ignores it.
-        assert_eq!(readers(&["pioneer"]), ["rekordbox-device"]);
+        assert_eq!(readers(&["engine library"]), ["engine-dj"]);
         // A stick can hold several libraries (one audio folder shared by every format); each reader once, in table order.
         assert_eq!(
-            readers(&["Traktor", "PIONEER", "Contents", "PIONEER"]),
-            ["rekordbox-device", "traktor"]
+            readers(&["Traktor", "_Serato_", "Contents", "_Serato_"]),
+            ["serato", "traktor"]
         );
         assert!(readers(&["Music", "PIONEER2", "Engine"]).is_empty());
         assert!(readers::<&str>(&[]).is_empty());

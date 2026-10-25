@@ -22,7 +22,7 @@ On Linux the build needs the ALSA, fontconfig and xkbcommon development packages
 
 ```bash
 cargo build --release   # 0 warnings expected
-cargo test --release    # with the companion checkouts in place their tests run too
+cargo test --release --workspace   # also the rekordbox crates of crates/; with the companion checkouts in place their tests run too
 ```
 
 ## Making a change

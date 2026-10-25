@@ -25,6 +25,7 @@
 //! those of the first read until a restart ([`Registry::restart_needed`]).
 
 pub mod action;
+pub mod builtin;
 pub mod config;
 pub mod controller;
 pub mod device;
@@ -215,8 +216,11 @@ impl SettingDecl {
 
 #[derive(Clone)]
 pub struct Plugin {
+    /// The plugin folder; empty for a built-in plugin.
     pub dir: PathBuf,
     pub manifest: Manifest,
+    /// Set for a plugin compiled into the app ([`builtin`]): no folder, always on, no uninstall.
+    pub builtin: Option<&'static builtin::Builtin>,
 }
 
 /// Every plugin found, the effects their libraries add, and what went wrong on the way (bad manifests, duplicate
@@ -341,6 +345,8 @@ fn read_all() -> Registry {
         .plugins
         .into_iter()
         .partition(|p| cfg.enabled(&p.manifest.name));
+    // The built-in plugins come first and are on whatever the user decided.
+    r.plugins.splice(0..0, builtin::plugins().iter().cloned());
     r
 }
 
@@ -418,12 +424,21 @@ pub fn discover(dirs: &[PathBuf]) -> Registry {
         };
         for dir in candidates {
             match read_manifest(&dir) {
+                Ok(m) if builtin::is(&m.name) => r.errors.push(format!(
+                    "{}: {:?} is built into the app, this folder is not used (delete it)",
+                    dir.display(),
+                    m.name
+                )),
                 Ok(m) if r.get(&m.name).is_some() => r.errors.push(format!(
                     "{}: a plugin named {:?} is already loaded",
                     dir.display(),
                     m.name
                 )),
-                Ok(manifest) => r.plugins.push(Plugin { dir, manifest }),
+                Ok(manifest) => r.plugins.push(Plugin {
+                    dir,
+                    manifest,
+                    builtin: None,
+                }),
                 Err(e) => r.errors.push(e),
             }
         }
@@ -437,17 +452,28 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
         serde_json::from_str(&crate::paths::at(std::fs::read_to_string(&file), &file)?),
         &file,
     )?;
+    let name = file.display().to_string();
+    validate(&m, &name, Some(dir))?;
+    if m.library.as_ref().is_some_and(|l| l.lib.file().is_none_or(str::is_empty)) {
+        return Err(format!("{name}: library: `lib` must name a file for this OS"));
+    }
+    Ok(m)
+}
+
+/// The rules every manifest keeps; `file` names it in the messages, `dir` (a folder plugin) is where its script must be.
+/// A library plugin of a folder names its native library; a built-in one has none.
+fn validate(m: &Manifest, file: &str, dir: Option<&Path>) -> Result<(), String> {
     if m.name.is_empty() || m.name.contains(':') {
         return Err(format!(
             "{}: `name` must be non-empty and hold no `:`",
-            file.display()
+            file
         ));
     }
     if let Some(e) = &m.effects {
-        effect::check(e).map_err(|e| format!("{}: {e}", file.display()))?;
+        effect::check(e).map_err(|e| format!("{}: {e}", file))?;
     }
     if let Some(l) = &m.library {
-        library::check(l, &m.settings).map_err(|e| format!("{}: {e}", file.display()))?;
+        library::check(l, &m.settings).map_err(|e| format!("{}: {e}", file))?;
     }
     if let Some(s) = m
         .sources
@@ -456,7 +482,7 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
     {
         return Err(format!(
             "{}: source id {:?} must be non-empty and hold no `:`",
-            file.display(),
+            file,
             s.id
         ));
     }
@@ -466,27 +492,31 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
     {
         return Err(format!(
             "{}: sources, actions, events and artwork need a `script` or a `command`",
-            file.display()
+            file
         ));
     }
-    if let Some(s) = m.script.as_ref().filter(|s| !dir.join(s).is_file()) {
+    if let Some(s) = m
+        .script
+        .as_ref()
+        .filter(|s| dir.is_some_and(|d| !d.join(s).is_file()))
+    {
         return Err(format!(
             "{}: script {s:?} is not in the plugin folder",
-            file.display()
+            file
         ));
     }
     for (i, s) in m.settings.iter().enumerate() {
         if s.id.is_empty() || m.settings[..i].iter().any(|o| o.id == s.id) {
             return Err(format!(
                 "{}: setting ids must be non-empty and unique ({:?})",
-                file.display(),
+                file,
                 s.id
             ));
         }
         if s.kind == SettingKind::Choice && s.choices.is_empty() {
             return Err(format!(
                 "{}: setting {:?} is a `choice` without `choices`",
-                file.display(),
+                file,
                 s.id
             ));
         }
@@ -499,7 +529,7 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
     {
         return Err(format!(
             "{}: knob mode {:?} needs a name of 1 to 16 characters and a `stop` from 0 to 1",
-            file.display(),
+            file,
             k.name
         ));
     }
@@ -510,18 +540,21 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
     {
         return Err(format!(
             "{}: pad mode {:?} needs a name of 1 to 16 characters and a `press` or `release` step",
-            file.display(),
+            file,
             p.name
         ));
     }
-    crate::mixstyle::validate_all(&m.automix).map_err(|e| format!("{}: {e}", file.display()))?;
-    Ok(m)
+    crate::mixstyle::validate_all(&m.automix).map_err(|e| format!("{}: {e}", file))?;
+    Ok(())
 }
 
 impl Plugin {
     /// `text` given by this plugin (its manifest, a reply) in the language set, from its `locales/` ([`crate::locale`]).
     pub fn tr(&self, text: &str) -> String {
-        crate::locale::tr(&self.dir, text)
+        match self.builtin {
+            Some(b) => b.tr(&self.manifest.name, text),
+            None => crate::locale::tr(&self.dir, text),
+        }
     }
 
     /// Sends `request` (`{"op": …}`, given the plugin's `settings`, see [`config`], and the language `lang`, see

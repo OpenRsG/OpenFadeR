@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "players": [
+    {
+      "model": "CDJ-2000NXS2",
+      "reads": [
+        "Device Library"
+      ],
+      "file_systems": [
+        "vfat",
+        "hfsplus"
+      ],
+      "partition_tables": [
+        "dos"
+      ],
+      "status": "confirmed",
+      "note": "Reads FAT32 (and HFS+); not exFAT"
+    },
+    {
+      "model": "CDJ-3000",
+      "reads": [
+        "Device Library",
+        "OneLibrary"
+      ],
+      "file_systems": [
+        "vfat",
+        "exfat",
+        "hfsplus"
+      ],
+      "status": "confirmed",
+      "note": "Firmware 3.30 (withdrawn 4 Nov 2025) needed a OneLibrary; later firmware reads the Device Library again"
+    },
+    {
+      "model": "CDJ-3000X",
+      "reads": [
+        "OneLibrary"
+      ],
+      "file_systems": [
+        "vfat",
+        "exfat"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "model": "OPUS-QUAD",
+      "reads": [
+        "OneLibrary"
+      ],
+      "file_systems": [
+        "vfat",
+        "exfat"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "model": "OMNIS-DUO",
+      "reads": [
+        "OneLibrary"
+      ],
+      "file_systems": [
+        "vfat",
+        "exfat"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "model": "XDJ-AZ",
+      "reads": [
+        "OneLibrary"
+      ],
+      "file_systems": [
+        "vfat",
+        "exfat"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "model": "XDJ-XZ",
+      "reads": [
+        "Device Library"
+      ],
+      "file_systems": [
+        "vfat",
+        "exfat"
+      ],
+      "status": "to_measure",
+      "note": "Which library it reads is not documented yet"
+    },
+    {
+      "model": "XDJ-RX3",
+      "reads": [
+        "Device Library"
+      ],
+      "file_systems": [
+        "vfat",
+        "exfat"
+      ],
+      "status": "to_measure",
+      "note": "Which library it reads is not documented yet"
+    },
+    {
+      "model": "CDJ-2000 Nexus",
+      "reads": [
+        "Device Library"
+      ],
+      "file_systems": [
+        "vfat"
+      ],
+      "status": "to_measure",
+      "note": "Players reported stuck on exports from other software: test before a gig"
+    },
+    {
+      "model": "XDJ-1000MK2",
+      "reads": [
+        "Device Library"
+      ],
+      "file_systems": [
+        "vfat"
+      ],
+      "status": "to_measure",
+      "note": "Players reported stuck on exports from other software: test before a gig"
+    }
+  ],
+  "presets": [
+    {
+      "id": "older",
+      "label": "Older players",
+      "models": [
+        "CDJ-2000NXS2",
+        "CDJ-2000 Nexus",
+        "XDJ-1000MK2"
+      ]
+    },
+    {
+      "id": "mixed",
+      "label": "Mixed booth",
+      "models": [
+        "CDJ-2000NXS2",
+        "CDJ-3000",
+        "CDJ-3000X"
+      ]
+    },
+    {
+      "id": "newest",
+      "label": "Newest only",
+      "models": [
+        "CDJ-3000X",
+        "OPUS-QUAD",
+        "OMNIS-DUO",
+        "XDJ-AZ"
+      ]
+    }
+  ]
+}

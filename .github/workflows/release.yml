@@ -56,6 +56,13 @@ jobs:
         run: |
           if [ "${GITHUB_REF_TYPE}" = tag ]; then v=${GITHUB_REF_NAME#v}; else v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)-dev; fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
+      # The app links SQLCipher with its own OpenSSL (the rekordbox extensions): Git Bash's perl lacks modules, Strawberry Perl (on
+      # the runners) has them.
+      - name: OpenSSL build tools (Windows)
+        if: matrix.name == 'windows'
+        run: |
+          echo "OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl.exe" >> "$GITHUB_ENV"
+          echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
       - name: Build the plugins
         run: extension/plugin/build.sh --quiet
       - name: Build the app
@@ -193,7 +200,7 @@ jobs:
             out/*.tar.gz
           generate_release_notes: true
           body: |
-            Archives (each holds the app with its themes, controller mappings and plugins, ready to run):
+            Archives (each holds the app with its themes, controller mappings and plugins, ready to run; the rekordbox extensions are part of the app itself):
 
             - **Linux** (x86_64): `openfader-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
             - **Raspberry Pi 3, 4, 5 and CM4** (aarch64, 64-bit Raspberry Pi OS based on Debian 13): `openfader-<version>-linux-aarch64-pi.tar.gz`. Unpack and run `./openfader-<version>-linux-aarch64-pi/openfader`. See docs/raspberry-pi.md.

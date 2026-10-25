@@ -1,0 +1,21 @@
+{
+  "name": "rekordbox-device",
+  "version": "0.1.0",
+  "suggest": "rekordbox",
+  "description": "rekordbox Device Libraries on USB sticks and SD cards (export.pdb for rekordbox 5 to 7 and every CDJ / XDJ, and the encrypted OneLibrary exportLibrary.db for rekordbox 7 and the newest players, a per-device option): browse them, export a collection to a device, update the collection from it, back up, convert, edit its settings.",
+  "library": {
+    "formats": [
+      "dir"
+    ],
+    "device": true,
+    "legacy_analysis_refs": true
+  },
+  "settings": [
+    {
+      "id": "onelibrary_key",
+      "label": "OneLibrary key (optional)",
+      "type": "secret",
+      "help": "SQLCipher key of exportLibrary.db (OneLibrary, formerly Device Library Plus). Empty: the built-in key, the same on every device."
+    }
+  ]
+}

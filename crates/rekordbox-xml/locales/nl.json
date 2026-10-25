@@ -1,0 +1,17 @@
+{
+ "C:/Users/x/Music=>/home/y/Music;… (empty: $OPENFADER_PATH_MAP)": "C:/Users/x/Music=>/home/y/Music;… (leeg: $OPENFADER_PATH_MAP)",
+ "Export BeatGrid information": "Beatgrid-informatie exporteren",
+ "Export Collection in xml format": "Collectie exporteren in xml-indeling",
+ "Import from rekordbox xml…": "Importeren uit rekordbox xml…",
+ "Imported Library": "Geïmporteerde bibliotheek",
+ "Path map": "Padtoewijzing",
+ "Reads and writes rekordbox's \"Export Collection in xml format\" (rekordbox.xml): tracks, playlists, beat grids and cues.": "Leest en schrijft rekordbox' \"Export Collection in xml format\" (rekordbox.xml): tracks, afspeellijsten, beatgrids en cues.",
+ "path map entry '{}' is not <from>=><to>": "padtoewijzing '{}' heeft niet de vorm <van>=><naar>",
+ "path of a rekordbox xml, listed in the Media Browser": "pad van een rekordbox-xml, getoond in de mediabrowser",
+ "the plugin panicked": "de plugin is gecrasht",
+ "{}: bad attribute in <{}>": "{}: ongeldig attribuut in <{}>",
+ "{}: not a rekordbox XML export (no <DJ_PLAYLISTS>)": "{}: geen rekordbox-XML-export (geen <DJ_PLAYLISTS>)",
+ "{}: unquoted attribute {}": "{}: attribuut zonder aanhalingstekens {}",
+ "{}: unterminated attribute value": "{}: niet-afgesloten attribuutwaarde",
+ "{}: unterminated tag": "{}: niet-afgesloten tag"
+}

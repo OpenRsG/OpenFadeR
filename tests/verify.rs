@@ -1,6 +1,6 @@
 //! `openfader verify`: the stick checker as a command (src/app/device/verify.rs), run as the built binary. The exit code is the
 //! verdict (0 ready, 1 needs fixing or empty, 2 unreadable, 3 could not be checked) and nothing is written to the stick. The
-//! test with a library on a pretend stick needs the bundled device plugin (`extension/plugin/build.sh`) and skips without it.
+//! test with a library on a pretend stick uses the built-in device plugin.
 
 mod common;
 
@@ -56,9 +56,7 @@ fn what_cannot_be_checked_exits_3_and_help_exits_0() {
 #[test]
 fn a_stick_with_a_library_is_ready_until_audio_goes_missing_and_a_cut_off_export_is_reported_not_recovered(
 ) {
-    let Some(plugin) = common::device_plugin() else {
-        return;
-    };
+    let plugin = common::device_plugin();
     let root = common::fresh_dir("verify-stick");
     let (music, stick) = (root.join("music"), root.join("stick"));
     std::fs::create_dir_all(&music).unwrap();
@@ -136,6 +134,48 @@ fn a_stick_with_a_library_is_ready_until_audio_goes_missing_and_a_cut_off_export
         .iter()
         .any(|p| p["id"] == "openfader:interrupted"));
     assert!(journal.is_file(), "verify must not recover");
+}
+
+/// The rekordbox readers are compiled in: a program started with an empty home (no `~/.config`, no extension folder next to the
+/// executable, no `plugins.json`) still reads a stick's library.
+#[test]
+fn the_builtin_rekordbox_reader_is_on_with_an_empty_home() {
+    let plugin = common::device_plugin();
+    let root = common::fresh_dir("verify-empty-home");
+    let (music, stick, home) = (root.join("music"), root.join("stick"), root.join("home"));
+    for d in [&music, &stick, &home] {
+        std::fs::create_dir_all(d).unwrap();
+    }
+    common::click_wav(&music.join("a.wav"), 120.0, 4.0);
+    device::provider(plugin)
+        .unwrap()
+        .export(
+            &stick,
+            &Snapshot::take(&*library::open(&music).unwrap()).unwrap(),
+            &ExportOptions::default(),
+            &Arc::new(Control::default()),
+        )
+        .unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_openfader"))
+        .args(["verify", "--json", stick.to_str().unwrap()])
+        .env_clear()
+        .env("HOME", &home)
+        .env("XDG_CONFIG_HOME", home.join("config"))
+        .env("XDG_DATA_HOME", home.join("data"))
+        .env("XDG_CACHE_HOME", home.join("cache"))
+        .env("OPENFADER_DEVICE_ROOTS", &stick)
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    let j: Value = serde_json::from_str(&text).unwrap_or_else(|e| {
+        panic!("{e}: {text}{}", String::from_utf8_lossy(&out.stderr))
+    });
+    assert_eq!(j["verdict"], "ready", "{text}");
+    assert!(j["libraries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|l| l["present"] == true && l["readable"] == true));
 }
 
 fn find_audio(dir: &Path) -> Vec<std::path::PathBuf> {

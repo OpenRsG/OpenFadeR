@@ -84,7 +84,8 @@ fn plugins() {
         let v = &p.manifest.version;
         format!("{}: {} ({on})", p.manifest.name, if v.is_empty() { "no version" } else { v })
     };
-    let all = r.plugins.iter().map(|p| line(p, "on")).chain(r.disabled.iter().map(|p| line(p, "off")));
+    let on = |p: &openfader::plugin::Plugin| if p.builtin.is_some() { "built in" } else { "on" };
+    let all = r.plugins.iter().map(|p| line(p, on(p))).chain(r.disabled.iter().map(|p| line(p, "off")));
     diag::set_plugins(all.collect::<Vec<_>>().join("\n"));
 }
 

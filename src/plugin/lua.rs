@@ -372,6 +372,7 @@ mod tests {
             Plugin {
                 dir: dir.clone(),
                 manifest,
+                builtin: None,
             },
             dir,
         )

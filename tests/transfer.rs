@@ -1,4 +1,4 @@
-//! A transfer onto a device with the bundled device plugin (built by `extension/plugin/build.sh`; skips when it is not) on a fake
+//! A transfer onto a device with the built-in device plugin (rekordbox-device) on a fake
 //! device root: tracks written to a device playlist, tracks added to it later (the members keep their cues, the new tracks
 //! arrive whole, a track already there is skipped) and tracks sent to the device itself (no playlist is made). Each step is read
 //! back through the plugin.
@@ -73,9 +73,7 @@ fn playlist<'a>(pls: &'a [Playlist], name: &str) -> &'a Playlist {
 
 #[test]
 fn a_transfer_keeps_what_the_device_holds_and_writes_the_new_tracks_whole() {
-    if common::device_plugin().is_none() {
-        return;
-    }
+    common::device_plugin();
     let root = common::fresh_dir("transfer");
     let (music, stick) = (root.join("music"), root.join("stick"));
     std::fs::create_dir_all(&music).unwrap();

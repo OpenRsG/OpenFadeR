@@ -8,12 +8,14 @@ use openfader::plugin::current;
 use slint::{ComponentHandle, SharedString};
 use std::path::PathBuf;
 
-/// Every plugin of the repositories read, in list order (the index a card's button reports).
+/// Every plugin of the repositories read, in list order (the index a card's button reports). A plugin built into the app is
+/// not offered: an older repository may still hold its folder.
 fn all(st: &State) -> Vec<(&Repo, &Source, &Entry)> {
     st.repos
         .iter()
         .filter_map(|(repo, read)| Some((repo, read.as_ref().ok()?)))
         .flat_map(|(repo, src)| src.plugins.iter().map(move |e| (repo, src, e)))
+        .filter(|(_, _, e)| !openfader::plugin::builtin::is(&e.manifest.name))
         .collect()
 }
 

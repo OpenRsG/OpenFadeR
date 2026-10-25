@@ -501,6 +501,16 @@ pub unsafe extern "C" fn free_c(buf: Buf) {
     }
 }
 
+/// The table of `P`: what [`export_library!`] returns from the entry point, and what a plugin compiled into the host is
+/// called through (the same JSON `call`, no second path).
+pub const fn api<P: LibraryPlugin>() -> LibraryApi {
+    LibraryApi {
+        abi: LIBRARY_ABI,
+        call: call_c::<P>,
+        free: free_c,
+    }
+}
+
 /// Exports a [`LibraryPlugin`] from a `cdylib`: defines the `openfader_library_v2` entry point. Use it once per library.
 ///
 /// ```ignore
@@ -511,11 +521,7 @@ macro_rules! export_library {
     ($p:ty) => {
         #[unsafe(no_mangle)]
         pub extern "C" fn openfader_library_v2() -> *const $crate::library::LibraryApi {
-            static API: $crate::library::LibraryApi = $crate::library::LibraryApi {
-                abi: $crate::library::LIBRARY_ABI,
-                call: $crate::library::call_c::<$p>,
-                free: $crate::library::free_c,
-            };
+            static API: $crate::library::LibraryApi = $crate::library::api::<$p>();
             &API
         }
     };
