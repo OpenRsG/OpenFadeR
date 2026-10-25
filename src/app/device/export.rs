@@ -19,8 +19,10 @@ pub(super) fn refresh(cx: &Rc<Ctx>, count: bool) {
         return;
     }
     let Some(snap) = cx.pending() else { return };
+    // A playlist sent from the browser replaces the ticks; otherwise the user's ticks survive tab switches and finished exports.
     let pre = std::mem::take(&mut *cx.preselect.borrow_mut());
-    cx.export.set(snap.outline(), &|id| pre.iter().any(|p| p == id));
+    let ticked = if pre.is_empty() { cx.export.ticked() } else { pre };
+    cx.export.set(snap.outline(), &|id| ticked.iter().any(|p| p == id));
     if count && s.get_tab() == 1 && !cx.busy() {
         cx.say(
             &tr!(

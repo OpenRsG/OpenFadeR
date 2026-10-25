@@ -10,7 +10,7 @@
 //! PIONEER/rekordbox/exportLibrary.db  OneLibrary (SQLCipher; the built-in key, or the plugin's `onelibrary_key` setting);
 //!                                     left out of a new library when the device option [`ONE_OPTION`] is off
 //! PIONEER/USBANLZ/P<xxx>/<8 hex>/ANLZ0000.{DAT,EXT,2EX}   grid, cues, waveforms of each track
-//! PIONEER/Artwork/<00001>/{a,b}<n>.jpg   covers (the file itself, no thumbnail resizing; `a` for export.pdb, `b` for OneLibrary)
+//! PIONEER/Artwork/<00001>/{a,b}<n>{,_m}.jpg   covers, 80×80 and 240×240 JPEG (`a` for export.pdb, `b` for OneLibrary)
 //! PIONEER/{MYSETTING,MYSETTING2,DJMMYSETTING,DEVSETTING}.DAT   device settings
 //! PIONEER/djprofile.nxs                DJ profile (written when the device has none, see [`profile`])
 //! Contents/<artist>/<album>/<file>    copies of the audio files
