@@ -221,17 +221,15 @@ static CACHE: Mutex<Option<(Instant, Facts)>> = Mutex::new(None);
 
 /// The facts, reused for [`super::TTL`].
 pub fn facts() -> Facts {
-    if let Some((_, f)) = CACHE.lock().as_ref().filter(|(t, _)| super::fresh(t)) {
+    if let Some((_, f)) = CACHE.lock().as_ref().filter(|(t, _)| super::usable(t)) {
         return f.clone();
+    }
+    if super::UI.get() {
+        return Facts::default();
     }
     let f = read_facts();
     *CACHE.lock() = Some((Instant::now(), f.clone()));
     f
-}
-
-/// Forgets the cached facts (a device was plugged or the page opened).
-pub fn forget() {
-    *CACHE.lock() = None;
 }
 
 #[cfg(test)]

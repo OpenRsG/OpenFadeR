@@ -127,8 +127,27 @@ struct Cache {
 /// enumeration (ALSA opens every PCM: about 0.25 s here).
 static CACHE: LazyLock<Mutex<Cache>> = LazyLock::new(Mutex::default);
 
+/// When [`refresh`] last asked for new answers: an entry older than that is stale.
+static FORGOTTEN: Mutex<Option<Instant>> = Mutex::new(None);
+
 fn fresh(t: &Instant) -> bool {
-    t.elapsed() < TTL
+    t.elapsed() < TTL && FORGOTTEN.lock().is_none_or(|f| *t > f)
+}
+
+thread_local! {
+    static UI: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Marks the calling thread as the UI thread: it never enumerates devices or runs `pactl`. Every answer it asks for comes from
+/// the cache, stale or not (nothing cached yet: no devices, no capabilities). Another thread fills the cache: the
+/// Preferences' background refresh ([`refresh`], then the lists).
+pub fn never_block_here() {
+    UI.set(true);
+}
+
+/// A cached answer is good enough for this thread: fresh, or any age on a thread that must not wait.
+fn usable(t: &Instant) -> bool {
+    fresh(t) || UI.get()
 }
 
 /// Every output name cpal has listed since the start (kept across [`refresh`]): the names of a PCM that is in use now.
@@ -166,16 +185,18 @@ pub fn cards(input: bool, show_all: bool, saved: &str) -> Vec<card::Card> {
 /// Forgets every cached list and answer: the next call sees devices plugged since (the Preferences call this when the
 /// AUDIO page opens).
 pub fn refresh() {
-    *CACHE.lock() = Cache::default();
-    sys::forget();
+    *FORGOTTEN.lock() = Some(Instant::now());
 }
 
 fn names(input: bool) -> Vec<String> {
     if let Some((_, v)) = CACHE.lock().lists[input as usize]
         .as_ref()
-        .filter(|(t, _)| fresh(t))
+        .filter(|(t, _)| usable(t))
     {
         return v.clone();
+    }
+    if UI.get() {
+        return Vec::new();
     }
     let mut v: Vec<String> = Vec::new();
     for n in devices(input).filter_map(|d| d.name().ok()) {
@@ -245,10 +266,13 @@ fn caps(input: bool, name: &str) -> Option<Caps> {
         .lock()
         .caps
         .get(&key)
-        .filter(|(t, _)| fresh(t))
+        .filter(|(t, _)| usable(t))
         .map(|(_, v)| v.clone())
     {
         return c;
+    }
+    if UI.get() {
+        return None;
     }
     let host = cpal::default_host();
     let found = match (name.is_empty(), input) {
@@ -282,6 +306,21 @@ pub fn max_channels(dev: &cpal::Device) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_ui_thread_reads_the_cache_and_never_enumerates() {
+        std::thread::spawn(|| {
+            never_block_here();
+            assert!(output_caps("no such device").is_none());
+            let _ = cards(true, false, "");
+            assert!(
+                CACHE.lock().lists[1].is_none() && CACHE.lock().caps.is_empty(),
+                "nothing was read from the host"
+            );
+        })
+        .join()
+        .unwrap();
+    }
 
     #[test]
     fn rates_keep_only_what_some_range_covers() {

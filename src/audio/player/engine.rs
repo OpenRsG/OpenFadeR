@@ -345,4 +345,29 @@ mod tests {
         assert_eq!((st.source, st.pending), ("system default", None));
         assert!(st.notes.iter().any(|n| n.contains("no such pcm")), "{:?}", st.notes);
     }
+    /// Two decks playing for `OF_XRUN_SECS` (60) on the `pipewire` PCM at `OF_XRUN_FRAMES` frames, to be watched from outside:
+    /// cpal's ALSA host recovers an underrun silently, so the count is the ERR column of `pw-top` for this process.
+    /// `PIPEWIRE_NODE=<null sink> OF_XRUN_FRAMES=256 cargo test --release --lib -- --ignored --nocapture bench_xruns`
+    #[test]
+    #[ignore = "plays for a minute into a sound server"]
+    fn bench_xruns() {
+        let env = |k: &str, d: u32| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
+        let (frames, secs) = (env("OF_XRUN_FRAMES", 0), env("OF_XRUN_SECS", 60));
+        configure(Settings { device: "pipewire".into(), buffer: frames, ..Settings::default() }).unwrap();
+        let mut decks = [Player::new().unwrap(), Player::new().unwrap()];
+        for (k, d) in decks.iter_mut().enumerate() {
+            let hz = 220.0 * (k + 1) as f32;
+            let samples = (0..44100 * (secs as usize + 10))
+                .flat_map(|i| {
+                    let v = 0.2 * (i as f32 * hz * std::f32::consts::TAU / 44100.0).sin();
+                    [v, v]
+                })
+                .collect();
+            d.load(crate::audio::Pcm { rate: 44100, samples });
+            d.play();
+        }
+        let st = status();
+        eprintln!("xrun bench: {} frames asked, buffer {:?}, device {}, pid {}", frames, st.buffer, st.device, std::process::id());
+        std::thread::sleep(std::time::Duration::from_secs(secs.into()));
+    }
 }

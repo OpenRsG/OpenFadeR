@@ -352,6 +352,7 @@ fn refresh_when_settled() {
 pub fn wire() {
     // A device is looked up on a worker thread; the UI thread moves the stream when it is found.
     audio::set_waker(|| _ = slint::invoke_from_event_loop(audio::settle));
+    device::never_block_here(); // the page reads the lists the background refresh keeps (cards::sync)
     let ins = super::get().audio;
     mic::open(ins.mic_on, &ins.input_device, ins.mic_pair);
     let last = Rc::new(RefCell::new(super::get().audio.settings()));
