@@ -1,0 +1,116 @@
+import { Glyph, Icon, MenuItem } from "widgets.slint";
+import { Theme } from "theme.slint";
+import { BrowserState } from "browser-state.slint";
+import { DeckState } from "deck-state.slint";
+import { LibraryState } from "library.slint";
+
+/// The title of one group of the track menu: its glyph and name.
+component MenuHead inherits Rectangle {
+    in property <Icon> icon;
+    in property <string> text;
+    /// The top group of its column: no line above it.
+    in property <bool> first;
+    height: 24px;
+    if !root.first: Rectangle { x: Theme.space-sm; y: 1px; width: parent.width - 2 * Theme.space-sm; height: 1px; background: Theme.line-strong.with-alpha(0.5); }
+    Glyph { x: Theme.space-lg; y: (parent.height - self.height) / 2 + 1px; width: 12px; height: 12px; icon: root.icon; tint: Theme.accent-hi; }
+    Text {
+        x: Theme.space-lg + 12px + Theme.space-md;
+        width: parent.width - self.x - Theme.space-lg;
+        height: parent.height;
+        text: root.text;
+        vertical-alignment: center;
+        overflow: elide;
+        color: Theme.accent-hi;
+        font-family: Theme.font;
+        font-size: Theme.font-sm;
+        font-weight: Theme.weight-bold;
+    }
+}
+
+/// Left column: what to do with the track now (PLAY), where it is listed (PLAYLISTS), sending it to a stick (USB).
+component MenuUse inherits VerticalLayout {
+    alignment: start;
+    in property <bool> two-decks;
+    in property <bool> palettes;
+    in property <bool> multi;
+    in property <bool> list-view;
+    callback done;
+    MenuHead { icon: Icon.play; text: @tr("PLAY"); first: true; }
+    if !root.two-decks: MenuItem { text: @tr("Load to deck"); enabled: !root.multi; activated => { BrowserState.track-pressed(BrowserState.current-row); BrowserState.track-pressed(BrowserState.current-row); root.done(); } }
+    if root.two-decks: MenuItem { text: @tr("Load to deck {}", DeckState.slots[0] + 1); enabled: !root.multi; activated => { DeckState.load(DeckState.slots[0]); root.done(); } }
+    if root.two-decks: MenuItem { text: @tr("Load to deck {}", DeckState.slots[1] + 1); enabled: !root.multi; activated => { DeckState.load(DeckState.slots[1]); root.done(); } }
+    MenuItem { text: BrowserState.related ? @tr("Hide related tracks") : @tr("Related tracks"); enabled: !root.multi; activated => { BrowserState.related-toggled(!BrowserState.related); root.done(); } }
+    MenuHead { icon: Icon.list; text: @tr("PLAYLISTS"); }
+    MenuItem { text: @tr("Add to Tag List (T)"); activated => { BrowserState.tag-add(); root.done(); } }
+    MenuItem { text: @tr("Add to playlist…"); activated => { BrowserState.panel-request(0); root.done(); } }
+    MenuItem { text: @tr("New playlist from selection…"); activated => { BrowserState.playlist-op("new-from-selection"); root.done(); } }
+    if root.palettes: MenuItem { text: @tr("Add to palette 1"); activated => { BrowserState.palette-add-chosen(1); root.done(); } }
+    if root.palettes: MenuItem { text: @tr("Add to palette 2"); activated => { BrowserState.palette-add-chosen(2); root.done(); } }
+    if root.palettes: MenuItem { text: @tr("Add to palette 3"); activated => { BrowserState.palette-add-chosen(3); root.done(); } }
+    if root.list-view: MenuItem { text: @tr("Move up"); enabled: !root.multi; activated => { BrowserState.list-move(-1); root.done(); } }
+    if root.list-view: MenuItem { text: @tr("Move down"); enabled: !root.multi; activated => { BrowserState.list-move(1); root.done(); } }
+    if root.list-view: MenuItem { text: @tr("Remove from list"); activated => { BrowserState.list-remove(); root.done(); } }
+    MenuHead { icon: Icon.usb; text: @tr("USB STICK / SD CARD"); }
+    for label[i] in BrowserState.transfer-targets: MenuItem { text: @tr("Transfer to {}", label); activated => { BrowserState.transfer-to(i); root.done(); } }
+    if BrowserState.transfer-targets.length == 0: MenuItem { text: @tr("Plug one in to send tracks to it"); enabled: false; }
+}
+
+/// Right column: what the app knows about the track (ANALYSIS), its tags and artwork (TRACK INFO), its file (FILE).
+component MenuKnow inherits VerticalLayout {
+    alignment: start;
+    in property <bool> multi;
+    /// Under the left column (narrow table): its first group gets the line too.
+    in property <bool> stacked;
+    callback done;
+    MenuHead { icon: Icon.mix-point; text: @tr("ANALYSIS"); first: !root.stacked; }
+    MenuItem { text: @tr("Analyze track"); activated => { LibraryState.action("track-analyze"); root.done(); } }
+    MenuItem { text: @tr("Make Auto Cue point"); activated => { LibraryState.action("track-autocue"); root.done(); } }
+    MenuItem { text: @tr("Analysis lock"); activated => { LibraryState.action("track-lock"); root.done(); } }
+    MenuHead { icon: Icon.info; text: @tr("TRACK INFO"); }
+    MenuItem { text: @tr("Edit track details…"); enabled: !root.multi; activated => { LibraryState.action("track-edit"); root.done(); } }
+    MenuItem { text: @tr("Tags…"); enabled: !root.multi; activated => { BrowserState.panel-request(1); root.done(); } }
+    MenuItem { text: @tr("Reload tag"); activated => { LibraryState.action("track-reload-tag"); root.done(); } }
+    MenuItem { text: @tr("Reload tag (discard edits)"); activated => { LibraryState.action("track-reload-tag-discard"); root.done(); } }
+    MenuItem { text: @tr("Find artwork…"); enabled: !root.multi; activated => { LibraryState.action("track-artwork"); root.done(); } }
+    MenuItem { text: @tr("Fetch missing artwork"); activated => { LibraryState.action("track-artwork-missing"); root.done(); } }
+    MenuHead { icon: Icon.folder; text: @tr("FILE"); }
+    MenuItem { text: @tr("Show in file manager"); enabled: !root.multi; activated => { LibraryState.action("track-show"); root.done(); } }
+    MenuItem { text: @tr("Relocate…"); enabled: !root.multi; activated => { LibraryState.action("track-relocate"); root.done(); } }
+    MenuItem { text: @tr("Auto relocate"); activated => { LibraryState.action("track-auto-relocate"); root.done(); } }
+    MenuItem { text: @tr("Remove from Collection"); danger: true; activated => { LibraryState.action("track-remove"); root.done(); } }
+}
+
+/// The right-click menu of a track row, shared by every track table: six named groups in two columns (one column when the
+/// table is narrower than both). Put it in a `PopupWindow` sized `menu-w` × `menu-h`; `done` closes it.
+export component TrackMenu inherits Rectangle {
+    /// Stage and Studio load to the two shown decks by name; the classic browser loads as a double click does.
+    in property <bool> two-decks;
+    in property <bool> palettes;
+    in property <bool> narrow;
+    in property <length> radius: Theme.radius;
+    callback done;
+    property <bool> multi: BrowserState.selected-count > 1;
+    property <bool> list-view: BrowserState.tag-view || BrowserState.user-view;
+    property <length> col-w: 210px;
+    out property <length> menu-w: root.narrow ? root.col-w + 2px : 2 * root.col-w + 3px;
+    out property <length> menu-h: lay.preferred-height + 2px;
+    background: Theme.panel-raised;
+    border-width: 1px;
+    border-color: Theme.line-strong;
+    border-radius: root.radius;
+    lay := VerticalLayout {
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        if root.multi: MenuItem { text: @tr("{} tracks selected", BrowserState.selected-count); enabled: false; }
+        if !root.narrow: HorizontalLayout {
+            MenuUse { width: root.col-w; two-decks: root.two-decks; palettes: root.palettes; multi: root.multi; list-view: root.list-view; done => { root.done(); } }
+            Rectangle { width: 1px; background: Theme.line-strong.with-alpha(0.5); }
+            MenuKnow { width: root.col-w; multi: root.multi; done => { root.done(); } }
+        }
+        if root.narrow: VerticalLayout {
+            MenuUse { two-decks: root.two-decks; palettes: root.palettes; multi: root.multi; list-view: root.list-view; done => { root.done(); } }
+            MenuKnow { multi: root.multi; stacked: true; done => { root.done(); } }
+        }
+    }
+}

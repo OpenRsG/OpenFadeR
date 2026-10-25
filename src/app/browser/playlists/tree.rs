@@ -6,7 +6,8 @@ use crate::app::browser::{
     App, BrowserState, Home, View,
 };
 use openfader::store::{self, NodeKind};
-use slint::{ComponentHandle, StandardListViewItem};
+use crate::app::{Icon, TreeRow};
+use slint::ComponentHandle;
 
 /// "Folder › Playlist" path of node `id`.
 fn path_of(nodes: &[store::Node], mut id: i64) -> String {
@@ -218,13 +219,34 @@ impl View {
             stages: &stage_rows,
         });
         self.health_insert(&mut entries, &mut labels);
+        // The chosen row is never folded away (a playlist just made, a device just opened): its heading opens.
+        let at = entries.iter().position(|e| *e == self.entry);
+        if let Some(h) = at.and_then(|r| sidebar::heading_of(&entries, &labels, r)) {
+            if !self.open.contains(h) {
+                self.open.push(h.clone());
+            }
+        }
+        let (entries, labels) = sidebar::fold(entries, labels, &self.open);
+        let mut heads = 0;
+        let rows: Vec<TreeRow> = entries
+            .iter()
+            .zip(&labels)
+            .map(|(e, l)| {
+                let head = sidebar::is_heading(e);
+                let row = TreeRow {
+                    text: l.trim_start().trim_start_matches("▸ ").into(),
+                    depth: sidebar::depth(l) as i32,
+                    icon: self.icon_of(e),
+                    head,
+                    open: head && self.open.contains(e),
+                    heads,
+                };
+                heads += i32::from(head);
+                row
+            })
+            .collect();
         self.entries = entries;
-        self.sidebar.set_vec(
-            labels
-                .iter()
-                .map(|l| StandardListViewItem::from(l.as_str()))
-                .collect::<Vec<_>>(),
-        );
+        self.sidebar.set_vec(rows);
         let row = self
             .entries
             .iter()
@@ -235,6 +257,51 @@ impl View {
         state.set_side_row(row as i32);
         state.set_side_kind(self.side_kind(&self.entry));
         self.publish_source(app);
+    }
+
+    /// Click on a heading (or Left / Right on it): its rows unfold or fold away.
+    pub(in crate::app::browser) fn toggle(&mut self, app: &App, row: usize) {
+        let Some(e) = self.entries.get(row).filter(|e| sidebar::is_heading(e)).cloned() else {
+            return;
+        };
+        match self.open.iter().position(|o| *o == e) {
+            Some(k) => {
+                self.open.remove(k);
+            }
+            None => self.open.push(e),
+        }
+        self.rebuild(app);
+    }
+
+    /// The glyph before a row: what kind of list it is.
+    fn icon_of(&self, e: &Entry) -> Icon {
+        match e {
+            Entry::All | Entry::PlaylistsAll | Entry::SourceAll(_) => Icon::Browse,
+            Entry::Tags => Icon::Star,
+            Entry::Session | Entry::HistoryRoot | Entry::Day(_) => Icon::Clock,
+            Entry::Dupes => Icon::Grid,
+            Entry::CueAnalysis => Icon::MixPoint,
+            Entry::UserRoot => Icon::List,
+            Entry::User(id) => match self.node(*id).map(|n| n.kind) {
+                Some(NodeKind::Folder) => Icon::Folder,
+                Some(NodeKind::Smart) => Icon::Smart,
+                _ => Icon::List,
+            },
+            Entry::BankRoot | Entry::Bank(_) => Icon::Cue,
+            Entry::StageRoot | Entry::Stage(_) => Icon::Inbox,
+            Entry::TagsRoot | Entry::Category(_) | Entry::Tag(_) => Icon::Tag,
+            Entry::LibRoot => Icon::Lock,
+            Entry::Lib(i) if self.lib_playlists[*i].is_folder => Icon::Folder,
+            Entry::Lib(_) => Icon::List,
+            Entry::HealthRoot | Entry::Health(_) => Icon::Pulse,
+            Entry::DevicesRoot => Icon::Usb,
+            Entry::Source(i) if self.sources.get(*i).is_some_and(|s| s.is_device()) => Icon::Usb,
+            Entry::Source(_) => Icon::Folder,
+            Entry::SourceList(i, j) => match self.sources.get(*i).and_then(|s| s.playlists.get(*j)) {
+                Some(p) if p.is_folder => Icon::Folder,
+                _ => Icon::List,
+            },
+        }
     }
 
     pub(in crate::app::browser) fn select(&mut self, app: &App, row: usize) {

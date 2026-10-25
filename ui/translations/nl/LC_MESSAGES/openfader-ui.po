@@ -191,7 +191,7 @@ msgid "Show in File Manager"
 msgstr "Tonen in bestandsbeheer"
 
 #: ui/app.slint:245
-#: ui/browser-table.slint:315
+#: ui/track-menu.slint:73
 msgid "Relocate…"
 msgstr "Opnieuw koppelen…"
 
@@ -200,8 +200,8 @@ msgid "Auto Relocate"
 msgstr "Automatisch opnieuw koppelen"
 
 #: ui/app.slint:247
-#: ui/browser-table.slint:317
-#: ui/stage/table.slint:283
+#: ui/track-menu.slint:75
+#: src/app/library/mod.rs:118
 msgid "Remove from Collection"
 msgstr "Verwijderen uit collectie"
 
@@ -214,8 +214,7 @@ msgid "Add to Playlist…"
 msgstr "Toevoegen aan afspeellijst…"
 
 #: ui/app.slint:251
-#: ui/browser-table.slint:302
-#: ui/stage/table.slint:278
+#: ui/track-menu.slint:66
 msgid "Tags…"
 msgstr "Tags…"
 
@@ -260,7 +259,7 @@ msgid "Genre"
 msgstr "Genre"
 
 #: ui/app.slint:266
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 #: ui/touch-actions.slint:74
 msgid "Key"
 msgstr "Key"
@@ -391,7 +390,7 @@ msgid "Related Tracks"
 msgstr "Gerelateerde tracks"
 
 #: ui/app.slint:304
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 msgid "Tags"
 msgstr "Tags"
 
@@ -584,12 +583,12 @@ msgid "Drop a playlist or tracks here"
 msgstr "Sleep een afspeellijst of tracks hierheen"
 
 #: ui/browser-palette.slint:181
-#: ui/browser-table.slint:293
+#: ui/track-menu.slint:36
 msgid "Load to deck"
 msgstr "LOAD op deck"
 
 #: ui/browser-palette.slint:182
-#: ui/browser-table.slint:306
+#: ui/track-menu.slint:49
 msgid "Remove from list"
 msgstr "Verwijderen uit lijst"
 
@@ -598,7 +597,7 @@ msgid "SAVED SEARCHES"
 msgstr "OPGESLAGEN ZOEKOPDRACHTEN"
 
 #: ui/browser-saved.slint:24
-#: ui/browser-tree.slint:113
+#: ui/browser-tree.slint:145
 #: ui/sampler.slint:161
 msgid "SAVE"
 msgstr "OPSLAAN"
@@ -626,12 +625,12 @@ msgstr "ZEKER?"
 msgid "DELETE"
 msgstr "VERWIJD."
 
-#: ui/browser-state.slint:74
+#: ui/browser-state.slint:88
 #: src/app/browser/suggest/view.rs:176
 msgid "LIST"
 msgstr "LIJST"
 
-#: ui/browser-state.slint:74
+#: ui/browser-state.slint:88
 #: ui/deck-compact.slint:74
 #: ui/deck-header.slint:67
 msgid "MASTER"
@@ -669,244 +668,129 @@ msgstr "Zang inbegrepen / niet inbegrepen (klik om te wijzigen)"
 msgid "FOR"
 msgstr "VOOR"
 
-#: ui/browser-table.slint:162
+#: ui/browser-table.slint:160
 #: ui/stage/library.slint:168
 #: src/app/prefs/audio/page.rs:164
 msgid "PREVIEW"
 msgstr "PREVIEW"
 
-#: ui/browser-table.slint:163
+#: ui/browser-table.slint:161
 msgid "TRACK TITLE"
 msgstr "TRACKTITEL"
 
-#: ui/browser-table.slint:164
+#: ui/browser-table.slint:162
 #: ui/stage/table.slint:140
 #: ui/studio/table.slint:123
 msgid "ARTIST"
 msgstr "ARTIEST"
 
-#: ui/browser-table.slint:165
+#: ui/browser-table.slint:163
 #: ui/stage/table.slint:144
 #: ui/studio/table.slint:127
 msgid "GENRE"
 msgstr "GENRE"
 
-#: ui/browser-table.slint:166
+#: ui/browser-table.slint:164
 msgid "COMMENT"
 msgstr "OPMERKING"
 
-#: ui/browser-table.slint:168
+#: ui/browser-table.slint:166
 #: ui/stage/table.slint:146
 #: ui/studio/table.slint:121
 msgid "RATING"
 msgstr "BEOORDELING"
 
-#: ui/browser-table.slint:169
+#: ui/browser-table.slint:167
 msgid "TIME"
 msgstr "TIJD"
 
-#: ui/browser-table.slint:170
+#: ui/browser-table.slint:168
 #: ui/deck-header.slint:74
 #: ui/stage/table.slint:143
 msgid "KEY"
 msgstr "KEY"
 
-#: ui/browser-table.slint:209
+#: ui/browser-table.slint:207
 #: src/app/deck/pads/mod.rs:93
 #: src/app/prefs/extensions.rs:87
 msgid "STEMS"
 msgstr "STEMS"
 
-#: ui/browser-table.slint:215
+#: ui/browser-table.slint:213
 #: ui/stage/table.slint:205
 #: ui/studio/table.slint:160
 msgid "★★★★★"
 msgstr "★★★★★"
 
-#: ui/browser-table.slint:270
+#: ui/browser-table.slint:268
 #: ui/stage/table.slint:251
 #: ui/studio/table.slint:204
 msgid "No tracks"
 msgstr "Geen tracks"
 
-#: ui/browser-table.slint:292
-#: ui/stage/table.slint:270
-#: ui/studio/table.slint:223
-msgid "{} tracks selected"
-msgstr "{} tracks geselecteerd"
-
-#: ui/browser-table.slint:294
-#: ui/stage/table.slint:273
-#: ui/studio/table.slint:226
-msgid "Edit track details…"
-msgstr "Trackgegevens bewerken…"
-
-#: ui/browser-table.slint:295
-#: ui/stage/table.slint:274
-#: ui/studio/table.slint:227
-msgid "Add to Tag List (T)"
-msgstr "Toevoegen aan taglijst (T)"
-
-#: ui/browser-table.slint:296
-#: ui/stage/table.slint:275
-#: ui/studio/table.slint:228
-msgid "Add to playlist…"
-msgstr "Toevoegen aan afspeellijst…"
-
-#: ui/browser-table.slint:297
-#: ui/stage/table.slint:276
-#: ui/studio/table.slint:229
-msgid "New playlist from selection…"
-msgstr "Nieuwe afspeellijst uit selectie…"
-
-#: ui/browser-table.slint:298
-#: ui/stage/table.slint:277
-#: ui/studio/table.slint:230
-msgid "Transfer to {}"
-msgstr "Overzetten naar {}"
-
-#: ui/browser-table.slint:299
-msgid "Add to palette 1"
-msgstr "Toevoegen aan palet 1"
-
-#: ui/browser-table.slint:300
-msgid "Add to palette 2"
-msgstr "Toevoegen aan palet 2"
-
-#: ui/browser-table.slint:301
-msgid "Add to palette 3"
-msgstr "Toevoegen aan palet 3"
-
-#: ui/browser-table.slint:303
-#: ui/stage/table.slint:279
-#: ui/studio/table.slint:232
-msgid "Hide related tracks"
-msgstr "Gerelateerde tracks verbergen"
-
-#: ui/browser-table.slint:303
-#: ui/browser.slint:151
-#: ui/stage/library.slint:53
-msgid "Related tracks"
-msgstr "Gerelateerde tracks"
-
-#: ui/browser-table.slint:304
-#: ui/browser.slint:408
-msgid "Move up"
-msgstr "Omhoog"
-
-#: ui/browser-table.slint:305
-#: ui/browser.slint:409
-msgid "Move down"
-msgstr "Omlaag"
-
-#: ui/browser-table.slint:307
-#: ui/stage/table.slint:280
-#: ui/studio/table.slint:233
-msgid "Analyze track"
-msgstr "Track analyseren"
-
-#: ui/browser-table.slint:308
-#: ui/stage/table.slint:281
-#: ui/studio/table.slint:234
-msgid "Make Auto Cue point"
-msgstr "Automatisch cuepunt maken"
-
-#: ui/browser-table.slint:309
-#: ui/touch-actions.slint:57
-msgid "Analysis lock"
-msgstr "Analysevergrendeling"
-
-#: ui/browser-table.slint:310
-msgid "Reload tag"
-msgstr "Tag opnieuw laden"
-
-#: ui/browser-table.slint:311
-msgid "Reload tag (discard edits)"
-msgstr "Tag opnieuw laden (wijzigingen negeren)"
-
-#: ui/browser-table.slint:312
-msgid "Find artwork…"
-msgstr "Artwork zoeken…"
-
-#: ui/browser-table.slint:313
-#: ui/touch-actions.slint:61
-msgid "Fetch missing artwork"
-msgstr "Ontbrekende artwork ophalen"
-
-#: ui/browser-table.slint:314
-#: ui/stage/table.slint:282
-#: ui/studio/table.slint:235
-msgid "Show in file manager"
-msgstr "Tonen in bestandsbeheer"
-
-#: ui/browser-table.slint:316
-#: ui/touch-actions.slint:64
-msgid "Auto relocate"
-msgstr "Automatisch opnieuw koppelen"
-
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 msgid "Rating ≥"
 msgstr "Beoordeling ≥"
 
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 msgid "Genre contains"
 msgstr "Genre bevat"
 
-#: ui/browser-tree.slint:102
+#: ui/browser-tree.slint:134
 msgid "Date added"
 msgstr "Toegevoegd op"
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "BPM min"
 msgstr "BPM min"
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "1-5 stars"
 msgstr "1-5 sterren"
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "text"
 msgstr "tekst"
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "tag name"
 msgstr "tagnaam"
 
-#: ui/browser-tree.slint:103
+#: ui/browser-tree.slint:135
 msgid "from YYYY-MM-DD"
 msgstr "vanaf JJJJ-MM-DD"
 
-#: ui/browser-tree.slint:104
+#: ui/browser-tree.slint:136
 msgid "BPM max"
 msgstr "BPM max"
 
-#: ui/browser-tree.slint:104
+#: ui/browser-tree.slint:136
 msgid "to YYYY-MM-DD"
 msgstr "tot JJJJ-MM-DD"
 
-#: ui/browser-tree.slint:110
+#: ui/browser-tree.slint:142
 msgid "SMART PLAYLIST: {}"
 msgstr "SLIMME AFSPEELLIJST: {}"
 
-#: ui/browser-tree.slint:111
+#: ui/browser-tree.slint:143
 msgid "MATCH ANY"
 msgstr "ELKE VOORWAARDE"
 
-#: ui/browser-tree.slint:111
+#: ui/browser-tree.slint:143
 msgid "MATCH ALL"
 msgstr "ALLE VOORWAARDEN"
 
-#: ui/browser-tree.slint:112
+#: ui/browser-tree.slint:144
 msgid "+ CONDITION"
 msgstr "+ VOORWAARDE"
 
-#: ui/browser-tree.slint:114
+#: ui/browser-tree.slint:146
 #: ui/browser.slint:307
 #: ui/device-format.slint:73
 msgid "CANCEL"
 msgstr "ANNUL."
 
-#: ui/browser-tree.slint:125
+#: ui/browser-tree.slint:157
 msgid "Remove condition"
 msgstr "Voorwaarde verwijderen"
 
@@ -930,6 +814,12 @@ msgstr "Sessiegeschiedenis"
 #: ui/studio/library.slint:33
 msgid "Duplicate tracks"
 msgstr "Dubbele tracks"
+
+#: ui/browser.slint:151
+#: ui/stage/library.slint:53
+#: ui/studio/library.slint:34
+msgid "Related tracks"
+msgstr "Gerelateerde tracks"
 
 #: ui/browser.slint:156
 #: ui/stage/library.slint:62
@@ -1215,6 +1105,16 @@ msgstr "Hoofdtelefoon-preview: tik op de golfvorm om te zoeken"
 #: src/app/prefs/view.rs:362
 msgid "Playlist Palette"
 msgstr "Afspeellijstpalet"
+
+#: ui/browser.slint:408
+#: ui/track-menu.slint:47
+msgid "Move up"
+msgstr "Omhoog"
+
+#: ui/browser.slint:409
+#: ui/track-menu.slint:48
+msgid "Move down"
+msgstr "Omlaag"
 
 #: ui/browser.slint:410
 #: ui/studio/automix.slint:96
@@ -1649,7 +1549,7 @@ msgid "Key +"
 msgstr "Key +"
 
 #: ui/deck-touch.slint:47
-#: ui/widgets.slint:209
+#: ui/widgets.slint:211
 msgid "Transport"
 msgstr "Transport"
 
@@ -1806,6 +1706,7 @@ msgid "LAST WRITTEN"
 msgstr "LAATST GESCHREVEN"
 
 #: ui/device-check.slint:145
+#: ui/track-menu.slint:40
 msgid "PLAYLISTS"
 msgstr "PLAYLISTS"
 
@@ -3687,6 +3588,7 @@ msgstr "AUDIO"
 
 #: ui/prefs.slint:49
 #: ui/prefs.slint:68
+#: ui/track-menu.slint:60
 msgid "ANALYSIS"
 msgstr "ANALYSE"
 
@@ -4033,12 +3935,6 @@ msgstr "ALBUM"
 #: ui/stage/table.slint:147
 msgid "DATE ADDED"
 msgstr "TOEGEVOEGD"
-
-#: ui/stage/table.slint:271
-#: ui/stage/table.slint:272
-#: ui/studio/table.slint:224
-msgid "Load to deck {}"
-msgstr "Laden op deck {}"
 
 #: ui/stems-model.slint:30
 msgid "STEMS model download failed"
@@ -4445,6 +4341,16 @@ msgstr "Trackgegevens bewerken"
 msgid "Import to collection"
 msgstr "Importeren naar collectie"
 
+#: ui/touch-actions.slint:56
+#: ui/track-menu.slint:61
+msgid "Analyze track"
+msgstr "Track analyseren"
+
+#: ui/touch-actions.slint:57
+#: ui/track-menu.slint:63
+msgid "Analysis lock"
+msgstr "Analysevergrendeling"
+
 #: ui/touch-actions.slint:58
 msgid "Reload tags"
 msgstr "Tags opnieuw laden"
@@ -4457,9 +4363,24 @@ msgstr "Tags opnieuw laden (wijzigingen negeren)"
 msgid "Find artwork"
 msgstr "Artwork zoeken"
 
+#: ui/touch-actions.slint:61
+#: ui/track-menu.slint:70
+msgid "Fetch missing artwork"
+msgstr "Ontbrekende artwork ophalen"
+
+#: ui/touch-actions.slint:62
+#: ui/track-menu.slint:72
+msgid "Show in file manager"
+msgstr "Tonen in bestandsbeheer"
+
 #: ui/touch-actions.slint:63
 msgid "Relocate track"
 msgstr "Track opnieuw koppelen"
+
+#: ui/touch-actions.slint:64
+#: ui/track-menu.slint:74
+msgid "Auto relocate"
+msgstr "Automatisch opnieuw koppelen"
 
 #: ui/touch-actions.slint:65
 msgid "Remove from collection"
@@ -4686,6 +4607,84 @@ msgstr "Mix point-banen uitzoomen"
 msgid "Mix point lanes zoom in"
 msgstr "Mix point-banen inzoomen"
 
+#: ui/track-menu.slint:37
+#: ui/track-menu.slint:38
+msgid "Load to deck {}"
+msgstr "Laden op deck {}"
+
+#: ui/track-menu.slint:39
+msgid "Hide related tracks"
+msgstr "Gerelateerde tracks verbergen"
+
+#: ui/track-menu.slint:41
+msgid "Add to Tag List (T)"
+msgstr "Toevoegen aan taglijst (T)"
+
+#: ui/track-menu.slint:42
+msgid "Add to playlist…"
+msgstr "Toevoegen aan afspeellijst…"
+
+#: ui/track-menu.slint:43
+msgid "New playlist from selection…"
+msgstr "Nieuwe afspeellijst uit selectie…"
+
+#: ui/track-menu.slint:44
+msgid "Add to palette 1"
+msgstr "Toevoegen aan palet 1"
+
+#: ui/track-menu.slint:45
+msgid "Add to palette 2"
+msgstr "Toevoegen aan palet 2"
+
+#: ui/track-menu.slint:46
+msgid "Add to palette 3"
+msgstr "Toevoegen aan palet 3"
+
+#: ui/track-menu.slint:50
+msgid "USB STICK / SD CARD"
+msgstr "USB-STICK / SD-KAART"
+
+#: ui/track-menu.slint:51
+msgid "Transfer to {}"
+msgstr "Overzetten naar {}"
+
+#: ui/track-menu.slint:52
+msgid "Plug one in to send tracks to it"
+msgstr "Sluit er een aan om er tracks naartoe te sturen"
+
+#: ui/track-menu.slint:62
+#: src/app/library/autocue.rs:129
+msgid "Make Auto Cue point"
+msgstr "Automatisch cuepunt maken"
+
+#: ui/track-menu.slint:64
+msgid "TRACK INFO"
+msgstr "TRACKINFO"
+
+#: ui/track-menu.slint:65
+msgid "Edit track details…"
+msgstr "Trackgegevens bewerken…"
+
+#: ui/track-menu.slint:67
+msgid "Reload tag"
+msgstr "Tag opnieuw laden"
+
+#: ui/track-menu.slint:68
+msgid "Reload tag (discard edits)"
+msgstr "Tag opnieuw laden (wijzigingen negeren)"
+
+#: ui/track-menu.slint:69
+msgid "Find artwork…"
+msgstr "Artwork zoeken…"
+
+#: ui/track-menu.slint:71
+msgid "FILE"
+msgstr "BESTAND"
+
+#: ui/track-menu.slint:100
+msgid "{} tracks selected"
+msgstr "{} tracks geselecteerd"
+
 #: ui/trackinfo.slint:72
 msgid "Select a track"
 msgstr "Selecteer een track"
@@ -4894,11 +4893,11 @@ msgstr "Je kunt dit later wijzigen in VOORKEUREN > EXTENSIES en dit venster opni
 msgid "SWITCH ON {}"
 msgstr "{} INSCHAKELEN"
 
-#: ui/widgets.slint:209
+#: ui/widgets.slint:211
 msgid "Play"
 msgstr "Play"
 
-#: ui/widgets.slint:209
+#: ui/widgets.slint:211
 msgid "Pause"
 msgstr "Pauze"
 
@@ -4967,12 +4966,12 @@ msgid "under a minute"
 msgstr "minder dan een minuut"
 
 #: src/app/analyze/stale.rs:75
-#: src/app/device/pace.rs:186
+#: src/app/device/pace.rs:188
 msgid "about {} min"
 msgstr "ongeveer {} min"
 
 #: src/app/analyze/stale.rs:76
-#: src/app/device/pace.rs:189
+#: src/app/device/pace.rs:191
 msgid "about {} h {} min"
 msgstr "ongeveer {} u {} min"
 
@@ -5257,7 +5256,7 @@ msgstr "{} van {} tracks"
 msgid " · BPM ±6% / KEY MATCH wait for a loaded deck"
 msgstr " · BPM ±6% / KEY MATCH wachten op een geladen deck"
 
-#: src/app/browser/mod.rs:375
+#: src/app/browser/mod.rs:377
 msgid "{} selected"
 msgstr "{} geselecteerd"
 
@@ -5275,12 +5274,12 @@ msgstr "die track is verdwenen"
 
 #: src/app/browser/palette/edit.rs:74
 #: src/app/browser/palette/edit.rs:110
-#: src/app/browser/wire.rs:319
+#: src/app/browser/wire.rs:326
 msgid "{} tracks added to the Tag List"
 msgstr "{} tracks toegevoegd aan de taglijst"
 
 #: src/app/browser/palette/edit.rs:90
-#: src/app/browser/wire.rs:299
+#: src/app/browser/wire.rs:306
 msgid "“{}” is already in the Tag List"
 msgstr "“{}” staat al in de taglijst"
 
@@ -5289,7 +5288,7 @@ msgid "the Tag List holds up to {} tracks"
 msgstr "de taglijst bevat maximaal {} tracks"
 
 #: src/app/browser/palette/edit.rs:97
-#: src/app/browser/wire.rs:301
+#: src/app/browser/wire.rs:308
 msgid "tagged “{}” ({} in the Tag List)"
 msgstr "“{}” getagd ({} in de taglijst)"
 
@@ -5512,59 +5511,59 @@ msgstr "“{}” staat niet in de Collectie: importeer het eerst"
 msgid "Library Protection is on: cannot {} (Preferences > Advanced > Browse)"
 msgstr "Bibliotheekbeveiliging staat aan: kan niet {} (Voorkeuren > Geavanceerd > Bladeren)"
 
-#: src/app/browser/playlists/tree.rs:60
+#: src/app/browser/playlists/tree.rs:61
 msgid "Edit conditions…"
 msgstr "Voorwaarden bewerken…"
 
-#: src/app/browser/playlists/tree.rs:63
+#: src/app/browser/playlists/tree.rs:64
 msgid "▲ Move up"
 msgstr "▲ Omhoog"
 
-#: src/app/browser/playlists/tree.rs:66
+#: src/app/browser/playlists/tree.rs:67
 msgid "▼ Move down"
 msgstr "▼ Omlaag"
 
-#: src/app/browser/playlists/tree.rs:69
+#: src/app/browser/playlists/tree.rs:70
 msgid "Move to the top level"
 msgstr "Naar het hoogste niveau verplaatsen"
 
-#: src/app/browser/playlists/tree.rs:76
+#: src/app/browser/playlists/tree.rs:77
 msgid "Move into ▸ {}"
 msgstr "Verplaatsen naar ▸ {}"
 
-#: src/app/browser/playlists/tree.rs:140
+#: src/app/browser/playlists/tree.rs:141
 msgid "My Playlists: + NEW makes a playlist, folder or smart playlist; ADD TO PLAYLIST puts the chosen track in a playlist"
 msgstr "Mijn afspeellijsten: + NIEUW maakt een afspeellijst, map of slimme afspeellijst; TOEVOEGEN AAN AFSPEELLIJST zet de gekozen track in een afspeellijst"
 
-#: src/app/browser/playlists/tree.rs:145
+#: src/app/browser/playlists/tree.rs:146
 msgid "History: tracks that stayed on air for 60 s, one list per day"
 msgstr "Geschiedenis: tracks die 60 s on air bleven, één lijst per dag"
 
-#: src/app/browser/playlists/tree.rs:148
+#: src/app/browser/playlists/tree.rs:149
 msgid "Stages: new music from the watched folders waits in INBOX; drag a track onto the next stage or use MORE; + NEW adds a stage before COLLECTION"
 msgstr "Fasen: nieuwe muziek uit de bewaakte mappen wacht in INBOX; sleep een track naar de volgende fase of gebruik MEER; + NIEUW voegt een fase toe vóór COLLECTION"
 
-#: src/app/browser/playlists/tree.rs:153
+#: src/app/browser/playlists/tree.rs:154
 msgid "Cue Bank: + NEW makes a list of up to 8 cues (A–H) of different tracks; the device export carries the lists"
 msgstr "Cue Bank: + NIEUW maakt een lijst van maximaal 8 cues (A–H) van verschillende tracks; de apparaatexport bevat de lijsten"
 
-#: src/app/browser/playlists/tree.rs:158
+#: src/app/browser/playlists/tree.rs:159
 msgid "Tags: + NEW adds a category; choose a category and + NEW adds a tag to it"
 msgstr "Tags: + NIEUW voegt een categorie toe; kies een categorie en + NIEUW voegt er een tag aan toe"
 
-#: src/app/browser/playlists/tree.rs:161
+#: src/app/browser/playlists/tree.rs:162
 msgid "Library: read-only; DUPLICATE TO MY PLAYLISTS copies a playlist you can edit"
 msgstr "Bibliotheek: alleen-lezen; DUPLICEREN NAAR MIJN AFSPEELLIJSTEN kopieert een afspeellijst die je kunt bewerken"
 
-#: src/app/browser/playlists/tree.rs:164
+#: src/app/browser/playlists/tree.rs:165
 msgid "Folder of the library (read-only): DUPLICATE TO MY PLAYLISTS copies it with its playlists"
 msgstr "Map van de bibliotheek (alleen-lezen): DUPLICEREN NAAR MIJN AFSPEELLIJSTEN kopieert de map met haar afspeellijsten"
 
-#: src/app/browser/playlists/tree.rs:169
+#: src/app/browser/playlists/tree.rs:170
 msgid "Folder: + NEW makes a playlist, folder or smart playlist inside it"
 msgstr "Map: + NIEUW maakt daarin een afspeellijst, map of slimme afspeellijst"
 
-#: src/app/browser/playlists/tree.rs:172
+#: src/app/browser/playlists/tree.rs:173
 msgid "Category: + NEW adds a tag; choose a tag to list its tracks"
 msgstr "Categorie: + NIEUW voegt een tag toe; kies een tag om de tracks ervan te tonen"
 
@@ -5628,17 +5627,17 @@ msgstr "de opgeslagen zoekopdracht „{}” kan niet worden gelezen"
 msgid "deleted the saved search “{}”"
 msgstr "opgeslagen zoekopdracht „{}” verwijderd"
 
-#: src/app/browser/session.rs:31
+#: src/app/browser/session.rs:37
 #: src/app/browser/sidebar.rs:116
 msgid "Tag List ({})"
 msgstr "Taglijst ({})"
 
-#: src/app/browser/session.rs:61
+#: src/app/browser/session.rs:64
 #: src/app/browser/sidebar.rs:117
 msgid "Session history ({})"
 msgstr "Sessiegeschiedenis ({})"
 
-#: src/app/browser/session.rs:75
+#: src/app/browser/session.rs:77
 msgid "history: {}"
 msgstr "geschiedenis: {}"
 
@@ -6015,7 +6014,7 @@ msgid " · reading {}/{}"
 msgstr " · lezen {}/{}"
 
 #: src/app/browser/tagging.rs:141
-#: src/app/browser/wire.rs:298
+#: src/app/browser/wire.rs:305
 msgid "select a track to tag"
 msgstr "selecteer een track om te taggen"
 
@@ -6051,21 +6050,21 @@ msgstr "{} tracks toegevoegd aan tag “{}”"
 msgid "every deck is playing; pause one to load"
 msgstr "elk deck speelt; pauzeer er een om te laden"
 
-#: src/app/browser/wire.rs:226
+#: src/app/browser/wire.rs:227
 msgid "saved {n} track to {}"
 msgid_plural "saved {n} tracks to {}"
 msgstr[0] "{n} track opgeslagen in {}"
 msgstr[1] "{n} tracks opgeslagen in {}"
 
-#: src/app/browser/wire.rs:232
+#: src/app/browser/wire.rs:233
 msgid "save failed: {}"
 msgstr "opslaan mislukt: {}"
 
-#: src/app/browser/wire.rs:290
+#: src/app/browser/wire.rs:297
 msgid "select a track to see what relates to it"
 msgstr "selecteer een track om te zien wat erbij past"
 
-#: src/app/browser/wire.rs:353
+#: src/app/browser/wire.rs:360
 msgid "AUTOMIX stopped"
 msgstr "AUTOMIX gestopt"
 
@@ -7593,23 +7592,23 @@ msgstr "{}: de extensie kan dat niet met dit apparaat. Zet de extensie aan bij V
 msgid "Cancelling…"
 msgstr "Annuleren…"
 
-#: src/app/device/pace.rs:138
+#: src/app/device/pace.rs:140
 msgid "{} left"
 msgstr "{} resterend"
 
-#: src/app/device/pace.rs:171
+#: src/app/device/pace.rs:173
 msgid "This stick writes small files slowly (analysis files): {}. A faster stick helps"
 msgstr "Deze stick schrijft kleine bestanden langzaam (analysebestanden): {}. Een snellere stick helpt"
 
-#: src/app/device/pace.rs:175
+#: src/app/device/pace.rs:177
 msgid "This stick writes at {}"
 msgstr "Deze stick schrijft met {}"
 
-#: src/app/device/pace.rs:184
+#: src/app/device/pace.rs:186
 msgid "a few seconds"
 msgstr "een paar seconden"
 
-#: src/app/device/pace.rs:185
+#: src/app/device/pace.rs:187
 msgid "about {} s"
 msgstr "ongeveer {} s"
 

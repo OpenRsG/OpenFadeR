@@ -1,8 +1,20 @@
+import { Icon } from "icons.slint";
+
+/// One row of the playlist tree (src/app/browser/playlists/tree.rs). A heading (`head`: My Playlists, History, Devices …)
+/// is taller and folds the rows under it away; `heads` counts the headings above the row, for the scroll position.
+export struct TreeRow {
+    text: string,
+    depth: int,
+    icon: Icon,
+    head: bool,
+    open: bool,
+    heads: int,
+}
 
 /// The state globals of the browser (Rust: src/app/browser/). The components are in browser.slint and its children.
 /// Library side: playlist tree + Tag List + search + track filter + track table. Rust drives it through this global (src/app/browser/).
 export global BrowserState {
-    in property <[StandardListViewItem]> playlists;
+    in property <[TreeRow]> playlists;
     in property <[[StandardListViewItem]]> tracks;
     /// "N of M tracks" or the last error, shown under the table.
     in property <string> status;
@@ -11,6 +23,8 @@ export global BrowserState {
     /// The step that read is at, one readable line ("KINGSTON: reading the library 2.1 of 4.8 MB"), shown beside the bar.
     in property <string> load-text;
     callback playlist-selected(int);
+    /// A click on a heading of the tree (or Left / Right on it): its rows unfold or fold away.
+    callback tree-toggle(int);
     /// Row index in `tracks` (the filtered, sorted view).
     callback track-selected(int);
     /// Ctrl+click (mode 1) / Shift+click and Shift+arrows (mode 2) on row `i`: the multi-selection grows, shrinks or spans a range.
