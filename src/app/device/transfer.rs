@@ -163,7 +163,7 @@ impl Ctx {
         }
         let writers = self.writers(&d)?;
         let g = self.gather(&pack)?;
-        let t = Target::new(self, Some(&d), d.mount.clone(), writers, false);
+        let t = Target::new(self, &d, writers);
         if analysed {
             self.write_transfer(d, t, to, g);
             return Some(());

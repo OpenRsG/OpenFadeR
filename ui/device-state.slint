@@ -168,6 +168,8 @@ export global DeviceState {
     callback export-toggle(int);
     callback export-clear();
     callback export-start();
+    /// The EXPORT folder field changed: the chips and the status line follow the target.
+    callback folder-edited();
     /// Switches format `i` of `formats` for the chosen device.
     callback format-toggle(int);
     /// `true`: every format on; `false`: only the format that handles the device (the user then ticks the others).

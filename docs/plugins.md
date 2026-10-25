@@ -775,6 +775,14 @@ merges by (it replaces that playlist's content), so the snapshot lists the playl
 has too is written with the collection's analysis, its empty parts filled from the device copy; any other member with the analysis
 read from the device) and then the new tracks; a track the playlist holds already is skipped and counted.
 
+**Export target and formats.** Right-click a collection playlist → **Export to a device** to open EXPORT with it ticked.
+The format chips apply to both a mounted device and a typed folder. A non-empty folder takes precedence; the page and
+confirmation card name that target explicitly. Blank targets default to all available formats; existing libraries default to
+their formats plus rekordbox. Each format switch is remembered separately for each target, so choosing another target
+does not carry the previous target's switches over, and newly installed formats follow the defaults. EXPORT keeps its
+playlist ticks when you change tabs. A playlist sent before the collection has loaded waits for its list to arrive.
+
+
 **Before a write.** EXPORT, SYNC NOW, the sync of a device that was just plugged in, and Transfer show a card first (Preferences > DJ
 SYSTEM > DEVICE, "Show what an export will write before it starts"): the tracks to copy and the ones refreshed, the analyses run
 first, the time, what is left out and why, then START or CANCEL. A format whose plugin lists the `plan` feature answers the same

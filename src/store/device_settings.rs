@@ -97,7 +97,8 @@ pub fn player_changed(store: &Store, scope: &str, fingerprint: &str) -> bool {
         .unwrap_or(true)
 }
 
-/// The library formats (device plugin names) the user picked for the device `id`; `None` when never picked.
+/// The user's library format switches for the device `id` (`+plugin` / `-plugin`; plain names from older versions); `None`
+/// when never switched.
 pub fn formats(store: &Store, id: &str) -> Option<Vec<String>> {
     let rows = store.device_settings(id).ok()?;
     let list = rows.get(FORMATS)?;
@@ -109,7 +110,7 @@ pub fn formats(store: &Store, id: &str) -> Option<Vec<String>> {
     )
 }
 
-/// Remembers the formats picked for the device `id`.
+/// Remembers the format switches of the device `id`.
 pub fn set_formats(store: &Store, id: &str, names: &[String]) -> R<()> {
     store.set_device_setting(id, FORMATS, &names.join(","))
 }
