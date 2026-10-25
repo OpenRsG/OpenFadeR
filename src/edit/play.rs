@@ -21,7 +21,7 @@ impl Cursor {
     fn fill<T: Sample + FromSample<f32>>(&mut self, out: &mut [T], ch: usize) -> bool {
         let mut ended = false;
         for frame in out.chunks_mut(ch) {
-            let lr = self.pcm.frame_at(self.pos).unwrap_or_else(|| {
+            let lr = self.pcm.frame_at_step(self.pos, self.step).unwrap_or_else(|| {
                 ended = true;
                 [0.0; 2]
             });
@@ -116,10 +116,13 @@ mod tests {
 
     #[test]
     fn maps_channels_and_resamples() {
-        let mut c = cursor(4, 0.5);
+        // interior of a ramp (the interpolator needs ~16 frames on each side): the half position is the midpoint
+        let mut c = cursor(64, 0.5);
+        c.pos = 30.0;
         let mut out = [9.0f32; 6];
         c.fill(&mut out, 3); // 3 channels: L, R, silent
-        assert_eq!(out, [0.0, 0.0, 0.0, 0.5, -0.5, 0.0]);
+        let want = [30.0, -30.0, 0.0, 30.5, -30.5, 0.0];
+        assert!(out.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-3), "{out:?}");
         let mut c = cursor(4, 1.0);
         let mut mono = [9.0f32; 2];
         c.fill(&mut mono, 1);

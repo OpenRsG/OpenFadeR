@@ -63,6 +63,17 @@ the window has no graphics API (for example `winit-software`). This setting does
 If the log says llvmpipe on a Pi, fix the graphics driver or use `SLINT_BACKEND=winit-software`; forcing GPU does
 not turn an emulated renderer into hardware.
 
+## Low-power mode
+
+PREFS > ADVANCED > OTHERS > LOW-POWER MODE is AUTO (default), ON or OFF; its hint shows the effective mode. AUTO counts
+the machine as low-power when `/proc/device-tree/model` says Raspberry Pi, or when it runs Linux on ARM (aarch64 or armv7)
+with 8 GB of RAM or less. While it is on:
+
+- a sampler slot keeps at most 10 s instead of 30 s (16 slots at 48 kHz stereo f32: 60 MB instead of 180 MB);
+- the analysis pool runs at most 2 workers (Performance would use up to 3 on a 4-core Pi, each holding a whole track).
+
+Decks, previews and analysis decode to 16-bit on every machine, so that is not part of the mode.
+
 The image-composition path keeps the enlarged strip in a texture and changes its source rectangle, rather than
 moving a three-view-wide item. It also keeps each overview and its cue marker in a texture: the playhead and dashed
 slip ghost are tiny separate textures. The CPU prepares waveform pixels only when the cached strip or overview

@@ -1,8 +1,9 @@
 //! File > Import: tracks, a folder, a playlist file (M3U / M3U8 / PLS), a collection file through a library plugin. The reading
 //! runs on a thread ([`openfader::library::import`]); here are the dialogs' answers going in and the result coming out
-//! (status line, browser reload, analysis of the new files when Auto Analysis is on).
+//! (status line, browser reload, analysis of the new files when Auto Analysis is on: files that came with cues are analysed for
+//! the waveform and grid only, [`analyze::request_keep_cues`]).
 
-use super::{BrowserState, Ctx};
+use super::{analyze, prefs, BrowserState, Ctx};
 use openfader::{
     library::{
         self,
@@ -52,16 +53,23 @@ fn finished(c: &Rc<Ctx>, r: Result<Report, String>) {
         Ok(r) => {
             c.say(&r.text());
             c.reload(r.node);
-            c.analyze(
-                r.files
-                    .into_iter()
-                    .map(|f| library::Track {
-                        file: Some(f),
-                        ..Default::default()
-                    })
-                    .collect(),
-                false,
-            );
+            // Tracks that came with cues (another library's) are analysed for the waveform only: CUE Analysis would replace them.
+            let (keep, todo): (Vec<library::Track>, Vec<library::Track>) = r
+                .files
+                .into_iter()
+                .map(|f| library::Track {
+                    file: Some(f),
+                    ..Default::default()
+                })
+                .partition(|t| {
+                    c.store
+                        .edits(&c.store.key_of(t))
+                        .is_ok_and(|e| e.cues.is_some_and(|cues| !cues.is_empty()))
+                });
+            c.analyze(todo, false);
+            if !keep.is_empty() && prefs::with(|p| p.analysis.auto_analysis) {
+                analyze::request_keep_cues(&keep);
+            }
         }
         Err(e) => c.say(&tr!("import failed: {}", e)),
     }

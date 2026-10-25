@@ -15,9 +15,9 @@ use openfader::{
         plan::{self, Preview, Speeds},
         Device,
     },
-    library::snapshot::Snapshot,
+    library::snapshot::{Pending as Collection, Snapshot},
     plugin::device::{Control, ExportOptions, Feature, PlanItem, Provider},
-    store::device_settings::Behaviour,
+    store::{device_settings::Behaviour, Store},
 };
 use parking_lot::Mutex;
 use slint::{ComponentHandle, ModelRc, VecModel};
@@ -45,9 +45,10 @@ pub(super) struct Built {
 }
 
 impl Built {
-    pub fn of(snap: Arc<Snapshot>) -> Self {
+    /// The collection `pending` with its analyses read now ([`Collection::read`]): call it on the worker.
+    pub fn read(pending: &Collection, store: &Store) -> Self {
         Self {
-            snap,
+            snap: Arc::new(pending.read(store)),
             added: 0,
             skipped: 0,
             idle: None,

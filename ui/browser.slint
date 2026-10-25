@@ -429,6 +429,7 @@ export component Browser inherits Rectangle {
                 if BrowserState.side-kind == 12 && BrowserState.source-history: IconButton { icon: Icon.check; icon-size: 16px; tooltip: @tr("Import into the play history"); clicked => { DeviceState.import-history(BrowserState.source-device, BrowserState.source-list); } }
                 if BrowserState.side-kind == 12: IconButton { icon: Icon.trash; icon-size: 16px; tooltip: @tr("Delete from the device"); clicked => { DeviceState.delete-playlist(BrowserState.source-device, BrowserState.source-list); } }
                 if BrowserState.history-view: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: @tr("Save as M3U8"); clicked => { BrowserState.history-save(); } }
+                if BrowserState.history-view: IconButton { icon: Icon.clock; icon-size: 16px; tooltip: @tr("Save set list"); clicked => { BrowserState.history-save-set-list(); } }
                 if !root.detached: IconButton { icon: Icon.expand; icon-size: 16px; tooltip: @tr("Browse view (W)"); active: BrowserState.browse-max; clicked => { BrowserState.browse-max = !BrowserState.browse-max; } }
             }
             }

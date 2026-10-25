@@ -1,7 +1,7 @@
 //! Play history: which track was played when, grouped by local day (`YYYY-MM-DD`), one
 //! history playlist per session.
 
-use super::{R, Sql, Store, column};
+use super::{R, Sql, Store, column, query_all};
 use rusqlite::params;
 
 const APPEND: &str = "INSERT INTO history(day, key, played_at) VALUES (?1, ?2, ?3)";
@@ -43,6 +43,16 @@ impl Store {
             [day],
         )
     }
+
+    /// [`Store::history_day`] with each play's time (Unix seconds).
+    pub fn history_day_plays(&self, day: &str) -> R<Vec<(String, i64)>> {
+        query_all(
+            &self.db(),
+            "SELECT key, played_at FROM history WHERE day = ?1 ORDER BY played_at, id",
+            [day],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -56,5 +66,9 @@ mod tests {
         s.history_append_many("2026-10-13", &[("c|3".into(), 30), ("b|2".into(), 20)])
             .unwrap();
         assert_eq!(s.history_day("2026-10-13").unwrap(), ["a|1", "b|2", "c|3"]);
+        assert_eq!(
+            s.history_day_plays("2026-10-13").unwrap()[1],
+            ("b|2".to_owned(), 20)
+        );
     }
 }

@@ -61,6 +61,7 @@ impl View {
     /// A track reached 30 s on air: list it, update the sidebar count and, when shown, the rows.
     fn log(&mut self, app: &App, t: Track) {
         self.history.push(t);
+        self.history_at.push(chrono::Local::now().timestamp());
         self.relabel(HISTORY_ROW, tr!("Session history ({})", self.history.len()));
         if self.related.is_none() && matches!(self.home, Home::History) {
             self.load(app);

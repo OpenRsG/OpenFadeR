@@ -7,7 +7,7 @@ use super::preview::{Build, Built, Target};
 use super::{record_all, App, Ctx, DeviceState};
 use openfader::{
     device::{plan::Preview, size, sync, Device},
-    library::snapshot::Snapshot,
+    library::snapshot::Pending,
     store::device_settings::Behaviour,
 };
 use slint::ComponentHandle;
@@ -19,7 +19,7 @@ pub(super) fn refresh(cx: &Rc<Ctx>) {
         return;
     };
     let ticked = cx.store.sync_playlists(&dev.id).unwrap_or_default();
-    cx.sync.set(&snap, &|id| ticked.iter().any(|t| t == id));
+    cx.sync.set(snap.outline(), &|id| ticked.iter().any(|t| t == id));
     let on = cx.store.device_sync_on(&dev.id).unwrap_or(false);
     cx.with_state(|s| s.set_sync_on(on));
 }
@@ -93,18 +93,18 @@ pub(super) fn run(cx: &Rc<Ctx>, dev: &Device, auto: bool) {
     let Some(writers) = cx.writers(dev) else {
         return;
     };
-    let Some(full) = cx.snapshot() else { return };
-    let snap = match sync::narrow(&full, &ticked) {
+    let Some(full) = cx.pending() else { return };
+    let snap = match full.map(|s| sync::narrow(s, &ticked)) {
         Ok(s) => Arc::new(s),
         Err(e) => return cx.say(&e, true),
     };
     let t = Target::new(cx, Some(dev), dev.mount.clone(), writers, false);
-    let build = |snap: &Arc<Snapshot>| {
-        let snap = snap.clone();
-        move || -> Build { Box::new(move |_| Ok(Built::of(snap))) }
+    let build = |snap: &Arc<Pending>| {
+        let (snap, store) = (snap.clone(), cx.store.clone());
+        move || -> Build { Box::new(move |_| Ok(Built::read(&snap, &store))) }
     };
     let (store, id) = (cx.store.clone(), dev.id.clone());
-    let (go_t, go_snap) = (t.clone(), snap.clone());
+    let (go_t, go_snap, go_store) = (t.clone(), snap.clone(), cx.store.clone());
     let go = move |cx: &Rc<Ctx>| {
         // The device may be gone when the question was answered.
         let Some(d) = cx.device(&id) else {
@@ -113,7 +113,7 @@ pub(super) fn run(cx: &Rc<Ctx>, dev: &Device, auto: bool) {
         cx.write(
             go_t,
             tr!("Syncing"),
-            Box::new(move |_| Ok(Built::of(go_snap))),
+            Box::new(move |_| Ok(Built::read(&go_snap, &go_store))),
             {
                 let (store, d) = (store, d);
                 move |_, done| {

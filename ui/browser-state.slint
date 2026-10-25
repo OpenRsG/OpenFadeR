@@ -113,6 +113,7 @@ export global BrowserState {
     /// A history list is on screen (session or a stored day): the SAVE M3U8 button applies.
     in property <bool> history-view;
     callback history-save();
+    callback history-save-set-list();
     /// A Library health check is on screen: its action bar applies. `health-act` takes `ignore` (the chosen track), `ignore-all` (every
     /// listed track), `ignored` (show what was ignored instead) and `rescan`; the other buttons call the library actions.
     in property <bool> health-view;

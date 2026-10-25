@@ -5,7 +5,7 @@
 //! * Auto Analysis: at start-up (and on ANALYZE NOW) every track lacking a BPM / grid or a key that the enabled parts
 //!   would fill is analysed; with Auto Analysis off nothing runs by itself. [`request`] is the explicit path: the browser's
 //!   track menu hands it the selected tracks, which are analysed again whatever the cache holds (tracks with the analysis
-//!   lock are skipped).
+//!   lock are skipped). [`request_keep_cues`] is the path of imports that bring cues: the cache entry is made, no cues are stored.
 //! * Track Analysis Setting / mode / precision / BPM range and the cue options reach the analysis code
 //!   as [`openfader::analysis::options`], set from the settings by [`sync`] on every change.
 //! * Analysis Process: [`workers`] threads, at low priority when power saving ([`job`]).
@@ -133,10 +133,10 @@ pub fn cue_analysed() -> HashSet<String> {
 
 /// Worker threads of Analysis Process `process` on this machine.
 pub fn workers(process: Process) -> usize {
-    sync::workers(
+    crate::app::prefs::lowpower::analysis_workers(sync::workers(
         process,
         std::thread::available_parallelism().map_or(1, |n| n.get()),
-    )
+    ))
 }
 
 /// What CUE Analysis Auto learnt from the collection (empty until Auto is chosen).
@@ -267,6 +267,19 @@ pub fn request(tracks: &[Track], explicit: bool) {
     let Some((app, lib)) = context() else { return };
     let refs: Vec<&Track> = tracks.iter().collect();
     start_run(&app, jobs(&*lib, &refs, explicit), prefs::with(settings));
+}
+
+/// [`request`] for tracks that came with cues (an import): the analysis fills the cache (waveform, grid, key) and stores no cues,
+/// so the cue list they came with stays whatever "Prohibit overwriting CUEs" says. Never explicit: a key tag the library gave
+/// is left alone.
+pub fn request_keep_cues(tracks: &[Track]) {
+    let Some((app, lib)) = context() else { return };
+    let refs: Vec<&Track> = tracks.iter().collect();
+    let jobs = jobs(&*lib, &refs, false)
+        .into_iter()
+        .map(|j| Job { keep_cues: true, ..j })
+        .collect();
+    start_run(&app, jobs, prefs::with(settings));
 }
 
 /// What [`request`] would run for `tracks`, gathered on the UI thread for a caller that waits for the analysis on a worker thread
@@ -406,6 +419,7 @@ fn jobs(lib: &dyn Library, tracks: &[&Track], explicit: bool) -> Vec<Job> {
                 key,
                 explicit,
                 refresh: false,
+                keep_cues: false,
                 library_key: !t.key.is_empty(),
                 guide,
             })

@@ -18,13 +18,22 @@ use std::{
     time::Instant,
 };
 
-/// `text` and under it `lines`, one per row.
 /// What to do when a write failed with EIO (`os error 5`): the kernel lost the device mid-write (a USB link that resets, a
-/// stick that fails), which no retry in the app mends.
-fn usb_hint(e: &str) -> Option<String> {
-    e.contains("(os error 5)").then(|| tr!("The device stopped answering while it was written (a USB input/output error, not a format problem): plug it straight into the computer, without a hub, or into another port, then export again. If it keeps happening, the stick is failing.").to_owned())
+/// stick that fails), which the one retry of the audio copy did not mend. A device behind a hub ([`openfader::device::Device::via_hub`]) is the
+/// likely cause and is said first; the files already copied stay, so the same export again resumes.
+fn usb_hint(e: &str, via_hub: bool) -> Option<String> {
+    if !e.contains("(os error 5)") {
+        return None;
+    }
+    let resume = tr!("Audio already copied stays on the device: export again and it continues with the rest.");
+    Some(if via_hub {
+        tr!("The device is plugged in through a USB hub, and the hub dropped its link while it was written (a USB input/output error, not a format problem): plug it straight into a port of the computer, then export again. {} If it keeps happening, the stick is failing.", resume)
+    } else {
+        tr!("The device stopped answering while it was written (a USB input/output error, not a format problem): plug it into another port of the computer, then export again. {} If it keeps happening, the stick is failing.", resume)
+    })
 }
 
+/// `text` and under it `lines`, one per row.
 fn with_lines(mut text: String, lines: impl IntoIterator<Item = String>) -> String {
     for l in lines {
         text.push('\n');
@@ -150,7 +159,7 @@ impl Ctx {
                         (true, None) => e,
                         (true, Some(f)) => f,
                         (false, f) => {
-                            let hint = usb_hint(&e);
+                            let hint = usb_hint(&e, t.dev.as_ref().is_some_and(|d| d.via_hub));
                             with_lines(e, hint.into_iter().chain(notes.iter().cloned()).chain(f))
                         }
                     }

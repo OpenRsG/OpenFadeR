@@ -18,15 +18,15 @@ pub(super) fn refresh(cx: &Rc<Ctx>, count: bool) {
     if !s.get_visible() || s.get_tab() == 0 {
         return;
     }
-    let Some(snap) = cx.snapshot() else { return };
+    let Some(snap) = cx.pending() else { return };
     let pre = std::mem::take(&mut *cx.preselect.borrow_mut());
-    cx.export.set(&snap, &|id| pre.iter().any(|p| p == id));
+    cx.export.set(snap.outline(), &|id| pre.iter().any(|p| p == id));
     if count && s.get_tab() == 1 && !cx.busy() {
         cx.say(
             &tr!(
                 "{} tracks, {} playlists in the collection",
-                snap.len(),
-                snap.playlists().count()
+                snap.outline().len(),
+                snap.outline().playlists().count()
             ),
             false,
         );
@@ -103,15 +103,16 @@ fn start(cx: &Rc<Ctx>) {
     let t = Target::new(cx, dev.as_ref(), dest, writers, folder_plans);
     let (store, target, name) = (cx.store.clone(), dev.clone(), t.name.clone());
     let (build, go_snap, go_t) = (snap.clone(), snap, t.clone());
+    let (build_store, go_store) = (store.clone(), store.clone());
     cx.gate(
         &t,
         0,
-        move || Box::new(move |_| Ok(Built::of(build))),
+        move || Box::new(move |_| Ok(Built::read(&build, &build_store))),
         move |cx| {
             cx.write(
                 go_t,
                 tr!("Exporting"),
-                Box::new(move |_| Ok(Built::of(go_snap))),
+                Box::new(move |_| Ok(Built::read(&go_snap, &go_store))),
                 move |_, done| record_all(&store, target.as_ref(), done, &name),
                 move |cx, _| {
                     refresh(cx, false);

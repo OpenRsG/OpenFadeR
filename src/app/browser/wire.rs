@@ -24,6 +24,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
+    sync::Arc,
     time::Instant,
 };
 
@@ -87,7 +88,7 @@ pub fn wire(
         rows,
         sidebar,
         panel_rows,
-        list: Rc::default(),
+        list: Arc::default(),
         shown: Vec::new(),
         query: String::new(),
         filter: Filter::default(),
@@ -98,6 +99,7 @@ pub fn wire(
         related: None,
         tags: Vec::new(),
         history: Vec::new(),
+        history_at: Vec::new(),
         selected: None,
         sel: Default::default(),
         sel_entry: Entry::All,
@@ -230,6 +232,16 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
                 n,
                 path.display()
             ),
+            Err(e) => tr!("save failed: {}", e),
+        };
+        weak.unwrap()
+            .global::<BrowserState>()
+            .set_status(msg.into());
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
+    state.on_history_save_set_list(move || {
+        let msg = match history::save_set_list(&mut v.borrow_mut()) {
+            Ok((csv, txt)) => tr!("saved set list to {} and {}", csv.display(), txt.display()),
             Err(e) => tr!("save failed: {}", e),
         };
         weak.unwrap()

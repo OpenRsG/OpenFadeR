@@ -7,7 +7,7 @@
 //!
 //! # Sections (one child per dialog category)
 //! [`view`], [`audio`], [`analysis`], [`controller`], [`extensions`], [`keyboard`], [`advanced`] own typed
-//! sections of [`Prefs`]; [`dj_system`] keeps its settings elsewhere. Every category exports the same two
+//! sections of [`Prefs`]; [`dj_system`] keeps its settings elsewhere ([`lowpower`] is the ADVANCED > Others LOW-POWER MODE setting's logic). Every category exports the same two
 //! functions:
 //!
 //! * `pub fn rows(p: &Prefs) -> Vec<Row>`: the rows shown for the category (rebuilt after every click and
@@ -40,6 +40,7 @@ mod file;
 pub mod keyboard;
 pub mod libraries;
 mod live;
+pub mod lowpower;
 mod look;
 mod panes;
 mod rows;

@@ -626,7 +626,7 @@ msgid "DELETE"
 msgstr "EXCLUIR"
 
 #: ui/browser-state.slint:92
-#: src/app/browser/suggest/view.rs:176
+#: src/app/browser/suggest/view.rs:182
 msgid "LIST"
 msgstr "LISTA"
 
@@ -1156,34 +1156,38 @@ msgid "Save as M3U8"
 msgstr "Salvar como M3U8"
 
 #: ui/browser.slint:432
+msgid "Save set list"
+msgstr "Salvar setlist"
+
+#: ui/browser.slint:433
 msgid "Browse view (W)"
 msgstr "Modo navegação (W)"
 
-#: ui/browser.slint:475
+#: ui/browser.slint:476
 msgid "Tracks"
 msgstr "Faixas"
 
-#: ui/browser.slint:475
+#: ui/browser.slint:476
 msgid "Sources"
 msgstr "Fontes"
 
-#: ui/browser.slint:475
+#: ui/browser.slint:476
 msgid "Info"
 msgstr "Info"
 
-#: ui/browser.slint:475
+#: ui/browser.slint:476
 msgid "Actions"
 msgstr "Ações"
 
-#: ui/browser.slint:481
+#: ui/browser.slint:482
 msgid "→ {}"
 msgstr "→ {}"
 
-#: ui/browser.slint:481
+#: ui/browser.slint:482
 msgid "Load {}"
 msgstr "LOAD {}"
 
-#: ui/browser.slint:482
+#: ui/browser.slint:483
 msgid "Load the selected track to deck {}"
 msgstr "LOAD: carregar a faixa selecionada no deck {}"
 
@@ -3912,7 +3916,7 @@ msgid "PHONES"
 msgstr "PHONES"
 
 #: ui/stage/strip.slint:81
-#: src/app/welcome.rs:29
+#: src/app/welcome.rs:32
 msgid "EFFECTS"
 msgstr "EFEITOS"
 
@@ -4927,7 +4931,7 @@ msgstr "modelo de key NEURAL indisponível: esta execução usa CLASSIC"
 msgid "analysis: library query failed: {}"
 msgstr "análise: falha na consulta à biblioteca: {}"
 
-#: src/app/analyze/mod.rs:354
+#: src/app/analyze/mod.rs:367
 msgid " · library grid in use: PREFS > ANALYSIS > BEAT GRID FROM > OPENFADER ANALYSIS shows ours"
 msgstr " · grade da biblioteca em uso: PREFS > ANÁLISE > GRADE DE BATIDAS E CUES DE > ANÁLISE DO OPENFADER mostra a nossa"
 
@@ -5163,11 +5167,17 @@ msgid_plural "{n} tracks are listed again by “{}”"
 msgstr[0] "{n} faixa é listada de novo por “{}”"
 msgstr[1] "{n} faixas são listadas de novo por “{}”"
 
-#: src/app/browser/history.rs:139
+#: src/app/browser/history.rs:234
+msgid "open the Session history or a day of History first"
+msgstr "abra primeiro o histórico da sessão ou um dia do histórico"
+
+#: src/app/browser/history.rs:237
+#: src/app/browser/history.rs:255
 msgid "this list is empty"
 msgstr "esta lista está vazia"
 
-#: src/app/browser/history.rs:143
+#: src/app/browser/history.rs:247
+#: src/app/browser/history.rs:259
 #: src/app/library/export.rs:61
 msgid "set OPENFADER_EXPORT_DIR or HOME"
 msgstr "defina OPENFADER_EXPORT_DIR ou HOME"
@@ -5226,31 +5236,31 @@ msgstr "biblioteca: {}"
 msgid "Deck {} pads show the track's own hot cues"
 msgstr "Os pads do Deck {} mostram os HOT CUES da própria faixa"
 
-#: src/app/browser/list.rs:43
-msgid "the source is not open"
-msgstr "a fonte não está aberta"
-
-#: src/app/browser/list.rs:64
+#: src/app/browser/list.rs:41
 msgid "query failed: {}"
 msgstr "falha na consulta: {}"
 
-#: src/app/browser/list.rs:109
+#: src/app/browser/list.rs:72
+msgid "the source is not open"
+msgstr "a fonte não está aberta"
+
+#: src/app/browser/list.rs:118
 msgid "{} tracks relate to “{}” (registered partners, then compatible key, BPM ±6%)"
 msgstr "{} faixas se relacionam com “{}” (parceiras registradas, depois KEY compatível, BPM ±6%)"
 
-#: src/app/browser/list.rs:116
+#: src/app/browser/list.rs:125
 msgid "{} of 8 banks, A first · MORE adds a cue from a deck or the chosen track, loads the list onto a deck"
 msgstr "{} de 8 bancos, A primeiro · MAIS adiciona um CUE de um deck ou da faixa escolhida, carrega a lista em um deck"
 
-#: src/app/browser/list.rs:120
+#: src/app/browser/list.rs:129
 msgid "{} of {} tracks waiting · drag one onto the next stage, or MORE moves the chosen or all shown tracks"
 msgstr "{} de {} faixas aguardando · arraste uma para a próxima etapa, ou MORE move a faixa escolhida ou todas as exibidas"
 
-#: src/app/browser/list.rs:125
+#: src/app/browser/list.rs:134
 msgid "{} tracks share title, artist and length (±1 s) with another one, in {} groups"
 msgstr "{} faixas compartilham título, artista e duração (±1 s) com outra, em {} grupos"
 
-#: src/app/browser/list.rs:131
+#: src/app/browser/list.rs:140
 msgid "{} of {} tracks"
 msgstr "{} de {} faixas"
 
@@ -5258,7 +5268,7 @@ msgstr "{} de {} faixas"
 msgid " · BPM ±6% / KEY MATCH wait for a loaded deck"
 msgstr " · BPM ±6% / KEY MATCH aguardam um deck carregado"
 
-#: src/app/browser/mod.rs:381
+#: src/app/browser/mod.rs:384
 msgid "{} selected"
 msgstr "{} selecionadas"
 
@@ -5276,12 +5286,12 @@ msgstr "essa faixa não existe mais"
 
 #: src/app/browser/palette/edit.rs:74
 #: src/app/browser/palette/edit.rs:110
-#: src/app/browser/wire.rs:331
+#: src/app/browser/wire.rs:343
 msgid "{} tracks added to the Tag List"
 msgstr "{} faixas adicionadas à lista de tags"
 
 #: src/app/browser/palette/edit.rs:90
-#: src/app/browser/wire.rs:311
+#: src/app/browser/wire.rs:323
 msgid "“{}” is already in the Tag List"
 msgstr "“{}” já está na lista de tags"
 
@@ -5290,7 +5300,7 @@ msgid "the Tag List holds up to {} tracks"
 msgstr "a lista de tags comporta até {} faixas"
 
 #: src/app/browser/palette/edit.rs:97
-#: src/app/browser/wire.rs:313
+#: src/app/browser/wire.rs:325
 msgid "tagged “{}” ({} in the Tag List)"
 msgstr "“{}” marcada ({} na lista de tags)"
 
@@ -5346,27 +5356,27 @@ msgstr "a cor das faixas tocadas foi redefinida"
 msgid "this smart playlist has no conditions yet: EDIT adds some"
 msgstr "esta playlist inteligente ainda não tem condições: EDITAR adiciona algumas"
 
-#: src/app/browser/playlists/lists.rs:101
+#: src/app/browser/playlists/lists.rs:113
 msgid "choose one of your playlists first (My Playlists)"
 msgstr "escolha primeiro uma das suas playlists (Minhas playlists)"
 
-#: src/app/browser/playlists/lists.rs:104
+#: src/app/browser/playlists/lists.rs:116
 msgid "reorder a playlist"
 msgstr "reordenar uma playlist"
 
-#: src/app/browser/playlists/lists.rs:126
+#: src/app/browser/playlists/lists.rs:138
 msgid "renumbered"
 msgstr "renumerada"
 
-#: src/app/browser/playlists/lists.rs:128
+#: src/app/browser/playlists/lists.rs:140
 msgid "sorted"
 msgstr "ordenada"
 
-#: src/app/browser/playlists/lists.rs:130
+#: src/app/browser/playlists/lists.rs:142
 msgid "{} tracks {}"
 msgstr "{} faixas {}"
 
-#: src/app/browser/playlists/lists.rs:137
+#: src/app/browser/playlists/lists.rs:149
 msgid "remove tracks from a playlist"
 msgstr "remover faixas de uma playlist"
 
@@ -5634,12 +5644,12 @@ msgstr "busca salva “{}” excluída"
 msgid "Tag List ({})"
 msgstr "Lista de tags ({})"
 
-#: src/app/browser/session.rs:64
+#: src/app/browser/session.rs:65
 #: src/app/browser/sidebar.rs:117
 msgid "Session history ({})"
 msgstr "Histórico da sessão ({})"
 
-#: src/app/browser/session.rs:77
+#: src/app/browser/session.rs:78
 msgid "history: {}"
 msgstr "histórico: {}"
 
@@ -5893,11 +5903,11 @@ msgstr "{} · {}{}"
 msgid " · same genre"
 msgstr " · mesmo gênero"
 
-#: src/app/browser/suggest/mod.rs:164
+#: src/app/browser/suggest/mod.rs:186
 msgid "the track has no analysis data yet (ANALYZE TRACK)"
 msgstr "a faixa ainda não tem dados de análise (ANALISAR FAIXA)"
 
-#: src/app/browser/suggest/mod.rs:166
+#: src/app/browser/suggest/mod.rs:188
 msgid "the track has no year tag"
 msgstr "a faixa não tem tag de ano"
 
@@ -5961,62 +5971,62 @@ msgstr "SEM VOCAL"
 msgid "{}% · sound {}%{}{}"
 msgstr "{}% · som {}%{}{}"
 
-#: src/app/browser/suggest/view.rs:89
+#: src/app/browser/suggest/view.rs:92
 msgid "Collection Radar"
 msgstr "Radar da coleção"
 
-#: src/app/browser/suggest/view.rs:90
+#: src/app/browser/suggest/view.rs:93
 msgid "Era"
 msgstr "Era"
 
-#: src/app/browser/suggest/view.rs:91
+#: src/app/browser/suggest/view.rs:94
 msgid "Mood"
 msgstr "Clima"
 
-#: src/app/browser/suggest/view.rs:92
+#: src/app/browser/suggest/view.rs:95
 msgid "Association"
 msgstr "Associação"
 
-#: src/app/browser/suggest/view.rs:99
+#: src/app/browser/suggest/view.rs:102
 msgid "a year tag"
 msgstr "uma tag de ano"
 
-#: src/app/browser/suggest/view.rs:100
+#: src/app/browser/suggest/view.rs:103
 msgid "analysis data"
 msgstr "dados de análise"
 
-#: src/app/browser/suggest/view.rs:210
+#: src/app/browser/suggest/view.rs:216
 msgid "Track Suggestion: click a track, then press LIST"
 msgstr "Sugestão de faixas: clique em uma faixa e pressione LISTA"
 
-#: src/app/browser/suggest/view.rs:212
+#: src/app/browser/suggest/view.rs:218
 msgid "Track Suggestion: load a track on a deck, or click a track and press LIST"
 msgstr "Sugestão de faixas: carregue uma faixa em um deck ou clique em uma faixa e pressione LISTA"
 
-#: src/app/browser/suggest/view.rs:257
+#: src/app/browser/suggest/view.rs:263
 msgid "{} for “{}”: {}"
 msgstr "{} para “{}”: {}"
 
-#: src/app/browser/suggest/view.rs:258
+#: src/app/browser/suggest/view.rs:264
 msgid "{n} track suggested for “{}” by {}"
 msgid_plural "{n} tracks suggested for “{}” by {}"
 msgstr[0] "{n} faixa sugerida para “{}” por {}"
 msgstr[1] "{n} faixas sugeridas para “{}” por {}"
 
-#: src/app/browser/suggest/view.rs:267
+#: src/app/browser/suggest/view.rs:273
 msgid " · no shared label, composer, artist, album or playlist"
 msgstr " · sem gravadora, compositor, artista, álbum ou playlist em comum"
 
-#: src/app/browser/suggest/view.rs:270
+#: src/app/browser/suggest/view.rs:276
 msgid " · {} without {}"
 msgstr " · {} sem {}"
 
-#: src/app/browser/suggest/view.rs:273
+#: src/app/browser/suggest/view.rs:279
 msgid " · reading {}/{}"
 msgstr " · lendo {}/{}"
 
 #: src/app/browser/tagging.rs:141
-#: src/app/browser/wire.rs:310
+#: src/app/browser/wire.rs:322
 msgid "select a track to tag"
 msgstr "selecione uma faixa para marcar"
 
@@ -6048,25 +6058,30 @@ msgstr "“{}” adicionada à tag “{}”"
 msgid "added {} tracks to tag “{}”"
 msgstr "{} faixas adicionadas à tag “{}”"
 
-#: src/app/browser/wire.rs:49
+#: src/app/browser/wire.rs:50
 msgid "every deck is playing; pause one to load"
 msgstr "todos os decks estão tocando; pause um para carregar"
 
-#: src/app/browser/wire.rs:227
+#: src/app/browser/wire.rs:229
 msgid "saved {n} track to {}"
 msgid_plural "saved {n} tracks to {}"
 msgstr[0] "{n} faixa salva em {}"
 msgstr[1] "{n} faixas salvas em {}"
 
-#: src/app/browser/wire.rs:233
+#: src/app/browser/wire.rs:235
+#: src/app/browser/wire.rs:245
 msgid "save failed: {}"
 msgstr "falha ao salvar: {}"
 
-#: src/app/browser/wire.rs:302
+#: src/app/browser/wire.rs:244
+msgid "saved set list to {} and {}"
+msgstr "setlist salva em {} e {}"
+
+#: src/app/browser/wire.rs:314
 msgid "select a track to see what relates to it"
 msgstr "selecione uma faixa para ver o que se relaciona com ela"
 
-#: src/app/browser/wire.rs:365
+#: src/app/browser/wire.rs:377
 msgid "AUTOMIX stopped"
 msgstr "AUTOMIX parado"
 
@@ -6165,52 +6180,52 @@ msgstr "Instalando {}…"
 msgid "{} installed: it is in the gallery above, APPLY to use it"
 msgstr "{} instalado: está na galeria acima, APLICAR para usar"
 
-#: src/app/connect.rs:106
+#: src/app/connect.rs:125
 msgid "never"
 msgstr "nunca"
 
-#: src/app/connect.rs:110
+#: src/app/connect.rs:129
 msgid "just now"
 msgstr "agora há pouco"
 
-#: src/app/connect.rs:111
+#: src/app/connect.rs:130
 msgid "{} min ago"
 msgstr "há {} min"
 
-#: src/app/connect.rs:112
+#: src/app/connect.rs:131
 msgid "{} h ago"
 msgstr "há {} h"
 
-#: src/app/connect.rs:113
+#: src/app/connect.rs:132
 msgid "{} d ago"
 msgstr "há {} d"
 
-#: src/app/connect.rs:141
+#: src/app/connect.rs:160
 msgid "Syncing {}: {} / {} tracks"
 msgstr "Sincronizando {}: {} / {} faixas"
 
-#: src/app/connect.rs:167
+#: src/app/connect.rs:186
 msgid "{}: sync failed: {}"
 msgstr "{}: falha na sincronização: {}"
 
-#: src/app/connect.rs:189
+#: src/app/connect.rs:208
 msgid "choose All tracks or a playlist of a library source first"
 msgstr "escolha primeiro Todas as faixas ou uma playlist de uma fonte de biblioteca"
 
-#: src/app/connect.rs:205
-#: src/app/connect.rs:218
+#: src/app/connect.rs:224
+#: src/app/connect.rs:237
 msgid "Connected {}"
 msgstr "{} conectado"
 
-#: src/app/connect.rs:351
+#: src/app/connect.rs:396
 msgid "{}: wrote {} tracks (backup in the backups folder)"
 msgstr "{}: {} faixas gravadas (backup na pasta de backups)"
 
-#: src/app/connect.rs:359
+#: src/app/connect.rs:404
 msgid "{}: not written: {}"
 msgstr "{}: não gravado: {}"
 
-#: src/app/connect.rs:401
+#: src/app/connect.rs:447
 msgid "Found {}: connect it in Preferences > Libraries"
 msgstr "{} encontrado: conecte-o em Preferências > Bibliotecas"
 
@@ -6318,60 +6333,60 @@ msgstr "BPM inserido"
 msgid "AUTO GAIN not saved: {}"
 msgstr "AUTO GAIN não salvo: {}"
 
-#: src/app/deck/grid.rs:248
+#: src/app/deck/grid.rs:249
 #: src/app/deck/pads/cues.rs:133
 msgid " · NOT saved: {}"
 msgstr " · NÃO salvo: {}"
 
-#: src/app/deck/grid.rs:315
+#: src/app/deck/grid.rs:316
 msgid "grid: needs a beat grid with at least 2 beats (TAP sets one) and a tempo that fits"
 msgstr "grade: requer uma grade de batidas com pelo menos 2 batidas (TAP cria uma) e um tempo compatível"
 
-#: src/app/deck/grid.rs:327
+#: src/app/deck/grid.rs:328
 msgid "grid shifted {} ms"
 msgstr "grade deslocada {} ms"
 
-#: src/app/deck/grid.rs:336
+#: src/app/deck/grid.rs:337
 msgid "beat 1 at {}"
 msgstr "batida 1 em {}"
 
-#: src/app/deck/grid.rs:351
+#: src/app/deck/grid.rs:352
 msgid "grid {} · {} BPM"
 msgstr "grade {} · {} BPM"
 
-#: src/app/deck/grid.rs:379
+#: src/app/deck/grid.rs:380
 msgid "tap tempo: keep tapping on the beat"
 msgstr "tap tempo: continue batendo no ritmo"
 
-#: src/app/deck/grid.rs:382
+#: src/app/deck/grid.rs:383
 msgid "tap tempo"
 msgstr "tap tempo"
 
-#: src/app/deck/grid.rs:413
+#: src/app/deck/grid.rs:414
 msgid "{} · {} BPM"
 msgstr "{} · {} BPM"
 
-#: src/app/deck/grid.rs:414
+#: src/app/deck/grid.rs:415
 msgid "{}: tempo does not fit the grid"
 msgstr "{}: o tempo não se ajusta à grade"
 
-#: src/app/deck/grid.rs:429
+#: src/app/deck/grid.rs:430
 msgid "tempo section removed"
 msgstr "seção de tempo removida"
 
-#: src/app/deck/grid.rs:430
+#: src/app/deck/grid.rs:431
 msgid "grid: the first tempo section has none before it to merge into"
 msgstr "grade: a primeira seção de tempo não tem anterior para mesclar"
 
-#: src/app/deck/grid.rs:449
+#: src/app/deck/grid.rs:450
 msgid "grid reset to the original"
 msgstr "grade restaurada ao original"
 
-#: src/app/deck/grid.rs:453
+#: src/app/deck/grid.rs:454
 msgid "grid reset failed: {}"
 msgstr "falha ao restaurar a grade: {}"
 
-#: src/app/deck/grid.rs:457
+#: src/app/deck/grid.rs:458
 msgid "grid reset to the library's"
 msgstr "grade restaurada à da biblioteca"
 
@@ -6870,7 +6885,7 @@ msgstr "master: este deck, fixado"
 msgid "synced start cancelled"
 msgstr "início sincronizado cancelado"
 
-#: src/app/deck/tick.rs:182
+#: src/app/deck/tick.rs:183
 msgid "end of track"
 msgstr "fim da faixa"
 
@@ -6897,98 +6912,98 @@ msgstr "o beat jump requer uma grade de batidas"
 msgid "select a track in the library first"
 msgstr "selecione primeiro uma faixa na biblioteca"
 
-#: src/app/device/actions.rs:60
+#: src/app/device/actions.rs:61
 msgid "{}: its extension no longer offers that action. Open DEVICES and press CHECK AGAIN."
 msgstr "{}: a extensão dele não oferece mais essa ação. Abra DISPOSITIVOS e pressione VERIFICAR DE NOVO."
 
-#: src/app/device/actions.rs:68
+#: src/app/device/actions.rs:69
 msgid "{}: its extension is switched off. Switch it on in PREFERENCES > EXTENSIONS, then restart."
 msgstr "{}: a extensão dele está desativada. Ative-a em PREFERÊNCIAS > EXTENSÕES e reinicie."
 
-#: src/app/device/actions.rs:100
+#: src/app/device/actions.rs:101
 msgid "{} has no library to read from. Export to it first."
 msgstr "{} não tem biblioteca para ler. Exporte para ele primeiro."
 
-#: src/app/device/actions.rs:117
+#: src/app/device/actions.rs:118
 #: src/app/device/review.rs:548
 msgid "Updating the collection"
 msgstr "Atualizando a coleção"
 
-#: src/app/device/actions.rs:125
+#: src/app/device/actions.rs:126
 #: src/app/device/review.rs:553
 msgid "Update Collection of {}"
 msgstr "Atualizar coleção a partir de {}"
 
-#: src/app/device/actions.rs:166
+#: src/app/device/actions.rs:167
 #: src/app/device/review.rs:577
 msgid "Importing histories"
 msgstr "Importando históricos"
 
-#: src/app/device/actions.rs:177
+#: src/app/device/actions.rs:178
 #: src/app/device/review.rs:579
 msgid "Histories of {}"
 msgstr "Históricos de {}"
 
-#: src/app/device/actions.rs:182
+#: src/app/device/actions.rs:183
 #: src/app/device/review.rs:585
 msgid "its plugin is not available"
 msgstr "seu plugin não está disponível"
 
-#: src/app/device/actions.rs:183
+#: src/app/device/actions.rs:184
 #: src/app/device/review.rs:590
 msgid "; deleted {} from the device"
 msgstr "; {} excluído(s) do dispositivo"
 
-#: src/app/device/actions.rs:184
+#: src/app/device/actions.rs:185
 #: src/app/device/review.rs:592
 msgid "; not deleted from the device: {}"
 msgstr "; não excluído(s) do dispositivo: {}"
 
-#: src/app/device/actions.rs:196
+#: src/app/device/actions.rs:197
 msgid "{}: {n} history is waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows it first"
 msgid_plural "{}: {n} histories are waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows them first"
 msgstr[0] "{}: {n} histórico aguarda importação. Nada foi importado ainda: IMPORTAR HISTÓRICOS na janela DISPOSITIVOS mostra-o primeiro"
 msgstr[1] "{}: {n} históricos aguardam importação. Nada foi importado ainda: IMPORTAR HISTÓRICOS na janela DISPOSITIVOS mostra-os primeiro"
 
-#: src/app/device/actions.rs:240
+#: src/app/device/actions.rs:241
 #: src/app/device/transfer.rs:292
 msgid "That playlist is not on the device any more"
 msgstr "Essa playlist não está mais no dispositivo"
 
-#: src/app/device/actions.rs:244
+#: src/app/device/actions.rs:245
 msgid "Delete the history {} from {}?"
 msgstr "Excluir o histórico {} de {}?"
 
-#: src/app/device/actions.rs:246
+#: src/app/device/actions.rs:247
 msgid "Delete {} from {}? Tracks that no other playlist lists are deleted too."
 msgstr "Excluir {} de {}? As faixas que nenhuma outra playlist lista também são excluídas."
 
-#: src/app/device/actions.rs:252
+#: src/app/device/actions.rs:253
 msgid "Delete {} from {}? Its tracks stay on the device."
 msgstr "Excluir {} de {}? Suas faixas permanecem no dispositivo."
 
-#: src/app/device/actions.rs:260
-#: src/app/device/actions.rs:307
+#: src/app/device/actions.rs:261
+#: src/app/device/actions.rs:308
 msgid "Deleting"
 msgstr "Excluindo"
 
-#: src/app/device/actions.rs:263
+#: src/app/device/actions.rs:264
 msgid "Deleted the history {} from {}"
 msgstr "Histórico {} excluído de {}"
 
-#: src/app/device/actions.rs:267
+#: src/app/device/actions.rs:268
 msgid "Deleted {} ({} list(s), {} track(s)) from {}{}"
 msgstr "{} excluída ({} lista(s), {} faixa(s)) de {}{}"
 
-#: src/app/device/actions.rs:273
+#: src/app/device/actions.rs:274
 msgid " — {} file(s) could not be deleted, first: {}"
 msgstr " — {} arquivo(s) não puderam ser excluídos, primeiro: {}"
 
-#: src/app/device/actions.rs:299
+#: src/app/device/actions.rs:300
 msgid "Delete {} from {}? The file and its analysis are removed."
 msgstr "Excluir {} de {}? O arquivo e sua análise são removidos."
 
-#: src/app/device/actions.rs:315
+#: src/app/device/actions.rs:316
 msgid "Deleted {} track(s) from {}"
 msgstr "{} faixa(s) excluída(s) de {}"
 
@@ -7051,7 +7066,7 @@ msgid "; {} track(s) were not in the collection"
 msgstr "; {} faixa(s) não estavam na coleção"
 
 #: src/app/device/backup.rs:235
-#: src/app/device/preview.rs:183
+#: src/app/device/preview.rs:184
 msgid "… and {} more"
 msgstr "… e mais {}"
 
@@ -7330,7 +7345,7 @@ msgstr[1] "{n} arquivos de áudio ausentes foram copiados de novo da sua coleç�
 msgid "Copied {} of {} missing audio files again. {} are not in your collection: copy them to the stick by hand or take them off its playlists."
 msgstr "{} de {} arquivos de áudio ausentes foram copiados de novo. {} não estão na sua coleção: copie-os para o pendrive à mão ou tire-os das playlists dele."
 
-#: src/app/device/check.rs:774
+#: src/app/device/check.rs:778
 msgid "{}: the copy is shorter than the original"
 msgstr "{}: a cópia é mais curta que o original"
 
@@ -7354,7 +7369,7 @@ msgstr "Nada para exportar: reabra a janela"
 msgid "None of the ticked playlists has tracks"
 msgstr "Nenhuma das playlists marcadas tem faixas"
 
-#: src/app/device/export.rs:113
+#: src/app/device/export.rs:114
 msgid "Exporting"
 msgstr "Exportando"
 
@@ -7494,53 +7509,61 @@ msgstr "{} formatado como {} em vez de FAT32: em um cartão tão pequeno o siste
 msgid "{}: switch on at least one library format"
 msgstr "{}: ative pelo menos um formato de biblioteca"
 
-#: src/app/device/import.rs:67
+#: src/app/device/import.rs:70
 msgid "No Music folder to copy into: set XDG_MUSIC_DIR"
 msgstr "Nenhuma pasta Música para onde copiar: defina XDG_MUSIC_DIR"
 
-#: src/app/device/import.rs:83
+#: src/app/device/import.rs:86
 msgid "Copying from {}"
 msgstr "Copiando de {}"
 
-#: src/app/device/import.rs:101
+#: src/app/device/import.rs:104
 msgid "that playlist is not on the device any more"
 msgstr "essa playlist não está mais no dispositivo"
 
-#: src/app/device/import.rs:110
+#: src/app/device/import.rs:113
 msgid "Imported {} from {} into My Playlists"
 msgstr "{} importada de {} em Minhas playlists"
 
-#: src/app/device/import.rs:115
+#: src/app/device/import.rs:118
 msgid "Imported from {}"
 msgstr "Importado de {}"
 
-#: src/app/device/import.rs:117
+#: src/app/device/import.rs:120
 msgid ": {} track(s) copied to {}, {} already in your collection"
 msgstr ": {} faixa(s) copiada(s) para {}, {} já na sua coleção"
 
-#: src/app/device/import.rs:124
+#: src/app/device/import.rs:127
 msgid "; {} file(s) missing on the device"
 msgstr "; {} arquivo(s) ausente(s) no dispositivo"
 
-#: src/app/device/job.rs:25
-msgid "The device stopped answering while it was written (a USB input/output error, not a format problem): plug it straight into the computer, without a hub, or into another port, then export again. If it keeps happening, the stick is failing."
-msgstr "O dispositivo parou de responder durante a gravação (um erro de entrada/saída USB, não um problema de formato): ligue-o diretamente ao computador, sem hub, ou noutra porta, e exporte de novo. Se continuar a acontecer, o pendrive está a falhar."
+#: src/app/device/job.rs:28
+msgid "Audio already copied stays on the device: export again and it continues with the rest."
+msgstr "O áudio já copiado fica no dispositivo: exporte de novo e continua com o resto."
 
-#: src/app/device/job.rs:51
+#: src/app/device/job.rs:30
+msgid "The device is plugged in through a USB hub, and the hub dropped its link while it was written (a USB input/output error, not a format problem): plug it straight into a port of the computer, then export again. {} If it keeps happening, the stick is failing."
+msgstr "O dispositivo está ligado através de um hub USB, e o hub perdeu a ligação durante a gravação (um erro de entrada/saída USB, não um problema de formato): ligue-o diretamente a uma porta do computador e exporte de novo. {} Se continuar a acontecer, o pendrive está a falhar."
+
+#: src/app/device/job.rs:32
+msgid "The device stopped answering while it was written (a USB input/output error, not a format problem): plug it into another port of the computer, then export again. {} If it keeps happening, the stick is failing."
+msgstr "O dispositivo deixou de responder durante a gravação (um erro de entrada/saída USB, não um problema de formato): ligue-o a outra porta do computador e exporte de novo. {} Se continuar a acontecer, o pendrive está a falhar."
+
+#: src/app/device/job.rs:60
 msgid "Not checked after writing: {}"
 msgstr "Não verificado após gravar: {}"
 
-#: src/app/device/job.rs:59
+#: src/app/device/job.rs:68
 msgid "Checked: {} holds {n} track in {}"
 msgid_plural "Checked: {} holds {n} tracks in {}"
 msgstr[0] "Verificado: {} contém {n} faixa em {}"
 msgstr[1] "Verificado: {} contém {n} faixas em {}"
 
-#: src/app/device/job.rs:186
+#: src/app/device/job.rs:195
 msgid "the worker stopped"
 msgstr "o worker parou"
 
-#: src/app/device/job.rs:208
+#: src/app/device/job.rs:217
 msgid "Cancelled: the device was left as it was"
 msgstr "Cancelado: o dispositivo foi deixado como estava"
 
@@ -7578,43 +7601,43 @@ msgstr "cues de {} faixa(s) gravados em {}"
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr "Outro trabalho está em andamento: aguarde ou cancele (X)"
 
-#: src/app/device/mod.rs:176
+#: src/app/device/mod.rs:175
 msgid " — {} warning(s), first: {}"
 msgstr " — {} aviso(s), primeiro: {}"
 
-#: src/app/device/mod.rs:178
+#: src/app/device/mod.rs:177
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr "{} faixas exportadas ({} novas, {} atualizadas) e {} playlists para {}{}{}"
 
-#: src/app/device/mod.rs:197
+#: src/app/device/mod.rs:196
 msgid " — Update Collection baseline not recorded: {}"
 msgstr " — Linha de base de Atualizar coleção não registrada: {}"
 
-#: src/app/device/mod.rs:222
+#: src/app/device/mod.rs:221
 msgid "failed: {}"
 msgstr "falhou: {}"
 
-#: src/app/device/mod.rs:277
+#: src/app/device/mod.rs:276
 msgid "That stick is not connected any more. Plug it in again, then try once more."
 msgstr "Esse pendrive não está mais conectado. Conecte-o de novo e tente mais uma vez."
 
-#: src/app/device/mod.rs:289
+#: src/app/device/mod.rs:288
 msgid "No device is chosen. Pick one in the list on the left."
 msgstr "Nenhum dispositivo escolhido. Escolha um na lista à esquerda."
 
-#: src/app/device/mod.rs:303
+#: src/app/device/mod.rs:302
 msgid "it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"
 msgstr "está montado como somente leitura, então nada pode ser gravado. Verifique a chave de proteção contra gravação e conecte-o de novo"
 
-#: src/app/device/mod.rs:312
+#: src/app/device/mod.rs:311
 msgid "cannot read the collection: {}"
 msgstr "não foi possível ler a coleção: {}"
 
-#: src/app/device/mod.rs:353
+#: src/app/device/mod.rs:365
 msgid "{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports."
 msgstr "{}: a extensão dele não consegue fazer isso com este dispositivo. Ative a extensão em PREFERÊNCIAS > EXTENSÕES ou use um dispositivo compatível."
 
-#: src/app/device/mod.rs:500
+#: src/app/device/mod.rs:511
 msgid "Cancelling…"
 msgstr "Cancelando…"
 
@@ -7638,71 +7661,71 @@ msgstr "alguns segundos"
 msgid "about {} s"
 msgstr "cerca de {} s"
 
-#: src/app/device/preview.rs:207
+#: src/app/device/preview.rs:208
 msgid "Not enough room: this needs {} and the stick has {} free. Leave some playlists out or free some space."
 msgstr "Espaço insuficiente: são necessários {} e o pen drive tem {} livres. Deixe algumas playlists de fora ou libere espaço."
 
-#: src/app/device/preview.rs:215
+#: src/app/device/preview.rs:216
 msgid "{} is {}: this stick holds files up to {}. It would be left out; convert it to FLAC or use an exFAT stick."
 msgstr "{} tem {}: este pen drive aceita arquivos de até {}. Seria deixado de fora; converta para FLAC ou use um pen drive exFAT."
 
-#: src/app/device/preview.rs:223
+#: src/app/device/preview.rs:224
 msgid "… and {} more tracks are too big for this stick"
 msgstr "… e mais {} faixas são grandes demais para este pen drive"
 
-#: src/app/device/preview.rs:229
+#: src/app/device/preview.rs:230
 msgid "{n} track has no audio file and would be left out: {}"
 msgid_plural "{n} tracks have no audio file and would be left out: {}"
 msgstr[0] "{n} faixa não tem arquivo de áudio e seria deixada de fora: {}"
 msgstr[1] "{n} faixas não têm arquivo de áudio e seriam deixadas de fora: {}"
 
-#: src/app/device/preview.rs:259
+#: src/app/device/preview.rs:260
 msgid "Preparing the preview"
 msgstr "Preparando a prévia"
 
-#: src/app/device/preview.rs:313
+#: src/app/device/preview.rs:314
 msgid "{n} track is analysed first (beat grid and key): {}"
 msgid_plural "{n} tracks are analysed first (beat grid and key): {}"
 msgstr[0] "{n} faixa é analisada primeiro (grade de tempo e tom): {}"
 msgstr[1] "{n} faixas são analisadas primeiro (grade de tempo e tom): {}"
 
-#: src/app/device/preview.rs:321
+#: src/app/device/preview.rs:322
 msgid "{n} playlist written"
 msgid_plural "{n} playlists written"
 msgstr[0] "{n} playlist gravada"
 msgstr[1] "{n} playlists gravadas"
 
-#: src/app/device/preview.rs:329
+#: src/app/device/preview.rs:330
 msgid "Takes {} (from earlier jobs on this stick)"
 msgstr "Leva {} (com base em trabalhos anteriores neste pen drive)"
 
-#: src/app/device/preview.rs:331
+#: src/app/device/preview.rs:332
 msgid "Takes {} (estimate)"
 msgstr "Leva {} (estimativa)"
 
-#: src/app/device/preview.rs:338
+#: src/app/device/preview.rs:339
 msgid "The current library is backed up first"
 msgstr "A biblioteca atual é salva em backup primeiro"
 
-#: src/app/device/preview.rs:340
+#: src/app/device/preview.rs:341
 msgid "Your music on this computer is not changed"
 msgstr "Sua música neste computador não é alterada"
 
-#: src/app/device/preview.rs:352
+#: src/app/device/preview.rs:353
 msgid "Write to {}"
 msgstr "Gravar em {}"
 
-#: src/app/device/preview.rs:362
+#: src/app/device/preview.rs:363
 msgid "No new track to copy"
 msgstr "Nenhuma faixa nova para copiar"
 
-#: src/app/device/preview.rs:364
+#: src/app/device/preview.rs:365
 msgid "{n} new track to copy ({})"
 msgid_plural "{n} new tracks to copy ({})"
 msgstr[0] "{n} faixa nova para copiar ({})"
 msgstr[1] "{n} faixas novas para copiar ({})"
 
-#: src/app/device/preview.rs:377
+#: src/app/device/preview.rs:378
 msgid "{n} track is there already: its marks are refreshed"
 msgid_plural "{n} tracks are there already: their marks are refreshed"
 msgstr[0] "{n} faixa já está lá: suas marcas são atualizadas"
@@ -7933,31 +7956,31 @@ msgstr "Nada foi gravado: o backup da biblioteca de {} falhou ({})"
 msgid "The library of {} was backed up first, to {}"
 msgstr "A biblioteca de {} foi salva em backup primeiro, em {}"
 
-#: src/app/device/scan.rs:17
+#: src/app/device/scan.rs:20
 msgid "no library yet"
 msgstr "ainda sem biblioteca"
 
-#: src/app/device/scan.rs:26
+#: src/app/device/scan.rs:29
 msgid "mounted read-only: nothing can be written"
 msgstr "montado somente leitura: nada pode ser gravado"
 
-#: src/app/device/scan.rs:63
+#: src/app/device/scan.rs:66
 msgid "{}: plugged in, mounting /dev/{}…"
 msgstr "{}: conectado, montando /dev/{}…"
 
-#: src/app/device/scan.rs:75
+#: src/app/device/scan.rs:78
 msgid "{}: cannot mount /dev/{}: {}. Mount it from your file manager, then it shows up here."
 msgstr "{}: não foi possível montar /dev/{}: {}. Monte-o pelo gerenciador de arquivos e ele aparecerá aqui."
 
-#: src/app/device/scan.rs:104
+#: src/app/device/scan.rs:115
 msgid "{} connected ({})"
 msgstr "{} conectado ({})"
 
-#: src/app/device/scan.rs:115
+#: src/app/device/scan.rs:126
 msgid "{}: {} setting(s) changed on the player were taken over"
 msgstr "{}: {} preferência(s) alterada(s) no player foram assumidas"
 
-#: src/app/device/scan.rs:154
+#: src/app/device/scan.rs:165
 msgid "{} removed"
 msgstr "{} removido"
 
@@ -8604,7 +8627,7 @@ msgid "backup failed: {}"
 msgstr "falha no backup: {}"
 
 #: src/app/library/backup.rs:54
-#: src/app/plugins/mod.rs:137
+#: src/app/plugins/mod.rs:138
 msgid "{}: no such file"
 msgstr "{}: arquivo inexistente"
 
@@ -8786,13 +8809,13 @@ msgstr " · não preservado por este formato: {}"
 msgid "no such export format"
 msgstr "formato de exportação inexistente"
 
-#: src/app/library/export.rs:98
-#: src/app/library/export.rs:106
+#: src/app/library/export.rs:99
+#: src/app/library/export.rs:107
 #: src/app/library/playlist.rs:74
 msgid "export failed: {}"
 msgstr "falha na exportação: {}"
 
-#: src/app/library/export.rs:103
+#: src/app/library/export.rs:104
 msgid "exporting {} tracks…"
 msgstr "exportando {} faixas…"
 
@@ -8886,39 +8909,39 @@ msgstr[1] "analisando {n} faixas…"
 msgid "unknown health action {}"
 msgstr "ação de verificação desconhecida {}"
 
-#: src/app/library/import.rs:36
+#: src/app/library/import.rs:37
 msgid "{} {}/{}…"
 msgstr "{} {}/{}…"
 
-#: src/app/library/import.rs:66
+#: src/app/library/import.rs:74
 msgid "import failed: {}"
 msgstr "falha na importação: {}"
 
-#: src/app/library/import.rs:72
-#: src/app/library/import.rs:79
+#: src/app/library/import.rs:80
+#: src/app/library/import.rs:87
 msgid "reading tags"
 msgstr "lendo tags"
 
-#: src/app/library/import.rs:73
-#: src/app/library/import.rs:80
-#: src/app/library/import.rs:171
+#: src/app/library/import.rs:81
+#: src/app/library/import.rs:88
+#: src/app/library/import.rs:179
 msgid "importing…"
 msgstr "importando…"
 
-#: src/app/library/import.rs:166
+#: src/app/library/import.rs:174
 msgid "that library plugin is not loaded"
 msgstr "esse plugin de biblioteca não está carregado"
 
-#: src/app/library/import.rs:170
-#: src/app/library/import.rs:215
+#: src/app/library/import.rs:178
+#: src/app/library/import.rs:223
 msgid "importing"
 msgstr "importando"
 
-#: src/app/library/import.rs:195
+#: src/app/library/import.rs:203
 msgid "{} · {} sampler slots loading"
 msgstr "{} · {} slots do SAMPLER carregando"
 
-#: src/app/library/import.rs:211
+#: src/app/library/import.rs:219
 msgid "choose All tracks or a playlist of a library source or Explorer first"
 msgstr "escolha antes Todas as faixas ou uma playlist de uma fonte de biblioteca ou do Explorer"
 
@@ -9556,56 +9579,56 @@ msgstr "KILL"
 msgid "{}% MST"
 msgstr "{}% MST"
 
-#: src/app/mixer/rec.rs:63
+#: src/app/mixer/rec.rs:65
 msgid "REC stopped: no audio came, nothing saved"
 msgstr "REC parado: nenhum áudio chegou, nada salvo"
 
-#: src/app/mixer/rec.rs:64
+#: src/app/mixer/rec.rs:66
 msgid "Saved {} ({})"
 msgstr "{} salvo ({})"
 
-#: src/app/mixer/rec.rs:65
+#: src/app/mixer/rec.rs:67
 msgid "Saved {} files: {} … {} ({} in all)"
 msgstr "{} arquivos salvos: {} … {} ({} no total)"
 
-#: src/app/mixer/rec.rs:74
+#: src/app/mixer/rec.rs:76
 msgid "REC ended after silence. "
 msgstr "REC encerrado após silêncio. "
 
-#: src/app/mixer/rec.rs:77
+#: src/app/mixer/rec.rs:79
 msgid ", {} frames lost: the disk could not keep up"
 msgstr ", {} frames perdidos: o disco não acompanhou"
 
-#: src/app/mixer/rec.rs:98
+#: src/app/mixer/rec.rs:100
 msgid "REC: input: {}"
 msgstr "REC: entrada: {}"
 
-#: src/app/mixer/rec.rs:104
+#: src/app/mixer/rec.rs:106
 msgid "REC: no audio output, nothing to record"
 msgstr "REC: sem saída de áudio, nada para gravar"
 
-#: src/app/mixer/rec.rs:118
-#: src/app/mixer/rec.rs:209
+#: src/app/mixer/rec.rs:120
+#: src/app/mixer/rec.rs:216
 msgid "REC → {}"
 msgstr "REC → {}"
 
-#: src/app/mixer/rec.rs:119
+#: src/app/mixer/rec.rs:121
 msgid "REC armed: waiting for audio"
 msgstr "REC armado: aguardando áudio"
 
-#: src/app/mixer/rec.rs:135
+#: src/app/mixer/rec.rs:138
 msgid "REC failed: {}"
 msgstr "REC falhou: {}"
 
-#: src/app/mixer/rec.rs:167
+#: src/app/mixer/rec.rs:171
 msgid ". Cue sheet not written: {}"
 msgstr ". Cue sheet não gravada: {}"
 
-#: src/app/mixer/rec.rs:181
+#: src/app/mixer/rec.rs:185
 msgid "REC stopped at {}, {} may be incomplete: {}"
 msgstr "REC parado em {}, {} pode estar incompleto: {}"
 
-#: src/app/mixer/rec.rs:184
+#: src/app/mixer/rec.rs:188
 msgid "the file"
 msgstr "o arquivo"
 
@@ -9703,153 +9726,165 @@ msgstr "plugin {} desinstalado"
 msgid "plugin folders read again"
 msgstr "pastas de plugins lidas novamente"
 
-#: src/app/plugins/mod.rs:129
+#: src/app/plugins/mod.rs:130
 msgid "{}: no deck {}"
 msgstr "{}: sem deck {}"
 
-#: src/app/plugins/mod.rs:143
+#: src/app/plugins/mod.rs:144
 msgid "no shortcut {}"
 msgstr "sem atalho {}"
 
-#: src/app/plugins/mod.rs:264
+#: src/app/plugins/mod.rs:265
 msgid "nothing was typed"
 msgstr "nada foi digitado"
 
-#: src/app/prefs/advanced.rs:141
+#: src/app/prefs/advanced.rs:143
 #: src/app/prefs/extensions.rs:175
 msgid "LOCATION OF FILES"
 msgstr "LOCAL DOS ARQUIVOS"
 
-#: src/app/prefs/advanced.rs:142
+#: src/app/prefs/advanced.rs:144
 msgid "empty = ~/Music/OpenFadeR"
 msgstr "vazio = ~/Music/OpenFadeR"
 
-#: src/app/prefs/advanced.rs:145
+#: src/app/prefs/advanced.rs:147
 msgid "SILENCE LEVEL THRESHOLD"
 msgstr "LIMIAR DO NÍVEL DE SILÊNCIO"
 
-#: src/app/prefs/advanced.rs:154
+#: src/app/prefs/advanced.rs:156
 msgid "RECORDING STARTS WHEN"
 msgstr "A GRAVAÇÃO COMEÇA QUANDO"
 
-#: src/app/prefs/advanced.rs:155
-#: src/app/prefs/advanced.rs:161
+#: src/app/prefs/advanced.rs:157
+#: src/app/prefs/advanced.rs:163
 msgid "REC BUTTON"
 msgstr "BOTÃO REC"
 
-#: src/app/prefs/advanced.rs:155
+#: src/app/prefs/advanced.rs:157
 msgid "AUDIO INPUT"
 msgstr "ENTRADA DE ÁUDIO"
 
-#: src/app/prefs/advanced.rs:160
+#: src/app/prefs/advanced.rs:162
 msgid "RECORDING ENDS WHEN"
 msgstr "A GRAVAÇÃO TERMINA QUANDO"
 
-#: src/app/prefs/advanced.rs:161
+#: src/app/prefs/advanced.rs:163
 msgid "20 S SILENCE"
 msgstr "20 S DE SILÊNCIO"
 
-#: src/app/prefs/advanced.rs:166
+#: src/app/prefs/advanced.rs:168
 msgid "Automatically separate files when silence continues"
 msgstr "Separar arquivos automaticamente quando o silêncio continuar"
 
-#: src/app/prefs/advanced.rs:171
+#: src/app/prefs/advanced.rs:173
 msgid "SILENCE LENGTH"
 msgstr "DURAÇÃO DO SILÊNCIO"
 
-#: src/app/prefs/advanced.rs:178
+#: src/app/prefs/advanced.rs:180
 msgid "Automatically optimize the audio level of a recorded file"
 msgstr "Otimizar automaticamente o nível de áudio de um arquivo gravado"
 
-#: src/app/prefs/advanced.rs:183
+#: src/app/prefs/advanced.rs:185
 msgid "Automatically import a recorded file"
 msgstr "Importar automaticamente um arquivo gravado"
 
-#: src/app/prefs/advanced.rs:188
+#: src/app/prefs/advanced.rs:190
 msgid "Automatically display the tag information of a recorded file"
 msgstr "Exibir automaticamente as informações de tag de um arquivo gravado"
 
-#: src/app/prefs/advanced.rs:193
+#: src/app/prefs/advanced.rs:195
 msgid "Write a cue sheet next to each recording"
 msgstr "Gravar uma cue sheet ao lado de cada gravação"
 
-#: src/app/prefs/advanced.rs:198
+#: src/app/prefs/advanced.rs:200
 msgid "Write a tracklist next to each recording"
 msgstr "Gravar uma lista de faixas ao lado de cada gravação"
 
-#: src/app/prefs/advanced.rs:203
+#: src/app/prefs/advanced.rs:205
 msgid "Write a control log next to each recording"
 msgstr "Gravar um log de controle ao lado de cada gravação"
 
-#: src/app/prefs/advanced.rs:208
+#: src/app/prefs/advanced.rs:210
 msgid "SHORTEST TRACK LISTED"
 msgstr "FAIXA MAIS CURTA LISTADA"
 
-#: src/app/prefs/advanced.rs:230
+#: src/app/prefs/advanced.rs:232
 #: src/app/prefs/controller/mod.rs:260
 msgid "RECORDINGS"
 msgstr "GRAVAÇÕES"
 
-#: src/app/prefs/advanced.rs:233
+#: src/app/prefs/advanced.rs:235
 msgid "OTHERS"
 msgstr "OUTROS"
 
-#: src/app/prefs/advanced.rs:234
+#: src/app/prefs/advanced.rs:236
 #: src/app/prefs/controller/deck.rs:80
 msgid "SYNC TYPE"
 msgstr "TIPO DE SYNC"
 
-#: src/app/prefs/advanced.rs:237
+#: src/app/prefs/advanced.rs:239
 #: src/app/prefs/controller/deck.rs:83
 msgid "Allow BEAT/BPM SYNC with double/half BPM"
 msgstr "Permitir BEAT/BPM SYNC com BPM dobrado/pela metade"
 
-#: src/app/prefs/advanced.rs:242
+#: src/app/prefs/advanced.rs:244
 #: src/app/prefs/controller/deck.rs:88
 msgid "HOT CUE: during pause, GATE playback is applied"
 msgstr "HOT CUE: durante a pausa, a reprodução GATE é aplicada"
 
-#: src/app/prefs/advanced.rs:245
+#: src/app/prefs/advanced.rs:247
 msgid "EXPORT LOOP AS WAV"
 msgstr "EXPORTAR LOOP COMO WAV"
 
-#: src/app/prefs/advanced.rs:246
+#: src/app/prefs/advanced.rs:248
 msgid "sampling frequency"
 msgstr "taxa de amostragem"
 
-#: src/app/prefs/advanced.rs:247
+#: src/app/prefs/advanced.rs:249
 msgid "Check for updates"
 msgstr "Verificar atualizações"
 
-#: src/app/prefs/advanced.rs:248
+#: src/app/prefs/advanced.rs:250
 msgid "once a day, at start"
 msgstr "uma vez por dia, ao iniciar"
 
-#: src/app/prefs/advanced.rs:251
+#: src/app/prefs/advanced.rs:253
 msgid "UPDATE CHANNEL"
 msgstr "CANAL DE ATUALIZAÇÃO"
 
-#: src/app/prefs/advanced.rs:252
+#: src/app/prefs/advanced.rs:254
 #: src/app/prefs/advanced.rs:22
 msgid "STABLE"
 msgstr "ESTÁVEL"
 
-#: src/app/prefs/advanced.rs:252
+#: src/app/prefs/advanced.rs:254
 #: src/app/prefs/advanced.rs:22
 msgid "BETA"
 msgstr "BETA"
 
-#: src/app/prefs/advanced.rs:255
+#: src/app/prefs/advanced.rs:257
 msgid "BETA also offers pre-releases"
 msgstr "BETA também oferece pré-lançamentos"
 
-#: src/app/prefs/advanced.rs:258
+#: src/app/prefs/advanced.rs:260
 msgid "Back up the library before updating"
 msgstr "Fazer backup da biblioteca antes de atualizar"
 
-#: src/app/prefs/advanced.rs:261
+#: src/app/prefs/advanced.rs:263
 msgid "the last 3 are kept; a roll-back puts the library back"
 msgstr "as 3 últimas são mantidas; uma reversão restaura a biblioteca"
+
+#: src/app/prefs/advanced.rs:266
+msgid "LOW-POWER MODE"
+msgstr "MODO DE BAIXO CONSUMO"
+
+#: src/app/prefs/advanced.rs:267
+msgid "effective: ON (small sampler, fewer analysis workers)"
+msgstr "efetivo: LIGADO (sampler reduzido, menos processos de análise)"
+
+#: src/app/prefs/advanced.rs:269
+msgid "effective: OFF"
+msgstr "efetivo: DESLIGADO"
 
 #: src/app/prefs/analysis.rs:115
 msgid "TRACK ANALYSIS"
@@ -11308,7 +11343,7 @@ msgstr "ARQUIVO…"
 msgid "FOLDER…"
 msgstr "PASTA…"
 
-#: src/app/prefs/mod.rs:67
+#: src/app/prefs/mod.rs:68
 msgid "CONSTANT"
 msgstr "CONSTANTE"
 
@@ -11547,7 +11582,7 @@ msgid "deck order, 4 decks"
 msgstr "ordem dos decks, 4 decks"
 
 #: src/app/prefs/view.rs:396
-#: src/app/welcome.rs:30
+#: src/app/welcome.rs:33
 msgid "PAD MODE"
 msgstr "PAD MODE"
 
@@ -11861,39 +11896,39 @@ msgstr "nenhum loop nesse deck e o slot {} está vazio"
 msgid "exported {}"
 msgstr "exportado {}"
 
-#: src/app/sampler/mod.rs:61
+#: src/app/sampler/mod.rs:71
 msgid "slot {} is not in use ({} slots: PREFS > Controller > Sampler)"
 msgstr "o slot {} não está em uso ({} slots: PREFS > Controlador > Sampler)"
 
-#: src/app/sampler/mod.rs:67
+#: src/app/sampler/mod.rs:77
 msgid "slot {} is loaded"
 msgstr "o slot {} está carregado"
 
-#: src/app/sampler/mod.rs:244
+#: src/app/sampler/mod.rs:254
 msgid "slot {} is empty: pick A–D / TRK, then LOAD"
 msgstr "o slot {} está vazio: escolha A–D / TRK e depois LOAD"
 
-#: src/app/sampler/mod.rs:259
+#: src/app/sampler/mod.rs:269
 msgid "audio disabled"
 msgstr "áudio desativado"
 
-#: src/app/sampler/mod.rs:261
+#: src/app/sampler/mod.rs:271
 msgid "nothing to capture here (playhead at the end?)"
 msgstr "nada para capturar aqui (cursor no fim?)"
 
-#: src/app/sampler/mod.rs:265
+#: src/app/sampler/mod.rs:275
 msgid "slot {}: {} beats · {} BPM"
 msgstr "slot {}: {} batidas · {} BPM"
 
-#: src/app/sampler/mod.rs:272
+#: src/app/sampler/mod.rs:282
 msgid "slot {}: {} s · no tempo, SYNC does nothing"
 msgstr "slot {}: {} s · sem tempo, SYNC não faz nada"
 
-#: src/app/sampler/mod.rs:296
+#: src/app/sampler/mod.rs:306
 msgid "slot {}: decoding…"
 msgstr "slot {}: decodificando…"
 
-#: src/app/sampler/mod.rs:307
+#: src/app/sampler/mod.rs:317
 msgid "decoder stopped"
 msgstr "decodificador parado"
 
@@ -12133,39 +12168,39 @@ msgstr "{} de {} MB"
 msgid "STEMS model ready"
 msgstr "Modelo STEMS pronto"
 
-#: src/app/trackinfo.rs:109
+#: src/app/trackinfo.rs:142
 msgid "detected {} BPM (library {})"
 msgstr "detectado {} BPM (biblioteca {})"
 
-#: src/app/trackinfo.rs:116
+#: src/app/trackinfo.rs:149
 msgid "detected {} (library {})"
 msgstr "detectado {} (biblioteca {})"
 
-#: src/app/trackinfo.rs:139
+#: src/app/trackinfo.rs:172
 msgid "not saved: {}"
 msgstr "não salvo: {}"
 
-#: src/app/trackinfo.rs:157
+#: src/app/trackinfo.rs:190
 msgid "Saved in OpenFadeR"
 msgstr "Salvo no OpenFadeR"
 
-#: src/app/trackinfo.rs:199
+#: src/app/trackinfo.rs:232
 msgid "Import a local file before editing descriptive fields"
 msgstr "Importe um arquivo local antes de editar os campos descritivos"
 
-#: src/app/trackinfo.rs:269
+#: src/app/trackinfo.rs:302
 msgid "added {}"
 msgstr "{} adicionado"
 
-#: src/app/trackinfo.rs:292
+#: src/app/trackinfo.rs:333
 msgid "Phrases: none"
 msgstr "Frases: nenhuma"
 
-#: src/app/trackinfo.rs:293
+#: src/app/trackinfo.rs:334
 msgid "Phrases: {} · {}"
 msgstr "Frases: {} · {}"
 
-#: src/app/trackinfo.rs:303
+#: src/app/trackinfo.rs:344
 msgid "Stem file: {}"
 msgstr "Arquivo de stems: {}"
 
@@ -12275,54 +12310,60 @@ msgstr "{} de {} decks com imagem"
 msgid "empty"
 msgstr "vazio"
 
-#: src/app/welcome.rs:26
+#: src/app/welcome.rs:29
 msgid "LIBRARY + DEVICES"
 msgstr "BIBLIOTECA + DISPOSITIVOS"
 
-#: src/app/welcome.rs:31
+#: src/app/welcome.rs:34
 msgid "KNOB MODE"
 msgstr "MODO DO KNOB"
 
-#: src/app/welcome.rs:32
+#: src/app/welcome.rs:35
 msgid "PLUGIN"
 msgstr "PLUGIN"
 
-#: src/app/welcome.rs:53
+#: src/app/welcome.rs:64
+msgid "{} holds a library written by other DJ software. This extension reads it; it stays off until you switch it on."
+msgid_plural "{} holds libraries written by other DJ software. These extensions read them; they stay off until you switch them on."
+msgstr[0] "{} contém uma biblioteca escrita por outro software de DJ. Esta extensão lê-a; fica desligada até a ligar."
+msgstr[1] "{} contém bibliotecas escritas por outro software de DJ. Estas extensões lêem-nas; ficam desligadas até as ligar."
+
+#: src/app/welcome.rs:83
 msgid "FEATURE"
 msgstr "RECURSO"
 
-#: src/app/welcome.rs:54
+#: src/app/welcome.rs:84
 msgid "Splits a track into vocals, instruments and drums. Switching it on downloads a {} MB model once."
 msgstr "Divide uma faixa em vocais, instrumentos e bateria. Ao ativá-lo, baixa um modelo de {} MB uma única vez."
 
-#: src/app/welcome.rs:62
+#: src/app/welcome.rs:92
 msgid "Switch these on to get the most out of OpenFadeR."
 msgstr "Ative-os para aproveitar ao máximo o OpenFadeR."
 
-#: src/app/welcome.rs:64
+#: src/app/welcome.rs:94
 msgid "These make OpenFadeR fully compatible with {}: its libraries, devices, effects and pad modes."
 msgstr "Eles tornam o OpenFadeR totalmente compatível com {}: bibliotecas, dispositivos, efeitos e pad modes."
 
-#: src/app/welcome.rs:66
+#: src/app/welcome.rs:96
 msgid " and "
 msgstr " e "
 
-#: src/app/welcome.rs:70
+#: src/app/welcome.rs:99
 msgid "{} They stay off until you switch them on."
 msgstr "{} Ficam desligados até você ativá-los."
 
-#: src/app/welcome.rs:98
+#: src/app/welcome.rs:124
 msgid "{} extensions switched on"
 msgstr "{} extensões ativadas"
 
-#: src/app/welcome.rs:105
+#: src/app/welcome.rs:131
 msgid "STEMS on: its model is downloading"
 msgstr "STEMS ativo: o modelo está sendo baixado"
 
-#: src/app/welcome.rs:110
+#: src/app/welcome.rs:136
 msgid "restart OpenFadeR to load their effects and libraries"
 msgstr "reinicie o OpenFadeR para carregar os efeitos e as bibliotecas deles"
 
-#: src/app/welcome.rs:112
+#: src/app/welcome.rs:138
 msgid "{}."
 msgstr "{}."

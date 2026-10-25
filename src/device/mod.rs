@@ -1,6 +1,6 @@
 //! Removable devices (USB sticks, SD cards) a library plugin can work with, and what is done with them (base): finding the mounted
 //! ones with their file system, free space and the plugin that handles them ([`scan`]), opening the library on one read-only
-//! ([`open_library`]).
+//! ([`open_library`]), and knowing when to look again ([`watch`]).
 //!
 //! Detection is the OS's own, one child each (`os`): Linux (`linux`) reads `/proc/self/mountinfo` (a mount counts as a device when
 //! it is under `/run/media` or `/media` or its disk is removable or on USB), Windows (`windows`) lists the removable drive
@@ -30,6 +30,7 @@ pub mod sync;
 pub mod transfer;
 pub mod undo;
 pub mod update;
+pub mod watch;
 
 #[cfg_attr(target_os = "linux", path = "linux.rs")]
 #[cfg_attr(target_os = "macos", path = "macos.rs")]
@@ -111,6 +112,9 @@ pub struct Device {
     pub kind: Kind,
     pub support: Support,
     pub read_only: bool,
+    /// Whether the disk sits behind a USB hub (Linux knows from sysfs; `false` elsewhere): a hub that resets its links
+    /// makes long writes fail with input/output errors.
+    pub via_hub: bool,
     /// Bytes; 0 while unknown.
     pub total: u64,
     pub free: u64,
@@ -139,6 +143,7 @@ impl Device {
             kind,
             support,
             read_only: false,
+            via_hub: false,
             total: 0,
             free: 0,
             provider: None,
@@ -317,7 +322,7 @@ pub fn forget(path: &Path) {
 }
 
 /// The devices mounted right now, by mount path, with file system, space, the plugin that handles them and what it found.
-// ponytail: the app polls this every second and compares ids; udev / udisks D-Bus signals would avoid the poll, but need a bus crate.
+/// The app calls it when [`watch::Watch`] says the mounts changed (Linux) or every second (elsewhere), and compares ids.
 pub fn scan() -> Vec<Device> {
     let mut v = os::mounted();
     v.extend(pretend_devices(OsStr::new(

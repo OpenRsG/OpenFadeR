@@ -5,8 +5,8 @@
 //! what did not fit. It carries the store's edits (the overlaid library: rating, comment, cues, grid; the store's colours, tags
 //! and user playlists via [`Snapshot::add_store`]) and tracks loaded in a deck carry the deck's session edits instead.
 //!
-//! `Rc<dyn Library>` cannot leave the UI thread, so the press snapshots the library there ([`Snapshot::take`]); the file is
-//! written on a thread.
+//! `Rc<dyn Library>` cannot leave the UI thread, so the press snapshots the library there ([`Snapshot::take_pending`]: tracks and
+//! playlists); the analyses are read and the file written on a thread.
 
 use super::{BrowserState, Ctx, LibraryState};
 use crate::app::App;
@@ -92,17 +92,18 @@ pub fn collection(c: &Rc<Ctx>, i: usize) {
             None => return c.say(tr!("no such export format")),
         },
     };
-    let mut snap =
-        match Snapshot::take(&*c.lib).and_then(|mut s| s.add_store(&store::global()).map(|()| s)) {
-            Ok(s) => s,
-            Err(e) => return c.say(&tr!("export failed: {}", e)),
-        };
+    let mut snap = match Snapshot::take_pending(&*c.lib)
+        .and_then(|mut s| s.add_store(&store::global()).map(|()| s))
+    {
+        Ok(s) => s,
+        Err(e) => return c.say(&tr!("export failed: {}", e)),
+    };
     for (t, beats, cues) in c.decks.iter().filter_map(|d| d.session()) {
         snap.override_session(&t, beats, cues);
     }
-    c.say(&tr!("exporting {} tracks…", snap.len()));
+    c.say(&tr!("exporting {} tracks…", snap.outline().len()));
     c.spawn(
-        move || write(&target, &snap),
+        move || write(&target, &snap.read(&store::global())),
         |c, r| c.say(&r.unwrap_or_else(|e| tr!("export failed: {}", e))),
     );
 }

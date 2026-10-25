@@ -1,4 +1,4 @@
-//! The live device list: the 1 s scan of the mounted devices, the toasts for those that come and go, and the automatic work
+//! The live device list: the scan of the mounted devices (when [`device::watch`] reports a change, or every few seconds), the toasts for those that come and go, and the automatic work
 //! queued for a device that appears. A stick plugged in that nothing mounted (no desktop automounter) is mounted here first
 //! ([`device::plug`]), with the step in the status bar's loading line. Only devices a library plugin handles are listed.
 
@@ -10,7 +10,10 @@ use openfader::{
     store::device_settings,
 };
 use slint::SharedString;
-use std::rc::Rc;
+use std::{rc::Rc, sync::LazyLock};
+
+/// Started with the first look at the devices; tells the 250 ms timer when another scan is worth it.
+static WATCH: LazyLock<device::watch::Watch> = LazyLock::new(device::watch::Watch::start);
 
 fn item(d: &Device) -> DeviceItem {
     let library = match d.held() {
@@ -82,13 +85,21 @@ impl Ctx {
         }
     }
 
+    /// The timer's look at the devices: only when the OS reported a change (or the slow fallback came).
+    pub(super) fn poll_devices(self: &Rc<Self>) {
+        if WATCH.take() {
+            self.refresh_devices();
+        }
+    }
+
     /// Looks at the mounted devices; updates the list, announces changes, queues the automatic work of new devices.
     pub(super) fn refresh_devices(self: &Rc<Self>) {
         self.automount();
-        let now: Vec<Device> = device::scan()
-            .into_iter()
-            .filter(|d| d.provider.is_some())
-            .collect();
+        let all = device::scan();
+        if let Some(app) = self.app() {
+            crate::app::plugins::suggest::devices(&app, &all);
+        }
+        let now: Vec<Device> = all.into_iter().filter(|d| d.provider.is_some()).collect();
         if *self.devices.borrow() == now {
             return;
         }

@@ -137,6 +137,14 @@ pub fn add_bytes(n: u64) -> bool {
     due && send()
 }
 
+/// Takes back `n` bytes [`add_bytes`] counted: a copy that is tried again counts its bytes once.
+pub fn rewind_bytes(n: u64) {
+    JOB.with(|j| {
+        let mut j = j.borrow_mut();
+        j.bytes_done = j.bytes_done.saturating_sub(n);
+    });
+}
+
 fn send() -> bool {
     let req = JOB.with(|j| {
         let mut j = j.borrow_mut();

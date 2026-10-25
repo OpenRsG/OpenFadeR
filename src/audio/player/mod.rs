@@ -734,8 +734,11 @@ impl Player {
     /// beat of it: the grid is taken as even). The phase is read from the audio thread's own position when it takes the seek,
     /// never from a position the caller heard earlier: the press, the next buffer and the output latency lie between them, and a
     /// beat boundary in that gap would otherwise put the landing a whole beat off. A grid that is not usable seeks plainly.
-    /// shortcut: the grid is taken as even from the beat it starts at to the jump (tens of ms), a tempo change in that gap is not
-    /// followed; upgrade: hand the audio thread the beat list (`Shared::beats`) instead of one beat.
+    /// A tempo change needs no beat list here: the phase is the time since the last boundary (`start` plus whole `beat_ms`), which
+    /// past the end of the caller's beat is the time since the next beat began, whatever its own length turns out to be; it
+    /// goes wrong only when the press-to-buffer gap (tens of ms) outlasts that whole next beat. Where the beat window and
+    /// length come from is the caller's grid (the beat under the playhead at the press, so across a tempo change they are the
+    /// source section's).
     pub fn seek_on_beat(&mut self, ms: u32, beat_start_ms: f64, beat_ms: f64, wrap_ms: f64) {
         let r = self.src_rate as f64 / 1000.0;
         let (start, len) = (beat_start_ms * r, beat_ms * r);

@@ -37,13 +37,14 @@ pub(super) fn ruler(beats: &[Beat], pos_ms: f64, span_ms: f64, width: f64) -> Op
     let per_ms = width / span_ms;
     let left = pos_ms - span_ms / 2.0;
     let from = left - LABEL_PX / per_ms;
-    // A grid without any bar-1 beat counts every 4th beat from its first, as `analysis::bars` does.
+    // A grid without any bar-1 beat counts every `per`th beat from its first, as `analysis::bars` does.
+    let per = super::grid::per_bar(beats);
     let marked = beats.iter().any(|b| b.bar_pos == 1);
     let is_bar = |i: usize| {
         if marked {
             beats[i].bar_pos == 1
         } else {
-            i % 4 == 0
+            i % usize::from(per) == 0
         }
     };
     let last = (0..beats.len()).filter(|&i| is_bar(i)).count() as i32;
@@ -51,12 +52,12 @@ pub(super) fn ruler(beats: &[Beat], pos_ms: f64, span_ms: f64, width: f64) -> Op
     let before = (0..start).filter(|&i| is_bar(i)).count() as i32;
     let line = (start..beats.len()).find(|&i| is_bar(i))?;
     let next = (line + 1..beats.len()).find(|&i| is_bar(i));
-    // The bar's length: to the next bar line, else four beats of the last interval.
+    // The bar's length: to the next bar line, else a bar's beats of the last interval.
     let bar_ms = match next {
         Some(n) => f64::from(beats[n].time_ms) - f64::from(beats[line].time_ms),
         None => {
             let i = line.min(beats.len() - 2);
-            4.0 * (f64::from(beats[i + 1].time_ms) - f64::from(beats[i].time_ms))
+            f64::from(per) * (f64::from(beats[i + 1].time_ms) - f64::from(beats[i].time_ms))
         }
     };
     let bar_px = bar_ms * per_ms;
@@ -154,5 +155,18 @@ mod tests {
         assert_eq!(r.first, 1);
         let left = 1000.0 - 4000.0;
         assert!((f64::from(r.x) - (2000.0 - left) * 0.1).abs() < 0.01);
+    }
+
+    #[test]
+    fn a_three_four_grid_has_a_bar_line_every_three_beats() {
+        let g: Vec<Beat> = grid(300)
+            .into_iter()
+            .enumerate()
+            .map(|(i, b)| Beat { bar_pos: (i % 3 + 1) as u16, ..b })
+            .collect();
+        // 0.1 px/ms: a bar is 1500 ms = 150 px; the first line at or after 5560 ms is bar 5 at 7000 ms
+        let r = ruler(&g, 10_000.0, 8000.0, 800.0).unwrap();
+        assert_eq!((r.first, r.last), (5, 100));
+        assert!((r.pitch - 150.0).abs() < 0.01, "{}", r.pitch);
     }
 }

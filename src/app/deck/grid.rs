@@ -10,7 +10,8 @@
 //! section from the playhead up to the next tempo change, the later sections keep their place; [`merge_section`] removes one.
 //! On WHOLE a TAP replaces the whole grid with a constant-tempo one.
 //!
-//! ponytail: bar length is the grid's largest bar position (4/4 and 3/4 keep their length).
+//! shortcut: the bar length is the grid's largest bar position, at most 4 (4/4 and 3/4 keep their length; 5/4 or 6/8 read as 4),
+//! raise the clamp when a grid source or detector can produce longer bars.
 
 use super::{Deck, Loaded, beatmath::sections, exportedit, fmt_ms, grid_bpm, loops, tempo_at};
 use openfader::{analysis::Beat, store};
@@ -26,7 +27,7 @@ const TAP_WINDOW: usize = 8;
 const TAP_BPM: std::ops::RangeInclusive<f64> = 30.0..=300.0;
 
 /// Beats per bar of the grid (its largest bar position, 1..=4; 4 for an empty grid).
-pub(super) fn per_bar(beats: &[Beat]) -> u16 {
+pub(in crate::app) fn per_bar(beats: &[Beat]) -> u16 {
     beats
         .iter()
         .map(|b| b.bar_pos)
@@ -587,6 +588,7 @@ mod tests {
             })
             .collect();
         assert_eq!(bars(&set_downbeat(&g, 667.0).unwrap()), [3, 1, 2, 3, 1, 2]);
+        assert_eq!(bars(&double(&g).unwrap()), [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]);
     }
 
     #[test]

@@ -81,6 +81,18 @@ impl View {
         self.tracks_of(&keys, false)
     }
 
+    /// The plays of `day` with their times; plays of tracks the library lacks are skipped.
+    pub(in crate::app::browser) fn day_plays(
+        &mut self,
+        day: &str,
+    ) -> Result<Vec<(Track, i64)>, String> {
+        let mut out = Vec::new();
+        for (key, at) in self.store.history_day_plays(day)? {
+            out.extend(self.tracks_of(&[key], false)?.pop().map(|t| (t, at)));
+        }
+        Ok(out)
+    }
+
     pub(in crate::app::browser) fn dupes_list(&mut self) -> Result<Vec<Track>, String> {
         let cache = self.cache()?;
         let groups = crate::app::library::dupes::find(&cache.tracks);

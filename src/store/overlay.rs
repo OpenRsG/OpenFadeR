@@ -146,6 +146,22 @@ pub fn apply(a: &mut Analysis, e: &Edits) {
     }
 }
 
+/// `own`, the analysis a library gave for `track`, with the store's cues / grid / phrases on top ([`apply`]); `own` itself, unchanged,
+/// for a track the store has no such edit for. [`Overlay::analysis`], and what a worker does with a [`crate::library::AnalysisReader`]'s
+/// answer to get the same.
+pub fn with_edits(own: Option<Analysis>, track: &Track, store: &Store) -> Option<Analysis> {
+    let edits = store.edits(&key(track)).unwrap_or_else(|e| {
+        eprintln!("store: {e}");
+        Edits::default()
+    });
+    if edits.cues.is_none() && edits.grid.is_none() && edits.phrases.is_none() {
+        return own;
+    }
+    let mut a = own.unwrap_or_default();
+    apply(&mut a, &edits);
+    Some(a)
+}
+
 impl Library for Overlay {
     fn kind(&self) -> &str {
         self.inner.kind()
@@ -187,16 +203,7 @@ impl Library for Overlay {
     /// The library's analysis with the store's cues / grid / phrases on top; the library's own answer, unchanged, for a
     /// track the store has no such edit for.
     fn analysis(&self, track: &Track) -> Option<Analysis> {
-        let edits = self.store.edits(&key(track)).unwrap_or_else(|e| {
-            eprintln!("store: {e}");
-            Edits::default()
-        });
-        if edits.cues.is_none() && edits.grid.is_none() && edits.phrases.is_none() {
-            return self.inner.analysis(track);
-        }
-        let mut a = self.inner.analysis(track).unwrap_or_default();
-        apply(&mut a, &edits);
-        Some(a)
+        with_edits(self.inner.analysis(track), track, &self.store)
     }
 
     fn analysis_reader(&self) -> Option<crate::library::AnalysisReader> {

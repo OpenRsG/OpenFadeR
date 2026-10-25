@@ -20,7 +20,6 @@ A plugin can have sources, actions and events together (they share one program),
 modes on top.
 
 Working examples in the [plugins repository](https://github.com/OpenRsG/OpenFadeR-Plugins) (checked out as `extension/plugin/`):
-[`mix-log`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/mix-log) (a Lua plugin: events, actions, settings, files),
 [`yt-dlp`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/yt-dlp) (YouTube and SoundCloud search, playlists, downloads;
 Python and the `yt-dlp` program), [`now-playing`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/now-playing) (events,
 actions and settings; Python), and the DJ effects listed under [Effects](#effects), all JSON
@@ -45,14 +44,20 @@ The app reads plugins from
 
 An entry of that search path is either one plugin folder or a folder of plugin folders; the first plugin of a name wins.
 
-PREFERENCES > EXTENSIONS lists every plugin as a card: a switch to turn it on or off (every plugin starts off, the bundled ones
-too; installing one switches it on), what it runs on (LUA, PYTHON, PROGRAM or
+PREFERENCES > EXTENSIONS lists every plugin as a card: a switch to turn it on or off (a plugin starts off and installing one switches it on; the exception is a fresh
+profile with no `plugins.json`, where the readers `rekordbox-device`, `rekordbox-xml` and `engine-dj` and the effect packs `beat-fx`,
+`send-fx`, `lever-fx`, `mic-fx`, `soft-mix` and `cross-pass` start on, so a plugged-in rekordbox or Engine DJ stick is read at once;
+once the file exists it is your choice and nothing is switched on behind it), what it runs on (LUA, PYTHON, PROGRAM or
 JSON), what it brings, its settings (**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`), then whatever went wrong while
 reading the plugins. The card's **⋮** menu opens its folder or **uninstalls** it: an installed plugin's folder is deleted, and a
 bundled one is hidden (listed under `removed`) until you install it again, from GET PLUGINS or a drop. **RELOAD** reads the folders
 again (after you edit a plugin). Actions, events and settings apply at once; effects, sources, knob and pad modes are part of the
 mixer and the browser from start-up, so a change to those shows a **RESTART NOW** banner. The switches, the uninstalled plugins and
 the settings are kept in `~/.config/openfader/plugins.json`.
+
+When a stick is plugged in whose library only an extension that is off can read (`PIONEER/`: `rekordbox-device`, `Engine Library/`:
+`engine-dj`, `_Serato_/`: `serato`, `VirtualDJ/`: `virtualdj`, `Traktor/`: `traktor`), the welcome window opens with just that extension
+and SWITCH ON turns it on (its library loads at the next start: RESTART NOW). Each extension is offered once per device per run.
 
 ### Install from a repository
 
@@ -240,7 +245,7 @@ end
 return M
 ```
 
-[`mix-log`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/mix-log) is a complete one (events, actions, settings, files).
+The plugins repository has no Lua example any more (the mix log is built into History: SAVE SET LIST); the protocol above is all of it.
 
 ### Settings
 

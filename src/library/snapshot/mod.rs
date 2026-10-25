@@ -1,9 +1,14 @@
 //! [`Snapshot`]: the owned, `Send` input of a collection or device export: a library's unique tracks with their
 //! analysis, its playlist tree (history playlists left out) and what only our store has (track colours, tags, user
 //! playlists, see [`extra`]). Take it on the thread that owns the [`Library`], write it anywhere: a library plugin writes
-//! the collection as a file ([`Snapshot::to_wire`] is what crosses the plugin ABI), the device export reads it directly.
+//! the collection as a file ([`Snapshot::to_wire`] is what crosses the plugin ABI), the device export reads it directly. A
+//! library with a [`crate::library::AnalysisReader`] can be taken as a [`Pending`] instead: the tracks and playlists now, the analyses
+//! (the slow part) later on the thread that writes.
 
 mod extra;
+mod pending;
+
+pub use pending::Pending;
 
 use super::{Library, Playlist, Track};
 use crate::analysis::{Analysis, Beat, Cue};
@@ -80,14 +85,27 @@ impl Snapshot {
     }
 
     /// The snapshot of `lib`: all its tracks, its playlists and their members.
-    // ponytail: asks the library for every track's analysis here, on the caller's thread (a library that reads files for it
-    // makes this slow for a big collection); `Library` is not `Send`, so it cannot move to the writing thread.
+    ///
+    /// Asks the library for every track's analysis on the caller's thread (a library that reads files for it makes this slow
+    /// for a big collection); [`Snapshot::take_pending`] leaves that to the thread that writes.
     pub fn take(lib: &dyn Library) -> Result<Self, String> {
+        Self::build(lib, true)
+    }
+
+    /// [`Snapshot::take`] without the analyses when `lib` has a [`crate::library::AnalysisReader`]: [`Pending::read`] reads
+    /// them later, on a worker. A library without a reader is read here as `take` does.
+    pub fn take_pending(lib: &dyn Library) -> Result<Pending, String> {
+        let reader = lib.analysis_reader();
+        Ok(Pending::new(Self::build(lib, reader.is_none())?, reader))
+    }
+
+    /// `analyses`: ask `lib` for each track's analysis now; else the slots stay `None`.
+    fn build(lib: &dyn Library, analyses: bool) -> Result<Self, String> {
         let (mut ids, mut tracks): (HashMap<String, usize>, Vec<(Track, Option<Analysis>)>) =
             Default::default();
         let mut intern = |t: Track| {
             *ids.entry(track_key(&t)).or_insert_with(|| {
-                let a = lib.analysis(&t);
+                let a = analyses.then(|| lib.analysis(&t)).flatten();
                 tracks.push((t, a));
                 tracks.len() - 1
             })

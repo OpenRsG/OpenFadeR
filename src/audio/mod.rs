@@ -1,4 +1,4 @@
-//! Audio. Base: [`Pcm`] (interleaved stereo f32), its resampling read [`Pcm::frame_at`], the read-only [`Frames`] view analysis
+//! Audio. Base: [`Pcm`] (interleaved stereo f32), its windowed-sinc resampling read [`Pcm::frame_at`], the read-only [`Frames`] view analysis
 //! and measuring code take (f32 slices and [`Track16`]), the position arithmetic
 //! children share ([`Loop`], [`advance`]), the lock-free frame queue [`Ring`], the device-frame writer [`put_frame`], the
 //! output-device lookup [`find_output`], and the knob helpers [`clamped`], [`store_clamped`], [`load_f32`] and [`mono`].
@@ -65,6 +65,7 @@ pub use wavout::write_wav;
 
 use cpal::FromSample;
 use std::ops::Range;
+use std::sync::OnceLock;
 use std::sync::atomic::{
     AtomicU32, AtomicU64, AtomicUsize,
     Ordering::{Acquire, Relaxed, Release},
@@ -241,11 +242,18 @@ impl Pcm {
         }
     }
 
-    /// Stereo frame at fractional source-frame position `pos`, linearly interpolated; None past the end.
-    /// ponytail: linear interpolation aliases/dulls when rates differ (44.1k<->48k is audible on bright
-    /// material); upgrade to a windowed-sinc/polyphase resampler (e.g. rubato) if that matters.
+    /// Stereo frame at fractional source-frame position `pos`, windowed-sinc interpolated ([`resample_at`]) for a read that
+    /// advances at most one source frame per call; None past the end.
     pub fn frame_at(&self, pos: f64) -> Option<[f32; 2]> {
-        lerp_at(self.samples.len() / 2, pos, |k, c| self.samples[2 * k + c])
+        self.frame_at_step(pos, 1.0)
+    }
+
+    /// [`Pcm::frame_at`] for a read that advances `step` source frames per output frame: above 1 (a source faster than the
+    /// device, a raised pitch) the interpolator low-passes to the new Nyquist so the extra band folds nowhere.
+    pub fn frame_at_step(&self, pos: f64, step: f64) -> Option<[f32; 2]> {
+        resample_at(self.samples.len() / 2, pos, step, |k, c| {
+            self.samples[2 * k + c]
+        })
     }
 }
 
@@ -270,20 +278,97 @@ impl<T: AsRef<[f32]> + Sync + ?Sized> Frames for T {
     }
 }
 
-/// Frame `pos` of a `frames`-frame signal read through `sample(frame, channel)`, linearly interpolated; the last frame
-/// holds, `None` at or past the end. The one resampling read of [`Pcm`] and [`Track16`].
+/// Taps of the interpolator on each side of the read position (32 in all: a Kaiser-windowed sinc flat to about 0.4 of the
+/// sample rate, 18 kHz at 44.1 kHz).
+const HALF: usize = 16;
+/// Entries of the kernel table per source frame; between two entries the kernel is interpolated linearly (error ~ -90 dB).
+const RES: usize = 256;
+/// Largest read step that still narrows the kernel; a faster read (never reached: tempo x2 and +12 st make 4) folds the rest.
+const MAX_STEP: f64 = 4.0;
+/// Kaiser shape: about -90 dB of window leakage.
+const BETA: f64 = 9.0;
+
+/// Zeroth-order modified Bessel function (the Kaiser window's shape), by its power series.
+fn bessel_i0(x: f64) -> f64 {
+    let (mut sum, mut term, q) = (1.0, 1.0, x * x / 4.0);
+    for k in 1..40 {
+        term *= q / (k * k) as f64;
+        sum += term;
+        if term < 1e-12 * sum {
+            break;
+        }
+    }
+    sum
+}
+
+/// Half of the interpolation kernel, `x` = `i / RES` source frames from the centre: `sinc(x)` under a Kaiser window `HALF`
+/// wide, zero at and beyond `HALF`. Built once, on first use (a few hundred microseconds); one entry past the end so a
+/// linear read between two entries never leaves the table.
+fn kernel() -> &'static [f32] {
+    static TABLE: OnceLock<Vec<f32>> = OnceLock::new();
+    TABLE.get_or_init(|| {
+        (0..=HALF * RES + 1)
+            .map(|i| {
+                let x = i as f64 / RES as f64;
+                if x >= HALF as f64 {
+                    return 0.0;
+                }
+                let sinc = match i {
+                    0 => 1.0,
+                    _ if i % RES == 0 => 0.0, // exact zeros at the whole frames: an integer position reads its own sample
+                    _ => (std::f64::consts::PI * x).sin() / (std::f64::consts::PI * x),
+                };
+                let t = x / HALF as f64;
+                (sinc * bessel_i0(BETA * (1.0 - t * t).sqrt()) / bessel_i0(BETA)) as f32
+            })
+            .collect()
+    })
+}
+
+/// Frame `pos` of a `frames`-frame signal read through `sample(frame, channel)` by windowed-sinc interpolation over the
+/// `2 * HALF` nearest frames; `None` at or past the end. Before the start and past the last frame the edge frame holds (the
+/// taps there read it), so the end of a track is a plateau, not a click. A whole-frame `pos` at `step <= 1` is the sample
+/// itself, bit for bit. `step` is how far the read advances per output frame: above 1 the kernel widens by that factor
+/// (lower cutoff, `step * 2 * HALF` taps, at most [`MAX_STEP`]), so downsampling does not alias. The weights are divided by
+/// their sum, so a constant signal stays constant at every position and step. The one resampling read of [`Pcm`] and
+/// [`Track16`]: no allocation, `2 * HALF * max(step, 1)` table reads per call.
 #[inline]
-fn lerp_at(frames: usize, pos: f64, sample: impl Fn(usize, usize) -> f32) -> Option<[f32; 2]> {
-    let i = pos as usize;
-    if i >= frames {
+fn resample_at(
+    frames: usize,
+    pos: f64,
+    step: f64,
+    sample: impl Fn(usize, usize) -> f32,
+) -> Option<[f32; 2]> {
+    let floor = pos.floor();
+    if frames == 0 || floor >= frames as f64 {
         return None;
     }
-    let j = (i + 1).min(frames - 1);
-    let t = (pos - i as f64) as f32;
-    Some([0, 1].map(|c| {
-        let a = sample(i, c);
-        a + (sample(j, c) - a) * t
-    }))
+    let last = frames as i64 - 1;
+    let i = floor as i64; // saturates for a negative or NaN position
+    let frac = (pos - floor) as f32;
+    let width = step.abs().max(1.0).min(MAX_STEP);
+    if frac == 0.0 && width == 1.0 {
+        let k = i.clamp(0, last) as usize;
+        return Some([sample(k, 0), sample(k, 1)]);
+    }
+    let table = kernel();
+    let scale = RES as f32 / width as f32; // table entries per source frame of distance
+    let reach = (HALF as f64 * width).ceil() as i64;
+    let limit = (HALF * RES) as f32;
+    let (mut acc, mut norm) = ([0.0f32; 2], 0.0f32);
+    for n in i + 1 - reach..=i + reach {
+        let u = ((n - i) as f32 - frac).abs() * scale;
+        if u >= limit {
+            continue;
+        }
+        let e = u as usize;
+        let w = table[e] + (table[e + 1] - table[e]) * (u - e as f32);
+        let k = n.clamp(0, last) as usize;
+        acc[0] += w * sample(k, 0);
+        acc[1] += w * sample(k, 1);
+        norm += w;
+    }
+    Some(acc.map(|v| v / norm))
 }
 
 /// The `f32` stored as bits in `a` (see [`store_clamped`]).
@@ -315,37 +400,90 @@ pub(crate) fn gain_at(from: f32, to: f32, i: usize, n: usize) -> f32 {
 mod tests {
     use super::*;
 
+    /// `n` frames of a sine at `f` cycles per frame, both channels.
+    fn tone(n: usize, f: f64) -> Pcm {
+        Pcm {
+            rate: 44100,
+            samples: (0..n)
+                .flat_map(|k| {
+                    let v = (std::f64::consts::TAU * f * k as f64).sin() as f32;
+                    [v, -v]
+                })
+                .collect(),
+        }
+    }
+
     #[test]
     fn resampler_maps_positions() {
-        // ramp: frame k = (k, -k); 22.05 kHz source on a 44.1 kHz device => step 0.5 source frames
         let pcm = Pcm {
             rate: 22050,
             samples: (0..4).flat_map(|k| [k as f32, -(k as f32)]).collect(),
         };
-        let step = 22050.0 / 44100.0;
-        let got: Vec<_> = (0..7)
-            .map(|n| pcm.frame_at(n as f64 * step).map(|f| f[0]))
-            .collect();
-        // last real frame (k=3) holds, nothing at/after pos 4.0
-        assert_eq!(
-            got,
-            [
-                Some(0.0),
-                Some(0.5),
-                Some(1.0),
-                Some(1.5),
-                Some(2.0),
-                Some(2.5),
-                Some(3.0)
-            ]
-        );
-        assert_eq!(pcm.frame_at(3.5).map(|f| f[1]), Some(-3.0));
+        // a whole frame is its own sample, bit for bit; the end holds; nothing at or past it
+        for k in 0..4 {
+            assert_eq!(pcm.frame_at(k as f64), Some([k as f32, -(k as f32)]));
+        }
+        assert!(pcm.frame_at(3.5).is_some_and(|f| f[0].is_finite()));
         assert_eq!(pcm.frame_at(4.0), None);
-        // downsample 48k -> 44.1k: step > 1 lands on interpolated positions
-        assert_eq!(
-            pcm.frame_at(48000.0 / 44100.0).unwrap()[0],
-            48000.0 / 44100.0
-        );
+        assert_eq!(Pcm::default().frame_at(0.0), None);
+        assert_eq!(Pcm::default().frame_at(-1.0), None);
+    }
+
+    #[test]
+    fn sinc_follows_a_band_limited_sine_far_closer_than_linear() {
+        // 0.2 cycles per frame (8.8 kHz at 44.1 kHz): linear interpolation is off by up to 1 - cos(0.2 pi) = 19 % in between
+        let (f, pcm) = (0.2, tone(512, 0.2));
+        let (mut sinc, mut lin) = (0.0f32, 0.0f32);
+        for n in 0..1000 {
+            let pos = 40.0 + n as f64 * 0.37; // well inside the signal: no edge taps
+            let want = (std::f64::consts::TAU * f * pos).sin() as f32;
+            sinc = sinc.max((pcm.frame_at(pos).unwrap()[0] - want).abs());
+            let (i, t) = (pos as usize, (pos - pos.floor()) as f32);
+            let (a, b) = (pcm.samples[2 * i], pcm.samples[2 * i + 2]);
+            lin = lin.max((a + (b - a) * t - want).abs());
+        }
+        assert!(sinc < 1e-3, "sinc error {sinc}");
+        assert!(lin > 50.0 * sinc, "linear {lin} vs sinc {sinc}");
+    }
+
+    #[test]
+    fn constant_stays_constant_at_every_position_step_and_edge() {
+        let pcm = Pcm {
+            rate: 44100,
+            samples: vec![0.7; 2 * 100],
+        };
+        for step in [1.0, 1.088, 2.0, -3.0, 9.0] {
+            for pos in [0.0, 0.3, 1.5, 50.25, 98.9, 99.0, 99.5, 99.999] {
+                let f = pcm.frame_at_step(pos, step).unwrap();
+                assert!(
+                    f.iter().all(|v| (v - 0.7).abs() < 1e-5),
+                    "step {step} at {pos}: {f:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_sample_just_off_a_whole_frame_is_that_sample() {
+        let pcm = tone(64, 0.05);
+        for k in [0usize, 1, 30, 63] {
+            let at = pcm.frame_at(k as f64 + 1e-6).unwrap()[0];
+            assert!((at - pcm.samples[2 * k]).abs() < 1e-4, "frame {k}");
+        }
+    }
+
+    #[test]
+    fn a_faster_read_low_passes_so_a_tone_above_the_new_nyquist_vanishes() {
+        // 0.4 cycles per frame read every 2nd frame would alias to 0.2: with the step given it is filtered out
+        let pcm = tone(2048, 0.4);
+        let rms = |step: f64| {
+            let e: f32 = (0..400)
+                .map(|n| pcm.frame_at_step(200.0 + n as f64 * step, step).unwrap()[0].powi(2))
+                .sum();
+            (e / 400.0).sqrt()
+        };
+        assert!(rms(2.0) < 0.02, "filtered {}", rms(2.0));
+        assert!(rms(1.0) > 0.6, "kept {}", rms(1.0)); // not a victim at step 1
     }
 
     #[test]

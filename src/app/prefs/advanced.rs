@@ -2,7 +2,7 @@
 //! BROWSE are the library's ([`crate::app::library::settings`]); BEAT/BPM SYNC and HOT CUE are the CONTROLLER >
 //! Deck settings shown again. Streaming services, Tribe XR and PRO DJ LINK items need a network and are left out.
 
-use super::{choice, section, Prefs, Row};
+use super::{choice, lowpower::LowPower, section, Prefs, Row};
 use crate::app::library::settings as library;
 use openfader::audio::RecOptions;
 use std::path::PathBuf;
@@ -62,6 +62,8 @@ section!(
         update_channel: UpdateChannel = UpdateChannel::Stable;
         /// UPDATE NOW first backs up the library to the data folder (the last 3 are kept) so a roll-back can put it back.
         backup_before_update: bool = true;
+        /// Low-power device profile: AUTO detects a Raspberry Pi / small ARM machine ([`super::lowpower`]).
+        low_power: LowPower = LowPower::Auto;
     }
 );
 
@@ -261,6 +263,11 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         .hint(tr!(
             "the last 3 are kept; a roll-back puts the library back"
         )),
+        Row::of("low_power", tr!("LOW-POWER MODE"), a.low_power).hint(if super::lowpower::on(p) {
+            tr!("effective: ON (small sampler, fewer analysis workers)")
+        } else {
+            tr!("effective: OFF")
+        }),
     ]);
     rows
 }
@@ -344,6 +351,18 @@ mod tests {
             "sync_type is the Deck setting"
         );
         assert!(!choose(&mut p, "nope", 0));
+    }
+
+    #[test]
+    fn low_power_row_shows_the_effective_mode() {
+        use crate::app::prefs::lowpower::LowPower;
+        let mut p = Prefs::default();
+        let row = |p: &Prefs| rows(p).into_iter().find(|r| r.key == "low_power").unwrap();
+        assert_eq!(row(&p).current, 0, "AUTO by default");
+        assert!(choose(&mut p, "low_power", 1) && p.advanced.low_power == LowPower::On);
+        assert_eq!((row(&p).current, row(&p).hint.contains("ON")), (1, true));
+        assert!(choose(&mut p, "low_power", 2));
+        assert_eq!((row(&p).current, row(&p).hint.as_str()), (2, "effective: OFF"));
     }
 
     #[test]

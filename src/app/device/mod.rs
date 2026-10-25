@@ -1,8 +1,8 @@
 //! Devices ↔ ui/device*.slint (global `DeviceState`) (base): the window with DEVICES / EXPORT / SYNC MANAGER / BACKUPS, the live
 //! device list, and the one background job that works on a device with its progress and cancel.
 //!
-//! One timer ticks every 250 ms: it shows the running job's progress, and every fourth tick (1 s) looks at the mounted devices
-//! ([`openfader::device::scan`]); a device that appears is announced (with the file-system warning), remembered in the store, and
+//! One timer ticks every 250 ms: it shows the running job's progress, and looks at the mounted devices
+//! ([`openfader::device::scan`]) when [`openfader::device::watch`] reports a change (every 10 s as a fallback); a device that appears is announced (with the file-system warning), remembered in the store, and
 //! gets its automatic work (Preferences > DEVICE: import the play history, SYNC MANAGER auto-sync).
 //!
 //! What a device can do and how it is called comes from the library plugin that handles it ([`Device::info`]): the window lists
@@ -58,7 +58,7 @@ use super::{
 };
 use openfader::{
     device::{self, Device, export::Written},
-    library::{Library, Track, snapshot::Snapshot},
+    library::{Library, Track, snapshot::{Pending, Snapshot}},
     plugin::device::{Control, ExportOptions, ExportReport, Feature, Provider},
     store::{self, device_settings, Store},
 };
@@ -116,13 +116,12 @@ pub(super) struct Ctx {
     ask: RefCell<Option<Box<dyn FnOnce(&Rc<Ctx>)>>>,
     export: Pick,
     /// The collection as listed in the EXPORT / SYNC MANAGER tabs (loaded when the window opens or a tab changes).
-    snap: RefCell<Option<Snapshot>>,
+    snap: RefCell<Option<Pending>>,
     /// Playlist ids to tick the next time the EXPORT list loads (the browser's "export to device").
     preselect: RefCell<Vec<String>>,
     /// The backups of the BACKUPS tab, row by row.
     backups: RefCell<Vec<store::DeviceBackup>>,
     sync: Pick,
-    ticks: Cell<u32>,
     /// The running job's progress also shows in the browser's status bar (a transfer started from the browser).
     mirror: Cell<bool>,
     models: Models,
@@ -308,7 +307,7 @@ impl Ctx {
         ok
     }
 
-    fn read_collection(&self, f: impl FnOnce() -> Result<Snapshot, String>) -> Option<Snapshot> {
+    fn read_collection<T>(&self, f: impl FnOnce() -> Result<T, String>) -> Option<T> {
         f().map_err(|e| self.say(&tr!("cannot read the collection: {}", e), true))
             .ok()
     }
@@ -316,6 +315,19 @@ impl Ctx {
     /// The collection as it is (overlaid tracks and their analysis), for the jobs that compare or look tracks up.
     fn collection(&self) -> Option<Snapshot> {
         self.read_collection(|| Snapshot::take(&*self.lib))
+    }
+
+    /// [`Ctx::snapshot`] with the analyses still to be read ([`Pending::read`], on the worker that writes): what the lists and
+    /// the export press need on the UI thread is the tracks and playlists.
+    fn pending(&self) -> Option<Pending> {
+        self.read_collection(|| {
+            let mut pending = Snapshot::take_pending(&*self.lib)?;
+            pending.add_store(&self.store)?;
+            for (t, beats, cues) in self.decks.iter().filter_map(|d| d.session()) {
+                pending.override_session(&t, beats, cues);
+            }
+            Ok(pending)
+        })
     }
 
     /// The collection as the export writes it: the overlaid tracks, the store's colours / tags / user playlists, the decks'
@@ -418,7 +430,6 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
         preselect: RefCell::default(),
         backups: RefCell::default(),
         sync: Pick::default(),
-        ticks: Cell::new(0),
         mirror: Cell::new(false),
         models: Models {
             devices: Rc::default(),
@@ -523,10 +534,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     let timer = Timer::default();
     timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
         c.poll_job();
-        c.ticks.set(c.ticks.get() + 1);
-        if c.ticks.get() % 4 == 1 {
-            c.refresh_devices();
-        }
+        c.poll_devices();
         c.run_autos();
         c.run_checks();
         c.run_pushes();

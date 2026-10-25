@@ -2,7 +2,7 @@
 //! prompt of an action that asks for text, the commands actions and event replies answer with, the `timer` and
 //! `app_started` events, and the [`notify`] callback of the plugin track sources ([`openfader::plugin::source`]), which
 //! makes the browser re-read the library. Child: [`manager`] (PREFS > EXTENSIONS: install, switch on / off, settings,
-//! remove, restart).
+//! remove, restart), and [`suggest`] (the welcome window's offer of the reader of a plugged-in device's library).
 //!
 //! An action runs on a worker thread ([`openfader::plugin::action::run`]); its commands run here, on the UI thread,
 //! when it is done. Nothing in this section waits for a plugin. The menu follows [`openfader::plugin::current`]
@@ -10,6 +10,7 @@
 
 mod manager;
 pub use manager::{install, installed};
+pub mod suggest;
 
 use super::{
     App, BrowserState, PluginState, browser, deck::Decks, deck::active, keys, library, toast,

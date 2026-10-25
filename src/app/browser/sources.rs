@@ -517,6 +517,7 @@ mod tests {
             kind: device::Kind::Usb,
             support: device::Support::Ok,
             read_only: false,
+            via_hub: false,
             total: 0,
             free: 0,
             provider: None,

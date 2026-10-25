@@ -55,7 +55,7 @@ pub use device::{DeviceBackup, NewBackup};
 pub use gain::{TrackGain, effective_db};
 pub use inbox::{Batch, Move, Role, Stage};
 pub use node::{Node, NodeKind};
-pub use overlay::{Overlay, apply, overlay};
+pub use overlay::{Overlay, apply, overlay, with_edits};
 pub use saved_search::SavedSearch;
 pub use sequence::{MAX_SEQUENCES, Sequence};
 pub use tag::{Tag, TagGroup};

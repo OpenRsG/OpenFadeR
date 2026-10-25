@@ -94,16 +94,16 @@ impl Deck {
     }
 
     /// Range length, beats.
-    fn slicer_len(&self) -> f64 {
-        self.slicer_bars() as f64 * 4.0
+    fn slicer_len(&self, l: &Loaded) -> f64 {
+        f64::from(self.slicer_bars()) * f64::from(super::grid::per_bar(&l.analysis.beats))
     }
 
     /// Start (beats) of the range the pads address now.
-    fn slicer_range(&self, beats: f64) -> f64 {
+    fn slicer_range(&self, beats: f64, len: f64) -> f64 {
         self.slicer.looped.get().unwrap_or_else(|| {
             range_start(
                 self.slicer.origin.get(),
-                self.slicer_len(),
+                len,
                 beats,
                 self.slicer.shift.get(),
             )
@@ -135,9 +135,9 @@ impl Deck {
         }
         if to == PadMode::SlicerLoop && l.ready {
             let pos = beat_at(&l.analysis.beats, self.clock(&l).0);
-            let len = self.slicer_len();
+            let len = self.slicer_len(&l);
             let range = pos
-                .map(|p| self.slicer_range(p))
+                .map(|p| self.slicer_range(p, len))
                 .and_then(|b| Self::slicer_ms(&l, b, len).map(|ms| (b, ms)));
             match range {
                 Some((b, ms)) => {
@@ -159,12 +159,12 @@ impl Deck {
     pub(super) fn slicer_pad(&self, pad: usize) {
         let l = self.loaded.borrow_mut();
         let (pos, playing) = self.clock(&l);
-        let len = self.slicer_len();
+        let len = self.slicer_len(&l);
         let Some(beat) = beat_at(&l.analysis.beats, pos) else {
             drop(l);
             return self.say(tr!("the slicer needs a track with a beat grid"));
         };
-        let (start, roll) = roll_beats(self.slicer_range(beat), len, pad, self.slicer_roll());
+        let (start, roll) = roll_beats(self.slicer_range(beat, len), len, pad, self.slicer_roll());
         let Some((s, e)) = Self::slicer_ms(&l, start, roll).filter(|(s, e)| e > s) else {
             return;
         };
@@ -195,7 +195,7 @@ impl Deck {
             .slicer
             .looped
             .get()
-            .and_then(|b| Self::slicer_ms(&l, b, self.slicer_len()));
+            .and_then(|b| Self::slicer_ms(&l, b, self.slicer_len(&l)));
         let at = if h.playing {
             background(
                 h.pos_ms,
@@ -232,7 +232,7 @@ impl Deck {
     pub(super) fn slicer_shift(&self, dir: i32) {
         self.slicer_release();
         let l = self.loaded.borrow_mut();
-        let len = self.slicer_len();
+        let len = self.slicer_len(&l);
         if let Some(b) = self.slicer.looped.get() {
             let b = b + dir as f64 * len;
             if let Some(ms) =
@@ -257,7 +257,7 @@ impl Deck {
             .set(next_of(&SLICER_BARS, self.slicer_bars()));
         if let Some(b) = self.slicer.looped.get() {
             let l = self.loaded.borrow_mut();
-            let ms = Self::slicer_ms(&l, b, self.slicer_len());
+            let ms = Self::slicer_ms(&l, b, self.slicer_len(&l));
             self.apply_loop(l, ms);
         }
         self.refresh_pads();
@@ -277,7 +277,8 @@ impl Deck {
             return Some(h.pad);
         }
         let beat = beat_at(&l.analysis.beats, self.clock(l).0)?;
-        slice_at(self.slicer_range(beat), self.slicer_len(), beat)
+        let len = self.slicer_len(l);
+        slice_at(self.slicer_range(beat, len), len, beat)
     }
 
     /// Every tick in a slicer mode: lights the pad under the playhead.

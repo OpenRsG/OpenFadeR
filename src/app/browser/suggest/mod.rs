@@ -27,7 +27,7 @@ pub use radar::Conditions;
 pub use view::{State, wire};
 
 use openfader::{analysis::similar::Profile, library::Track};
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use super::table::bpm_key;
 use crate::app::camelot::{Key, camelot};
@@ -157,6 +157,28 @@ impl Links {
     }
 }
 
+/// What the lists were read from: the store's generation, the length of this session's history, the number of library playlists.
+pub type Stamp = (u64, usize, usize);
+
+/// The playlists and play histories (track keys, in order) that [`Links`] are made from, read once per [`Stamp`] and shared by
+/// every anchor after that, instead of reading every playlist again for each new anchor.
+#[derive(Default)]
+pub struct Lists {
+    stamp: Option<Stamp>,
+    lists: Rc<Vec<Vec<String>>>,
+}
+
+impl Lists {
+    /// The lists as of `stamp`; `read` runs only when `stamp` is not the one they were last read for.
+    pub fn get(&mut self, stamp: Stamp, read: impl FnOnce() -> Vec<Vec<String>>) -> Rc<Vec<Vec<String>>> {
+        if self.stamp != Some(stamp) {
+            self.lists = Rc::new(read());
+            self.stamp = Some(stamp);
+        }
+        self.lists.clone()
+    }
+}
+
 /// `pool` ranked for `anchor` under `mode`, best first. The anchor itself (same `key`) is never in the result.
 pub fn rank(mode: Mode, anchor: &Item, pool: &[Item], cond: &Conditions, links: &Links) -> Outcome {
     let blocked = match mode {
@@ -242,5 +264,30 @@ pub(super) mod testing {
             .iter()
             .map(|p| pool[p.at].track.title.as_str())
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod lists_tests {
+    use super::*;
+
+    #[test]
+    fn lists_are_read_once_per_stamp_and_again_when_it_moves() {
+        let mut reads = 0;
+        let mut lists = Lists::default();
+        let mut get = |stamp| {
+            lists.get(stamp, || {
+                reads += 1;
+                vec![vec![format!("read {reads}")]]
+            })
+        };
+        let first = get((1, 0, 0));
+        assert!(Rc::ptr_eq(&first, &get((1, 0, 0))), "a second anchor shares the lists");
+        assert_eq!(first[0][0], "read 1");
+        // the store changed, the session history grew, a playlist appeared: each reads again
+        assert_eq!(get((2, 0, 0))[0][0], "read 2");
+        assert_eq!(get((2, 1, 0))[0][0], "read 3");
+        assert_eq!(get((2, 1, 1))[0][0], "read 4");
+        assert_eq!(get((2, 1, 1))[0][0], "read 4");
     }
 }

@@ -1,6 +1,7 @@
 //! Session history: the sidebar entry "Session history (N)" lists every track that played at least
 //! [`MIN_ON_AIR`] *on air* in this session, in play order; SAVE M3U8 writes the list into the shared
-//! output folder ([`paths`]). Never written to the library.
+//! output folder ([`paths`]), SAVE SET LIST writes it (or a stored day, below) as `.csv` and `.txt` set lists next to it.
+//! Never written to the library.
 //!
 //! The stored play history (sidebar "History" > day) uses the same on-air rule with the longer [`MIN_PLAYED`]: a
 //! track that was on air that long is appended to today's history in the store ([`log_today`]). The threshold is 60 s.
@@ -10,6 +11,7 @@
 //! LOAD of a track counts separately (the deck's load serial), so a track played twice is listed twice.
 //! [`Watcher`] samples the decks from the browser's 200 ms timer.
 
+use super::{table::bpm_key, Home, View};
 use crate::app::{
     deck::{active, Decks},
     mixer, App, DeckState, MixerState,
@@ -119,18 +121,132 @@ pub fn log_today(store: &Store, t: &Track) -> Result<(), String> {
     )
 }
 
-fn write_new(dir: &Path, tracks: &[Track]) -> Result<(PathBuf, usize), String> {
-    let path = paths::at(paths::timestamped(dir, "history", "m3u8"), dir)?;
-    let (text, n) = m3u8(tracks);
+/// Writes `text` to a new `<dir>/<prefix>-YYYYmmdd-HHMMSS.<ext>` (never overwrites).
+fn write_text(dir: &Path, prefix: &str, ext: &str, text: &str) -> Result<PathBuf, String> {
+    let path = paths::at(paths::timestamped(dir, prefix, ext), dir)?;
+    write_to(&path, text)?;
+    Ok(path)
+}
+
+fn write_to(path: &Path, text: &str) -> Result<(), String> {
     let mut f = paths::at(
         std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(&path),
-        &path,
+            .open(path),
+        path,
     )?;
-    paths::at(f.write_all(text.as_bytes()), &path)?;
-    Ok((path, n))
+    paths::at(f.write_all(text.as_bytes()), path)
+}
+
+fn write_new(dir: &Path, tracks: &[Track]) -> Result<(PathBuf, usize), String> {
+    let (text, n) = m3u8(tracks);
+    Ok((write_text(dir, "history", "m3u8", &text)?, n))
+}
+
+/// One play of a set list: when it started (Unix seconds) and what the history row shows.
+struct Row {
+    at: i64,
+    title: String,
+    artist: String,
+    /// BPM × 100, 0 = unknown.
+    bpm: i64,
+    key: String,
+    length_s: i64,
+}
+
+fn clock(at: i64, seconds: bool) -> String {
+    chrono::DateTime::from_timestamp(at, 0)
+        .map(|d| {
+            d.with_timezone(&chrono::Local)
+                .format(if seconds { "%H:%M:%S" } else { "%H:%M" })
+                .to_string()
+        })
+        .unwrap_or_default()
+}
+
+fn csv_cell(s: &str) -> String {
+    if s.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", s.replace('"', "\"\""))
+    } else {
+        s.to_owned()
+    }
+}
+
+/// `position,start,title,artist,bpm,key,length`, one line per play. The history records when a track reached the on-air
+/// threshold, not how long it then played, so the last column is the track's length (empty when unknown).
+fn set_list_csv(rows: &[Row]) -> String {
+    let mut out = String::from("position,start,title,artist,bpm,key,length\n");
+    for (i, r) in rows.iter().enumerate() {
+        let bpm = if r.bpm > 0 { format!("{:.2}", r.bpm as f64 / 100.0) } else { String::new() };
+        let length = if r.length_s > 0 { format!("{}:{:02}", r.length_s / 60, r.length_s % 60) } else { String::new() };
+        out += &format!(
+            "{},{},{},{},{},{},{}\n",
+            i + 1,
+            clock(r.at, true),
+            csv_cell(&r.title),
+            csv_cell(&r.artist),
+            bpm,
+            csv_cell(&r.key),
+            length
+        );
+    }
+    out
+}
+
+/// `HH:MM  Artist - Title` per play, the shape of a track list pasted into a post (no artist: just the title).
+fn set_list_txt(rows: &[Row]) -> String {
+    let flat = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut out = String::new();
+    for r in rows {
+        let (artist, title) = (flat(&r.artist), flat(&r.title));
+        let name = if artist.is_empty() { title } else { format!("{artist} - {title}") };
+        out += &format!("{}  {name}\n", clock(r.at, false));
+    }
+    out
+}
+
+/// The set list in the format of the file name extension (`csv` or `txt`); `None` for any other.
+fn set_list(rows: &[Row], ext: &str) -> Option<String> {
+    match ext {
+        "csv" => Some(set_list_csv(rows)),
+        "txt" => Some(set_list_txt(rows)),
+        _ => None,
+    }
+}
+
+fn write_set_list(dir: &Path, rows: &[Row]) -> Result<(PathBuf, PathBuf), String> {
+    let csv = paths::at(paths::timestamped(dir, "setlist", "csv"), dir)?;
+    let txt = csv.with_extension("txt");
+    for p in [&csv, &txt] {
+        let ext = p.extension().and_then(|e| e.to_str()).unwrap_or_default();
+        write_to(p, &set_list(rows, ext).ok_or_else(|| format!("{}: unknown format", p.display()))?)?;
+    }
+    Ok((csv, txt))
+}
+
+/// SAVE SET LIST: the stored day or the session history on screen, as `setlist-YYYYmmdd-HHMMSS.csv` and `.txt` in the
+/// export folder (never overwrites). Returns both paths.
+pub(super) fn save_set_list(v: &mut View) -> Result<(PathBuf, PathBuf), String> {
+    let plays: Vec<(Track, i64)> = match v.home.clone() {
+        Home::Day(day) => v.day_plays(&day)?,
+        Home::History => v.history.iter().cloned().zip(v.history_at.iter().copied()).collect(),
+        _ => return Err(tr!("open the Session history or a day of History first").into()),
+    };
+    if plays.is_empty() {
+        return Err(tr!("this list is empty").into());
+    }
+    let rows: Vec<Row> = plays
+        .into_iter()
+        .map(|(t, at)| {
+            let (bpm, key) = bpm_key(&t);
+            Row { at, title: t.title, artist: t.artist, bpm, key, length_s: t.length_s }
+        })
+        .collect();
+    write_set_list(
+        &paths::output_dir("OPENFADER_EXPORT_DIR").ok_or(tr!("set OPENFADER_EXPORT_DIR or HOME"))?,
+        &rows,
+    )
 }
 
 /// Writes `<$OPENFADER_EXPORT_DIR | …>/history-YYYYmmdd-HHMMSS.m3u8` (never overwrites). Returns the path and the track count.
@@ -253,6 +369,48 @@ mod tests {
             "#EXTM3U\n#EXTINF:200,A - One\n/m/one.mp3\n#EXTINF:-1,Two lines\n/m/two.flac\n"
         );
         assert_eq!(m3u8(&[]), ("#EXTM3U\n".to_owned(), 0));
+    }
+
+    fn row(at: i64, title: &str, artist: &str, bpm: i64, key: &str, length_s: i64) -> Row {
+        Row { at, title: title.into(), artist: artist.into(), bpm, key: key.into(), length_s }
+    }
+
+    fn at(h: u32, m: u32, s: u32) -> i64 {
+        use chrono::TimeZone;
+        chrono::Local.with_ymd_and_hms(2026, 10, 25, h, m, s).unwrap().timestamp()
+    }
+
+    #[test]
+    fn set_list_csv_escapes_and_leaves_unknowns_empty() {
+        let rows = [
+            row(at(21, 5, 9), "Hello, \"World\"", "A", 12850, "8A", 245),
+            row(at(21, 9, 0), "Two\nlines", "", 0, "", 0),
+        ];
+        assert_eq!(
+            set_list(&rows, "csv").unwrap(),
+            "position,start,title,artist,bpm,key,length\n\
+             1,21:05:09,\"Hello, \"\"World\"\"\",A,128.50,8A,4:05\n\
+             2,21:09:00,\"Two\nlines\",,,,\n"
+        );
+    }
+
+    #[test]
+    fn set_list_txt_is_clock_artist_dash_title() {
+        let rows = [
+            row(at(9, 7, 59), "One", "A", 0, "", 0),
+            row(at(23, 0, 0), "Two\nlines", "", 0, "", 0),
+        ];
+        assert_eq!(set_list(&rows, "txt").unwrap(), "09:07  A - One\n23:00  Two lines\n");
+        assert_eq!(set_list(&rows, "mp3"), None);
+    }
+
+    #[test]
+    fn set_list_saves_both_formats_side_by_side() {
+        let dir = std::env::temp_dir().join(format!("openfader-setlist-{}", std::process::id()));
+        let (csv, txt) = write_set_list(&dir, &[row(at(1, 2, 3), "One", "A", 0, "", 0)]).unwrap();
+        assert_eq!(csv.with_extension(""), txt.with_extension(""));
+        assert_eq!(std::fs::read_to_string(&txt).unwrap(), "01:02  A - One\n");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

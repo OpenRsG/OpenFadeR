@@ -1,7 +1,10 @@
 //! The welcome window ↔ ui/welcome.slint (`WelcomeState`): at the first start (prefs key `welcomed`) and from Help > Welcome.
 //! It offers what is off of the suggested set: every plugin found whose manifest names software it makes the app
-//! compatible with (`suggest`, [`openfader::plugin::Manifest::suggest`]), and STEMS. ACCEPT switches them on (plugins with
-//! effects or libraries load at the next start: RESTART NOW), SKIP leaves everything as it is.
+//! compatible with (`suggest`, [`openfader::plugin::Manifest::suggest`]), and STEMS. ACCEPT switches on what the window shows
+//! (plugins with effects or libraries load at the next start: RESTART NOW), SKIP leaves everything as it is.
+//!
+//! [`offer`] opens the same window with only the extensions that read what a plugged-in device holds (found by
+//! [`plugins::suggest`]).
 use super::{plugins, prefs, App, SuggestView, WelcomeState};
 use openfader::plugin::{config, current, Manifest, Plugin};
 use openfader::stems::model;
@@ -33,20 +36,47 @@ fn kind(m: &Manifest) -> &'static str {
     }
 }
 
+fn view(p: &Plugin) -> SuggestView {
+    SuggestView {
+        name: p.manifest.name.as_str().into(),
+        kind: kind(&p.manifest).into(),
+        description: p.tr(&p.manifest.description).into(),
+    }
+}
+
+/// Shows the window with `views` under `intro`.
+fn open(app: &App, views: Vec<SuggestView>, intro: &str) {
+    let s = app.global::<WelcomeState>();
+    s.set_intro(intro.into());
+    s.set_plugins(ModelRc::new(VecModel::from(views)));
+    s.set_done("".into());
+    s.set_restart(false);
+    s.set_visible(true);
+}
+
+/// Whether the window is up (the first start, Help > Welcome, or an [`offer`]).
+pub fn visible(app: &App) -> bool {
+    app.global::<WelcomeState>().get_visible()
+}
+
+/// Opens the window with just `plugins`, the extensions that read what the device `device` holds; ACCEPT switches them on.
+pub fn offer(app: &App, device: &str, plugins: &[Plugin]) {
+    let intro = tr_n!(
+        "{} holds a library written by other DJ software. This extension reads it; it stays off until you switch it on.",
+        "{} holds libraries written by other DJ software. These extensions read them; they stay off until you switch them on.",
+        plugins.len(),
+        device
+    );
+    open(app, plugins.iter().map(view).collect(), &intro);
+}
+
 /// Fills and shows the window.
 pub fn show(app: &App) {
     let off = offered();
     let mut targets: Vec<&str> = off.iter().map(|p| p.manifest.suggest.as_str()).collect();
     targets.sort_unstable();
     targets.dedup();
-    let mut views: Vec<SuggestView> = off
-        .iter()
-        .map(|p| SuggestView {
-            name: p.manifest.name.as_str().into(),
-            kind: kind(&p.manifest).into(),
-            description: p.tr(&p.manifest.description).into(),
-        })
-        .collect();
+    let mut views: Vec<SuggestView> = off.iter().map(view).collect();
     if !prefs::with(|p| p.stems) {
         views.push(SuggestView {
             name: STEMS.into(),
@@ -66,12 +96,7 @@ pub fn show(app: &App) {
             targets.join(&tr!(" and "))
         )
     };
-    let s = app.global::<WelcomeState>();
-    s.set_intro(tr!("{} They stay off until you switch them on.", intro).into());
-    s.set_plugins(ModelRc::new(VecModel::from(views)));
-    s.set_done("".into());
-    s.set_restart(false);
-    s.set_visible(true);
+    open(app, views, &tr!("{} They stay off until you switch them on.", intro));
 }
 
 /// Remembers that the window was seen, so it does not open at the next start.
@@ -87,9 +112,10 @@ fn close(app: &App) {
 }
 
 fn accept(app: &App) {
-    let names: Vec<String> = offered().into_iter().map(|p| p.manifest.name).collect();
     let s = app.global::<WelcomeState>();
-    let stems = s.get_plugins().iter().any(|v| v.name == STEMS);
+    let shown: Vec<String> = s.get_plugins().iter().map(|v| v.name.to_string()).collect();
+    let stems = shown.iter().any(|n| n == STEMS);
+    let names: Vec<String> = shown.into_iter().filter(|n| n != STEMS).collect();
     let mut done = Vec::new();
     if !names.is_empty() {
         match config::update(|c| names.iter().for_each(|n| c.set_enabled(n, true))) {

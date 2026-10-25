@@ -54,7 +54,7 @@ fn grid(c: &mut Canvas, axis: &Axis, beats: &[Beat]) {
         return;
     };
     let beat_px = 6_000_000.0 / f64::from(first.bpm_x100) * axis.px_per_ms;
-    if beat_px * 4.0 < plan::MIN_BEAT_PX {
+    if beat_px * f64::from(super::super::grid::per_bar(beats)) < plan::MIN_BEAT_PX {
         return;
     }
     let bars_only = beat_px < plan::MIN_BEAT_PX;

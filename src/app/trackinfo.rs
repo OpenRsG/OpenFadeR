@@ -9,6 +9,7 @@ use openfader::{
 use slint::{Color, ComponentHandle, ModelRc, VecModel};
 use std::{
     cell::{Cell, RefCell},
+    collections::HashMap,
     path::Path,
     rc::Rc,
 };
@@ -25,6 +26,38 @@ thread_local! {
     static LISTENER: RefCell<Option<Box<dyn Fn(&Track)>>> = const { RefCell::new(None) };
     /// The library the panel reads the selected track's phrases from.
     static LIBRARY: RefCell<Option<Rc<dyn Library>>> = const { RefCell::new(None) };
+    /// What the library answered for the phrases of the tracks shown since the store last changed ([`phrases`]).
+    static LIBRARY_PHRASES: RefCell<Memo<Option<openfader::analysis::Phrases>>> = RefCell::default();
+}
+
+/// Answers by track key, valid for one store generation: the library's analysis (a plugin reads a file for it) is asked once per
+/// track until the store changes (a sync, an edit), not on every selection.
+struct Memo<T> {
+    generation: u64,
+    by_key: HashMap<String, T>,
+}
+
+impl<T> Default for Memo<T> {
+    fn default() -> Self {
+        Self {
+            generation: 0,
+            by_key: HashMap::new(),
+        }
+    }
+}
+
+impl<T: Clone> Memo<T> {
+    /// Tracks looked at between two store changes before the memo starts over (an arrow-key walk down a big list).
+    const MAX: usize = 512;
+
+    /// The answer for `key` in `generation`; `read` runs only when there is none yet.
+    fn get(&mut self, generation: u64, key: String, read: impl FnOnce() -> T) -> T {
+        if self.generation != generation || self.by_key.len() >= Self::MAX {
+            self.by_key.clear();
+            self.generation = generation;
+        }
+        self.by_key.entry(key).or_insert_with(read).clone()
+    }
 }
 
 /// The browser's library: where the panel finds the analysis of the track it shows.
@@ -284,10 +317,18 @@ fn display_track(app: &App, t: &Track) {
 
 /// "Phrases: High · 9" (mood, section count): the stored phrase edit, else the phrases the library's analysis of the track
 /// holds, else empty. An edit that deleted every phrase shows "Phrases: none".
-// ponytail: asks the library for the whole analysis (waveforms included) on every selection just to reach the phrases;
-// fine for a click, cache or add a phrases-only op if arrow-key browsing lags.
+///
+/// The library's answer is remembered per track while the store does not change ([`Memo`]); there is no phrases-only read in
+/// the plugin interface, so the first look at a track still reads its whole analysis.
 fn phrases(t: &Track, edit: Option<openfader::analysis::Phrases>) -> String {
-    let own = || LIBRARY.with_borrow(|l| l.as_ref()?.analysis(t)?.phrases);
+    let own = || {
+        let (store, key) = (store::global(), store::key(t));
+        LIBRARY_PHRASES.with_borrow_mut(|m| {
+            m.get(store.generation(), key, || {
+                LIBRARY.with_borrow(|l| l.as_ref()?.analysis(t)?.phrases)
+            })
+        })
+    };
     match edit.or_else(own) {
         Some(p) if p.list.is_empty() => tr!("Phrases: none").into(),
         Some(p) => tr!("Phrases: {} · {}", format!("{:?}", p.mood), p.list.len()),
@@ -301,4 +342,37 @@ fn stems(t: &Track) -> String {
         .as_deref()
         .and_then(openfader::audio::stemfile::read_info)
         .map_or_else(String::new, |i| tr!("Stem file: {}", i.label()).into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn memo_asks_once_per_track_until_the_store_changes() {
+        let mut m = Memo::<Option<u8>>::default();
+        let mut asked = 0;
+        let mut get = |m: &mut Memo<Option<u8>>, generation, key: &str| {
+            m.get(generation, key.into(), || {
+                asked += 1;
+                Some(asked)
+            })
+        };
+        assert_eq!(get(&mut m, 1, "a"), Some(1));
+        assert_eq!(get(&mut m, 1, "a"), Some(1));
+        assert_eq!(get(&mut m, 1, "b"), Some(2));
+        // The store changed: the same track is asked again.
+        assert_eq!(get(&mut m, 2, "a"), Some(3));
+        assert_eq!(get(&mut m, 2, "a"), Some(3));
+    }
+
+    #[test]
+    fn memo_starts_over_when_full() {
+        let mut m = Memo::<u32>::default();
+        for i in 0..Memo::<u32>::MAX {
+            m.get(1, i.to_string(), || 0);
+        }
+        assert_eq!(m.get(1, "again".into(), || 7), 7);
+        assert_eq!(m.by_key.len(), 1);
+    }
 }

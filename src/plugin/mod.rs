@@ -327,8 +327,9 @@ fn read_all() -> Registry {
         "OPENFADER_PLUGINS",
         "extension/plugin",
     ));
-    let mut cfg = config::get();
     let found: Vec<&str> = r.plugins.iter().map(|p| p.manifest.name.as_str()).collect();
+    config::seed(&found);
+    let mut cfg = config::get();
     if cfg.adopt(&found) {
         if let Err(e) = config::update(|c| *c = cfg.clone()) {
             eprintln!("plugin: {e}");

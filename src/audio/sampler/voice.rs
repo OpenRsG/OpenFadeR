@@ -115,7 +115,7 @@ impl Voice {
         let n = buf.len();
         for (i, out) in buf.iter_mut().enumerate() {
             let fr = if !stretched {
-                pcm.frame_at(self.pos)
+                pcm.frame_at_step(self.pos, step)
             } else if self.pos < frames as f64 {
                 Some(self.stretch.next(pcm, self.pos, step, lp))
             } else {

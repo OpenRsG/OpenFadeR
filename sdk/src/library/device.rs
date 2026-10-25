@@ -609,8 +609,10 @@ pub fn audio_slot(root: &Path, t: &super::Track) -> Result<(String, bool), Strin
 }
 
 /// [`audio_slot`], copying the audio there when the device does not hold it yet (through a temporary file flushed to the device
-/// before it is renamed, so a cut copy never looks whole). The bytes copied count in the job's progress
-/// ([`super::host::add_bytes`]); a cancel stops the copy and removes the part. Returns the relative path and whether it was
+/// before it is renamed, so a cut copy never looks whole). A file that is there with the size of the source counts as copied, so
+/// an export that was cut off resumes where it stopped, and `.part` files an earlier run left in the folder are removed first.
+/// The bytes copied count in the job's progress ([`super::host::add_bytes`]); a cancel stops the copy and removes the part; an
+/// input/output error (a USB link that resets) is tried once more after a pause. Returns the relative path and whether it was
 /// copied.
 pub fn place_audio(root: &Path, t: &super::Track) -> Result<(String, bool), String> {
     let (rel, there) = audio_slot(root, t)?;
@@ -622,9 +624,13 @@ pub fn place_audio(root: &Path, t: &super::Track) -> Result<(String, bool), Stri
     let err = |e: std::io::Error| format!("{}: {e}", dest.display());
     if let Some(dir) = dest.parent() {
         std::fs::create_dir_all(dir).map_err(err)?;
+        remove_parts(dir);
     }
-    copy_counted(src, &tmp)
-        .and_then(|()| std::fs::rename(&tmp, &dest).map_err(err))
+    retry_eio(EIO_PAUSE, || {
+        let mut counted = 0;
+        copy_counted(src, &tmp, &mut counted).inspect_err(|_| super::host::rewind_bytes(counted))
+    })
+    .and_then(|()| std::fs::rename(&tmp, &dest).map_err(err))
         .inspect_err(|_| drop(std::fs::remove_file(&tmp)))?;
     if let Some(dir) = dest.parent() {
         super::commit::sync_dir(dir);
@@ -632,8 +638,37 @@ pub fn place_audio(root: &Path, t: &super::Track) -> Result<(String, bool), Stri
     Ok((rel, true))
 }
 
-/// Copies `src` to a new `to` in 1 MiB blocks, counting them in the job's bytes, and flushes `to` to the device.
-fn copy_counted(src: &Path, to: &Path) -> Result<(), String> {
+/// How long a copy waits before it tries again after an input/output error: a USB link that resets is back after about a second.
+const EIO_PAUSE: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Runs `attempt`; when it fails with an input/output error (`os error 5`: the device lost its link mid-write) waits `pause` and
+/// runs it once more. Any other error, and a second one, is the answer.
+pub fn retry_eio<T>(
+    pause: std::time::Duration,
+    mut attempt: impl FnMut() -> Result<T, String>,
+) -> Result<T, String> {
+    match attempt() {
+        Err(e) if e.contains("(os error 5)") => {
+            std::thread::sleep(pause);
+            attempt()
+        }
+        r => r,
+    }
+}
+
+/// Removes the `*.part` files in `dir`: what a copy that a lost device cut off could not clean up.
+fn remove_parts(dir: &Path) {
+    for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        let p = e.path();
+        if p.extension().is_some_and(|x| x == "part") && p.is_file() {
+            let _ = std::fs::remove_file(p);
+        }
+    }
+}
+
+/// Copies `src` to a new `to` in 1 MiB blocks, counting them in the job's bytes (and in `counted`), and flushes `to` to the
+/// device.
+fn copy_counted(src: &Path, to: &Path, counted: &mut u64) -> Result<(), String> {
     use std::io::{Read, Write};
     fn at(p: &Path) -> impl Fn(std::io::Error) -> String + '_ {
         move |e| format!("{}: {e}", p.display())
@@ -647,6 +682,7 @@ fn copy_counted(src: &Path, to: &Path) -> Result<(), String> {
             break;
         }
         out.write_all(&buf[..n]).map_err(at(to))?;
+        *counted += n as u64;
         if super::host::add_bytes(n as u64) {
             return Err("cancelled".into());
         }

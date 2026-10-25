@@ -132,7 +132,7 @@ impl Voice {
         Voice { applied: 1.0 }
     }
 
-    /// Hands up to `n` frames of the playing track to `put(i, frame)` (linear resample to `dev_rate`, gain ramped
+    /// Hands up to `n` frames of the playing track to `put(i, frame)` (windowed-sinc resample to `dev_rate`, gain ramped
     /// from the last buffer's value). Calls `put` for no frame while stopped; stops at the end of the track.
     pub fn render(
         &mut self,
@@ -153,7 +153,7 @@ impl Voice {
         let mut pos = c.head(c.seek.swap(NO_SEEK, Relaxed));
         let step = pcm.rate as f64 / dev_rate as f64;
         for i in 0..n {
-            let Some(f) = pcm.frame_at(pos) else {
+            let Some(f) = pcm.frame_at_step(pos, step) else {
                 c.playing.store(false, Relaxed); // end of the track
                 break;
             };

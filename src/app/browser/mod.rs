@@ -207,7 +207,8 @@ struct View {
     rows: Rc<table::Rows>,
     sidebar: Rc<VecModel<TreeRow>>,
     panel_rows: Rc<VecModel<StandardListViewItem>>,
-    list: Rc<Vec<Track>>,
+    /// Shared with the library cache for the whole library ([`View::load`]), so a view change copies nothing.
+    list: Arc<Vec<Track>>,
     /// Visible row → index into `list`.
     shown: Vec<usize>,
     query: String,
@@ -225,6 +226,8 @@ struct View {
     tags: Vec<Track>,
     /// Session history, in play order (see [`history`]).
     history: Vec<Track>,
+    /// When each track of [`View::history`] reached the session threshold (Unix seconds), same order.
+    history_at: Vec<i64>,
     /// The track chosen in the table last.
     selected: Option<Track>,
     /// The selected rows (the chosen one is always among them).

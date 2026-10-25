@@ -125,7 +125,7 @@ impl Deck {
         if let Some((own, reference)) = self.phase_meter(&l.analysis.beats, pos) {
             row.phase_show = true;
             (row.phase_own, row.phase_ref) = (own as f32, reference as f32);
-            row.phase_off = super::tick::phase_offset(own, reference) as f32;
+            row.phase_off = super::tick::phase_offset(own, reference, f64::from(super::grid::per_bar(&l.analysis.beats))) as f32;
         }
         if self.scroll.row_data(self.index).as_ref() != Some(&row) {
             self.scroll.set_row_data(self.index, row);

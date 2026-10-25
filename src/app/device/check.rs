@@ -740,8 +740,12 @@ impl Fix {
     }
 }
 
+/// How long a copy waits before it tries again after an input/output error: a USB link that resets is back after about a second.
+const EIO_PAUSE: std::time::Duration = std::time::Duration::from_secs(2);
+
 /// Copies `src` to `to`, which does not exist: into a `.part` file that is flushed to the stick, checked against the source's
-/// size and renamed, so a copy that is cut short never looks whole. The bytes count in the job's progress.
+/// size and renamed, so a copy that is cut short never looks whole. The bytes count in the job's progress. An input/output error
+/// (a USB link that resets) is tried once more after a pause.
 pub(super) fn copy_audio(src: &Path, to: &Path, ctl: &Control) -> Result<(), String> {
     use std::io::{Read, Write};
     let err = |p: &Path| {
@@ -775,7 +779,12 @@ pub(super) fn copy_audio(src: &Path, to: &Path, ctl: &Control) -> Result<(), Str
         }
         std::fs::rename(&tmp, to).map_err(err(to))
     };
-    copy().inspect_err(|_| drop(std::fs::remove_file(&tmp)))?;
+    let counted = ctl.bytes_done.load(Relaxed);
+    openfader_plugin::library::retry_eio(EIO_PAUSE, || {
+        // A leftover part of a cut-off run is overwritten; the bytes of a failed try are taken back so the retry counts once.
+        copy().inspect_err(|_| ctl.bytes_done.store(counted, Relaxed))
+    })
+    .inspect_err(|_| drop(std::fs::remove_file(&tmp)))?;
     if let Some(dir) = to.parent() {
         commit::sync_dir(dir);
     }
@@ -909,6 +918,9 @@ mod tests {
         std::fs::create_dir_all(dir.join("src")).unwrap();
         std::fs::write(dir.join("src/a.mp3"), vec![7u8; 3_000_000]).unwrap();
         let ctl = Control::default();
+        // The part a run cut off by a lost device left is overwritten, not kept.
+        std::fs::create_dir_all(dir.join("stick/Contents/A/B")).unwrap();
+        std::fs::write(dir.join("stick/Contents/A/B/a.part"), b"half").unwrap();
         copy_audio(&dir.join("src/a.mp3"), &dir.join("stick/Contents/A/B/a.mp3"), &ctl).unwrap();
         assert_eq!(std::fs::read(dir.join("stick/Contents/A/B/a.mp3")).unwrap().len(), 3_000_000);
         assert_eq!(ctl.bytes_done.load(Relaxed), 3_000_000);

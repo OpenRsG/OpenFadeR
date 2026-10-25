@@ -42,6 +42,10 @@ pub struct Job {
     /// Analysed again because an update changed the analysis ([`super::stale`]): the cache entry is replaced, but a cue list
     /// the track has stays whatever the settings say, and no tag is written.
     pub refresh: bool,
+    /// The track came with cues of its own (an import): the cache entry is made, but CUE Analysis stores no cues, whatever
+    /// "Prohibit overwriting CUEs" says and whether the track has cues yet. The grid is never written here, and the key tag
+    /// only for a track the library gave no key.
+    pub keep_cues: bool,
     /// The library gave the track a key.
     pub library_key: bool,
     pub guide: Guide,
@@ -87,6 +91,7 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
         ..s.options.cue
     };
     let cues = !arrived
+        && !job.keep_cues
         && auto::for_analysis(beats, phrases.as_ref(), &cue_options, g.has_cues).is_some_and(|c| {
             match store.system(|| store_cues(store, &job.key, &c)) {
                 Ok(()) => true,
@@ -418,6 +423,7 @@ mod tests {
             key: format!("{path}|1"),
             explicit: false,
             refresh: false,
+            keep_cues: false,
             library_key: false,
             guide,
         }
@@ -554,6 +560,50 @@ mod tests {
         j.refresh = false;
         assert!(finish(&j, &analysed(), src(), &settings(false), &store).cues);
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn keep_cues_mode_never_stores_cues_and_leaves_the_grid_and_library_key_alone() {
+        let store = Store::in_memory().unwrap();
+        let mine = vec![openfader::analysis::Cue {
+            hot_cue: 1,
+            time_ms: 4_000,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        }];
+        let grid: Vec<Beat> = beats()
+            .into_iter()
+            .map(|b| Beat {
+                time_ms: b.time_ms + 70,
+                ..b
+            })
+            .collect();
+        for has_cues in [true, false] {
+            let mut j = job(
+                &format!("/m/kept{has_cues}.mp3"),
+                Guide {
+                    has_cues,
+                    ..Default::default()
+                },
+            );
+            j.keep_cues = true;
+            j.library_key = true;
+            if has_cues {
+                store.set_cues(&j.key, Some(&mine)).unwrap();
+                store.set_grid(&j.key, &grid, &beats()).unwrap();
+            }
+            // Overwriting CUEs is allowed and the key tag is asked for: this mode stores no cues and writes no tag over the library's key.
+            let out = finish(&j, &analysed(), src(), &settings(true), &store);
+            assert!(!out.cues && out.tag.is_none());
+            let edits = store.edits(&j.key).unwrap();
+            if has_cues {
+                assert_eq!(edits.cues, Some(mine.clone()));
+                assert_eq!(edits.grid, Some(grid.clone()));
+            } else {
+                assert!(edits.cues.is_none());
+            }
+        }
     }
 
     #[test]

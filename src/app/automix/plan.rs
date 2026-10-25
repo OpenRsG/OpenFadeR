@@ -1,6 +1,7 @@
 //! Automix planner: pure functions from two tracks' analysis to a transition. No audio, no UI.
 //!
-//! Bars are 4 beats (ponytail: 4/4 only) numbered from the grid's first downbeat (`bar_pos == 1`).
+//! Bars have the outgoing grid's own length (3 beats for a 3/4 grid, else 4; see `per_bar`), numbered from the grid's
+//! first downbeat (`bar_pos == 1`).
 //! - Mix-out point of the outgoing track: the start of its last `Outro` phrase (rounded to a bar) when
 //!   Analysis phrases exist, else `bars` bars before its last whole bar. If the track is already past that,
 //!   or [`plan`] is asked to mix `asap`, the next bar line after [`LEAD_MS`].
@@ -10,12 +11,11 @@
 //!
 //! The rules are our own design.
 
-use crate::app::deck::{beat_at, grid_bpm, ms_at};
+use crate::app::deck::{beat_at, grid::per_bar, grid_bpm, ms_at};
 use openfader::analysis::{Analysis, Beat, PhraseKind};
 
 /// Track time kept between "now" and the earliest mix-out point (the incoming deck needs a moment to start).
 const LEAD_MS: f64 = 150.0;
-const BEATS_PER_BAR: f64 = 4.0;
 /// Measured offsets beyond this are not an output-latency error but a different problem; leave them.
 const MAX_ALIGN_MS: f64 = 500.0;
 /// Offsets below this are within the measuring noise.
@@ -30,6 +30,8 @@ pub struct Plan {
     pub in_ms: f64,
     /// Fade length in bars of the outgoing grid (≤ the requested count).
     pub bars: u32,
+    /// Beats per bar of the outgoing grid.
+    pub per_bar: u32,
     /// Fade length on the outgoing track's timeline (so wall time = this / outgoing rate).
     pub fade_ms: f64,
 }
@@ -48,7 +50,7 @@ pub(super) fn anchor(a: &Analysis) -> Option<f64> {
 }
 
 /// Bar index (from the first downbeat `d0`) of the last `Outro` phrase's start.
-fn outro_bar(a: &Analysis, d0: f64) -> Option<f64> {
+fn outro_bar(a: &Analysis, d0: f64, per: f64) -> Option<f64> {
     let p = a
         .phrases
         .as_ref()?
@@ -56,7 +58,14 @@ fn outro_bar(a: &Analysis, d0: f64) -> Option<f64> {
         .iter()
         .rev()
         .find(|p| p.kind == PhraseKind::Outro)?;
-    Some(((beat_at(&a.beats, p.span_ms(&a.beats).0)? - d0) / BEATS_PER_BAR).round())
+    Some(((beat_at(&a.beats, p.span_ms(&a.beats).0)? - d0) / per).round())
+}
+
+impl Plan {
+    /// Fade length in beats of the outgoing grid.
+    pub fn beats(&self) -> f64 {
+        f64::from(self.bars * self.per_bar)
+    }
 }
 
 /// Plans a mix of `inc` into `out` (`out_dur` ms long). `from_ms` is where `out` plays now; the mix
@@ -74,11 +83,12 @@ pub fn plan(
     grid_bpm(ob)?;
     grid_bpm(&inc.beats)?;
     let d0 = first_downbeat(ob);
-    let bar_of = |ms: f64| beat_at(ob, ms).map(|b| (b - d0) / BEATS_PER_BAR);
+    let per = f64::from(per_bar(ob));
+    let bar_of = |ms: f64| beat_at(ob, ms).map(|b| (b - d0) / per);
     let end_bar = bar_of(out_dur as f64)?.floor();
     let first_bar = bar_of(0.0)?.ceil(); // bars before the first beat's time are not on the track
     let earliest = bar_of(from_ms + LEAD_MS)?.ceil();
-    let ideal = outro_bar(out, d0)
+    let ideal = outro_bar(out, d0, per)
         .filter(|k| *k < end_bar)
         .unwrap_or(end_bar - bars as f64);
     let k = if asap { earliest } else { ideal.max(earliest) }.max(first_bar);
@@ -87,12 +97,13 @@ pub fn plan(
         return None;
     }
     let bars = (bars as f64).min(left) as u32;
-    let out_ms = ms_at(ob, d0 + BEATS_PER_BAR * k)?;
-    let fade_ms = ms_at(ob, d0 + BEATS_PER_BAR * (k + bars as f64))? - out_ms;
+    let out_ms = ms_at(ob, d0 + per * k)?;
+    let fade_ms = ms_at(ob, d0 + per * (k + bars as f64))? - out_ms;
     Some(Plan {
         out_ms,
         in_ms: anchor(inc)?,
         bars,
+        per_bar: per as u32,
         fade_ms,
     })
 }
@@ -144,9 +155,14 @@ mod tests {
 
     /// 120 BPM (500 ms beats), 4/4, first beat at `start` ms, `n` beats, first beat on bar position `first`.
     fn analysis(start: u32, n: u32, first: u16) -> Analysis {
+        in_bars_of(4, start, n, first)
+    }
+
+    /// [`analysis`] with `per` beats to the bar.
+    fn in_bars_of(per: u16, start: u32, n: u32, first: u16) -> Analysis {
         let beats = (0..n)
             .map(|i| Beat {
-                bar_pos: ((i as u16 + first - 1) % 4) + 1,
+                bar_pos: ((i as u16 + first - 1) % per) + 1,
                 bpm_x100: 12000,
                 time_ms: start + i * 500,
             })
@@ -225,6 +241,22 @@ mod tests {
     }
 
     #[test]
+    fn a_three_four_grid_counts_bars_of_three_beats() {
+        // 600 beats at 500 ms: 200 bars of 1500 ms; b's first downbeat is its 3rd beat
+        let (a, b) = (in_bars_of(3, 0, 600, 1), in_bars_of(3, 0, 600, 2));
+        let p = plan(&a, DUR, &b, 8, 0.0, false).unwrap();
+        assert_eq!((p.out_ms, p.bars, p.per_bar), (192.0 * 1500.0, 8, 3));
+        assert_eq!((p.fade_ms, p.beats()), (12_000.0, 24.0));
+        assert_eq!(p.in_ms, 1000.0);
+        // the last Outro starts mid-bar (beat 561, 280000 ms): it rounds to bar 187 = 280500 ms
+        let a = with_phrases(a, vec![(1, 561, PhraseKind::Verse), (561, 601, PhraseKind::Outro)]);
+        assert_eq!(plan(&a, DUR, &b, 8, 0.0, false).unwrap().out_ms, 187.0 * 1500.0);
+        // the same tracks in 4/4 keep bars of four
+        let q = plan(&analysis(0, 600, 1), DUR, &b, 8, 0.0, false).unwrap();
+        assert_eq!((q.per_bar, q.beats()), (4, 32.0));
+    }
+
+    #[test]
     fn a_passed_mix_point_slides_to_the_next_bar_and_asap_does_too() {
         let (a, b) = (analysis(0, 600, 1), analysis(0, 600, 1));
         let ideal = plan(&a, DUR, &b, 16, 0.0, false).unwrap().out_ms;
@@ -265,6 +297,7 @@ mod tests {
             out_ms: 1000.0,
             in_ms: 500.0,
             bars: 8,
+            per_bar: 4,
             fade_ms: 16_000.0,
         };
         assert_eq!(expected_in(&p, 1000.0, 1.0, 1.0), 500.0);

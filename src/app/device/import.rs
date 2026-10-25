@@ -9,6 +9,9 @@
 //! already has holds other values than the device's, nothing is overwritten by itself: those tracks open the review dialog
 //! ([`update::row_of`], every track ticked), APPLY takes the device's values of the ticked ones, CANCEL keeps all of yours, and
 //! UNDO stays available.
+//!
+//! With Auto Analysis on, the new tracks are analysed: those that came with cues, or with BPM and key, only for the waveform and
+//! grid ([`analyze::request_keep_cues`]), so CUE Analysis never replaces the cues the device brought.
 
 use super::{check::copy_audio, toast, transfer::with_ctx, Ctx};
 use crate::app::{analyze, prefs};
@@ -134,10 +137,19 @@ impl Ctx {
                     Err(e) => cx.tell(e.clone(), true),
                 }
                 cx.reload_browser();
-                // Only what the device did not analyse: CUE Analysis would replace the cues it brought.
-                let todo: Vec<Track> = c.added.into_iter().filter(|t| t.bpm_x100 == 0 || t.key.is_empty()).collect();
-                if !todo.is_empty() && prefs::with(|p| p.analysis.auto_analysis) {
-                    analyze::request(&todo, false);
+                if prefs::with(|p| p.analysis.auto_analysis) {
+                    // What the device brought cues or BPM and key with is analysed for the waveform only: CUE Analysis would
+                    // replace the cues it brought.
+                    let (keep, todo): (Vec<Track>, Vec<Track>) = c.added.into_iter().partition(|t| {
+                        (t.bpm_x100 > 0 && !t.key.is_empty())
+                            || cx.store.edits(&cx.store.key_of(t)).is_ok_and(|e| e.cues.is_some_and(|cues| !cues.is_empty()))
+                    });
+                    if !todo.is_empty() {
+                        analyze::request(&todo, false);
+                    }
+                    if !keep.is_empty() {
+                        analyze::request_keep_cues(&keep);
+                    }
                 }
                 if !c.rows.is_empty() {
                     cx.open_update_review(&d, update::of_rows(c.rows), true);
