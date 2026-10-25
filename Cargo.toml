@@ -7,7 +7,7 @@ edition = "2024"
 # too. The companion checkouts and the Android project are separate workspaces.
 [workspace]
 members = ["crates/*"]
-exclude = ["extension", "mobile", "mappings"]
+exclude = ["extension", "mobile", "mappings", "vendor/cpal"]
 
 [workspace.dependencies]
 openfader-plugin = { path = "sdk", features = ["library"] }
@@ -137,3 +137,7 @@ lto = "fat"
 [profile.pi.package.openfader]
 codegen-units = 1
 strip = "symbols"
+
+# cpal 0.15.3, unchanged except ALSA Fixed buffers request two periods rather than four.
+[patch.crates-io]
+cpal = { path = "vendor/cpal" }

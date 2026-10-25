@@ -752,12 +752,16 @@ plugin's own settings; `config` the device's settings, key → text):
 **Several formats on one device.** Every device plugin is probed for every device. Those that hold a library there or `can_write`
 are its formats; the one holding a library with the most `features` reads it (browse, update, histories). The DEVICES tab of the
 device window lists them with their `title`, `about` and `options`: UNIVERSAL switches every format on, DEDICATED keeps the ticked
-ones (the EXPORT and SYNC MANAGER tabs show the same as chips). By default these are the ones already on the device, or all of them
-on an empty device, and the choice is kept per device. Each connected device also has a USB icon on the browser's left strip that
+ones (the EXPORT and SYNC MANAGER tabs show the same as chips). Blank targets start with all available formats; existing targets
+start with their held formats plus rekordbox. Explicit switches are saved per target; a typed folder has its own switches. Each connected device has a USB icon on the browser's left strip that
 opens this tab on it. The formats are written one after the other. The first copies the audio. Each
-later one gets the snapshot's tracks pointed at the files the first one's library lists, so every format shares one copy. A plugin
+later one gets the snapshot's tracks pointed at the files the first one's library lists, so formats can share the unchanged audio. A plugin
 that writes audio should place it with the SDK's `place_audio` (`Contents/<artist>/<album>/<file>`); then the formats agree even
 when the first one reads nothing back.
+
+Serato embeds cues and grids in audio tags. When existing padding is insufficient, it writes a private copy under
+`_Serato_/Audio` instead of growing the shared file. The `Contents` copy stays byte-identical to the source: collection matching
+and cue sync depend on its file name and size. Do not resize shared copies without preserving that identity contract.
 
 **Cue sync.** A track that is in the collection and on a device, same file name and size, has its cues, hot cues, loops, beat grid
 and phrases kept the same on both copies (PREFERENCES > DJ SYSTEM > DEVICE > CUE SYNC, on by default). This needs a device whose
@@ -787,7 +791,7 @@ playlist ticks when you change tabs. A playlist sent before the collection has l
 SYSTEM > DEVICE, "Show what an export will write before it starts"): the tracks to copy and the ones refreshed, the analyses run
 first, the time, what is left out and why, then START or CANCEL. A format whose plugin lists the `plan` feature answers the same
 `export` request with `options.dry_run` set (nothing is written; the answer's `plan` is the card); for any other format the app
-estimates from the audio files. The device holds one copy of each track, so its bytes count once whatever formats are written. The time
+estimates from the audio files. Shared audio counts once; required private copies for Serato tags count separately. The time
 uses the write speed measured on earlier jobs on that device (8 MB/s and 20 ms per small file until there is one). Every write job
 then finishes or undoes a change a pulled stick left (`commit::recover`), backs the library up (kept as an automatic backup, the last
 five per device) unless Preferences say otherwise, writes, and reports the plugins' read-back (`verified`). Its status line shows the

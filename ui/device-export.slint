@@ -26,7 +26,7 @@ component FormatChips inherits FormRow {
 /// copied and analysed, tracks it has are refreshed, same-named playlists replaced, everything else stays).
 export component ExportPage inherits VerticalLayout {
     spacing: Theme.space-lg;
-    Note { text: @tr("Writes the library, its analysis and the audio in every format that is on: several formats share one copy of each track, so the device works with any software. A library already on the device is extended, never wiped."); vertical-stretch: 0; }
+    Note { text: @tr("Writes the library, analysis and audio in the enabled formats. Audio is shared where possible; Serato may need a separate tagged copy. Existing libraries are extended, never wiped."); vertical-stretch: 0; }
     FormRow {
         label: @tr("DEVICE");
         vertical-stretch: 0;

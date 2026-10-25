@@ -5,6 +5,20 @@ use openfader_plugin::library::Track;
 use rusqlite::{Connection, OpenFlags};
 use std::path::Path;
 
+/// A read-only connection; an uncheckpointed WAL is read from a private copy, never beside the source media.
+pub struct ReadDb {
+    conn: Connection,
+    _snapshot: Option<tempfile::TempDir>, // dropped after the connection closes, including on Windows
+}
+
+impl std::ops::Deref for ReadDb {
+    type Target = Connection;
+
+    fn deref(&self) -> &Connection {
+        &self.conn
+    }
+}
+
 /// `path` as an SQLite `file:` URI with `?immutable=1`: SQLite then never creates `-shm`/`-wal`/
 /// `-journal` next to the file (library sources live on the user's USB stick and stay untouched).
 /// Only `%`, `?` and `#` need escaping in the path part (SQLite URI syntax).
@@ -22,19 +36,38 @@ pub fn immutable_uri(path: &Path) -> String {
     uri
 }
 
-/// Opens a SQLCipher database read-only and write-free (see [`immutable_uri`]; changes made by
-/// another process while we read are not seen); a wrong key fails here ("file is not a database").
-pub fn open_encrypted(path: &Path, key: &str) -> Result<Connection, String> {
+/// Opens SQLCipher without writing to the source. WAL databases are copied locally because `immutable=1` ignores the WAL.
+pub fn open_encrypted(path: &Path, key: &str) -> Result<ReadDb, String> {
+    let mut wal = path.as_os_str().to_owned();
+    wal.push("-wal");
+    let wal = std::path::PathBuf::from(wal);
+    let snapshot = if wal.is_file() {
+        let dir = crate::at(tempfile::tempdir(), path)?;
+        crate::at(std::fs::copy(path, dir.path().join("library.db")), path)?;
+        crate::at(std::fs::copy(&wal, dir.path().join("library.db-wal")), &wal)?;
+        Some(dir)
+    } else {
+        None
+    };
     let open = || -> rusqlite::Result<Connection> {
-        let conn = Connection::open_with_flags(
-            immutable_uri(path),
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
-        )?;
+        let conn = match &snapshot {
+            Some(dir) => Connection::open_with_flags(
+                dir.path().join("library.db"),
+                OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )?,
+            None => Connection::open_with_flags(
+                immutable_uri(path),
+                OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
+            )?,
+        };
         conn.pragma_update(None, "key", key)?;
         conn.query_row("select count(*) from sqlite_master", [], |_| Ok(()))?;
         Ok(conn)
     };
-    crate::at(open(), path)
+    Ok(ReadDb {
+        conn: crate::at(open(), path)?,
+        _snapshot: snapshot,
+    })
 }
 
 /// Runs `sql` and collects every row through `row`.

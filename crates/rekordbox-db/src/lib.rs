@@ -20,9 +20,9 @@ use rekordbox_common::{
     PathMap, anlz,
     list::{add_histories, analysis_ref, existing, history_raw},
     path_map, remap_path, setting,
-    sql::{open_encrypted, query, track_from_row},
+    sql::{ReadDb, open_encrypted, query, track_from_row},
 };
-use rusqlite::{Connection, params, params_from_iter};
+use rusqlite::{params, params_from_iter};
 use serde_json::Value;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -69,7 +69,7 @@ impl LibraryPlugin for MasterDb {
 }
 
 struct Db {
-    conn: Connection,
+    conn: ReadDb,
     /// `share/` folder that `AnalysisDataPath` is relative to.
     share: PathBuf,
     /// Remaps `FolderPath` prefixes written on another OS; empty = paths as stored.

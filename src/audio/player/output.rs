@@ -340,15 +340,14 @@ pub(super) fn choose() -> Result<Output, String> {
     let fmt = sup.sample_format();
     let mut cfg: StreamConfig = sup.config();
     let mut buffer = None;
-    if set.buffer > 0 {
+    if let Some(frames) = set.requested_buffer() {
         match *sup.buffer_size() {
-            SupportedBufferSize::Range { min, max } if (min..=max).contains(&set.buffer) => {
-                cfg.buffer_size = BufferSize::Fixed(set.buffer);
-                buffer = Some(set.buffer);
+            SupportedBufferSize::Range { min, max } if (min..=max).contains(&frames) => {
+                cfg.buffer_size = BufferSize::Fixed(frames);
+                buffer = Some(frames);
             }
             _ => notes.push(format!(
-                "a buffer of {} frames is outside what the device supports: automatic",
-                set.buffer
+                "a buffer of {frames} frames is outside what the device supports: driver default"
             )),
         }
     }

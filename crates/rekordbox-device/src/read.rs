@@ -10,7 +10,6 @@ use openfader_plugin::library::{Analysis, Probe, Source, Track};
 use rekordbox_common::{anlz, onelibrary_key};
 use serde_json::Value;
 use std::path::Path;
-use std::time::Duration;
 
 /// The library files below a device root.
 const PDB: &str = "PIONEER/rekordbox/export.pdb";
@@ -36,10 +35,6 @@ pub fn probe(path: &Path) -> Option<Probe> {
     })
 }
 
-/// How much older than `exportLibrary.db` an `export.pdb` may be and still come from the same export: FAT keeps times to 2 s,
-/// and an export writes the two files one after the other.
-const SAME_EXPORT: Duration = Duration::from_secs(10);
-
 /// The `export.pdb` library when it is as new as the OneLibrary (one export writes both, with the same tracks, playlists and
 /// cues): it needs no key derivation (about 70 ms). The OneLibrary (key: [`rekordbox_common::onelibrary_key`]) when it is the
 /// only library, the newer one (a player wrote to it since), or `export.pdb` cannot be read.
@@ -61,10 +56,15 @@ pub fn open(path: &Path, settings: &Value) -> Result<Box<dyn Source>, String> {
     }
 }
 
-/// Whether the `export.pdb` under `root` was written with or after its `exportLibrary.db` ([`SAME_EXPORT`]).
+/// Whether the Device Library is at least as new, with no OneLibrary WAL that may hold newer player edits.
 fn same_export(root: &Path) -> bool {
-    let at = |f: &str| std::fs::metadata(root.join(f)).and_then(|m| m.modified()).ok();
-    matches!((at(PDB), at(ONE)), (Some(pdb), Some(one)) if pdb + SAME_EXPORT >= one)
+    let at = |f: &str| {
+        std::fs::metadata(root.join(f))
+            .and_then(|m| m.modified())
+            .ok()
+    };
+    !root.join("PIONEER/rekordbox/exportLibrary.db-wal").exists()
+        && matches!((at(PDB), at(ONE)), (Some(pdb), Some(one)) if pdb >= one)
 }
 
 /// The analysis behind a track's `analysis_ref` (the absolute path of its `.DAT`).
@@ -81,6 +81,7 @@ fn analysis(track: &Track) -> Option<Analysis> {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::time::Duration;
 
     /// What both libraries of the device at `root` list, one line each (playlists, all tracks, each list's tracks, each
     /// track's cues), as `export.pdb` and as the OneLibrary. A cover is compared by its bytes: rekordbox writes each picture
@@ -155,12 +156,62 @@ mod tests {
         let kind = || open(&root, &json!({})).unwrap().kind();
         assert_eq!(kind(), "USB (Device Library)");
         // A player wrote to the OneLibrary since the export: it is the newer library.
-        let later = std::fs::metadata(root.join(PDB)).unwrap().modified().unwrap() + Duration::from_secs(60);
-        std::fs::File::options().write(true).open(root.join(ONE)).unwrap().set_modified(later).unwrap();
+        let later = std::fs::metadata(root.join(PDB))
+            .unwrap()
+            .modified()
+            .unwrap()
+            + Duration::from_secs(2);
+        std::fs::File::options()
+            .write(true)
+            .open(root.join(ONE))
+            .unwrap()
+            .set_modified(later)
+            .unwrap();
         assert_eq!(kind(), "USB (OneLibrary)");
         // export.pdb as new again but damaged: the OneLibrary.
         std::fs::File::options().write(true).open(root.join(PDB)).unwrap().set_modified(later).unwrap();
         assert_eq!(kind(), "USB (Device Library)");
+        let db = rusqlite::Connection::open(root.join(ONE)).unwrap();
+        db.pragma_update(None, "key", onelibrary_key(&json!({})))
+            .unwrap();
+        db.pragma_update(None, "journal_mode", "WAL").unwrap();
+        assert_eq!(db.execute(
+            "UPDATE content SET title = 'Updated on player' WHERE content_id = (SELECT min(content_id) FROM content)",
+            [],
+        ).unwrap(), 1);
+        let base = std::fs::metadata(root.join(ONE))
+            .unwrap()
+            .modified()
+            .unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(root.join(PDB))
+            .unwrap()
+            .set_modified(base)
+            .unwrap();
+        let source_files = [
+            ONE,
+            "PIONEER/rekordbox/exportLibrary.db-wal",
+            "PIONEER/rekordbox/exportLibrary.db-shm",
+        ];
+        let before = source_files.map(|file| std::fs::read(root.join(file)).unwrap());
+        let source = open(&root, &json!({})).unwrap();
+        assert_eq!(source.kind(), "USB (OneLibrary)");
+        assert!(
+            source
+                .tracks(None)
+                .unwrap()
+                .iter()
+                .any(|t| t.title == "Updated on player")
+        );
+        for (file, bytes) in source_files.into_iter().zip(before) {
+            assert_eq!(
+                std::fs::read(root.join(file)).unwrap(),
+                bytes,
+                "reader changed {file}"
+            );
+        }
+        drop(db);
         std::fs::write(root.join(PDB), b"x").unwrap();
         assert_eq!(kind(), "USB (OneLibrary)");
         let _ = std::fs::remove_dir_all(&dir); // cleanup: Windows may still hold a handle
@@ -174,8 +225,16 @@ mod tests {
             for (a, b) in pdb.iter().zip(&one) {
                 if a != b {
                     let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
-                    let at = a.iter().zip(&b).position(|(x, y)| x != y).unwrap_or(a.len().min(b.len()));
-                    let s = |v: &[char]| v[at.saturating_sub(150)..(at + 150).min(v.len())].iter().collect::<String>();
+                    let at = a
+                        .iter()
+                        .zip(&b)
+                        .position(|(x, y)| x != y)
+                        .unwrap_or(a.len().min(b.len()));
+                    let s = |v: &[char]| {
+                        v[at.saturating_sub(150)..(at + 150).min(v.len())]
+                            .iter()
+                            .collect::<String>()
+                    };
                     println!("{root}:\n PDB …{}\n ONE …{}", s(&a), s(&b));
                 }
             }

@@ -3,6 +3,7 @@
 //!
 //! | where | low-power mode |
 //! | --- | --- |
+//! | automatic audio buffer ([`super::audio`]) | driver default instead of the low-latency fixed buffer; explicit frame counts still win |
 //! | sampler ([`crate::app::sampler`]) | a slot keeps at most [`SAMPLER_SECS`] instead of 30 s (16 slots at 48 kHz stereo f32: 180 MB down to 60 MB) |
 //! | analysis workers ([`crate::app::analyze::workers`]) | at most [`ANALYSIS_WORKERS`] ([`analysis_workers`]); each worker holds a whole decoded track |
 //!

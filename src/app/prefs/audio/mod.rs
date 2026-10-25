@@ -172,6 +172,7 @@ impl Audio {
             device: self.output_device.clone(),
             rate: self.sample_rate,
             buffer: self.buffer_size,
+            driver_buffer: false,
             mixer: if self.mixer_mode == MixerMode::External {
                 Mixer::External
             } else {
@@ -243,11 +244,13 @@ fn pairs_of(caps: Option<&Caps>) -> (usize, usize) {
     (ch, route::pairs(ch).min(MAX_PAIRS))
 }
 
-fn buffer_in_use(p: &Prefs, st: &Status) -> u32 {
-    match (p.audio.buffer_size, st.buffer) {
-        (b, Some(_)) if b > 0 => b,
-        _ => audio::live_bus().map_or(0, |b| b.buffer_frames()),
-    }
+fn buffer_in_use(_p: &Prefs, st: &Status) -> u32 {
+    // A callback contains a period, not the full ALSA buffer. Unknown driver buffering must not be labelled as its size.
+    st.buffer.unwrap_or(0)
+}
+
+fn effective_settings(p: &Prefs) -> Settings {
+    Settings { driver_buffer: super::lowpower::on(p), ..p.audio.settings() }
 }
 
 pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
@@ -355,13 +358,13 @@ pub fn wire() {
     device::never_block_here(); // the page reads the lists the background refresh keeps (cards::sync)
     let ins = super::get().audio;
     mic::open(ins.mic_on, &ins.input_device, ins.mic_pair);
-    let last = Rc::new(RefCell::new(super::get().audio.settings()));
+    let last = Rc::new(RefCell::new(effective_settings(&super::get())));
     if let Err(e) = audio::configure(last.borrow().clone()) {
         eprintln!("prefs: audio: {e}");
     }
     super::on_change(move |p| {
         mic::open(p.audio.mic_on, &p.audio.input_device, p.audio.mic_pair); // device / pair are not stream knobs
-        let s = p.audio.settings();
+        let s = effective_settings(p);
         if s == *last.borrow() {
             return;
         }

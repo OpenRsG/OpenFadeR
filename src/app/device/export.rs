@@ -53,14 +53,14 @@ pub(super) fn refresh(cx: &Rc<Ctx>, count: bool) {
 }
 
 /// A playlist sent to EXPORT before the collection lists it (still loading): says so and looks again every half second, ticking
-/// it once it is there; gives up after about 10 s.
+/// it once it is there; stops retrying after about 10 s but keeps that selection required.
 fn wait_for(cx: &Rc<Ctx>, pre: Vec<String>) {
     let tries = cx.preselect_tries.get();
     if pre.is_empty() {
         return;
     }
     if tries >= 20 {
-        cx.preselect_tries.set(0);
+        *cx.preselect.borrow_mut() = pre;
         return cx.say(tr!("That playlist is not in the collection"), true);
     }
     if tries == 0 {
@@ -81,10 +81,16 @@ pub(super) fn wire(cx: &Rc<Ctx>, app: &App) {
     let s = app.global::<DeviceState>();
     let c = cx.clone();
     s.on_export_toggle(move |i| {
+        c.preselect.borrow_mut().clear();
+        c.preselect_tries.set(0);
         c.export.toggle(i as usize);
     });
     let c = cx.clone();
-    s.on_export_clear(move || c.export.clear());
+    s.on_export_clear(move || {
+        c.preselect.borrow_mut().clear();
+        c.preselect_tries.set(0);
+        c.export.clear();
+    });
     let c = cx.clone();
     s.on_folder_edited(move || {
         c.show_formats();
@@ -95,6 +101,7 @@ pub(super) fn wire(cx: &Rc<Ctx>, app: &App) {
     let c = cx.clone();
     s.on_export_playlists(move |id| {
         *c.preselect.borrow_mut() = vec![id.to_string()];
+        c.preselect_tries.set(0);
         c.with_state(|s| {
             s.set_tab(1);
             s.set_visible(true);
@@ -119,6 +126,9 @@ pub(super) fn say_target(cx: &Ctx) {
 
 fn start(cx: &Rc<Ctx>) {
     if !cx.preselect.borrow().is_empty() {
+        if cx.preselect_tries.get() >= 20 {
+            return cx.say(tr!("That playlist is not in the collection"), true);
+        }
         return cx.say(
             tr!("The collection is still loading: the playlist is ticked as soon as it is there"),
             false,
@@ -187,4 +197,52 @@ fn start(cx: &Rc<Ctx>) {
             )
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use openfader::library::{Library, Playlist, Track};
+
+    #[test]
+    fn a_timed_out_preselection_cannot_export_an_unrelated_playlist() {
+        struct Lists;
+        impl Library for Lists {
+            fn kind(&self) -> &str {
+                "late export fixture"
+            }
+            fn playlists(&self) -> Result<Vec<Playlist>, String> {
+                Ok(["intended", "unrelated"]
+                    .into_iter()
+                    .map(|id| Playlist {
+                        id: id.into(),
+                        name: id.into(),
+                        depth: 0,
+                        is_folder: false,
+                    })
+                    .collect())
+            }
+            fn tracks(&self, _: Option<&str>) -> Result<Vec<Track>, String> {
+                Ok(Vec::new())
+            }
+        }
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let lib: Rc<dyn Library> = Rc::new(Lists);
+        let decks = crate::app::deck::wire(&app, lib.clone(), Default::default());
+        let guard = super::super::wire(&app, lib, decks);
+        let cx = &guard._ctx;
+        let state = app.global::<DeviceState>();
+        state.set_visible(true);
+        state.set_tab(1);
+        cx.export.set_names(&["unrelated".into()], &|_| true);
+        cx.preselect_tries.set(20);
+        wait_for(cx, vec!["intended".into()]);
+        refresh(cx, false);
+        assert_eq!(cx.export.ticked(), ["intended"]);
+        wait_for(cx, vec!["missing".into()]);
+        state.invoke_export_clear();
+        assert!(cx.preselect.borrow().is_empty());
+        assert!(cx.export.ticked().is_empty());
+    }
 }

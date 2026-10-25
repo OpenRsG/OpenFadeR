@@ -67,8 +67,8 @@ mod wheel;
 mod wire;
 
 use super::{
-    deck::{Decks, DECKS, DECK_NAMES},
     App,
+    deck::{DECK_NAMES, DECKS, Decks},
 };
 use jog::Jog;
 use led::Leds;
@@ -476,12 +476,8 @@ mod tests {
         );
     }
 
-    /// Regression guard for the MIDI latency goal: `Midi::run` (what a decoded message costs once bound, on the UI
-    /// thread, including the engine's shared-state write) must stay cheap for every time-critical kind of control
-    /// (press, knob + soft takeover, jog, a mapped pad). Measured with a real `MIDILAT` virtual-ALSA-port run
-    /// (`examples/midi_latency.rs`, now removed): callback-to-UI p50 ~15-35 us, callback-to-engine p50 ~20-35 us on
-    /// this box; the occasional multi-ms p99 spikes traced to event-loop scheduling delay under heavy external CPU
-    /// contention (the dispatch itself, pinned here, is µs-scale). `#[ignore]`: prints with `--nocapture`.
+    /// UI-thread dispatch for loaded-deck transport, mapped pads and mixer controls.
+    /// Does not measure MIDI input delivery or sound-card output latency.
     #[test]
     #[ignore]
     fn bench_dispatch_latency() {
@@ -496,8 +492,33 @@ mod tests {
         let app = App::new().unwrap();
         let lib: Rc<dyn Library> =
             Rc::new(Own::new(std::sync::Arc::new(Store::in_memory().unwrap())));
-        let decks = crate::app::deck::wire(&app, lib, Default::default());
+        let decks = crate::app::deck::wire(&app, lib.clone(), Default::default());
         crate::app::mixer::wire(&app, decks.clone());
+        let file =
+            std::env::temp_dir().join(format!("openfader-midi-latency-{}.wav", std::process::id()));
+        openfader::audio::write_wav(
+            &file,
+            &openfader::audio::Pcm {
+                rate: 8000,
+                samples: vec![0.0; 8000 * 2 * 10],
+            },
+            8000,
+        )
+        .unwrap();
+        let deck = decks[0].clone();
+        deck.load(
+            &openfader::library::Track {
+                file: Some(file.clone()),
+                ..Default::default()
+            },
+            &*lib,
+        );
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !deck.ready() && Instant::now() < deadline {
+            slint::platform::update_timers_and_animations();
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert!(deck.ready(), "the benchmark must dispatch to a loaded deck");
         let guard = wire(&app, decks);
         let m = &guard.midi;
         let index = |name| ACTIONS.iter().position(|a| a.name == name).unwrap();
@@ -535,6 +556,12 @@ mod tests {
             let t = Instant::now();
             m.run(&app, ev, &play);
             ts.push(t.elapsed().as_nanos());
+            if i == 0 {
+                assert!(
+                    deck.playing(),
+                    "PLAY must reach the audio engine, not the unloaded-deck guard"
+                );
+            }
         }
         report("play", &mut ts);
 
@@ -594,5 +621,6 @@ mod tests {
             ts.push(t.elapsed().as_nanos());
         }
         report("eq-low", &mut ts);
+        std::fs::remove_file(file).unwrap();
     }
 }

@@ -9,16 +9,16 @@
 
 use super::super::bus::{self, Bus};
 use super::super::cue;
-use super::super::route::{self, EXTERNAL, Settings};
+use super::super::route::{self, Settings, EXTERNAL};
+use super::mix::{callback, Mix};
+use super::output::{self, choose, Output};
 use super::Shared;
-use super::mix::{Mix, callback};
-use super::output::{self, Output, choose};
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{FromSample, SizedSample, Stream};
 use std::cell::{Cell, RefCell};
 use std::rc::Weak;
-use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Arc;
 
 /// Mixer channels one stream carries.
 pub(super) const SLOTS: usize = bus::CHANNELS;
@@ -65,7 +65,7 @@ fn build(out: &Output, cfg: &cpal::StreamConfig, mix: Mix) -> Result<Stream, Str
 }
 
 /// A running stream on `out` rendering the channels `shared` through `bus`. A fixed buffer size the driver
-/// refuses is dropped (automatic buffer) and noted in `out.status`.
+/// refuses is dropped (driver default buffer) and noted in `out.status`.
 fn start(
     out: &mut Output,
     shared: &[Arc<Shared>; SLOTS],
@@ -79,7 +79,7 @@ fn start(
         Err(e) if matches!(cfg.buffer_size, cpal::BufferSize::Fixed(_)) => {
             out.cfg.buffer_size = cpal::BufferSize::Default;
             out.status.notes.push(format!(
-                "the driver refused the buffer size ({e}): automatic"
+                "the driver refused the buffer size ({e}): driver default"
             ));
             out.status.buffer = None;
             build(out, &out.cfg, mix_for(out, shared, bus))?
@@ -320,7 +320,9 @@ mod tests {
         let Some(name) = cpal::default_host()
             .output_devices()
             .ok()
-            .and_then(|mut d| d.find_map(|d| d.name().ok().filter(|n| n == "pipewire" || n == "pulse")))
+            .and_then(|mut d| {
+                d.find_map(|d| d.name().ok().filter(|n| n == "pipewire" || n == "pulse"))
+            })
         else {
             return; // no sound server: no device to find that is safe to open
         };
@@ -345,15 +347,43 @@ mod tests {
         assert_eq!((st.source, st.pending), ("system default", None));
         assert!(st.notes.iter().any(|n| n.contains("no such pcm")), "{:?}", st.notes);
     }
-    /// Two decks playing for `OF_XRUN_SECS` (60) on the `pipewire` PCM at `OF_XRUN_FRAMES` frames, to be watched from outside:
-    /// cpal's ALSA host recovers an underrun silently, so the count is the ERR column of `pw-top` for this process.
-    /// `PIPEWIRE_NODE=<null sink> OF_XRUN_FRAMES=256 cargo test --release --lib -- --ignored --nocapture bench_xruns`
+    /// Two decks on a private PipeWire server; inspect this process's ERR column with `pw-top` on that same server.
+    /// Requires `OPENFADER_OUTPUT_DEVICE=pipewire`, a non-default `PIPEWIRE_REMOTE` and a separate `PIPEWIRE_RUNTIME_DIR`.
     #[test]
-    #[ignore = "plays for a minute into a sound server"]
+    #[ignore = "requires a private PipeWire daemon with only a null sink"]
     fn bench_xruns() {
-        let env = |k: &str, d: u32| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
+        let remote = std::env::var("PIPEWIRE_REMOTE")
+            .expect("use a private PipeWire daemon, never the desktop server");
+        assert!(
+            !remote.is_empty() && remote != "pipewire-0",
+            "the desktop PipeWire server is not a test sink"
+        );
+        let runtime = std::env::var_os("PIPEWIRE_RUNTIME_DIR")
+            .expect("set a private PipeWire runtime directory");
+        assert_ne!(
+            Some(runtime),
+            std::env::var_os("XDG_RUNTIME_DIR"),
+            "do not use the desktop audio runtime"
+        );
+        assert_eq!(
+            std::env::var(bus::OUTPUT_ENV).as_deref(),
+            Ok("pipewire"),
+            "pin the output before opening any stream"
+        );
+        let env = |k: &str, d: u32| {
+            std::env::var(k)
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(d)
+        };
         let (frames, secs) = (env("OF_XRUN_FRAMES", 0), env("OF_XRUN_SECS", 60));
-        configure(Settings { device: "pipewire".into(), buffer: frames, ..Settings::default() }).unwrap();
+        configure(Settings {
+            device: "pipewire".into(),
+            buffer: frames,
+            driver_buffer: std::env::var_os("OF_XRUN_DRIVER").is_some(),
+            ..Settings::default()
+        })
+        .unwrap();
         let mut decks = [Player::new().unwrap(), Player::new().unwrap()];
         for (k, d) in decks.iter_mut().enumerate() {
             let hz = 220.0 * (k + 1) as f32;
@@ -367,7 +397,34 @@ mod tests {
             d.play();
         }
         let st = status();
-        eprintln!("xrun bench: {} frames asked, buffer {:?}, device {}, pid {}", frames, st.buffer, st.device, std::process::id());
-        std::thread::sleep(std::time::Duration::from_secs(secs.into()));
+        eprintln!(
+            "xrun bench: {} frames asked, buffer {:?}, device {}, pid {}",
+            frames,
+            st.buffer,
+            st.device,
+            std::process::id()
+        );
+        let mut latencies = Vec::with_capacity(secs as usize);
+        for _ in 0..secs {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            latencies.push(decks[0].output_latency_ms());
+        }
+        latencies.sort_by(f64::total_cmp);
+        eprintln!(
+            "xrun bench: ALSA callback-to-playback delay min/median/max {:.3}/{:.3}/{:.3} ms",
+            latencies[0],
+            latencies[latencies.len() / 2],
+            latencies[latencies.len() - 1]
+        );
+        eprintln!(
+            "xrun bench: callback {} frames, positions {} {} ms",
+            decks[0].bus().buffer_frames(),
+            decks[0].position_ms(),
+            decks[1].position_ms()
+        );
+        assert!(
+            decks.iter().all(|d| d.position_ms() > secs as f64 * 800.0),
+            "both decks must really play for the measurement"
+        );
     }
 }

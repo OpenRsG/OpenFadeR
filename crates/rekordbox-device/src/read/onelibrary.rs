@@ -16,8 +16,8 @@
 use super::{analysis, onelibrary_key, ONE};
 use openfader_plugin::library::{playlist_tree, Analysis, Playlist, PlaylistRow, Source, Track};
 use rekordbox_common::list::{add_histories, analysis_ref, existing, history_raw, under};
-use rekordbox_common::sql::{open_encrypted, query, track_from_row};
-use rusqlite::{params, Connection};
+use rekordbox_common::sql::{ReadDb, open_encrypted, query, track_from_row};
+use rusqlite::params;
 use std::collections::HashMap;
 use std::io::Read;
 use std::num::NonZeroU32;
@@ -80,7 +80,7 @@ impl OneLibrary {
         Ok(this)
     }
 
-    fn conn(&self) -> Result<Connection, String> {
+    fn conn(&self) -> Result<ReadDb, String> {
         let path = self.root.join(ONE);
         // a key given raw already is used as it is
         let raw = (!self.key.starts_with("x'")).then(|| raw_key(&path, &self.key)).flatten();
@@ -168,6 +168,7 @@ impl Source for OneLibrary {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rusqlite::Connection;
 
     /// Schema as observed in a real export (only the columns the queries read for `content`);
     /// the history rows are synthetic because the sample export has none.
