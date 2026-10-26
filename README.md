@@ -80,10 +80,16 @@ The playing deck leads the tempo. SYNC on the only playing deck keeps its tempo 
 
 For clearer waveforms, open PREFERENCES > VIEW > WAVEFORM. Set BEAT GRID to BOLD for outlined lines over the enlarged waveform, with wider downbeats that do not rely on colour alone. The whole-track overview keeps thin bar lines behind the audio in either setting, so track dynamics and phrases stay readable. Set HOT CUE MARKERS to LARGE for double-size flags and letters on the decks and browser previews (when preview cue markers are enabled). Memory cues are solid bars in the theme's memory-cue colour with an M flag, drawn over the grid and wider than a bold downbeat, and they grow with LARGE too. Both settings apply immediately and are saved; NORMAL keeps the original sizes.
 
-The same WAVEFORM section has RENDERER: AUTO (default), GPU or CPU. AUTO uses cached images composed by a hardware renderer;
-CPU retains the raster-overlay fallback. GPU also allows emulated OpenGL for diagnosis; without a graphics API it falls back
-to CPU. Changes apply while playing, without restarting or interrupting audio. The startup log identifies the graphics API,
-the OpenGL renderer and the waveform path. See [Raspberry Pi performance advice](docs/raspberry-pi.md#speed).
+The same WAVEFORM section has RENDERER: AUTO (default), GPU or CPU. AUTO uses cached image cropping when a hardware
+graphics API is available; CPU translates cached raster strips. Both paths keep the overview static and move small
+playhead/slip textures instead of copying the overview every tick. GPU also permits emulated OpenGL for diagnosis;
+without a graphics API it falls back to CPU. Changes apply while playing without restarting or interrupting audio.
+The startup log identifies the graphics API, OpenGL renderer and waveform path.
+
+If the default graphics backend fails before its first frame, the app retries once with Slint's native software renderer.
+Windowless startup has a two-second deadline so a deferred driver error cannot leave an invisible process running.
+An explicit `SLINT_BACKEND` selection is never replaced. Drawing rate is an upper bound: actual cadence also depends on
+the display, renderer and hardware, not a promise of zero physical latency. See [Raspberry Pi performance advice](docs/raspberry-pi.md#speed).
 
 PREFERENCES > AUDIO > BUFFER shows what AUTO requests: 512 frames on a full-power machine, or the driver's default in LOW-POWER MODE. An explicit frame count overrides either choice; a driver that refuses it falls back to its own buffer and reports that in the audio status. The Linux backend requests two periods per fixed buffer. Smaller buffers reduce output delay but can underrun under load: increase the buffer if audio crackles. Output-device lookup runs off the UI thread; the status shows a pending lookup and then the device actually in use. MIDI dispatch, drawing time and the sound card's output delay are separate costs, not zero physical latency.
 

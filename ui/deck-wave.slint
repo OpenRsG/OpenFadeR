@@ -265,7 +265,7 @@ export component DeckOverview inherits Rectangle {
         resized(w, h) => { DeckState.overview-resized(root.index, w, h); }
     }
     // Tiny physical-pixel textures reuse the CPU painter's marks, composed over a static overview.
-    if DeckState.waveform-gpu && root.loaded: Rectangle {
+    if root.loaded: Rectangle {
         if DeckState.scroll[root.index].overview-slip-x >= 0: Image {
             x: DeckState.scroll[root.index].overview-slip-x;
             source: DeckState.decks[root.index].overview-ghost;

@@ -363,7 +363,7 @@ msgid "Split Screen"
 msgstr "Geteilter Bildschirm"
 
 #: ui/app.slint:321
-#: src/app/prefs/view.rs:417
+#: src/app/prefs/view.rs:435
 msgid "Mixer"
 msgstr "Mixer"
 
@@ -385,7 +385,7 @@ msgstr "BEAT LAB"
 
 #: ui/app.slint:326
 #: ui/stage/library.slint:53
-#: src/app/prefs/view.rs:348
+#: src/app/prefs/view.rs:365
 msgid "Related Tracks"
 msgstr "Ähnliche Tracks"
 
@@ -1113,7 +1113,7 @@ msgid "Headphone preview: tap the waveform to seek"
 msgstr "Kopfhörer-Vorschau: Wellenform antippen zum Springen"
 
 #: ui/browser.slint:420
-#: src/app/prefs/view.rs:362
+#: src/app/prefs/view.rs:379
 msgid "Playlist Palette"
 msgstr "Playlist-Palette"
 
@@ -3012,7 +3012,7 @@ msgid "GREEN"
 msgstr "GRÜN"
 
 #: ui/lighting.slint:152
-#: src/app/prefs/view.rs:405
+#: src/app/prefs/view.rs:423
 #: src/app/prefs/view.rs:39
 msgid "BLUE"
 msgstr "BLAU"
@@ -3789,12 +3789,12 @@ msgid "VIDEO"
 msgstr "VIDEO"
 
 #: ui/stage/bar.slint:50
-#: src/app/prefs/view.rs:423
+#: src/app/prefs/view.rs:441
 msgid "2 DECKS"
 msgstr "2 DECKS"
 
 #: ui/stage/bar.slint:50
-#: src/app/prefs/view.rs:423
+#: src/app/prefs/view.rs:441
 msgid "4 DECKS"
 msgstr "4 DECKS"
 
@@ -3934,7 +3934,7 @@ msgid "SOUND COLOR FX"
 msgstr "SOUND-COLOR-FX"
 
 #: ui/stage/table.slint:139
-#: src/app/prefs/view.rs:315
+#: src/app/prefs/view.rs:331
 msgid "WAVEFORM"
 msgstr "WELLENFORM"
 
@@ -5772,7 +5772,7 @@ msgid "{}  ({}, {} free)"
 msgstr "{}  ({}, {} frei)"
 
 #: src/app/browser/sources.rs:77
-#: src/app/prefs/view.rs:355
+#: src/app/prefs/view.rs:372
 msgid "Explorer"
 msgstr "Explorer"
 
@@ -6569,12 +6569,12 @@ msgstr "MIX OUT: das laufende Deck wählen"
 msgid "MIX IN: pick a stopped deck"
 msgstr "MIX IN: ein gestopptes Deck wählen"
 
-#: src/app/deck/mod.rs:287
+#: src/app/deck/mod.rs:291
 #: src/app/deck/pads/mod.rs:459
 msgid "Select a track, then LOAD"
 msgstr "Track wählen, dann LOAD"
 
-#: src/app/deck/mod.rs:289
+#: src/app/deck/mod.rs:293
 msgid "audio disabled: {}"
 msgstr "Audio deaktiviert: {}"
 
@@ -10062,7 +10062,7 @@ msgstr "KEY-ERKENNUNG"
 
 #: src/app/prefs/analysis.rs:165
 #: src/app/prefs/analysis.rs:40
-#: src/app/prefs/view.rs:262
+#: src/app/prefs/view.rs:264
 msgid "CLASSIC"
 msgstr "KLASSISCH"
 
@@ -10102,7 +10102,7 @@ msgstr "CUE BEI ANALYSE SETZEN"
 
 #: src/app/prefs/analysis.rs:190
 #: src/app/prefs/analysis.rs:31
-#: src/app/prefs/view.rs:397
+#: src/app/prefs/view.rs:415
 msgid "MANUAL"
 msgstr "MANUELL"
 
@@ -11425,267 +11425,267 @@ msgstr "KONSTANT"
 msgid "KEY DISPLAY"
 msgstr "KEY-ANZEIGE"
 
-#: src/app/prefs/view.rs:262
+#: src/app/prefs/view.rs:263
 msgid "ALPHANUMERIC"
 msgstr "ALPHANUMERISCH"
 
-#: src/app/prefs/view.rs:262
+#: src/app/prefs/view.rs:265
 msgid "OPEN KEY"
 msgstr "OPEN KEY"
 
-#: src/app/prefs/view.rs:262
+#: src/app/prefs/view.rs:266
 #: src/app/prefs/view.rs:20
 msgid "DATABASE"
 msgstr "DATENBANK"
 
-#: src/app/prefs/view.rs:267
+#: src/app/prefs/view.rs:272
 msgid "DISPLAY TYPE"
 msgstr "ANZEIGETYP"
 
-#: src/app/prefs/view.rs:270
+#: src/app/prefs/view.rs:275
 msgid "LANGUAGE"
 msgstr "SPRACHE"
 
-#: src/app/prefs/view.rs:272
+#: src/app/prefs/view.rs:277
 #: src/app/prefs/view.rs:122
 msgid "SYSTEM"
 msgstr "SYSTEM"
 
-#: src/app/prefs/view.rs:283
+#: src/app/prefs/view.rs:288
 msgid "Tooltips"
 msgstr "Tooltips"
 
-#: src/app/prefs/view.rs:286
+#: src/app/prefs/view.rs:291
 msgid "TEMPO DECIMAL PLACES"
 msgstr "TEMPO-NACHKOMMASTELLEN"
 
-#: src/app/prefs/view.rs:292
+#: src/app/prefs/view.rs:297
 msgid "Tempo fader: + at the bottom"
 msgstr "Tempo-Fader: + unten"
 
-#: src/app/prefs/view.rs:295
+#: src/app/prefs/view.rs:300
 msgid "vertical faders only; a horizontal one keeps + at the right"
 msgstr "nur vertikale Fader; ein horizontaler behält + rechts"
 
-#: src/app/prefs/view.rs:296
+#: src/app/prefs/view.rs:303
 msgid "BROWSE"
 msgstr "BROWSER"
 
-#: src/app/prefs/view.rs:297
+#: src/app/prefs/view.rs:304
 msgid "FONT SIZE"
 msgstr "SCHRIFTGRÖSSE"
 
-#: src/app/prefs/view.rs:298
+#: src/app/prefs/view.rs:305
 msgid "Bold characters"
 msgstr "Fette Schrift"
 
-#: src/app/prefs/view.rs:299
+#: src/app/prefs/view.rs:306
 msgid "LINE SPACE"
 msgstr "ZEILENABSTAND"
 
-#: src/app/prefs/view.rs:302
+#: src/app/prefs/view.rs:309
 msgid "Show the selected track to the center"
 msgstr "Ausgewählten Track zentriert anzeigen"
 
-#: src/app/prefs/view.rs:305
+#: src/app/prefs/view.rs:314
 msgid "Coloring of played tracks"
 msgstr "Einfärbung gespielter Tracks"
 
-#: src/app/prefs/view.rs:308
+#: src/app/prefs/view.rs:319
 msgid "Reset the colour of played tracks when quitting"
 msgstr "Farbe gespielter Tracks beim Beenden zurücksetzen"
 
-#: src/app/prefs/view.rs:312
+#: src/app/prefs/view.rs:325
 msgid "PLAYED TRACKS"
 msgstr "GESPIELTE TRACKS"
 
-#: src/app/prefs/view.rs:312
+#: src/app/prefs/view.rs:326
 msgid "RESET NOW"
 msgstr "JETZT ZURÜCKSETZEN"
 
-#: src/app/prefs/view.rs:318
+#: src/app/prefs/view.rs:334
 msgid "RENDERER"
 msgstr "RENDERER"
 
-#: src/app/prefs/view.rs:319
+#: src/app/prefs/view.rs:335
 #: src/app/prefs/view.rs:61
 msgid "GPU"
 msgstr "GPU"
 
-#: src/app/prefs/view.rs:319
+#: src/app/prefs/view.rs:335
 #: src/app/prefs/view.rs:61
 msgid "CPU"
 msgstr "CPU"
 
-#: src/app/prefs/view.rs:322
+#: src/app/prefs/view.rs:338
 msgid "DRAWING RATE"
 msgstr "ZEICHENRATE"
 
-#: src/app/prefs/view.rs:322
+#: src/app/prefs/view.rs:338
 msgid "frames / s"
 msgstr "Bilder / s"
 
-#: src/app/prefs/view.rs:325
+#: src/app/prefs/view.rs:341
 msgid "OVERVIEW / PREVIEW"
 msgstr "ÜBERSICHT / VORSCHAU"
 
-#: src/app/prefs/view.rs:326
+#: src/app/prefs/view.rs:342
 #: src/app/prefs/view.rs:65
 msgid "FULL"
 msgstr "VOLL"
 
-#: src/app/prefs/view.rs:326
+#: src/app/prefs/view.rs:342
 #: src/app/prefs/view.rs:65
 msgid "HALF"
 msgstr "HALB"
 
-#: src/app/prefs/view.rs:329
+#: src/app/prefs/view.rs:345
 msgid "BEAT COUNT"
 msgstr "BEAT-ZÄHLUNG"
 
-#: src/app/prefs/view.rs:330
+#: src/app/prefs/view.rs:346
 msgid "BEAT GRID"
 msgstr "BEATGRID"
 
-#: src/app/prefs/view.rs:330
+#: src/app/prefs/view.rs:347
 msgid "Bold: thicker lines, wider downbeats"
 msgstr "Fett: dickere Linien, breitere Downbeats"
 
-#: src/app/prefs/view.rs:331
+#: src/app/prefs/view.rs:348
 msgid "HOT CUE MARKERS"
 msgstr "HOT-CUE-MARKER"
 
-#: src/app/prefs/view.rs:332
+#: src/app/prefs/view.rs:349
 msgid "Large: double-size flags and letters"
 msgstr "Groß: doppelt große Flaggen und Buchstaben"
 
-#: src/app/prefs/view.rs:333
+#: src/app/prefs/view.rs:350
 msgid "DECK NUMBER"
 msgstr "DECK-NUMMER"
 
-#: src/app/prefs/view.rs:334
+#: src/app/prefs/view.rs:351
 msgid "Position of the deck number on the waveforms"
 msgstr "Position der Deck-Nummer auf den Wellenformen"
 
-#: src/app/prefs/view.rs:337
+#: src/app/prefs/view.rs:354
 msgid "Click on the waveform for PLAY and CUE"
 msgstr "Klick auf die Wellenform für PLAY und CUE"
 
-#: src/app/prefs/view.rs:342
+#: src/app/prefs/view.rs:359
 msgid "JOG DISPLAY"
 msgstr "JOG-ANZEIGE"
 
-#: src/app/prefs/view.rs:343
+#: src/app/prefs/view.rs:360
 msgid "CUE / SLIP"
 msgstr "CUE / SLIP"
 
-#: src/app/prefs/view.rs:343
+#: src/app/prefs/view.rs:360
 msgid "HOT CUE COUNTDOWN"
 msgstr "HOT-CUE-COUNTDOWN"
 
-#: src/app/prefs/view.rs:346
+#: src/app/prefs/view.rs:363
 msgid "TRAFFIC LIGHT"
 msgstr "AMPEL"
 
-#: src/app/prefs/view.rs:347
+#: src/app/prefs/view.rs:364
 msgid "LAYOUT: MEDIA BROWSER"
 msgstr "LAYOUT: MEDIENBROWSER"
 
-#: src/app/prefs/view.rs:349
+#: src/app/prefs/view.rs:366
 msgid "Cue Bank"
 msgstr "CUE-Bank"
 
-#: src/app/prefs/view.rs:352
+#: src/app/prefs/view.rs:369
 msgid "Track Suggestion"
 msgstr "Track-Vorschlag"
 
-#: src/app/prefs/view.rs:356
+#: src/app/prefs/view.rs:373
 msgid "LAYOUT: BROWSER PANEL"
 msgstr "LAYOUT: BROWSER-PANEL"
 
-#: src/app/prefs/view.rs:359
+#: src/app/prefs/view.rs:376
 msgid "CUE Analysis Playlist"
 msgstr "CUE-Analyse-Playlist"
 
-#: src/app/prefs/view.rs:365
+#: src/app/prefs/view.rs:382
 msgid "Display Cue Markers on Preview"
 msgstr "CUE-Marker in der Vorschau anzeigen"
 
-#: src/app/prefs/view.rs:370
+#: src/app/prefs/view.rs:387
 msgid "Display All Tracks in the Playlists"
 msgstr "Alle Tracks in den Playlists anzeigen"
 
-#: src/app/prefs/view.rs:373
+#: src/app/prefs/view.rs:390
 msgid "LAYOUT: DECK"
 msgstr "LAYOUT: DECK"
 
-#: src/app/prefs/view.rs:374
+#: src/app/prefs/view.rs:391
 msgid "Display SYNC RATE"
 msgstr "SYNC RATE anzeigen"
 
-#: src/app/prefs/view.rs:377
+#: src/app/prefs/view.rs:394
 msgid "Phrase (Enlarged Waveform)"
 msgstr "Phrase (vergrößerte Wellenform)"
 
-#: src/app/prefs/view.rs:380
+#: src/app/prefs/view.rs:397
 msgid "Phrase (Full Waveform)"
 msgstr "Phrase (volle Wellenform)"
 
-#: src/app/prefs/view.rs:383
+#: src/app/prefs/view.rs:400
 msgid "Always show the types of phrases"
 msgstr "Phrasentypen immer anzeigen"
 
-#: src/app/prefs/view.rs:388
+#: src/app/prefs/view.rs:405
 msgid "Vocal (Enlarged Waveform)"
 msgstr "Vocal (vergrößerte Wellenform)"
 
-#: src/app/prefs/view.rs:391
+#: src/app/prefs/view.rs:408
 msgid "Vocal (Full Waveform)"
 msgstr "Vocal (volle Wellenform)"
 
-#: src/app/prefs/view.rs:392
+#: src/app/prefs/view.rs:409
 msgid "EFFECT PANEL"
 msgstr "EFFEKT-PANEL"
 
-#: src/app/prefs/view.rs:393
+#: src/app/prefs/view.rs:410
 msgid "ENLARGED WAVEFORMS"
 msgstr "VERGRÖSSERTE WELLENFORMEN"
 
-#: src/app/prefs/view.rs:393
+#: src/app/prefs/view.rs:411
 msgid "deck order, 4 decks"
 msgstr "Deck-Reihenfolge, 4 Decks"
 
-#: src/app/prefs/view.rs:396
+#: src/app/prefs/view.rs:414
 #: src/app/welcome.rs:33
 msgid "PAD MODE"
 msgstr "PAD-MODUS"
 
-#: src/app/prefs/view.rs:400
+#: src/app/prefs/view.rs:418
 msgid "COLOR"
 msgstr "FARBE"
 
-#: src/app/prefs/view.rs:404
+#: src/app/prefs/view.rs:422
 msgid "WAVEFORM COLOR"
 msgstr "WELLENFORMFARBE"
 
-#: src/app/prefs/view.rs:405
+#: src/app/prefs/view.rs:423
 msgid "3BAND"
 msgstr "3BAND"
 
-#: src/app/prefs/view.rs:405
+#: src/app/prefs/view.rs:423
 #: src/app/prefs/view.rs:39
 msgid "RGB"
 msgstr "RGB"
 
-#: src/app/prefs/view.rs:408
+#: src/app/prefs/view.rs:426
 msgid "HOT CUE COLOR"
 msgstr "HOT-CUE-FARBE"
 
-#: src/app/prefs/view.rs:409
+#: src/app/prefs/view.rs:427
 msgid "PAD FX COLOR"
 msgstr "PAD-FX-FARBE"
 
-#: src/app/prefs/view.rs:412
+#: src/app/prefs/view.rs:430
 msgid "SAMPLER COLOR"
 msgstr "SAMPLER-FARBE"
 
@@ -11699,29 +11699,29 @@ msgstr "SYNC MIT FREQUENZ"
 msgid "PURPLE"
 msgstr "VIOLETT"
 
-#: src/app/prefs/view.rs:416
+#: src/app/prefs/view.rs:434
 msgid "DECK LAYOUT"
 msgstr "DECK-LAYOUT"
 
-#: src/app/prefs/view.rs:416
+#: src/app/prefs/view.rs:434
 msgid "enlarged waveforms"
 msgstr "vergrößerte Wellenformen"
 
-#: src/app/prefs/view.rs:418
+#: src/app/prefs/view.rs:436
 msgid "EXPORT LAYOUT"
 msgstr "EXPORT-LAYOUT"
 
-#: src/app/prefs/view.rs:419
-#: src/app/prefs/view.rs:422
+#: src/app/prefs/view.rs:437
+#: src/app/prefs/view.rs:440
 msgid "DECKS"
 msgstr "DECKS"
 
-#: src/app/prefs/view.rs:436
-#: src/app/prefs/view.rs:438
+#: src/app/prefs/view.rs:454
+#: src/app/prefs/view.rs:456
 msgid "SKIN"
 msgstr "SKIN"
 
-#: src/app/prefs/view.rs:438
+#: src/app/prefs/view.rs:456
 msgid "see THEMES"
 msgstr "siehe THEMES"
 
@@ -11908,12 +11908,11 @@ msgstr "IT"
 msgid "NL"
 msgstr "NL"
 
-#: src/app/render/detail.rs:50
-#: src/app/render/detail.rs:54
+#: src/app/render/detail.rs:37
 msgid "{}.{}BARS"
 msgstr "{}.{}TAKTE"
 
-#: src/app/render/detail.rs:55
+#: src/app/render/detail.rs:38
 msgid "{}BEATS"
 msgstr "{}BEATS"
 

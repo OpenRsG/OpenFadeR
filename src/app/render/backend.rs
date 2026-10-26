@@ -1,12 +1,54 @@
 //! Waveform image composition uses Slint's renderer, never a second graphics context.
 //! AUTO rejects software GL implementations; GPU explicitly allows those for diagnosis.
-use crate::app::{App, DeckState, prefs::{self, view::WaveRenderer}};
+//! A default-renderer startup failure requests one clean restart with Slint's native software renderer.
+use crate::app::{
+    App, DeckState,
+    prefs::{self, view::WaveRenderer},
+};
 use slint::{ComponentHandle, GraphicsAPI};
-use std::cell::Cell;
+use std::{cell::Cell, time::Duration};
 
 thread_local! {
     static AVAILABLE: Cell<(bool, bool)> = const { Cell::new((false, false)) };
     static ENABLED: Cell<bool> = const { Cell::new(false) };
+    static FIRST_FRAME: Cell<bool> = const { Cell::new(false) };
+    static WINIT: Cell<bool> = const { Cell::new(false) };
+    static WINDOW_FAILED: Cell<bool> = const { Cell::new(false) };
+}
+
+pub fn select() -> Result<(), slint::PlatformError> {
+    slint::BackendSelector::new()
+        .with_winit_window_attributes_hook(|attributes| {
+            WINIT.set(true);
+            attributes
+        })
+        .select()
+}
+
+pub fn watch(app: &App) {
+    use slint::winit_030::WinitWindowAccessor;
+    if !WINIT.get() {
+        return;
+    }
+    let weak = app.as_weak();
+    // shortcut: windowless startup is limited to 2 s; remove when Slint propagates deferred creation failures.
+    slint::Timer::single_shot(Duration::from_secs(2), move || {
+        if let Some(app) = weak.upgrade()
+            && app.window().is_visible()
+            && !app.window().has_winit_window()
+        {
+            WINDOW_FAILED.set(true);
+            let _ = slint::quit_event_loop();
+        }
+    });
+}
+
+pub fn check_startup() -> Result<(), slint::PlatformError> {
+    if WINDOW_FAILED.get() {
+        Err("Graphics backend did not create a native window within 2 seconds".into())
+    } else {
+        Ok(())
+    }
 }
 
 fn software(name: &str) -> bool {
@@ -19,7 +61,30 @@ fn selected(mode: WaveRenderer, available: bool, hardware: bool) -> bool {
     available && (mode == WaveRenderer::Gpu || (mode == WaveRenderer::Auto && hardware))
 }
 
-pub fn gpu() -> bool { ENABLED.get() }
+pub fn gpu() -> bool {
+    ENABLED.get()
+}
+
+/// AfterRendering precedes presentation; leave startup retry available until the frame returns to the event loop.
+pub fn first_frame() {
+    slint::Timer::single_shot(Duration::ZERO, || FIRST_FRAME.set(true));
+}
+
+fn retry_allowed(backend: Option<&std::ffi::OsStr>, first_frame: bool) -> bool {
+    !first_frame && backend.is_none_or(|name| name.is_empty())
+}
+
+/// Slint cannot replace its platform after selection; retry through the app's clean process restart.
+pub fn retry_software(error: &slint::PlatformError) -> bool {
+    if !retry_allowed(
+        std::env::var_os("SLINT_BACKEND").as_deref(),
+        FIRST_FRAME.get(),
+    ) {
+        return false;
+    }
+    eprintln!("Slint startup failed: {error}; restarting once with SLINT_BACKEND=winit-software");
+    true
+}
 
 pub fn apply(app: &App) {
     let (available, hardware) = AVAILABLE.get();
@@ -51,8 +116,8 @@ pub fn setup(api: &GraphicsAPI, app: &App) {
             }
         }
         _ => {
-            eprintln!("Slint renderer: {api:?}");
-            true
+            eprintln!("Slint renderer: {api:?}; hardware capability unknown");
+            false
         }
     };
     AVAILABLE.set((true, hardware));
@@ -69,6 +134,35 @@ pub fn teardown() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn startup_retry_remains_available_until_the_rendered_frame_returns() {
+        crate::app::headless::init();
+        FIRST_FRAME.set(false);
+        first_frame();
+        assert!(retry_allowed(None, FIRST_FRAME.get()));
+        slint::platform::update_timers_and_animations();
+        assert!(!retry_allowed(None, FIRST_FRAME.get()));
+        FIRST_FRAME.set(false);
+    }
+
+    #[test]
+    fn startup_retry_preserves_explicit_selection_and_never_retries_after_a_frame() {
+        use std::ffi::OsStr;
+        assert!(retry_allowed(None, false));
+        assert!(retry_allowed(Some(OsStr::new("")), false));
+        for name in [
+            "winit",
+            "femtovg",
+            "winit-femtovg",
+            "software",
+            "winit-software",
+            "invalid",
+        ] {
+            assert!(!retry_allowed(Some(OsStr::new(name)), false), "{name}");
+        }
+        assert!(!retry_allowed(None, true));
+        assert!(!retry_allowed(Some(OsStr::new("")), true));
+    }
     #[test]
     fn teardown_discards_capabilities_without_accessing_a_window() {
         AVAILABLE.set((true, true));

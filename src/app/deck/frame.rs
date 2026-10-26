@@ -62,16 +62,13 @@ impl Deck {
             overview_slip_x: -1.0,
             ..Default::default()
         };
-        if render::backend::gpu() {
-            let ow = (self.overview_size.get().0 * scale).round() as usize;
-            if ow > 0 && l.duration_ms > 0 {
-                row.overview_x =
-                    (render::overview::playhead_x(ow, pos, l.duration_ms) - 1) as f32 / scale;
-                if let Some(slip) = self.with_player(|p| p.slip_position()).flatten() {
-                    row.overview_slip_x =
-                        render::overview::playhead_x(ow, slip * 1000.0, l.duration_ms) as f32
-                            / scale;
-                }
+        let ow = (self.overview_size.get().0 * scale).round() as usize;
+        if ow > 0 && l.duration_ms > 0 {
+            row.overview_x =
+                (render::overview::playhead_x(ow, pos, l.duration_ms) - 1) as f32 / scale;
+            if let Some(slip) = self.with_player(|p| p.slip_position()).flatten() {
+                row.overview_slip_x =
+                    render::overview::playhead_x(ow, slip * 1000.0, l.duration_ms) as f32 / scale;
             }
         }
         if w > 0 && h > 0 {
@@ -120,10 +117,17 @@ impl Deck {
             }
             if h >= 40 {
                 let mode = prefs::with(|p| p.view.beat_count);
-                row.beat_text =
-                    render::detail::beat_count_text(mode, &l.analysis.beats, &l.analysis.cues, pos)
-                        .unwrap_or_default()
-                        .into();
+                let value = render::detail::beat_count_value(
+                    mode,
+                    &l.analysis.beats,
+                    &l.analysis.cues,
+                    pos,
+                );
+                if l.beat_count != value {
+                    l.beat_count = value;
+                    l.beat_text = value.map(|v| v.text().into()).unwrap_or_default();
+                }
+                row.beat_text = l.beat_text.clone();
             }
         }
         if let Some((own, reference)) = self.phase_meter(&l.analysis.beats, pos) {
@@ -237,17 +241,49 @@ mod tests {
     use super::*;
 
     fn rig(count: usize) -> (App, Decks) {
-        use openfader::{analysis::{Analysis, Beat, Cue}, library::{Library, own::Own}, store::Store};
         use crate::app::deck::Loaded;
+        use openfader::{
+            analysis::{Analysis, Beat, Cue},
+            library::{Library, own::Own},
+            store::Store,
+        };
         crate::app::headless::init();
         let app = App::new().unwrap();
         let lib: Rc<dyn Library> = Rc::new(Own::new(std::sync::Arc::new(Store::in_memory().unwrap())));
         let decks = crate::app::deck::wire(&app, lib, Default::default());
         let a = Analysis {
-            beats: (0..360).map(|i| Beat { time_ms: i * 500, bar_pos: (i % 4 + 1) as u16, bpm_x100: 12000 }).collect(),
-            cues: vec![Cue { time_ms: 24000, hot_cue: 1, loop_end_ms: None, color: None, comment: None }],
-            three_band_detail: (0..27000).map(|i| [(i % 128) as u8, ((i * 7) % 128) as u8, ((i * 13) % 128) as u8]).collect(),
-            three_band_preview: (0..400).map(|i| [(i % 128) as u8, ((i * 7) % 128) as u8, ((i * 13) % 128) as u8]).collect(),
+            beats: (0..360)
+                .map(|i| Beat {
+                    time_ms: i * 500,
+                    bar_pos: (i % 4 + 1) as u16,
+                    bpm_x100: 12000,
+                })
+                .collect(),
+            cues: vec![Cue {
+                time_ms: 24000,
+                hot_cue: 1,
+                loop_end_ms: None,
+                color: None,
+                comment: None,
+            }],
+            three_band_detail: (0..27000)
+                .map(|i| {
+                    [
+                        (i % 128) as u8,
+                        ((i * 7) % 128) as u8,
+                        ((i * 13) % 128) as u8,
+                    ]
+                })
+                .collect(),
+            three_band_preview: (0..400)
+                .map(|i| {
+                    [
+                        (i % 128) as u8,
+                        ((i * 7) % 128) as u8,
+                        ((i * 13) % 128) as u8,
+                    ]
+                })
+                .collect(),
             ..Default::default()
         };
         for d in &decks {
@@ -279,8 +315,8 @@ mod tests {
     #[test]
     #[ignore = "10 s paced real-deck software rendering per case; --release --ignored --nocapture"]
     fn bench_waveform_ui_frames() {
-        use slint::{PhysicalSize, Rgb8Pixel};
         use openfader::audio::{Pcm, Track16};
+        use slint::{PhysicalSize, Rgb8Pixel};
         crate::app::headless::repaint_changes_only();
         let pcm = std::sync::Arc::new(Track16::from(Pcm { rate: 8000, samples: vec![0.0; 180 * 8000 * 2] }));
         let (app, decks) = rig(4);
@@ -327,7 +363,18 @@ mod tests {
                 let start = Instant::now();
                 let mut times = Vec::with_capacity(10 * fps as usize);
                 let mut updates = Vec::with_capacity(times.capacity());
-                let keys = || decks[..count].iter().map(|d| { let l = d.loaded.borrow(); (l.strip.as_ref().map(|s| s.start_ms.to_bits()), l.overview_key) }).collect::<Vec<_>>();
+                let keys = || {
+                    decks[..count]
+                        .iter()
+                        .map(|d| {
+                            let l = d.loaded.borrow();
+                            (
+                                l.strip.as_ref().map(|s| s.start_ms.to_bits()),
+                                l.overview_key,
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                };
                 let (mut strips, mut overviews) = (0, 0);
                 let mut areas = Vec::with_capacity(times.capacity());
                 for frame in 0..10 * fps {

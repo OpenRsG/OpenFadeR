@@ -369,10 +369,13 @@ impl Canvas {
     /// computed per pixel, which is the same value: the phrase band, a loop and the vocal band are tens of thousands of pixels.
     pub fn shade(&mut self, x0: i64, x1: i64, rows: Range<usize>, c: Rgb, cov: f32) {
         let (w, h) = (self.w, self.h);
-        let px = self.buf.make_mut_slice();
         let end = x1.clamp(0, w as i64) as usize;
         let xs = (x0.max(0) as usize).min(end)..end;
         let rows = rows.start..rows.end.min(h);
+        if xs.is_empty() || rows.is_empty() {
+            return;
+        }
+        let px = self.buf.make_mut_slice();
         if cov >= 1.0 {
             let solid = Rgba8Pixel::new(c[0], c[1], c[2], 255);
             for y in rows {
@@ -399,13 +402,20 @@ impl Canvas {
     /// `s` in the 5×7 [`font`] at integer `scale` with its top-left at (`x`, `y`); columns at or beyond `end` are not drawn.
     pub fn text(&mut self, mut x: i64, y: usize, s: &str, scale: usize, c: Rgb, end: i64) {
         let (c, w, h) = (Rgba8Pixel::new(c[0], c[1], c[2], 255), self.w, self.h);
+        let end = end.min(w as i64);
+        if y >= h || scale == 0 || x >= end || end <= 0 || s.is_empty() {
+            return;
+        }
         let px = self.buf.make_mut_slice();
         for ch in s.chars() {
+            if x >= end {
+                break;
+            }
             for (r, row) in font::glyph(ch).iter().flatten().enumerate() {
                 for k in (0..font::W).filter(|k| row >> (font::W - 1 - k) & 1 == 1) {
                     for (dx, dy) in (0..scale).flat_map(|dx| (0..scale).map(move |dy| (dx, dy))) {
                         let (cx, cy) = (x + (k * scale + dx) as i64, y + r * scale + dy);
-                        if (0..end.min(w as i64)).contains(&cx) && cy < h {
+                        if (0..end).contains(&cx) && cy < h {
                             px[cy * w + cx as usize] = c;
                         }
                     }
@@ -479,12 +489,9 @@ impl Wave {
         if e1 - e0 < 1.0 {
             // Entry i is centred at i + 0.5: interpolate between the two centres around the column centre.
             let c = (e0 + e1) / 2.0 - 0.5;
+            let left = c.floor();
             let at = |i: f64| self.layers[i.clamp(0.0, n - 1.0) as usize];
-            return Some(lerp(
-                &at(c.floor()),
-                &at(c.floor() + 1.0),
-                (c - c.floor()) as f32,
-            ));
+            return Some(lerp(&at(left), &at(left + 1.0), (c - left) as f32));
         }
         let (i0, i1) = (e0.floor().max(0.0) as usize, (e1.ceil().min(n)) as usize);
         let entries = &self.layers[i0..i1];
@@ -517,12 +524,12 @@ impl Wave {
         let (w, ch) = (c.w, c.h);
         let h = ch as f32;
         let px = c.buf.make_mut_slice();
+        let mut e0 = axis.ms(0.0) * self.per_ms;
         for x in 0..w {
-            let (e0, e1) = (
-                axis.ms(x as f64) * self.per_ms,
-                axis.ms(x as f64 + 1.0) * self.per_ms,
-            );
-            let Some(layers) = self.sample(e0, e1) else {
+            let e1 = axis.ms(x as f64 + 1.0) * self.per_ms;
+            let sampled = self.sample(e0, e1);
+            e0 = e1;
+            let Some(layers) = sampled else {
                 continue;
             };
             let mut spans: [Option<Span>; 3] = [None, None, None];
@@ -631,6 +638,16 @@ pub fn sources(mode: WaveColors) -> [Src; 3] {
 /// core where all three overlap (245,235,215). Per-band gains are 1. The [`CLASSIC_BANDS`] have fixed overlaps; a skin that
 /// changes a band gets the mean of the bands that overlap.
 pub fn three_band(p: &Palette, src: &[[u8; 3]]) -> Vec<Layers> {
+    if src.is_empty() {
+        return Vec::new();
+    }
+    // The byte's nonlinear height is palette-independent; evaluate its 256 values once, not once per track entry.
+    static HIGH: std::sync::LazyLock<[f32; 256]> = std::sync::LazyLock::new(|| {
+        std::array::from_fn(|hi| {
+            ((1.0 - (std::f32::consts::PI * hi as f32 / 128.0).cos()) / 2.0).min(1.0)
+        })
+    });
+    let high = &*HIGH;
     fn mean(cs: &[Rgb]) -> Rgb {
         std::array::from_fn(|i| {
             (cs.iter().map(|c| c[i] as u32).sum::<u32>() / cs.len() as u32) as u8
@@ -659,12 +676,7 @@ pub fn three_band(p: &Palette, src: &[[u8; 3]]) -> Vec<Layers> {
     };
     src.iter()
         .map(|&[lo, mid, hi]| {
-            let h = [
-                lo as f32 / 128.0,
-                mid as f32 / 128.0,
-                (1.0 - (std::f32::consts::PI * hi as f32 / 128.0).cos()) / 2.0,
-            ]
-            .map(|h| h.min(1.0));
+            let h = [lo as f32 / 128.0, mid as f32 / 128.0, high[hi as usize]].map(|h| h.min(1.0));
             let mut o = [0, 1, 2];
             o.sort_by(|&a, &b| h[b].total_cmp(&h[a]));
             // tallest alone, then the two tallest overlapped, then all three
@@ -732,6 +744,7 @@ pub fn playhead(c: &mut Canvas, x: i64) {
 }
 
 /// Slip ghost line: the shadow playhead, 1-px dashed cyan at column `x` (our choice).
+#[cfg(test)]
 pub fn slip_ghost(c: &mut Canvas, x: i64) {
     c.vline(x, (0..c.h).step_by(2), [60, 220, 255]);
 }
@@ -993,18 +1006,27 @@ mod tests {
             per_ms: 0.15,
         };
         // 0.75 px/ms upsamples (5 px per entry), 0.05 downsamples (3 entries per px).
-        for (px_per_ms, h, centered) in [(0.75, 37, true), (0.05, 23, false), (0.75, 8, true)] {
-            let axis = Axis {
-                start_ms: 123.4,
-                px_per_ms,
-            };
-            let (mut a, mut b) = (Canvas::new(300, h), Canvas::new(300, h));
-            draw_every_layer(&w, &mut a, &axis, centered);
-            w.draw(&mut b, &axis, centered);
-            assert!(
-                a.buf.as_slice() == b.buf.as_slice(),
-                "{px_per_ms} px/ms, {h} rows"
-            );
+        for (px_per_ms, h, centered) in [
+            (0.75, 37, true),
+            (0.05, 23, false),
+            (0.75, 8, true),
+            (0.15 - 1e-9, 37, true),
+            (0.15, 37, true),
+            (0.15 + 1e-9, 37, true),
+        ] {
+            for start_ms in [-2000.0, -6.6666666667, 0.0, 123.4, 2666.0] {
+                let axis = Axis {
+                    start_ms,
+                    px_per_ms,
+                };
+                let (mut a, mut b) = (Canvas::new(300, h), Canvas::new(300, h));
+                draw_every_layer(&w, &mut a, &axis, centered);
+                w.draw(&mut b, &axis, centered);
+                assert!(
+                    a.buf.as_slice() == b.buf.as_slice(),
+                    "{px_per_ms} px/ms, {h} rows, start {start_ms}"
+                );
+            }
         }
     }
 
@@ -1102,6 +1124,27 @@ mod tests {
     }
 
     #[test]
+    fn invisible_shades_and_text_leave_shared_pixels_untouched() {
+        let base = Canvas::new(4, 3);
+        for (x0, x1, rows) in [
+            (-4, 0, 0..3),
+            (4, 8, 0..3),
+            (3, 1, 0..3),
+            (0, 4, 3..8),
+            (0, 4, 2..1),
+        ] {
+            let mut c = base.clone();
+            c.shade(x0, x1, rows, [200; 3], 0.3);
+            assert_eq!(c.buf.as_slice().as_ptr(), base.buf.as_slice().as_ptr());
+        }
+        for (x, y, end) in [(4, 0, 4), (0, 3, 4), (-8, 0, 0)] {
+            let mut c = base.clone();
+            c.text(x, y, "INTRO 1", 1, [255; 3], end);
+            assert_eq!(c.buf.as_slice().as_ptr(), base.buf.as_slice().as_ptr());
+        }
+    }
+
+    #[test]
     fn extended_keeps_rows_and_appends_the_background() {
         let mut c = Canvas::new(2, 1);
         c.shade(0, 2, 0..1, [200, 0, 0], 1.0);
@@ -1117,6 +1160,28 @@ mod tests {
         Palette {
             band: CLASSIC_BANDS,
             ..Palette::DEFAULT
+        }
+    }
+
+    #[test]
+    fn three_band_lookup_preserves_every_byte_height_and_layer_order() {
+        let src: Vec<_> = (0..=255u8)
+            .map(|v| [v, v.wrapping_add(91), v.wrapping_add(173)])
+            .collect();
+        let actual = three_band(&classic(), &src);
+        for (&[lo, mid, hi], layers) in src.iter().zip(actual) {
+            let mut heights = [
+                lo as f32 / 128.0,
+                mid as f32 / 128.0,
+                (1.0 - (std::f32::consts::PI * hi as f32 / 128.0).cos()) / 2.0,
+            ]
+            .map(|h| h.min(1.0));
+            heights.sort_by(|a, b| b.total_cmp(a));
+            assert_eq!(
+                layers.map(|l| l.h.to_bits()),
+                heights.map(f32::to_bits),
+                "{lo}/{mid}/{hi}"
+            );
         }
     }
 

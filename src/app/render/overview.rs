@@ -7,9 +7,11 @@
 //! With the STEM waveform on (PREFS) and a part muted, the 3-band wave of the stems heard ([`wave_3band`]) replaces these.
 
 use super::{
-    cue_letter, hot_cue_rgb, mono_layers, phrase::phrase_band, playhead, slip_ghost, sources,
-    three_band, Axis, Canvas, Col, Layers, Palette, Src, Wave,
+    Axis, Canvas, Col, Layers, Palette, Src, Wave, cue_letter, hot_cue_rgb, mono_layers,
+    phrase::phrase_band, sources, three_band,
 };
+#[cfg(test)]
+use super::{playhead, slip_ghost};
 use crate::app::prefs::{
     self,
     view::{CueMarkers, OverviewSize},
@@ -78,8 +80,8 @@ fn axis(w: usize, duration_ms: u32) -> Axis {
     }
 }
 
-/// Static layer at `w`×`h` physical pixels; [`with_playhead`] adds the moving part. The bottom 14/50 of the
-/// rows are the phrase strip (Theme.h-phrase of h-overview + h-phrase), the wave fills the rest.
+/// Static layer at `w`×`h` physical pixels; [`composed`] supplies its cached cue and separate moving markers for either renderer.
+/// The bottom 14/50 of the rows are the phrase strip (Theme.h-phrase of h-overview + h-phrase), the wave fills the rest.
 pub fn render(wave: Option<&Wave>, a: &Analysis, duration_ms: u32, w: usize, h: usize) -> Canvas {
     let strip = if h >= 24 { h * 14 / 50 } else { 0 };
     let hw = h - strip;
@@ -177,7 +179,8 @@ fn marker_buffers(
     (head, ghost)
 }
 
-/// `slip_ms`: the slip shadow playhead, drawn as a ghost line under the playhead.
+/// Independent full-buffer reference for compositor pixel parity and timings; `slip_ms` is the ghost under the playhead.
+#[cfg(test)]
 pub fn with_playhead(
     base: &Canvas,
     pos_ms: f64,

@@ -221,28 +221,8 @@ impl Deck {
             v.sync_rate = rate.into();
             dirty = true;
         }
-        let slip = self
-            .with_player(|p| p.slip_position())
-            .flatten()
-            .map(|s| s * 1000.0);
         if osize.0 > 0 && osize.1 > 0 {
-            let gpu = render::backend::gpu();
-            let x = if gpu {
-                0
-            } else {
-                render::overview::playhead_x(osize.0, pos, l.duration_ms)
-            };
-            let okey = (
-                x,
-                osize,
-                if gpu {
-                    None
-                } else {
-                    slip.map(|s| render::overview::playhead_x(osize.0, s, l.duration_ms))
-                },
-                l.cue_ms,
-                gpu,
-            );
+            let okey = (osize, l.cue_ms);
             if l.overview_key != Some(okey) {
                 let base = match l.overview_base.take().filter(|c| (c.w, c.h) == osize) {
                     Some(base) => base,
@@ -263,15 +243,11 @@ impl Deck {
                         )
                     }
                 };
-                let overview = if gpu {
-                    let overview;
-                    (overview, v.overview_head, v.overview_ghost) =
-                        render::overview::composed(&base, l.cue_ms, l.duration_ms);
-                    dirty = true;
-                    overview
-                } else {
-                    render::overview::with_playhead(&base, pos, l.cue_ms, slip, l.duration_ms)
-                };
+                let (overview, head, ghost) =
+                    render::overview::composed(&base, l.cue_ms, l.duration_ms);
+                v.overview_head = head;
+                v.overview_ghost = ghost;
+                dirty = true;
                 self.set_live(|r| r.overview = overview);
                 l.overview_base = Some(base);
                 l.overview_key = Some(okey);

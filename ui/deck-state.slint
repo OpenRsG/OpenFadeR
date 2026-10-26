@@ -89,9 +89,9 @@ export struct DeckView {
     grid-here: bool,
 }
 
-/// What changes while a deck plays, but not every frame: the time readouts (ten times a second), the overview (its CPU-drawn
-/// playhead) and the enlarged waveform's still picture (`DeckScroll` slides it). Kept apart from `DeckView` so these pushes
-/// redraw only what shows them, not every binding of the deck (src/app/deck/tick.rs, frame.rs).
+/// What changes while a deck plays, but not every frame: the time readouts (ten times a second) and the
+/// waveform still pictures (`DeckScroll` moves the detail and composes the overview's tiny markers).
+/// Kept apart from `DeckView` so these pushes redraw only what shows them (src/app/deck/tick.rs, frame.rs).
 export struct DeckLive {
     detail: image,
     overview: image,
@@ -109,6 +109,7 @@ export struct DeckScroll {
     strip-w: length,
     /// Slip ghost x in the view; negative = none.
     slip-x: length,
+    /// Physical-pixel marker positions, converted to logical lengths; negative slip x = none.
     overview-x: length,
     overview-slip-x: length,
     /// VIEW > Beat Count Display text right of the playhead; empty = none.

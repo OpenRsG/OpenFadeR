@@ -159,7 +159,9 @@ struct Loaded {
     overview_base: Option<render::Canvas>,
     /// The detail picture the view slides over ([`frame`]); `None` = draw it again.
     strip: Option<frame::Strip>,
-    overview_key: Option<(i64, Size, Option<i64>, u32, bool)>,
+    overview_key: Option<(Size, u32)>,
+    beat_count: Option<render::detail::BeatCountValue>,
+    beat_text: slint::SharedString,
     time_key: Option<u32>,
     /// GRID panel undo / redo lists and range ([`exportedit`]); gone with the next LOAD.
     grid_hist: exportedit::Hist,
@@ -172,6 +174,8 @@ impl Loaded {
         self.overview_key = None;
         self.overview_base = None;
         self.time_key = None;
+        self.beat_count = None;
+        self.beat_text = Default::default();
     }
 }
 

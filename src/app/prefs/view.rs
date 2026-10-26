@@ -57,7 +57,7 @@ choice!(
     DrawRate { Fps30 = "30", #[default] Fps60 = "60", Fps120 = "120" }
 );
 choice!(
-    /// AUTO uses hardware image composition; GPU also permits emulated GL; CPU keeps raster overlays.
+    /// AUTO uses hardware image cropping; GPU permits emulated GL; CPU translates cached raster strips.
     WaveRenderer { #[default] Auto = "auto", Gpu = "gpu", Cpu = "cpu" }
 );
 choice!(

@@ -107,6 +107,7 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc};
 /// Set by [`restart`]: `main` starts the app again once the window has closed.
 static RESTART: AtomicBool = AtomicBool::new(false);
 static RESTART_EXE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+static RESTART_SOFTWARE: AtomicBool = AtomicBool::new(false);
 
 /// Closes the window and has `main` start the app again (plugin manager: RESTART NOW).
 pub fn restart() {
@@ -131,6 +132,20 @@ pub fn restart_requested() -> bool {
     RESTART.load(Ordering::Relaxed)
 }
 
+/// Whether this restart needs Slint's software renderer; set only after default-renderer startup failed.
+pub fn restart_software_requested() -> bool {
+    RESTART_SOFTWARE.load(Ordering::Relaxed)
+}
+
+fn startup_error(error: slint::PlatformError) -> Result<(), Box<dyn std::error::Error>> {
+    if !render::backend::retry_software(&error) {
+        return Err(error.into());
+    }
+    RESTART_SOFTWARE.store(true, Ordering::Relaxed);
+    restart();
+    Ok(())
+}
+
 /// When the process started (set first thing in `main`), for the start-up line [`log_first_frame`] writes.
 static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
 
@@ -147,6 +162,7 @@ pub(crate) fn log_first_frame(app: &App) {
     if DONE.swap(true, Ordering::Relaxed) {
         return;
     }
+    render::backend::first_frame();
     let ms = STARTED.get().map_or(0, |t| t.elapsed().as_millis());
     let n = slint::Model::row_count(&app.global::<BrowserState>().get_tracks());
     eprintln!("startup: window shown after {ms} ms ({n} tracks)");
@@ -164,7 +180,13 @@ pub fn run(
     connect::adopt_startup(&store, legacy, music);
     // the store's edits (cues, grid, rating, comment) win over the Collection's rows
     let inner = openfader::store::overlay(Box::new(openfader::library::own::Own::new(store)));
-    let app = App::new()?;
+    if let Err(error) = render::backend::select() {
+        return startup_error(error);
+    }
+    let app = match App::new() {
+        Ok(app) => app,
+        Err(error) => return startup_error(error),
+    };
     // Wayland / X11 match the window to the menu entry `openfader.desktop` (its icon) by this id; set before the window shows.
     let _ = slint::set_xdg_app_id("openfader");
     about::wire(&app);
@@ -227,7 +249,11 @@ pub fn run(
     })?;
     let _analyzer = analyze::wire(&app, lib.clone()); // dropping it cancels the worker: lives until the window closes
     connect::wire(&app); // live sync of the connected libraries; after the browser, which it asks to reload
-    app.run()?;
+    render::backend::watch(&app);
+    if let Err(error) = app.run().and_then(|()| render::backend::check_startup()) {
+        openfader::plugin::process::stop_all();
+        return startup_error(error);
+    }
     update::quit(); // a clean exit shows that the version just installed starts
     openfader::plugin::event::fire("app_quit", serde_json::json!({}));
     openfader::plugin::process::stop_all(); // closes their stdin, kills what has not exited within a second

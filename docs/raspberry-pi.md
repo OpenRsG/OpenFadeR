@@ -62,6 +62,9 @@ the CPU waveform fallback. GPU explicitly permits emulated GL for diagnosis; it 
 the window has no graphics API (for example `winit-software`). This setting does not replace the window's renderer.
 If the log says llvmpipe on a Pi, fix the graphics driver or use `SLINT_BACKEND=winit-software`; forcing GPU does
 not turn an emulated renderer into hardware.
+Both paths reuse cached waveform strips and static overviews; moving markers do not copy the full overview.
+If default graphics startup fails, the app retries once with the native software renderer. Window creation has a
+two-second deadline; an unusually slow driver may therefore fall back to CPU. An explicit `SLINT_BACKEND` remains explicit.
 
 ## Low-power mode
 
