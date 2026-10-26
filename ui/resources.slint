@@ -1,0 +1,55 @@
+import { Theme } from "theme.slint";
+import { Tooltip } from "widgets.slint";
+
+export global ResourceState {
+    in-out property <string> ram-text: "…";
+    in-out property <string> vram-text: "…";
+    in-out property <string> ram-detail: @tr("OpenFadeR resident RAM usage; waiting for the first sample.");
+    in-out property <string> vram-detail: @tr("OpenFadeR process VRAM usage; waiting for the first sample.");
+}
+
+export component ResourceChip inherits Rectangle {
+    width: 104px;
+    height: Theme.h-ctl;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    Rectangle { x: 0px; width: 1px; height: parent.height; background: Theme.line; }
+    for row[i] in [
+        { label: @tr("RAM"), value: ResourceState.ram-text, detail: ResourceState.ram-detail },
+        { label: @tr("VRAM"), value: ResourceState.vram-text, detail: ResourceState.vram-detail },
+    ]: Rectangle {
+        x: Theme.space-lg;
+        y: i * root.height / 2;
+        width: root.width - Theme.space-lg;
+        height: root.height / 2;
+        accessible-role: text;
+        accessible-label: row.detail + " " + row.value;
+        Text {
+            x: 0px;
+            width: 32px;
+            height: parent.height;
+            text: row.label;
+            vertical-alignment: center;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+            font-weight: Theme.weight;
+            accessible-role: none;
+        }
+        Text {
+            x: 32px;
+            width: parent.width - self.x;
+            height: parent.height;
+            text: row.value;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            color: Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.font-sm;
+            font-weight: Theme.weight-semi;
+            accessible-role: none;
+        }
+        hover := TouchArea {}
+        Tooltip { width: parent.width; height: parent.height; text: row.detail; hovered: hover.has-hover && !hover.pressed; }
+    }
+}

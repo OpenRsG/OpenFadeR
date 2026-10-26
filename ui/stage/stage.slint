@@ -15,6 +15,7 @@ import { StageLibrary } from "library.slint";
 import { StageMixer } from "mixer.slint";
 import { StageColorSampler, StageEffects } from "strip.slint";
 import { StageMetrics } from "state.slint";
+import { ResourceChip } from "../resources.slint";
 
 /// The row of bar numbers over one waveform: Rust gives the number of the first labelled bar, the x of its line and the distance
 /// between labels (`DeckScroll.ruler-*`, src/app/deck/ruler.rs); the row repeats one label at that distance, so a frame moves a few
@@ -151,7 +152,7 @@ export component StageWorkspace inherits Rectangle {
             }
             Text {
                 x: BrowserState.load-progress >= 0 ? 260px : 90px;
-                width: parent.width - self.x - prog.width - 120px;
+                width: parent.width - self.x - prog.width - 120px - resources.width - Theme.space-md;
                 height: parent.height;
                 text: BrowserState.load-progress >= 0 ? BrowserState.load-text : AutomixState.running ? AutomixState.status : "";
                 vertical-alignment: center;
@@ -159,9 +160,10 @@ export component StageWorkspace inherits Rectangle {
                 color: Theme.text-bright;
                 font-size: Theme.font-size;
             }
-            if TrackInfoState.progress != "": Glyph { x: parent.width - prog.width - 28px - root.g; y: (parent.height - self.height) / 2; width: 14px; height: 14px; icon: Icon.info; tint: Theme.accent; }
-            prog := Text { x: parent.width - self.width - root.g; height: parent.height; text: TrackInfoState.progress; vertical-alignment: center; color: Theme.accent; font-size: Theme.font-size; }
-            DeviceProgress { x: parent.width - self.width - prog.width - 60px; y: (parent.height - self.height) / 2; }
+            if TrackInfoState.progress != "": Glyph { x: parent.width - prog.width - 28px - root.g - resources.width - Theme.space-md; y: (parent.height - self.height) / 2; width: 14px; height: 14px; icon: Icon.info; tint: Theme.accent; }
+            prog := Text { x: parent.width - self.width - root.g - resources.width - Theme.space-md; height: parent.height; text: TrackInfoState.progress; vertical-alignment: center; color: Theme.accent; font-size: Theme.font-size; }
+            DeviceProgress { x: parent.width - self.width - prog.width - 60px - resources.width - Theme.space-md; y: (parent.height - self.height) / 2; }
+            resources := ResourceChip { x: parent.width - self.width - root.g; y: (parent.height - self.height) / 2; }
         }
     }
 }

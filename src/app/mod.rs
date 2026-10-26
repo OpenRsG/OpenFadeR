@@ -86,6 +86,7 @@ mod mixer;
 mod plugins;
 mod prefs;
 mod render;
+mod resources;
 mod sampler;
 mod skin;
 mod split;
@@ -223,6 +224,7 @@ pub fn run(
     eprintln!("plugins: {} built in", openfader::plugin::builtin::plugins().len());
     prefs::audio::wire(); // hands the AUDIO settings to the engine before the decks open the output
     let _diag = diag::wire(&app); // Help > Report a Problem and the crash offer; the guard holds the timer that reads the audio facts
+    let _resources = resources::wire(&app);
     let lib: Rc<dyn Library> = openfader::plugin::source::wrap(inner, plugins::notify(&app)).into(); // plugin sources join the tree, outside the store's overlay
     app.set_window_title("OpenFadeR".into());
     let selected = Rc::new(RefCell::new(None));

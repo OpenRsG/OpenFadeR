@@ -59,474 +59,474 @@ msgstr "LIZENZ"
 msgid "Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."
 msgstr "Freie Software: Sie dürfen sie unter der AGPL nutzen, weitergeben und ändern. Entwickelt mit Rust und Slint."
 
-#: ui/app.slint:225
+#: ui/app.slint:227
 msgid "File"
 msgstr "Datei"
 
-#: ui/app.slint:227
+#: ui/app.slint:229
 msgid "Import"
 msgstr "Importieren"
 
-#: ui/app.slint:228
+#: ui/app.slint:230
 msgid "Import Track…"
 msgstr "Track importieren…"
 
-#: ui/app.slint:229
+#: ui/app.slint:231
 msgid "Import Folder…"
 msgstr "Ordner importieren…"
 
-#: ui/app.slint:230
-#: ui/app.slint:303
+#: ui/app.slint:232
+#: ui/app.slint:305
 msgid "Import Playlist…"
 msgstr "Playlist importieren…"
 
-#: ui/app.slint:234
+#: ui/app.slint:236
 msgid "Display All Missing Files"
 msgstr "Alle fehlenden Dateien anzeigen"
 
-#: ui/app.slint:235
+#: ui/app.slint:237
 msgid "Display All Duplicated Files"
 msgstr "Alle doppelten Dateien anzeigen"
 
-#: ui/app.slint:237
-#: ui/touch.slint:85
-#: ui/touch.slint:99
+#: ui/app.slint:239
+#: ui/touch.slint:86
+#: ui/touch.slint:100
 msgid "Library"
 msgstr "Bibliothek"
 
-#: ui/app.slint:238
+#: ui/app.slint:240
 msgid "Backup Library…"
 msgstr "Bibliothek sichern…"
 
-#: ui/app.slint:239
+#: ui/app.slint:241
 msgid "Restore Library…"
 msgstr "Bibliothek wiederherstellen…"
 
-#: ui/app.slint:240
+#: ui/app.slint:242
 msgid "Backed up device library management…"
 msgstr "Verwaltung gesicherter Geräte-Bibliotheken…"
 
-#: ui/app.slint:241
+#: ui/app.slint:243
 msgid "Last Import Report…"
 msgstr "Letzter Importbericht…"
 
-#: ui/app.slint:241
+#: ui/app.slint:243
 msgid "Last Import Report: no import yet"
 msgstr "Letzter Importbericht: noch kein Import"
 
-#: ui/app.slint:244
+#: ui/app.slint:246
 msgid "Export Collection"
 msgstr "Sammlung exportieren"
 
-#: ui/app.slint:248
+#: ui/app.slint:250
 msgid "Preferences…"
 msgstr "Einstellungen…"
 
-#: ui/app.slint:249
+#: ui/app.slint:251
 msgid "Exit"
 msgstr "Beenden"
 
-#: ui/app.slint:252
-#: ui/touch.slint:81
-#: ui/touch.slint:81
+#: ui/app.slint:254
+#: ui/touch.slint:82
+#: ui/touch.slint:82
 msgid "Edit"
 msgstr "Bearbeiten"
 
-#: ui/app.slint:253
+#: ui/app.slint:255
 msgid "Undo (Ctrl+Z)"
 msgstr "Rückgängig (Ctrl+Z)"
 
-#: ui/app.slint:253
+#: ui/app.slint:255
 msgid "Undo {} (Ctrl+Z)"
 msgstr "{} rückgängig (Ctrl+Z)"
 
-#: ui/app.slint:254
+#: ui/app.slint:256
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr "Wiederholen (Ctrl+Shift+Z)"
 
-#: ui/app.slint:254
+#: ui/app.slint:256
 msgid "Redo {} (Ctrl+Shift+Z)"
 msgstr "{} wiederholen (Ctrl+Shift+Z)"
 
-#: ui/app.slint:257
+#: ui/app.slint:259
 msgid "Track"
 msgstr "Track"
 
-#: ui/app.slint:258
+#: ui/app.slint:260
 msgid "Edit Track Details…"
 msgstr "Track-Details bearbeiten…"
 
-#: ui/app.slint:259
+#: ui/app.slint:261
 msgid "Import To Collection"
 msgstr "In Sammlung importieren"
 
-#: ui/app.slint:260
+#: ui/app.slint:262
 msgid "Analyze Track"
 msgstr "Track analysieren"
 
-#: ui/app.slint:261
+#: ui/app.slint:263
 msgid "Analysis Lock"
 msgstr "Analysesperre"
 
-#: ui/app.slint:262
+#: ui/app.slint:264
 #: src/app/library/track.rs:172
 msgid "Reload Tag"
 msgstr "Tag neu laden"
 
-#: ui/app.slint:263
+#: ui/app.slint:265
 #: src/app/library/track.rs:174
 msgid "Reload Tag (discard edits)"
 msgstr "Tag neu laden (Änderungen verwerfen)"
 
-#: ui/app.slint:264
+#: ui/app.slint:266
 msgid "Find Artwork…"
 msgstr "Cover suchen…"
 
-#: ui/app.slint:265
+#: ui/app.slint:267
 msgid "Fetch Missing Artwork"
 msgstr "Fehlende Cover laden"
 
-#: ui/app.slint:266
+#: ui/app.slint:268
 msgid "Show in File Manager"
 msgstr "Im Dateimanager anzeigen"
 
-#: ui/app.slint:268
+#: ui/app.slint:270
 #: ui/track-menu.slint:111
 msgid "Relocate…"
 msgstr "Neu zuordnen…"
 
-#: ui/app.slint:269
+#: ui/app.slint:271
 msgid "Auto Relocate"
 msgstr "Automatisch neu zuordnen"
 
-#: ui/app.slint:270
+#: ui/app.slint:272
 #: ui/track-menu.slint:113
 #: src/app/library/mod.rs:118
 msgid "Remove from Collection"
 msgstr "Aus Sammlung entfernen"
 
-#: ui/app.slint:272
+#: ui/app.slint:274
 msgid "Add to Tag List"
 msgstr "Zur Tag-Liste hinzufügen"
 
-#: ui/app.slint:273
+#: ui/app.slint:275
 msgid "Add to Playlist…"
 msgstr "Zu Playlist hinzufügen…"
 
-#: ui/app.slint:274
+#: ui/app.slint:276
 #: ui/track-menu.slint:104
 msgid "Tags…"
 msgstr "Tags…"
 
-#: ui/app.slint:277
+#: ui/app.slint:279
 msgid "Playlist"
 msgstr "Playlist"
 
-#: ui/app.slint:278
+#: ui/app.slint:280
 msgid "Create New Playlist"
 msgstr "Neue Playlist erstellen"
 
-#: ui/app.slint:279
+#: ui/app.slint:281
 msgid "Create New Intelligent Playlist"
 msgstr "Neue intelligente Playlist erstellen"
 
-#: ui/app.slint:280
+#: ui/app.slint:282
 msgid "Create New Folder"
 msgstr "Neuen Ordner erstellen"
 
-#: ui/app.slint:281
+#: ui/app.slint:283
 msgid "Delete Playlist"
 msgstr "Playlist löschen"
 
-#: ui/app.slint:284
+#: ui/app.slint:286
 msgid "Sort Items"
 msgstr "Einträge sortieren"
 
-#: ui/app.slint:285
+#: ui/app.slint:287
 msgid "Track Title"
 msgstr "Track-Titel"
 
-#: ui/app.slint:286
+#: ui/app.slint:288
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:198
 msgid "Artist"
 msgstr "Künstler"
 
-#: ui/app.slint:287
+#: ui/app.slint:289
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:202
 msgid "Genre"
 msgstr "Genre"
 
-#: ui/app.slint:289
+#: ui/app.slint:291
 #: ui/browser-tree.slint:169
 #: ui/touch-actions.slint:74
 msgid "Key"
 msgstr "Key"
 
-#: ui/app.slint:290
+#: ui/app.slint:292
 #: ui/touch-actions.slint:74
 msgid "Time"
 msgstr "Dauer"
 
-#: ui/app.slint:291
+#: ui/app.slint:293
 #: ui/touch-actions.slint:74
 msgid "Rating"
 msgstr "Bewertung"
 
-#: ui/app.slint:292
+#: ui/app.slint:294
 #: ui/touch-actions.slint:74
 msgid "Comments"
 msgstr "Kommentare"
 
-#: ui/app.slint:294
+#: ui/app.slint:296
 msgid "Renumber Track Order"
 msgstr "Track-Reihenfolge neu nummerieren"
 
-#: ui/app.slint:297
+#: ui/app.slint:299
 msgid "Export a playlist to a file"
 msgstr "Playlist in eine Datei exportieren"
 
-#: ui/app.slint:300
+#: ui/app.slint:302
 #: ui/touch-actions.slint:76
 msgid "Text"
 msgstr "Text"
 
-#: ui/app.slint:302
+#: ui/app.slint:304
 msgid "Export Playlist (to a device)…"
 msgstr "Playlist exportieren (auf ein Gerät)…"
 
-#: ui/app.slint:306
+#: ui/app.slint:308
 msgid "View"
 msgstr "Ansicht"
 
-#: ui/app.slint:307
+#: ui/app.slint:309
 msgid "Full Screen"
 msgstr "Vollbild"
 
-#: ui/app.slint:309
-#: ui/app.slint:503
+#: ui/app.slint:311
+#: ui/app.slint:505
 msgid "2Deck Horizontal"
 msgstr "2 Decks horizontal"
 
-#: ui/app.slint:310
-#: ui/app.slint:503
+#: ui/app.slint:312
+#: ui/app.slint:505
 msgid "2Deck Vertical"
 msgstr "2 Decks vertikal"
 
-#: ui/app.slint:311
-#: ui/app.slint:503
+#: ui/app.slint:313
+#: ui/app.slint:505
 msgid "4Deck Horizontal"
 msgstr "4 Decks horizontal"
 
-#: ui/app.slint:312
-#: ui/app.slint:503
+#: ui/app.slint:314
+#: ui/app.slint:505
 msgid "4Deck Vertical"
 msgstr "4 Decks vertikal"
 
-#: ui/app.slint:313
-#: ui/app.slint:503
+#: ui/app.slint:315
+#: ui/app.slint:505
 msgid "Browse"
 msgstr "Durchsuchen"
 
-#: ui/app.slint:314
+#: ui/app.slint:316
 #: ui/exportmode-state.slint:54
 msgid "1 PLAYER"
 msgstr "1 PLAYER"
 
-#: ui/app.slint:315
+#: ui/app.slint:317
 #: ui/exportmode-state.slint:54
 msgid "2 PLAYER"
 msgstr "2 PLAYER"
 
-#: ui/app.slint:316
+#: ui/app.slint:318
 #: ui/exportmode-state.slint:54
 msgid "DUAL PLAYER"
 msgstr "DUAL PLAYER"
 
-#: ui/app.slint:317
+#: ui/app.slint:319
 #: ui/exportmode-state.slint:54
 msgid "SIMPLE PLAYER"
 msgstr "SIMPLE PLAYER"
 
-#: ui/app.slint:318
+#: ui/app.slint:320
 #: ui/exportmode-state.slint:54
 msgid "FULL BROWSER"
 msgstr "VOLLER BROWSER"
 
-#: ui/app.slint:319
+#: ui/app.slint:321
 msgid "Close Split Screen"
 msgstr "Geteilten Bildschirm schließen"
 
-#: ui/app.slint:319
+#: ui/app.slint:321
 msgid "Split Screen"
 msgstr "Geteilter Bildschirm"
 
-#: ui/app.slint:321
-#: src/app/prefs/view.rs:435
+#: ui/app.slint:323
+#: src/app/prefs/view.rs:417
 msgid "Mixer"
 msgstr "Mixer"
 
-#: ui/app.slint:322
+#: ui/app.slint:324
 msgid "Effect Panel"
 msgstr "Effektpanel"
 
-#: ui/app.slint:323
-#: ui/touch.slint:85
-#: ui/touch.slint:99
+#: ui/app.slint:325
+#: ui/touch.slint:86
+#: ui/touch.slint:100
 msgid "Sampler"
 msgstr "Sampler"
 
-#: ui/app.slint:324
-#: ui/app.slint:522
+#: ui/app.slint:326
+#: ui/app.slint:524
 #: ui/groove.slint:250
 msgid "BEAT LAB"
 msgstr "BEAT LAB"
 
-#: ui/app.slint:326
+#: ui/app.slint:328
 #: ui/stage/library.slint:53
-#: src/app/prefs/view.rs:365
+#: src/app/prefs/view.rs:348
 msgid "Related Tracks"
 msgstr "Ähnliche Tracks"
 
-#: ui/app.slint:327
+#: ui/app.slint:329
 #: ui/browser-tree.slint:169
 msgid "Tags"
 msgstr "Tags"
 
-#: ui/app.slint:328
+#: ui/app.slint:330
 #: ui/studio/automix.slint:181
 #: ui/touch-actions.slint:79
 msgid "Automix"
 msgstr "Automix"
 
-#: ui/app.slint:331
+#: ui/app.slint:333
 msgid "Plugins"
 msgstr "Plugins"
 
-#: ui/app.slint:335
+#: ui/app.slint:337
 msgid "Help"
 msgstr "Hilfe"
 
-#: ui/app.slint:336
+#: ui/app.slint:338
 msgid "Keyboard Shortcuts"
 msgstr "Tastenkürzel"
 
-#: ui/app.slint:337
+#: ui/app.slint:339
 #: ui/welcome.slint:69
 msgid "Welcome"
 msgstr "Willkommen"
 
-#: ui/app.slint:338
+#: ui/app.slint:340
 msgid "Update to {}…"
 msgstr "Auf {} aktualisieren…"
 
-#: ui/app.slint:338
+#: ui/app.slint:340
 #: ui/touch-actions.slint:85
 msgid "Check for Updates"
 msgstr "Nach Updates suchen"
 
-#: ui/app.slint:339
+#: ui/app.slint:341
 msgid "Roll Back to {}…"
 msgstr "Auf {} zurücksetzen…"
 
-#: ui/app.slint:340
+#: ui/app.slint:342
 msgid "Report a Problem…"
 msgstr "Problem melden…"
 
-#: ui/app.slint:341
+#: ui/app.slint:343
 msgid "About OpenFadeR"
 msgstr "Über OpenFadeR"
 
-#: ui/app.slint:462
+#: ui/app.slint:464
 msgid "Split screen: the browser in a window of its own"
 msgstr "Geteilter Bildschirm: der Browser in einem eigenen Fenster"
 
-#: ui/app.slint:463
+#: ui/app.slint:465
 msgid "Switch the active window"
 msgstr "Aktives Fenster wechseln"
 
-#: ui/app.slint:491
-#: ui/app.slint:492
 #: ui/app.slint:493
+#: ui/app.slint:494
+#: ui/app.slint:495
 msgid "EXPORT"
 msgstr "EXPORT"
 
-#: ui/app.slint:491
-#: ui/app.slint:492
 #: ui/app.slint:493
+#: ui/app.slint:494
+#: ui/app.slint:495
 msgid "PERFORMANCE"
 msgstr "PERFORMANCE"
 
-#: ui/app.slint:491
-#: ui/app.slint:492
 #: ui/app.slint:493
+#: ui/app.slint:494
+#: ui/app.slint:495
 msgid "EDIT"
 msgstr "BEARBEITEN"
 
-#: ui/app.slint:491
-#: ui/app.slint:492
-#: ui/app.slint:534
+#: ui/app.slint:493
+#: ui/app.slint:494
+#: ui/app.slint:536
 msgid "LIGHTING (BETA)"
 msgstr "LICHT (BETA)"
 
-#: ui/app.slint:491
 #: ui/app.slint:493
-#: ui/app.slint:533
+#: ui/app.slint:495
+#: ui/app.slint:535
 msgid "VIDEO (BETA)"
 msgstr "VIDEO (BETA)"
 
-#: ui/app.slint:521
+#: ui/app.slint:523
 #: ui/stage/mixer.slint:224
 msgid "FX"
 msgstr "FX"
 
-#: ui/app.slint:523
+#: ui/app.slint:525
 #: src/app/prefs/controller/mixpoint.rs:8
 msgid "MIX POINT LINK"
 msgstr "MIX POINT LINK"
 
-#: ui/app.slint:524
+#: ui/app.slint:526
 #: ui/stage/deck-parts.slint:478
 #: ui/stage/strip.slint:164
 msgid "SAMPLER"
 msgstr "SAMPLER"
 
-#: ui/app.slint:525
+#: ui/app.slint:527
 #: ui/stage/mixer.slint:224
 #: ui/stage/mixer.slint:226
 msgid "MIXER"
 msgstr "MIXER"
 
-#: ui/app.slint:530
+#: ui/app.slint:532
 msgid "REC panel"
 msgstr "REC-Panel"
 
-#: ui/app.slint:530
+#: ui/app.slint:532
 #: ui/stage/bar.slint:80
-#: ui/studio/bar.slint:57
+#: ui/studio/bar.slint:70
 msgid "REC (master out)"
 msgstr "REC (MASTER-Ausgang)"
 
-#: ui/app.slint:540
-msgid "SHORTCUTS (?)"
-msgstr "KÜRZEL (?)"
-
-#: ui/app.slint:541
-msgid "PREFS"
-msgstr "EINST."
-
-#: ui/app.slint:554
+#: ui/app.slint:547
 msgid "Zoom out the waveforms"
 msgstr "Wellenformen verkleinern"
 
-#: ui/app.slint:555
+#: ui/app.slint:548
 msgid "Default waveform zoom"
 msgstr "Standard-Wellenform-Zoom"
 
-#: ui/app.slint:556
+#: ui/app.slint:549
 msgid "Zoom in the waveforms"
 msgstr "Wellenformen vergrößern"
+
+#: ui/app.slint:554
+msgid "SHORTCUTS (?)"
+msgstr "KÜRZEL (?)"
+
+#: ui/app.slint:555
+msgid "PREFS"
+msgstr "EINST."
 
 #: ui/artwork.slint:29
 #: ui/trackinfo.slint:116
@@ -1113,7 +1113,7 @@ msgid "Headphone preview: tap the waveform to seek"
 msgstr "Kopfhörer-Vorschau: Wellenform antippen zum Springen"
 
 #: ui/browser.slint:420
-#: src/app/prefs/view.rs:379
+#: src/app/prefs/view.rs:362
 msgid "Playlist Palette"
 msgstr "Playlist-Palette"
 
@@ -3012,7 +3012,7 @@ msgid "GREEN"
 msgstr "GRÜN"
 
 #: ui/lighting.slint:152
-#: src/app/prefs/view.rs:423
+#: src/app/prefs/view.rs:405
 #: src/app/prefs/view.rs:39
 msgid "BLUE"
 msgstr "BLAU"
@@ -3129,7 +3129,7 @@ msgstr "AUX"
 
 #: ui/mixer-touch.slint:42
 #: ui/mixer-touch.slint:77
-#: ui/touch.slint:154
+#: ui/touch.slint:155
 msgid "Deck {}"
 msgstr "Deck {}"
 
@@ -3587,7 +3587,7 @@ msgstr "ERSETZEN"
 
 #: ui/prefs.slint:39
 #: ui/stage/bar.slint:97
-#: ui/studio/bar.slint:74
+#: ui/studio/bar.slint:87
 msgid "PREFERENCES"
 msgstr "EINSTELLUNGEN"
 
@@ -3671,6 +3671,22 @@ msgstr "LOG-ORDNER ÖFFNEN"
 #: ui/report.slint:62
 msgid "OPEN GITHUB ISSUE"
 msgstr "OPEN GITHUB ISSUE"
+
+#: ui/resources.slint:7
+msgid "OpenFadeR resident RAM usage; waiting for the first sample."
+msgstr "Residenter RAM-Verbrauch von OpenFadeR; erste Messung wird erwartet."
+
+#: ui/resources.slint:8
+msgid "OpenFadeR process VRAM usage; waiting for the first sample."
+msgstr "VRAM-Verbrauch des OpenFadeR-Prozesses; erste Messung wird erwartet."
+
+#: ui/resources.slint:18
+msgid "RAM"
+msgstr "RAM"
+
+#: ui/resources.slint:19
+msgid "VRAM"
+msgstr "VRAM"
 
 #: ui/sampler.slint:152
 msgid "REC…"
@@ -3789,12 +3805,12 @@ msgid "VIDEO"
 msgstr "VIDEO"
 
 #: ui/stage/bar.slint:50
-#: src/app/prefs/view.rs:441
+#: src/app/prefs/view.rs:423
 msgid "2 DECKS"
 msgstr "2 DECKS"
 
 #: ui/stage/bar.slint:50
-#: src/app/prefs/view.rs:441
+#: src/app/prefs/view.rs:423
 msgid "4 DECKS"
 msgstr "4 DECKS"
 
@@ -3934,7 +3950,7 @@ msgid "SOUND COLOR FX"
 msgstr "SOUND-COLOR-FX"
 
 #: ui/stage/table.slint:139
-#: src/app/prefs/view.rs:331
+#: src/app/prefs/view.rs:315
 msgid "WAVEFORM"
 msgstr "WELLENFORM"
 
@@ -4031,17 +4047,17 @@ msgstr "Seitenliste"
 msgid "Linked"
 msgstr "Verknüpft"
 
-#: ui/studio/bar.slint:34
+#: ui/studio/bar.slint:35
 msgid "PERFORM"
 msgstr "PERFORM"
 
-#: ui/studio/bar.slint:39
+#: ui/studio/bar.slint:40
 msgid "The performance workspace: decks, mixer, effects and library"
 msgstr "Der Performance-Arbeitsbereich: Decks, Mixer, Effekte und Bibliothek"
 
-#: ui/studio/bar.slint:39
-#: ui/studio/bar.slint:42
+#: ui/studio/bar.slint:40
 #: ui/studio/bar.slint:43
+#: ui/studio/bar.slint:44
 msgid "Open this mode"
 msgstr "Diesen Modus öffnen"
 
@@ -4475,150 +4491,150 @@ msgstr "Problem melden"
 msgid "Exit OpenFadeR"
 msgstr "OpenFadeR beenden"
 
-#: ui/touch.slint:81
-#: ui/touch.slint:81
-#: ui/touch.slint:81
+#: ui/touch.slint:82
+#: ui/touch.slint:82
+#: ui/touch.slint:82
 msgid "Export"
 msgstr "Export"
 
-#: ui/touch.slint:81
-#: ui/touch.slint:81
-#: ui/touch.slint:81
+#: ui/touch.slint:82
+#: ui/touch.slint:82
+#: ui/touch.slint:82
 msgid "Performance"
 msgstr "Performance"
 
-#: ui/touch.slint:81
-#: ui/touch.slint:81
-#: ui/touch.slint:85
+#: ui/touch.slint:82
+#: ui/touch.slint:82
+#: ui/touch.slint:86
 msgid "Lighting"
 msgstr "Beleuchtung"
 
-#: ui/touch.slint:81
-#: ui/touch.slint:81
-#: ui/touch.slint:85
+#: ui/touch.slint:82
+#: ui/touch.slint:82
+#: ui/touch.slint:86
 msgid "Video"
 msgstr "Video"
 
-#: ui/touch.slint:85
-#: ui/touch.slint:99
+#: ui/touch.slint:86
+#: ui/touch.slint:100
 msgid "Decks"
 msgstr "Decks"
 
-#: ui/touch.slint:85
-#: ui/touch.slint:99
+#: ui/touch.slint:86
+#: ui/touch.slint:100
 msgid "Export players"
 msgstr "Export-Player"
 
-#: ui/touch.slint:85
-#: ui/touch.slint:99
+#: ui/touch.slint:86
+#: ui/touch.slint:100
 msgid "Mixer & output"
 msgstr "Mixer & Ausgang"
 
-#: ui/touch.slint:85
-#: ui/touch.slint:99
+#: ui/touch.slint:86
+#: ui/touch.slint:100
 msgid "Effects"
 msgstr "Effekte"
 
-#: ui/touch.slint:85
-#: ui/touch.slint:99
+#: ui/touch.slint:86
+#: ui/touch.slint:100
 msgid "Mix point link"
 msgstr "MIX POINT LINK"
 
-#: ui/touch.slint:85
-#: ui/touch.slint:99
+#: ui/touch.slint:86
+#: ui/touch.slint:100
 msgid "Beat Lab"
 msgstr "Beat Lab"
 
-#: ui/touch.slint:85
-#: ui/touch.slint:95
-#: ui/touch.slint:99
+#: ui/touch.slint:86
+#: ui/touch.slint:96
+#: ui/touch.slint:100
 msgid "All commands"
 msgstr "Alle Befehle"
 
-#: ui/touch.slint:88
-#: ui/touch.slint:88
-#: ui/touch.slint:88
+#: ui/touch.slint:89
+#: ui/touch.slint:89
+#: ui/touch.slint:89
 msgid "Deck A"
 msgstr "Deck A"
 
-#: ui/touch.slint:88
-#: ui/touch.slint:88
-#: ui/touch.slint:88
+#: ui/touch.slint:89
+#: ui/touch.slint:89
+#: ui/touch.slint:89
 msgid "Deck B"
 msgstr "Deck B"
 
-#: ui/touch.slint:88
-#: ui/touch.slint:88
-#: ui/touch.slint:88
+#: ui/touch.slint:89
+#: ui/touch.slint:89
+#: ui/touch.slint:89
 msgid "Deck C"
 msgstr "Deck C"
 
-#: ui/touch.slint:88
-#: ui/touch.slint:88
-#: ui/touch.slint:88
+#: ui/touch.slint:89
+#: ui/touch.slint:89
+#: ui/touch.slint:89
 msgid "Deck D"
 msgstr "Deck D"
 
-#: ui/touch.slint:91
-#: ui/touch.slint:100
+#: ui/touch.slint:92
+#: ui/touch.slint:101
 msgid "2 decks"
 msgstr "2 Decks"
 
-#: ui/touch.slint:91
-#: ui/touch.slint:100
+#: ui/touch.slint:92
+#: ui/touch.slint:101
 msgid "4 decks"
 msgstr "4 Decks"
 
-#: ui/touch.slint:91
-#: ui/touch.slint:100
+#: ui/touch.slint:92
+#: ui/touch.slint:101
 msgid "decks"
 msgstr "Decks"
 
-#: ui/touch.slint:93
+#: ui/touch.slint:94
 msgid "Devices"
 msgstr "Geräte"
 
-#: ui/touch.slint:94
+#: ui/touch.slint:95
 msgid "Preferences, themes and extensions"
 msgstr "Einstellungen, Themes und Erweiterungen"
 
-#: ui/touch.slint:105
+#: ui/touch.slint:106
 msgid "Deck"
 msgstr "Deck"
 
-#: ui/touch.slint:105
+#: ui/touch.slint:106
 msgid "Select deck {}"
 msgstr "Deck {} auswählen"
 
-#: ui/touch.slint:107
+#: ui/touch.slint:108
 msgid "Reset waveform zoom"
 msgstr "Wellenform-Zoom zurücksetzen"
 
-#: ui/touch.slint:155
+#: ui/touch.slint:156
 msgid "Select deck waveform for MIX POINT / SILENT editing"
 msgstr "Deck-Wellenform für die Bearbeitung von MIX POINT / SILENT auswählen"
 
-#: ui/touch.slint:158
+#: ui/touch.slint:159
 msgid "Deck waveform zoom out"
 msgstr "Deck-Wellenform verkleinern"
 
-#: ui/touch.slint:159
+#: ui/touch.slint:160
 msgid "Reset deck waveform zoom"
 msgstr "Deck-Wellenform-Zoom zurücksetzen"
 
-#: ui/touch.slint:160
+#: ui/touch.slint:161
 msgid "Deck waveform zoom in"
 msgstr "Deck-Wellenform vergrößern"
 
-#: ui/touch.slint:161
+#: ui/touch.slint:162
 msgid "Mix point lane zoom"
 msgstr "MIX POINT-Spur-Zoom"
 
-#: ui/touch.slint:162
+#: ui/touch.slint:163
 msgid "Mix point lanes zoom out"
 msgstr "MIX POINT-Spuren verkleinern"
 
-#: ui/touch.slint:163
+#: ui/touch.slint:164
 msgid "Mix point lanes zoom in"
 msgstr "MIX POINT-Spuren vergrößern"
 
@@ -5772,7 +5788,7 @@ msgid "{}  ({}, {} free)"
 msgstr "{}  ({}, {} frei)"
 
 #: src/app/browser/sources.rs:77
-#: src/app/prefs/view.rs:372
+#: src/app/prefs/view.rs:355
 msgid "Explorer"
 msgstr "Explorer"
 
@@ -10062,7 +10078,7 @@ msgstr "KEY-ERKENNUNG"
 
 #: src/app/prefs/analysis.rs:165
 #: src/app/prefs/analysis.rs:40
-#: src/app/prefs/view.rs:264
+#: src/app/prefs/view.rs:262
 msgid "CLASSIC"
 msgstr "KLASSISCH"
 
@@ -10102,7 +10118,7 @@ msgstr "CUE BEI ANALYSE SETZEN"
 
 #: src/app/prefs/analysis.rs:190
 #: src/app/prefs/analysis.rs:31
-#: src/app/prefs/view.rs:415
+#: src/app/prefs/view.rs:397
 msgid "MANUAL"
 msgstr "MANUELL"
 
@@ -11425,267 +11441,267 @@ msgstr "KONSTANT"
 msgid "KEY DISPLAY"
 msgstr "KEY-ANZEIGE"
 
-#: src/app/prefs/view.rs:263
+#: src/app/prefs/view.rs:262
 msgid "ALPHANUMERIC"
 msgstr "ALPHANUMERISCH"
 
-#: src/app/prefs/view.rs:265
+#: src/app/prefs/view.rs:262
 msgid "OPEN KEY"
 msgstr "OPEN KEY"
 
-#: src/app/prefs/view.rs:266
+#: src/app/prefs/view.rs:262
 #: src/app/prefs/view.rs:20
 msgid "DATABASE"
 msgstr "DATENBANK"
 
-#: src/app/prefs/view.rs:272
+#: src/app/prefs/view.rs:267
 msgid "DISPLAY TYPE"
 msgstr "ANZEIGETYP"
 
-#: src/app/prefs/view.rs:275
+#: src/app/prefs/view.rs:270
 msgid "LANGUAGE"
 msgstr "SPRACHE"
 
-#: src/app/prefs/view.rs:277
+#: src/app/prefs/view.rs:272
 #: src/app/prefs/view.rs:122
 msgid "SYSTEM"
 msgstr "SYSTEM"
 
-#: src/app/prefs/view.rs:288
+#: src/app/prefs/view.rs:283
 msgid "Tooltips"
 msgstr "Tooltips"
 
-#: src/app/prefs/view.rs:291
+#: src/app/prefs/view.rs:286
 msgid "TEMPO DECIMAL PLACES"
 msgstr "TEMPO-NACHKOMMASTELLEN"
 
-#: src/app/prefs/view.rs:297
+#: src/app/prefs/view.rs:292
 msgid "Tempo fader: + at the bottom"
 msgstr "Tempo-Fader: + unten"
 
-#: src/app/prefs/view.rs:300
+#: src/app/prefs/view.rs:295
 msgid "vertical faders only; a horizontal one keeps + at the right"
 msgstr "nur vertikale Fader; ein horizontaler behält + rechts"
 
-#: src/app/prefs/view.rs:303
+#: src/app/prefs/view.rs:296
 msgid "BROWSE"
 msgstr "BROWSER"
 
-#: src/app/prefs/view.rs:304
+#: src/app/prefs/view.rs:297
 msgid "FONT SIZE"
 msgstr "SCHRIFTGRÖSSE"
 
-#: src/app/prefs/view.rs:305
+#: src/app/prefs/view.rs:298
 msgid "Bold characters"
 msgstr "Fette Schrift"
 
-#: src/app/prefs/view.rs:306
+#: src/app/prefs/view.rs:299
 msgid "LINE SPACE"
 msgstr "ZEILENABSTAND"
 
-#: src/app/prefs/view.rs:309
+#: src/app/prefs/view.rs:302
 msgid "Show the selected track to the center"
 msgstr "Ausgewählten Track zentriert anzeigen"
 
-#: src/app/prefs/view.rs:314
+#: src/app/prefs/view.rs:305
 msgid "Coloring of played tracks"
 msgstr "Einfärbung gespielter Tracks"
 
-#: src/app/prefs/view.rs:319
+#: src/app/prefs/view.rs:308
 msgid "Reset the colour of played tracks when quitting"
 msgstr "Farbe gespielter Tracks beim Beenden zurücksetzen"
 
-#: src/app/prefs/view.rs:325
+#: src/app/prefs/view.rs:312
 msgid "PLAYED TRACKS"
 msgstr "GESPIELTE TRACKS"
 
-#: src/app/prefs/view.rs:326
+#: src/app/prefs/view.rs:312
 msgid "RESET NOW"
 msgstr "JETZT ZURÜCKSETZEN"
 
-#: src/app/prefs/view.rs:334
+#: src/app/prefs/view.rs:318
 msgid "RENDERER"
 msgstr "RENDERER"
 
-#: src/app/prefs/view.rs:335
+#: src/app/prefs/view.rs:319
 #: src/app/prefs/view.rs:61
 msgid "GPU"
 msgstr "GPU"
 
-#: src/app/prefs/view.rs:335
+#: src/app/prefs/view.rs:319
 #: src/app/prefs/view.rs:61
 msgid "CPU"
 msgstr "CPU"
 
-#: src/app/prefs/view.rs:338
+#: src/app/prefs/view.rs:322
 msgid "DRAWING RATE"
 msgstr "ZEICHENRATE"
 
-#: src/app/prefs/view.rs:338
+#: src/app/prefs/view.rs:322
 msgid "frames / s"
 msgstr "Bilder / s"
 
-#: src/app/prefs/view.rs:341
+#: src/app/prefs/view.rs:325
 msgid "OVERVIEW / PREVIEW"
 msgstr "ÜBERSICHT / VORSCHAU"
 
-#: src/app/prefs/view.rs:342
+#: src/app/prefs/view.rs:326
 #: src/app/prefs/view.rs:65
 msgid "FULL"
 msgstr "VOLL"
 
-#: src/app/prefs/view.rs:342
+#: src/app/prefs/view.rs:326
 #: src/app/prefs/view.rs:65
 msgid "HALF"
 msgstr "HALB"
 
-#: src/app/prefs/view.rs:345
+#: src/app/prefs/view.rs:329
 msgid "BEAT COUNT"
 msgstr "BEAT-ZÄHLUNG"
 
-#: src/app/prefs/view.rs:346
+#: src/app/prefs/view.rs:330
 msgid "BEAT GRID"
 msgstr "BEATGRID"
 
-#: src/app/prefs/view.rs:347
+#: src/app/prefs/view.rs:330
 msgid "Bold: thicker lines, wider downbeats"
 msgstr "Fett: dickere Linien, breitere Downbeats"
 
-#: src/app/prefs/view.rs:348
+#: src/app/prefs/view.rs:331
 msgid "HOT CUE MARKERS"
 msgstr "HOT-CUE-MARKER"
 
-#: src/app/prefs/view.rs:349
+#: src/app/prefs/view.rs:332
 msgid "Large: double-size flags and letters"
 msgstr "Groß: doppelt große Flaggen und Buchstaben"
 
-#: src/app/prefs/view.rs:350
+#: src/app/prefs/view.rs:333
 msgid "DECK NUMBER"
 msgstr "DECK-NUMMER"
 
-#: src/app/prefs/view.rs:351
+#: src/app/prefs/view.rs:334
 msgid "Position of the deck number on the waveforms"
 msgstr "Position der Deck-Nummer auf den Wellenformen"
 
-#: src/app/prefs/view.rs:354
+#: src/app/prefs/view.rs:337
 msgid "Click on the waveform for PLAY and CUE"
 msgstr "Klick auf die Wellenform für PLAY und CUE"
 
-#: src/app/prefs/view.rs:359
+#: src/app/prefs/view.rs:342
 msgid "JOG DISPLAY"
 msgstr "JOG-ANZEIGE"
 
-#: src/app/prefs/view.rs:360
+#: src/app/prefs/view.rs:343
 msgid "CUE / SLIP"
 msgstr "CUE / SLIP"
 
-#: src/app/prefs/view.rs:360
+#: src/app/prefs/view.rs:343
 msgid "HOT CUE COUNTDOWN"
 msgstr "HOT-CUE-COUNTDOWN"
 
-#: src/app/prefs/view.rs:363
+#: src/app/prefs/view.rs:346
 msgid "TRAFFIC LIGHT"
 msgstr "AMPEL"
 
-#: src/app/prefs/view.rs:364
+#: src/app/prefs/view.rs:347
 msgid "LAYOUT: MEDIA BROWSER"
 msgstr "LAYOUT: MEDIENBROWSER"
 
-#: src/app/prefs/view.rs:366
+#: src/app/prefs/view.rs:349
 msgid "Cue Bank"
 msgstr "CUE-Bank"
 
-#: src/app/prefs/view.rs:369
+#: src/app/prefs/view.rs:352
 msgid "Track Suggestion"
 msgstr "Track-Vorschlag"
 
-#: src/app/prefs/view.rs:373
+#: src/app/prefs/view.rs:356
 msgid "LAYOUT: BROWSER PANEL"
 msgstr "LAYOUT: BROWSER-PANEL"
 
-#: src/app/prefs/view.rs:376
+#: src/app/prefs/view.rs:359
 msgid "CUE Analysis Playlist"
 msgstr "CUE-Analyse-Playlist"
 
-#: src/app/prefs/view.rs:382
+#: src/app/prefs/view.rs:365
 msgid "Display Cue Markers on Preview"
 msgstr "CUE-Marker in der Vorschau anzeigen"
 
-#: src/app/prefs/view.rs:387
+#: src/app/prefs/view.rs:370
 msgid "Display All Tracks in the Playlists"
 msgstr "Alle Tracks in den Playlists anzeigen"
 
-#: src/app/prefs/view.rs:390
+#: src/app/prefs/view.rs:373
 msgid "LAYOUT: DECK"
 msgstr "LAYOUT: DECK"
 
-#: src/app/prefs/view.rs:391
+#: src/app/prefs/view.rs:374
 msgid "Display SYNC RATE"
 msgstr "SYNC RATE anzeigen"
 
-#: src/app/prefs/view.rs:394
+#: src/app/prefs/view.rs:377
 msgid "Phrase (Enlarged Waveform)"
 msgstr "Phrase (vergrößerte Wellenform)"
 
-#: src/app/prefs/view.rs:397
+#: src/app/prefs/view.rs:380
 msgid "Phrase (Full Waveform)"
 msgstr "Phrase (volle Wellenform)"
 
-#: src/app/prefs/view.rs:400
+#: src/app/prefs/view.rs:383
 msgid "Always show the types of phrases"
 msgstr "Phrasentypen immer anzeigen"
 
-#: src/app/prefs/view.rs:405
+#: src/app/prefs/view.rs:388
 msgid "Vocal (Enlarged Waveform)"
 msgstr "Vocal (vergrößerte Wellenform)"
 
-#: src/app/prefs/view.rs:408
+#: src/app/prefs/view.rs:391
 msgid "Vocal (Full Waveform)"
 msgstr "Vocal (volle Wellenform)"
 
-#: src/app/prefs/view.rs:409
+#: src/app/prefs/view.rs:392
 msgid "EFFECT PANEL"
 msgstr "EFFEKT-PANEL"
 
-#: src/app/prefs/view.rs:410
+#: src/app/prefs/view.rs:393
 msgid "ENLARGED WAVEFORMS"
 msgstr "VERGRÖSSERTE WELLENFORMEN"
 
-#: src/app/prefs/view.rs:411
+#: src/app/prefs/view.rs:393
 msgid "deck order, 4 decks"
 msgstr "Deck-Reihenfolge, 4 Decks"
 
-#: src/app/prefs/view.rs:414
+#: src/app/prefs/view.rs:396
 #: src/app/welcome.rs:33
 msgid "PAD MODE"
 msgstr "PAD-MODUS"
 
-#: src/app/prefs/view.rs:418
+#: src/app/prefs/view.rs:400
 msgid "COLOR"
 msgstr "FARBE"
 
-#: src/app/prefs/view.rs:422
+#: src/app/prefs/view.rs:404
 msgid "WAVEFORM COLOR"
 msgstr "WELLENFORMFARBE"
 
-#: src/app/prefs/view.rs:423
+#: src/app/prefs/view.rs:405
 msgid "3BAND"
 msgstr "3BAND"
 
-#: src/app/prefs/view.rs:423
+#: src/app/prefs/view.rs:405
 #: src/app/prefs/view.rs:39
 msgid "RGB"
 msgstr "RGB"
 
-#: src/app/prefs/view.rs:426
+#: src/app/prefs/view.rs:408
 msgid "HOT CUE COLOR"
 msgstr "HOT-CUE-FARBE"
 
-#: src/app/prefs/view.rs:427
+#: src/app/prefs/view.rs:409
 msgid "PAD FX COLOR"
 msgstr "PAD-FX-FARBE"
 
-#: src/app/prefs/view.rs:430
+#: src/app/prefs/view.rs:412
 msgid "SAMPLER COLOR"
 msgstr "SAMPLER-FARBE"
 
@@ -11699,29 +11715,29 @@ msgstr "SYNC MIT FREQUENZ"
 msgid "PURPLE"
 msgstr "VIOLETT"
 
-#: src/app/prefs/view.rs:434
+#: src/app/prefs/view.rs:416
 msgid "DECK LAYOUT"
 msgstr "DECK-LAYOUT"
 
-#: src/app/prefs/view.rs:434
+#: src/app/prefs/view.rs:416
 msgid "enlarged waveforms"
 msgstr "vergrößerte Wellenformen"
 
-#: src/app/prefs/view.rs:436
+#: src/app/prefs/view.rs:418
 msgid "EXPORT LAYOUT"
 msgstr "EXPORT-LAYOUT"
 
-#: src/app/prefs/view.rs:437
-#: src/app/prefs/view.rs:440
+#: src/app/prefs/view.rs:419
+#: src/app/prefs/view.rs:422
 msgid "DECKS"
 msgstr "DECKS"
 
-#: src/app/prefs/view.rs:454
-#: src/app/prefs/view.rs:456
+#: src/app/prefs/view.rs:436
+#: src/app/prefs/view.rs:438
 msgid "SKIN"
 msgstr "SKIN"
 
-#: src/app/prefs/view.rs:456
+#: src/app/prefs/view.rs:438
 msgid "see THEMES"
 msgstr "siehe THEMES"
 
@@ -11915,6 +11931,22 @@ msgstr "{}.{}TAKTE"
 #: src/app/render/detail.rs:38
 msgid "{}BEATS"
 msgstr "{}BEATS"
+
+#: src/app/resources/mod.rs:56
+msgid "Resident RAM used by OpenFadeR, including shared pages."
+msgstr "Von OpenFadeR genutzter residenter RAM, einschließlich gemeinsam genutzter Seiten."
+
+#: src/app/resources/mod.rs:58
+msgid "Process RAM usage is unavailable on this system."
+msgstr "Der RAM-Verbrauch des Prozesses ist auf diesem System nicht verfügbar."
+
+#: src/app/resources/mod.rs:61
+msgid "GPU memory used by OpenFadeR, as reported by the driver. Shared allocations follow driver accounting."
+msgstr "Von OpenFadeR genutzter GPU-Speicher laut Treiber. Gemeinsam genutzte Zuweisungen werden nach Treiberangaben gezählt."
+
+#: src/app/resources/mod.rs:63
+msgid "Per-process VRAM usage is unavailable on this GPU or driver."
+msgstr "Der VRAM-Verbrauch pro Prozess ist mit dieser GPU oder diesem Treiber nicht verfügbar."
 
 #: src/app/sampler/controls.rs:89
 msgid "this slice has no tempo: SYNC does nothing"

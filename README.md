@@ -91,6 +91,12 @@ Windowless startup has a two-second deadline so a deferred driver error cannot l
 An explicit `SLINT_BACKEND` selection is never replaced. Drawing rate is an upper bound: actual cadence also depends on
 the display, renderer and hardware, not a promise of zero physical latency. See [Raspberry Pi performance advice](docs/raspberry-pi.md#speed).
 
+RAM and VRAM in the top-right show OpenFadeR's process usage, refreshed once a second by a background worker.
+RAM is resident memory, including shared pages. VRAM follows the driver's accounting: optional NVIDIA NVML or
+Linux DRM resident/local-memory counters, never whole-device usage or an estimate. Unsupported drivers and
+shared-memory-only GPUs show **—**, not a fabricated zero. Hover either row for details. Touch and Stage layouts
+put the same readout in the existing status line to preserve space for their controls.
+
 PREFERENCES > AUDIO > BUFFER shows what AUTO requests: 512 frames on a full-power machine, or the driver's default in LOW-POWER MODE. An explicit frame count overrides either choice; a driver that refuses it falls back to its own buffer and reports that in the audio status. The Linux backend requests two periods per fixed buffer. Smaller buffers reduce output delay but can underrun under load: increase the buffer if audio crackles. Output-device lookup runs off the UI thread; the status shows a pending lookup and then the device actually in use. MIDI dispatch, drawing time and the sound card's output delay are separate costs, not zero physical latency.
 
 The interface is in English, French, Spanish, German, Portuguese (Brazil), Italian or Dutch: PREFERENCES > VIEW > LANGUAGE, where SYSTEM follows the computer's language. Button labels that match DJ hardware (CUE, SYNC, LOOP, BEAT FX …) stay in English in every language.
