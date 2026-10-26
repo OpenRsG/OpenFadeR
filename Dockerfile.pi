@@ -11,7 +11,7 @@
 ARG RUST_VERSION=1.99
 
 FROM rust:${RUST_VERSION}-trixie AS build
-ARG PLUGINS_REF=v0.2.7
+ARG PLUGINS_REF=v0.2.8
 ARG THEMES_REF=main
 ARG MAPPINGS_REF=main
 # Cortex-A53 (Pi 3) code also runs on the A72 of the Pi 4 / CM4 and on later cores.

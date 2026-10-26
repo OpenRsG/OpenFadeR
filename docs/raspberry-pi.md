@@ -12,7 +12,7 @@ tar xzf openfader-*-linux-aarch64-pi.tar.gz && ./openfader-*-linux-aarch64-pi/op
 ```
 
 The archive holds the same plugins, themes and controller mappings as a release archive. Core 0.2.7 builds the companion
-OpenFadeR-Plugins tag `v0.2.7`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
+OpenFadeR-Plugins tag `v0.2.8`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
 pick the other companions' branch or tag). Checkouts already present in `extension/plugin`, `extension/skin` or `mappings`
 are used as they are, so switch an older plugin checkout to the matching tag first. The cargo registry and target folders stay
 in BuildKit cache mounts, so the next build only recompiles what changed.

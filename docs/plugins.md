@@ -928,7 +928,7 @@ workspace in release mode and copies each library next to its `plugin.json`; `st
 `sdk/` and `compatibility/rekordbox/common` from the core checkout. Their settings are on their cards in PREFERENCES >
 EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
 
-Core 0.2.7 builds use the matching OpenFadeR-Plugins tag `v0.2.7`: CI's `plugins_ref` input, Docker's `PLUGINS_REF` build arg
+Core 0.2.7 builds use the matching OpenFadeR-Plugins tag `v0.2.8`: CI's `plugins_ref` input, Docker's `PLUGINS_REF` build arg
 and the `PLUGINS_REF` environment variable for `start.sh` / `install.sh` can select another compatible ref. Existing companion
 checkouts are used as they stand; switch an older checkout to that tag before building this core. The generic GET PLUGINS
 catalog still reads repositories' default branches and downloads their prebuilt native libraries.
