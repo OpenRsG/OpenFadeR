@@ -1,9 +1,8 @@
 name: Release
 
-# Tag v*: build the app on Linux, Windows and macOS (arm64), bundle it with the themes, the controller mappings and the plugins
-# (the native ones prebuilt) in the folders it finds next to its executable, run the app from the packaged files, cross-compile the
-# Raspberry Pi archive (Dockerfile.pi), and create a DRAFT release with the four archives. A manual run (workflow_dispatch) builds
-# and uploads the archives as workflow artifacts only.
+# Tag v*: package Linux, Windows, Apple silicon and Raspberry Pi archives, then create a draft release.
+# macOS uses native Intel smoke tests plus an ARM cross-build with archive architecture/signature checks.
+# A manual run uploads workflow artifacts only.
 # Publish a draft with: gh release edit <tag> --draft=false
 on:
   push:
@@ -21,7 +20,12 @@ jobs:
         include:
           - { name: linux, os: ubuntu-latest, arch: x86_64 }
           - { name: windows, os: windows-latest, arch: x86_64 }
-          - { name: macos, os: macos-15, arch: arm64 }
+          - {
+              name: macos,
+              os: macos-15-intel,
+              arch: arm64,
+              target: aarch64-apple-darwin,
+            }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     defaults:
@@ -45,6 +49,8 @@ jobs:
         with:
           python-version: "3.x"
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
@@ -70,6 +76,22 @@ jobs:
         env:
           CARGO_PROFILE_DIST_LTO: ${{ matrix.name == 'macos' && 'false' || 'thin' }}
         run: cargo build --profile dist
+      - name: Native macOS smoke
+        if: matrix.name == 'macos'
+        run: |
+          mkdir native-smoke
+          cp target/dist/openfader native-smoke/
+          cp -L target/dist/*.dylib native-smoke/
+          python .github/bundle.py native-smoke
+          bash .github/smoke.sh native-smoke/openfader smoke
+      - name: Cross-build Apple silicon app and plugins
+        if: matrix.name == 'macos'
+        env:
+          CARGO_BUILD_TARGET: aarch64-apple-darwin
+          CARGO_PROFILE_DIST_LTO: "false"
+        run: |
+          extension/plugin/build.sh --quiet
+          cargo build --profile dist
       - name: Package
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -100,8 +122,8 @@ jobs:
           macos)
             d=OpenFadeR.app
             mkdir -p "$d/Contents/MacOS" "$d/Contents/Resources"
-            cp target/dist/openfader "$d/Contents/MacOS/"
-            cp -L target/dist/*.dylib "$d/Contents/MacOS/"
+            cp target/aarch64-apple-darwin/dist/openfader "$d/Contents/MacOS/"
+            cp -L target/aarch64-apple-darwin/dist/*.dylib "$d/Contents/MacOS/"
             python .github/bundle.py "$d/Contents/Resources"
             cp LICENSE README.md "$d/Contents/Resources/"
             cp assets/openfader.icns "$d/Contents/Resources/"
@@ -131,7 +153,7 @@ jobs:
             ;;
           esac
           ls -l out
-      # The packaged files, unpacked somewhere else, must start and show their window (the smoke test of ci.yml).
+      # Linux/Windows execute their unpacked packages; the ARM macOS bundle is checked after the native Intel smoke.
       - name: Unpack the archive
         run: |
           mkdir unpacked
@@ -148,10 +170,21 @@ jobs:
       - name: Smoke test of the packaged app
         if: matrix.name == 'windows'
         run: bash .github/smoke.sh unpacked/openfader-*/openfader.exe smoke
-      - name: Smoke test of the packaged app (macOS)
+      - name: Validate Apple silicon package
         if: matrix.name == 'macos'
-        run: bash .github/smoke.sh unpacked/OpenFadeR.app/Contents/MacOS/openfader smoke
-      # Only publish distributable archives after the packaged app passes its smoke test.
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          bundle = Path("unpacked/OpenFadeR.app")
+          binary = bundle / "Contents/MacOS/openfader"
+          assert binary.is_file()
+          for path in [binary, *bundle.rglob("*.dylib")]:
+              arches = subprocess.check_output(["lipo", "-archs", str(path)], text=True).split()
+              assert "arm64" in arches, f"{path}: expected arm64, got {arches}"
+          PY
+          codesign --verify --deep --strict unpacked/OpenFadeR.app
+      # Upload only after the platform smoke test and, for cross-built macOS, archive validation.
       - name: Upload validated package
         uses: actions/upload-artifact@v4
         with:
@@ -205,6 +238,6 @@ jobs:
             - **Linux** (x86_64): `openfader-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
             - **Raspberry Pi 3, 4, 5 and CM4** (aarch64, 64-bit Raspberry Pi OS based on Debian 13): `openfader-<version>-linux-aarch64-pi.tar.gz`. Unpack and run `./openfader-<version>-linux-aarch64-pi/openfader`. See docs/raspberry-pi.md.
             - **Windows** (x86_64): `openfader-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
-            - **macOS** (Apple silicon): `OpenFadeR-<version>-macos-arm64.zip` holds `OpenFadeR.app`. It is **not signed or notarized**: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/OpenFadeR.app`.
+            - **macOS** (Apple silicon): `OpenFadeR-<version>-macos-arm64.zip` holds `OpenFadeR.app`. It is ad-hoc signed, not developer-signed or notarized: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/OpenFadeR.app`. Native tests/smoke run on Intel macOS; the ARM archive is cross-built and checked for ARM libraries and signatures, without an ARM runtime smoke test.
 
             Optional: `ffmpeg` on the PATH for video; `python` (3) for the Python plugins. Volume sliders of the audio page exist on Linux only: on Windows and macOS the volume is the system's.
