@@ -14,9 +14,8 @@ type Session = (Track, Vec<Beat>, Vec<Cue>);
 
 #[derive(Clone)]
 pub struct Pending {
-    /// Tracks, playlists and store data; the analysis slots stay `None` while `reader` is set.
+    /// Tracks, playlists and store data; source analyses are read only on the worker.
     snap: Snapshot,
-    /// `None`: the library had no reader and `snap` holds its analyses already.
     reader: Option<AnalysisReader>,
     /// Applied after the analyses are read, in the order they came.
     sessions: Vec<Session>,
@@ -31,6 +30,13 @@ impl Pending {
         }
     }
 
+    /// Selected tracks without any synchronous source reads.
+    pub fn of_tracks(tracks: Vec<Track>, reader: Option<AnalysisReader>) -> Self {
+        Self::new(
+            Snapshot::of_tracks(tracks.into_iter().map(|t| (t, None)).collect()),
+            reader,
+        )
+    }
     /// The tracks and playlists, for what needs no analysis (a list of playlists, a count). Its analyses are not read.
     pub fn outline(&self) -> &Snapshot {
         &self.snap
@@ -71,16 +77,34 @@ impl Pending {
     /// worker. `store` is the one the library is overlaid with: its cue, grid and phrase edits go on top of what the reader
     /// answers ([`store::edited`]), then the decks' sessions.
     pub fn read(&self, store: &Store) -> Snapshot {
+        self.read_cancellable(store, &|| false)
+            .expect("uncancelled snapshot")
+    }
+
+    /// [`Pending::read`] with cancellation checked between source reads and session overrides.
+    pub fn read_cancellable(
+        &self,
+        store: &Store,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Option<Snapshot> {
         let mut snap = self.snap.clone();
-        if let Some(read) = &self.reader {
-            for (t, a) in &mut snap.tracks {
-                *a = store::with_edits(read(t), t, store);
+        for (t, a) in &mut snap.tracks {
+            if cancelled() {
+                return None;
             }
+            let own = self
+                .reader
+                .as_ref()
+                .map_or_else(|| a.take(), |read| read(t));
+            *a = store::with_edits(own, t, store);
         }
         for (t, beats, cues) in &self.sessions {
+            if cancelled() {
+                return None;
+            }
             snap.override_session(t, beats.clone(), cues.clone());
         }
-        snap
+        (!cancelled()).then_some(snap)
     }
 }
 
@@ -91,10 +115,20 @@ mod tests {
     use crate::library::{Library, Playlist};
     use std::sync::Arc;
 
-    /// Three tracks, one playlist of two of them; the analysis of a track is its title as the key. `reader`: whether it
-    /// offers an [`AnalysisReader`].
-    struct Lib {
-        reader: bool,
+    /// Three tracks, one playlist of two; analyses are available through both source interfaces.
+    struct Lib;
+
+    struct Empty;
+    impl Library for Empty {
+        fn kind(&self) -> &str {
+            "empty source"
+        }
+        fn playlists(&self) -> Result<Vec<Playlist>, String> {
+            Lib.playlists()
+        }
+        fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {
+            Lib.tracks(playlist)
+        }
     }
 
     fn analysis(t: &Track) -> Option<Analysis> {
@@ -130,8 +164,7 @@ mod tests {
             analysis(t)
         }
         fn analysis_reader(&self) -> Option<AnalysisReader> {
-            self.reader
-                .then(|| Arc::new(|t: &Track| analysis(t)) as AnalysisReader)
+            Some(Arc::new(analysis))
         }
     }
 
@@ -163,7 +196,7 @@ mod tests {
     #[test]
     fn read_gives_what_take_gives_for_the_overlaid_library() {
         let store = Arc::new(Store::in_memory().unwrap());
-        let overlaid = |reader| store::Overlay::new(Box::new(Lib { reader }), store.clone());
+        let overlaid = || store::Overlay::new(Box::new(Lib), store.clone());
         // An edit for a track the reader answers, and one for a track the library would answer with nothing new.
         let t1 = Track {
             title: "t1".into(),
@@ -174,10 +207,10 @@ mod tests {
             .unwrap();
         let session = (t1.clone(), Vec::new(), vec![cue(1234)]);
 
-        let mut eager = Snapshot::take(&overlaid(true)).unwrap();
+        let mut eager = Snapshot::take(&overlaid()).unwrap();
         eager.override_session(&session.0, session.1.clone(), session.2.clone());
 
-        let mut pending = Snapshot::take_pending(&overlaid(true)).unwrap();
+        let mut pending = Snapshot::take_pending(&overlaid()).unwrap();
         assert!(pending.outline().tracks().iter().all(|(_, a)| a.is_none()));
         pending.override_session(&session.0, session.1.clone(), session.2.clone());
         let read = pending.read(&store);
@@ -200,24 +233,59 @@ mod tests {
     }
 
     #[test]
-    fn a_library_without_a_reader_is_read_up_front() {
+    fn a_library_without_a_reader_never_reads_sources_on_the_ui_thread_and_keeps_store_edits() {
         let store = Store::in_memory().unwrap();
-        let pending = Snapshot::take_pending(&Lib { reader: false }).unwrap();
-        assert!(pending.outline().tracks().iter().all(|(_, a)| a.is_some()));
-        assert_eq!(
-            shape(&pending.read(&store)),
-            shape(&Snapshot::take(&Lib { reader: false }).unwrap())
-        );
+        let pending = Snapshot::take_pending(&Empty).unwrap();
+        assert!(pending.outline().tracks().iter().all(|(_, a)| a.is_none()));
+        let track = &pending.outline().tracks()[0].0;
+        store
+            .set_cues(&store::key(track), Some(&[cue(900)]))
+            .unwrap();
+        let read = pending.read(&store);
+        assert_eq!(read.tracks()[0].1.as_ref().unwrap().cues[0].time_ms, 900);
+        assert!(read.tracks()[1..].iter().all(|(_, a)| a.is_none()));
     }
 
     #[test]
     fn narrowed_keeps_the_analyses_to_read() {
         let store = Store::in_memory().unwrap();
-        let pending = Snapshot::take_pending(&Lib { reader: true }).unwrap();
+        let pending = Snapshot::take_pending(&Lib).unwrap();
         let narrowed = pending.narrowed(&["p"]).unwrap();
         assert!(pending.narrowed(&["nope"]).is_none());
         let s = narrowed.read(&store);
         assert_eq!(shape(&s).len(), 2);
         assert!(s.tracks().iter().all(|(_, a)| a.is_some()));
+    }
+    #[test]
+    fn deferred_track_sources_keep_their_own_cues_grid_and_key_without_overrides() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let reads = Arc::new(AtomicUsize::new(0));
+        let calls = reads.clone();
+        let pending = Pending::of_tracks(
+            vec![Track {
+                title: "source".into(),
+                ..Default::default()
+            }],
+            Some(Arc::new(move |_| {
+                calls.fetch_add(1, Ordering::Relaxed);
+                Some(Analysis {
+                    key: Some("9B".into()),
+                    cues: vec![cue(1800)],
+                    beats: vec![Beat {
+                        bar_pos: 1,
+                        bpm_x100: 12800,
+                        time_ms: 100,
+                    }],
+                    ..Default::default()
+                })
+            })),
+        );
+        assert_eq!(reads.load(Ordering::Relaxed), 0);
+        let read = pending.read(&Store::in_memory().unwrap());
+        let analysis = read.tracks()[0].1.as_ref().unwrap();
+        assert_eq!(analysis.key.as_deref(), Some("9B"));
+        assert_eq!(analysis.cues[0].time_ms, 1800);
+        assert_eq!(analysis.beats[0].time_ms, 100);
+        assert_eq!(reads.load(Ordering::Relaxed), 1);
     }
 }

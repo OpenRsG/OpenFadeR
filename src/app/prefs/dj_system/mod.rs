@@ -26,7 +26,7 @@ pub use connected::sync_from_device;
 
 use super::{Prefs, Row};
 use crate::app::{App, DjEditor, DjItem, DjSystemState};
-use openfader::device::{self, Device};
+use openfader::device::Device;
 use openfader::plugin::device::{self as plugin, Provider};
 use openfader::store::{
     self, Store,
@@ -292,7 +292,7 @@ fn open(tab: usize, n: usize) -> usize {
 /// The rows of the open tab (the dialog calls this after every click); also refreshes `DjSystemState`.
 pub fn rows(_: &Prefs) -> Vec<Row> {
     let (scope, tab, status) = snapshot();
-    let devices = device::scan();
+    let devices = crate::app::device::mounted();
     let pages = pages(&scope, &devices);
     let i = open(tab, pages.len());
     let store = store::global();
@@ -327,7 +327,7 @@ pub fn rows(_: &Prefs) -> Vec<Row> {
 /// Runs `f` on the open tab with a fresh context and remembers its outcome for the status line.
 fn run(f: impl FnOnce(&mut Ctx, &Page, &[Device]) -> Done) {
     let (scope, tab, _) = snapshot();
-    let devices = device::scan();
+    let devices = crate::app::device::mounted();
     let pages = pages(&scope, &devices);
     let store = store::global();
     let mut c = Ctx::new(&store, &scope, device_settings::files_dir());

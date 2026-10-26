@@ -134,6 +134,9 @@ impl library::Library for Tagged<'_> {
     fn analysis(&self, track: &library::Track) -> Option<openfader::analysis::Analysis> {
         self.0.analysis(track)
     }
+    fn analysis_reader(&self) -> Option<library::AnalysisReader> {
+        self.0.analysis_reader()
+    }
 }
 
 /// Imports a sampler pack: its samples join the Collection with their tags, its top-level folders replace those of an
@@ -236,4 +239,44 @@ pub fn source(c: &Rc<Ctx>) {
         },
         finished,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use library::Library;
+
+    struct Source;
+    impl Library for Source {
+        fn kind(&self) -> &str {
+            "source"
+        }
+        fn playlists(&self) -> Result<Vec<library::Playlist>, String> {
+            Ok(Vec::new())
+        }
+        fn tracks(&self, _: Option<&str>) -> Result<Vec<library::Track>, String> {
+            Ok(Vec::new())
+        }
+        fn analysis(&self, _: &library::Track) -> Option<openfader::analysis::Analysis> {
+            panic!("reader creation must not call the source")
+        }
+        fn analysis_reader(&self) -> Option<library::AnalysisReader> {
+            Some(Arc::new(|_| {
+                Some(openfader::analysis::Analysis {
+                    key: Some("8A".into()),
+                    ..Default::default()
+                })
+            }))
+        }
+    }
+
+    #[test]
+    fn tagged_import_sources_keep_their_worker_analysis_reader() {
+        let tagged = Tagged(&Source);
+        let reader = tagged.analysis_reader().unwrap();
+        assert_eq!(
+            reader(&library::Track::default()).unwrap().key.as_deref(),
+            Some("8A")
+        );
+    }
 }

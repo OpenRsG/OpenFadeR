@@ -131,7 +131,7 @@ that asset for the user's platform nothing is installed and the page says `no pr
 | `suggest` | The software the plugin makes OpenFadeR compatible with (its name). The welcome window, at the first start and from Help > Welcome, offers to switch on every plugin found with one and names that software. |
 | `script` | The file serving sources, actions and events, in the plugin folder: `*.lua` runs inside the app ([Lua plugins](#lua-plugins)), `*.py` with `python3` (on Windows the `py` launcher, else `python`), anything else is run as a program. |
 | `command` | Instead of `script`: the program and its arguments, started once per request. A relative program or argument that names a file in the plugin folder becomes that file's path (`["node", "main.js"]` runs the plugin's `main.js`). |
-| `persistent` | `true`: one process (or one Lua state) serves every request instead of a new one each: no start-up cost per request, and the plugin keeps its state. See [Persistent plugins](#persistent-plugins). |
+| `persistent` | `true`: one process (or one Lua state) serves ordinary requests instead of a new one each: no start-up cost per request, and the plugin keeps its state. Cancellable `fetch` requests use isolated request-owned execution. See [Persistent plugins](#persistent-plugins). |
 | `sources` | Track sources. `id` (no `:`, unique in the plugin), `name` (the folder's label), `search` (the source has a search entry). |
 | `actions` | Menu entries: `id`, `label`, and `input`, the prompt of a text field asked for before the action runs (leave it out to run at once). |
 | `events` | Names of the events the plugin wants to hear (see [Events](#events)). |
@@ -212,6 +212,8 @@ for line in sys.stdin:  # ends when the app closes stdin
 
 A persistent Lua plugin keeps one Lua state: globals survive between requests (the script is loaded again when its file or the
 plugin's `version` changes), and its requests take turns instead of running at the same time.
+
+`fetch` is the exception: it always runs in a fresh process or Lua state so cancelling a download cannot terminate or mutate another request's persistent session. Its `id` remains the source's track id, not a host correlation id. A fetch must be self-contained using the supplied source, id, settings and directory.
 
 You can test a Python plugin without the app:
 
@@ -328,7 +330,7 @@ AUTOMIX, Continuous Playing): the deck shows "downloading…", then the track lo
 
 ```json
 {"op": "fetch", "source": "youtube", "id": "K0HSD_i2DvA",
- "dir": "/home/me/.local/share/openfader/plugins/yt-dlp/youtube", "name": "K0HSD_i2DvA"}
+ "dir": "/home/me/.local/share/openfader/plugins/yt-dlp/youtube/.fetch-1234-0", "name": "K0HSD_i2DvA"}
 → {"file": "K0HSD_i2DvA.m4a"}
 ```
 
@@ -336,12 +338,11 @@ Write the audio into `dir` as `<name>.<extension>` and answer its path (relative
 
 * The audio must be a format the decks play: **mp3, AAC (m4a), FLAC or WAV**. Convert what you download (ffmpeg) and fail with a
   clear `error` when you cannot.
-* `name` is the track's id made safe for a file name; keep it as the file's name without extension. The app looks for
-  `<name>.*` in `dir` before asking, so a track that was fetched once is **never fetched again**, also in the next run. A file
-  with the extension `part`, `tmp` or `ytdl`, or an empty one, does not count.
-* Make the file appear complete: download into a temporary folder and rename it into `dir` at the end.
-* `dir` is `<data dir>/plugins/<plugin>/<source>/`; the data dir is `$XDG_DATA_HOME/openfader` (else `~/.local/share/openfader`).
-  Deleting files there is safe, they are fetched again.
+* `name` is the track's id made safe for a file name; keep it as the file's name without extension. Before fetching, the app reuses a non-empty completed `<name>.*` in the source's download folder. Files with extension `part`, `tmp` or `ytdl` do not count.
+* `dir` is a request-owned staging folder below `<data dir>/plugins/<plugin>/<source>/`. The data dir is `$XDG_DATA_HOME/openfader` (else `~/.local/share/openfader`). Do not assume `dir` is the permanent source folder.
+* Write the complete result inside `dir` and return its path. The host publishes it atomically into the source folder without replacing an already valid cached download.
+* Superseding a load cancels its fetch and removes request-owned partial output. If cancellation wins before publication, no result is published; if publication already won, the valid cached result remains. An existing file returned outside `dir` is not removed.
+* Downloads use four workers and at most eight queued requests. Queued cancellation removes the work immediately. A process request owns its process group; Lua checks cancellation during execution, sleeps, subprocess waits and download chunks. A blocked Lua HTTP operation may still occupy its worker until the existing 60-second transport timeout.
 
 ### Actions
 

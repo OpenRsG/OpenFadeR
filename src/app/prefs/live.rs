@@ -60,9 +60,11 @@ pub fn on_action(key: &str, f: impl Fn() + 'static) {
     ACTIONS.with(|a| a.add(key, Rc::new(f)));
 }
 
-/// Runs the handlers registered for `key` (no handler: nothing happens).
-pub fn run_action(key: &str) {
-    ACTIONS.with(|a| a.of(key)).iter().for_each(|f| f());
+/// Runs registered actions outside the settings borrow; handlers may read or edit preferences.
+pub(super) fn run_action(key: &str) -> bool {
+    let handlers = ACTIONS.with(|a| a.of(key));
+    handlers.iter().for_each(|f| f());
+    !handlers.is_empty()
 }
 
 /// Registers the handler of a text row ([`super::Row::text`]) with key `key`; it gets the accepted text and decides

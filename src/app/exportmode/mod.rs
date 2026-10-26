@@ -186,11 +186,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
                 }
                 Some((_, t)) => {
                     analyze::request(std::slice::from_ref(&t), true);
-                    tr!(
-                        "analysing “{}”…{}",
-                        t.title,
-                        analyze::library_grid_notice(&t)
-                    )
+                    tr!("analysing “{}”…", t.title)
                 }
             };
             toast::show(&app, &msg);

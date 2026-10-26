@@ -4,9 +4,126 @@ use super::super::{Deck, PadMode};
 use crate::app::prefs;
 use openfader::audio::{self, stemfile};
 use openfader::stems::{Phase, Quality};
+use parking_lot::{Condvar, Mutex};
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, LazyLock};
 use std::{path::PathBuf, time::Instant};
+
+struct Prepared {
+    parts: Option<stemfile::Info>,
+    separates: bool,
+}
+
+struct LookupWork {
+    file: PathBuf,
+    quality: Quality,
+    from_file: bool,
+    cancelled: Arc<AtomicBool>,
+    back: mpsc::Sender<Prepared>,
+}
+
+fn prepare(
+    cancelled: &AtomicBool,
+    parts: impl FnOnce() -> Option<stemfile::Info>,
+    cached: impl FnOnce() -> bool,
+) -> Option<Prepared> {
+    if cancelled.load(Relaxed) {
+        return None;
+    }
+    let parts = parts();
+    if cancelled.load(Relaxed) {
+        return None;
+    }
+    let separates = parts.is_none() && !cached();
+    (!cancelled.load(Relaxed)).then_some(Prepared { parts, separates })
+}
+
+static LOOKUPS: LazyLock<(Mutex<VecDeque<LookupWork>>, Condvar)> = LazyLock::new(|| {
+    for _ in 0..2 {
+        std::thread::spawn(|| {
+            loop {
+                let work = {
+                    let (queue, ready) = &*LOOKUPS;
+                    let mut queue = queue.lock();
+                    while queue.is_empty() {
+                        ready.wait(&mut queue);
+                    }
+                    queue.pop_front().expect("not empty")
+                };
+                let prepared = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    prepare(
+                        &work.cancelled,
+                        || {
+                            work.from_file
+                                .then(|| stemfile::read_info(&work.file))
+                                .flatten()
+                        },
+                        || openfader::stems::cache::has(&work.file, work.quality),
+                    )
+                }))
+                .ok()
+                .flatten();
+                if let Some(prepared) = prepared {
+                    let _ = work.back.send(prepared);
+                }
+            }
+        });
+    }
+    (Mutex::new(VecDeque::new()), Condvar::new())
+});
+
+pub(super) struct Lookup {
+    file: PathBuf,
+    quality: Quality,
+    multithread: bool,
+    from_file: bool,
+    cancelled: Arc<AtomicBool>,
+    rx: Receiver<Prepared>,
+    ready: Option<Prepared>,
+    pcm: Option<Arc<audio::Track16>>,
+}
+
+impl Lookup {
+    fn new(file: PathBuf, quality: Quality, multithread: bool, from_file: bool) -> Self {
+        let (back, rx) = mpsc::channel();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let mut queue = LOOKUPS.0.lock();
+        queue.retain(|w| !w.cancelled.load(Relaxed));
+        // Four decks retain one request each; active filesystem calls are bounded by the two workers.
+        if queue.len() < 8 {
+            queue.push_back(LookupWork {
+                file: file.clone(),
+                quality,
+                from_file,
+                cancelled: cancelled.clone(),
+                back,
+            });
+            LOOKUPS.1.notify_one();
+        }
+        Self {
+            file,
+            quality,
+            multithread,
+            from_file,
+            cancelled,
+            rx,
+            ready: None,
+            pcm: None,
+        }
+    }
+}
+
+impl Drop for Lookup {
+    fn drop(&mut self) {
+        self.cancelled.store(true, Relaxed);
+        LOOKUPS
+            .0
+            .lock()
+            .retain(|w| !Arc::ptr_eq(&w.cancelled, &self.cancelled));
+    }
+}
 
 fn progress_text(phase: Phase, f: f32) -> String {
     let pct = (f * 100.0) as u32;
@@ -59,23 +176,27 @@ impl Deck {
         if WARM.load(Relaxed) || now_s() < 2 {
             return;
         }
-        prefs::with(|p| {
-            let quality = if p.stems_fast {
+        let (enabled, fast, multithread, from_file) = prefs::with(|p| {
+            (
+                p.stems,
+                p.stems_fast,
+                p.extensions.stems_multithread,
+                p.extensions.stem_files,
+            )
+        });
+        if enabled && let Some(file) = file {
+            let quality = if fast {
                 Quality::Speed
             } else {
                 Quality::Quality
             };
-            // A cached track separates nothing: the job reads the entry, so no engine is needed. Nor does a stem file.
-            let separates = !file.is_some_and(|f| {
-                openfader::stems::cache::has(f, quality)
-                    || p.extensions.stem_files && stemfile::read_info(f).is_some()
-            });
-            if p.stems && separates {
-                WARM.store(true, Relaxed);
-                LAST_BUSY.store(now_s(), Relaxed);
-                openfader::stems::warm(p.extensions.stems_multithread);
-            }
-        });
+            self.stems.borrow_mut().lookup = Some(Lookup::new(
+                file.to_owned(),
+                quality,
+                multithread,
+                from_file,
+            ));
+        }
     }
 }
 
@@ -102,19 +223,91 @@ impl Deck {
         } else {
             Quality::Quality
         };
-        let parts = from_file.then(|| stemfile::read_info(&file)).flatten();
-        let job = match parts.clone() {
-            Some(info) => openfader::stems::Job::from_stem_file(file, pcm, info),
-            None => openfader::stems::Job::start(file, pcm, quality, multithread),
-        };
         let mut s = self.stems.borrow_mut();
+        let same_lookup = s.lookup.as_ref().is_some_and(|lookup| {
+            lookup.file == file
+                && lookup.quality == quality
+                && lookup.multithread == multithread
+                && lookup.from_file == from_file
+        });
+        if !same_lookup {
+            s.lookup = None;
+            s.lookup = Some(Lookup::new(file, quality, multithread, from_file));
+        }
+        s.lookup.as_mut().expect("installed").pcm = Some(pcm);
         s.complete = false;
         s.focus = None;
-        s.parts = parts;
         s.text = progress_text(Phase::Opening, 0.0);
-        s.job = Some(job);
         drop(s);
         self.show_stems();
+    }
+
+    fn poll_stems_lookup(&self) {
+        let Some(mut lookup) = self.stems.borrow_mut().lookup.take() else {
+            return;
+        };
+        if lookup.ready.is_some() && lookup.pcm.is_none() {
+            self.stems.borrow_mut().lookup = Some(lookup);
+            return;
+        }
+        let prepared = match lookup.ready.take() {
+            Some(ready) => ready,
+            None => match lookup.rx.try_recv() {
+                Ok(ready) => ready,
+                Err(TryRecvError::Empty) => {
+                    self.stems.borrow_mut().lookup = Some(lookup);
+                    return;
+                }
+                Err(TryRecvError::Disconnected) => {
+                    self.stems.borrow_mut().text = tr!("NO STEMS").into();
+                    self.show_stems();
+                    return;
+                }
+            },
+        };
+        let current = prefs::with(|p| {
+            p.stems
+                && p.stems_fast == (lookup.quality == Quality::Speed)
+                && p.extensions.stem_files == lookup.from_file
+                && p.extensions.stems_multithread == lookup.multithread
+        });
+        let same_file = self
+            .loaded
+            .borrow()
+            .track
+            .as_ref()
+            .and_then(|t| t.file.as_ref())
+            .is_some_and(|f| *f == lookup.file);
+        if !current || !same_file {
+            return;
+        }
+        if prepared.separates
+            && now_s() >= 2
+            && WARM.compare_exchange(false, true, Relaxed, Relaxed).is_ok()
+        {
+            LAST_BUSY.store(now_s(), Relaxed);
+            let multithread = lookup.multithread;
+            std::thread::spawn(move || openfader::stems::warm(multithread));
+        }
+        if let Some(pcm) = lookup.pcm.take() {
+            let job = match prepared.parts.clone() {
+                Some(info) => openfader::stems::Job::from_stem_file(lookup.file.clone(), pcm, info),
+                None => openfader::stems::Job::start(
+                    lookup.file.clone(),
+                    pcm,
+                    lookup.quality,
+                    lookup.multithread,
+                ),
+            };
+            let mut s = self.stems.borrow_mut();
+            s.parts = prepared.parts;
+            s.job = Some(job);
+            drop(s);
+            self.show_stems();
+        } else {
+            lookup.ready = Some(prepared);
+            self.stems.borrow_mut().lookup = Some(lookup);
+        }
     }
 
     pub(in crate::app::deck) fn completed_stems(&self) -> Option<Arc<audio::Stems>> {
@@ -150,6 +343,7 @@ impl Deck {
         self.stemwave_pcm(&pcm);
         self.stemwave_stems(&stems);
         let mut s = self.stems.borrow_mut();
+        s.lookup = None;
         s.job = None;
         s.complete = true;
         s.text = tr!("100% READY").into();
@@ -208,6 +402,7 @@ impl Deck {
 
     /// Tick: shows the job's progress, keeps it pointed at the play position and takes its outcome.
     pub(in crate::app::deck) fn poll_stems(&self) {
+        self.poll_stems_lookup();
         engines_tick(self.stems.borrow().job.is_some());
         let pending = {
             let s = self.stems.borrow();
@@ -342,6 +537,7 @@ impl Deck {
     /// STEMS switched off: no job, no stems in the player (the mute state stays for when it comes back).
     fn stems_clear_job(&self) {
         let mut s = self.stems.borrow_mut();
+        s.lookup = None;
         s.job = None;
         s.attached = None;
         s.parts = None;
@@ -355,6 +551,48 @@ impl Deck {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancelled_blocked_preflight_cannot_publish_or_probe_the_cache() {
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let (_back, rx) = mpsc::channel();
+        let owner = Lookup {
+            file: PathBuf::from("old.wav"),
+            quality: Quality::Quality,
+            multithread: false,
+            from_file: true,
+            cancelled: cancelled.clone(),
+            rx,
+            ready: None,
+            pcm: None,
+        };
+        let (started, begin) = mpsc::channel();
+        let (release, wait) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            prepare(
+                &cancelled,
+                || {
+                    started.send(()).unwrap();
+                    wait.recv().unwrap();
+                    None
+                },
+                || panic!("cancelled metadata cannot lead to cache or model work"),
+            )
+        });
+        begin
+            .recv_timeout(std::time::Duration::from_secs(1))
+            .unwrap();
+        drop(owner);
+        release.send(()).unwrap();
+        assert!(worker.join().unwrap().is_none());
+    }
+
+    #[test]
+    fn cached_preflight_does_not_admit_a_model_warmup() {
+        let prepared = prepare(&AtomicBool::new(false), || None, || true).unwrap();
+        assert!(!prepared.separates);
+        assert!(prepared.parts.is_none());
+    }
 
     #[test]
     fn shared_stems_require_completion_rate_length_and_sufficient_quality() {

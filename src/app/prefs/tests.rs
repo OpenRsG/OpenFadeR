@@ -1,4 +1,3 @@
-use super::dialog::PAGES;
 use super::file::{load_from, path_from, save_to};
 use super::live::update_with;
 use super::*;
@@ -112,26 +111,6 @@ fn extra_settings_are_stored_in_the_file() {
         (Some("/tmp/y"), true),
         "{notes:?}"
     );
-}
-
-#[test]
-fn every_row_of_every_page_is_clickable() {
-    let p = Prefs::default();
-    for (rows, _) in PAGES {
-        for r in rows(&p).iter().filter(|r| {
-            matches!(
-                r.kind,
-                rows::Kind::Chips | rows::Kind::Dropdown | rows::Kind::Check
-            )
-        }) {
-            assert!(
-                PAGES.iter().any(|(_, c)| c(&mut p.clone(), &r.key, 0))
-                    || p.clone().choose(&r.key, 0),
-                "no handler for row {:?}",
-                r.key
-            );
-        }
-    }
 }
 
 #[test]

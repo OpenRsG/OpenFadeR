@@ -2,8 +2,8 @@ use super::fetch::file_name;
 use super::reply::{Listed, MAX_DEPTH};
 use super::*;
 use crate::library::Remote;
-use crate::plugin::tests::{registry_of, temp};
 use crate::plugin::Registry;
+use crate::plugin::tests::{registry_of, temp};
 use std::{
     sync::mpsc::{channel, Receiver},
     time::{Duration, Instant},
@@ -213,11 +213,11 @@ fn nesting_drops_parent_cycles_and_stays_bounded() {
     assert!(nest(&own).len() <= MAX_DEPTH + 1);
 }
 
-/// A plugin whose `fetch` writes `$dir/$name.mp3` (and counts its runs in `$dir/.runs`).
+/// A plugin whose `fetch` writes `$dir/$name.mp3` and counts runs beside the request folder.
 const FETCHER: &str = r#"read line
 dir=$(printf '%s' "$line" | sed 's/.*"dir":"\([^"]*\)".*/\1/')
 name=$(printf '%s' "$line" | sed 's/.*"name":"\([^"]*\)".*/\1/')
-echo run >> "$dir/.runs"
+echo run >> "$dir/../.runs"
 printf 'audio' > "$dir/$name.mp3"
 printf '{"file":"%s.mp3"}' "$name""#;
 

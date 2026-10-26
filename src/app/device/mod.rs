@@ -40,8 +40,8 @@ mod link;
 mod pace;
 mod pick;
 mod preview;
-mod safety;
 mod review;
+mod safety;
 mod scan;
 mod sync;
 mod transfer;
@@ -49,7 +49,8 @@ mod verify;
 
 pub use import::import_tracks;
 pub use link::{track_edited, track_loading};
-pub use transfer::{drop_playlist, drop_tracks, Dest, List};
+pub(crate) use scan::mounted;
+pub use transfer::{Dest, List, drop_playlist, drop_tracks};
 pub use verify::verify;
 
 use super::{
@@ -105,6 +106,8 @@ pub(super) struct Ctx {
     store: Arc<Store>,
     /// The mounted devices as of the last scan; `DeviceState.devices` shows the same list.
     devices: RefCell<Vec<Device>>,
+    scan: RefCell<scan::State>,
+    folder: RefCell<formats::Folder>,
     current: RefCell<Option<String>>,
     job: RefCell<Option<Job>>,
     autos: RefCell<VecDeque<(String, Auto)>>,
@@ -349,7 +352,7 @@ impl Ctx {
     /// the device's settings, the Cue Banks.
     fn options(&self, dev: Option<&Device>) -> ExportOptions {
         ExportOptions {
-            free: dev.and_then(|d| device::space(&d.mount)).map(|s| s.1),
+            free: dev.filter(|d| d.total > 0).map(|d| d.free),
             max_file: dev.and_then(Device::max_file),
             config: device_settings::config(&self.store, dev.map_or("", |d| d.id.as_str())),
             banks: store::collect_banks(&self.store).unwrap_or_else(|e| {
@@ -415,12 +418,15 @@ pub fn show_panel(app: &App, id: &str) {
 
 /// Connects `DeviceState`; the returned guard keeps the timer alive.
 pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
+    scan::reset();
     let cx = Rc::new(Ctx {
         app: app.as_weak(),
         lib,
         decks,
         store: store::global(),
         devices: RefCell::default(),
+        scan: RefCell::default(),
+        folder: RefCell::default(),
         current: RefCell::default(),
         job: RefCell::default(),
         autos: RefCell::default(),
@@ -497,6 +503,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     let c = cx.clone();
     s.on_opened(move || {
         c.refresh_devices();
+        c.refresh_folder();
         if let Some(d) = c
             .current()
             .filter(|_| c.with_state(|s| s.get_tab()) == Some(0))
@@ -538,6 +545,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
         c.poll_job();
         c.poll_devices();
+        c.poll_formats();
         c.run_autos();
         c.run_checks();
         c.run_pushes();

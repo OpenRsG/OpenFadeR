@@ -479,7 +479,6 @@ pub fn apply_layout(p: &mut Prefs, layout: &[(String, String)]) -> Vec<String> {
 pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
     match key {
         "wave_order" => pick_order(&mut p.view, i),
-        "played_reset" => super::run_action(key),
         "skin" => {
             if let Some(n) = skin::names().get(i) {
                 let bad = select_skin(p, n);

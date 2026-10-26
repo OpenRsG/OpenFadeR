@@ -393,6 +393,10 @@ mod tests {
                 .find(|(s, _)| s.file == t.file)
                 .map(|(_, a)| a.clone())
         }
+        fn analysis_reader(&self) -> Option<openfader::library::AnalysisReader> {
+            let source = Stick(self.0.clone());
+            Some(Arc::new(move |t| source.analysis(t)))
+        }
     }
 
     fn cue(ms: u32) -> Cue {

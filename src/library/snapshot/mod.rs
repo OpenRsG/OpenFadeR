@@ -92,11 +92,10 @@ impl Snapshot {
         Self::build(lib, true)
     }
 
-    /// [`Snapshot::take`] without the analyses when `lib` has a [`crate::library::AnalysisReader`]: [`Pending::read`] reads
-    /// them later, on a worker. A library without a reader is read here as `take` does.
+    /// [`Snapshot::take`] with analysis deferred to [`Pending::read`] on a worker. A missing reader means no source analysis.
     pub fn take_pending(lib: &dyn Library) -> Result<Pending, String> {
         let reader = lib.analysis_reader();
-        Ok(Pending::new(Self::build(lib, reader.is_none())?, reader))
+        Ok(Pending::new(Self::build(lib, false)?, reader))
     }
 
     /// `analyses`: ask `lib` for each track's analysis now; else the slots stay `None`.

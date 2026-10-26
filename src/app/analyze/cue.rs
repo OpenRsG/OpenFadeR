@@ -1,6 +1,6 @@
 //! CUE Analysis glue: finding the library's grid and cues of a track and learning the user's cue habits from
 //! the collection. The cue generation itself is a pure function in [`openfader::analysis::auto`]; storing its result
-//! and the CUE Analysis playlist marker are in the base ([`super::store_cues`], [`super::cue_analysed`]).
+//! and the CUE Analysis playlist marker are in the store ([`super::cue_analysed`]).
 
 use openfader::{
     analysis::{
@@ -12,7 +12,7 @@ use openfader::{
 };
 use std::collections::HashSet;
 
-/// Tracks looked at, and tracks with cues kept, when learning (the UI thread does the looking: keep it bounded).
+/// Tracks looked at, and tracks with cues kept, when learning on a pool worker.
 const SCAN: usize = 1500;
 const SAMPLE: usize = 200;
 
@@ -31,8 +31,11 @@ pub fn library_cues(lib: &dyn Library, t: &Track) -> Vec<Cue> {
 
 /// The user's cue tendency from the cues the library and the store already hold. Tracks whose cues CUE Analysis set
 /// itself (`marked`) do not count: Auto must follow the user, not its own output.
-pub fn learn(lib: &dyn Library, marked: &HashSet<String>) -> Learnt {
-    let tracks = lib.tracks(None).unwrap_or_default();
+pub fn learn(
+    tracks: &[Track],
+    read: &dyn Fn(&Track) -> Option<openfader::analysis::Analysis>,
+    marked: &HashSet<String>,
+) -> Learnt {
     let mut have: Vec<(Vec<Beat>, Vec<Cue>)> = Vec::new();
     for t in tracks.iter().take(SCAN) {
         if have.len() >= SAMPLE {
@@ -41,10 +44,7 @@ pub fn learn(lib: &dyn Library, marked: &HashSet<String>) -> Learnt {
         if !marked.is_empty() && marked.contains(&store::key(t)) {
             continue;
         }
-        if let Some(a) = lib
-            .analysis(t)
-            .filter(|a| !a.beats.is_empty() && !a.cues.is_empty())
-        {
+        if let Some(a) = read(t).filter(|a| !a.beats.is_empty() && !a.cues.is_empty()) {
             have.push((a.beats, a.cues));
         }
     }
@@ -74,6 +74,10 @@ mod tests {
         }
         fn analysis(&self, t: &Track) -> Option<Analysis> {
             self.1.get(t.file.as_ref()?).cloned()
+        }
+        fn analysis_reader(&self) -> Option<openfader::library::AnalysisReader> {
+            let source = Fake(self.0.clone(), self.1.clone());
+            Some(std::sync::Arc::new(move |t| source.analysis(t)))
         }
     }
 
@@ -117,9 +121,13 @@ mod tests {
 
     #[test]
     fn learns_from_thirty_tracks_and_reports_fewer() {
-        let few = learn(&library(29), &HashSet::new());
+        let lib = library(29);
+        let few = learn(&lib.0, &|t| lib.analysis(t), &HashSet::new());
         assert_eq!((few.found, few.tendency), (29, None));
-        let t = learn(&library(40), &HashSet::new()).tendency.unwrap();
+        let lib = library(40);
+        let t = learn(&lib.0, &|t| lib.analysis(t), &HashSet::new())
+            .tendency
+            .unwrap();
         assert_eq!(
             (t.offset_bars, t.spacing_bars, t.hot, t.memory),
             (4, Some(16), 3, 0)
@@ -131,7 +139,7 @@ mod tests {
         let lib = library(40);
         // 11 of them were set by CUE Analysis: 29 left
         let marked: HashSet<String> = lib.0.iter().take(11).map(store::key).collect();
-        let learnt = learn(&lib, &marked);
+        let learnt = learn(&lib.0, &|t| lib.analysis(t), &marked);
         assert_eq!((learnt.found, learnt.tendency), (29, None));
     }
 }

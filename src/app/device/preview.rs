@@ -11,9 +11,8 @@ use super::pace::approx;
 use super::{format_label, Ctx, DeviceState, PreviewRow};
 use openfader::{
     device::{
-        self,
+        self, Device,
         plan::{self, Preview, Speeds},
-        Device,
     },
     library::snapshot::{Pending as Collection, Snapshot},
     plugin::device::{Control, ExportOptions, Feature, PlanItem, Provider},
@@ -90,6 +89,15 @@ impl Target {
             writers,
             plans,
         }
+    }
+}
+
+impl Target {
+    pub(super) fn validate_folder(&self) -> Result<(), String> {
+        if self.dev.is_folder() && !self.dest.is_dir() {
+            return Err(tr!("No such folder: {}", self.dest.display()));
+        }
+        Ok(())
     }
 }
 
@@ -249,6 +257,9 @@ impl Ctx {
             id,
             tr!("Preparing the preview"),
             move |ctl| {
+                let mut t = t;
+                t.validate_folder()?;
+                t.o.free = openfader::device::space(&t.dest).map(|s| s.1);
                 let built = build(&ctl)?;
                 if let Some(m) = built.idle {
                     return Ok(m);

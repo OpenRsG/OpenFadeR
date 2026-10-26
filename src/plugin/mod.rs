@@ -564,6 +564,33 @@ impl Plugin {
     /// ours. A reply with an `"error"` string (shown translated, [`Plugin::tr`]), a non-zero exit, output that is not one JSON object, or no reply within
     /// `timeout` (the process is killed, the script stopped) is an `Err`.
     pub fn call(&self, request: &Value, timeout: Duration) -> Result<Value, String> {
+        self.call_inner(request, timeout, None)
+    }
+
+    /// A request-owned execution: cancellation must never terminate a shared persistent plugin.
+    pub(super) fn call_cancellable(
+        &self,
+        request: &Value,
+        timeout: Duration,
+        cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> Result<Value, String> {
+        self.call_inner(request, timeout, Some(cancelled))
+    }
+
+    fn call_inner(
+        &self,
+        request: &Value,
+        timeout: Duration,
+        cancelled: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    ) -> Result<Value, String> {
+        let stop = || {
+            cancelled
+                .as_ref()
+                .is_some_and(|c| c.load(std::sync::atomic::Ordering::Relaxed))
+        };
+        if stop() {
+            return Err("request cancelled".into());
+        }
         let name = &self.manifest.name;
         let mut request = request.clone();
         if let Some(o) = request.as_object_mut() {
@@ -572,7 +599,10 @@ impl Plugin {
         }
         let command: Vec<String> = match (&self.manifest.command[..], &self.manifest.script) {
             ([], Some(s)) if s.ends_with(".lua") => {
-                return lua::call(self, s, &request, timeout, self.manifest.persistent);
+                return match cancelled {
+                    Some(c) => lua::call_cancellable(self, s, &request, timeout, c),
+                    None => lua::call(self, s, &request, timeout, self.manifest.persistent),
+                };
             }
             ([], Some(s)) if s.ends_with(".py") => vec![python().into(), s.clone()],
             ([], Some(s)) => vec![s.clone()],
@@ -587,13 +617,13 @@ impl Plugin {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
-        if self.manifest.persistent {
+        if self.manifest.persistent && cancelled.is_none() {
             let key = format!("{:?} {command:?} {}", self.dir, self.manifest.version);
             return process::call(self, key, cmd, &request, timeout);
         }
         let mut child =
             process::spawn(cmd).map_err(|e| format!("{name}: cannot start {program:?}: {e}"))?;
-        let body = request.to_string();
+        let body = request.to_string() + "\n";
         let mut stdin = child.stdin.take().expect("piped");
         // A writer thread: a reply larger than the pipe buffer must not deadlock against our write.
         let writer = std::thread::spawn(move || stdin.write_all(body.as_bytes()));
@@ -604,6 +634,12 @@ impl Plugin {
         });
         let deadline = Instant::now() + timeout;
         let status = loop {
+            if stop() {
+                let _ = child.end();
+                let _ = writer.join();
+                let _ = reader.join();
+                return Err(format!("{name}: request cancelled"));
+            }
             if !child.running() {
                 break child.end().map_err(|e| format!("{name}: {e}"))?;
             }

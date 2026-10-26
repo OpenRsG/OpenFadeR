@@ -11,7 +11,13 @@ use openfader::{
 };
 use openfader_plugin::library::{Field, FieldKind};
 use slint::{ModelRc, VecModel};
-use std::{collections::BTreeMap, path::Path, rc::Rc};
+use std::{
+    collections::BTreeMap,
+    path::PathBuf,
+    rc::Rc,
+    sync::mpsc,
+    time::{Duration, Instant},
+};
 
 /// The formats of `d` an export can write, in the device's order (the one handling it first).
 fn writable(d: &Device) -> impl Iterator<Item = &(String, DeviceInfo)> {
@@ -27,6 +33,72 @@ fn options(info: &DeviceInfo) -> impl Iterator<Item = &Field> {
         .filter(|f| matches!(f.kind, FieldKind::Bool | FieldKind::Choice { .. }))
 }
 
+#[derive(Default)]
+pub(super) struct Folder {
+    path: Option<PathBuf>,
+    generation: u64,
+    ready: Option<(Instant, Result<Device, String>)>,
+    task: Option<(u64, mpsc::Receiver<Result<Device, String>>)>,
+}
+
+impl Folder {
+    fn invalidate(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        self.ready = None;
+    }
+
+    fn request(&mut self, path: Option<PathBuf>) -> Option<Device> {
+        if self.path != path {
+            self.path = path;
+            self.invalidate();
+        }
+        self.start();
+        self.ready.as_ref()?.1.as_ref().ok().cloned()
+    }
+
+    fn start(&mut self) {
+        if self.task.is_some()
+            || self
+                .ready
+                .as_ref()
+                .is_some_and(|r| r.0.elapsed() < Duration::from_secs(5))
+        {
+            return;
+        }
+        let Some(path) = self.path.clone() else {
+            return;
+        };
+        let (tx, rx) = mpsc::channel();
+        self.task = Some((self.generation, rx));
+        std::thread::spawn(move || {
+            let result = if path.is_dir() {
+                Ok(device::folder(&path))
+            } else {
+                Err(tr!("No such folder: {}", path.display()))
+            };
+            let _ = tx.send(result);
+        });
+    }
+
+    fn poll(&mut self) -> bool {
+        let result = self.task.as_ref().map(|(_, rx)| rx.try_recv());
+        let result = match result {
+            Some(Ok(r)) => r,
+            Some(Err(mpsc::TryRecvError::Disconnected)) => {
+                Err(tr!("the worker stopped").to_owned())
+            }
+            _ => return false,
+        };
+        let (generation, _) = self.task.take().unwrap();
+        let current = generation == self.generation;
+        if current {
+            self.ready = Some((Instant::now(), result));
+        }
+        self.start();
+        current
+    }
+}
+
 impl Ctx {
     /// What the FORMATS chips are about: on the EXPORT tab with a folder typed, that folder; else the chosen device.
     pub(super) fn format_target(&self) -> Option<Device> {
@@ -34,10 +106,33 @@ impl Ctx {
             .with_state(|s| (s.get_tab() == 1).then(|| s.get_folder().trim().to_owned()))
             .flatten()
             .filter(|f| !f.is_empty());
-        match folder {
-            Some(f) => Some(device::folder(Path::new(&f))),
-            None => self.current(),
+        let target = self.folder.borrow_mut().request(folder.map(PathBuf::from));
+        if self.folder.borrow().path.is_some() {
+            target
+        } else {
+            self.current()
         }
+    }
+
+    pub(super) fn poll_formats(&self) {
+        let changed = self.folder.borrow_mut().poll();
+        if changed {
+            self.show_formats();
+        }
+    }
+
+    pub(super) fn refresh_folder(&self) {
+        self.folder.borrow_mut().invalidate();
+        self.show_formats();
+    }
+
+    pub(super) fn folder_error(&self) -> Option<String> {
+        self.folder
+            .borrow()
+            .ready
+            .as_ref()
+            .and_then(|(_, r)| r.as_ref().err())
+            .cloned()
     }
 
     /// The user's format switches for `d` (plugin name → on), stored as `+name` / `-name`. A list of plain names (what older
@@ -62,7 +157,12 @@ impl Ctx {
         d.formats
             .iter()
             .map(|(n, _)| n)
-            .filter(|n| switched.get(*n).copied().unwrap_or_else(|| default.contains(n)))
+            .filter(|n| {
+                switched
+                    .get(*n)
+                    .copied()
+                    .unwrap_or_else(|| default.contains(n))
+            })
             .cloned()
             .collect()
     }
@@ -144,7 +244,9 @@ impl Ctx {
 
     /// Switches the `i`-th format of [`Self::show_formats`] for the chips' target.
     pub(super) fn toggle_format(&self, i: usize) {
-        let Some(d) = self.format_target() else { return };
+        let Some(d) = self.format_target() else {
+            return;
+        };
         let Some((name, _)) = writable(&d).nth(i) else {
             return;
         };
@@ -155,7 +257,9 @@ impl Ctx {
     /// UNIVERSAL (`true`): every format of the chips' target on. DEDICATED: when it was universal, only the format handling
     /// it stays on (the user ticks the others); otherwise nothing changes.
     pub(super) fn set_universal(&self, on: bool) {
-        let Some(d) = self.format_target() else { return };
+        let Some(d) = self.format_target() else {
+            return;
+        };
         let all: Vec<String> = writable(&d).map(|(n, _)| n.clone()).collect();
         let picked = self.picked(&d);
         if on {
@@ -167,7 +271,9 @@ impl Ctx {
 
     /// Sets option `k` of format `i` of the chosen device: 1 / 0 for a switch, the entry index for a choice.
     pub(super) fn set_option(&self, i: usize, k: usize, value: usize) {
-        let Some(d) = self.format_target() else { return };
+        let Some(d) = self.format_target() else {
+            return;
+        };
         let Some(f) = writable(&d)
             .nth(i)
             .and_then(|(_, info)| options(info).nth(k))
@@ -185,5 +291,43 @@ impl Ctx {
             self.say(&e.to_string(), true);
         }
         self.show_formats();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn changing_or_clearing_a_folder_discards_the_blocked_old_probe() {
+        let dir =
+            std::env::temp_dir().join(format!("openfader-folder-probe-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (tx, rx) = mpsc::channel();
+        let mut f = Folder {
+            path: Some(dir.join("missing")),
+            task: Some((0, rx)),
+            ..Default::default()
+        };
+        assert!(f.request(Some(dir.clone())).is_none());
+        tx.send(Err("old folder failed".into())).unwrap();
+        assert!(!f.poll());
+        let end = Instant::now() + Duration::from_secs(10);
+        while f.ready.is_none() {
+            f.poll();
+            assert!(Instant::now() < end, "latest folder probe did not finish");
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(f.request(Some(dir.clone())).unwrap().mount, dir);
+
+        let (tx, rx) = mpsc::channel();
+        f.invalidate();
+        f.task = Some((f.generation, rx));
+        f.request(None);
+        tx.send(Err("cleared folder failed".into())).unwrap();
+        assert!(!f.poll());
+        assert!(f.ready.is_none());
+        assert!(f.path.is_none());
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

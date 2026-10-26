@@ -169,12 +169,12 @@ msgid "Analysis Lock"
 msgstr "Blocco analisi"
 
 #: ui/app.slint:262
-#: src/app/library/track.rs:192
+#: src/app/library/track.rs:172
 msgid "Reload Tag"
 msgstr "Ricarica tag"
 
 #: ui/app.slint:263
-#: src/app/library/track.rs:194
+#: src/app/library/track.rs:174
 msgid "Reload Tag (discard edits)"
 msgstr "Ricarica tag (scarta modifiche)"
 
@@ -1661,7 +1661,7 @@ msgid "RESTORE TO DEVICE"
 msgstr "RIPRISTINA SUL DISPOSITIVO"
 
 #: ui/device-check.slint:39
-#: src/app/device/check.rs:448
+#: src/app/device/check.rs:459
 msgid "FIX THE STICK"
 msgstr "RIPARA LA CHIAVETTA"
 
@@ -2257,7 +2257,7 @@ msgstr "Colore"
 
 #: ui/exportmode-cues.slint:204
 #: ui/trackinfo.slint:186
-#: src/app/library/track.rs:177
+#: src/app/library/track.rs:157
 msgid "Comment"
 msgstr "Commento"
 
@@ -4435,7 +4435,7 @@ msgstr "Elimina playlist"
 
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:196
-#: src/app/library/track.rs:172
+#: src/app/library/track.rs:152
 msgid "Title"
 msgstr "Titolo"
 
@@ -4757,12 +4757,12 @@ msgid "comment (Enter saves)"
 msgstr "commento (Invio salva)"
 
 #: ui/trackinfo.slint:200
-#: src/app/library/track.rs:174
+#: src/app/library/track.rs:154
 msgid "Album"
 msgstr "Album"
 
 #: ui/trackinfo.slint:204
-#: src/app/library/track.rs:176
+#: src/app/library/track.rs:156
 msgid "Label"
 msgstr "Etichetta"
 
@@ -4916,6 +4916,19 @@ msgstr "Play"
 msgid "Pause"
 msgstr "Pausa"
 
+#: src/app/analyze/job.rs:281
+msgid "Analysis is busy: wait for an existing analysis run to finish or cancel it."
+msgstr "Analisi occupata: attendi il completamento di un'analisi in corso oppure annullala."
+
+#: src/app/analyze/job.rs:416
+#: src/app/exportmode/mod.rs:185
+msgid "this track has an Analysis Lock: unlock it first"
+msgstr "questa traccia ha un Blocco analisi: sbloccala prima"
+
+#: src/app/analyze/job.rs:449
+msgid "analysing “{}”…{}"
+msgstr "analisi di “{}”…{}"
+
 #: src/app/analyze/key_model.rs:40
 msgid "KEY DETECTOR: downloading the NEURAL model {}%"
 msgstr "KEY DETECTOR: download del modello NEURAL {}%"
@@ -4936,43 +4949,51 @@ msgstr "Il modello KEY NEURAL è ancora in download: questa analisi usa CLASSIC"
 msgid "NEURAL key model unavailable: this run uses CLASSIC"
 msgstr "Modello KEY NEURAL non disponibile: questa analisi usa CLASSIC"
 
-#: src/app/analyze/mod.rs:256
+#: src/app/analyze/mod.rs:326
 msgid "analysis: library query failed: {}"
 msgstr "analisi: query della libreria non riuscita: {}"
 
-#: src/app/analyze/mod.rs:367
+#: src/app/analyze/mod.rs:443
 msgid " · library grid in use: PREFS > ANALYSIS > BEAT GRID FROM > OPENFADER ANALYSIS shows ours"
 msgstr " · griglia della libreria in uso: PREF. > ANALISI > GRIGLIA DEI BEAT E CUE DA > ANALISI OPENFADER mostra la griglia di OpenFadeR"
 
-#: src/app/analyze/progress.rs:40
+#: src/app/analyze/progress.rs:44
 msgid "analyzing {}/{}"
 msgstr "analisi {}/{}"
 
-#: src/app/analyze/progress.rs:42
+#: src/app/analyze/progress.rs:46
 msgid "analyzed {}"
 msgstr "analizzato {}"
 
-#: src/app/analyze/progress.rs:44
+#: src/app/analyze/progress.rs:51
 msgid "from cache"
 msgstr "dalla cache"
 
-#: src/app/analyze/progress.rs:45
+#: src/app/analyze/progress.rs:52
 msgid "failed"
 msgstr "non riuscito"
 
-#: src/app/analyze/progress.rs:46
+#: src/app/analyze/progress.rs:53
+msgid "skipped (Analysis Lock)"
+msgstr "escluse (blocco analisi)"
+
+#: src/app/analyze/progress.rs:54
+msgid "cancelled"
+msgstr "annullate"
+
+#: src/app/analyze/progress.rs:55
 msgid "stale/corrupt cache files recomputed"
 msgstr "file di cache obsoleti/corrotti ricalcolati"
 
-#: src/app/analyze/progress.rs:47
+#: src/app/analyze/progress.rs:56
 msgid "cue lists set"
 msgstr "liste di cue impostate"
 
-#: src/app/analyze/progress.rs:48
+#: src/app/analyze/progress.rs:57
 msgid "key tags written"
 msgstr "tag di key scritti"
 
-#: src/app/analyze/progress.rs:49
+#: src/app/analyze/progress.rs:58
 msgid "key tags not written"
 msgstr "tag di key non scritti"
 
@@ -6428,58 +6449,59 @@ msgstr "key sync: {} st → {}"
 msgid "key sync: {} st → {} (relative key)"
 msgstr "key sync: {} st → {} (key relativa)"
 
-#: src/app/deck/load.rs:58
-#: src/app/deck/load.rs:325
+#: src/app/deck/load.rs:124
+#: src/app/deck/load.rs:392
 msgid "no file path"
 msgstr "nessun percorso del file"
 
-#: src/app/deck/load.rs:194
+#: src/app/deck/load.rs:264
 msgid "downloading…"
 msgstr "download in corso…"
 
-#: src/app/deck/load.rs:196
-#: src/app/deck/load.rs:561
+#: src/app/deck/load.rs:266
+#: src/app/deck/load.rs:682
+#: src/app/deck/load.rs:846
 msgid "not analysed"
 msgstr "non analizzata"
 
-#: src/app/deck/load.rs:237
+#: src/app/deck/load.rs:299
 msgid "the download stopped"
 msgstr "il download si è interrotto"
 
-#: src/app/deck/load.rs:259
+#: src/app/deck/load.rs:323
 msgid "download failed: {}"
 msgstr "download non riuscito: {}"
 
-#: src/app/deck/load.rs:430
+#: src/app/deck/load.rs:529
 msgid "loading… · {}"
 msgstr "caricamento… · {}"
 
-#: src/app/deck/load.rs:583
+#: src/app/deck/load.rs:708
 #: src/app/midi/session.rs:283
 msgid "audio: {}"
 msgstr "audio: {}"
 
-#: src/app/deck/load.rs:664
+#: src/app/deck/load.rs:789
 msgid "eject lock: pause the deck before loading another track"
 msgstr "eject lock: metti in pausa il deck prima di caricare un'altra traccia"
 
-#: src/app/deck/load.rs:689
+#: src/app/deck/load.rs:814
 msgid "continuous playing: no next track in the list"
 msgstr "riproduzione continua: nessuna traccia successiva nell'elenco"
 
-#: src/app/deck/load.rs:706
+#: src/app/deck/load.rs:882
 msgid "grid: analysed"
 msgstr "griglia: analizzata"
 
-#: src/app/deck/load.rs:711
+#: src/app/deck/load.rs:887
 msgid "waveform: analysed"
 msgstr "forma d'onda: analizzata"
 
-#: src/app/deck/load.rs:725
+#: src/app/deck/load.rs:904
 msgid "{} — {} beats @ {}, {} automatic cues"
 msgstr "{} — {} beat a {}, {} cue automatici"
 
-#: src/app/deck/load.rs:733
+#: src/app/deck/load.rs:912
 msgid "{} — {} beats @ {}, {} cues"
 msgstr "{} — {} beat a {}, {} cue"
 
@@ -6817,42 +6839,43 @@ msgstr "instant doubles: l'altro deck ha cambiato traccia"
 msgid "instant double {}: {} here, muted on {}"
 msgstr "instant double {}: {} qui, muto su {}"
 
-#: src/app/deck/stems/job.rs:14
+#: src/app/deck/stems/job.rs:131
 msgid "STEMS 0%"
 msgstr "STEMS 0%"
 
-#: src/app/deck/stems/job.rs:15
+#: src/app/deck/stems/job.rs:132
 msgid "MODEL {}%"
 msgstr "MODELLO {}%"
 
-#: src/app/deck/stems/job.rs:16
+#: src/app/deck/stems/job.rs:133
 msgid "STEMS {}%"
 msgstr "STEMS {}%"
 
-#: src/app/deck/stems/job.rs:155
 #: src/app/deck/stems/job.rs:262
+#: src/app/deck/stems/job.rs:475
+msgid "NO STEMS"
+msgstr "NESSUN STEM"
+
+#: src/app/deck/stems/job.rs:349
+#: src/app/deck/stems/job.rs:457
 msgid "100% READY"
 msgstr "100% PRONTO"
 
-#: src/app/deck/stems/job.rs:172
+#: src/app/deck/stems/job.rs:366
 msgid "stems: {}"
 msgstr "stem: {}"
 
-#: src/app/deck/stems/job.rs:176
+#: src/app/deck/stems/job.rs:370
 msgid "no audio"
 msgstr "nessun audio"
 
-#: src/app/deck/stems/job.rs:260
+#: src/app/deck/stems/job.rs:455
 msgid "STEM FILE"
 msgstr "FILE STEM"
 
-#: src/app/deck/stems/job.rs:278
+#: src/app/deck/stems/job.rs:473
 msgid "NO MODEL"
 msgstr "NESSUN MODELLO"
-
-#: src/app/deck/stems/job.rs:280
-msgid "NO STEMS"
-msgstr "NESSUN STEM"
 
 #: src/app/deck/sync/follow.rs:26
 msgid "synced: starting on the master's next beat…"
@@ -6975,7 +6998,7 @@ msgstr[0] "{}: {n} cronologia attende di essere importata. Non è stato ancora i
 msgstr[1] "{}: {n} cronologie attendono di essere importate. Non è stato ancora importato nulla: IMPORTA CRONOLOGIE nella finestra DISPOSITIVI le mostra prima"
 
 #: src/app/device/actions.rs:241
-#: src/app/device/transfer.rs:292
+#: src/app/device/transfer.rs:359
 msgid "That playlist is not on the device any more"
 msgstr "Quella playlist non è più sul dispositivo"
 
@@ -7075,7 +7098,7 @@ msgid "; {} track(s) were not in the collection"
 msgstr "; {} tracce non erano nella collezione"
 
 #: src/app/device/backup.rs:235
-#: src/app/device/preview.rs:174
+#: src/app/device/preview.rs:182
 msgid "… and {} more"
 msgstr "… e altri {}"
 
@@ -7107,254 +7130,255 @@ msgstr "Espulsione"
 msgid "Not ejected: the backup failed ({}). Fix that, or switch the backup off in PREFERENCES > DJ SYSTEM, then eject again."
 msgstr "Non espulso: il backup è fallito ({}). Risolvi, oppure disattiva il backup in PREFERENZE > DJ SYSTEM, poi espelli di nuovo."
 
-#: src/app/device/check.rs:89
+#: src/app/device/check.rs:93
 msgid "cannot read {}"
 msgstr "non legge {}"
 
-#: src/app/device/check.rs:90
+#: src/app/device/check.rs:94
 msgid "cannot read a {} partition table"
 msgstr "non legge una tabella delle partizioni {}"
 
-#: src/app/device/check.rs:94
+#: src/app/device/check.rs:102
 msgid "needs {}, this stick has none"
 msgstr "ha bisogno di {}, questa chiavetta non ne ha"
 
-#: src/app/device/check.rs:94
+#: src/app/device/check.rs:104
 msgid "or"
 msgstr "o"
 
-#: src/app/device/check.rs:95
+#: src/app/device/check.rs:106
 msgid "cannot open the {} of this stick"
 msgstr "non riesce ad aprire la {} di questa chiavetta"
 
-#: src/app/device/check.rs:96
+#: src/app/device/check.rs:107
 msgid "finds the {} of this stick damaged (see WHAT IS WRONG)"
 msgstr "trova danneggiata la {} di questa chiavetta (vedi COSA NON VA)"
 
-#: src/app/device/check.rs:104
+#: src/app/device/check.rs:115
 msgid "Not confirmed yet"
 msgstr "Non ancora confermato"
 
-#: src/app/device/check.rs:105
+#: src/app/device/check.rs:116
 msgid "Not confirmed: {}"
 msgstr "Non confermato: {}"
 
-#: src/app/device/check.rs:106
+#: src/app/device/check.rs:117
 msgid "no extension knows this model"
 msgstr "nessuna estensione conosce questo modello"
 
-#: src/app/device/check.rs:114
+#: src/app/device/check.rs:125
 msgid "library"
 msgstr "libreria"
 
-#: src/app/device/check.rs:120
+#: src/app/device/check.rs:131
 msgid "An export to this stick was cut off (it was pulled out or lost power while the library was written)."
 msgstr "Un'esportazione su questa chiavetta è stata interrotta (è stata sfilata o è mancata la corrente mentre si scriveva la libreria)."
 
-#: src/app/device/check.rs:121
+#: src/app/device/check.rs:132
 msgid "A player could show an old library next to a new one."
 msgstr "Un lettore potrebbe mostrare una libreria vecchia accanto a una nuova."
 
-#: src/app/device/check.rs:122
+#: src/app/device/check.rs:133
 msgid "FIX THE STICK finishes or undoes it; your music is not touched."
 msgstr "RIPARA LA CHIAVETTA la completa o la annulla; la tua musica non viene toccata."
 
-#: src/app/device/check.rs:125
+#: src/app/device/check.rs:136
 msgid "{n} audio file that the {} lists is missing from this stick."
 msgid_plural "{n} audio files that the {} lists are missing from this stick."
 msgstr[0] "Manca {n} file audio elencato dalla {} su questa chiavetta."
 msgstr[1] "Mancano {n} file audio elencati dalla {} su questa chiavetta."
 
-#: src/app/device/check.rs:131
+#: src/app/device/check.rs:142
 msgid "Those tracks would not load on a player."
 msgstr "Quelle tracce non si caricherebbero su un lettore."
 
-#: src/app/device/check.rs:132
+#: src/app/device/check.rs:143
 msgid "FIX THE STICK copies them again from your collection."
 msgstr "RIPARA LA CHIAVETTA le copia di nuovo dalla tua collezione."
 
-#: src/app/device/check.rs:135
+#: src/app/device/check.rs:146
 msgid "The {} of this stick cannot be read ({})."
 msgstr "La {} di questa chiavetta non può essere letta ({})."
 
-#: src/app/device/check.rs:136
+#: src/app/device/check.rs:147
 msgid "A player would show an empty stick."
 msgstr "Un lettore mostrerebbe una chiavetta vuota."
 
-#: src/app/device/check.rs:137
+#: src/app/device/check.rs:148
 msgid "FIX THE STICK writes the library again from your collection, or restore a backup in BACKUPS. Your music is not touched."
 msgstr "RIPARA LA CHIAVETTA riscrive la libreria dalla tua collezione, oppure ripristina un backup in BACKUP. La tua musica non viene toccata."
 
-#: src/app/device/check.rs:140
+#: src/app/device/check.rs:151
 msgid "Part of the check of this stick failed: {}"
 msgstr "Una parte del controllo di questa chiavetta è fallita: {}"
 
-#: src/app/device/check.rs:141
+#: src/app/device/check.rs:152
 msgid "Some problems may not have been found."
 msgstr "Alcuni problemi potrebbero non essere stati trovati."
 
-#: src/app/device/check.rs:142
+#: src/app/device/check.rs:153
 msgid "Press CHECK AGAIN. If it keeps failing, update the extension."
 msgstr "Premi CONTROLLA DI NUOVO. Se continua a fallire, aggiorna l'estensione."
 
-#: src/app/device/check.rs:150
+#: src/app/device/check.rs:161
 msgid "READY"
 msgstr "PRONTA"
 
-#: src/app/device/check.rs:151
+#: src/app/device/check.rs:162
 msgid "NEEDS FIXING"
 msgstr "DA RIPARARE"
 
-#: src/app/device/check.rs:152
+#: src/app/device/check.rs:163
 msgid "UNREADABLE"
 msgstr "ILLEGGIBILE"
 
-#: src/app/device/check.rs:153
+#: src/app/device/check.rs:164
 msgid "EMPTY"
 msgstr "VUOTA"
 
-#: src/app/device/check.rs:172
+#: src/app/device/check.rs:183
 msgid "{} {}."
 msgstr "{} {}."
 
-#: src/app/device/check.rs:188
+#: src/app/device/check.rs:199
 msgid "{n} player reads it."
 msgid_plural "{n} players read it."
 msgstr[0] "{n} lettore la legge."
 msgstr[1] "{n} lettori la leggono."
 
-#: src/app/device/check.rs:189
+#: src/app/device/check.rs:200
 msgid "{} of {} players read it."
 msgstr "{} lettori su {} la leggono."
 
-#: src/app/device/check.rs:197
+#: src/app/device/check.rs:208
 msgid "Ready for a set."
 msgstr "Pronta per un set."
 
-#: src/app/device/check.rs:203
+#: src/app/device/check.rs:214
 msgid "No library of this stick can be read."
 msgstr "Nessuna libreria di questa chiavetta può essere letta."
 
-#: src/app/device/check.rs:210
+#: src/app/device/check.rs:221
 msgid "No library on this stick yet. Export to it to use it."
 msgstr "Ancora nessuna libreria su questa chiavetta. Esporta su di essa per usarla."
 
-#: src/app/device/check.rs:219
+#: src/app/device/check.rs:230
 msgid "The last export to {} was cut off. It was finished from what was already on the stick: the new library is complete."
 msgstr "L'ultima esportazione su {} è stata interrotta. È stata completata con ciò che era già sulla chiavetta: la nuova libreria è completa."
 
-#: src/app/device/check.rs:223
+#: src/app/device/check.rs:234
 msgid "The last export to {} was cut off. Its previous library is in use again: export once more to bring it up to date."
 msgstr "L'ultima esportazione su {} è stata interrotta. La libreria precedente è di nuovo in uso: esporta ancora una volta per aggiornarla."
 
-#: src/app/device/check.rs:227
+#: src/app/device/check.rs:238
 msgid "The last export to {} was cut off and could not be put right ({}). Open DEVICES and press FIX THE STICK."
 msgstr "L'ultima esportazione su {} è stata interrotta e non è stato possibile rimediare ({}). Apri DISPOSITIVI e premi RIPARA LA CHIAVETTA."
 
-#: src/app/device/check.rs:238
+#: src/app/device/check.rs:249
 msgid "not on this stick"
 msgstr "non è su questa chiavetta"
 
-#: src/app/device/check.rs:239
+#: src/app/device/check.rs:250
 msgid "cannot be read"
 msgstr "non leggibile"
 
-#: src/app/device/check.rs:308
-#: src/app/device/check.rs:326
+#: src/app/device/check.rs:319
+#: src/app/device/check.rs:337
 msgid "CHECKING…"
 msgstr "CONTROLLO…"
 
-#: src/app/device/check.rs:327
+#: src/app/device/check.rs:338
+#: src/app/device/export.rs:147
 msgid "Looking at the stick…"
 msgstr "Esame della chiavetta…"
 
-#: src/app/device/check.rs:427
+#: src/app/device/check.rs:438
 msgid "{} needs fixing: {} Open DEVICES to fix it."
 msgstr "{} va riparata: {} Apri DISPOSITIVI per ripararla."
 
-#: src/app/device/check.rs:439
+#: src/app/device/check.rs:450
 msgid "{} needs fixing: {} Eject anyway?"
 msgstr "{} va riparata: {} Espellere comunque?"
 
-#: src/app/device/check.rs:445
+#: src/app/device/check.rs:456
 msgid "EJECT ANYWAY"
 msgstr "ESPELLI COMUNQUE"
 
-#: src/app/device/check.rs:476
+#: src/app/device/check.rs:487
 msgid "Checking {} before it is ejected…"
 msgstr "Controllo di {} prima dell'espulsione…"
 
-#: src/app/device/check.rs:486
+#: src/app/device/check.rs:497
 msgid "Wait for the check to finish, then try again."
 msgstr "Attendi la fine del controllo, poi riprova."
 
-#: src/app/device/check.rs:490
+#: src/app/device/check.rs:501
 msgid "Nothing on {} that this app can repair."
 msgstr "Su {} non c'è nulla che questa app possa riparare."
 
-#: src/app/device/check.rs:499
+#: src/app/device/check.rs:510
 msgid "Rebuild the library on {} from your collection: the whole collection?"
 msgstr "Ricostruire la libreria su {} dalla tua collezione: tutta la collezione?"
 
-#: src/app/device/check.rs:501
+#: src/app/device/check.rs:512
 msgid "Rebuild the library on {} from your collection: the playlists ticked in SYNC MANAGER?"
 msgstr "Ricostruire la libreria su {} dalla tua collezione: le playlist spuntate in SYNC MANAGER?"
 
-#: src/app/device/check.rs:507
+#: src/app/device/check.rs:518
 msgid "REBUILD"
 msgstr "RICOSTRUISCI"
 
-#: src/app/device/check.rs:540
+#: src/app/device/check.rs:551
 msgid "Fixing the stick"
 msgstr "Riparazione della chiavetta"
 
-#: src/app/device/check.rs:557
+#: src/app/device/check.rs:617
 msgid "it is mounted read-only"
 msgstr "è montata in sola lettura"
 
-#: src/app/device/check.rs:645
+#: src/app/device/check.rs:653
 msgid "Finishing what was cut off"
 msgstr "Completamento di ciò che era stato interrotto"
 
-#: src/app/device/check.rs:648
+#: src/app/device/check.rs:657
 msgid "{}: the cut-off export could not be put right ({})."
 msgstr "{}: non è stato possibile rimediare all'esportazione interrotta ({})."
 
-#: src/app/device/check.rs:655
+#: src/app/device/check.rs:669
 msgid "{}: the extension {} is switched off. Switch it on in PREFERENCES > EXTENSIONS."
 msgstr "{}: l'estensione {} è disattivata. Attivala in PREFERENZE > ESTENSIONI."
 
-#: src/app/device/check.rs:656
+#: src/app/device/check.rs:670
 msgid "Repairing ({})"
 msgstr "Riparazione ({})"
 
-#: src/app/device/check.rs:671
+#: src/app/device/check.rs:685
 msgid "{} is ready."
 msgstr "{} è pronta."
 
-#: src/app/device/check.rs:675
+#: src/app/device/check.rs:689
 msgid "{} still needs attention: {}"
 msgstr "{} richiede ancora attenzione: {}"
 
-#: src/app/device/check.rs:687
+#: src/app/device/check.rs:701
 msgid "Writing the library again"
 msgstr "Riscrittura della libreria"
 
-#: src/app/device/check.rs:719
+#: src/app/device/check.rs:733
 msgid "Copying missing music"
 msgstr "Copia della musica mancante"
 
-#: src/app/device/check.rs:731
+#: src/app/device/check.rs:745
 msgid "Copied {n} missing audio file again from your collection."
 msgid_plural "Copied {n} missing audio files again from your collection."
 msgstr[0] "{n} file audio mancante è stato copiato di nuovo dalla tua collezione."
 msgstr[1] "{n} file audio mancanti sono stati copiati di nuovo dalla tua collezione."
 
-#: src/app/device/check.rs:733
+#: src/app/device/check.rs:747
 msgid "Copied {} of {} missing audio files again. {} are not in your collection: copy them to the stick by hand or take them off its playlists."
 msgstr "{} di {} file audio mancanti sono stati copiati di nuovo. {} non sono nella tua collezione: copiali a mano sulla chiavetta o toglili dalle sue playlist."
 
-#: src/app/device/check.rs:778
+#: src/app/device/check.rs:792
 msgid "{}: the copy is shorter than the original"
 msgstr "{}: la copia è più corta dell'originale"
 
@@ -7384,163 +7408,170 @@ msgstr "EXPORT scrive nella cartella {}"
 msgid "EXPORT writes to {}"
 msgstr "EXPORT scrive su {}"
 
-#: src/app/device/export.rs:141
-msgid "No such folder: {}"
-msgstr "Cartella inesistente: {}"
-
-#: src/app/device/export.rs:144
+#: src/app/device/export.rs:145
 msgid "Choose a device or type a folder"
 msgstr "Scegli un dispositivo o scrivi una cartella"
 
-#: src/app/device/export.rs:154
+#: src/app/device/export.rs:160
 msgid "No device plugin can write a library there"
 msgstr "Nessun plugin di dispositivo può scrivere una libreria lì"
 
-#: src/app/device/export.rs:160
+#: src/app/device/export.rs:166
 msgid "Nothing to export: reopen the window"
 msgstr "Niente da esportare: riapri la finestra"
 
-#: src/app/device/export.rs:169
+#: src/app/device/export.rs:175
 msgid "None of the ticked playlists has tracks"
 msgstr "Nessuna delle playlist selezionate contiene tracce"
 
-#: src/app/device/export.rs:184
+#: src/app/device/export.rs:190
 msgid "Exporting"
 msgstr "Esportazione"
 
-#: src/app/device/format.rs:46
+#: src/app/device/format.rs:45
 msgid "Reading the disk"
 msgstr "Lettura del disco"
 
-#: src/app/device/format.rs:47
+#: src/app/device/format.rs:46
 msgid "Unmounting"
 msgstr "Smontaggio"
 
-#: src/app/device/format.rs:48
+#: src/app/device/format.rs:47
 msgid "Erasing the disk"
 msgstr "Cancellazione del disco"
 
-#: src/app/device/format.rs:49
+#: src/app/device/format.rs:48
 msgid "Formatting"
 msgstr "Formattazione"
 
-#: src/app/device/format.rs:50
+#: src/app/device/format.rs:49
 msgid "Mounting"
 msgstr "Montaggio"
 
-#: src/app/device/format.rs:64
+#: src/app/device/format.rs:63
 msgid "{} is not on a disk this app can format. Nothing was erased. Choose a USB stick or an SD card."
 msgstr "{} non si trova su un disco che l'app può formattare. Non è stato cancellato nulla. Scegli una chiavetta USB o una scheda SD."
 
-#: src/app/device/format.rs:65
+#: src/app/device/format.rs:64
 msgid "{} is on the disk this computer runs from. Nothing was erased. Only USB sticks and SD cards can be formatted here."
 msgstr "{} si trova sul disco da cui funziona questo computer. Non è stato cancellato nulla. Qui si possono formattare solo chiavette USB e schede SD."
 
-#: src/app/device/format.rs:66
+#: src/app/device/format.rs:65
 msgid "{} is on a disk that is not removable. Nothing was erased. Only USB sticks and SD cards can be formatted here."
 msgstr "{} si trova su un disco non rimovibile. Non è stato cancellato nulla. Qui si possono formattare solo chiavette USB e schede SD."
 
-#: src/app/device/format.rs:67
+#: src/app/device/format.rs:66
 msgid "{} is write-protected or mounted read-only. Nothing was erased. Slide the lock switch of the card to unlocked or plug it in again, then try again."
 msgstr "{} è protetto da scrittura o montato in sola lettura. Non è stato cancellato nulla. Sposta l'interruttore di blocco della scheda su sbloccato o ricollegala, poi riprova."
 
-#: src/app/device/format.rs:68
+#: src/app/device/format.rs:67
 msgid "A job is writing to {}. Nothing was erased. Wait for it or cancel it (X), then format."
 msgstr "Un lavoro sta scrivendo su {}. Non è stato cancellato nulla. Aspetta che finisca o annullalo (X), poi formatta."
 
-#: src/app/device/format.rs:69
+#: src/app/device/format.rs:68
 msgid "The disk holds a volume ({}) that was not listed when you confirmed. Nothing was erased. Press FORMAT… again to see everything on the disk."
 msgstr "Il disco contiene un volume ({}) che non era nell'elenco quando hai confermato. Non è stato cancellato nulla. Premi di nuovo FORMATTA… per vedere tutto ciò che c'è sul disco."
 
-#: src/app/device/format.rs:70
+#: src/app/device/format.rs:69
 msgid "The confirmation does not match. Nothing was erased. Type {} exactly as shown."
 msgstr "La conferma non corrisponde. Non è stato cancellato nulla. Scrivi {} esattamente come mostrato."
 
-#: src/app/device/format.rs:71
+#: src/app/device/format.rs:70
 msgid "Players refuse exFAT SD cards. Nothing was erased. Choose FAT32 for the card."
 msgstr "I lettori rifiutano le schede SD in exFAT. Non è stato cancellato nulla. Scegli FAT32 per la scheda."
 
-#: src/app/device/format.rs:72
+#: src/app/device/format.rs:71
 msgid "This disk is larger than 2 TB, the most an MBR partition table holds. Nothing was erased. Use a smaller stick, or format it with the disk tool of your system."
 msgstr "Questo disco supera i 2 TB, il massimo di una tabella delle partizioni MBR. Non è stato cancellato nulla. Usa una chiavetta più piccola o formattala con lo strumento dischi del tuo sistema."
 
-#: src/app/device/format.rs:73
+#: src/app/device/format.rs:72
 msgid "The label is not valid for {}: use up to 11 letters or digits, no punctuation. Nothing was erased. Type a simpler label."
 msgstr "L'etichetta non è valida per {}: fino a 11 lettere o cifre, senza punteggiatura. Non è stato cancellato nulla. Scrivi un'etichetta più semplice."
 
-#: src/app/device/format.rs:74
+#: src/app/device/format.rs:73
 msgid "The system did not allow formatting. Nothing was erased. Try again and enter your password when asked."
 msgstr "Il sistema non ha consentito la formattazione. Non è stato cancellato nulla. Riprova e inserisci la password quando richiesta."
 
-#: src/app/device/format.rs:75
+#: src/app/device/format.rs:74
 msgid "The system stopped allowing the format after the disk was erased, so it has no usable volume yet. Press FORMAT… again and enter your password when asked."
 msgstr "Il sistema ha smesso di consentire la formattazione dopo la cancellazione del disco, quindi non ha ancora un volume utilizzabile. Premi di nuovo FORMATTA… e inserisci la password quando richiesta."
 
-#: src/app/device/format.rs:76
+#: src/app/device/format.rs:75
 msgid "{} is in use by another program. Nothing was erased. Close what uses it, then try again."
 msgstr "{} è in uso da un altro programma. Non è stato cancellato nulla. Chiudi ciò che lo usa, poi riprova."
 
-#: src/app/device/format.rs:77
+#: src/app/device/format.rs:76
 msgid "The tool {} is not available. Nothing was erased. Install it (on Linux: udisks2) and try again."
 msgstr "Lo strumento {} non è disponibile. Non è stato cancellato nulla. Installalo (su Linux: udisks2) e riprova."
 
-#: src/app/device/format.rs:80
+#: src/app/device/format.rs:79
 msgid "reading the disk"
 msgstr "la lettura del disco"
 
-#: src/app/device/format.rs:81
+#: src/app/device/format.rs:80
 msgid "unmounting it"
 msgstr "lo smontaggio"
 
-#: src/app/device/format.rs:82
+#: src/app/device/format.rs:81
 msgid "writing the partition table"
 msgstr "la scrittura della tabella delle partizioni"
 
-#: src/app/device/format.rs:83
+#: src/app/device/format.rs:82
 msgid "making the file system"
 msgstr "la creazione del file system"
 
-#: src/app/device/format.rs:84
+#: src/app/device/format.rs:83
 msgid "mounting it"
 msgstr "il montaggio"
 
-#: src/app/device/format.rs:87
+#: src/app/device/format.rs:86
 msgid "Formatting {} stopped while {}: {}. The disk was erased and has no usable volume yet. Press FORMAT… again to finish."
 msgstr "La formattazione di {} si è interrotta durante {}: {}. Il disco è stato cancellato e non ha ancora un volume utilizzabile. Premi di nuovo FORMATTA… per completare."
 
-#: src/app/device/format.rs:89
+#: src/app/device/format.rs:88
 msgid "Formatting {} stopped while {}: {}. Nothing was erased. Try again."
 msgstr "La formattazione di {} si è interrotta durante {}: {}. Non è stato cancellato nulla. Riprova."
 
-#: src/app/device/format.rs:98
+#: src/app/device/format.rs:97
 msgid "no file system"
 msgstr "nessun file system"
 
-#: src/app/device/format.rs:108
+#: src/app/device/format.rs:107
 msgid "no label"
 msgstr "senza etichetta"
 
-#: src/app/device/format.rs:159
+#: src/app/device/format.rs:158
 msgid "Disk"
 msgstr "Disco"
 
-#: src/app/device/format.rs:166
+#: src/app/device/format.rs:165
 msgid "Everything on this disk will be erased: the music, the libraries and every volume listed here. This cannot be undone."
 msgstr "Tutto ciò che si trova su questo disco verrà cancellato: la musica, le librerie e ogni volume elencato qui. L'operazione non è reversibile."
 
-#: src/app/device/format.rs:225
+#: src/app/device/format.rs:224
 msgid "Not formatted: the library backup failed ({}). The disk was not touched. Fix that or untick the backup, then try again."
 msgstr "Non formattato: il backup della libreria non è riuscito ({}). Il disco non è stato toccato. Risolvi il problema o deseleziona il backup, poi riprova."
 
-#: src/app/device/format.rs:252
+#: src/app/device/format.rs:251
 msgid "{} formatted: {} on one MBR partition. Choose EXPORT to put music on it."
 msgstr "{} formattato: {} su una partizione MBR. Scegli ESPORTA per metterci della musica."
 
-#: src/app/device/format.rs:257
+#: src/app/device/format.rs:256
 msgid "{} formatted as {} instead of FAT32: the system makes FAT32 on a card this small only with an extra permission. DJ players read it all the same. Press FORMAT… again and enter your password when asked if you want FAT32."
 msgstr "{} formattato come {} invece di FAT32: su una scheda così piccola il sistema crea FAT32 solo con un permesso aggiuntivo. I lettori DJ lo leggono comunque. Premi di nuovo FORMATTA… e inserisci la password quando richiesta se vuoi il FAT32."
 
-#: src/app/device/formats.rs:80
+#: src/app/device/formats.rs:77
+#: src/app/device/preview.rs:98
+msgid "No such folder: {}"
+msgstr "Cartella inesistente: {}"
+
+#: src/app/device/formats.rs:88
+#: src/app/device/job.rs:200
+#: src/app/device/scan.rs:125
+msgid "the worker stopped"
+msgstr "il worker si è fermato"
+
+#: src/app/device/formats.rs:180
 msgid "{}: switch on at least one library format"
 msgstr "{}: attiva almeno un formato di libreria"
 
@@ -7594,11 +7625,7 @@ msgid_plural "Checked: {} holds {n} tracks in {}"
 msgstr[0] "Verificato: {} contiene {n} brano in {}"
 msgstr[1] "Verificato: {} contiene {n} brani in {}"
 
-#: src/app/device/job.rs:197
-msgid "the worker stopped"
-msgstr "il worker si è fermato"
-
-#: src/app/device/job.rs:219
+#: src/app/device/job.rs:222
 msgid "Cancelled: the device was left as it was"
 msgstr "Annullato: il dispositivo è rimasto com'era"
 
@@ -7632,47 +7659,47 @@ msgstr "Scrittura dei cue"
 msgid "cues of {} track(s) written to {}"
 msgstr "cue di {} tracce scritti in {}"
 
-#: src/app/device/mod.rs:75
+#: src/app/device/mod.rs:76
 msgid "Another job is running: wait for it or cancel it (X)"
 msgstr "Un altro lavoro è in corso: attendi o annullalo (X)"
 
-#: src/app/device/mod.rs:177
+#: src/app/device/mod.rs:180
 msgid " — {} warning(s), first: {}"
 msgstr " — {} avvisi, il primo: {}"
 
-#: src/app/device/mod.rs:179
+#: src/app/device/mod.rs:182
 msgid "exported {} tracks ({} new, {} updated) and {} playlists to {}{}{}"
 msgstr "esportate {} tracce ({} nuove, {} aggiornate) e {} playlist in {}{}{}"
 
-#: src/app/device/mod.rs:198
+#: src/app/device/mod.rs:201
 msgid " — Update Collection baseline not recorded: {}"
 msgstr " — Punto di partenza di Aggiorna collezione non registrato: {}"
 
-#: src/app/device/mod.rs:223
+#: src/app/device/mod.rs:226
 msgid "failed: {}"
 msgstr "non riuscito: {}"
 
-#: src/app/device/mod.rs:278
+#: src/app/device/mod.rs:281
 msgid "That stick is not connected any more. Plug it in again, then try once more."
 msgstr "Quella chiavetta non è più collegata. Ricollegala e riprova."
 
-#: src/app/device/mod.rs:290
+#: src/app/device/mod.rs:293
 msgid "No device is chosen. Pick one in the list on the left."
 msgstr "Nessun dispositivo scelto. Scegline uno nella lista a sinistra."
 
-#: src/app/device/mod.rs:304
+#: src/app/device/mod.rs:307
 msgid "it is mounted read-only, so nothing can be written. Check its write-protect switch, then plug it in again"
 msgstr "è montata in sola lettura, quindi non si può scrivere nulla. Controlla l'interruttore di protezione da scrittura, poi ricollegala"
 
-#: src/app/device/mod.rs:313
+#: src/app/device/mod.rs:316
 msgid "cannot read the collection: {}"
 msgstr "impossibile leggere la collezione: {}"
 
-#: src/app/device/mod.rs:367
+#: src/app/device/mod.rs:370
 msgid "{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports."
 msgstr "{}: la sua estensione non può farlo con questo dispositivo. Attiva l'estensione in PREFERENZE > ESTENSIONI o usa un dispositivo supportato."
 
-#: src/app/device/mod.rs:514
+#: src/app/device/mod.rs:521
 msgid "Cancelling…"
 msgstr "Annullamento…"
 
@@ -7696,75 +7723,75 @@ msgstr "pochi secondi"
 msgid "about {} s"
 msgstr "circa {} s"
 
-#: src/app/device/preview.rs:198
+#: src/app/device/preview.rs:206
 msgid "Not enough room: this needs {} and the stick has {} free. Leave some playlists out or free some space."
 msgstr "Spazio insufficiente: servono {} e la chiavetta ne ha {} liberi. Escludi alcune playlist o libera spazio."
 
-#: src/app/device/preview.rs:206
+#: src/app/device/preview.rs:214
 msgid "{} is {}: this stick holds files up to {}. It would be left out; convert it to FLAC or use an exFAT stick."
 msgstr "{} è di {}: questa chiavetta accetta file fino a {}. Verrebbe escluso; convertilo in FLAC o usa una chiavetta exFAT."
 
-#: src/app/device/preview.rs:214
+#: src/app/device/preview.rs:222
 msgid "… and {} more tracks are too big for this stick"
 msgstr "… e altri {} brani sono troppo grandi per questa chiavetta"
 
-#: src/app/device/preview.rs:220
+#: src/app/device/preview.rs:228
 msgid "{n} track has no audio file and would be left out: {}"
 msgid_plural "{n} tracks have no audio file and would be left out: {}"
 msgstr[0] "{n} brano non ha un file audio e verrebbe escluso: {}"
 msgstr[1] "{n} brani non hanno un file audio e verrebbero esclusi: {}"
 
-#: src/app/device/preview.rs:250
+#: src/app/device/preview.rs:258
 msgid "Preparing the preview"
 msgstr "Preparazione dell'anteprima"
 
-#: src/app/device/preview.rs:304
+#: src/app/device/preview.rs:315
 msgid "{n} track is analysed first (beat grid and key): {}"
 msgid_plural "{n} tracks are analysed first (beat grid and key): {}"
 msgstr[0] "{n} brano viene analizzato prima (griglia dei battiti e tonalità): {}"
 msgstr[1] "{n} brani vengono analizzati prima (griglia dei battiti e tonalità): {}"
 
-#: src/app/device/preview.rs:312
+#: src/app/device/preview.rs:323
 msgid "{n} playlist written"
 msgid_plural "{n} playlists written"
 msgstr[0] "{n} playlist scritta"
 msgstr[1] "{n} playlist scritte"
 
-#: src/app/device/preview.rs:320
+#: src/app/device/preview.rs:331
 msgid "Takes {} (from earlier jobs on this stick)"
 msgstr "Durata: {} (in base ai lavori precedenti su questa chiavetta)"
 
-#: src/app/device/preview.rs:322
+#: src/app/device/preview.rs:333
 msgid "Takes {} (estimate)"
 msgstr "Durata: {} (stima)"
 
-#: src/app/device/preview.rs:329
+#: src/app/device/preview.rs:340
 msgid "The current library is backed up first"
 msgstr "La libreria attuale viene prima salvata in un backup"
 
-#: src/app/device/preview.rs:331
+#: src/app/device/preview.rs:342
 msgid "Your music on this computer is not changed"
 msgstr "La tua musica su questo computer non viene modificata"
 
-#: src/app/device/preview.rs:343
+#: src/app/device/preview.rs:354
 msgid "Write to {}"
 msgstr "Scrivi su {}"
 
-#: src/app/device/preview.rs:346
+#: src/app/device/preview.rs:357
 msgid "folder {}"
 msgstr "cartella {}"
 
-#: src/app/device/preview.rs:354
+#: src/app/device/preview.rs:365
 msgid "No new track to copy"
 msgstr "Nessun nuovo brano da copiare"
 
-#: src/app/device/preview.rs:365
+#: src/app/device/preview.rs:367
 msgid "{n} new track to copy ({})"
 msgid_plural "{n} new tracks to copy ({})"
 msgstr[0] "{n} nuovo brano da copiare ({})"
 msgstr[1] "{n} nuovi brani da copiare ({})"
 
-#: src/app/device/preview.rs:369
+#: src/app/device/preview.rs:380
 msgid "{n} track is there already: its marks are refreshed"
 msgid_plural "{n} tracks are there already: their marks are refreshed"
 msgstr[0] "{n} brano è già presente: i suoi segnali vengono aggiornati"
@@ -7995,31 +8022,31 @@ msgstr "Nulla è stato scritto: il backup della libreria di {} non è riuscito (
 msgid "The library of {} was backed up first, to {}"
 msgstr "La libreria di {} è stata prima salvata in un backup, in {}"
 
-#: src/app/device/scan.rs:20
+#: src/app/device/scan.rs:49
 msgid "no library yet"
 msgstr "ancora nessuna libreria"
 
-#: src/app/device/scan.rs:29
+#: src/app/device/scan.rs:58
 msgid "mounted read-only: nothing can be written"
 msgstr "montato in sola lettura: non si può scrivere nulla"
 
-#: src/app/device/scan.rs:66
+#: src/app/device/scan.rs:161
 msgid "{}: plugged in, mounting /dev/{}…"
 msgstr "{}: collegato, montaggio di /dev/{}…"
 
-#: src/app/device/scan.rs:78
+#: src/app/device/scan.rs:172
 msgid "{}: cannot mount /dev/{}: {}. Mount it from your file manager, then it shows up here."
 msgstr "{}: impossibile montare /dev/{}: {}. Montala dal gestore file e comparirà qui."
 
-#: src/app/device/scan.rs:115
-msgid "{} connected ({})"
-msgstr "{} collegato ({})"
-
-#: src/app/device/scan.rs:126
+#: src/app/device/scan.rs:201
 msgid "{}: {} setting(s) changed on the player were taken over"
 msgstr "{}: {} impostazioni modificate sul player sono state recepite"
 
-#: src/app/device/scan.rs:165
+#: src/app/device/scan.rs:251
+msgid "{} connected ({})"
+msgstr "{} collegato ({})"
+
+#: src/app/device/scan.rs:287
 msgid "{} removed"
 msgstr "{} rimosso"
 
@@ -8049,39 +8076,43 @@ msgstr "Sincronizzazione"
 msgid "synced: {}"
 msgstr "sincronizzato: {}"
 
-#: src/app/device/transfer.rs:191
+#: src/app/device/transfer.rs:197
+msgid "Preparing transfer"
+msgstr "Preparazione del trasferimento"
+
+#: src/app/device/transfer.rs:262
 msgid "Nothing to transfer: choose some tracks first"
 msgstr "Niente da trasferire: scegli prima dei brani"
 
-#: src/app/device/transfer.rs:208
+#: src/app/device/transfer.rs:275
 msgid "That playlist has no tracks to transfer"
 msgstr "Quella playlist non ha brani da trasferire"
 
-#: src/app/device/transfer.rs:222
+#: src/app/device/transfer.rs:289
 msgid "Analysing"
 msgstr "Analisi"
 
-#: src/app/device/transfer.rs:224
+#: src/app/device/transfer.rs:291
 msgid "Analysing {} of {}…"
 msgstr "Analisi di {} su {}…"
 
-#: src/app/device/transfer.rs:304
+#: src/app/device/transfer.rs:371
 msgid "Nothing transferred: {n} track is in {} already"
 msgid_plural "Nothing transferred: {n} tracks are in {} already"
 msgstr[0] "Niente trasferito: {n} brano è già in {}"
 msgstr[1] "Niente trasferito: {n} brani sono già in {}"
 
-#: src/app/device/transfer.rs:332
+#: src/app/device/transfer.rs:399
 msgid "Transferring"
 msgstr "Trasferimento"
 
-#: src/app/device/transfer.rs:336
+#: src/app/device/transfer.rs:403
 msgid "{n} track transferred to {}"
 msgid_plural "{n} tracks transferred to {}"
 msgstr[0] "{n} brano trasferito su {}"
 msgstr[1] "{n} brani trasferiti su {}"
 
-#: src/app/device/transfer.rs:343
+#: src/app/device/transfer.rs:410
 msgid " ({} already there)"
 msgstr " ({} già presenti)"
 
@@ -8239,29 +8270,24 @@ msgstr "MODIFICATO"
 msgid "BPM: type a tempo between 30 and 300"
 msgstr "BPM: scrivi un tempo tra 30 e 300"
 
-#: src/app/exportmode/mod.rs:185
-#: src/app/library/track.rs:66
-msgid "this track has an Analysis Lock: unlock it first"
-msgstr "questa traccia ha un Blocco analisi: sbloccala prima"
-
 #: src/app/exportmode/mod.rs:189
-#: src/app/library/track.rs:67
-msgid "analysing “{}”…{}"
-msgstr "analisi di “{}”…{}"
+#: src/app/library/track.rs:63
+msgid "analysing “{}”…"
+msgstr "analisi di “{}”…"
 
-#: src/app/exportmode/mod.rs:204
+#: src/app/exportmode/mod.rs:200
 msgid "load a track in both players first"
 msgstr "carica prima una traccia in entrambi i player"
 
-#: src/app/exportmode/mod.rs:215
+#: src/app/exportmode/mod.rs:211
 msgid "matching: {}"
 msgstr "abbinamento: {}"
 
-#: src/app/exportmode/mod.rs:216
+#: src/app/exportmode/mod.rs:212
 msgid "“{}” and “{}” are now related tracks"
 msgstr "“{}” e “{}” ora sono tracce correlate"
 
-#: src/app/exportmode/mod.rs:217
+#: src/app/exportmode/mod.rs:213
 msgid "“{}” and “{}” are no longer related"
 msgstr "“{}” e “{}” non sono più correlate"
 
@@ -8963,24 +8989,24 @@ msgstr "lettura dei tag"
 
 #: src/app/library/import.rs:81
 #: src/app/library/import.rs:88
-#: src/app/library/import.rs:179
+#: src/app/library/import.rs:182
 msgid "importing…"
 msgstr "importazione…"
 
-#: src/app/library/import.rs:174
+#: src/app/library/import.rs:177
 msgid "that library plugin is not loaded"
 msgstr "questo plugin di libreria non è caricato"
 
-#: src/app/library/import.rs:178
-#: src/app/library/import.rs:223
+#: src/app/library/import.rs:181
+#: src/app/library/import.rs:226
 msgid "importing"
 msgstr "importazione"
 
-#: src/app/library/import.rs:203
+#: src/app/library/import.rs:206
 msgid "{} · {} sampler slots loading"
 msgstr "{} · {} slot sampler in caricamento"
 
-#: src/app/library/import.rs:219
+#: src/app/library/import.rs:222
 msgid "choose All tracks or a playlist of a library source or Explorer first"
 msgstr "scegli prima Tutte le tracce o una playlist di una sorgente della libreria o di Explorer"
 
@@ -9310,7 +9336,7 @@ msgid "0 = off"
 msgstr "0 = disattivato"
 
 #: src/app/library/track.rs:31
-#: src/app/library/track.rs:95
+#: src/app/library/track.rs:75
 msgid "this track has no file"
 msgstr "questa traccia non ha un file"
 
@@ -9330,55 +9356,51 @@ msgstr "RIMUOVI DALLA COLLEZIONE"
 msgid "unknown track action {}"
 msgstr "azione traccia sconosciuta {}"
 
-#: src/app/library/track.rs:76
+#: src/app/library/track.rs:64
 msgid "analysing {} tracks…"
 msgstr "analisi di {} tracce…"
 
-#: src/app/library/track.rs:82
-msgid "{} skipped (Analysis Lock)"
-msgstr "{} saltate (Blocco analisi)"
-
-#: src/app/library/track.rs:98
+#: src/app/library/track.rs:78
 msgid "already in the Collection"
 msgstr "già nella collezione"
 
-#: src/app/library/track.rs:102
+#: src/app/library/track.rs:82
 msgid "“{}” imported to the Collection"
 msgstr "“{}” importata nella collezione"
 
-#: src/app/library/track.rs:121
+#: src/app/library/track.rs:101
 msgid "Analysis Lock on for “{}”"
 msgstr "Blocco analisi attivo per “{}”"
 
-#: src/app/library/track.rs:123
+#: src/app/library/track.rs:103
 msgid "Analysis Lock off for “{}”"
 msgstr "Blocco analisi disattivato per “{}”"
 
-#: src/app/library/track.rs:125
+#: src/app/library/track.rs:105
 msgid "Analysis Lock on for {} tracks"
 msgstr "Blocco analisi attivo per {} tracce"
 
-#: src/app/library/track.rs:126
+#: src/app/library/track.rs:106
 msgid "Analysis Lock off for {} tracks"
 msgstr "Blocco analisi disattivato per {} tracce"
 
-#: src/app/library/track.rs:189
+#: src/app/library/track.rs:169
 msgid "the file is missing: relocate it first"
 msgstr "il file è mancante: ricollegalo prima"
 
-#: src/app/library/track.rs:203
+#: src/app/library/track.rs:183
 msgid "tags of “{}” reloaded"
 msgstr "tag di “{}” ricaricati"
 
-#: src/app/library/track.rs:204
+#: src/app/library/track.rs:184
 msgid "Reload Tag: kept your edits of {}"
 msgstr "Ricarica tag: mantenute le tue modifiche di {}"
 
-#: src/app/library/track.rs:205
+#: src/app/library/track.rs:185
 msgid "tags of {} tracks reloaded"
 msgstr "tag di {} tracce ricaricati"
 
-#: src/app/library/track.rs:208
+#: src/app/library/track.rs:188
 msgid "{} files are missing"
 msgstr "{} file mancanti"
 
@@ -9490,7 +9512,7 @@ msgstr "luce sconosciuta \"{}\""
 msgid "no <name>"
 msgstr "nessun <name>"
 
-#: src/app/midi/mod.rs:253
+#: src/app/midi/mod.rs:257
 msgid "{} {} ch {}"
 msgstr "{} {} ch {}"
 

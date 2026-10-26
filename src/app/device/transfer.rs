@@ -14,12 +14,14 @@ use crate::app::{analyze, browser, BrowserState};
 use openfader::{
     analysis::{Analysis, cache},
     device::{
-        self, link,
+        self, Device, link,
         plan::Speeds,
         transfer::{self, Plan},
-        Device,
     },
-    library::{snapshot::Snapshot, Track},
+    library::{
+        Track,
+        snapshot::{Pending, Snapshot},
+    },
     plugin::device::Feature,
     store,
 };
@@ -63,18 +65,41 @@ enum Gathered {
     Playlist(Arc<Snapshot>),
 }
 
+enum Gathering {
+    Tracks(Pending),
+    Playlist(Pending),
+}
+
+impl Gathering {
+    fn read(&self, store: &store::Store, cancelled: &dyn Fn() -> bool) -> Option<Gathered> {
+        match self {
+            Self::Tracks(pending) => pending
+                .read_cancellable(store, cancelled)
+                .map(|snapshot| Gathered::Tracks(Arc::new(snapshot.into_tracks()))),
+            Self::Playlist(pending) => pending
+                .read_cancellable(store, cancelled)
+                .map(|snapshot| Gathered::Playlist(Arc::new(snapshot))),
+        }
+    }
+}
+
 impl Gathered {
     /// The tracks that are analysed before they are written ([`transfer::needs_analysis`]).
-    fn todo(&self) -> Vec<Track> {
+    fn todo(&self, cancelled: &dyn Fn() -> bool) -> Option<Vec<Track>> {
         let tracks = match self {
             Self::Tracks(v) => v.as_slice(),
             Self::Playlist(s) => s.tracks(),
         };
-        tracks
-            .iter()
-            .filter(|(t, a)| transfer::needs_analysis(t, a.as_ref(), cache::glance(t).as_ref()))
-            .map(|(t, _)| t.clone())
-            .collect()
+        let mut todo = Vec::new();
+        for (track, analysis) in tracks {
+            if cancelled() {
+                return None;
+            }
+            if transfer::needs_analysis(track, analysis.as_ref(), cache::glance(track).as_ref()) {
+                todo.push(track.clone());
+            }
+        }
+        Some(todo)
     }
 }
 
@@ -164,11 +189,58 @@ impl Ctx {
         let writers = self.writers(&d)?;
         let g = self.gather(&pack)?;
         let t = Target::new(self, &d, writers);
-        if analysed {
-            self.write_transfer(d, t, to, g);
-            return Some(());
-        }
-        let batch = analyze::batch(&g.todo());
+        let (out, store) = (Arc::new(Mutex::new(None)), self.store.clone());
+        let (ready, to) = (out.clone(), to.clone());
+        self.mirror.set(true);
+        self.start_then(
+            Some(d.id.clone()),
+            tr!("Preparing transfer"),
+            move |ctl| {
+                let gathered = g
+                    .read(&store, &|| ctl.cancelled())
+                    .ok_or_else(|| "cancelled".to_owned())?;
+                let todo = if analysed {
+                    None
+                } else {
+                    Some(
+                        gathered
+                            .todo(&|| ctl.cancelled())
+                            .ok_or_else(|| "cancelled".to_owned())?,
+                    )
+                };
+                if ctl.cancelled() {
+                    return Err("cancelled".into());
+                }
+                *out.lock() = Some((gathered, todo));
+                Ok(String::new())
+            },
+            move |cx, result| {
+                cx.mirror.set(false);
+                cx.clear_loading();
+                if result.is_ok() {
+                    if let Some((gathered, todo)) = ready.lock().take() {
+                        cx.transfer_ready(d, t, to, pack, gathered, todo);
+                    }
+                }
+            },
+        );
+        Some(())
+    }
+
+    fn transfer_ready(
+        self: &Rc<Self>,
+        d: Device,
+        t: Target,
+        to: Dest,
+        pack: Pack,
+        g: Gathered,
+        todo: Option<Vec<Track>>,
+    ) {
+        let Some(todo) = todo else {
+            self.write_transfer(d, t, &to, g);
+            return;
+        };
+        let batch = analyze::batch(&todo);
         let analyse = batch.as_ref().map_or(0, |b| b.len());
         let (bd, bto, bg) = (d.clone(), to.clone(), g.clone());
         let (go_t, dest) = (t.clone(), to.clone());
@@ -181,33 +253,28 @@ impl Ctx {
                 None => cx.write_transfer(d, go_t, &dest, g),
             },
         );
-        Some(())
     }
 
     /// What `pack` is, read from the library now.
-    fn gather(&self, pack: &Pack) -> Option<Gathered> {
+    fn gather(&self, pack: &Pack) -> Option<Gathering> {
         match pack {
             Pack::Tracks(tracks) if tracks.is_empty() => {
                 self.say(tr!("Nothing to transfer: choose some tracks first"), true);
                 None
             }
             Pack::Tracks(tracks) => {
-                let picks = tracks
-                    .iter()
-                    .map(|t| (t.clone(), self.lib.analysis(t)))
-                    .collect();
-                let mut s = Snapshot::of_tracks(picks);
+                let mut s = Pending::of_tracks(tracks.clone(), self.lib.analysis_reader());
                 for (t, beats, cues) in self.decks.iter().filter_map(|d| d.session()) {
                     s.override_session(&t, beats, cues);
                 }
-                Some(Gathered::Tracks(Arc::new(s.into_tracks())))
+                Some(Gathering::Tracks(s))
             }
             Pack::Playlist(id) => {
-                let narrowed = self.snapshot()?.narrowed(&[id.as_str()]);
+                let narrowed = self.pending()?.narrowed(&[id.as_str()]);
                 if narrowed.is_none() {
                     self.say(tr!("That playlist has no tracks to transfer"), true);
                 }
-                narrowed.map(|s| Gathered::Playlist(Arc::new(s)))
+                narrowed.map(Gathering::Playlist)
             }
         }
     }
@@ -224,7 +291,7 @@ impl Ctx {
                 let say = |done: usize| ctl.set_phase(&tr!("Analysing {} of {}…", done, n));
                 say(0);
                 let started = Instant::now();
-                let r = batch.run(store.clone(), &|| ctl.cancelled(), &say);
+                let r = batch.run(store.clone(), &|| ctl.cancelled(), &say)?;
                 if ctl.cancelled() {
                     return Err("cancelled".into());
                 }
@@ -362,5 +429,120 @@ impl Ctx {
                 }
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use openfader::analysis::{Beat, Cue};
+    use std::sync::{
+        Condvar, Mutex as StdMutex,
+        atomic::{AtomicUsize, Ordering},
+        mpsc,
+    };
+    use std::time::Duration;
+
+    fn cue(time_ms: u32) -> Cue {
+        Cue {
+            hot_cue: 1,
+            time_ms,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        }
+    }
+
+    #[test]
+    fn transfer_capture_defers_blocked_source_reads_and_keeps_session_analysis_over_store_edits() {
+        let store = Arc::new(store::Store::in_memory().unwrap());
+        let track = Track {
+            title: "selected".into(),
+            ..Default::default()
+        };
+        let calls = Arc::new(AtomicUsize::new(0));
+        let reads = calls.clone();
+        let release = Arc::new((StdMutex::new(false), Condvar::new()));
+        let worker_release = release.clone();
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let reader = Arc::new(move |_: &Track| {
+            reads.fetch_add(1, Ordering::Relaxed);
+            let _ = entered_tx.send(());
+            let (lock, wake) = &*worker_release;
+            let mut released = lock.lock().unwrap();
+            while !*released {
+                released = wake.wait(released).unwrap();
+            }
+            Some(Analysis {
+                key: Some("8A".into()),
+                cues: vec![cue(100)],
+                ..Default::default()
+            })
+        });
+        let mut pending = Pending::of_tracks(vec![track.clone()], Some(reader));
+        pending.override_session(
+            &track,
+            vec![Beat {
+                bar_pos: 1,
+                bpm_x100: 12000,
+                time_ms: 500,
+            }],
+            vec![cue(1200)],
+        );
+        let captured = Gathering::Tracks(pending);
+        assert_eq!(
+            calls.load(Ordering::Relaxed),
+            0,
+            "capturing a transfer never reads source analyses"
+        );
+        let worker_store = store.clone();
+        let worker = std::thread::spawn(move || captured.read(&worker_store, &|| false));
+        let entered = entered_rx.recv_timeout(Duration::from_secs(2));
+        store
+            .set_cues(&store::key(&track), Some(&[cue(900)]))
+            .unwrap();
+        *release.0.lock().unwrap() = true;
+        release.1.notify_all();
+        entered.unwrap();
+        let Some(Gathered::Tracks(picks)) = worker.join().unwrap() else {
+            panic!("prepared picks")
+        };
+        let analysis = picks[0].1.as_ref().unwrap();
+        assert_eq!(analysis.key.as_deref(), Some("8A"));
+        assert_eq!(analysis.beats[0].time_ms, 500);
+        assert_eq!(
+            analysis.cues[0].time_ms, 1200,
+            "the loaded session still wins over source and stored cues"
+        );
+        assert_eq!(
+            store.edits(&store::key(&track)).unwrap().cues.unwrap()[0].time_ms,
+            900
+        );
+    }
+
+    #[test]
+    fn cancelled_transfer_preparation_stops_between_tracks_without_a_partial_export() {
+        let store = store::Store::in_memory().unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let reads = calls.clone();
+        let pending = Pending::of_tracks(
+            (0..100)
+                .map(|i| Track {
+                    title: format!("t{i}"),
+                    ..Default::default()
+                })
+                .collect(),
+            Some(Arc::new(move |_| {
+                reads.fetch_add(1, Ordering::Relaxed);
+                Some(Analysis::default())
+            })),
+        );
+        let gathered = Gathering::Tracks(pending);
+        assert!(
+            gathered
+                .read(&store, &|| calls.load(Ordering::Relaxed) > 0)
+                .is_none()
+        );
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
     }
 }

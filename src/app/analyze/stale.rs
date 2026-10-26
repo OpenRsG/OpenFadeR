@@ -8,14 +8,14 @@
 
 use super::{detected, Job};
 use crate::app::{
-    prefs::{self, analysis::AnalysisUpdate},
     AnalysisNoticeState, App,
+    prefs::{self, analysis::AnalysisUpdate},
 };
 use openfader::{
     analysis::{
+        Execution,
         cache::{self, Age},
         options::{self, Options},
-        Execution,
     },
     library::Track,
     store,
@@ -144,17 +144,19 @@ pub(super) fn check() {
         let factor = (policy == AnalysisUpdate::Ask)
             .then(|| measure(&stale, &o))
             .flatten();
-        let _ = weak.upgrade_in_event_loop(move |app| found(&app, stale, policy, factor));
+        let _ = weak.upgrade_in_event_loop(move |app| found(&app, stale, factor));
     });
 }
 
 /// The answer of [`check`] on the UI thread.
-fn found(app: &App, stale: Vec<Track>, policy: AnalysisUpdate, factor: Option<f64>) {
+fn found(app: &App, stale: Vec<Track>, factor: Option<f64>) {
     eprintln!(
         "analysis: {} tracks were analysed by an older version",
         stale.len()
     );
-    match policy {
+    STALE.take();
+    app.global::<AnalysisNoticeState>().set_visible(false);
+    match prefs::with(|p| p.analysis.analysis_update) {
         AnalysisUpdate::Background => refresh(app, &stale),
         AnalysisUpdate::Ask => {
             let workers = super::workers(prefs::with(|p| p.analysis.process));
@@ -278,5 +280,25 @@ mod tests {
         let many = notice(52_000, None);
         assert!(many.starts_with("52000 tracks were"), "{many}");
         assert!(many.contains("could not be measured"), "{many}");
+    }
+    #[test]
+    fn completed_discovery_uses_current_update_policy_not_the_startup_choice() {
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let original = prefs::with(|p| p.analysis.analysis_update);
+        let stale = vec![track("/not-read/stale.wav", 200)];
+        prefs::set_for_test(|p| p.analysis.analysis_update = AnalysisUpdate::Ask);
+        found(&app, stale.clone(), None);
+        assert!(app.global::<AnalysisNoticeState>().get_visible());
+        assert_eq!(STALE.with_borrow(Vec::len), 1);
+        prefs::set_for_test(|p| p.analysis.analysis_update = AnalysisUpdate::OnLoad);
+        found(&app, stale.clone(), Some(0.1));
+        assert!(!app.global::<AnalysisNoticeState>().get_visible());
+        assert!(STALE.with_borrow(Vec::is_empty));
+        prefs::set_for_test(|p| p.analysis.analysis_update = AnalysisUpdate::Background);
+        found(&app, stale, None);
+        assert!(!app.global::<AnalysisNoticeState>().get_visible());
+        assert!(STALE.with_borrow(Vec::is_empty));
+        prefs::set_for_test(|p| p.analysis.analysis_update = original);
     }
 }

@@ -138,6 +138,9 @@ impl Ctx {
             Some(t.dev.id.clone()),
             phase,
             move |ctl| {
+                let mut t = t;
+                t.validate_folder()?;
+                t.o.free = openfader::device::space(&t.dest).map(|s| s.1);
                 let built = build(&ctl)?;
                 if let Some(m) = &built.idle {
                     return Ok(m.clone());

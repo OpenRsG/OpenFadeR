@@ -265,7 +265,6 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
         "cue_repeat_bars" => {
             a.cue_repeat_bars = REPEAT_BARS.get(i).copied().unwrap_or(a.cue_repeat_bars)
         }
-        "analyze_now" => super::run_action(key),
         // the same setting as VIEW > Layout > Browser panel > CUE Analysis Playlist
         "panel_cue_analysis" => p.view.panel_cue_analysis = i == 1,
         _ => return a.pick(key, i),

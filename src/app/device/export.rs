@@ -8,7 +8,7 @@ use super::preview::{Built, Target};
 use super::{record_all, App, Ctx, DeviceState};
 use openfader::plugin::device as plugins;
 use slint::ComponentHandle;
-use std::{path::Path, rc::Rc, sync::Arc};
+use std::{rc::Rc, sync::Arc};
 
 /// Reloads the playlist list when the window is open on a tab that needs the collection (EXPORT, SYNC MANAGER, BACKUPS).
 /// `count` also shows the collection size in the status line (not after a job, which has just put its result there).
@@ -137,11 +137,17 @@ fn start(cx: &Rc<Ctx>) {
     let Some(folder) = cx.with_state(|s| s.get_folder().trim().to_owned()) else {
         return;
     };
-    if !folder.is_empty() && !Path::new(&folder).is_dir() {
-        return cx.say(&tr!("No such folder: {}", folder), true);
-    }
     let Some(dev) = cx.format_target() else {
-        return cx.say(tr!("Choose a device or type a folder"), true);
+        let error = (!folder.is_empty()).then(|| cx.folder_error()).flatten();
+        let failed = error.is_some();
+        let text = error.unwrap_or_else(|| {
+            if folder.is_empty() {
+                tr!("Choose a device or type a folder").to_owned()
+            } else {
+                tr!("Looking at the stick…").to_owned()
+            }
+        });
+        return cx.say(&text, failed);
     };
     if !cx.writable(&dev) {
         return;
@@ -189,7 +195,7 @@ fn start(cx: &Rc<Ctx>) {
                     if dev.is_folder() {
                         // The job forgets only mounted devices: the folder's chips must see the libraries now there.
                         openfader::device::forget(&dev.mount);
-                        cx.show_formats();
+                        cx.refresh_folder();
                     } else {
                         cx.relink(&dev.id);
                     }

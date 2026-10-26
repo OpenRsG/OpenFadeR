@@ -68,7 +68,11 @@ impl Default for State {
 /// "12 Oct 2026 21:03".
 fn when(ts: i64) -> String {
     chrono::DateTime::from_timestamp(ts, 0)
-        .map(|t| t.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
+        .map(|t| {
+            t.with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M")
+                .to_string()
+        })
         .unwrap_or_default()
 }
 
@@ -89,9 +93,16 @@ pub(super) fn why(w: &Why) -> String {
         Why::FileSystem(fs) => tr!("cannot read {}", fs_name(fs)),
         Why::Table(t) => tr!(
             "cannot read a {} partition table",
-            if t == "dos" { "MBR".to_owned() } else { t.to_uppercase() }
+            if t == "dos" {
+                "MBR".to_owned()
+            } else {
+                t.to_uppercase()
+            }
         ),
-        Why::NoLibrary(reads) => tr!("needs {}, this stick has none", reads.join(&format!(" {} ", tr!("or")))),
+        Why::NoLibrary(reads) => tr!(
+            "needs {}, this stick has none",
+            reads.join(&format!(" {} ", tr!("or")))
+        ),
         Why::Unreadable(n) => tr!("cannot open the {} of this stick", n),
         Why::Damaged(n) => tr!("finds the {} of this stick damaged (see WHAT IS WRONG)", n),
     }
@@ -547,23 +558,6 @@ impl Ctx {
         );
     }
 
-    /// A device appeared: finishes or undoes an export a pulled stick cut off, before anything else touches the device, says what
-    /// happened, and queues the first look.
-    pub(super) fn on_mounted(&self, d: &Device) {
-        if commit::pending(&d.mount).is_some() || d.mount.join(commit::JOURNAL).is_file() {
-            let r = if d.writable() {
-                commit::recover(&d.mount)
-            } else {
-                Err(tr!("it is mounted read-only").to_owned())
-            };
-            if let (Some(text), Some(app)) = (recovery_text(&d.label, &r), self.app()) {
-                toast::show(&app, &text);
-            }
-            device::forget(&d.mount);
-        }
-        self.recheck(&d.id);
-    }
-
     /// The callbacks of the card and the booth picker.
     pub(super) fn wire_check(cx: &Rc<Self>, app: &App) {
         let s = app.global::<DeviceState>();
@@ -612,6 +606,20 @@ impl Ctx {
     }
 }
 
+/// Recover a newly mounted library on its scan worker before queuing any automatic writes.
+pub(super) fn recover_mounted(d: &Device) -> Option<String> {
+    if commit::pending(&d.mount).is_none() && !d.mount.join(commit::JOURNAL).is_file() {
+        return None;
+    }
+    let r = if d.writable() {
+        commit::recover(&d.mount)
+    } else {
+        Err(tr!("it is mounted read-only").to_owned())
+    };
+    device::forget(&d.mount);
+    recovery_text(&d.label, &r)
+}
+
 /// Everything FIX THE STICK needs, moved to its worker.
 struct Fix {
     dev: Device,
@@ -645,7 +653,13 @@ impl Fix {
         ctl.set_phase(tr!("Finishing what was cut off"));
         match commit::recover(&dev.mount) {
             Ok(r) => said.extend(recovery_text(&dev.label, &Ok(r))),
-            Err(e) => return Err(tr!("{}: the cut-off export could not be put right ({}).", dev.label, e)),
+            Err(e) => {
+                return Err(tr!(
+                    "{}: the cut-off export could not be put right ({}).",
+                    dev.label,
+                    e
+                ));
+            }
         }
         for s in &self.steps {
             let Step::Plugin { plugin, fix } = s else {

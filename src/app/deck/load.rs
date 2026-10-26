@@ -1,6 +1,7 @@
 //! LOAD publishes decoded audio before optional analysis. The worker decodes straight to the 16-bit [`audio::Track16`] the
 //! player keeps (no full-length f32 copy), and prepares loudness, auto cue, the audio-only waveform and the analysis from that
 //! same shared track; the UI merges late results without replacing edits.
+//! Source/cache reads run on the bounded loader pool; their initial cue is installed before audio becomes playable.
 //! Replacing the loaded track cancels its worker at decode packet and analysis stage boundaries.
 
 use super::{
@@ -25,6 +26,34 @@ use std::{
     },
 };
 
+type DecodeWork = (Arc<AtomicBool>, Box<dyn FnOnce() + Send>);
+static DECODE_WORK: std::sync::LazyLock<(
+    parking_lot::Mutex<std::collections::VecDeque<DecodeWork>>,
+    parking_lot::Condvar,
+)> = std::sync::LazyLock::new(|| {
+    for _ in 0..4 {
+        std::thread::spawn(|| {
+            loop {
+                let work = {
+                    let (queue, ready) = &*DECODE_WORK;
+                    let mut queue = queue.lock();
+                    while queue.is_empty() {
+                        ready.wait(&mut queue);
+                    }
+                    queue.pop_front().expect("not empty")
+                };
+                if !work.0.load(Ordering::Relaxed) {
+                    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(work.1));
+                }
+            }
+        });
+    }
+    (
+        parking_lot::Mutex::new(std::collections::VecDeque::new()),
+        parking_lot::Condvar::new(),
+    )
+});
+
 pub(super) enum Decoded {
     Playable {
         pcm: Arc<audio::Track16>,
@@ -33,6 +62,7 @@ pub(super) enum Decoded {
         cue: Option<u32>,
     },
     Detail(Option<render::Wave>),
+    Initial(analysis::Analysis),
     Analyzed(analysis::Analysis),
     Finished,
 }
@@ -44,11 +74,47 @@ fn decode_and_analyze(
     library: bool,
     auto_cue: Option<f32>,
     fallback: bool,
+    ours: bool,
+    reader: Option<openfader::library::AnalysisReader>,
+    decode: bool,
     cancelled: Arc<AtomicBool>,
 ) -> Receiver<Result<Decoded, String>> {
     let (tx, rx) = channel();
-    std::thread::spawn(move || {
+    let busy = tx.clone();
+    let cancel = cancelled.clone();
+    let run = Box::new(move || {
         let stop = || cancelled.load(Ordering::Relaxed);
+        if stop() {
+            return;
+        }
+        let initial_stage = reader.is_some() || ours;
+        let mut initial = reader.and_then(|read| read(&t)).unwrap_or_default();
+        if stop() {
+            return;
+        }
+        let cached = if ours {
+            analysis::cache::load_for(&t, &analysis::options::get())
+                .ok()
+                .flatten()
+        } else {
+            None
+        };
+        let cache_hit = cached.is_some();
+        if stop() {
+            return;
+        }
+        if ours {
+            analysis::cache::take_ours(&mut initial, cached);
+        }
+        let need = need && (initial.beats.is_empty() || initial.three_band_detail.is_empty());
+        let fallback = fallback && initial.three_band_detail.is_empty();
+        if library && initial_stage && tx.send(Ok(Decoded::Initial(initial))).is_err() {
+            return;
+        }
+        if !decode {
+            let _ = tx.send(Ok(Decoded::Finished));
+            return;
+        }
         let decoded = match pcm {
             // A sampler slice is no library track: no fingerprint to remember.
             Some(pcm) => Ok((audio::Track16::from(pcm), String::new())),
@@ -104,7 +170,7 @@ fn decode_and_analyze(
         if library {
             analysis::cache::remember_fingerprint(&t, &print);
         }
-        if need && !stop() {
+        if need && !cache_hit && !stop() {
             let Some((a, _)) =
                 analysis::cache::analyze_cached_cancellable(&t, &*track, track.rate, &stop)
             else {
@@ -116,12 +182,21 @@ fn decode_and_analyze(
         }
         let _ = tx.send(Ok(Decoded::Finished));
     });
+    let (queue, ready) = &*DECODE_WORK;
+    let mut queue = queue.lock();
+    queue.retain(|(cancelled, _)| !cancelled.load(Ordering::Relaxed));
+    if queue.len() < 8 {
+        queue.push_back((cancel, run));
+        ready.notify_one();
+    } else {
+        let _ = busy.send(Err("decoder queue is full".into()));
+    }
     rx
 }
 
 /// A track on its way from a plugin source: the worker's answer (the downloaded file) and the track it is for.
 pub(super) struct Download {
-    rx: Receiver<Result<std::path::PathBuf, String>>,
+    rx: source::FetchJob,
     track: Track,
 }
 
@@ -184,46 +259,33 @@ impl Deck {
         self.autoplay.set(false);
         self.download.borrow_mut().take(); // a download in progress is for a track that is no longer wanted
         let downloading = t.file.is_none() && t.remote.is_some();
-        let mut notes = Vec::new();
-        crate::app::device::track_loading(t); // cue sync: the copy loaded wins over its other copies, before it is read
-        let mut a = match lib.analysis(t) {
-            Some(a) => a,
-            None => {
-                notes.push(
-                    if downloading {
-                        tr!("downloading…")
-                    } else {
-                        tr!("not analysed")
-                    }
-                    .into(),
-                );
-                analysis::Analysis::default()
+        let notes = vec![
+            if downloading {
+                tr!("downloading…")
+            } else {
+                tr!("not analysed")
             }
-        };
+            .into(),
+        ];
+        crate::app::device::track_loading(t); // cue sync precedes the worker's source read
+        let mut a = analysis::Analysis::default();
         let mut base = None;
         if t.file.is_some() && prefs::with(|p| p.analysis.grid_source) == GridSource::Ours {
             // Our grid replaces the library's; the user's own edits (grid, cues, phrases) stay on top of both.
-            let ours = analysis::cache::load_for(t, &analysis::options::get())
-                .ok()
-                .flatten();
-            analysis::cache::take_ours(&mut a, ours);
+            analysis::cache::take_ours(&mut a, None);
             base = Some(a.beats.clone());
-            let edits = store::global().edits(&store::key(t)).unwrap_or_default();
-            store::apply(&mut a, &edits);
         }
-        self.install(t, a, notes, None);
+        let edits = store::global().edits(&store::key(t)).unwrap_or_default();
+        store::apply(&mut a, &edits);
+        self.install_audio(t, a, notes, None, None, lib.analysis_reader());
         if let Some(b) = base {
             let mut l = self.loaded.borrow_mut();
             l.lib_beats.clone_from(&b);
             l.base_beats = Some(b);
         }
         if let Some(remote) = t.remote.clone().filter(|_| downloading) {
-            let (tx, rx) = channel();
-            std::thread::spawn(move || {
-                let _ = tx.send(source::fetch(&remote));
-            });
             *self.download.borrow_mut() = Some(Download {
-                rx,
+                rx: source::fetch_async(remote),
                 track: t.clone(),
             });
         }
@@ -254,10 +316,13 @@ impl Deck {
                 self.autoplay.set(autoplay);
                 self.load_serial.set(serial);
             }
-            Err(e) => self.show(|v| {
-                (v.loading, v.loaded) = (false, true);
-                v.status = tr!("download failed: {}", e).into();
-            }),
+            Err(e) => {
+                self.loaded.borrow_mut().pending.take();
+                self.show(|v| {
+                    (v.loading, v.loaded) = (false, true);
+                    v.status = tr!("download failed: {}", e).into();
+                });
+            }
         }
     }
 
@@ -270,7 +335,7 @@ impl Deck {
         notes: Vec<String>,
         pcm: Option<audio::Pcm>,
     ) {
-        self.install_audio(t, a, notes, pcm, None);
+        self.install_audio(t, a, notes, pcm, None, None);
     }
 
     pub(super) fn install_shared(
@@ -281,7 +346,7 @@ impl Deck {
         pcm: Arc<audio::Track16>,
         stems: Arc<audio::Stems>,
     ) {
-        self.install_audio(t, a, notes, None, Some((pcm, stems)));
+        self.install_audio(t, a, notes, None, Some((pcm, stems)), None);
     }
 
     fn install_audio(
@@ -291,7 +356,9 @@ impl Deck {
         notes: Vec<String>,
         pcm: Option<audio::Pcm>,
         shared: Option<(Arc<audio::Track16>, Arc<audio::Stems>)>,
+        reader: Option<openfader::library::AnalysisReader>,
     ) {
+        self.download.borrow_mut().take(); // sampler/bank installs supersede remote LOAD too
         // LOAD SETTING: the track's own cue nearest the start wins over the others (before the automatic cues are added).
         let nearest = prefs::with(|p| p.controller.load_nearest_cue)
             .then(|| autocue::nearest(&a.cues))
@@ -328,6 +395,10 @@ impl Deck {
         let library = pcm.is_none(); // a sampler slice is no library track: not exported, not in the history
         let reused = shared.is_some();
         let downloading = library && t.file.is_none() && t.remote.is_some();
+        let ours = library
+            && !reused
+            && t.file.is_some()
+            && prefs::with(|p| p.analysis.grid_source) == GridSource::Ours;
         self.rate.set(1.0);
         self.key_st.set(0);
         self.sync_reset();
@@ -368,17 +439,23 @@ impl Deck {
                     let _ = tx.send(Ok(Decoded::Finished));
                     Some(rx)
                 }
-                None => (pcm.is_some() || t.file.is_some()).then(|| {
-                    decode_and_analyze(
-                        t.clone(),
-                        need,
-                        pcm,
-                        library,
-                        auto_cue,
-                        detail.is_none(),
-                        cancelled.clone(),
-                    )
-                }),
+                None => {
+                    (pcm.is_some() || t.file.is_some() || reader.is_some() || ours).then(|| {
+                        let decode = pcm.is_some() || t.file.is_some();
+                        decode_and_analyze(
+                            t.clone(),
+                            need,
+                            pcm,
+                            library,
+                            auto_cue,
+                            detail.is_none(),
+                            ours,
+                            reader,
+                            decode,
+                            cancelled.clone(),
+                        )
+                    })
+                }
             };
             pending = rx.map(|rx| Pending {
                 rx,
@@ -388,8 +465,30 @@ impl Deck {
                 playable: false,
                 initial_cue: cue_ms,
             });
+        } else if library && (reader.is_some() || ours) {
+            let cancelled = Arc::new(AtomicBool::new(false));
+            let rx = decode_and_analyze(
+                t.clone(),
+                false,
+                None,
+                true,
+                None,
+                false,
+                ours,
+                reader,
+                false,
+                cancelled.clone(),
+            );
+            pending = Some(Pending {
+                rx,
+                cancelled,
+                title: t.title.clone(),
+                notes,
+                playable: false,
+                initial_cue: cue_ms,
+            });
         }
-        if pending.is_some() && !reused {
+        if self.player.is_some() && pending.is_some() && !reused {
             self.stems_warm(t.file.as_deref());
         }
         let loading = pending.is_some() || downloading;
@@ -557,6 +656,28 @@ impl Deck {
                     detail_update = detail;
                 }
             }
+            Ok(Decoded::Initial(an)) => {
+                let edits = l
+                    .track
+                    .as_ref()
+                    .and_then(|t| store::global().edits(&store::key(t)).ok())
+                    .unwrap_or_default();
+                merge_initial(&mut l, an, &edits, &mut pending.notes);
+                let nearest = prefs::with(|p| p.controller.load_nearest_cue)
+                    .then(|| autocue::nearest(&l.analysis.cues))
+                    .flatten();
+                analysis::auto::fill(&mut l.analysis);
+                let automatic = add_auto_cues(&mut l.analysis, edits.cues.is_some());
+                l.auto_cues.set(automatic);
+                if resolve_initial_cue(&mut l, &mut pending, nearest) {
+                    self.with_player(|p| p.seek(l.cue_ms));
+                }
+                if l.duration_ms == 0 {
+                    l.duration_ms = l.analysis.beats.last().map_or(0, |b| b.time_ms);
+                }
+                detail_update = render::detail::wave(&colors, &l.analysis, None);
+                added_cues = true;
+            }
             Ok(Decoded::Analyzed(an)) => {
                 pending.notes.retain(|n| n != tr!("not analysed"));
                 let edits = l
@@ -564,6 +685,10 @@ impl Deck {
                     .as_ref()
                     .and_then(|t| store::global().edits(&store::key(t)).ok())
                     .unwrap_or_default();
+                if l.base_beats.is_some() {
+                    l.base_beats = Some(an.beats.clone());
+                    l.lib_beats.clone_from(&an.beats);
+                }
                 merge_analysis(&mut l, an, &edits, &mut pending.notes);
                 if let Some(t) = l.track.as_ref() {
                     crate::app::analyze::noted(t, &l.analysis);
@@ -621,7 +746,7 @@ impl Deck {
         } else {
             (None, None)
         };
-        let ready = pending.playable || finished;
+        let ready = (pending.playable || finished) && self.download.borrow().is_none();
         let stem_src = playable
             .then(|| l.track.as_ref().and_then(|t| t.file.clone()))
             .flatten();
@@ -691,6 +816,54 @@ impl Deck {
     }
 }
 
+fn resolve_initial_cue(l: &mut Loaded, pending: &mut Pending, nearest: Option<u32>) -> bool {
+    if pending.playable || l.cue_ms != pending.initial_cue {
+        return false;
+    }
+    l.cue_ms = nearest.unwrap_or_else(|| {
+        l.analysis
+            .cues
+            .iter()
+            .find(|c| c.hot_cue == 0)
+            .map_or(0, |c| c.time_ms)
+    });
+    l.cue_locked = nearest.is_some();
+    pending.initial_cue = l.cue_ms;
+    true
+}
+
+fn merge_initial(
+    l: &mut Loaded,
+    mut an: analysis::Analysis,
+    edits: &store::Edits,
+    notes: &mut Vec<String>,
+) {
+    if !an.beats.is_empty()
+        || !an.cues.is_empty()
+        || !an.three_band_detail.is_empty()
+        || an.key.is_some()
+    {
+        notes.retain(|n| n != tr!("not analysed"));
+    }
+    l.lib_beats.clone_from(&an.beats);
+    if l.base_beats.is_some() {
+        l.base_beats = Some(an.beats.clone());
+    }
+    if l.analysis.beats.is_empty() {
+        l.analysis.beats = edits.grid.clone().unwrap_or_else(|| an.beats.clone());
+    }
+    if l.analysis.cues.is_empty() {
+        l.analysis.cues = edits
+            .cues
+            .clone()
+            .unwrap_or_else(|| std::mem::take(&mut an.cues));
+    }
+    if l.analysis.phrases.is_none() {
+        l.analysis.phrases = edits.phrases.clone().or_else(|| an.phrases.take());
+    }
+    merge_analysis(l, an, edits, notes);
+}
+
 fn merge_analysis(
     l: &mut Loaded,
     an: analysis::Analysis,
@@ -703,12 +876,18 @@ fn merge_analysis(
     if l.analysis.beats.is_empty() && edits.grid.is_none() && !an.beats.is_empty() {
         l.lib_beats = an.beats.clone();
         l.analysis.beats = an.beats;
+        if edits.phrases.is_none() {
+            l.analysis.phrases = an.phrases;
+        }
         notes.push(tr!("grid: analysed").into());
     }
     if l.analysis.three_band_detail.is_empty() && !an.three_band_detail.is_empty() {
         l.analysis.three_band_detail = an.three_band_detail;
         l.analysis.three_band_preview = an.three_band_preview;
         notes.push(tr!("waveform: analysed").into());
+    }
+    if l.analysis.vocal.is_empty() {
+        l.analysis.vocal = an.vocal;
     }
 }
 
@@ -784,6 +963,9 @@ mod tests {
             Some(pcm),
             false,
             Some(-36.0),
+            true,
+            false,
+            None,
             true,
             Arc::new(AtomicBool::new(false)),
         );
@@ -897,5 +1079,160 @@ mod tests {
             deleted.analysis.beats.is_empty(),
             "an explicit grid deletion stays deleted"
         );
+    }
+
+    #[test]
+    fn replacing_pending_load_disconnects_stale_results_and_cancels_work() {
+        let (stale, rx) = channel();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let mut loaded = Loaded {
+            pending: Some(Pending {
+                rx,
+                cancelled: cancelled.clone(),
+                title: "old".into(),
+                notes: Vec::new(),
+                playable: false,
+                initial_cue: 0,
+            }),
+            ..Default::default()
+        };
+        let (current, rx) = channel();
+        drop(loaded.pending.replace(Pending {
+            rx,
+            cancelled: Arc::new(AtomicBool::new(false)),
+            title: "current".into(),
+            notes: Vec::new(),
+            playable: false,
+            initial_cue: 700,
+        }));
+        loaded.analysis.beats = vec![beat(700)];
+        assert!(cancelled.load(Ordering::Relaxed));
+        assert!(
+            stale
+                .send(Ok(Decoded::Initial(analysis::Analysis {
+                    beats: vec![beat(100)],
+                    ..Default::default()
+                })))
+                .is_err()
+        );
+        assert!(matches!(
+            loaded.pending.as_ref().unwrap().rx.try_recv(),
+            Err(TryRecvError::Empty)
+        ));
+        assert_eq!(loaded.analysis.beats, vec![beat(700)]);
+        drop(current);
+    }
+    #[test]
+    fn a_blocked_source_reader_is_off_thread_and_cannot_publish_after_replacement() {
+        let (started, began) = channel();
+        let (release, wait) = channel();
+        let wait = std::sync::Mutex::new(wait);
+        let reader: openfader::library::AnalysisReader = Arc::new(move |_| {
+            started.send(()).unwrap();
+            wait.lock().unwrap().recv().unwrap();
+            Some(analysis::Analysis {
+                beats: vec![beat(123)],
+                ..Default::default()
+            })
+        });
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let rx = decode_and_analyze(
+            Track::default(),
+            false,
+            None,
+            true,
+            None,
+            false,
+            false,
+            Some(reader),
+            false,
+            cancelled.clone(),
+        );
+        began
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap();
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+        cancelled.store(true, Ordering::Relaxed);
+        release.send(()).unwrap();
+        assert!(matches!(
+            rx.recv_timeout(std::time::Duration::from_secs(2)),
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
+        ));
+    }
+
+    #[test]
+    fn initial_source_cues_are_ready_before_audio_and_current_edits_win() {
+        let cue = |time_ms| analysis::Cue {
+            time_ms,
+            hot_cue: 0,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        };
+        let source = analysis::Analysis {
+            beats: vec![beat(100)],
+            cues: vec![cue(250)],
+            ..Default::default()
+        };
+        let reader: openfader::library::AnalysisReader = Arc::new({
+            let source = source.clone();
+            move |_| Some(source.clone())
+        });
+        let rx = decode_and_analyze(
+            Track::default(),
+            false,
+            None,
+            true,
+            None,
+            false,
+            false,
+            Some(reader),
+            false,
+            Arc::new(AtomicBool::new(false)),
+        );
+        let Decoded::Initial(initial) = rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("source cues must precede readiness")
+        };
+        assert!(matches!(rx.recv().unwrap().unwrap(), Decoded::Finished));
+        let mut pending = Pending {
+            rx,
+            cancelled: Arc::new(AtomicBool::new(false)),
+            title: String::new(),
+            notes: Vec::new(),
+            playable: false,
+            initial_cue: 0,
+        };
+        let mut loaded = Loaded::default();
+        merge_initial(
+            &mut loaded,
+            initial,
+            &store::Edits::default(),
+            &mut Vec::new(),
+        );
+        assert!(resolve_initial_cue(&mut loaded, &mut pending, None));
+        assert_eq!((loaded.cue_ms, pending.initial_cue), (250, 250));
+        let edits = store::Edits {
+            grid: Some(vec![beat(900)]),
+            cues: Some(vec![cue(700)]),
+            ..Default::default()
+        };
+        let mut edited = Loaded {
+            analysis: analysis::Analysis {
+                beats: vec![beat(900)],
+                cues: vec![cue(700)],
+                ..Default::default()
+            },
+            cue_ms: 700,
+            ..Default::default()
+        };
+        merge_initial(&mut edited, source, &edits, &mut Vec::new());
+        assert_eq!(edited.analysis.beats, vec![beat(900)]);
+        assert_eq!(edited.analysis.cues[0].time_ms, 700);
+        assert!(!resolve_initial_cue(&mut edited, &mut pending, Some(250)));
+        assert_eq!(edited.cue_ms, 700);
     }
 }

@@ -40,8 +40,8 @@ mod file;
 pub mod keyboard;
 pub mod libraries;
 mod live;
-pub mod lowpower;
 mod look;
+pub mod lowpower;
 mod panes;
 mod rows;
 mod section;
@@ -52,11 +52,11 @@ pub use dialog::{refresh, wire};
 pub use file::{load, path, save};
 #[cfg(test)]
 pub use live::set_for_test;
-pub use live::{get, notify, on_action, on_change, on_text, run_action, update, with};
+pub use live::{get, notify, on_action, on_change, on_text, update, with};
 pub use look::apply_theme;
 pub use rows::Row;
-pub(crate) use section::{choice, section};
 pub use section::{Choice, Section, Setting};
+pub(crate) use section::{choice, section};
 pub use view::{FontSize, HotCueColors, KeyNotation, LineSpace, WaveColors};
 
 use openfader::audio::fx::DEFAULT_BEAT;

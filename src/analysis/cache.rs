@@ -14,12 +14,16 @@
 //! [`migrate`] moves those of the Collection's tracks here once.
 
 use super::{
+    Analysis, Beat,
     detect::VocalRegion,
     options::{self, Options, Profile},
-    Analysis, Beat,
 };
 use crate::{audio::Frames, library::Track, paths::at, store};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{BTreeSet, HashMap},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 const MAGIC: &[u8; 4] = b"RKAC";
 /// Bump when the layout or the detectors change enough that old results should be recomputed (5: bar phase from accent,
@@ -27,6 +31,16 @@ const MAGIC: &[u8; 4] = b"RKAC";
 const VERSION: u32 = 5;
 /// The layout before the audio size was stored: [`migrate`] upgrades these.
 const VERSION_BEFORE_SIZE: u32 = 3;
+// shortcut: 256 MiB covers over six days of 150 Hz detail; raise only if multi-day recordings need more.
+const MAX_CACHE_BYTES: u64 = 256 * 1024 * 1024;
+
+fn collect_table<T>(items: impl ExactSizeIterator<Item = T>) -> Result<Vec<T>, String> {
+    let mut out = Vec::new();
+    out.try_reserve_exact(items.len())
+        .map_err(|_| "cache allocation failed")?;
+    out.extend(items);
+    Ok(out)
+}
 
 /// [`crate::paths::cache_dir`]: the parent of every cache folder (stems, models, folder tags).
 pub fn root() -> Option<PathBuf> {
@@ -160,36 +174,25 @@ fn decode(b: &[u8]) -> Result<(Analysis, Profile, u64), String> {
     let profile = Profile(c.u64()?);
     let n = c.take(1)?[0] as usize;
     let key = std::str::from_utf8(c.take(n)?).map_err(|_| "bad key text")?;
-    let beats: Vec<Beat> = c
-        .table(8)?
-        .chunks_exact(8)
-        .map(|e| Beat {
-            bar_pos: u16::from_le_bytes([e[0], e[1]]),
-            bpm_x100: u16::from_le_bytes([e[2], e[3]]),
-            time_ms: u32::from_le_bytes([e[4], e[5], e[6], e[7]]),
-        })
-        .collect();
-    let tri = |t: &[u8]| {
-        t.chunks_exact(3)
-            .map(|e| [e[0], e[1], e[2]])
-            .collect::<Vec<_>>()
-    };
-    let three_band_detail = tri(c.table(3)?);
-    let three_band_preview = tri(c.table(3)?);
-    let vocal = c
-        .table(8)?
-        .chunks_exact(8)
-        .map(|e| VocalRegion {
-            start_ms: u32::from_le_bytes([e[0], e[1], e[2], e[3]]),
-            end_ms: u32::from_le_bytes([e[4], e[5], e[6], e[7]]),
-        })
-        .collect();
+    let beats = collect_table(c.table(8)?.chunks_exact(8).map(|e| Beat {
+        bar_pos: u16::from_le_bytes([e[0], e[1]]),
+        bpm_x100: u16::from_le_bytes([e[2], e[3]]),
+        time_ms: u32::from_le_bytes([e[4], e[5], e[6], e[7]]),
+    }))?;
+    let tri = |t: &[u8]| collect_table(t.chunks_exact(3).map(|e| [e[0], e[1], e[2]]));
+    let three_band_detail = tri(c.table(3)?)?;
+    let preview = c.table(3)?;
+    if preview.len() / 3 > super::PREVIEW_ENTRIES {
+        return Err("bad preview count".into());
+    }
+    let three_band_preview = tri(preview)?;
+    let vocal = collect_table(c.table(8)?.chunks_exact(8).map(|e| VocalRegion {
+        start_ms: u32::from_le_bytes([e[0], e[1], e[2], e[3]]),
+        end_ms: u32::from_le_bytes([e[4], e[5], e[6], e[7]]),
+    }))?;
     if !c.0.is_empty() {
         return Err("trailing bytes".into());
     }
-    // Phrases are not stored: they are a pure function of the beats and the 3-band detail, so a cache hit gets the same ones as a fresh analysis
-    // (none while the Phrase part of Track Analysis Setting is off).
-    let phrases = super::phrases_for(&options::get(), &beats, &three_band_detail);
     Ok((
         Analysis {
             beats,
@@ -197,7 +200,6 @@ fn decode(b: &[u8]) -> Result<(Analysis, Profile, u64), String> {
             three_band_preview,
             key: (n > 0).then(|| key.to_owned()),
             vocal,
-            phrases,
             ..Default::default()
         },
         profile,
@@ -205,16 +207,94 @@ fn decode(b: &[u8]) -> Result<(Analysis, Profile, u64), String> {
     ))
 }
 
+fn open_entry(path: &Path) -> std::io::Result<std::fs::File> {
+    if !std::fs::metadata(path)?.is_file() {
+        return Err(std::io::Error::other("cache is not a regular file"));
+    }
+    let file = std::fs::File::open(path)?;
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::other("cache is not a regular file"));
+    }
+    Ok(file)
+}
+
+/// Checks the layout using small reads before reserving space for any table or the file.
+fn read_entry(path: &Path) -> Result<Vec<u8>, String> {
+    read_entry_format(path, false)
+}
+
+fn read_entry_format(path: &Path, legacy: bool) -> Result<Vec<u8>, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = open_entry(path).map_err(|e| e.to_string())?;
+    let len = file.metadata().map_err(|e| e.to_string())?.len();
+    if len > MAX_CACHE_BYTES {
+        return Err("cache too large".into());
+    }
+    let mut head = [0; 25];
+    let head_len = if legacy { 17 } else { 25 };
+    file.read_exact(&mut head[..head_len])
+        .map_err(|_| "truncated")?;
+    let mut c = Cur(&head[..head_len]);
+    let version = if legacy { VERSION_BEFORE_SIZE } else { VERSION };
+    if c.take(4)? != MAGIC || c.u32()? != version {
+        return Err("bad cache header".into());
+    }
+    if !legacy {
+        c.u64()?;
+    }
+    c.u64()?;
+    let mut offset = head_len as u64 + c.take(1)?[0] as u64;
+    for (index, width) in [8u64, 3, 3, 8].into_iter().enumerate() {
+        if offset.checked_add(4).is_none_or(|n| n > len) {
+            return Err("truncated".into());
+        }
+        file.seek(SeekFrom::Start(offset))
+            .map_err(|e| e.to_string())?;
+        let mut count = [0; 4];
+        file.read_exact(&mut count).map_err(|_| "truncated")?;
+        let count = u32::from_le_bytes(count) as u64;
+        if index == 2 && count > super::PREVIEW_ENTRIES as u64 {
+            return Err("bad preview count".into());
+        }
+        offset = offset
+            .checked_add(4)
+            .and_then(|n| {
+                count
+                    .checked_mul(width)
+                    .and_then(|bytes| n.checked_add(bytes))
+            })
+            .filter(|n| *n <= len)
+            .ok_or("truncated")?;
+    }
+    if offset != len {
+        return Err("trailing bytes".into());
+    }
+    let len = usize::try_from(len).map_err(|_| "cache too large")?;
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(len)
+        .map_err(|_| "cache allocation failed")?;
+    file.rewind().map_err(|e| e.to_string())?;
+    bytes.resize(len, 0);
+    file.read_exact(&mut bytes).map_err(|_| "truncated")?;
+    let mut extra = [0];
+    if file.read(&mut extra).map_err(|e| e.to_string())? != 0 {
+        return Err("cache changed while reading".into());
+    }
+    Ok(bytes)
+}
+
 /// `Ok(None)`: no entry, or one made for a file of another size (the audio changed).
 fn load_from(dir: &Path, t: &Track) -> Result<Option<(Analysis, Profile)>, String> {
     let size = audio_size(t)?;
-    match std::fs::read(dir.join(file_name(t))) {
-        Ok(b) => decode(&b)
-            .map(|(a, p, s)| (s == size).then_some((a, p)))
-            .map_err(|e| format!("analysis cache ignored ({e})")),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(format!("analysis cache ignored ({e})")),
+    let path = dir.join(file_name(t));
+    if !path.try_exists().map_err(|e| e.to_string())? {
+        return Ok(None);
     }
+    read_entry(&path)
+        .and_then(|b| decode(&b))
+        .map(|(a, p, s)| (s == size).then_some((a, p)))
+        .map_err(|e| format!("analysis cache ignored ({e})"))
 }
 
 /// Writes `bytes` as `name` in `dir` (created): beside the target and renamed, so a concurrent reader (deck load vs bulk
@@ -232,7 +312,12 @@ fn put(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), String> {
 }
 
 fn store_in(dir: &Path, t: &Track, a: &Analysis, profile: Profile) -> Result<(), String> {
-    put(dir, &file_name(t), &encode(a, profile, audio_size(t)?))
+    let (name, bytes) = encoded(t, a, profile)?;
+    put(dir, &name, &bytes)
+}
+
+fn encoded(t: &Track, a: &Analysis, profile: Profile) -> Result<(String, Vec<u8>), String> {
+    Ok((file_name(t), encode(a, profile, audio_size(t)?)))
 }
 
 fn data_dir() -> Result<PathBuf, String> {
@@ -243,7 +328,10 @@ fn data_dir() -> Result<PathBuf, String> {
 /// `Ok(None)` = not stored (or the audio file changed since); `Err` = the file is corrupt, old or unreadable and is
 /// ignored (report it, then recompute and [`store`] over it).
 pub fn load(t: &Track) -> Result<Option<Analysis>, String> {
-    Ok(load_from(&data_dir()?, t)?.map(|x| x.0))
+    Ok(load_from(&data_dir()?, t)?.map(|(mut a, _)| {
+        a.phrases = super::phrases_for(&options::get(), &a.beats, &a.three_band_detail);
+        a
+    }))
 }
 
 /// What a stored analysis says about its track: the tempo of the first beat (0 = the analysis found no beats) and the key.
@@ -295,7 +383,7 @@ fn glance_from(dir: &Path, t: &Track) -> Option<Glance> {
     use std::io::Read;
     let size = audio_size(t).ok()?;
     let mut head = Vec::with_capacity(PEEK);
-    std::fs::File::open(dir.join(file_name(t)))
+    open_entry(&dir.join(file_name(t)))
         .ok()?
         .take(PEEK as u64)
         .read_to_end(&mut head)
@@ -345,7 +433,7 @@ pub fn age(t: &Track) -> Age {
 fn age_from(dir: &Path, t: &Track) -> Age {
     use std::io::Read;
     let mut head = Vec::with_capacity(24);
-    std::fs::File::open(dir.join(file_name(t)))
+    open_entry(&dir.join(file_name(t)))
         .and_then(|f| f.take(24).read_to_end(&mut head))
         .map_or(Age::None, |_| age_of(&head))
 }
@@ -359,7 +447,11 @@ pub fn vocal(t: &Track) -> Vec<VocalRegion> {
 /// The stored analysis of `t` when it covers `o` (every part `o` runs, the same grid settings), with the parts `o`
 /// switches off emptied; `Ok(None)` = not stored or made with other options.
 pub fn load_for(t: &Track, o: &Options) -> Result<Option<Analysis>, String> {
-    Ok(load_from(&data_dir()?, t)?
+    load_for_from(&data_dir()?, t, o)
+}
+
+fn load_for_from(dir: &Path, t: &Track, o: &Options) -> Result<Option<Analysis>, String> {
+    Ok(load_from(dir, t)?
         .filter(|x| x.1.covers(o.profile()))
         .map(|mut x| {
             x.0.phrases = super::phrases_for(o, &x.0.beats, &x.0.three_band_detail);
@@ -404,8 +496,60 @@ pub fn analyze_cached_cancellable<S: Frames + ?Sized>(
         false,
         super::Execution::Interactive,
         cancelled,
+        None,
     )
 }
+
+/// Bounded bulk generations. Call `publish` under a background-only mutex.
+pub struct CommitFence {
+    latest: HashMap<Arc<str>, u64>,
+    ordered: BTreeSet<(u64, Arc<str>)>,
+    floor: u64,
+    capacity: usize,
+}
+
+impl CommitFence {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            latest: HashMap::new(),
+            ordered: BTreeSet::new(),
+            floor: 0,
+            capacity,
+        }
+    }
+
+    pub fn publish(&mut self, key: &str, generation: u64, write: &mut dyn FnMut()) -> bool {
+        if self
+            .latest
+            .get(key)
+            .is_some_and(|latest| generation < *latest)
+            || (!self.latest.contains_key(key) && generation < self.floor)
+        {
+            return false;
+        }
+        let owned = if let Some((owned, previous)) = self.latest.get_key_value(key) {
+            let owned = owned.clone();
+            self.ordered.remove(&(*previous, owned.clone()));
+            *self.latest.get_mut(key).unwrap() = generation;
+            owned
+        } else {
+            let owned: Arc<str> = key.into();
+            self.latest.insert(owned.clone(), generation);
+            owned
+        };
+        self.ordered.insert((generation, owned));
+        while self.latest.len() > self.capacity {
+            let (generation, key) = self.ordered.pop_first().unwrap();
+            self.latest.remove(&key);
+            self.floor = self.floor.max(generation);
+        }
+        write();
+        true
+    }
+}
+
+/// Bulk publication guard: resolved cache-entry name and a write containing no source metadata reads.
+pub type Commit<'a> = dyn Fn(&str, &mut dyn FnMut()) -> bool + Sync + 'a;
 
 fn analyze_pcm<S: Frames + ?Sized>(
     t: &Track,
@@ -415,6 +559,7 @@ fn analyze_pcm<S: Frames + ?Sized>(
     explicit: bool,
     execution: super::Execution,
     cancelled: &(dyn Fn() -> bool + Sync),
+    commit: Option<&Commit<'_>>,
 ) -> Option<(Analysis, Source)> {
     if cancelled() {
         return None;
@@ -423,7 +568,11 @@ fn analyze_pcm<S: Frames + ?Sized>(
         None
     } else {
         match load_for(t, o) {
-            Ok(Some(a)) => return (!cancelled()).then_some((a, Source::Cache)),
+            Ok(Some(a)) => {
+                return (!cancelled()
+                    && commit.is_none_or(|commit| commit(&file_name(t), &mut || {})))
+                .then_some((a, Source::Cache));
+            }
             Ok(None) => None,
             Err(e) => Some(e),
         }
@@ -432,7 +581,23 @@ fn analyze_pcm<S: Frames + ?Sized>(
     if cancelled() {
         return None;
     }
-    let _ = store(t, &a, o.profile());
+    if let Some(commit) = commit {
+        let name = file_name(t);
+        let write = (|| {
+            let dir = data_dir()?;
+            let bytes = encode(&a, o.profile(), audio_size(t)?);
+            Ok::<_, String>((dir, bytes))
+        })();
+        if !commit(&name, &mut || {
+            if let Ok((dir, bytes)) = &write {
+                let _ = put(dir, &name, bytes);
+            }
+        }) {
+            return None;
+        }
+    } else {
+        let _ = store(t, &a, o.profile());
+    }
     Some((a, Source::Computed { ignored }))
 }
 
@@ -442,13 +607,16 @@ pub fn get_or_analyze_with(
     o: &Options,
     explicit: bool,
     cancelled: &(dyn Fn() -> bool + Sync),
+    commit: &Commit<'_>,
 ) -> Result<Option<(Analysis, Source)>, String> {
     if cancelled() {
         return Ok(None);
     }
     if !explicit {
         if let Ok(Some(a)) = load_for(t, o) {
-            return Ok((!cancelled()).then_some((a, Source::Cache)));
+            return Ok(
+                (!cancelled() && commit(&file_name(t), &mut || {})).then_some((a, Source::Cache))
+            );
         }
     }
     let (track, print) = crate::audio::decode_track16_cancellable(audio_of(t)?, cancelled)?;
@@ -464,6 +632,7 @@ pub fn get_or_analyze_with(
         explicit,
         super::Execution::Bulk,
         cancelled,
+        Some(commit),
     ))
 }
 
@@ -550,16 +719,18 @@ fn upgrade(old: &[u8], size: u64) -> Option<Vec<u8>> {
     if &head[..4] != MAGIC || head[4..] != VERSION_BEFORE_SIZE.to_le_bytes() {
         return None;
     }
-    Some(
-        [
-            MAGIC.as_slice(),
-            &VERSION.to_le_bytes(),
-            &size.to_le_bytes(),
-            &Profile(0).0.to_le_bytes(),
-            rest.get(8..)?,
-        ]
-        .concat(),
-    )
+    let mut out = Vec::new();
+    out.try_reserve_exact(old.len().checked_add(8)?).ok()?;
+    for part in [
+        MAGIC.as_slice(),
+        &VERSION.to_le_bytes(),
+        &size.to_le_bytes(),
+        &Profile(0).0.to_le_bytes(),
+        rest.get(8..)?,
+    ] {
+        out.extend_from_slice(part);
+    }
+    Some(out)
 }
 
 /// One-time move of the old per-path entries of `tracks` (the Collection) into [`dir`] under their identity names; the old
@@ -585,7 +756,7 @@ pub fn migrate(tracks: &[Track]) -> Migrated {
         };
         let Ok(k) = key(audio) else { continue };
         let from = old.join(format!("{k}.bin"));
-        let Ok(bytes) = std::fs::read(&from) else {
+        let Ok(bytes) = read_entry_format(&from, true) else {
             continue;
         };
         let name = file_name(t);
@@ -615,6 +786,32 @@ pub fn migrate(tracks: &[Track]) -> Migrated {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn fifo_cache_paths_are_rejected_without_opening_them() {
+        use std::os::unix::ffi::OsStrExt;
+        let (dir, t) = fixture("fifo");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(file_name(&t));
+        let name = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+        // SAFETY: valid nul-terminated path in our private temporary fixture.
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let _ = tx.send(read_entry(&path));
+        });
+        assert!(
+            rx.recv_timeout(std::time::Duration::from_secs(1))
+                .unwrap()
+                .unwrap_err()
+                .contains("regular file")
+        );
+        worker.join().unwrap();
+        assert!(glance_from(&dir, &t).is_none());
+        assert_eq!(age_from(&dir, &t), Age::None);
+        std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
 
     fn sample() -> Analysis {
         Analysis {
@@ -791,6 +988,7 @@ mod tests {
                 true,
                 super::super::Execution::Bulk,
                 &|| true,
+                None,
             )
             .is_none()
         );
@@ -807,7 +1005,7 @@ mod tests {
         };
         let mut old = good.clone();
         old[4..8].copy_from_slice(&(VERSION + 1).to_le_bytes());
-        assert!(put(&old).unwrap_err().contains("version"));
+        assert!(put(&old).is_err());
         let mut magic = good.clone();
         magic[0] = b'X';
         assert!(put(&magic).is_err());
@@ -904,5 +1102,190 @@ mod tests {
         let mut a = theirs();
         take_ours(&mut a, None);
         assert!(a.beats.is_empty() && a.cues.is_empty() && a.phrases.is_none());
+    }
+    #[test]
+    fn oversized_sparse_and_hostile_count_entries_are_rejected_before_allocation() {
+        let (dir, t) = fixture("bounded");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(file_name(&t));
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len(MAX_CACHE_BYTES + 1).unwrap();
+        assert!(load_from(&dir, &t).unwrap_err().contains("too large"));
+        let mut bad = encode(&Analysis::default(), profile(), 5);
+        bad[25..29].copy_from_slice(&u32::MAX.to_le_bytes());
+        std::fs::write(&path, bad).unwrap();
+        assert!(load_from(&dir, &t).unwrap_err().contains("truncated"));
+        let mut bad = encode(&Analysis::default(), profile(), 5);
+        bad.truncate(24);
+        std::fs::write(&path, bad).unwrap();
+        assert!(load_from(&dir, &t).unwrap_err().contains("truncated"));
+        std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn long_track_cache_and_phrases_use_the_callers_options() {
+        let (dir, t) = fixture("long-options");
+        let mut a = sample();
+        a.beats = (0..256)
+            .map(|i| Beat {
+                bar_pos: (i % 4 + 1) as u16,
+                bpm_x100: 12000,
+                time_ms: i * 500,
+            })
+            .collect();
+        a.three_band_detail =
+            vec![[30, 50, 10]; super::super::DETAIL_ENTRIES_PER_SEC as usize * 12 * 3600];
+        store_in(&dir, &t, &a, profile()).unwrap();
+        let on = Options::default();
+        let mut off = on;
+        off.parts.phrase = false;
+        let decoded = decode(&encode(&a, profile(), 5)).unwrap().0;
+        assert!(decoded.phrases.is_none(), "decoding does not scan phrases");
+        let loaded = load_for_from(&dir, &t, &on).unwrap().unwrap();
+        assert_eq!(loaded.three_band_detail.len(), a.three_band_detail.len());
+        assert_eq!(
+            loaded.phrases,
+            super::super::phrases_for(&on, &a.beats, &a.three_band_detail)
+        );
+        assert!(loaded.phrases.is_some());
+        assert!(
+            load_for_from(&dir, &t, &off)
+                .unwrap()
+                .unwrap()
+                .phrases
+                .is_none()
+        );
+        std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn a_late_alias_after_blocked_metadata_cannot_overwrite_newer_cache_and_other_keys_progress() {
+        use std::sync::{Arc, Condvar, Mutex, mpsc};
+        let (dir, track) = fixture("bulk-alias-fence");
+        let alias_file = dir.parent().unwrap().join("alias.wav");
+        std::fs::write(&alias_file, b"audio").unwrap();
+        let alias = Track {
+            file: Some(alias_file),
+            ..track.clone()
+        };
+        let fence = Arc::new(Mutex::new(CommitFence::new(8)));
+        let release = Arc::new((Mutex::new(false), Condvar::new()));
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (old_fence, old_release, old_dir) = (fence.clone(), release.clone(), dir.clone());
+        let old = std::thread::spawn(move || {
+            entered_tx.send(()).unwrap();
+            let mut ready = old_release.0.lock().unwrap();
+            while !*ready {
+                ready = old_release.1.wait(ready).unwrap();
+            }
+            drop(ready);
+            let key = store::key(&alias);
+            let (name, bytes) = encoded(&alias, &sample(), profile()).unwrap();
+            old_fence
+                .lock()
+                .unwrap()
+                .publish(&key, 1, &mut || put(&old_dir, &name, &bytes).unwrap())
+        });
+        entered_rx.recv().unwrap();
+        let mut options = Options::default();
+        options.grid.bpm_range = (110, 220);
+        let mut newest = sample();
+        newest.key = Some("9B".into());
+        newest.beats[0].bpm_x100 = 15000;
+        let key = store::key(&track);
+        let (name, bytes) = encoded(&track, &newest, options.profile()).unwrap();
+        assert!(
+            fence
+                .lock()
+                .unwrap()
+                .publish(&key, 2, &mut || put(&dir, &name, &bytes).unwrap())
+        );
+        let other = Track {
+            id: Some(8),
+            ..track.clone()
+        };
+        let (name, bytes) = encoded(&other, &sample(), profile()).unwrap();
+        assert!(
+            fence
+                .lock()
+                .unwrap()
+                .publish(&store::key(&other), 3, &mut || put(&dir, &name, &bytes)
+                    .unwrap())
+        );
+        assert!(
+            load_from(&dir, &other).unwrap().is_some(),
+            "an unresolved alias cannot stall unrelated keys"
+        );
+        *release.0.lock().unwrap() = true;
+        release.1.notify_all();
+        assert!(!old.join().unwrap());
+        let (stored, stored_profile) = load_from(&dir, &track).unwrap().unwrap();
+        assert_eq!(stored_profile, options.profile());
+        assert_eq!(stored.key.as_deref(), Some("9B"));
+        assert_eq!(stored.beats[0].bpm_x100, 15000);
+        std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn bulk_fence_eviction_bounds_metadata_and_rejects_older_missing_generations() {
+        let mut fence = CommitFence::new(2);
+        for (key, generation) in [("a", 10), ("b", 20), ("c", 30)] {
+            assert!(fence.publish(key, generation, &mut || {}));
+        }
+        assert_eq!(
+            (fence.latest.len(), fence.ordered.len(), fence.floor),
+            (2, 2, 10)
+        );
+        assert!(!fence.publish("a", 9, &mut || panic!("stale write")));
+        assert!(!fence.publish("b", 19, &mut || panic!("older existing write")));
+        assert!(fence.publish("d", 40, &mut || {}));
+        assert_eq!(
+            (fence.latest.len(), fence.ordered.len(), fence.floor),
+            (2, 2, 20)
+        );
+        assert!(!fence.publish("a", 15, &mut || panic!("evicted older write")));
+    }
+
+    #[test]
+    fn rejected_bulk_publication_returns_cancellation_even_when_cache_storage_is_unavailable() {
+        let options = Options {
+            parts: options::Parts {
+                grid: false,
+                key: false,
+                phrase: false,
+                vocal: false,
+            },
+            ..Default::default()
+        };
+        let samples = [0.0f32; 8000];
+        assert!(
+            analyze_pcm(
+                &Track::default(),
+                &samples,
+                8000,
+                &options,
+                true,
+                super::super::Execution::Bulk,
+                &|| false,
+                Some(&|_, _| false),
+            )
+            .is_none()
+        );
+        assert!(
+            analyze_pcm(
+                &Track::default(),
+                &samples,
+                8000,
+                &options,
+                true,
+                super::super::Execution::Bulk,
+                &|| false,
+                Some(&|_, write| {
+                    write();
+                    true
+                }),
+            )
+            .is_some(),
+            "optional cache-write failure still returns accepted analysis"
+        );
     }
 }

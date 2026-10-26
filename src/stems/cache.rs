@@ -11,6 +11,7 @@
 use super::Quality;
 use crate::analysis::cache;
 use crate::audio::{STEM_COUNT, Stems};
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -20,6 +21,77 @@ const VERSION: u32 = 1;
 const HEADER: usize = 20;
 /// Frames moved per read or write.
 const CHUNK: usize = 1 << 15;
+/// Complete entries and interrupted writes together stay within 4 GiB.
+const MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+
+fn lock(dir: &Path, exclusive: bool) -> Result<File, String> {
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let f = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(dir.join("cache.lock"))
+        .map_err(|e| format!("stems cache lock: {e}"))?;
+    if exclusive { f.lock() } else { f.lock_shared() }
+        .map_err(|e| format!("stems cache lock: {e}"))?;
+    Ok(f)
+}
+
+fn owned(name: &str) -> bool {
+    let Some((key, suffix)) = name.split_once('.') else {
+        return false;
+    };
+    key.len() == 16
+        && key.bytes().all(|b| b.is_ascii_hexdigit())
+        && matches!(suffix, "stems" | "fast.stems" | "part" | "fast.part")
+}
+
+/// Caller holds the directory's exclusive lock; readers and writers in other processes hold the same lock.
+fn prune(dir: &Path, budget: u64, keep: Option<&Path>) -> Result<bool, String> {
+    let mut entries = Vec::new();
+    let mut total = 0u64;
+    for entry in std::fs::read_dir(dir).map_err(|e| format!("stems cache: {e}"))? {
+        let entry = entry.map_err(|e| format!("stems cache: {e}"))?;
+        if !owned(&entry.file_name().to_string_lossy())
+            || !entry
+                .file_type()
+                .map_err(|e| format!("stems cache: {e}"))?
+                .is_file()
+        {
+            continue;
+        }
+        let path = entry.path();
+        if path.extension().is_some_and(|s| s == "part") {
+            std::fs::remove_file(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            continue;
+        }
+        let m = entry
+            .metadata()
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        total = total
+            .checked_add(m.len())
+            .ok_or("stems cache size overflow")?;
+        entries.push((
+            m.modified()
+                .map_err(|e| format!("{}: {e}", path.display()))?,
+            path,
+            m.len(),
+        ));
+    }
+    entries.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    for (_, path, bytes) in entries {
+        if total <= budget {
+            break;
+        }
+        if keep == Some(path.as_path()) {
+            continue;
+        }
+        std::fs::remove_file(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        total -= bytes;
+    }
+    Ok(total <= budget)
+}
 
 pub fn dir() -> Option<PathBuf> {
     Some(cache::root()?.join("stems"))
@@ -42,15 +114,37 @@ fn header(rate: u32, frames: usize) -> [u8; HEADER] {
     h
 }
 
+fn entry_bytes(frames: usize) -> Result<u64, String> {
+    (frames as u64)
+        .checked_mul(4 * STEM_COUNT as u64)
+        .and_then(|n| n.checked_add(HEADER as u64))
+        .ok_or_else(|| "stems cache size overflow".into())
+}
+
 /// Reads the entry at `path` into `into` (whose length must match) and marks it separated: `Ok(false)` = no such entry.
 fn read_from(path: &Path, rate: u32, into: &Stems) -> Result<bool, String> {
     let frames = into.frames();
+    let bad = |what: &str| format!("{}: {what}", path.display());
+    let meta = match std::fs::metadata(path) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    if !meta.is_file() || meta.len() != entry_bytes(frames)? {
+        return Err(bad("not a regular cache file of the expected length"));
+    }
     let mut f = match std::fs::File::open(path) {
         Ok(f) => std::io::BufReader::with_capacity(1 << 20, f),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(e) => return Err(format!("{}: {e}", path.display())),
     };
-    let bad = |what: &str| format!("{}: {what}", path.display());
+    let meta = f
+        .get_ref()
+        .metadata()
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    if !meta.is_file() || meta.len() != entry_bytes(frames)? {
+        return Err(bad("cache changed while opening"));
+    }
     let mut h = [0u8; HEADER];
     f.read_exact(&mut h).map_err(|_| bad("short header"))?;
     if h != header(rate, frames) {
@@ -80,23 +174,29 @@ fn write_to(path: &Path, rate: u32, s: &Stems) -> Result<(), String> {
     let err = |e: std::io::Error| format!("{}: {e}", path.display());
     std::fs::create_dir_all(path.parent().ok_or("no cache folder")?).map_err(err)?;
     let part = path.with_extension("part");
-    let mut f =
-        std::io::BufWriter::with_capacity(1 << 20, std::fs::File::create(&part).map_err(err)?);
-    f.write_all(&header(rate, s.frames())).map_err(err)?;
-    let (mut samples, mut bytes) = (vec![0i16; 2 * CHUNK], vec![0u8; 4 * CHUNK]);
-    for k in 0..STEM_COUNT {
-        for from in (0..s.frames()).step_by(CHUNK) {
-            let n = CHUNK.min(s.frames() - from);
-            s.read(k, from, &mut samples[..2 * n]);
-            for (b, x) in bytes.chunks_exact_mut(2).zip(&samples[..2 * n]) {
-                b.copy_from_slice(&x.to_le_bytes());
+    let result = (|| {
+        let mut f =
+            std::io::BufWriter::with_capacity(1 << 20, std::fs::File::create(&part).map_err(err)?);
+        f.write_all(&header(rate, s.frames())).map_err(err)?;
+        let (mut samples, mut bytes) = (vec![0i16; 2 * CHUNK], vec![0u8; 4 * CHUNK]);
+        for k in 0..STEM_COUNT {
+            for from in (0..s.frames()).step_by(CHUNK) {
+                let n = CHUNK.min(s.frames() - from);
+                s.read(k, from, &mut samples[..2 * n]);
+                for (b, x) in bytes.chunks_exact_mut(2).zip(&samples[..2 * n]) {
+                    b.copy_from_slice(&x.to_le_bytes());
+                }
+                f.write_all(&bytes[..4 * n]).map_err(err)?;
             }
-            f.write_all(&bytes[..4 * n]).map_err(err)?;
         }
+        f.flush().map_err(err)?;
+        drop(f);
+        std::fs::rename(&part, path).map_err(err)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&part);
     }
-    f.flush().map_err(err)?;
-    drop(f);
-    std::fs::rename(&part, path).map_err(err)
+    result
 }
 
 fn dir_or_err() -> Result<PathBuf, String> {
@@ -110,13 +210,18 @@ fn load_in(
     into: &Stems,
     quality: Quality,
 ) -> Result<bool, String> {
+    if !dir.is_dir() {
+        return Ok(false);
+    }
     let wanted: &[Quality] = match quality {
         Quality::Quality => &[Quality::Quality],
         Quality::Speed => &[Quality::Quality, Quality::Speed],
     };
     let mut err = None;
     for &q in wanted {
-        match read_from(&file(dir, audio, q)?, rate, into) {
+        let path = file(dir, audio, q)?;
+        let _lock = lock(dir, false)?;
+        match read_from(&path, rate, into) {
             Ok(true) => return Ok(true),
             Ok(false) => {}
             Err(e) => err = err.or(Some(e)), // a bad entry must not hide a good one
@@ -131,13 +236,29 @@ fn store_in(
     rate: u32,
     s: &Stems,
     quality: Quality,
+    budget: u64,
 ) -> Result<(), String> {
     if !s.is_complete() {
         return Err("stems are not complete".into());
     }
-    write_to(&file(dir, audio, quality)?, rate, s)?;
-    if quality == Quality::Quality {
-        let _ = std::fs::remove_file(file(dir, audio, Quality::Speed)?); // superseded; absent is fine
+    let path = file(dir, audio, quality)?;
+    let superseded = if quality == Quality::Quality {
+        Some(file(dir, audio, Quality::Speed)?)
+    } else {
+        None
+    };
+    let _lock = lock(dir, true)?;
+    let bytes = entry_bytes(s.frames())?;
+    if bytes > budget {
+        prune(dir, budget, None)?;
+        return Ok(());
+    }
+    if !prune(dir, budget - bytes, Some(&path))? {
+        return Ok(());
+    }
+    write_to(&path, rate, s)?;
+    if let Some(path) = superseded {
+        let _ = std::fs::remove_file(path); // superseded; absent is fine
     }
     Ok(())
 }
@@ -163,7 +284,7 @@ pub fn load(audio: &Path, rate: u32, into: &Stems, quality: Quality) -> Result<b
 
 /// Saves the complete `s`, separated at `quality`, for `audio`, replacing any old entry of that quality.
 pub fn store(audio: &Path, rate: u32, s: &Stems, quality: Quality) -> Result<(), String> {
-    store_in(&dir_or_err()?, audio, rate, s, quality)
+    store_in(&dir_or_err()?, audio, rate, s, quality, MAX_BYTES)
 }
 
 #[cfg(test)]
@@ -240,7 +361,15 @@ mod tests {
     fn a_long_track_crosses_chunk_boundaries_intact() {
         let (d, audio) = scratch("long");
         let frames = 2 * CHUNK + 777;
-        store_in(&d, &audio, 44100, &stems(frames), Quality::Quality).unwrap();
+        store_in(
+            &d,
+            &audio,
+            44100,
+            &stems(frames),
+            Quality::Quality,
+            MAX_BYTES,
+        )
+        .unwrap();
         let back = blank(frames);
         assert!(load_in(&d, &audio, 44100, &back, Quality::Quality).unwrap());
         assert_eq!(dump(&back), dump(&stems(frames)));
@@ -273,7 +402,7 @@ mod tests {
     #[test]
     fn only_complete_stems_are_stored() {
         let (d, audio) = scratch("partial");
-        assert!(store_in(&d, &audio, 44100, &blank(100), Quality::Quality).is_err());
+        assert!(store_in(&d, &audio, 44100, &blank(100), Quality::Quality, MAX_BYTES).is_err());
         assert!(!file(&d, &audio, Quality::Quality).unwrap().exists());
         std::fs::remove_dir_all(d).unwrap();
     }
@@ -288,7 +417,7 @@ mod tests {
         };
         assert!(load(quality, 100).unwrap().is_none() && load(speed, 100).unwrap().is_none());
 
-        store_in(&d, &audio, 44100, &stems(100), speed).unwrap();
+        store_in(&d, &audio, 44100, &stems(100), speed, MAX_BYTES).unwrap();
         assert!(
             load(quality, 100).unwrap().is_none(),
             "speed does not satisfy quality"
@@ -296,7 +425,7 @@ mod tests {
         assert_eq!(load(speed, 100).unwrap().unwrap(), dump(&stems(100)));
 
         let better = || Stems::complete(std::array::from_fn(|k| vec![k as i16; 200]));
-        store_in(&d, &audio, 44100, &better(), quality).unwrap();
+        store_in(&d, &audio, 44100, &better(), quality, MAX_BYTES).unwrap();
         assert_eq!(load(quality, 100).unwrap().unwrap(), dump(&better()));
         assert_eq!(
             load(speed, 100).unwrap().unwrap(),
@@ -309,10 +438,92 @@ mod tests {
         );
 
         // A bad quality entry does not hide a good speed one, but a quality request still reports it.
-        store_in(&d, &audio, 44100, &stems(100), speed).unwrap();
+        store_in(&d, &audio, 44100, &stems(100), speed, MAX_BYTES).unwrap();
         std::fs::write(file(&d, &audio, quality).unwrap(), b"RKST").unwrap();
         assert_eq!(load(speed, 100).unwrap().unwrap(), dump(&stems(100)));
         assert!(load(quality, 100).is_err());
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
+    #[test]
+    fn pruning_keeps_recent_entries_and_never_deletes_unrelated_files() {
+        use std::time::{Duration, UNIX_EPOCH};
+        let (d, a) = scratch("budget");
+        let (b, c) = (d.join("b.wav"), d.join("c.wav"));
+        std::fs::write(&b, b"audio").unwrap();
+        std::fs::write(&c, b"audio").unwrap();
+        let budget = 2 * (HEADER as u64 + 16 * 8);
+        let put =
+            |audio: &Path| store_in(&d, audio, 44100, &stems(8), Quality::Quality, budget).unwrap();
+        put(&a);
+        let pa = file(&d, &a, Quality::Quality).unwrap();
+        OpenOptions::new()
+            .write(true)
+            .open(&pa)
+            .unwrap()
+            .set_modified(UNIX_EPOCH + Duration::from_secs(1))
+            .unwrap();
+        put(&b);
+        let pb = file(&d, &b, Quality::Quality).unwrap();
+        OpenOptions::new()
+            .write(true)
+            .open(&pb)
+            .unwrap()
+            .set_modified(UNIX_EPOCH + Duration::from_secs(2))
+            .unwrap();
+        let partial = d.join("0123456789abcdef.part");
+        std::fs::write(&partial, b"interrupted").unwrap();
+        let unrelated = d.join("notes.txt");
+        std::fs::write(&unrelated, b"keep").unwrap();
+        put(&c);
+        assert!(!pa.exists());
+        assert!(!partial.exists());
+        assert_eq!(std::fs::read(&unrelated).unwrap(), b"keep");
+        assert_eq!(std::fs::read(&a).unwrap(), b"audio");
+        for audio in [&b, &c] {
+            let back = blank(8);
+            assert!(load_in(&d, audio, 44100, &back, Quality::Quality).unwrap());
+            assert_eq!(dump(&back), dump(&stems(8)));
+        }
+        std::fs::write(&b, b"changed audio").unwrap();
+        put(&b);
+        assert!(!pb.exists(), "the unreachable old key is evicted");
+        let back = blank(8);
+        assert!(load_in(&d, &b, 44100, &back, Quality::Quality).unwrap());
+        assert_eq!(dump(&back), dump(&stems(8)));
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
+    #[test]
+    fn a_replacement_that_cannot_fit_preserves_the_existing_cache() {
+        let (d, audio) = scratch("oversized");
+        let budget = HEADER as u64 + 16 * 8;
+        store_in(&d, &audio, 44100, &stems(8), Quality::Quality, budget).unwrap();
+        store_in(&d, &audio, 44100, &stems(16), Quality::Quality, budget).unwrap();
+        let back = blank(8);
+        assert!(load_in(&d, &audio, 44100, &back, Quality::Quality).unwrap());
+        assert_eq!(dump(&back), dump(&stems(8)));
+        store_in(&d, &audio, 44100, &stems(8), Quality::Quality, budget).unwrap();
+        assert!(load_in(&d, &audio, 44100, &blank(8), Quality::Quality).unwrap());
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
+    #[test]
+    fn truncated_cache_never_exposes_partial_stem_audio() {
+        let (d, audio) = scratch("truncated-early");
+        let frames = CHUNK + 2;
+        let path = file(&d, &audio, Quality::Quality).unwrap();
+        write_to(&path, 44100, &stems(frames)).unwrap();
+        OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_len((HEADER + 4 * CHUNK + 4) as u64)
+            .unwrap();
+        let back = blank(frames);
+        assert!(read_from(&path, 44100, &back).is_err());
+        assert!(dump(&back).iter().flatten().all(|s| *s == 0));
+        assert!(!back.is_complete());
         std::fs::remove_dir_all(d).unwrap();
     }
 }

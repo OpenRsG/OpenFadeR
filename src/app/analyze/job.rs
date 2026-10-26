@@ -1,33 +1,49 @@
 //! Process-wide bulk scheduling and per-request completion. Compatible queued or in-flight jobs share decoding and
 //! analysis; every subscriber keeps its own cue guide, tag settings, cancellation and result channel.
 
-use super::{Outcome, store_cues, summary};
+use super::{Outcome, summary};
 use openfader::{
     analysis::{
-        auto,
+        Analysis, Beat, Phrases, auto,
         cache::{self, Source},
         options::Options,
-        tag, Analysis, Beat, Phrases,
+        tag,
     },
-    library::Track,
+    library::{AnalysisReader, Track},
     store::Store,
 };
 use std::{
     collections::{HashMap, VecDeque},
     path::PathBuf,
     sync::{
+        Arc, Condvar, LazyLock, Mutex, Weak,
         atomic::{AtomicBool, Ordering},
-        mpsc, Arc, LazyLock, Mutex, Weak,
+        mpsc,
     },
 };
 
-/// What the library already knows about a track, gathered on the UI thread: the grid and phrases cues are placed on (the
-/// library's own, not ours: its cues must sit on its grid) and whether it has cues.
+const MAX_RUNS: usize = 8;
+const COMMIT_KEYS: usize = 8192;
+
+#[cfg(test)]
+pub(super) static TEST_RUNS: Mutex<()> = Mutex::new(());
+
+type Commits = cache::CommitFence;
+
+fn commits() -> &'static Mutex<Commits> {
+    static COMMITS: LazyLock<Mutex<Commits>> =
+        LazyLock::new(|| Mutex::new(Commits::new(COMMIT_KEYS)));
+    &COMMITS
+}
+
+/// Library grid and phrases, prepared only when a pool worker has capacity.
 #[derive(Default)]
 pub struct Guide {
     pub beats: Vec<Beat>,
     pub phrases: Option<Phrases>,
+    /// Includes an explicitly stored empty list: the user deleted every cue.
     pub has_cues: bool,
+    pub cue_revision: i64,
 }
 
 pub struct Job {
@@ -49,6 +65,10 @@ pub struct Job {
     /// The library gave the track a key.
     pub library_key: bool,
     pub guide: Guide,
+    pub reader: Option<AnalysisReader>,
+    pub generation: u64,
+    pub(super) ticket: Option<Arc<Mutex<Generations>>>,
+    pub cue_epoch: u64,
 }
 
 /// The key as the file's tag spells it (the user's key notation).
@@ -63,6 +83,27 @@ pub struct Settings {
     pub workers: usize,
     /// Analysis Process "Power saving": the workers run at the lowest priority.
     pub low_priority: bool,
+    pub grid_source: crate::app::prefs::analysis::GridSource,
+    pub(super) notice: Option<mpsc::Sender<Notice>>,
+    pub(super) learner: Option<Arc<super::Learner>>,
+}
+
+pub(super) struct Notice {
+    pub ticket: Option<Arc<Mutex<Generations>>>,
+    pub generation: u64,
+    pub text: String,
+}
+
+fn notice(sub: &Subscriber, text: String) {
+    if !sub.cancelled.load(Ordering::Relaxed) {
+        if let Some(tx) = &sub.settings.notice {
+            let _ = tx.send(Notice {
+                ticket: sub.job.ticket.clone(),
+                generation: sub.job.generation,
+                text,
+            });
+        }
+    }
 }
 
 /// The cues and tag of one analysed track (`a`), the part of [`spawn`]'s work that is not decoding.
@@ -80,21 +121,15 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
         };
         (g.beats.as_slice(), g.phrases.clone().or_else(own))
     };
-    // Cues stored after the job was made (a pad pressed meanwhile, cue sync from a device) are newer than this analysis: they stay.
-    let arrived = !g.has_cues
-        && store
-            .edits(&job.key)
-            .is_ok_and(|e| e.cues.is_some_and(|c| !c.is_empty()));
     // A refresh never replaces a cue list, whatever "Prohibit overwriting CUEs" says.
     let cue_options = auto::CueOptions {
         keep_existing: s.options.cue.keep_existing || job.refresh,
         ..s.options.cue
     };
-    let cues = !arrived
-        && !job.keep_cues
+    let cues = !job.keep_cues
         && auto::for_analysis(beats, phrases.as_ref(), &cue_options, g.has_cues).is_some_and(|c| {
-            match store.system(|| store_cues(store, &job.key, &c)) {
-                Ok(()) => true,
+            match store.system(|| store.set_auto_cues_if_revision(&job.key, &c, g.cue_revision)) {
+                Ok(stored) => stored,
                 Err(e) => {
                     eprintln!("analyze: {}: cues not stored: {e}", job.path.display());
                     false
@@ -112,6 +147,10 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
         src,
         cues,
         tag,
+        generation: job.generation,
+        skipped: false,
+        cancelled: false,
+        ticket: job.ticket.clone(),
     }
 }
 
@@ -146,6 +185,11 @@ pub struct Cancellation(Arc<AtomicBool>);
 impl Drop for Cancellation {
     fn drop(&mut self) {
         self.0.store(true, Ordering::Relaxed);
+        pool()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .cancel(&self.0);
+        wake().notify_all();
     }
 }
 
@@ -166,6 +210,7 @@ struct Work {
     source: Option<String>,
     options: Options,
     low_priority: bool,
+    generation: u64,
     subscribers: Mutex<Vec<Subscriber>>,
 }
 
@@ -190,22 +235,102 @@ impl Work {
 }
 
 #[derive(Default)]
+pub(super) struct Generations {
+    completed: u64,
+    pending: Vec<(u64, Weak<AtomicBool>)>,
+}
+
+impl Generations {
+    fn latest(&mut self) -> u64 {
+        self.pending.retain(|(_, run)| {
+            run.upgrade()
+                .is_some_and(|run| !run.load(Ordering::Relaxed))
+        });
+        self.pending
+            .last()
+            .map_or(self.completed, |(generation, _)| {
+                self.completed.max(*generation)
+            })
+    }
+}
+
+#[derive(Default)]
 struct Pool {
     queued: VecDeque<Arc<Work>>,
     running: Vec<Arc<Work>>,
     by_track: HashMap<String, Vec<Weak<Work>>>,
     limit: usize,
+    pending: VecDeque<Subscriber>,
+    preparing: Vec<(String, PathBuf)>,
+    prepared: usize,
+    threads: [usize; 2],
+    sequence: u64,
+    generations: HashMap<PathBuf, Weak<Mutex<Generations>>>,
+    learning: VecDeque<(Arc<super::Learner>, Arc<Store>, bool)>,
+    learning_running: usize,
+    runs: Vec<Weak<AtomicBool>>,
 }
 
 impl Pool {
+    fn admit(&mut self, cancelled: &Arc<AtomicBool>, workers: usize) -> Result<(), String> {
+        self.runs.retain(|run| {
+            run.upgrade()
+                .is_some_and(|run| !run.load(Ordering::Relaxed))
+        });
+        if self.runs.len() >= workers.max(1).saturating_mul(2).min(MAX_RUNS) {
+            return Err(tr!(
+                "Analysis is busy: wait for an existing analysis run to finish or cancel it."
+            )
+            .to_owned());
+        }
+        self.runs.push(Arc::downgrade(cancelled));
+        Ok(())
+    }
+
+    fn cancel(&mut self, cancelled: &Arc<AtomicBool>) {
+        self.pending
+            .retain(|s| !Arc::ptr_eq(&s.cancelled, cancelled));
+        for work in &self.queued {
+            let mut subscribers = work.subscribers.lock().unwrap_or_else(|e| e.into_inner());
+            let before = subscribers.len();
+            subscribers.retain(|s| !Arc::ptr_eq(&s.cancelled, cancelled));
+            self.prepared -= before - subscribers.len();
+        }
+        let mut index = 0;
+        while index < self.queued.len() {
+            if self.queued[index].cancelled() {
+                let work = self.queued.remove(index).unwrap();
+                self.forget(&work);
+            } else {
+                index += 1;
+            }
+        }
+        self.generations
+            .retain(|_, ticket| ticket.strong_count() > 0);
+    }
+
+    fn grow(&mut self, low_priority: bool) -> usize {
+        let count = &mut self.threads[usize::from(low_priority)];
+        let needed = self.limit.saturating_sub(*count);
+        *count += needed;
+        needed
+    }
+
+    fn configure(&mut self, workers: usize, low_priority: bool) {
+        self.limit = workers.max(1);
+        for _ in 0..self.grow(low_priority) {
+            std::thread::spawn(move || worker(low_priority));
+        }
+    }
+
     fn submit(&mut self, subscriber: Subscriber) {
+        self.prepared += 1;
         let work = self
             .by_track
             .get(&subscriber.job.key)
-            .into_iter()
-            .flatten()
-            .filter_map(Weak::upgrade)
-            .find(|w| w.compatible(&subscriber) && !w.cancelled());
+            .and_then(|works| works.last())
+            .and_then(Weak::upgrade)
+            .filter(|w| w.compatible(&subscriber) && !w.cancelled());
         if let Some(work) = work {
             work.subscribers
                 .lock()
@@ -221,6 +346,7 @@ impl Pool {
             source: subscriber.source.clone(),
             options: subscriber.settings.options,
             low_priority: subscriber.settings.low_priority,
+            generation: subscriber.job.generation,
             subscribers: Mutex::new(vec![subscriber]),
         });
         self.by_track
@@ -239,13 +365,22 @@ impl Pool {
         }
     }
 
+    #[cfg(test)]
     fn take_ready(&mut self) -> Vec<Arc<Work>> {
         let mut ready = Vec::new();
         while self.running.len() < self.limit {
-            let Some(work) = self.queued.pop_front() else {
+            let Some(index) = self.queued.iter().position(|work| {
+                work.cancelled() || !self.running.iter().any(|running| running.key == work.key)
+            }) else {
                 break;
             };
+            let work = self.queued.remove(index).unwrap();
             if work.cancelled() {
+                self.prepared -= work
+                    .subscribers
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .len();
                 self.forget(&work);
                 continue;
             }
@@ -261,45 +396,258 @@ fn pool() -> &'static Mutex<Pool> {
     &POOL
 }
 
-fn dispatch() {
-    let ready = pool()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .take_ready();
-    for work in ready {
-        std::thread::spawn(move || {
-            // Release the slot even if a detector or a subscriber's completion panics.
-            struct Slot(Arc<Work>);
-            impl Drop for Slot {
-                fn drop(&mut self) {
-                    {
-                        let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
-                        pool.running.retain(|w| !Arc::ptr_eq(w, &self.0));
-                        pool.forget(&self.0);
-                    }
-                    dispatch();
+fn wake() -> &'static Condvar {
+    static WAKE: Condvar = Condvar::new();
+    &WAKE
+}
+
+fn prepare(sub: &mut Subscriber) -> Result<bool, String> {
+    let job = &mut sub.job;
+    job.track = super::listed(&sub.store, &job.track);
+    job.path = job
+        .track
+        .file
+        .clone()
+        .ok_or_else(|| "track has no file".to_owned())?;
+    job.key = openfader::store::key(&job.track);
+    if sub.store.analysis_locked(&job.key)? {
+        notice(
+            sub,
+            tr!("this track has an Analysis Lock: unlock it first").to_owned(),
+        );
+        return Ok(false);
+    }
+    if let Some(learner) = &sub.settings.learner {
+        sub.settings.options.cue.tendency = learner.learned(&sub.store)?.tendency;
+    }
+    job.library_key = !job.track.key.is_empty();
+    job.guide.cue_revision = sub.store.cue_revision(&job.key)?;
+    if u64::try_from(job.guide.cue_revision)
+        .map_err(|_| "negative cue revision in store".to_owned())?
+        > job.cue_epoch
+    {
+        job.keep_cues = true;
+    }
+    let mut own = job
+        .reader
+        .as_ref()
+        .and_then(|read| read(&job.track))
+        .unwrap_or_default();
+    let mut edits = sub.store.edits(&job.key)?;
+    let edited_grid = edits.grid.is_some();
+    job.guide.has_cues = edits.cues.take().is_some() || !own.cues.is_empty();
+    openfader::store::apply(&mut own, &edits);
+    job.guide.beats = own.beats;
+    job.guide.phrases = own.phrases;
+    sub.source = cache::key(&job.path).ok();
+    if sub.settings.notice.is_some() {
+        let tail = super::notice_for(
+            sub.settings.grid_source,
+            !job.guide.beats.is_empty(),
+            edited_grid,
+        );
+        notice(sub, tr!("analysing “{}”…{}", sub.job.track.title, tail));
+    }
+    Ok(true)
+}
+
+enum Task {
+    Prepare(Subscriber, (String, PathBuf)),
+    Analyze(Arc<Work>),
+    Learn(Arc<super::Learner>, Arc<Store>),
+}
+
+impl Pool {
+    fn next(&mut self, low_priority: bool) -> Option<Task> {
+        // One key stays ordered through preparation, cache commit, cue/tag writes and result delivery.
+        if self.running.len() + self.learning_running < self.limit {
+            self.learning
+                .retain(|(learner, _, _)| Arc::strong_count(learner) > 1);
+            if let Some(index) = self
+                .learning
+                .iter()
+                .position(|(_, _, low)| *low == low_priority)
+            {
+                let (learner, store, _) = self.learning.remove(index).unwrap();
+                self.learning_running += 1;
+                return Some(Task::Learn(learner, store));
+            }
+            let index = self.queued.iter().enumerate().position(|(index, work)| {
+                work.low_priority == low_priority
+                    && !self
+                        .running
+                        .iter()
+                        .any(|running| running.key == work.key || running.path == work.path)
+                    && !self
+                        .queued
+                        .iter()
+                        .take(index)
+                        .any(|older| older.key == work.key || older.path == work.path)
+            });
+            if let Some(index) = index {
+                let work = self.queued.remove(index).unwrap();
+                self.running.push(work.clone());
+                return Some(Task::Analyze(work));
+            }
+        }
+        while self
+            .pending
+            .front()
+            .is_some_and(|s| s.cancelled.load(Ordering::Relaxed))
+        {
+            self.pending.pop_front();
+        }
+        if self.prepared + self.preparing.len() >= self.limit.max(1) * 3 {
+            return None;
+        }
+        let index = self.pending.iter().enumerate().position(|(index, s)| {
+            (s.settings.low_priority == low_priority || s.cancelled.load(Ordering::Relaxed))
+                && s.settings
+                    .learner
+                    .as_ref()
+                    .is_none_or(|learner| learner.result.get().is_some())
+                && !self
+                    .preparing
+                    .iter()
+                    .any(|(key, path)| key == &s.job.key || path == &s.job.path)
+                && !self
+                    .pending
+                    .iter()
+                    .take(index)
+                    .any(|older| older.job.key == s.job.key || older.job.path == s.job.path)
+        })?;
+        let sub = self.pending.remove(index).unwrap();
+        let identity = (sub.job.key.clone(), sub.job.path.clone());
+        self.preparing.push(identity.clone());
+        Some(Task::Prepare(sub, identity))
+    }
+}
+
+fn worker(low_priority: bool) {
+    if low_priority {
+        lower_priority();
+    }
+    loop {
+        let task = {
+            let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
+            loop {
+                if let Some(task) = pool.next(low_priority) {
+                    break task;
                 }
+                pool = wake().wait(pool).unwrap_or_else(|e| e.into_inner());
             }
-            let _slot = Slot(work.clone());
-            if work.low_priority {
-                lower_priority();
+        };
+        match task {
+            Task::Learn(learner, store) => {
+                if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    learner.learned(&store)
+                }))
+                .is_err()
+                {
+                    let _ = learner
+                        .result
+                        .set(Err("cue tendency learning panicked".into()));
+                }
+                let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
+                pool.learning_running -= 1;
+                wake().notify_all();
             }
-            if work.cancelled() {
-                return;
+            Task::Prepare(mut sub, identity) => {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    if sub.cancelled.load(Ordering::Relaxed) {
+                        Ok(false)
+                    } else {
+                        prepare(&mut sub)
+                    }
+                }))
+                .unwrap_or_else(|_| Err("analysis preparation panicked".into()));
+                let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
+                pool.preparing.retain(|i| i != &identity);
+                if !sub.cancelled.load(Ordering::Relaxed) {
+                    match result {
+                        Ok(true) => pool.submit(sub),
+                        Ok(false) => {
+                            let _ = sub.tx.send((
+                                sub.job.path,
+                                Ok(Outcome {
+                                    found: (0, String::new()),
+                                    src: Source::Cache,
+                                    cues: false,
+                                    tag: None,
+                                    generation: sub.job.generation,
+                                    skipped: true,
+                                    cancelled: false,
+                                    ticket: sub.job.ticket,
+                                }),
+                            ));
+                        }
+                        Err(e) => {
+                            let _ = sub.tx.send((sub.job.path, Err(e)));
+                        }
+                    }
+                }
+                wake().notify_all();
             }
-            let result =
-                cache::get_or_analyze_with(&work.track, &work.options, work.explicit, &|| {
-                    work.cancelled()
-                });
-            // Closing subscribers under the pool lock keeps later requests out of a completed computation.
-            let subscribers = {
-                let _pool = pool().lock().unwrap_or_else(|e| e.into_inner());
-                std::mem::take(&mut *work.subscribers.lock().unwrap_or_else(|e| e.into_inner()))
-            };
-            if let Some(result) = result.transpose() {
-                deliver(subscribers, result);
+            Task::Analyze(work) => {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    cache::get_or_analyze_with(
+                        &work.track,
+                        &work.options,
+                        work.explicit,
+                        &|| work.cancelled(),
+                        &|key, write| {
+                            if work.cancelled() {
+                                return false;
+                            }
+                            commits().lock().unwrap_or_else(|e| e.into_inner()).publish(
+                                key,
+                                work.generation,
+                                write,
+                            )
+                        },
+                    )
+                }));
+                let subscribers = {
+                    let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
+                    let subscribers = std::mem::take(
+                        &mut *work.subscribers.lock().unwrap_or_else(|e| e.into_inner()),
+                    );
+                    pool.forget(&work);
+                    subscribers
+                };
+                let prepared = subscribers.len();
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match result {
+                    Ok(Ok(Some(result))) => deliver(subscribers, Ok(result)),
+                    Ok(Ok(None)) => deliver_cancelled(subscribers),
+                    Ok(Err(e)) => deliver(subscribers, Err(e)),
+                    Err(_) => deliver(subscribers, Err("analysis worker panicked".into())),
+                }));
+                let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
+                pool.prepared -= prepared;
+                pool.running.retain(|w| !Arc::ptr_eq(w, &work));
+                wake().notify_all();
             }
-        });
+        }
+    }
+}
+
+fn deliver_cancelled(subscribers: Vec<Subscriber>) {
+    for sub in subscribers {
+        if !sub.cancelled.load(Ordering::Relaxed) {
+            let _ = sub.tx.send((
+                sub.job.path,
+                Ok(Outcome {
+                    found: (0, String::new()),
+                    src: Source::Cache,
+                    cues: false,
+                    tag: None,
+                    generation: sub.job.generation,
+                    ticket: sub.job.ticket,
+                    skipped: false,
+                    cancelled: true,
+                }),
+            ));
+        }
     }
 }
 
@@ -309,7 +657,7 @@ fn deliver(subscribers: Vec<Subscriber>, result: Result<(Analysis, Source), Stri
             continue;
         }
         // Library health lists a file whose analysis failed as corrupt, until it analyses or loads again.
-        let outcome = match &result {
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match &result {
             Ok((a, source)) => {
                 let _ = sub.store.health_clear_failure(&sub.job.track);
                 Ok(finish(
@@ -324,7 +672,15 @@ fn deliver(subscribers: Vec<Subscriber>, result: Result<(Analysis, Source), Stri
                 let _ = sub.store.health_note_failure(&sub.job.track, e);
                 Err(e.clone())
             }
-        };
+        }))
+        .unwrap_or_else(|_| Err("analysis completion panicked".into()));
+        if sub.cancelled.load(Ordering::Relaxed) {
+            continue;
+        }
+        if let Some(ticket) = &sub.job.ticket {
+            let mut generations = ticket.lock().unwrap_or_else(|e| e.into_inner());
+            generations.completed = generations.completed.max(sub.job.generation);
+        }
         let _ = sub.tx.send((sub.job.path, outcome));
     }
 }
@@ -338,38 +694,73 @@ fn copy_source(source: &Source) -> Source {
     }
 }
 
+pub(super) fn current(ticket: Option<&Arc<Mutex<Generations>>>, generation: u64) -> bool {
+    ticket.is_none_or(|ticket| {
+        generation >= ticket.lock().unwrap_or_else(|e| e.into_inner()).latest()
+    })
+}
+
+pub(super) fn learn(
+    learner: Arc<super::Learner>,
+    store: Arc<Store>,
+    workers: usize,
+    low_priority: bool,
+) {
+    let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
+    pool.configure(workers, low_priority);
+    pool.learning
+        .retain(|(learner, _, _)| Arc::strong_count(learner) > 1);
+    pool.learning.push_back((learner, store, low_priority));
+    wake().notify_all();
+}
+
 /// Runs share a process-wide budget; compatible requests share computation but retain their own completion settings.
 pub fn spawn(
     jobs: Vec<Job>,
     settings: Settings,
     store: Arc<Store>,
     tx: mpsc::Sender<(PathBuf, Result<Outcome, String>)>,
-) -> Cancellation {
-    let cancelled = Arc::new(AtomicBool::new(false));
-    pool().lock().unwrap_or_else(|e| e.into_inner()).limit = settings.workers.max(1);
-    let run_cancelled = cancelled.clone();
-    std::thread::spawn(move || {
-        for job in jobs {
-            if run_cancelled.load(Ordering::Relaxed) {
-                break;
-            }
-            // Source metadata can block on removable or network media, so it stays off the UI thread.
-            let source = cache::key(&job.path).ok();
-            pool()
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .submit(Subscriber {
-                    source,
-                    job,
-                    settings: settings.clone(),
-                    store: store.clone(),
-                    tx: tx.clone(),
-                    cancelled: run_cancelled.clone(),
-                });
-            dispatch();
+) -> Result<Cancellation, String> {
+    let cue_epoch = store.cue_generation();
+    let cancelled = Arc::new(AtomicBool::new(jobs.is_empty()));
+    let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
+    pool.admit(&cancelled, settings.workers)?;
+    pool.configure(settings.workers, settings.low_priority);
+    pool.generations
+        .retain(|_, ticket| ticket.strong_count() > 0);
+    for mut job in jobs {
+        pool.sequence += 1;
+        job.generation = pool.sequence;
+        job.cue_epoch = cue_epoch;
+        let ticket = pool
+            .generations
+            .get(&job.path)
+            .and_then(Weak::upgrade)
+            .unwrap_or_else(|| {
+                let ticket = Arc::new(Mutex::new(Generations::default()));
+                pool.generations
+                    .insert(job.path.clone(), Arc::downgrade(&ticket));
+                ticket
+            });
+        {
+            let mut generations = ticket.lock().unwrap_or_else(|e| e.into_inner());
+            generations.latest();
+            generations
+                .pending
+                .push((job.generation, Arc::downgrade(&cancelled)));
         }
-    });
-    Cancellation(cancelled)
+        job.ticket = Some(ticket);
+        pool.pending.push_back(Subscriber {
+            source: None,
+            job,
+            settings: settings.clone(),
+            store: store.clone(),
+            tx: tx.clone(),
+            cancelled: cancelled.clone(),
+        });
+    }
+    wake().notify_all();
+    Ok(Cancellation(cancelled))
 }
 
 #[cfg(test)]
@@ -426,6 +817,10 @@ mod tests {
             keep_cues: false,
             library_key: false,
             guide,
+            reader: None,
+            generation: 0,
+            ticket: None,
+            cue_epoch: u64::MAX,
         }
     }
 
@@ -435,6 +830,9 @@ mod tests {
             tag: tag.then(|| Arc::new(|k: &str| format!("<{k}>")) as TagText),
             workers: 1,
             low_priority: false,
+            grid_source: crate::app::prefs::analysis::GridSource::Library,
+            notice: None,
+            learner: None,
         }
     }
 
@@ -544,6 +942,7 @@ mod tests {
             })
             .collect();
         store.set_cues(&j.key, Some(&mine)).unwrap();
+        j.guide.cue_revision = store.cue_revision(&j.key).unwrap();
         store.set_grid(&j.key, &grid, &beats()).unwrap();
         // Overwriting CUEs is allowed (the default) and the key tag is asked for: a refresh does neither.
         let out = finish(&j, &analysed(), src(), &settings(true), &store);
@@ -756,6 +1155,7 @@ mod tests {
 
     #[test]
     fn the_pool_analyses_every_job_once_and_reports_failures() {
+        let _pool = TEST_RUNS.lock().unwrap_or_else(|e| e.into_inner());
         let (tx, rx) = mpsc::channel();
         let jobs: Vec<Job> = (0..6)
             .map(|i| job(&format!("/nonexistent/{i}.mp3"), Guide::default()))
@@ -929,5 +1329,514 @@ mod tests {
         assert_eq!(pool.queued.len(), 1);
         assert_ne!(pool.running[0].source, pool.queued[0].source);
         std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn edited_existing_cues_and_explicit_deletions_win_over_generated_cues() {
+        let store = Store::in_memory().unwrap();
+        let original = vec![openfader::analysis::Cue {
+            hot_cue: 1,
+            time_ms: 1000,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        }];
+        let mut edited = original.clone();
+        edited[0].time_ms = 9000;
+        for replacement in [Some(edited), Some(Vec::new()), None, Some(original.clone())] {
+            let mut j = job(
+                "/m/cue-revisions.mp3",
+                Guide {
+                    has_cues: true,
+                    ..Default::default()
+                },
+            );
+            store.set_cues(&j.key, Some(&original)).unwrap();
+            j.guide.cue_revision = store.cue_revision(&j.key).unwrap();
+            store.set_cues(&j.key, replacement.as_deref()).unwrap();
+            assert!(!finish(&j, &analysed(), src(), &settings(false), &store).cues);
+            assert_eq!(store.edits(&j.key).unwrap().cues, replacement);
+        }
+    }
+
+    #[test]
+    fn cue_revision_comparison_and_commit_cannot_race_a_user_write() {
+        use std::sync::Barrier;
+        for _ in 0..16 {
+            let store = Arc::new(Store::in_memory().unwrap());
+            let gate = Arc::new(Barrier::new(2));
+            let mine = vec![openfader::analysis::Cue {
+                hot_cue: 1,
+                time_ms: 9000,
+                loop_end_ms: None,
+                color: None,
+                comment: None,
+            }];
+            let worker_store = store.clone();
+            let worker_gate = gate.clone();
+            let worker = std::thread::spawn(move || {
+                worker_gate.wait();
+                worker_store
+                    .set_auto_cues_if_revision("race", &[], 0)
+                    .unwrap()
+            });
+            gate.wait();
+            store.set_cues("race", Some(&mine)).unwrap();
+            worker.join().unwrap();
+            assert_eq!(store.edits("race").unwrap().cues, Some(mine));
+        }
+    }
+
+    #[test]
+    fn large_submissions_bound_prepared_payloads_and_reuse_worker_lanes() {
+        let store = Arc::new(Store::in_memory().unwrap());
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let (tx, _rx) = mpsc::channel();
+        let mut pool = Pool {
+            limit: 2,
+            ..Default::default()
+        };
+        assert_eq!(pool.grow(false), 2);
+        assert_eq!(pool.grow(true), 2);
+        for i in 0..50_000 {
+            pool.pending.push_back(Subscriber {
+                job: job(&format!("/missing/large-{i}.wav"), Guide::default()),
+                source: None,
+                settings: settings(false),
+                store: store.clone(),
+                tx: tx.clone(),
+                cancelled: cancelled.clone(),
+            });
+            assert_eq!(pool.grow(false), 0, "submissions reuse existing workers");
+        }
+        for _ in 0..2 {
+            let Some(Task::Prepare(sub, identity)) = pool.next(false) else {
+                panic!("preparation")
+            };
+            pool.preparing.retain(|i| i != &identity);
+            pool.submit(sub);
+            assert!(matches!(pool.next(false), Some(Task::Analyze(_))));
+        }
+        for _ in 0..4 {
+            let Some(Task::Prepare(mut sub, identity)) = pool.next(false) else {
+                panic!("bounded preparation")
+            };
+            sub.job.guide.beats = beats();
+            pool.preparing.retain(|i| i != &identity);
+            pool.submit(sub);
+        }
+        assert_eq!(pool.prepared, 6);
+        assert!(
+            pool.next(false).is_none(),
+            "no more heavy guides while the budget is full"
+        );
+        assert_eq!(pool.pending.len(), 49_994);
+        cancelled.store(true, Ordering::Relaxed);
+        pool.cancel(&cancelled);
+        assert!(pool.pending.is_empty() && pool.queued.is_empty());
+        assert_eq!(pool.prepared, 2, "only bounded in-flight work remains");
+        assert_eq!(pool.threads, [2, 2]);
+    }
+
+    #[test]
+    fn incompatible_same_track_work_is_fifo_across_priority_lanes() {
+        let mut pool = Pool {
+            limit: 2,
+            ..Default::default()
+        };
+        let mut low = settings(false);
+        low.low_priority = true;
+        pool.submit(subscriber("ordered", true, low).0);
+        let mut changed = settings(false);
+        changed.options.grid.bpm_range = (110, 220);
+        pool.submit(subscriber("ordered", true, changed).0);
+        pool.submit(subscriber("other-track", true, settings(false)).0);
+        let Some(Task::Analyze(other)) = pool.next(false) else {
+            panic!("other tracks remain runnable")
+        };
+        assert_eq!(other.path, PathBuf::from("other-track"));
+        let Some(Task::Analyze(old)) = pool.next(true) else {
+            panic!("old settings first")
+        };
+        assert_eq!(old.path, PathBuf::from("ordered"));
+        pool.running.retain(|w| !Arc::ptr_eq(w, &other));
+        assert!(
+            pool.next(false).is_none(),
+            "new settings wait through old cache/cue commit"
+        );
+        pool.running.retain(|w| !Arc::ptr_eq(w, &old));
+        pool.forget(&old);
+        let Some(Task::Analyze(new)) = pool.next(false) else {
+            panic!("new settings after old")
+        };
+        assert_eq!(new.options.grid.bpm_range, (110, 220));
+    }
+
+    #[test]
+    fn preparation_preserves_submission_order_across_priority_lanes() {
+        let mut pool = Pool {
+            limit: 2,
+            ..Default::default()
+        };
+        let mut low = settings(false);
+        low.low_priority = true;
+        pool.pending
+            .push_back(subscriber("ordered-raw", true, low).0);
+        pool.pending
+            .push_back(subscriber("ordered-raw", true, settings(false)).0);
+        pool.pending
+            .push_back(subscriber("unrelated-raw", true, settings(false)).0);
+        let Some(Task::Prepare(other, _)) = pool.next(false) else {
+            panic!("unrelated preparation")
+        };
+        assert_eq!(other.job.path, PathBuf::from("unrelated-raw"));
+        assert!(
+            pool.next(false).is_none(),
+            "normal priority must not overtake an older same-track request"
+        );
+        let Some(Task::Prepare(old, identity)) = pool.next(true) else {
+            panic!("old preparation")
+        };
+        assert_eq!(old.job.path, PathBuf::from("ordered-raw"));
+        pool.preparing.retain(|i| i != &identity);
+        pool.submit(old);
+        let Some(Task::Prepare(new, _)) = pool.next(false) else {
+            panic!("new preparation")
+        };
+        assert_eq!(new.job.path, PathBuf::from("ordered-raw"));
+    }
+
+    #[test]
+    fn generation_tickets_reject_stale_ui_results_and_release_cancelled_intent() {
+        let old = Arc::new(AtomicBool::new(false));
+        let new = Arc::new(AtomicBool::new(false));
+        let ticket = Arc::new(Mutex::new(Generations {
+            completed: 1,
+            pending: vec![(1, Arc::downgrade(&old)), (2, Arc::downgrade(&new))],
+        }));
+        assert!(
+            !current(Some(&ticket), 1),
+            "latest intent wins before its work finishes"
+        );
+        new.store(true, Ordering::Relaxed);
+        assert!(
+            current(Some(&ticket), 1),
+            "a cancelled subscriber does not suppress a live run"
+        );
+        ticket.lock().unwrap().completed = 2;
+        assert!(
+            !current(Some(&ticket), 1),
+            "late timer delivery cannot overwrite newer detection"
+        );
+        let weak = Arc::downgrade(&ticket);
+        drop(ticket);
+        assert!(
+            weak.upgrade().is_none(),
+            "tickets retain no track or analysis after results are dropped"
+        );
+    }
+    #[test]
+    fn worker_preparation_panics_release_capacity_and_complete_the_run() {
+        let _pool = TEST_RUNS.lock().unwrap_or_else(|e| e.into_inner());
+        let mut bad = job("/missing/panic-reader.wav", Guide::default());
+        bad.reader = Some(Arc::new(|_| panic!("test source panic")));
+        let good = job("/missing/after-reader-panic.wav", Guide::default());
+        let (tx, rx) = mpsc::channel();
+        let _run = spawn(
+            vec![bad, good],
+            settings(false),
+            Arc::new(Store::in_memory().unwrap()),
+            tx,
+        );
+        for _ in 0..2 {
+            assert!(
+                rx.recv_timeout(std::time::Duration::from_secs(5))
+                    .unwrap()
+                    .1
+                    .is_err()
+            );
+        }
+    }
+    #[test]
+    fn cue_edits_while_waiting_for_preparation_are_preserved_but_older_generated_cues_are_replaceable()
+     {
+        for replacement in [Some(Vec::new()), None] {
+            let (mut sub, _rx) = subscriber("/missing/queued-cue-edit.wav", true, settings(false));
+            sub.job.cue_epoch = sub.store.cue_generation();
+            let key = openfader::store::key(&sub.job.track);
+            sub.store.set_cues(&key, replacement.as_deref()).unwrap();
+            assert!(prepare(&mut sub).unwrap());
+            assert!(
+                sub.job.keep_cues,
+                "a queued user edit is newer than the request"
+            );
+            assert!(!finish(&sub.job, &analysed(), src(), &sub.settings, &sub.store).cues);
+            assert_eq!(sub.store.edits(&key).unwrap().cues, replacement);
+        }
+        let (mut sub, _rx) =
+            subscriber("/missing/queued-generated-cues.wav", true, settings(false));
+        sub.job.cue_epoch = sub.store.cue_generation();
+        let key = openfader::store::key(&sub.job.track);
+        sub.store.set_auto_cues(&key, &[]).unwrap();
+        assert!(prepare(&mut sub).unwrap());
+        assert!(
+            !sub.job.keep_cues,
+            "an older analysis does not masquerade as a user edit"
+        );
+        assert!(finish(&sub.job, &analysed(), src(), &sub.settings, &sub.store).cues);
+    }
+    #[test]
+    fn undoing_cues_during_analysis_or_queued_preparation_advances_the_user_revision() {
+        let (mut sub, _rx) = subscriber("/missing/undo-cue-edit.wav", true, settings(false));
+        let key = openfader::store::key(&sub.job.track);
+        let mine = vec![openfader::analysis::Cue {
+            hot_cue: 1,
+            time_ms: 9000,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        }];
+        sub.store.set_cues(&key, Some(&mine)).unwrap();
+        sub.job.cue_epoch = sub.store.cue_generation();
+        assert!(prepare(&mut sub).unwrap());
+        let revision = sub.job.guide.cue_revision;
+        assert!(sub.store.undo().unwrap().is_some());
+        assert!(sub.store.cue_revision(&key).unwrap() > revision);
+        assert!(!finish(&sub.job, &analysed(), src(), &sub.settings, &sub.store).cues);
+        assert!(prepare(&mut sub).unwrap());
+        assert!(
+            sub.job.keep_cues,
+            "undo while waiting for a preparation slot is also a user edit"
+        );
+        assert!(!finish(&sub.job, &analysed(), src(), &sub.settings, &sub.store).cues);
+        assert!(sub.store.edits(&key).unwrap().cues.is_none());
+    }
+    #[test]
+    fn auto_learning_runs_once_on_the_shared_pool_before_cue_settings_are_prepared() {
+        let _pool = TEST_RUNS.lock().unwrap_or_else(|e| e.into_inner());
+        use std::sync::atomic::AtomicUsize;
+        let reads = Arc::new(AtomicUsize::new(0));
+        let source_reads = reads.clone();
+        let learner = Arc::new(super::super::Learner {
+            tracks: Arc::new(
+                (0..40)
+                    .map(|i| Track {
+                        title: format!("teacher-{i}"),
+                        ..Default::default()
+                    })
+                    .collect(),
+            ),
+            reader: Some(Arc::new(move |_| {
+                source_reads.fetch_add(1, Ordering::Relaxed);
+                Some(Analysis {
+                    beats: beats(),
+                    cues: [8000, 40000, 72000]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, time_ms)| openfader::analysis::Cue {
+                            hot_cue: i as u16 + 1,
+                            time_ms,
+                            loop_end_ms: None,
+                            color: None,
+                            comment: None,
+                        })
+                        .collect(),
+                    ..Default::default()
+                })
+            })),
+            result: std::sync::OnceLock::new(),
+        });
+        assert_eq!(reads.load(Ordering::Relaxed), 0);
+        let store = Arc::new(Store::in_memory().unwrap());
+        learn(learner.clone(), store.clone(), 2, false);
+        let mut auto_settings = settings(false);
+        auto_settings.workers = 2;
+        auto_settings.learner = Some(learner.clone());
+        auto_settings.options.cue.mode = auto::CueMode::Auto;
+        let (tx, rx) = mpsc::channel();
+        let _run = spawn(
+            (0..4)
+                .map(|i| job(&format!("/missing/learned-{i}.wav"), Guide::default()))
+                .collect(),
+            auto_settings.clone(),
+            store,
+            tx,
+        );
+        for _ in 0..4 {
+            assert!(
+                rx.recv_timeout(std::time::Duration::from_secs(5))
+                    .unwrap()
+                    .1
+                    .is_err()
+            );
+        }
+        let learned = learner.result.get().unwrap().as_ref().unwrap();
+        assert_eq!(learned.found, 40);
+        assert_eq!(learned.tendency.unwrap().hot, 3);
+        assert_eq!(
+            reads.load(Ordering::Relaxed),
+            40,
+            "runs share one collection scan, not a scan per track"
+        );
+        let (mut sub, _rx) = subscriber("/missing/learned-options.wav", true, auto_settings);
+        assert!(prepare(&mut sub).unwrap());
+        assert_eq!(sub.settings.options.cue.tendency, learned.tendency);
+        let mut manual = settings(false);
+        manual.options.cue.hot = 5;
+        let (mut sub, _rx) = subscriber("/missing/manual-options.wav", true, manual);
+        assert!(prepare(&mut sub).unwrap());
+        assert_eq!(sub.settings.options.cue.hot, 5);
+        assert!(sub.settings.options.cue.tendency.is_none());
+    }
+
+    #[test]
+    fn collection_learning_and_analysis_share_the_same_execution_budget() {
+        let mut pool = Pool {
+            limit: 1,
+            ..Default::default()
+        };
+        pool.submit(subscriber("running-before-learner", false, settings(false)).0);
+        let _running = pool.take_ready();
+        let learner = Arc::new(super::super::Learner {
+            tracks: Arc::new(Vec::new()),
+            reader: None,
+            result: std::sync::OnceLock::new(),
+        });
+        pool.learning.push_back((
+            learner.clone(),
+            Arc::new(Store::in_memory().unwrap()),
+            false,
+        ));
+        pool.submit(subscriber("after-learner", false, settings(false)).0);
+        assert!(
+            pool.next(false).is_none(),
+            "a collection learner cannot exceed the running bulk budget"
+        );
+        pool.running.clear();
+        assert!(matches!(pool.next(false), Some(Task::Learn(_, _))));
+        assert!(
+            pool.next(false).is_none(),
+            "bulk work waits for the learner's execution slot"
+        );
+    }
+    #[test]
+    fn an_explicitly_empty_cue_list_is_existing_for_refresh_and_no_overwrite() {
+        let (mut sub, _rx) = subscriber("/missing/explicit-empty.wav", true, settings(false));
+        let key = openfader::store::key(&sub.job.track);
+        sub.store.set_cues(&key, Some(&[])).unwrap();
+        sub.job.cue_epoch = sub.store.cue_generation();
+        assert!(prepare(&mut sub).unwrap());
+        assert!(sub.job.guide.has_cues);
+        sub.job.refresh = true;
+        assert!(!finish(&sub.job, &analysed(), src(), &sub.settings, &sub.store).cues);
+        sub.job.refresh = false;
+        sub.settings.options.cue.keep_existing = true;
+        assert!(!finish(&sub.job, &analysed(), src(), &sub.settings, &sub.store).cues);
+        assert_eq!(sub.store.edits(&key).unwrap().cues, Some(Vec::new()));
+        sub.settings.options.cue.keep_existing = false;
+        assert!(finish(&sub.job, &analysed(), src(), &sub.settings, &sub.store).cues);
+    }
+    #[test]
+    fn a_late_bare_path_alias_cannot_replace_a_newer_generated_cue_list_for_the_same_key() {
+        let store = Arc::new(Store::in_memory().unwrap());
+        let (mut old, rx) = subscriber("/alias/old.wav", true, settings(false));
+        let mut new = job("/alias/new.wav", Guide::default());
+        old.store = store.clone();
+        old.job.key = "shared-key".into();
+        new.key = old.job.key.clone();
+        old.job.generation = 1;
+        new.generation = 2;
+        let mut fence = Commits::new(8);
+        assert!(fence.publish(&new.key, 2, &mut || {}));
+        let mut changed = settings(false);
+        changed.options.cue.hot = 1;
+        assert!(finish(&new, &analysed(), src(), &changed, &store).cues);
+        let newest = store.edits(&new.key).unwrap().cues;
+        assert!(!fence.publish(&old.job.key, 1, &mut || panic!("stale cache write")));
+        deliver_cancelled(vec![old]);
+        let cancelled = rx.recv().unwrap().1.unwrap();
+        assert!(cancelled.cancelled && !cancelled.cues && cancelled.tag.is_none());
+        assert_eq!(store.edits(&new.key).unwrap().cues, newest);
+        assert!(store.cues_are_auto(&new.key).unwrap());
+    }
+    #[test]
+    fn raw_run_admission_is_bounded_and_completion_or_cancellation_releases_it() {
+        let mut pool = Pool::default();
+        let runs: Vec<_> = (0..MAX_RUNS)
+            .map(|_| Arc::new(AtomicBool::new(false)))
+            .collect();
+        for run in &runs {
+            pool.admit(run, 4).unwrap();
+        }
+        let ninth = Arc::new(AtomicBool::new(false));
+        assert!(
+            pool.admit(&ninth, 4).is_err(),
+            "repeated clicks get an error rather than another retained track snapshot"
+        );
+        runs[0].store(true, Ordering::Relaxed);
+        pool.admit(&ninth, 4).unwrap();
+        assert_eq!(pool.runs.len(), MAX_RUNS);
+        runs[1].store(true, Ordering::Relaxed);
+        let replacement = Arc::new(AtomicBool::new(false));
+        pool.admit(&replacement, 4).unwrap();
+        assert_eq!(pool.runs.len(), MAX_RUNS);
+    }
+    #[test]
+    fn low_power_raw_admission_allows_two_overlapping_runs_but_rejects_more() {
+        let mut pool = Pool::default();
+        let first = Arc::new(AtomicBool::new(false));
+        let second = Arc::new(AtomicBool::new(false));
+        pool.admit(&first, 1).unwrap();
+        pool.admit(&second, 1).unwrap();
+        assert!(pool.admit(&Arc::new(AtomicBool::new(false)), 1).is_err());
+    }
+
+    #[test]
+    fn repeated_submissions_reuse_worker_threads() {
+        let _pool = TEST_RUNS.lock().unwrap_or_else(|e| e.into_inner());
+        let threads = Arc::new(Mutex::new(std::collections::HashSet::new()));
+        let observed = threads.clone();
+        let reader: AnalysisReader = Arc::new(move |_| {
+            observed.lock().unwrap().insert(std::thread::current().id());
+            None
+        });
+        let store = Arc::new(Store::in_memory().unwrap());
+        for run in 0..2 {
+            let jobs = (0..128)
+                .map(|i| {
+                    let mut job = job(
+                        &format!("/missing/reused-workers-{run}-{i}.wav"),
+                        Guide::default(),
+                    );
+                    job.reader = Some(reader.clone());
+                    job
+                })
+                .collect();
+            let (tx, rx) = mpsc::channel();
+            let run = spawn(
+                jobs,
+                Settings {
+                    workers: 2,
+                    ..settings(false)
+                },
+                store.clone(),
+                tx,
+            )
+            .unwrap();
+            for _ in 0..128 {
+                assert!(
+                    rx.recv_timeout(std::time::Duration::from_secs(5))
+                        .unwrap()
+                        .1
+                        .is_err()
+                );
+            }
+            drop(run);
+        }
+        let retained = pool().lock().unwrap().threads[0];
+        let observed = threads.lock().unwrap().len();
+        assert!(
+            observed > 0 && observed <= retained,
+            "track count does not create new worker threads"
+        );
     }
 }

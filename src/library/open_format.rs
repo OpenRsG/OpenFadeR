@@ -310,6 +310,9 @@ mod tests {
                 ..Analysis::default()
             })
         }
+        fn analysis_reader(&self) -> Option<crate::library::AnalysisReader> {
+            Some(std::sync::Arc::new(|t| Lib.analysis(t)))
+        }
     }
 
     fn dir(name: &str) -> std::path::PathBuf {
