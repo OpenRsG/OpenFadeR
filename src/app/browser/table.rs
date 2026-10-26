@@ -15,7 +15,7 @@ use slint::{
 use std::{
     cell::{Ref, RefCell},
     collections::{HashMap, HashSet},
-    rc::Rc,
+    sync::Arc,
 };
 
 /// Table column indices, in the order of the model rows read by `TrackTable` in ui/browser-table.slint.
@@ -205,7 +205,7 @@ fn remark(row: &ModelRc<StandardListViewItem>, f: &Facts, r: &Reference, look: &
 }
 
 struct RowData {
-    list: Rc<Vec<Track>>,
+    list: Arc<Vec<Track>>,
     facts: Vec<Facts>,
     detected: u64,
     missing: u64,
@@ -228,7 +228,7 @@ impl Rows {
     pub fn new(played: HashSet<String>) -> Self {
         Self {
             data: RefCell::new(RowData {
-                list: Rc::default(),
+                list: Arc::default(),
                 facts: Vec::new(),
                 detected: detected().version(),
                 missing: crate::app::library::missing::version(),
@@ -244,7 +244,7 @@ impl Rows {
         }
     }
 
-    pub fn replace(&self, list: Rc<Vec<Track>>, notes: Vec<String>) {
+    pub fn replace(&self, list: Arc<Vec<Track>>, notes: Vec<String>) {
         let mut d = self.data.borrow_mut();
         if list.len() != d.list.len() {
             d.facts = list.iter().map(Facts::of).collect();
@@ -430,8 +430,8 @@ mod tests {
         assert_eq!(shown, [1, 0]);
     }
 
-    fn tracks(count: usize) -> Rc<Vec<Track>> {
-        Rc::new(
+    fn tracks(count: usize) -> Arc<Vec<Track>> {
+        Arc::new(
             (0..count)
                 .map(|i| Track {
                     title: format!("track {i:05}"),
@@ -595,7 +595,7 @@ mod tests {
         edited[0].bpm_x100 = 13725;
         edited[0].key = "11A".into();
         edited[0].comment = "edited comment".into();
-        model.replace(Rc::new(edited.clone()), Vec::new());
+        model.replace(Arc::new(edited.clone()), Vec::new());
         assert_eq!(model.facts()[0].bpm_x100, 13725);
         model.update(&[1, 0], look, Reference::default());
         assert_eq!(
@@ -621,7 +621,7 @@ mod tests {
                 &look
             ))
         );
-        model.replace(Rc::new(edited.clone()), Vec::new());
+        model.replace(Arc::new(edited.clone()), Vec::new());
         model.update(&[0, 1], look, Reference::default());
         assert_eq!(model.facts()[0].key, "11A");
         assert_eq!(
@@ -640,7 +640,7 @@ mod tests {
     fn missing_generation_refreshes_cached_title_without_changing_facts() {
         use crate::app::library::missing;
         let path = std::path::PathBuf::from("/openfader-browser-missing-test.wav");
-        let list = Rc::new(vec![Track {
+        let list = Arc::new(vec![Track {
             title: "missing test".into(),
             file: Some(path.clone()),
             ..Track::default()
@@ -691,7 +691,7 @@ mod tests {
         ));
         let model = Rows::new(HashSet::new());
         let look = Look::now();
-        model.replace(Rc::new(vec![t.clone()]), Vec::new());
+        model.replace(Arc::new(vec![t.clone()]), Vec::new());
         model.update(&[0], look, Reference::default());
         assert_eq!(model.row_data(0).unwrap().row_data(BPM).unwrap().text, "");
         cache::store(

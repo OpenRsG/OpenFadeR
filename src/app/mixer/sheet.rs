@@ -5,8 +5,8 @@
 //! [`Tracklist`] follows the deck that leads the mix and notes each time another track takes over, on the recorder's
 //! clock (ms of recorded audio). When the recording ends, [`write`] cuts that list per file: every file gets its own
 //! sheet, with times relative to its first frame and without the tracks that led it for less than the setting's minimum.
-//! ponytail: the sheets are written when the recording ends, so a crash mid-recording leaves the WAV without them
-//! (the control log streams); write each finished file's sheet at its split if that ever matters.
+//! While recording, [`write_live`] refreshes the sheets at every track change, so a crash leaves the last state next to
+//! the WAV; every write goes through a `.part` file and a rename, so a sheet is never half written.
 
 use super::rec::clock;
 use openfader::audio::Take;
@@ -144,6 +144,14 @@ pub fn sidecar(recording: &Path, suffix: &str) -> PathBuf {
     recording.with_file_name(name)
 }
 
+/// Writes `text` to `path` through `<path>.part` and a rename.
+fn atomic(path: &Path, text: &str) -> io::Result<()> {
+    let mut part = path.as_os_str().to_os_string();
+    part.push(".part");
+    std::fs::write(&part, text)?;
+    std::fs::rename(&part, path)
+}
+
 /// Writes the cue sheet and / or the tracklist of every file of `take`, from the tracks that led its recording; a file
 /// that none of the tracks reached gets no sheet. Returns the files written.
 pub fn write(
@@ -154,11 +162,29 @@ pub fn write(
     list: bool,
 ) -> io::Result<Vec<PathBuf>> {
     let ms = |frames: u64| frames * 1000 / u64::from(take.rate.max(1));
+    let files: Vec<_> = take
+        .files
+        .iter()
+        .enumerate()
+        .map(|(i, f)| (f.clone(), ms(take.starts.get(i).copied().unwrap_or(0))))
+        .collect();
+    write_live(&files, ms(take.frames), entries, min, cue, list)
+}
+
+/// [`write`] for a recording still running: `files` are the files so far with where each begins (ms on the recording's
+/// clock), `now_ms` is the recording's length so far.
+pub fn write_live(
+    files: &[(PathBuf, u64)],
+    now_ms: u64,
+    entries: &[Entry],
+    min: Duration,
+    cue: bool,
+    list: bool,
+) -> io::Result<Vec<PathBuf>> {
     let mut written = Vec::new();
-    for (i, file) in take.files.iter().enumerate() {
-        let from = ms(take.starts.get(i).copied().unwrap_or(0));
-        let to = take.starts.get(i + 1).map_or(ms(take.frames), |&f| ms(f));
-        let tracks = within(entries, from, to, min);
+    for (i, (file, from)) in files.iter().enumerate() {
+        let to = files.get(i + 1).map_or(now_ms, |f| f.1);
+        let tracks = within(entries, *from, to, min);
         if tracks.is_empty() {
             continue;
         }
@@ -169,7 +195,7 @@ pub fn write(
         ];
         for (_, suffix, text) in jobs.into_iter().filter(|j| j.0) {
             let path = sidecar(file, suffix);
-            std::fs::write(&path, text)?;
+            atomic(&path, &text)?;
             written.push(path);
         }
     }
@@ -179,6 +205,25 @@ pub fn write(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn live_write_leaves_a_whole_sheet_after_each_track_change() {
+        let dir = std::env::temp_dir().join(format!("ofr-sheet-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("mix.wav");
+        let files = [(wav.clone(), 0)];
+        let mut entries = vec![entry(0, "A", "One")];
+        write_live(&files, 5_000, &entries, Duration::ZERO, true, false).unwrap();
+        let cue = sidecar(&wav, "cue");
+        let first = std::fs::read_to_string(&cue).unwrap();
+        assert!(first.contains("One") && !first.contains("Two"));
+        entries.push(entry(60_000, "B", "Two"));
+        write_live(&files, 65_000, &entries, Duration::ZERO, true, false).unwrap();
+        let second = std::fs::read_to_string(&cue).unwrap();
+        assert!(second.contains("One") && second.contains("Two"));
+        assert!(!dir.join("mix.cue.part").exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     fn entry(at_ms: u64, artist: &str, title: &str) -> Entry {
         Entry {

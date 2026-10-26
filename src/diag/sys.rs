@@ -47,9 +47,7 @@ pub fn read() -> Sys {
         .iter()
         .find_map(|k| field(&info, k))
         .unwrap_or("unknown");
-    let ram = field(&file("/proc/meminfo"), "MemTotal")
-        .and_then(|v| v.trim_end_matches("kB").trim().parse::<u64>().ok())
-        .map_or_else(|| "unknown".into(), |kb| gib(kb * 1024));
+    let ram = crate::memory::total_bytes().map_or_else(|| "unknown".into(), gib);
     Sys {
         os: format!(
             "{distro}, kernel {}",
@@ -73,28 +71,19 @@ pub fn read() -> Sys {
             sysctl("machdep.cpu.brand_string").unwrap_or_else(|| "unknown".into()),
             threads()
         ),
-        ram: sysctl("hw.memsize")
-            .and_then(|v| v.parse().ok())
-            .map_or_else(|| "unknown".into(), gib),
+        ram: crate::memory::total_bytes().map_or_else(|| "unknown".into(), gib),
     }
 }
 
 #[cfg(windows)]
 pub fn read() -> Sys {
-    use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
-    // SAFETY: an all-zero MEMORYSTATUSEX with its length set is what the call asks for.
-    let ram = unsafe {
-        let mut m: MEMORYSTATUSEX = std::mem::zeroed();
-        m.dwLength = std::mem::size_of::<MEMORYSTATUSEX>() as u32;
-        (GlobalMemoryStatusEx(&mut m) != 0).then_some(m.ullTotalPhys)
-    };
     // `ver` prints "Microsoft Windows [Version 10.0.22631.4037]".
     let ver = command("cmd", &["/C", "ver"]).unwrap_or_else(|| "Windows".into());
     let cpu = std::env::var("PROCESSOR_IDENTIFIER").unwrap_or_else(|_| "unknown".into());
     Sys {
         os: ver.trim_matches(['[', ']']).to_owned(),
         cpu: format!("{cpu}, {} threads", threads()),
-        ram: ram.map_or_else(|| "unknown".into(), gib),
+        ram: crate::memory::total_bytes().map_or_else(|| "unknown".into(), gib),
     }
 }
 

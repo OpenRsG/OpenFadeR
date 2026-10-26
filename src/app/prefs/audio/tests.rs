@@ -198,3 +198,18 @@ fn clicks_set_numbers_pairs_and_keep_the_mixer_mode_honest() {
     assert!(!choose(&mut p, "nonsense", 0) && !choose(&mut p, "ext_9", 0));
     assert!(choose(&mut p, "mixer_mode", 0) && p.audio.mixer_mode == MixerMode::Internal);
 }
+
+#[test]
+fn automatic_buffer_follows_low_power_and_manual_values_win() {
+    use crate::app::prefs::lowpower::LowPower;
+    let mut p = Prefs::default();
+    p.advanced.low_power = LowPower::Off;
+    assert_eq!(
+        effective_settings(&p).requested_buffer(),
+        Some(openfader::audio::route::DEFAULT_BUFFER_FRAMES)
+    );
+    p.advanced.low_power = LowPower::On;
+    assert_eq!(effective_settings(&p).requested_buffer(), None);
+    p.audio.buffer_size = 256;
+    assert_eq!(effective_settings(&p).requested_buffer(), Some(256));
+}

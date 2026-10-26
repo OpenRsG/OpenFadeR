@@ -6,7 +6,7 @@
 //! (drawn like the 3-band overview), `color_detail` (R/G/B as 3-bit fields scaled `c*255/7` and the 5-bit height as `h*255/31` of the column, as
 //! [`analysis::color_detail_rgbh`] does), `detail` (mono blue); when the track has
 //! none of them, peaks computed from the decoded audio. Plus beat grid, cues and the cue point; the playhead, slip ghost and
-//! beat counter are drawn over the picture by `ui/deck-wave.slint` ([`beat_count_text`]).
+//! beat counter are drawn over the picture by `ui/deck-wave.slint` ([`beat_count_value`]).
 //! With the STEM waveform on (PREFS) and a part muted, the 3-band wave of the stems heard ([`wave_3band`]) replaces these.
 
 use super::{
@@ -24,15 +24,31 @@ pub const DEFAULT_SPAN_MS: u32 = 8000;
 const LOOP_RGB: super::Rgb = [255, 153, 0];
 const PER_MS: f64 = DETAIL_ENTRIES_PER_SEC as f64 / 1000.0;
 
+/// Semantic counter value; format only when it changes, rather than on every transport frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BeatCountValue {
+    Bars(usize),
+    Beats(usize),
+}
+
+impl BeatCountValue {
+    pub fn text(self) -> String {
+        match self {
+            Self::Bars(n) => tr!("{}.{}BARS", n / 4, n % 4),
+            Self::Beats(n) => tr!("{}BEATS", n),
+        }
+    }
+}
+
 /// The counter right of the playhead (VIEW > Beat Count Display): `Position` = bars.beats from the first
 /// beat to the playhead; `NextBars` / `NextBeats` = distance to the next memory cue (None without one ahead).
 /// Beat timestamps are ordered, as for the deck's beat-grid lookup; only the two range boundaries need searching.
-pub fn beat_count_text(
+pub fn beat_count_value(
     mode: BeatCount,
     beats: &[Beat],
     cues: &[Cue],
     pos_ms: f64,
-) -> Option<String> {
+) -> Option<BeatCountValue> {
     let between = |from: f64, to: f64| {
         let start = beats.partition_point(|b| b.time_ms as f64 <= from);
         let end = beats.partition_point(|b| b.time_ms as f64 <= to);
@@ -45,14 +61,13 @@ pub fn beat_count_text(
             .min()
     };
     match mode {
-        BeatCount::Position => {
-            let n = between(f64::NEG_INFINITY, pos_ms);
-            Some(tr!("{}.{}BARS", n / 4, n % 4))
+        BeatCount::Position => Some(BeatCountValue::Bars(between(f64::NEG_INFINITY, pos_ms))),
+        BeatCount::NextBars => {
+            next().map(|t| BeatCountValue::Bars(between(pos_ms, t as f64 - 1.0)))
         }
-        BeatCount::NextBars => next()
-            .map(|t| between(pos_ms, t as f64 - 1.0))
-            .map(|n| tr!("{}.{}BARS", n / 4, n % 4)),
-        BeatCount::NextBeats => next().map(|t| tr!("{}BEATS", between(pos_ms, t as f64 - 1.0))),
+        BeatCount::NextBeats => {
+            next().map(|t| BeatCountValue::Beats(between(pos_ms, t as f64 - 1.0)))
+        }
     }
 }
 
@@ -134,8 +149,14 @@ pub fn render_strip(
         start_ms,
         px_per_ms,
     };
+    // Include off-screen anchors whose bold outlines still touch the viewport; beats are time-ordered.
+    let first = a.beats.partition_point(|b| axis.col(b.time_ms as f64) < -4);
+    let last = a
+        .beats
+        .partition_point(|b| axis.col(b.time_ms as f64) < w as i64 + 2);
+    let beats = &a.beats[first..last];
     if view.beat_grid == BeatGrid::Normal {
-        for b in &a.beats {
+        for b in beats {
             let rgb = if b.bar_pos == 1 {
                 [230, 40, 40] // Theme.wave-bar
             } else if grid_edit {
@@ -150,7 +171,7 @@ pub fn render_strip(
         wave.draw(&mut c, &axis, true);
     }
     if view.beat_grid == BeatGrid::Bold {
-        for b in &a.beats {
+        for b in beats {
             c.bold_grid(axis.col(b.time_ms as f64), b.bar_pos == 1);
         }
     }
@@ -194,10 +215,12 @@ pub fn render_strip(
         2
     } + 2 * usize::from(large);
     for cue in &a.cues {
-        let (x, rgb) = (
-            axis.col(cue.time_ms as f64),
-            hot_cue_rgb(view.hot_cue_colors, cue),
-        );
+        let x = axis.col(cue.time_ms as f64);
+        // Large flags reach 16 px right; widened memory bars also reach left of their anchor.
+        if x < -16 || x >= w as i64 + 4 {
+            continue;
+        }
+        let rgb = hot_cue_rgb(view.hot_cue_colors, cue);
         if cue.hot_cue == 0 {
             c.memory_cue(x, memory_w, rgb, (h >= 40).then_some(box_y), large);
             continue;
@@ -250,7 +273,9 @@ mod tests {
                 (BeatCount::NextBeats, count),
             ] {
                 assert_eq!(
-                    beat_count_text(mode, &beats, &cues, pos).as_deref(),
+                    beat_count_value(mode, &beats, &cues, pos)
+                        .map(BeatCountValue::text)
+                        .as_deref(),
                     expected,
                     "position {pos}"
                 );
@@ -261,11 +286,32 @@ mod tests {
             (BeatCount::NextBars, Some("0.0BARS")),
             (BeatCount::NextBeats, Some("0BEATS")),
         ] {
-            assert_eq!(beat_count_text(mode, &[], &cues, 0.0).as_deref(), expected);
+            assert_eq!(
+                beat_count_value(mode, &[], &cues, 0.0)
+                    .map(BeatCountValue::text)
+                    .as_deref(),
+                expected
+            );
         }
         for mode in [BeatCount::NextBars, BeatCount::NextBeats] {
-            assert_eq!(beat_count_text(mode, &beats, &[], 0.0), None);
+            assert_eq!(beat_count_value(mode, &beats, &[], 0.0), None);
         }
+        assert_eq!(
+            beat_count_value(BeatCount::Position, &beats, &cues, 1000.0),
+            Some(BeatCountValue::Bars(4))
+        );
+        assert_eq!(
+            beat_count_value(BeatCount::Position, &beats, &cues, 1499.5),
+            Some(BeatCountValue::Bars(4))
+        );
+        assert_eq!(
+            beat_count_value(BeatCount::NextBars, &beats, &cues, 1000.0),
+            Some(BeatCountValue::Bars(0))
+        );
+        assert_eq!(
+            beat_count_value(BeatCount::NextBeats, &beats, &cues, 1000.0),
+            Some(BeatCountValue::Beats(0))
+        );
     }
 
     #[test]

@@ -1,6 +1,6 @@
 //! Removable devices (USB sticks, SD cards) a library plugin can work with, and what is done with them (base): finding the mounted
 //! ones with their file system, free space and the plugin that handles them ([`scan`]), opening the library on one read-only
-//! ([`open_library`]).
+//! ([`open_library`]), and knowing when to look again ([`watch`]).
 //!
 //! Detection is the OS's own, one child each (`os`): Linux (`linux`) reads `/proc/self/mountinfo` (a mount counts as a device when
 //! it is under `/run/media` or `/media` or its disk is removable or on USB), Windows (`windows`) lists the removable drive
@@ -30,6 +30,7 @@ pub mod sync;
 pub mod transfer;
 pub mod undo;
 pub mod update;
+pub mod watch;
 
 #[cfg_attr(target_os = "linux", path = "linux.rs")]
 #[cfg_attr(target_os = "macos", path = "macos.rs")]
@@ -111,6 +112,9 @@ pub struct Device {
     pub kind: Kind,
     pub support: Support,
     pub read_only: bool,
+    /// Whether the disk sits behind a USB hub (Linux knows from sysfs; `false` elsewhere): a hub that resets its links
+    /// makes long writes fail with input/output errors.
+    pub via_hub: bool,
     /// Bytes; 0 while unknown.
     pub total: u64,
     pub free: u64,
@@ -139,6 +143,7 @@ impl Device {
             kind,
             support,
             read_only: false,
+            via_hub: false,
             total: 0,
             free: 0,
             provider: None,
@@ -146,6 +151,22 @@ impl Device {
             formats: Vec::new(),
             mount,
         }
+    }
+
+    /// Whether this is a plain folder ([`folder`]), not a mounted device.
+    pub fn is_folder(&self) -> bool {
+        self.id.starts_with(FOLDER)
+    }
+
+    /// Asks the plugins what they find and can write here: [`Self::formats`], the provider and its answer.
+    fn probe(&mut self) {
+        self.formats = probe(&self.mount);
+        (self.provider, self.info) = self
+            .formats
+            .first()
+            .map_or((None, DeviceInfo::default()), |(p, i)| {
+                (Some(p.clone()), i.clone())
+            });
     }
 
     /// The plugin that handles this device.
@@ -169,20 +190,15 @@ impl Device {
             .then_some(u64::from(u32::MAX))
     }
 
-    /// The formats an export writes when the user picked none for this device: those whose library is on it, else all (a blank
-    /// device gets every format: it then works with any software).
+    /// The formats an export writes until the user switches one: every format on a blank device (it then works with any
+    /// software); on a device holding libraries, those formats plus rekordbox (built in, read by most players).
     pub fn default_formats(&self) -> Vec<String> {
-        let held: Vec<String> = self
-            .formats
+        let blank = self.formats.iter().all(|(_, i)| i.libraries.is_empty());
+        self.formats
             .iter()
-            .filter(|(_, i)| !i.libraries.is_empty())
+            .filter(|(n, i)| blank || !i.libraries.is_empty() || n == REKORDBOX)
             .map(|(n, _)| n.clone())
-            .collect();
-        if held.is_empty() {
-            self.formats.iter().map(|(n, _)| n.clone()).collect()
-        } else {
-            held
-        }
+            .collect()
     }
 
     /// The name shown for the format of `plugin` here: what its plugin calls it, else the plugin name in capitals
@@ -317,7 +333,7 @@ pub fn forget(path: &Path) {
 }
 
 /// The devices mounted right now, by mount path, with file system, space, the plugin that handles them and what it found.
-// ponytail: the app polls this every second and compares ids; udev / udisks D-Bus signals would avoid the poll, but need a bus crate.
+/// The app calls it when [`watch::Watch`] says the mounts changed (Linux) or every second (elsewhere), and compares ids.
 pub fn scan() -> Vec<Device> {
     let mut v = os::mounted();
     v.extend(pretend_devices(OsStr::new(
@@ -327,15 +343,33 @@ pub fn scan() -> Vec<Device> {
         if let Some((total, free)) = space(&d.mount) {
             (d.total, d.free) = (total, free);
         }
-        d.formats = probe(&d.mount);
-        (d.provider, d.info) = d
-            .formats
-            .first()
-            .map_or((None, DeviceInfo::default()), |(p, i)| {
-                (Some(p.clone()), i.clone())
-            });
+        d.probe();
     }
     v
+}
+
+/// The plugin of the built-in rekordbox device format.
+const REKORDBOX: &str = "rekordbox-device";
+
+/// Id prefix of a plain folder taken as a device ([`folder`]).
+const FOLDER: &str = "folder:";
+
+/// A plain folder as an export target (EXPORT > OR A FOLDER): probed like a device; its id is `folder:<path>`, its label the
+/// path, its file system unknown (no file size limit).
+pub fn folder(path: &Path) -> Device {
+    let mut d = Device::new(
+        format!("{FOLDER}{}", path.display()),
+        path.to_owned(),
+        String::new(),
+        Kind::Usb,
+        Support::Ok,
+    );
+    d.label = path.display().to_string();
+    if let Some((total, free)) = space(path) {
+        (d.total, d.free) = (total, free);
+    }
+    d.probe();
+    d
 }
 
 /// `OPENFADER_DEVICE_ROOTS=<dir>[:<dir>…]` (`;` on Windows): every existing folder listed counts as a mounted FAT32 USB stick
@@ -408,6 +442,26 @@ mod tests {
         let v = pretend_devices(&spec);
         assert_eq!(v.len(), 1);
         assert!(v[0].writable() && v[0].fs == "vfat" && v[0].mount == dir);
+    }
+
+    #[test]
+    fn default_formats_are_all_on_blank_else_held_plus_rekordbox() {
+        let mut d = Device::new(
+            "a".into(),
+            "/tmp/usb".into(),
+            "vfat".into(),
+            Kind::Usb,
+            Support::Ok,
+        );
+        d.formats = ["engine-dj", REKORDBOX, "serato", "traktor", "virtualdj"]
+            .into_iter()
+            .map(|name| (name.to_owned(), DeviceInfo::default()))
+            .collect();
+        assert_eq!(d.default_formats().len(), 5);
+        d.formats[0].1.libraries.push("Engine Library".into());
+        assert_eq!(d.default_formats(), ["engine-dj", REKORDBOX]);
+        d.formats[2].1.libraries.push("Serato".into());
+        assert_eq!(d.default_formats(), ["engine-dj", REKORDBOX, "serato"]);
     }
 
     #[test]

@@ -403,6 +403,9 @@ mod tests {
                 ..Analysis::default()
             })
         }
+        fn analysis_reader(&self) -> Option<crate::library::AnalysisReader> {
+            Some(std::sync::Arc::new(|t| Source(Vec::new()).analysis(t)))
+        }
     }
 
     #[test]

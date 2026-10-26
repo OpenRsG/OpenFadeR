@@ -1,7 +1,7 @@
 //! Our own persistent store (base): the edits to the collection (cues, loops, beat grids, ratings, comments,
 //! track colours, tags, user playlists and the play history), reproduced in a plain SQLite file `store.db` under
-//! [`paths::data_dir`]. The user's library sources (the library database, USB, XML) are never written; the store is overlaid on what
-//! they load, and the store wins.
+//! [`paths::data_dir`], with OpenFadeR's own schema and migrations. The store overlays loaded library data and wins.
+//! External schemas stay in compatibility adapters; export, device edits and cue-sync writeback use their supported operations.
 //!
 //! Track identity ([`key`]): `t<id>`, `id` the track's row in `collection` ([`Track::id`]): our own Collection is the
 //! library and every track in it has one, so the identity survives a move, a rename or a new file. A track without an id
@@ -55,7 +55,7 @@ pub use device::{DeviceBackup, NewBackup};
 pub use gain::{TrackGain, effective_db};
 pub use inbox::{Batch, Move, Role, Stage};
 pub use node::{Node, NodeKind};
-pub use overlay::{Overlay, apply, overlay};
+pub use overlay::{Overlay, apply, overlay, with_edits};
 pub use saved_search::SavedSearch;
 pub use sequence::{MAX_SEQUENCES, Sequence};
 pub use tag::{Tag, TagGroup};
@@ -236,8 +236,11 @@ pub struct Store {
     /// Counts the row changes of the `collection` table whoever makes them (SQLite's update hook): what [`Store::collection_generation`]
     /// reports and the `cache` compares.
     collection_changes: Arc<AtomicU64>,
+    cue_changes: AtomicU64,
     /// The track list and the file-name index of the Collection, each as of a [`Store::collection_generation`].
     cache: Mutex<collection::Cache>,
+    /// The Collection with the text and rating edits on ([`Store::collection_edited`]). Lock order: before `db`.
+    edited: Mutex<Option<overlay::EditedList>>,
 }
 
 /// SQLite errors as the `String`s the rest of the core uses.
@@ -374,10 +377,19 @@ impl Store {
         migrate(&mut conn)?;
         rekey::backfill(&mut conn)?;
         journal::install(&conn)?;
+        let cue_changes = scalar::<i64>(
+            &conn,
+            "SELECT COALESCE(MAX(CAST(value AS INTEGER)), 0) FROM device_setting WHERE scope = 'cue_revision'",
+            [],
+        )?.unwrap_or(0);
+        let cue_changes =
+            u64::try_from(cue_changes).map_err(|_| "negative cue revision in store".to_owned())?;
         Ok(Self {
             db: Mutex::new(conn),
             collection_changes,
+            cue_changes: AtomicU64::new(cue_changes),
             cache: Mutex::default(),
+            edited: Mutex::default(),
         })
     }
 
@@ -410,7 +422,12 @@ impl Store {
 }
 
 /// Applies every migration the file has not seen; refuses a store newer than this build.
-fn migrate(conn: &mut Connection) -> R<()> {
+fn migrate(db: &mut Connection) -> R<()> {
+    // The version check and guarded ALTERs share one write lock across app/CLI processes.
+    let tx = db
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        .s()?;
+    let conn = &tx;
     let have: usize = conn
         .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
         .s()? as usize;
@@ -421,10 +438,8 @@ fn migrate(conn: &mut Connection) -> R<()> {
         ));
     }
     for (i, sql) in MIGRATIONS.iter().enumerate().skip(have) {
-        let tx = conn.transaction().s()?;
-        tx.execute_batch(sql).s()?;
-        tx.pragma_update(None, "user_version", i as i64 + 1).s()?;
-        tx.commit().s()?;
+        conn.execute_batch(sql).s()?;
+        conn.pragma_update(None, "user_version", i as i64 + 1).s()?;
     }
     // Columns SQL cannot guard: added here when missing, so a re-run of their migration keeps them (v19 `collection.stage`, v21
     // `device_backup.auto`).
@@ -448,6 +463,13 @@ fn migrate(conn: &mut Connection) -> R<()> {
         conn.execute_batch("ALTER TABLE device_backup ADD COLUMN auto INTEGER NOT NULL DEFAULT 0;")
             .s()?;
     }
+    tx.commit().s()?;
+    // The rows [`rekey::backfill`] looks for at every start, found without reading the whole table (3 ms at 50k tracks, the
+    // whole file from disk when it is not cached). Not a schema version: an older build opens the store with it as well; a
+    // store that cannot take it (read-only) only reads slower.
+    let _ = db.execute_batch(
+        "CREATE INDEX IF NOT EXISTS collection_unstamped ON collection(id) WHERE added_at = 0 OR size = 0;",
+    );
     Ok(())
 }
 
@@ -572,6 +594,44 @@ mod tests {
             .unwrap();
         drop(c);
         assert!(Store::open_at(&path).err().unwrap().contains("newer"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn concurrent_openers_finish_guarded_columns_without_losing_edits() {
+        let dir =
+            std::env::temp_dir().join(format!("openfader-store-concurrent-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("s.db");
+        let conn = Connection::open(&path).unwrap();
+        conn.pragma_update(None, "journal_mode", "WAL").unwrap();
+        for sql in MIGRATIONS {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", MIGRATIONS.len() as i64)
+            .unwrap();
+        conn.execute("INSERT INTO track(key, rating) VALUES ('kept', 4)", [])
+            .unwrap();
+        drop(conn);
+        let start = Arc::new(std::sync::Barrier::new(8));
+        let workers: Vec<_> = (0..8)
+            .map(|_| {
+                let (path, start) = (path.clone(), start.clone());
+                std::thread::spawn(move || {
+                    let mut conn = Connection::open(path).unwrap();
+                    conn.busy_timeout(std::time::Duration::from_secs(5))
+                        .unwrap();
+                    start.wait();
+                    migrate(&mut conn)
+                })
+            })
+            .collect();
+        for worker in workers {
+            worker.join().unwrap().unwrap();
+        }
+        let store = Store::open_at(&path).unwrap();
+        assert_eq!(store.edits("kept").unwrap().rating, Some(4));
+        drop(store);
         std::fs::remove_dir_all(dir).unwrap();
     }
 

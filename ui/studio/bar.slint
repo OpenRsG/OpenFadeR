@@ -10,6 +10,7 @@ import { LightingState } from "../lighting.slint";
 import { VideoState } from "../video.slint";
 import { StudioState } from "../studio-state.slint";
 import { Caption } from "parts.slint";
+import { ResourceChip } from "../resources.slint";
 
 /// The top bar: the mode buttons (PERFORM is this workspace; the others open their own full-window views), the logo in the middle, and
 /// on the right the master meter, REC, the controller and device buttons, the clock and the gear that opens PREFERENCES.
@@ -42,7 +43,19 @@ export component StudioBar inherits Rectangle {
             if LightingState.enabled: Chip { text: @tr("LIGHTING"); width: max(64px, self.fit-width); horizontal-stretch: 0; tooltip: @tr("Open this mode"); clicked => { root.set-mode(3); } }
             if VideoState.enabled: Chip { text: @tr("VIDEO"); width: max(64px, self.fit-width); horizontal-stretch: 0; tooltip: @tr("Open this mode"); clicked => { root.set-mode(4); } }
         }
-        Rectangle { horizontal-stretch: 1; }
+        brand-space := Rectangle {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            clip: true;
+            HorizontalLayout {
+                x: Math.clamp((root.width - self.width) / 2 - brand-space.absolute-position.x, 0px, max(0px, brand-space.width - self.width));
+                width: self.preferred-width;
+                padding: Theme.space-sm;
+                spacing: Theme.space-md;
+                Image { source: @image-url("../../assets/icon.png"); width: root.height - 14px; height: self.width; y: 3px; horizontal-stretch: 0; image-fit: contain; }
+                Text { text: "OpenFadeR"; vertical-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-xl; font-weight: Theme.weight-bold; }
+            }
+        }
         Caption { text: @tr("MASTER"); width: 50px; horizontal-stretch: 0; horizontal-alignment: right; }
         Rectangle {
             width: 120px;
@@ -72,13 +85,6 @@ export component StudioBar inherits Rectangle {
             font-weight: Theme.weight-bold;
         }
         IconButton { icon: Icon.gear; icon-size: 18px; solid: true; tooltip: @tr("PREFERENCES"); clicked => { PrefsState.visible = true; } }
-    }
-    HorizontalLayout {
-        x: (root.width - self.width) / 2;
-        width: self.preferred-width;
-        padding: Theme.space-sm;
-        spacing: Theme.space-md;
-        Image { source: @image-url("../../assets/icon.png"); width: root.height - 14px; height: self.width; y: 3px; horizontal-stretch: 0; image-fit: contain; }
-        Text { text: "OpenFadeR"; vertical-alignment: center; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-xl; font-weight: Theme.weight-bold; }
+        ResourceChip {}
     }
 }

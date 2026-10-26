@@ -26,7 +26,7 @@ component FormatChips inherits FormRow {
 /// copied and analysed, tracks it has are refreshed, same-named playlists replaced, everything else stays).
 export component ExportPage inherits VerticalLayout {
     spacing: Theme.space-lg;
-    Note { text: @tr("Writes the library, its analysis and the audio in every format that is on: several formats share one copy of each track, so the device works with any software. A library already on the device is extended, never wiped."); vertical-stretch: 0; }
+    Note { text: @tr("Writes the library, analysis and audio in the enabled formats. Audio is shared where possible; Serato may need a separate tagged copy. Existing libraries are extended, never wiped."); vertical-stretch: 0; }
     FormRow {
         label: @tr("DEVICE");
         vertical-stretch: 0;
@@ -39,12 +39,14 @@ export component ExportPage inherits VerticalLayout {
             chose(i) => { DeviceState.select(i); }
         }
     }
-    if DeviceState.folder == "" && DeviceState.formats.length > 0: FormatChips {}
     FormRow {
         label: @tr("OR A FOLDER");
         vertical-stretch: 0;
-        TextField { text <=> DeviceState.folder; placeholder-text: @tr("any folder, e.g. a mounted share"); horizontal-stretch: 1; }
+        TextField { text <=> DeviceState.folder; placeholder-text: @tr("any folder, e.g. a mounted share"); horizontal-stretch: 1; edited => { DeviceState.folder-edited(); } }
     }
+    if DeviceState.folder != "": Note { text: @tr("The folder is written, not the device above. Clear it to export to the device."); vertical-stretch: 0; }
+    // The formats of the target: the folder's when one is typed, else the device's.
+    if DeviceState.formats.length > 0: FormatChips {}
     HorizontalLayout {
         spacing: Theme.space-sm;
         vertical-stretch: 0;

@@ -22,7 +22,7 @@ const COUNTDOWN_LAPS: f64 = 5.0;
 /// What the per-tick code reads of the settings (a copy, so a tick does not clone the whole settings).
 #[derive(Clone, Copy)]
 pub(super) struct Opts {
-    countdown: bool,
+    pub(super) countdown: bool,
     sync_rate: bool,
     half_double: bool,
     pub(super) stems: bool,
@@ -62,7 +62,7 @@ pub(super) fn jog_angle(ms: f64) -> f32 {
 }
 
 /// Laps from `pos` ms to the nearest hot cue ahead of it; `None` when there is none within [`COUNTDOWN_LAPS`].
-fn laps_to_hot_cue(cues: &[Cue], pos: f64) -> Option<f32> {
+pub(super) fn laps_to_hot_cue(cues: &[Cue], pos: f64) -> Option<f32> {
     let ahead = cues
         .iter()
         .filter(|c| c.hot_cue > 0 && f64::from(c.time_ms) > pos)
@@ -109,16 +109,17 @@ pub(super) fn wire_view(app: &App, decks: &Decks) {
     prefs::on_change(apply);
 }
 
-/// Position in the 4-beat bar, 0..1 (beat `bar_pos` of the nearest grid beat plus the fraction).
+/// Position in the bar (the grid's beats per bar), 0..1 (beat `bar_pos` of the nearest grid beat plus the fraction).
 fn bar_phase(beats: &[Beat], ms: f64) -> Option<f64> {
     let b = beat_at(beats, ms)?;
     let i = (b.floor().max(0.0) as usize).min(beats.len() - 1);
-    Some((f64::from(beats[i].bar_pos.clamp(1, 4) - 1) + b - i as f64).rem_euclid(4.0) / 4.0)
+    let per = f64::from(super::grid::per_bar(beats));
+    Some((f64::from(beats[i].bar_pos.clamp(1, per as u16) - 1) + b - i as f64).rem_euclid(per) / per)
 }
 
-/// This deck's bar phase against the reference's, in beats, the short way round (−2..2; positive = ahead).
-pub(super) fn phase_offset(own: f64, reference: f64) -> f64 {
-    ((own - reference) * 4.0 + 2.0).rem_euclid(4.0) - 2.0
+/// This deck's bar phase against the reference's, in beats of a `per`-beat bar, the short way round (±`per`/2; positive = ahead).
+pub(super) fn phase_offset(own: f64, reference: f64, per: f64) -> f64 {
+    ((own - reference) * per + per / 2.0).rem_euclid(per) - per / 2.0
 }
 
 impl Deck {
@@ -168,7 +169,10 @@ impl Deck {
             (self.overview_size.get().0 * scale).round() as usize,
             (self.overview_size.get().1 * scale).round() as usize,
         );
-        let mut dirty = frame::tick_scroll(playing) && self.scroll(&app, &mut l, pos);
+        if frame::tick_scroll(playing) {
+            self.scroll(&app, &mut l, pos);
+        }
+        let mut dirty = false;
         let mut v = self.view.borrow_mut();
         if v.playing != playing {
             let track = l.track.as_ref().map(openfader::plugin::source::track_json);
@@ -204,47 +208,21 @@ impl Deck {
             dirty = true;
         }
         let cue_angle = jog_angle(f64::from(l.cue_ms));
-        let laps = opts
-            .countdown
-            .then(|| laps_to_hot_cue(&l.analysis.cues, pos))
-            .flatten()
-            .unwrap_or(-1.0);
         let rate = if opts.sync_rate {
             self.sync_rate(&l.analysis.beats, pos, opts.half_double)
         } else {
             ""
         };
         if (v.jog_cue - cue_angle).abs() > 0.01
-            || (v.jog_laps - laps).abs() > 0.003
             || v.jog_countdown != opts.countdown
             || v.sync_rate.as_str() != rate
         {
-            (v.jog_cue, v.jog_laps, v.jog_countdown) = (cue_angle, laps, opts.countdown);
+            (v.jog_cue, v.jog_countdown) = (cue_angle, opts.countdown);
             v.sync_rate = rate.into();
             dirty = true;
         }
-        let slip = self
-            .with_player(|p| p.slip_position())
-            .flatten()
-            .map(|s| s * 1000.0);
         if osize.0 > 0 && osize.1 > 0 {
-            let gpu = render::backend::gpu();
-            let x = if gpu {
-                0
-            } else {
-                render::overview::playhead_x(osize.0, pos, l.duration_ms)
-            };
-            let okey = (
-                x,
-                osize,
-                if gpu {
-                    None
-                } else {
-                    slip.map(|s| render::overview::playhead_x(osize.0, s, l.duration_ms))
-                },
-                l.cue_ms,
-                gpu,
-            );
+            let okey = (osize, l.cue_ms);
             if l.overview_key != Some(okey) {
                 let base = match l.overview_base.take().filter(|c| (c.w, c.h) == osize) {
                     Some(base) => base,
@@ -265,27 +243,26 @@ impl Deck {
                         )
                     }
                 };
-                if gpu {
-                    (v.overview, v.overview_head, v.overview_ghost) =
-                        render::overview::composed(&base, l.cue_ms, l.duration_ms);
-                } else {
-                    v.overview =
-                        render::overview::with_playhead(&base, pos, l.cue_ms, slip, l.duration_ms);
-                }
+                let (overview, head, ghost) =
+                    render::overview::composed(&base, l.cue_ms, l.duration_ms);
+                v.overview_head = head;
+                v.overview_ghost = ghost;
+                dirty = true;
+                self.set_live(|r| r.overview = overview);
                 l.overview_base = Some(base);
                 l.overview_key = Some(okey);
-                dirty = true;
             }
         }
         let tenths = pos as u32 / 100;
         if l.time_key != Some(tenths) {
             let (ms, duration) = (pos as u32, l.duration_ms);
             let elapsed = fmt_ms(ms);
-            v.time_text = format!("{elapsed} / {}", fmt_ms(duration)).into();
-            v.remain_text = format!("-{}", fmt_ms(duration.saturating_sub(ms))).into();
-            v.elapsed_text = elapsed.into();
+            self.set_live(|r| {
+                r.time_text = format!("{elapsed} / {}", fmt_ms(duration)).into();
+                r.remain_text = format!("-{}", fmt_ms(duration.saturating_sub(ms))).into();
+                r.elapsed_text = elapsed.into();
+            });
             l.time_key = Some(tenths);
-            dirty = true;
         }
         if dirty {
             let snapshot = v.clone();
@@ -320,11 +297,21 @@ mod tests {
 
     #[test]
     fn offset_takes_the_short_way_round_the_bar() {
-        assert_eq!(phase_offset(0.5, 0.5), 0.0);
-        assert!((phase_offset(0.30, 0.25) - 0.2).abs() < 1e-9); // 0.2 beat ahead
-        assert!((phase_offset(0.05, 0.95) - 0.4).abs() < 1e-9); // across the bar line
-        assert!((phase_offset(0.95, 0.05) + 0.4).abs() < 1e-9);
-        assert!((phase_offset(0.75, 0.25).abs() - 2.0).abs() < 1e-9); // half a bar apart
+        assert_eq!(phase_offset(0.5, 0.5, 4.0), 0.0);
+        assert!((phase_offset(0.30, 0.25, 4.0) - 0.2).abs() < 1e-9); // 0.2 beat ahead
+        assert!((phase_offset(0.05, 0.95, 4.0) - 0.4).abs() < 1e-9); // across the bar line
+        assert!((phase_offset(0.95, 0.05, 4.0) + 0.4).abs() < 1e-9);
+        assert!((phase_offset(0.75, 0.25, 4.0).abs() - 2.0).abs() < 1e-9); // half a bar apart
+        assert!((phase_offset(0.05, 0.95, 3.0) - 0.3).abs() < 1e-9); // a 3-beat bar
+    }
+
+    #[test]
+    fn bar_phase_wraps_at_the_bar_length() {
+        let g: Vec<Beat> = (0..9)
+            .map(|i| Beat { bar_pos: (i % 3 + 1) as u16, ..grid()[i as usize] })
+            .collect();
+        assert!((bar_phase(&g, 1500.0).unwrap()).abs() < 1e-9); // beat 4 = bar 2's first
+        assert!((bar_phase(&g, 1000.0).unwrap() - 2.0 / 3.0).abs() < 1e-9);
     }
 
     fn cue(hot_cue: u16, time_ms: u32) -> Cue {

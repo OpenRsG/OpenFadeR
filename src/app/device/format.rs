@@ -4,12 +4,11 @@
 //! run again by [`format::format`]); the dialog shows what they refuse and nothing is erased until they pass. This file only
 //! turns their answers into text: cause, consequence, action.
 
-use super::{backup, show_panel, App, Ctx, DeviceState, BUSY};
+use super::{App, BUSY, Ctx, DeviceState, backup};
 use openfader::{
     device::{
-        self,
+        self, Device, Kind,
         format::{self, Disk, Done, Error, Fs, Request, Spec, Step, Volume},
-        Device, Kind,
     },
     plugin::device::Feature,
 };
@@ -267,17 +266,7 @@ fn start(cx: &Rc<Ctx>, dev: Device, spec: Spec, typed: String, seen: Vec<String>
             let Some(done) = kept.lock().unwrap().take().filter(|_| r.is_ok()) else {
                 return;
             };
-            // The new volume is mounted by now: look again and show it.
-            cx.refresh_devices();
-            let id = cx
-                .devices
-                .borrow()
-                .iter()
-                .find(|d| d.source == done.source)
-                .map(|d| d.id.clone());
-            if let (Some(id), Some(app)) = (id, cx.app()) {
-                show_panel(&app, &id);
-            }
+            cx.select_after_scan(done.source);
         },
     );
 }

@@ -60,6 +60,21 @@ impl Clock {
         }
     }
 
+    /// A new hardware stream must not extrapolate anchors queued by the old one.
+    pub(super) fn freeze(&mut self, pos: f64) {
+        self.push(
+            Anchor {
+                at: Instant::now(),
+                pos,
+                latency: Duration::ZERO,
+                fps: 0.0,
+                lp: None,
+            },
+            false,
+            true,
+        );
+    }
+
     /// Output latency (ms) of the newest recorded buffer; 0 before the first.
     pub(super) fn latency_ms(&self) -> f64 {
         self.anchors
@@ -70,12 +85,19 @@ impl Clock {
 
 /// Source-frame position audible at `now`, clamped to `0..=frames`; frozen at the last anchor when paused.
 pub(super) fn heard_frames(c: &Clock, now: Instant, frames: f64) -> f64 {
-    let Some(last) = c.anchors.back() else { return 0.0 };
+    let Some(last) = c.anchors.back() else {
+        return 0.0;
+    };
     if !c.playing {
         return last.pos.min(frames);
     }
     // Seconds since the anchor's first frame became audible (negative before that).
-    let dt = |a: &Anchor| now.saturating_duration_since(a.at).min(MAX_EXTRAPOLATE).as_secs_f64() - a.latency.as_secs_f64();
+    let dt = |a: &Anchor| {
+        now.saturating_duration_since(a.at)
+            .min(MAX_EXTRAPOLATE)
+            .as_secs_f64()
+            - a.latency.as_secs_f64()
+    };
     let h = match c.anchors.iter().rev().find(|a| a.at + a.latency <= now) {
         Some(a) => advance(a.pos, dt(a).max(0.0) * a.fps, a.lp),
         // Nothing audible yet: run the oldest backwards in time, not past where this run started.
@@ -96,8 +118,8 @@ pub(super) fn audible(c: &Clock, now: Instant) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::step;
+    use super::*;
 
     const SRC: f64 = 44100.0;
     const DEV: u32 = 48000;
@@ -264,5 +286,40 @@ mod tests {
             assert_eq!(heard_frames(&c, t0 + MS(ms), 1e9), 12345.0);
         }
         assert_eq!(heard_frames(&c, t0, 100.0), 100.0);
+    }
+
+    #[test]
+    fn reconnect_discards_the_old_hardware_epoch() {
+        let (t0, mut c) = (Instant::now(), clock());
+        c.push(
+            Anchor {
+                at: t0,
+                pos: 1000.0,
+                latency: MS(40),
+                fps: SRC,
+                lp: None,
+            },
+            true,
+            true,
+        );
+        c.freeze(2000.0);
+        assert_eq!(c.latency_ms(), 0.0);
+        assert_eq!(heard_frames(&c, t0 + MS(5000), 1e9), 2000.0);
+        let reset = !c.playing;
+        let resumed = t0 + MS(6000);
+        c.push(
+            Anchor {
+                at: resumed,
+                pos: 2000.0,
+                latency: MS(30),
+                fps: SRC,
+                lp: None,
+            },
+            true,
+            reset,
+        );
+        assert_eq!(heard_frames(&c, resumed + MS(10), 1e9), 2000.0);
+        assert!(!audible(&c, resumed + MS(10)));
+        assert_eq!(heard_frames(&c, resumed + MS(40), 1e9), 2000.0 + SRC * 0.01);
     }
 }

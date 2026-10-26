@@ -11,10 +11,11 @@ scp dist/pi/openfader-*-linux-aarch64-pi.tar.gz pi@raspberrypi.local:
 tar xzf openfader-*-linux-aarch64-pi.tar.gz && ./openfader-*-linux-aarch64-pi/openfader
 ```
 
-The archive holds the same plugins, themes and controller mappings as a release archive. The build takes the companion
-repositories from GitHub (`--build-arg PLUGINS_REF=…`, `THEMES_REF`, `MAPPINGS_REF` pick a branch or tag); checkouts already
-present in `extension/plugin`, `extension/skin` or `mappings` are used as they are. The cargo registry and the target folders stay in
-BuildKit cache mounts, so the next build only recompiles what changed.
+The archive holds the same plugins, themes and controller mappings as a release archive. Core 0.2.7 builds the companion
+OpenFadeR-Plugins tag `v0.2.8`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
+pick the other companions' branch or tag). Checkouts already present in `extension/plugin`, `extension/skin` or `mappings`
+are used as they are, so switch an older plugin checkout to the matching tag first. The cargo registry and target folders stay
+in BuildKit cache mounts, so the next build only recompiles what changed.
 
 To build on the Pi itself, with the menu entry and the `openfader` command, run `./install.sh` from a checkout. On ARM Linux it
 builds without the GPU STEMS engine; a plain `cargo build` needs `--no-default-features --features app` there.
@@ -28,8 +29,9 @@ extra software.
 
 - Profile `pi` (`Cargo.toml`): the `dist` profile with whole-program LTO and no symbol table (an 82 MB program instead of 104 MB).
 - `-C target-cpu=cortex-a53`: the Pi 3's core. The code also runs on the Pi 4 / CM4 (Cortex-A72) and the Pi 5 (Cortex-A76). To build for one of those only, pass `--build-arg TARGET_CPU=cortex-a72` or `cortex-a76`.
-- `--no-default-features --features app`: STEMS separates on the CPU. ONNX Runtime has no WebGPU build for ARM Linux; its
-  ARM build is also why the program needs Debian 13 (glibc 2.38, GCC 14's C++ library).
+- `--no-default-features --features app`: STEMS separates on the CPU. `app` still enables the `compatibility` feature and
+  its built-in format adapters. ONNX Runtime has no WebGPU build for ARM Linux; its ARM build is also why the program needs
+  Debian 13 (glibc 2.38, GCC 14's C++ library).
 
 ## Memory
 
@@ -50,8 +52,9 @@ tight, start it with the software renderer:
 SLINT_BACKEND=winit-software ./openfader
 ```
 
-STEMS stays off unless you switch it on: its model is 316 MB and separating takes about 0.8 GB more, so it is for a 4 GB Pi or
-larger.
+These baseline figures exclude STEMS. Its 316 MB model and operator scratch still need substantial temporary RAM:
+a 4 GB Pi or larger remains the conservative recommendation for full-quality separation. Model sessions now release
+as soon as the last active batch ends; loaded 16-bit tracks and completed stems remain available for immediate cue/scratch.
 
 ## Speed
 
@@ -62,6 +65,28 @@ the CPU waveform fallback. GPU explicitly permits emulated GL for diagnosis; it 
 the window has no graphics API (for example `winit-software`). This setting does not replace the window's renderer.
 If the log says llvmpipe on a Pi, fix the graphics driver or use `SLINT_BACKEND=winit-software`; forcing GPU does
 not turn an emulated renderer into hardware.
+Both paths reuse cached waveform strips and static overviews; moving markers do not copy the full overview.
+If default graphics startup fails, the app retries once with the native software renderer. Window creation has a
+two-second deadline; an unusually slow driver may therefore fall back to CPU. An explicit `SLINT_BACKEND` remains explicit.
+
+## Low-power mode
+
+PREFS > ADVANCED > OTHERS > LOW-POWER MODE is AUTO (default), ON or OFF; its hint shows the effective mode. AUTO counts
+Raspberry Pi boards and machines with at most 8 GiB of effective RAM, on every supported desktop OS. Linux cgroup v2
+limits count towards that budget. While it is on:
+
+- a sampler slot keeps at most 10 s instead of 30 s (16 slots at 48 kHz stereo f32: 60 MB instead of 180 MB);
+- the analysis pool runs at most 2 workers; the loading pool is sized to 2 workers at its first load;
+- only one uncached stem-inference batch runs at a time, with at most 2 CPU threads and no simultaneous CPU/GPU scratch.
+  A usable GPU runs first; failure falls back to CPU. The Pi build uses the CPU provider.
+
+An x86_64 software-renderer smoke with full-quality CPU stems, two generated three-minute 24 kHz tracks and a third
+replacement load stayed within a real 2 GiB cgroup with swap disabled: 1.37 GiB peak RSS and 1.76 GiB peak cgroup charge
+(including file cache), with no OOM/limit events. Retained tracks/stems settled near 352 MiB RSS. Sustained playback,
+output-server loss/restart, cue, pause and play were checked against captured PCM. These are not Pi performance figures
+or a guarantee that longer tracks and larger libraries fit the same budget.
+
+Decks, previews and analysis decode to 16-bit on every machine, so that is not part of the mode.
 
 The image-composition path keeps the enlarged strip in a texture and changes its source rectangle, rather than
 moving a three-view-wide item. It also keeps each overview and its cue marker in a texture: the playhead and dashed

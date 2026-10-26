@@ -252,7 +252,7 @@ impl Automix {
                                 pl.seek(pos0 as u32);
                                 pl.play();
                             });
-                            let len = p.bars as f64 * 4.0;
+                            let len = p.beats();
                             let recipe = &super::style::all()[super::style::chosen(run)];
                             let mut fade = super::fade::Fade::new(
                                 recipe.timeline(len),
@@ -298,7 +298,7 @@ impl Automix {
                 let dt = run.clock.elapsed().as_secs_f64();
                 run.clock = std::time::Instant::now();
                 let beat_secs = plan.fade_ms
-                    / (plan.bars as f64 * 4.0)
+                    / plan.beats()
                     / self.decks[out].rate().max(0.001)
                     / 1000.0;
                 let done = run

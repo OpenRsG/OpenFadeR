@@ -8,7 +8,7 @@
 //! re-ranks as more arrives; tracks the index has no analysis for are counted in the status, not guessed.
 
 use super::super::View;
-use super::{Conditions, Item, Links, Mode, max_list, rank};
+use super::{Conditions, Item, Links, Lists, Mode, max_list, rank};
 use crate::app::{App, BrowserState, DeckState, deck, prefs};
 use openfader::{
     analysis::similar::{Profile, Theirs, index},
@@ -61,6 +61,8 @@ pub struct State {
     seen: (String, u64),
     /// Playlist / history company of one anchor (by store key), kept until the anchor changes.
     links: Option<(String, Rc<Links>)>,
+    /// The playlists and histories the company is made from, kept until what they were read from changes.
+    lists: Lists,
     /// Queue the list's tracks again in the index, also the ones that had no features (the mode or the anchor changed).
     retry: bool,
     timer: Timer,
@@ -78,6 +80,7 @@ impl Default for State {
             status: String::new(),
             seen: (String::new(), 0),
             links: None,
+            lists: Lists::default(),
             retry: false,
             timer: Timer::default(),
         }
@@ -135,7 +138,6 @@ impl View {
 
     /// Where the Association mode looks for tracks that sit together: My Playlists, library playlists and histories, the stored
     /// play history and this session's.
-    // ponytail: reads every playlist per new anchor; keep the lists if a library has thousands of them.
     fn link_lists(&self) -> Vec<Vec<String>> {
         let keys = |ts: &[Track]| ts.iter().map(store::key).collect::<Vec<_>>();
         let mut lists: Vec<Vec<String>> = self
@@ -165,7 +167,11 @@ impl View {
                 return l.clone();
             }
         }
-        let l = Rc::new(Links::from_lists(anchor_key, &self.link_lists(), limit));
+        let stamp = (self.store.generation(), self.history.len(), self.lib_playlists.len());
+        let mut lists = std::mem::take(&mut self.suggest.lists);
+        let all = lists.get(stamp, || self.link_lists());
+        self.suggest.lists = lists;
+        let l = Rc::new(Links::from_lists(anchor_key, &all, limit));
         self.suggest.links = Some((id, l.clone()));
         l
     }
@@ -204,7 +210,7 @@ impl View {
         let ix = index();
         let version = ix.version();
         let Some(anchor) = self.suggest_anchor(app) else {
-            self.list = Rc::default();
+            self.list = Arc::default();
             self.suggest.seen = (String::new(), version);
             self.suggest.status = match self.suggest.anchor {
                 Anchor::List => tr!("Track Suggestion: click a track, then press LIST").to_owned(),
@@ -274,7 +280,7 @@ impl View {
         }
         self.suggest.status = status;
         self.suggest.notes = out.picks.iter().map(|p| p.note.clone()).collect();
-        self.list = Rc::new(out.picks.iter().map(|p| self.list[p.at].clone()).collect());
+        self.list = Arc::new(out.picks.iter().map(|p| self.list[p.at].clone()).collect());
     }
 
     /// The status line of the ranked list (`None` when the tab is off).

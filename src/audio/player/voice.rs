@@ -1,7 +1,7 @@
 //! One mixer channel's audio-thread state and [`render`].
 //!
 //! Varispeed: source frames advance by `rate * src_rate / dev_rate` per output frame, so frames
-//! heard per second = `rate * src_rate` (linear interpolation; pitch follows rate). With key lock
+//! heard per second = `rate * src_rate` (windowed-sinc interpolation; pitch follows rate). With key lock
 //! ([`super::super::stretch`]) the output runs at 1:1 pitch while this same `advance` clock still moves at
 //! `rate`; the clock reports the nominal position, the audio is within ~9 ms of it. A key shift
 //! ([`super::super::transport`]) rides the same stretcher at `pitch` times its read step, so tempo (the clock)
@@ -104,7 +104,7 @@ impl Voice {
             fader: Unit::rack_with(rate, faders),
             scr: Scratch::new(),
             spin: Spin::new(),
-            stretch: Stretch::new(),
+            stretch: Stretch::new(rate),
             sg: [1.0; COUNT],
             brake: Brake::new(),
             stretched: false,
@@ -112,7 +112,7 @@ impl Voice {
             cut: 1.0,
             part_fx: Unit::new(rate),
             mask: 0,
-            part_stretch: Stretch::new(),
+            part_stretch: Stretch::new(rate),
             split: false,
             groove: groove::Voice::new(rate),
             lp_was: None,
@@ -141,17 +141,18 @@ pub(super) struct Done {
     pub(super) lp: Loop,
 }
 
-/// The source frame heard at `pos`: a varispeed read, or with `stretch` the next WSOLA frame (`None` past the end).
+/// The source frame heard at `pos`: a varispeed read at `vel` source frames per output frame (the interpolator low-passes
+/// when that is above 1), or with `stretch` the next WSOLA frame (`None` past the end).
 fn read(
     src: &impl Source,
     stretch: Option<&mut Stretch>,
     pos: f64,
     frames: f64,
-    kp: f64,
+    (kp, vel): (f64, f64),
     lp: Loop,
 ) -> Option<[f32; 2]> {
     match stretch {
-        None => src.frame_at(pos),
+        None => src.frame_at_step(pos, vel),
         Some(s) if pos < frames => Some(s.next(src, pos, kp, lp)),
         Some(_) => None,
     }
@@ -346,6 +347,7 @@ pub(super) fn render(
         v.part_stretch.reset();
     }
     v.split = split;
+    let mut vel = kr.abs(); // source frames the last output frame moved: the width of the interpolator's low-pass
     for i in 0..n {
         if stems.is_some() {
             for k in 0..COUNT {
@@ -378,11 +380,11 @@ pub(super) fn render(
                         st,
                         pos,
                         frames,
-                        kp,
+                        (kp, vel),
                         lp,
                     )?;
                     let sp = stretched.then_some(&mut v.part_stretch);
-                    let x = read(&part(), sp, pos, frames, kp, lp).unwrap_or([0.0; 2]);
+                    let x = read(&part(), sp, pos, frames, (kp, vel), lp).unwrap_or([0.0; 2]);
                     let y = v.part_fx.process(x);
                     Some([rest[0] + y[0], rest[1] + y[1]])
                 }
@@ -395,10 +397,10 @@ pub(super) fn render(
                     st,
                     pos,
                     frames,
-                    kp,
+                    (kp, vel),
                     lp,
                 ),
-                _ => read(p, st, pos, frames, kp, lp),
+                _ => read(p, st, pos, frames, (kp, vel), lp),
             }
         });
         let Some([mut l, mut r]) = lr else {
@@ -431,9 +433,12 @@ pub(super) fn render(
         let f = v.brake.tick() * sp;
         let gs: f32;
         if scratching {
+            let from = pos;
             (pos, gs) = v.scr.step(moved, (frames - 1.0).max(0.0), nominal, kr);
+            vel = (pos - from).abs();
         } else {
             pos = advance(pos, kr * f as f64, lp);
+            vel = (kr * f as f64).abs();
             gs = (sp * rate.abs() as f32 / SPIN_GATE).min(1.0); // a speed near 0 (a stopped tempo fader too) is silent, not one held sample
         }
         played += 1;

@@ -98,6 +98,16 @@ fn control_device(st: &Status) -> String {
     }
 }
 
+pub(super) fn automatic_buffer_label(p: &Prefs, st: &Status) -> String {
+    if crate::app::prefs::lowpower::on(p)
+        || (p.audio.buffer_size == 0 && st.rate > 0 && st.buffer.is_none())
+    {
+        tr!("AUTO (driver default)").to_owned()
+    } else {
+        tr!("AUTO ({} frames)", route::DEFAULT_BUFFER_FRAMES)
+    }
+}
+
 pub fn rows(p: &Prefs) -> Vec<Row> {
     let a = &p.audio;
     let st = audio::status();
@@ -113,7 +123,8 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         Row::dropdown_of("sample_rate", tr!("SAMPLE RATE"), o, at)
             .hint(&hint_if(st.rate > 0, || tr!("{} Hz now", st.rate))),
     );
-    let (o, at) = value_options(&c.buffers, a.buffer_size, tr!("frames"));
+    let (mut o, at) = value_options(&c.buffers, a.buffer_size, tr!("frames"));
+    o[0] = automatic_buffer_label(p, &st);
     let frames = buffer_in_use(p, &st);
     let latency = device::latency_ms(frames, st.rate);
     rows.push(
@@ -136,6 +147,9 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     }
     for n in &st.notes {
         rows.push(Row::info(tr!("NOTE"), n));
+    }
+    if let Some(d) = &st.pending {
+        rows.push(Row::info(tr!("NOTE"), &tr!("looking for {}…", d)));
     }
     if let Some(e) = &st.error {
         rows.push(Row::info(tr!("PROBLEM"), e));

@@ -1,4 +1,4 @@
-//! The device ops through the host, with the bundled device plugin (built by `extension/plugin/build.sh`; skips when it is not) on
+//! The device ops through the host, with the built-in device plugin (rekordbox-device) on
 //! a fake device root: the app finds the device and its plugin, exports a collection to it, reads the library back with its
 //! analysis, takes edits back (Update Collection), refreshes it, changes the device's settings, deletes from it, and backs it up
 //! and restores it. The core knows no layout: it only follows what the plugin answers.
@@ -47,9 +47,7 @@ fn find(dir: &Path, name: &str, size: u64) -> Option<PathBuf> {
 
 #[test]
 fn the_plugin_exports_reads_updates_edits_and_backs_up_a_device() {
-    if common::device_plugin().is_none() {
-        return;
-    }
+    common::device_plugin();
     let root = common::fresh_dir("device-plugin");
     let (music, stick) = (root.join("music"), root.join("stick"));
     std::fs::create_dir_all(music.join("House")).unwrap();

@@ -193,6 +193,10 @@ mod tests {
         fn analysis(&self, t: &Track) -> Option<Analysis> {
             self.0.iter().find(|(x, _)| x.title == t.title)?.1.clone()
         }
+        fn analysis_reader(&self) -> Option<crate::library::AnalysisReader> {
+            let source = Device(self.0.clone());
+            Some(std::sync::Arc::new(move |t| source.analysis(t)))
+        }
     }
 
     #[test]

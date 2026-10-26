@@ -347,7 +347,7 @@ fn zero_shift_without_key_lock_is_bit_exact_varispeed() {
     let k = step(44100.0, 1.1, 44100);
     let mut pos = 0.0;
     for (i, &y) in out.iter().enumerate() {
-        assert_eq!(y, src.frame_at(pos).unwrap()[0], "frame {i}");
+        assert_eq!(y, src.frame_at_step(pos, k).unwrap()[0], "frame {i}");
         pos = advance(pos, k, None);
     }
 }
@@ -714,9 +714,10 @@ fn scratch_forward_half_second_in_100ms_lands_on_target_and_plays_forward() {
         2.5 * SRC
     );
     let plateau = &out[4000..4500]; // constant speed, gate open
-    // The 16-bit track steps every ~15 frames of this ramp: never falling, and rising across the plateau.
+    // The 16-bit track steps every ~30 frames of this ramp and the sinc rings by a few percent of a step around each:
+    // never falling by more than that, and rising across the plateau.
     assert!(
-        plateau.windows(2).all(|w| w[1] >= w[0]) && plateau[499] > plateau[0],
+        plateau.windows(2).all(|w| w[1] >= w[0] - 1.0 / 16384.0) && plateau[499] > plateau[0],
         "rising ramp = playing forward"
     );
     assert!(
@@ -738,7 +739,7 @@ fn scratch_backwards_is_time_reversed() {
     );
     let plateau = &out[4000..4500];
     assert!(
-        plateau.windows(2).all(|w| w[1] <= w[0]) && plateau[499] < plateau[0],
+        plateau.windows(2).all(|w| w[1] <= w[0] + 1.0 / 16384.0) && plateau[499] < plateau[0],
         "falling ramp = playing backwards"
     );
 }

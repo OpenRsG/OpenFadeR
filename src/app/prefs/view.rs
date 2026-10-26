@@ -57,7 +57,7 @@ choice!(
     DrawRate { Fps30 = "30", #[default] Fps60 = "60", Fps120 = "120" }
 );
 choice!(
-    /// AUTO uses hardware image composition; GPU also permits emulated GL; CPU keeps raster overlays.
+    /// AUTO uses hardware image cropping; GPU permits emulated GL; CPU translates cached raster strips.
     WaveRenderer { #[default] Auto = "auto", Gpu = "gpu", Cpu = "cpu" }
 );
 choice!(
@@ -479,7 +479,6 @@ pub fn apply_layout(p: &mut Prefs, layout: &[(String, String)]) -> Vec<String> {
 pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
     match key {
         "wave_order" => pick_order(&mut p.view, i),
-        "played_reset" => super::run_action(key),
         "skin" => {
             if let Some(n) = skin::names().get(i) {
                 let bad = select_skin(p, n);

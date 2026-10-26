@@ -578,6 +578,44 @@ The tokens of the stage workspace, described under [Stage workspace](#stage-work
 | `font-display` | string | `""` |  | Family of the big figures (BPM, times, deck numbers); empty = `font`. |
 | `weight-display` | int | `600` |  | Weight of the big figures. |
 
+### Library tree and track menu
+
+The playlist tree's headings (My Playlists, History, Devices …) and the glyphs of its lists, and the track right-click menu
+(six groups: PLAY, PLAYLISTS, USB STICK / SD CARD, ANALYSIS, TRACK INFO, FILE). `menu-focus` marks the item the controller's
+browse knob or the arrow keys are on. Bigger orange headings, no glyphs on the lists and the menu in one column:
+
+```json
+{
+  "name": "Booth Tree",
+  "tokens": {
+    "tree-heading": "#ff9e3b",
+    "tree-heading-icon": "#ff9e3b",
+    "tree-heading-grow": "4px",
+    "tree-heading-extra": "16px",
+    "tree-icons": 0,
+    "tree-lines": 0,
+    "menu-layout": 1,
+    "menu-heading": "#ff9e3b",
+    "menu-focus": "#2d6a4f"
+  }
+}
+```
+
+| Token | Type | Default (dark / light if they differ) | Values | Meaning |
+|---|---|---|---|---|
+| `tree-heading-grow` | length | `2px` |  | How much bigger than a list row the text of a tree heading is. |
+| `tree-heading-extra` | length | `10px` |  | How much taller than a list row a tree heading is. |
+| `tree-heading` | color | follows `text-bright` |  | Text of the tree headings. |
+| `tree-heading-icon` | color | follows `accent-hi` |  | Glyph of the tree headings. |
+| `tree-indent` | length | `14px` |  | Indent of each level of the tree. |
+| `tree-icons` | int | `1` | `0` off, `1` on | The glyph before every list of the tree (playlist, folder, history day, stick …); headings keep theirs. |
+| `tree-lines` | int | `1` | `0` off, `1` on | A hairline above each tree heading. |
+| `menu-layout` | int | `0` | `0` two columns, `1` one column | Track right-click menu: its six groups side by side in two columns, or one under the other. |
+| `menu-col-w` | length | `210px` |  | Width of a column of the track menu. |
+| `menu-heading` | color | follows `accent-hi` |  | Group titles of the track menu (PLAY, PLAYLISTS, USB …) and their glyphs. |
+| `menu-focus` | color | follows `accent` |  | The item the controller's browse knob (or the arrow keys) is on in an open menu. |
+| `menu-lines` | int | `1` | `0` off, `1` on | A line between the groups of the track menu. |
+
 ### Motion
 
 | Token | Type | Default (dark / light if they differ) | Values | Meaning |

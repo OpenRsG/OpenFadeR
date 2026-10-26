@@ -98,7 +98,7 @@ export component StudioHead inherits Rectangle {
         alignment: center;
         spacing: 2px;
         Text {
-            text: root.v.remain-text != "" ? root.v.remain-text : "--:--.-";
+            text: DeckState.live[root.index].remain-text != "" ? DeckState.live[root.index].remain-text : "--:--.-";
             color: root.v.ending ? Theme.danger : Theme.text-bright;
             font-family: Theme.font;
             font-size: Theme.font-xxl;

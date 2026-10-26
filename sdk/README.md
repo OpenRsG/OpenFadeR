@@ -161,7 +161,8 @@ openfader-plugin = { path = "/path/to/OpenFadeR/sdk", features = ["library"] }
 In Rust implement [`LibraryPlugin`] (`probe`, `open`, optionally `write_collection`) and [`Source`] (the opened library:
 `playlists`, `tracks`, optionally `search` and `analysis`) and call `export_library!(MyFormat)`: the macro defines the
 `openfader_library_v1` entry point and keeps panics from crossing the C boundary (an `{"error"}` answer instead; keep the default
-`panic = "unwind"`). `playlist_tree` turns flat folder rows into the depth-first list `playlists` answers with. Examples: the
+`panic = "unwind"`). A built-in compatibility adapter (`compatibility/` in the core repository) skips the macro: the host
+calls the table `library::api::<MyFormat>()` builds, through the same JSON `call`. `playlist_tree` turns flat folder rows into the depth-first list `playlists` answers with. Examples: the
 library plugins of `extension/plugin/` (one Cargo workspace; `build.sh` builds them and copies each library next to its
 `plugin.json`).
 

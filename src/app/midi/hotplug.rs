@@ -3,8 +3,10 @@
 //!
 //! A port is identified by its name without ALSA's trailing " client:port" address ([`key`]): a controller that comes back after a
 //! replug keeps its key but gets a new address, which [`diff`] reports as [`Change::Renamed`] (the old connection is dead).
-//! ponytail: midir has no hot-plug callback, so the list is polled every [`POLL`]; ALSA's sequencer announce port would push
-//! changes instead, if a second of latency ever matters (nothing is lost meanwhile: the old ports just stay open and silent).
+//!
+//! midir has no hot-plug callback. On Linux the thread sleeps on ALSA's sequencer announce port (`announce`) and reads the list when
+//! a port starts or exits, with [`FALLBACK`] as the longest it goes without reading; elsewhere, and where the sequencer cannot be
+//! opened, the list is read every [`POLL`].
 
 use super::port::is_own;
 use midir::MidiInput;
@@ -15,8 +17,15 @@ use std::{
     time::Duration,
 };
 
-/// How often the port list is read.
+#[cfg(target_os = "linux")]
+mod announce;
+
+/// How often the port list is read when nothing announces a change.
 const POLL: Duration = Duration::from_secs(1);
+
+/// The longest the list goes unread while the sequencer announces changes (it announces them all; this is a safety net).
+#[cfg(target_os = "linux")]
+const FALLBACK: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Change {
@@ -98,10 +107,13 @@ pub fn snapshot(filter: Option<&str>) -> Result<Vec<String>, String> {
         .map_err(|e| e.to_string())
 }
 
-/// The polling thread. Dropping it stops the thread (at once: it waits on the stop channel, not on a sleep).
+/// The watching thread. Dropping it stops the thread (at once: it waits on the stop channel or pipe, not on a sleep).
 pub struct Watcher {
     rx: Receiver<Vec<String>>,
     stop: Option<Sender<()>>,
+    /// Closing it wakes the thread out of its wait on the sequencer.
+    #[cfg(target_os = "linux")]
+    wake: Option<std::io::PipeWriter>,
     thread: Option<JoinHandle<()>>,
 }
 
@@ -114,13 +126,23 @@ impl Watcher {
     fn start_every(every: Duration, filter: Option<String>, mut known: Vec<String>) -> Watcher {
         let (tx, rx) = channel();
         let (stop, stop_rx) = channel::<()>();
+        #[cfg(target_os = "linux")]
+        let (announce, wake) = announce::open().unzip();
         let thread = std::thread::Builder::new()
             .name("midi-hotplug".into())
             .spawn(move || {
                 let Ok(input) = MidiInput::new("openfader-watch") else {
                     return eprintln!("midi: hot-plug disabled: no MIDI backend");
                 };
-                while let Err(RecvTimeoutError::Timeout) = stop_rx.recv_timeout(every) {
+                // true: read the list now; false: the watcher is gone
+                let next = || {
+                    #[cfg(target_os = "linux")]
+                    if let Some(a) = &announce {
+                        return matches!(a.wait(every.max(FALLBACK)), announce::Wake::Read);
+                    }
+                    matches!(stop_rx.recv_timeout(every), Err(RecvTimeoutError::Timeout))
+                };
+                while next() {
                     let now = read(&input, filter.as_deref());
                     if now != known {
                         known = now.clone();
@@ -133,6 +155,8 @@ impl Watcher {
         Watcher {
             rx,
             stop: Some(stop),
+            #[cfg(target_os = "linux")]
+            wake,
             thread: thread.ok(),
         }
     }
@@ -146,6 +170,10 @@ impl Watcher {
 impl Drop for Watcher {
     fn drop(&mut self) {
         self.stop = None; // the thread's recv sees the disconnect and returns
+        #[cfg(target_os = "linux")]
+        {
+            self.wake = None; // the thread's poll sees the pipe close
+        }
         if let Some(t) = self.thread.take() {
             let _ = t.join();
         }
@@ -260,6 +288,7 @@ mod tests {
         };
         let before = snapshot(Some(NAME)).unwrap();
         assert!(before.is_empty(), "{before:?}");
+        // 50 ms where the list is polled; on Linux the sequencer's announcement has to do (the fallback is 10 s)
         let w = Watcher::start_every(Duration::from_millis(50), Some(NAME.into()), before.clone());
         let Ok(port) = out.create_virtual(NAME) else {
             return eprintln!("skip: no ALSA seq");

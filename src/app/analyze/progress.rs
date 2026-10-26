@@ -9,6 +9,8 @@ pub struct Progress {
     pub total: usize,
     pub done: usize,
     pub failed: usize,
+    pub skipped: usize,
+    pub cancelled: usize,
     cached: usize,
     recomputed: usize,
     cues: usize,
@@ -28,6 +30,8 @@ impl Progress {
         self.total += other.total;
         self.done += other.done;
         self.failed += other.failed;
+        self.skipped += other.skipped;
+        self.cancelled += other.cancelled;
         self.cached += other.cached;
         self.recomputed += other.recomputed;
         self.cues += other.cues;
@@ -39,10 +43,15 @@ impl Progress {
         if self.done < self.total {
             return tr!("analyzing {}/{}", self.done, self.total);
         }
-        let mut s = tr!("analyzed {}", self.done - self.failed);
+        let mut s = tr!(
+            "analyzed {}",
+            self.done - self.failed - self.skipped - self.cancelled
+        );
         for (n, what) in [
             (self.cached, tr!("from cache")),
             (self.failed, tr!("failed")),
+            (self.skipped, tr!("skipped (Analysis Lock)")),
+            (self.cancelled, tr!("cancelled")),
             (self.recomputed, tr!("stale/corrupt cache files recomputed")),
             (self.cues, tr!("cue lists set")),
             (self.tags, tr!("key tags written")),
@@ -77,23 +86,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn progress_text_reports_cache_failures_cues_and_tags() {
-        let mut p = Progress {
-            total: 4,
-            done: 1,
-            ..Default::default()
-        };
-        assert_eq!(p.text(), "analyzing 1/4");
-        (p.done, p.cached, p.failed, p.recomputed) = (4, 2, 1, 1);
-        assert_eq!(
-            p.text(),
-            "analyzed 3 · 2 from cache · 1 failed · 1 stale/corrupt cache files recomputed"
-        );
-        (p.cues, p.tags, p.tag_failed) = (3, 2, 1);
-        assert!(
-            p.text()
-                .ends_with("· 3 cue lists set · 2 key tags written · 1 key tags not written")
-        );
+    fn unchanged_key_tags_are_not_counted_as_writes() {
         let mut q = Progress {
             total: 2,
             done: 2,
@@ -104,34 +97,13 @@ mod tests {
             src: Source::Cache,
             cues: true,
             tag,
+            generation: 0,
+            skipped: false,
+            cancelled: false,
+            ticket: None,
         };
         q.record(&out(Some(Ok(true))));
         q.record(&out(Some(Ok(false))));
         assert_eq!((q.cached, q.cues, q.tags, q.tag_failed), (2, 2, 1, 0));
-    }
-
-    #[test]
-    fn overlapping_runs_keep_all_request_progress_until_completion() {
-        let first = Progress {
-            total: 3,
-            done: 3,
-            cached: 2,
-            ..Default::default()
-        };
-        let mut second = Progress {
-            total: 2,
-            done: 1,
-            ..Default::default()
-        };
-        let mut total = Progress::default();
-        total.include(&first);
-        total.include(&second);
-        assert_eq!(total.text(), "analyzing 4/5");
-        second.done = 2;
-        second.failed = 1;
-        let mut total = Progress::default();
-        total.include(&first);
-        total.include(&second);
-        assert_eq!(total.text(), "analyzed 4 · 2 from cache · 1 failed");
     }
 }

@@ -20,7 +20,6 @@ A plugin can have sources, actions and events together (they share one program),
 modes on top.
 
 Working examples in the [plugins repository](https://github.com/OpenRsG/OpenFadeR-Plugins) (checked out as `extension/plugin/`):
-[`mix-log`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/mix-log) (a Lua plugin: events, actions, settings, files),
 [`yt-dlp`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/yt-dlp) (YouTube and SoundCloud search, playlists, downloads;
 Python and the `yt-dlp` program), [`now-playing`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/now-playing) (events,
 actions and settings; Python), and the DJ effects listed under [Effects](#effects), all JSON
@@ -45,14 +44,26 @@ The app reads plugins from
 
 An entry of that search path is either one plugin folder or a folder of plugin folders; the first plugin of a name wins.
 
-PREFERENCES > EXTENSIONS lists every plugin as a card: a switch to turn it on or off (every plugin starts off, the bundled ones
-too; installing one switches it on), what it runs on (LUA, PYTHON, PROGRAM or
+PREFERENCES > EXTENSIONS lists every plugin as a card. The built-in compatibility adapters `rekordbox-device`, `rekordbox-xml` and `rekordbox-db`
+come first, marked **BUILT IN**: they are compiled into the app ([Built-in adapters](#built-in-adapters)),
+always on, with no switch, folder or uninstall, and their settings work as any plugin's. The other cards have a switch to turn the plugin on or off (a plugin starts off and installing one switches it on; the exception is a fresh
+profile with no `plugins.json`, where the readers `engine-dj`, `serato`, `traktor`, `virtualdj` and the effect packs `beat-fx`,
+`send-fx`, `lever-fx`, `mic-fx`, `soft-mix` and `cross-pass` start on;
+once the file exists it is your choice and nothing is switched on behind it), what it runs on (LUA, PYTHON, PROGRAM or
 JSON), what it brings, its settings (**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`), then whatever went wrong while
 reading the plugins. The card's **⋮** menu opens its folder or **uninstalls** it: an installed plugin's folder is deleted, and a
 bundled one is hidden (listed under `removed`) until you install it again, from GET PLUGINS or a drop. **RELOAD** reads the folders
 again (after you edit a plugin). Actions, events and settings apply at once; effects, sources, knob and pad modes are part of the
 mixer and the browser from start-up, so a change to those shows a **RESTART NOW** banner. The switches, the uninstalled plugins and
 the settings are kept in `~/.config/openfader/plugins.json`.
+
+A plugin folder named like a built-in extension (an old copy in the plugin folders, or one from GET PLUGINS) is not read: the card
+list shows the folder with a note to delete it, and installing a plugin of that name is refused. Built-ins are not offered or updated
+by GET PLUGINS either; they change with the app.
+
+When a stick is plugged in whose library only an extension that is off can read (`Engine Library/`:
+`engine-dj`, `_Serato_/`: `serato`, `VirtualDJ/`: `virtualdj`, `Traktor/`: `traktor`), the welcome window opens with just that extension
+and SWITCH ON turns it on (its library loads at the next start: RESTART NOW). Each extension is offered once per device per run.
 
 ### Install from a repository
 
@@ -120,7 +131,7 @@ that asset for the user's platform nothing is installed and the page says `no pr
 | `suggest` | The software the plugin makes OpenFadeR compatible with (its name). The welcome window, at the first start and from Help > Welcome, offers to switch on every plugin found with one and names that software. |
 | `script` | The file serving sources, actions and events, in the plugin folder: `*.lua` runs inside the app ([Lua plugins](#lua-plugins)), `*.py` with `python3` (on Windows the `py` launcher, else `python`), anything else is run as a program. |
 | `command` | Instead of `script`: the program and its arguments, started once per request. A relative program or argument that names a file in the plugin folder becomes that file's path (`["node", "main.js"]` runs the plugin's `main.js`). |
-| `persistent` | `true`: one process (or one Lua state) serves every request instead of a new one each: no start-up cost per request, and the plugin keeps its state. See [Persistent plugins](#persistent-plugins). |
+| `persistent` | `true`: one process (or one Lua state) serves ordinary requests instead of a new one each: no start-up cost per request, and the plugin keeps its state. Cancellable `fetch` requests use isolated request-owned execution. See [Persistent plugins](#persistent-plugins). |
 | `sources` | Track sources. `id` (no `:`, unique in the plugin), `name` (the folder's label), `search` (the source has a search entry). |
 | `actions` | Menu entries: `id`, `label`, and `input`, the prompt of a text field asked for before the action runs (leave it out to run at once). |
 | `events` | Names of the events the plugin wants to hear (see [Events](#events)). |
@@ -202,6 +213,8 @@ for line in sys.stdin:  # ends when the app closes stdin
 A persistent Lua plugin keeps one Lua state: globals survive between requests (the script is loaded again when its file or the
 plugin's `version` changes), and its requests take turns instead of running at the same time.
 
+`fetch` is the exception: it always runs in a fresh process or Lua state so cancelling a download cannot terminate or mutate another request's persistent session. Its `id` remains the source's track id, not a host correlation id. A fetch must be self-contained using the supplied source, id, settings and directory.
+
 You can test a Python plugin without the app:
 
 ```sh
@@ -240,7 +253,7 @@ end
 return M
 ```
 
-[`mix-log`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/mix-log) is a complete one (events, actions, settings, files).
+The plugins repository has no Lua example any more (the mix log is built into History: SAVE SET LIST); the protocol above is all of it.
 
 ### Settings
 
@@ -317,7 +330,7 @@ AUTOMIX, Continuous Playing): the deck shows "downloading…", then the track lo
 
 ```json
 {"op": "fetch", "source": "youtube", "id": "K0HSD_i2DvA",
- "dir": "/home/me/.local/share/openfader/plugins/yt-dlp/youtube", "name": "K0HSD_i2DvA"}
+ "dir": "/home/me/.local/share/openfader/plugins/yt-dlp/youtube/.fetch-1234-0", "name": "K0HSD_i2DvA"}
 → {"file": "K0HSD_i2DvA.m4a"}
 ```
 
@@ -325,12 +338,11 @@ Write the audio into `dir` as `<name>.<extension>` and answer its path (relative
 
 * The audio must be a format the decks play: **mp3, AAC (m4a), FLAC or WAV**. Convert what you download (ffmpeg) and fail with a
   clear `error` when you cannot.
-* `name` is the track's id made safe for a file name; keep it as the file's name without extension. The app looks for
-  `<name>.*` in `dir` before asking, so a track that was fetched once is **never fetched again**, also in the next run. A file
-  with the extension `part`, `tmp` or `ytdl`, or an empty one, does not count.
-* Make the file appear complete: download into a temporary folder and rename it into `dir` at the end.
-* `dir` is `<data dir>/plugins/<plugin>/<source>/`; the data dir is `$XDG_DATA_HOME/openfader` (else `~/.local/share/openfader`).
-  Deleting files there is safe, they are fetched again.
+* `name` is the track's id made safe for a file name; keep it as the file's name without extension. Before fetching, the app reuses a non-empty completed `<name>.*` in the source's download folder. Files with extension `part`, `tmp` or `ytdl` do not count.
+* `dir` is a request-owned staging folder below `<data dir>/plugins/<plugin>/<source>/`. The data dir is `$XDG_DATA_HOME/openfader` (else `~/.local/share/openfader`). Do not assume `dir` is the permanent source folder.
+* Write the complete result inside `dir` and return its path. The host publishes it atomically into the source folder without replacing an already valid cached download.
+* Superseding a load cancels its fetch and removes request-owned partial output. If cancellation wins before publication, no result is published; if publication already won, the valid cached result remains. An existing file returned outside `dir` is not removed.
+* Downloads use four workers and at most eight queued requests. Queued cancellation removes the work immediately. A process request owns its process group; Lua checks cancellation during execution, sleeps, subprocess waits and download chunks. A blocked Lua HTTP operation may still occupy its worker until the existing 60-second transport timeout.
 
 ### Actions
 
@@ -610,6 +622,30 @@ The hardware's own algorithms are not published; each effect is a classic design
 
 ## Library plugins
 
+### Compatibility layer
+
+OpenFadeR stores its Collection in its own plain SQLite [`store.db`](library-format.md#2-the-library-database), with schema
+and migrations in `src/store/`. The compatibility layer translates external libraries and device formats through the SDK's
+library/device operations. Import copies metadata into the Collection; export, device edits and cue-sync writeback use each
+adapter's supported operations. Format-specific paths, table names and fields stay inside those adapters.
+
+| Adapter / format | Delivery | Supported operations |
+|---|---|---|
+| Rekordbox Device Library (`export.pdb`) and OneLibrary (`exportLibrary.db`) | Built in, `rekordbox-device` | Read USB/SD libraries and analysis; export, update Collection, back up/restore, convert, check/fix and edit device settings |
+| Rekordbox XML (`rekordbox.xml`) | Built in, `rekordbox-xml` | Read and write collection XML, including playlists, grids and cues |
+| Rekordbox desktop collection (`master.db`) | Built in, `rekordbox-db` | Read the SQLCipher collection with a supplied key |
+| Engine DJ (`Engine Library/Database2/m.db`) | Companion, `engine-dj` | Read desktop/device libraries; export tracks, cues, loops, grids, waveforms and playlists to devices |
+| Serato (`_Serato_`, database V2, crates and audio tags) | Companion, `serato` | Read desktop/device libraries; write device libraries and tagged cues/grids |
+| Traktor (`collection.nml`) | Companion, `traktor` | Read desktop/device collections; write a device collection for Traktor's Import another Collection |
+| VirtualDJ (`database.xml`) | Companion, `virtualdj` | Read desktop libraries/lists; export device libraries with cues, loops, grids and playlists |
+| iTunes / Music (`Library.xml`) | Companion, `itunes` | Read tracks and playlists |
+| Sampler packs (`.spp`, `sampler_pack.xml`) | Companion, `sample-pack` | Extract audio to the plugin cache and read pack lists/BPM; populate the sampler on import |
+
+The companion plugins remain in [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins), checked out as
+`extension/plugin/` and built separately. Its `mixxx` adapter runs Mixxx controller mappings and JavaScript through the
+[controller interface](#controller-plugins); it is not a collection reader. Physical-player compatibility is recorded separately
+in the built-in device adapter's [compatibility table](../compatibility/rekordbox/device/COMPATIBILITY.md).
+
 A library plugin teaches the app a **format of track libraries**: a file or folder it can open as a library (playlists and tracks,
 and optionally the beat grids, cues and waveforms the format holds), and optionally write the whole Collection as a file in
 that format. It is a native shared library (Rust or C) built against the library interface of [`sdk/`](../sdk), declared in
@@ -741,12 +777,16 @@ plugin's own settings; `config` the device's settings, key → text):
 **Several formats on one device.** Every device plugin is probed for every device. Those that hold a library there or `can_write`
 are its formats; the one holding a library with the most `features` reads it (browse, update, histories). The DEVICES tab of the
 device window lists them with their `title`, `about` and `options`: UNIVERSAL switches every format on, DEDICATED keeps the ticked
-ones (the EXPORT and SYNC MANAGER tabs show the same as chips). By default these are the ones already on the device, or all of them
-on an empty device, and the choice is kept per device. Each connected device also has a USB icon on the browser's left strip that
+ones (the EXPORT and SYNC MANAGER tabs show the same as chips). Blank targets start with all available formats; existing targets
+start with their held formats plus rekordbox. Explicit switches are saved per target; a typed folder has its own switches. Each connected device has a USB icon on the browser's left strip that
 opens this tab on it. The formats are written one after the other. The first copies the audio. Each
-later one gets the snapshot's tracks pointed at the files the first one's library lists, so every format shares one copy. A plugin
+later one gets the snapshot's tracks pointed at the files the first one's library lists, so formats can share the unchanged audio. A plugin
 that writes audio should place it with the SDK's `place_audio` (`Contents/<artist>/<album>/<file>`); then the formats agree even
 when the first one reads nothing back.
+
+Serato embeds cues and grids in audio tags. When existing padding is insufficient, it writes a private copy under
+`_Serato_/Audio` instead of growing the shared file. The `Contents` copy stays byte-identical to the source: collection matching
+and cue sync depend on its file name and size. Do not resize shared copies without preserving that identity contract.
 
 **Cue sync.** A track that is in the collection and on a device, same file name and size, has its cues, hot cues, loops, beat grid
 and phrases kept the same on both copies (PREFERENCES > DJ SYSTEM > DEVICE > CUE SYNC, on by default). This needs a device whose
@@ -764,11 +804,19 @@ merges by (it replaces that playlist's content), so the snapshot lists the playl
 has too is written with the collection's analysis, its empty parts filled from the device copy; any other member with the analysis
 read from the device) and then the new tracks; a track the playlist holds already is skipped and counted.
 
+**Export target and formats.** Right-click a collection playlist → **Export to a device** to open EXPORT with it ticked.
+The format chips apply to both a mounted device and a typed folder. A non-empty folder takes precedence; the page and
+confirmation card name that target explicitly. Blank targets default to all available formats; existing libraries default to
+their formats plus rekordbox. Each format switch is remembered separately for each target, so choosing another target
+does not carry the previous target's switches over, and newly installed formats follow the defaults. EXPORT keeps its
+playlist ticks when you change tabs. A playlist sent before the collection has loaded waits for its list to arrive.
+
+
 **Before a write.** EXPORT, SYNC NOW, the sync of a device that was just plugged in, and Transfer show a card first (Preferences > DJ
 SYSTEM > DEVICE, "Show what an export will write before it starts"): the tracks to copy and the ones refreshed, the analyses run
 first, the time, what is left out and why, then START or CANCEL. A format whose plugin lists the `plan` feature answers the same
 `export` request with `options.dry_run` set (nothing is written; the answer's `plan` is the card); for any other format the app
-estimates from the audio files. The device holds one copy of each track, so its bytes count once whatever formats are written. The time
+estimates from the audio files. Shared audio counts once; required private copies for Serato tags count separately. The time
 uses the write speed measured on earlier jobs on that device (8 MB/s and 20 ms per small file until there is one). Every write job
 then finishes or undoes a change a pulled stick left (`commit::recover`), backs the library up (kept as an automatic backup, the last
 five per device) unless Preferences say otherwise, writes, and reports the plugins' read-back (`verified`). Its status line shows the
@@ -802,7 +850,7 @@ stands. While staging, an interruption leaves the old library in use, and the ap
 staged file is whole and checked, so the app finishes the renames. Either way the device holds one whole generation of its
 libraries, never a new one next to an old one. The app recovers a device when it shows up and before any job writes to it.
 
-**Players.** A device plugin may ship `players.json` next to its `plugin.json`: `{"version", "players": [{"model", "reads":
+**Players.** A device plugin may ship `players.json` next to its `plugin.json` (a built-in one embeds it): `{"version", "players": [{"model", "reads":
 [library names from device_check], "file_systems": ["vfat", "exfat", "hfsplus"], "partition_tables": ["dos", "gpt"], "status":
 "confirmed" | "to_measure", "firmware", "note"}…], "presets": [{"id", "label", "models"}…]}`. The stick checker judges a device for
 each player of the booth profile (PREFERENCES > DJ SYSTEM > DEVICE and the DEVICES tab). A model marked `to_measure` is never shown
@@ -824,18 +872,66 @@ analysis of a stored track without the library being open, asks that plugin with
 plugin that declares `"legacy_analysis_refs": true` also answers references stored before they carried a plugin name (bare paths):
 the app prefixes them with its name at start-up.
 
+### Built-in adapters
+
+`compatibility/rekordbox/` holds the built-in family as Cargo workspace packages: `compat-rekordbox-device` (the device
+libraries on USB sticks and SD cards, Device Library `export.pdb` and OneLibrary `exportLibrary.db`: reads them, exports to them,
+updates the collection from them, backs them up, converts them and edits their settings), `compat-rekordbox-xml` (reads and writes a
+Rekordbox XML collection file), `compat-rekordbox-db` (reads the desktop collection `master.db`, a key as a `secret` setting), and
+`compat-rekordbox-common` and `compat-rekordbox-export` (shared readers/helpers and the device writer). The companion `itunes`
+and `sample-pack` plugins also use `compat-rekordbox-common`. Runtime plugin IDs remain `rekordbox-device`, `rekordbox-xml` and
+`rekordbox-db`, preserving settings, analysis references, device selections and journals independently of Cargo package names.
+
+They are the same library plugins as the ones below, with one difference: they are linked into the app, so they cannot go missing or be
+switched off. A crate does not export `openfader_library_v2`; it implements `LibraryPlugin` and the host (`src/plugin/builtin.rs`)
+holds a table per extension: its `plugin.json` (without `lib`), its `locales/`, its `players.json`, and the static
+`openfader_plugin::library::api::<Plugin>()`. Requests go through that table's JSON `call` exactly as through a loaded library: there
+is one protocol. The registry lists the built-ins first and on, whatever `plugins.json` says; their settings are stored there under
+their names as before. A plugin folder of the same name is skipped with a note in the plugin list. They are behind the `compatibility` feature of the `openfader` crate, which the `app` feature turns on (so
+Pi builds with `--no-default-features --features app` have them). It also swaps the bundled SQLite for SQLCipher with its own
+OpenSSL; a build without it, like the mobile crate, has no built-in plugins, plain SQLite and no OpenSSL. Their tests run with the app's:
+`cargo test --release --workspace`.
+
+What `rekordbox-device` guarantees when it writes a stick, and how that is checked:
+
+- **All or nothing.** One user action (export, sync, remove, player settings) is one transaction. New audio and analysis files are
+  written and fsynced first, the changed library files are staged beside their targets, then switched in one journalled step. Pulled
+  out at any point, the stick holds the old libraries or the new ones, never a mix; the next write or `device_check` finishes or rolls
+  back an interrupted switch first. A cancel or an error leaves the folder as it was.
+- **Read back before it counts.** Before the switch the staged Device Library and OneLibrary are read again and compared with what
+  was meant to be written (titles, counts, playlists and their entries, cue counts in the analysis files). A difference stops the
+  export with a plain sentence and nothing changed; a clean export reports `verified`.
+- **Dry run.** An export with `dry_run` writes nothing and returns the plan: tracks to add or update, bytes to copy and write, files,
+  and what is blocked (no room, a file over the file system's limit, a name the stick cannot hold, too many playlists).
+- **Names the file system accepts.** Long, accented, emoji and reserved (`CON`, `NUL`, ...) names are cleaned; a device path never
+  exceeds the 255 characters a Device Library row holds.
+- **Check and fix.** `device_check` reads what is on a stick without writing and lists problems (missing or unreadable library, the two
+  libraries disagreeing, missing audio or analysis files, leftovers of an interrupted write) with cause, consequence and action.
+  `device_fix` repairs one of them: rebuild one library from the other, rewrite the analysis files, clean leftovers.
+- **Players.** `compatibility/rekordbox/device/players.json` lists the players the checker knows, what each reads and what is only inferred.
+  `compatibility/rekordbox/device/COMPATIBILITY.md` says which rows are confirmed on hardware (none yet) and which are not; the test
+  `compatibility_lists_every_player_and_library` keeps the two together.
+
+Readers that are not ours check the output in CI (job `readers` of `ci.yml`): `compatibility/rekordbox/export/examples/fixture.rs` writes a
+small stick (unicode, emoji and long names, cues, loops, a playlist folder), and `.github/check_stick.py` reads it with pyrekordbox
+(the analysis files and `exportLibrary.db`), with a small DeviceSQL reader and with `rekordcrate` (`export.pdb`), and fails on any
+difference from the manifest. Locally: `cargo run --release -p compat-rekordbox-export --example fixture -- /tmp/fx && pip install
+pyrekordbox==0.5.0 && python .github/check_stick.py /tmp/fx`. rekordcrate 0.3.0 cannot parse cue entries of type 1, so it is used for
+`export.pdb` only.
+
 ### The bundled library plugins
 
-Rust crates of one Cargo workspace, the plugins repository's `Cargo.toml` (`extension/plugin/Cargo.toml` in a core checkout), are library plugins: `itunes` (reads a media player's
-library file), a collection-file plugin (reads and writes a collection file), a plugin for the device libraries on USB sticks and
-SD cards (reads them, exports to them, updates the collection from them, backs them up, converts them and edits their settings), four
-more device plugins that write the libraries of other players and apps beside it on the same stick and also read those apps' desktop
-libraries (with `detect` patterns, so PREFERENCES > LIBRARIES offers to connect them), one for a desktop collection
-database (a key as a `secret` setting), and one for sampler packs (a zip of audio and a list file; the
-samples are extracted to the plugin's cache folder and served as a library; with `"samples": true` the first list also fills the
-sampler after File > Import). Crates for what they share sit beside them. They need building once: `extension/plugin/build.sh` builds
-the workspace in release mode and copies each library next to its `plugin.json` (`start.sh` runs it first). Their settings are on their
-cards in PREFERENCES > EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
+The companion repository's Cargo workspace (`extension/plugin/Cargo.toml` in a core checkout) builds `itunes`, `sample-pack`
+and the four device adapters `engine-dj`, `serato`, `traktor` and `virtualdj` listed [above](#compatibility-layer). Their
+desktop-library `detect` patterns let PREFERENCES > LIBRARIES offer to connect them. `extension/plugin/build.sh` builds the
+workspace in release mode and copies each library next to its `plugin.json`; `start.sh` runs it first. The workspace uses
+`sdk/` and `compatibility/rekordbox/common` from the core checkout. Their settings are on their cards in PREFERENCES >
+EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
+
+Core 0.2.7 builds use the matching OpenFadeR-Plugins tag `v0.2.8`: CI's `plugins_ref` input, Docker's `PLUGINS_REF` build arg
+and the `PLUGINS_REF` environment variable for `start.sh` / `install.sh` can select another compatible ref. Existing companion
+checkouts are used as they stand; switch an older checkout to that tag before building this core. The generic GET PLUGINS
+catalog still reads repositories' default branches and downloads their prebuilt native libraries.
 
 ## Controller plugins
 

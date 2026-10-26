@@ -4,7 +4,7 @@
 //! `work` side by side on the same [`Stems`]; the cross-fades live with the stems, which is why the order of segments
 //! does not matter and playback can start on the first one ([`crate::audio::Stems::ready`]).
 //!
-//! The model wants 44.1 kHz; a track at another rate is read with linear resampling and its stems resampled back the same
+//! The model wants 44.1 kHz; a track at another rate is read with windowed-sinc resampling and its stems resampled back the same
 //! way, segment by segment, so the stems always have the track's own rate and frame count.
 
 use super::Quality;
@@ -44,7 +44,7 @@ pub fn segment(
     let valid = g.len.min(pcm.frames().saturating_sub(start));
     let mut x = vec![0f32; 2 * SEGMENT];
     for i in 0..SEGMENT {
-        match pcm.frame_at(start as f64 + i as f64 * step) {
+        match pcm.frame_at_step(start as f64 + i as f64 * step, step) {
             Some([l, r]) => (x[i], x[SEGMENT + i]) = (l, r),
             None => break,
         }

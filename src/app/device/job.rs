@@ -18,6 +18,21 @@ use std::{
     time::Instant,
 };
 
+/// What to do when a write failed with EIO (`os error 5`): the kernel lost the device mid-write (a USB link that resets, a
+/// stick that fails), which the one retry of the audio copy did not mend. A device behind a hub ([`openfader::device::Device::via_hub`]) is the
+/// likely cause and is said first; the files already copied stay, so the same export again resumes.
+fn usb_hint(e: &str, via_hub: bool) -> Option<String> {
+    if !e.contains("(os error 5)") {
+        return None;
+    }
+    let resume = tr!("Audio already copied stays on the device: export again and it continues with the rest.");
+    Some(if via_hub {
+        tr!("The device is plugged in through a USB hub, and the hub dropped its link while it was written (a USB input/output error, not a format problem): plug it straight into a port of the computer, then export again. {} If it keeps happening, the stick is failing.", resume)
+    } else {
+        tr!("The device stopped answering while it was written (a USB input/output error, not a format problem): plug it into another port of the computer, then export again. {} If it keeps happening, the stick is failing.", resume)
+    })
+}
+
 /// `text` and under it `lines`, one per row.
 fn with_lines(mut text: String, lines: impl IntoIterator<Item = String>) -> String {
     for l in lines {
@@ -35,7 +50,7 @@ fn checked(t: &Target, done: &[Written]) -> Option<String> {
         .filter_map(|(n, r)| Some((n.as_str(), r.as_ref().ok()?)))
         .collect();
     let first = ok.first()?.0;
-    let label = |n: &str| format_label(t.dev.as_ref(), n);
+    let label = |n: &str| format_label(Some(&t.dev), n);
     let unchecked: Vec<String> = ok
         .iter()
         .filter(|(_, r)| r.verified != Some(true))
@@ -120,16 +135,21 @@ impl Ctx {
     ) {
         let (safety, phase_text) = (self.safety(), format!("{phase}…"));
         self.start_then(
-            t.dev.as_ref().map(|d| d.id.clone()),
+            Some(t.dev.id.clone()),
             phase,
             move |ctl| {
+                let mut t = t;
+                t.validate_folder()?;
+                t.o.free = openfader::device::space(&t.dest).map(|s| s.1);
                 let built = build(&ctl)?;
                 if let Some(m) = &built.idle {
                     return Ok(m.clone());
                 }
-                let notes: Vec<String> = match &t.dev {
-                    Some(d) => safety.before_write(d, &ctl)?,
-                    None => safety.recover(&t.dest, &t.name)?.into_iter().collect(),
+                // A plain folder is recovered, not backed up (its backups would list under no device).
+                let notes: Vec<String> = if t.dev.is_folder() {
+                    safety.recover(&t.dest, &t.name)?.into_iter().collect()
+                } else {
+                    safety.before_write(&t.dev, &ctl)?
                 };
                 ctl.set_phase(&phase_text);
                 // A job that fails may have been cut off mid-switch: what a change left is finished or undone again, and the
@@ -143,7 +163,10 @@ impl Ctx {
                     match (e == "cancelled", fixed) {
                         (true, None) => e,
                         (true, Some(f)) => f,
-                        (false, f) => with_lines(e, notes.iter().cloned().chain(f)),
+                        (false, f) => {
+                            let hint = usb_hint(&e, t.dev.via_hub);
+                            with_lines(e, hint.into_iter().chain(notes.iter().cloned()).chain(f))
+                        }
                     }
                 };
                 let done = export(&t.writers, &t.dest, &built.snap, &t.o, &ctl).map_err(&failed)?;

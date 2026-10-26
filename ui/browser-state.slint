@@ -25,6 +25,8 @@ export global BrowserState {
     callback playlist-selected(int);
     /// A click on a heading of the tree (or Left / Right on it): its rows unfold or fold away.
     callback tree-toggle(int);
+    /// BACK (or Left) on tree row `i`: its section folds and the heading is chosen. Returns the heading's row (`i` when there is none).
+    callback tree-back(int) -> int;
     /// Row index in `tracks` (the filtered, sorted view).
     callback track-selected(int);
     /// Ctrl+click (mode 1) / Shift+click and Shift+arrows (mode 2) on row `i`: the multi-selection grows, shrinks or spans a range.
@@ -62,6 +64,8 @@ export global BrowserState {
     in property <string> source-device;
     in property <string> source-list;
     in property <bool> source-history;
+    /// The tracks on screen are a device's (All tracks or one of its playlists): the track menu offers to import them.
+    in property <bool> on-device;
     /// Track filter bar ("Track Filter"): BPM bounds as typed (empty = open), ±6 % around the master deck's BPM,
     /// only keys compatible with the master deck's effective key, and a minimum star rating (0 = any).
     in-out property <string> bpm-min;
@@ -109,6 +113,7 @@ export global BrowserState {
     /// A history list is on screen (session or a stored day): the SAVE M3U8 button applies.
     in property <bool> history-view;
     callback history-save();
+    callback history-save-set-list();
     /// A Library health check is on screen: its action bar applies. `health-act` takes `ignore` (the chosen track), `ignore-all` (every
     /// listed track), `ignored` (show what was ignored instead) and `rescan`; the other buttons call the library actions.
     in property <bool> health-view;

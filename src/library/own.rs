@@ -2,6 +2,8 @@
 //! libraries and folders are connections synced into it (`library::connect`), never opened as the library. User playlists
 //! are the store's node tree, not this library's, so it lists none.
 //!
+//! Its tracks carry the store's text and rating edits ([`Store::collection_edited`]).
+//!
 //! Analysis: the plugin analysis a row's `analysis_ref` names ([`super::load_ref`]); a row without one has none here and
 //! the analysis layer falls back to our own.
 
@@ -31,13 +33,17 @@ impl Library for Own {
     /// All rows for `None`; a playlist query is empty (the browser reads user playlists from the store).
     fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {
         match playlist {
-            None => Ok(self.store.collection_tracks()?.to_vec()),
+            None => Ok(self.store.collection_edited()?.to_vec()),
             Some(_) => Ok(Vec::new()),
         }
     }
 
     fn tracks_all(&self) -> Result<Arc<Vec<Track>>, String> {
-        self.store.collection_tracks()
+        self.store.collection_edited()
+    }
+
+    fn edited(&self) -> bool {
+        true
     }
 
     fn analysis(&self, track: &Track) -> Option<Analysis> {

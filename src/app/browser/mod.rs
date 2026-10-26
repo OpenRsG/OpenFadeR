@@ -82,6 +82,8 @@ pub struct Context {
     pub playlist: Option<String>,
     /// An opened iTunes / xml / Explorer list on screen: where to read it again from (for IMPORT TO COLLECTION).
     pub source: Option<(std::path::PathBuf, sources::SourceType, Option<String>)>,
+    /// The id of the device whose tracks are on screen (for IMPORT TO COLLECTION, which copies them).
+    pub device: Option<String>,
 }
 
 thread_local! {
@@ -109,6 +111,7 @@ pub fn context() -> Context {
             name: String::new(),
             playlist: None,
             source: None,
+            device: None,
         },
         |v| {
             let v = v.borrow();
@@ -118,6 +121,7 @@ pub fn context() -> Context {
                 list: v.shown.iter().map(|&i| v.list[i].clone()).collect(),
                 name: v.list_name(),
                 source: v.source_sel(),
+                device: v.device_target(&v.entry).map(|d| d.device),
                 playlist: match &v.entry {
                     Entry::User(id) => Some(format!("store:{id}")),
                     Entry::Lib(i) => Some(v.lib_playlists[*i].id.clone()),
@@ -203,7 +207,8 @@ struct View {
     rows: Rc<table::Rows>,
     sidebar: Rc<VecModel<TreeRow>>,
     panel_rows: Rc<VecModel<StandardListViewItem>>,
-    list: Rc<Vec<Track>>,
+    /// Shared with the library cache for the whole library ([`View::load`]), so a view change copies nothing.
+    list: Arc<Vec<Track>>,
     /// Visible row → index into `list`.
     shown: Vec<usize>,
     query: String,
@@ -221,6 +226,8 @@ struct View {
     tags: Vec<Track>,
     /// Session history, in play order (see [`history`]).
     history: Vec<Track>,
+    /// When each track of [`View::history`] reached the session threshold (Unix seconds), same order.
+    history_at: Vec<i64>,
     /// The track chosen in the table last.
     selected: Option<Track>,
     /// The selected rows (the chosen one is always among them).
@@ -325,7 +332,7 @@ impl View {
         }
         let tracks = self.lib.tracks_all()?;
         let keys: Vec<String> = tracks.iter().map(store::key).collect();
-        let mut by_key = HashMap::new();
+        let mut by_key = HashMap::with_capacity(keys.len());
         for (i, k) in keys.iter().enumerate() {
             by_key.entry(k.clone()).or_insert(i);
         }

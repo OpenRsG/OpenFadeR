@@ -23,7 +23,9 @@ if [ "${1:-}" = --uninstall ]; then
 fi
 
 cd "$root"
-for pair in extension/plugin:OpenFadeR-Plugins extension/skin:OpenFadeR-Themes mappings:OpenFadeR-Map; do
+[ -e extension/plugin ] || git clone --quiet --branch "${PLUGINS_REF:-v0.2.8}" \
+	https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
+for pair in extension/skin:OpenFadeR-Themes mappings:OpenFadeR-Map; do
 	[ -e "${pair%%:*}" ] || git clone --quiet "https://github.com/OpenRsG/${pair#*:}.git" "${pair%%:*}"
 done
 extension/plugin/build.sh --quiet

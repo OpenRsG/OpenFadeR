@@ -72,7 +72,7 @@ mod transport;
 mod wire;
 pub use wire::wire;
 
-use super::{App, DeckScroll, DeckState, DeckView, prefs, render};
+use super::{App, DeckLive, DeckScroll, DeckState, DeckView, prefs, render};
 use openfader::{
     analysis::{self, Beat},
     audio,
@@ -159,7 +159,9 @@ struct Loaded {
     overview_base: Option<render::Canvas>,
     /// The detail picture the view slides over ([`frame`]); `None` = draw it again.
     strip: Option<frame::Strip>,
-    overview_key: Option<(i64, Size, Option<i64>, u32, bool)>,
+    overview_key: Option<(Size, u32)>,
+    beat_count: Option<render::detail::BeatCountValue>,
+    beat_text: slint::SharedString,
     time_key: Option<u32>,
     /// GRID panel undo / redo lists and range ([`exportedit`]); gone with the next LOAD.
     grid_hist: exportedit::Hist,
@@ -172,6 +174,8 @@ impl Loaded {
         self.overview_key = None;
         self.overview_base = None;
         self.time_key = None;
+        self.beat_count = None;
+        self.beat_text = Default::default();
     }
 }
 
@@ -181,6 +185,8 @@ pub struct Deck {
     model: Rc<VecModel<DeckView>>,
     /// `DeckState.scroll`: what moves every frame ([`frame`]).
     scroll: Rc<VecModel<DeckScroll>>,
+    /// `DeckState.live`: what changes while playing, a few times a second (time readouts, overview, detail picture).
+    live: Rc<VecModel<DeckLive>>,
     /// Mirror of this deck's `DeckView` row; pushed to the model by [`Deck::show`] / `tick`.
     view: RefCell<DeckView>,
     player: Option<RefCell<audio::Player>>,
@@ -275,6 +281,7 @@ impl Deck {
         index: usize,
         model: Rc<VecModel<DeckView>>,
         scroll: Rc<VecModel<DeckScroll>>,
+        live: Rc<VecModel<DeckLive>>,
         link: Rc<sync::Link>,
         lib: Rc<dyn Library>,
     ) -> Rc<Self> {
@@ -318,6 +325,7 @@ impl Deck {
             app: app.as_weak(),
             model,
             scroll,
+            live,
             view: RefCell::new(view),
             player,
             loaded: RefCell::default(),
@@ -377,6 +385,13 @@ impl Deck {
             v.clone()
         };
         self.model.set_row_data(self.index, snapshot);
+    }
+
+    /// Edits this deck's `DeckLive` row; the callers change something, so it is always pushed.
+    fn set_live(&self, f: impl FnOnce(&mut DeckLive)) {
+        let mut row = self.live.row_data(self.index).unwrap_or_default();
+        f(&mut row);
+        self.live.set_row_data(self.index, row);
     }
 
     fn say(&self, text: impl Into<slint::SharedString>) {

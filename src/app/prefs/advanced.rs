@@ -2,7 +2,7 @@
 //! BROWSE are the library's ([`crate::app::library::settings`]); BEAT/BPM SYNC and HOT CUE are the CONTROLLER >
 //! Deck settings shown again. Streaming services, Tribe XR and PRO DJ LINK items need a network and are left out.
 
-use super::{choice, section, Prefs, Row};
+use super::{choice, lowpower::LowPower, section, Prefs, Row};
 use crate::app::library::settings as library;
 use openfader::audio::RecOptions;
 use std::path::PathBuf;
@@ -62,6 +62,8 @@ section!(
         update_channel: UpdateChannel = UpdateChannel::Stable;
         /// UPDATE NOW first backs up the library to the data folder (the last 3 are kept) so a roll-back can put it back.
         backup_before_update: bool = true;
+        /// Low-power device profile: AUTO detects Raspberry Pi and small effective RAM budgets ([`super::lowpower`]).
+        low_power: LowPower = LowPower::Auto;
     }
 );
 
@@ -261,6 +263,11 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         .hint(tr!(
             "the last 3 are kept; a roll-back puts the library back"
         )),
+        Row::of("low_power", tr!("LOW-POWER MODE"), a.low_power).hint(if super::lowpower::on(p) {
+            tr!("effective: ON (small sampler, fewer analysis workers)")
+        } else {
+            tr!("effective: OFF")
+        }),
     ]);
     rows
 }

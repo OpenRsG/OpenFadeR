@@ -198,6 +198,10 @@ impl Library for Lib {
             ..Default::default()
         })
     }
+    fn analysis_reader(&self) -> Option<openfader::library::AnalysisReader> {
+        let own = self.analysis(&Track::default());
+        Some(Arc::new(move |_| own.clone()))
+    }
 }
 
 #[test]

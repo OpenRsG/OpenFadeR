@@ -1,12 +1,15 @@
 //! The Cover column of the track table: one small picture per row, set when the row first shows (the table calls
 //! `BrowserState.cover-wanted`). The picture is the track's [`openfader::artwork::resolve`] (a kept cover, the library's, a folder
 //! image). Decoded pictures are kept by file ([`Covers::cache`]): a new cover is a new file, so an entry never goes stale, and the
-//! tracks of one album share one. ponytail: the cache is cleared whole when full, add LRU if that shows.
+//! tracks of one album share one. A full cache drops its least recently used picture.
 
-use super::{strip::StripRows, App, BrowserState, View};
+use super::{
+    strip::{Lru, StripRows},
+    App, BrowserState, View,
+};
 use openfader::{artwork, store};
 use slint::{ComponentHandle, Image, Model};
-use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 /// Side of the stored pictures, in pixels (the column shows 18 logical px).
 const SIDE: u32 = 48;
@@ -15,7 +18,7 @@ const CACHE_MAX: usize = 256;
 
 pub(super) struct Covers {
     model: Rc<StripRows>,
-    cache: RefCell<HashMap<PathBuf, Option<Image>>>,
+    cache: RefCell<Lru<PathBuf, Option<Image>>>,
 }
 
 impl Covers {
@@ -25,7 +28,7 @@ impl Covers {
             .set_covers(model.clone().into());
         Self {
             model,
-            cache: RefCell::default(),
+            cache: RefCell::new(Lru::new(CACHE_MAX)),
         }
     }
 
@@ -38,13 +41,12 @@ impl Covers {
 
     fn image(&self, path: PathBuf) -> Option<Image> {
         let mut cache = self.cache.borrow_mut();
-        if cache.len() >= CACHE_MAX {
-            cache.clear();
+        if let Some(hit) = cache.get(&path) {
+            return hit.clone();
         }
-        cache
-            .entry(path)
-            .or_insert_with_key(|p| crate::app::artwork::image(p, SIDE))
-            .clone()
+        let image = crate::app::artwork::image(&path, SIDE);
+        cache.insert(path, image.clone());
+        image
     }
 }
 

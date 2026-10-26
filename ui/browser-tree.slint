@@ -1,17 +1,19 @@
 import { ListView } from "std-widgets.slint";
-import { Chip, Glyph, IconButton, Icon, TextField } from "widgets.slint";
+import { Chip, Glyph, IconButton, Icon, MenuItem, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { BrowserState } from "browser-state.slint";
 import { DragState, TreeDropTarget } from "dnd.slint";
+import { DeviceState } from "device-state.slint";
+import { LibraryState } from "library.slint";
 
 /// The playlist tree: `h-row` rows with the glyph of what each list is, the selected one on `select`. Headings (My
 /// Playlists, History, Devices …) are taller and bold; a click on one folds or unfolds the rows under it.
 export component TreeView inherits Rectangle {
-    /// How much taller a heading row is than a list row.
-    property <length> head-extra: 10px;
+    property <length> head-extra: Theme.tree-heading-extra;
     pure function row-y(i: int) -> length { return i * Theme.h-row + BrowserState.playlists[i].heads * root.head-extra; }
     pure function row-h(i: int) -> length { return Theme.h-row + (BrowserState.playlists[i].head ? root.head-extra : 0px); }
     in-out property <int> current-item: -1;
+    property <length> menu-y;
     /// The chosen row changed by click, key or `set-current-item`.
     callback item-changed(int);
     callback focused;
@@ -33,21 +35,26 @@ export component TreeView inherits Rectangle {
         key-pressed(e) => {
             if (e.text == Key.UpArrow) { root.set-current-item(root.current-item - 1); return accept; }
             if (e.text == Key.DownArrow) { root.set-current-item(root.current-item + 1); return accept; }
-            // Right unfolds the chosen heading, Left folds it.
-            if (BrowserState.playlists[root.current-item].head && ((e.text == Key.RightArrow && !BrowserState.playlists[root.current-item].open) || (e.text == Key.LeftArrow && BrowserState.playlists[root.current-item].open))) {
+            // Right unfolds the chosen heading; Left folds the section of the chosen row and goes to its heading.
+            if (e.text == Key.RightArrow && BrowserState.playlists[root.current-item].head && !BrowserState.playlists[root.current-item].open) {
                 BrowserState.tree-toggle(root.current-item);
+                return accept;
+            }
+            if (e.text == Key.LeftArrow) {
+                let r = BrowserState.tree-back(root.current-item);
+                if (r != root.current-item) { root.set-current-item(r); }
                 return accept;
             }
             reject
         }
         list := ListView {
             for item[i] in BrowserState.playlists: Rectangle {
-                property <length> indent: Theme.space-md + item.depth * 14px;
+                property <length> indent: Theme.space-md + item.depth * Theme.tree-indent;
                 property <length> glyph: item.head ? 16px : 14px;
                 height: Theme.h-row + (item.head ? root.head-extra : 0px);
                 background: i == root.current-item ? Theme.select : (ta.has-hover ? Theme.hover-row : transparent);
                 // A hairline above each heading but the first keeps the sections apart.
-                if item.head && item.heads > 0: Rectangle { y: 0; height: 1px; background: Theme.line; }
+                if item.head && item.heads > 0 && Theme.tree-lines == 1: Rectangle { y: 0; height: 1px; background: Theme.line; }
                 if item.head: Glyph {
                     x: Theme.space-sm;
                     y: (parent.height - self.height) / 2;
@@ -57,24 +64,24 @@ export component TreeView inherits Rectangle {
                     tint: Theme.text-dim;
                     stroke-width: 2px;
                 }
-                Glyph {
+                if item.head || Theme.tree-icons == 1: Glyph {
                     x: parent.indent + (item.head ? 12px : 0px);
                     y: (parent.height - self.height) / 2;
                     width: parent.glyph;
                     height: parent.glyph;
                     icon: item.icon;
-                    tint: item.head ? Theme.accent-hi : (i == root.current-item ? Theme.text-bright : Theme.text-faint);
+                    tint: item.head ? Theme.tree-heading-icon : (i == root.current-item ? Theme.text-bright : Theme.text-faint);
                 }
                 Text {
-                    x: parent.indent + (item.head ? 12px : 0px) + parent.glyph + Theme.space-md;
+                    x: parent.indent + (item.head ? 12px + parent.glyph + Theme.space-md : (Theme.tree-icons == 1 ? parent.glyph + Theme.space-md : 0px));
                     width: parent.width - self.x - Theme.space-md;
                     height: parent.height;
                     text: item.text;
                     vertical-alignment: center;
                     overflow: elide;
-                    color: i == root.current-item || item.head ? Theme.text-bright : Theme.text-dim;
+                    color: item.head ? Theme.tree-heading : (i == root.current-item ? Theme.text-bright : Theme.text-dim);
                     font-family: Theme.font;
-                    font-size: item.head ? Theme.list-font + 2px : Theme.list-font;
+                    font-size: item.head ? Theme.list-font + Theme.tree-heading-grow : Theme.list-font;
                     font-weight: item.head ? Theme.weight-bold : Theme.list-weight;
                 }
                 // Dragging a playlist onto a palette (Playlist Palette) shows it there.
@@ -90,6 +97,16 @@ export component TreeView inherits Rectangle {
                                 root.set-current-item(i);
                                 if (item.head) { BrowserState.tree-toggle(i); }
                             }
+                            // Right-click on a playlist of a device or of the collection: its menu.
+                            if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right) {
+                                root.focused();
+                                fs.focus();
+                                root.set-current-item(i);
+                                if (BrowserState.side-kind == 12 || BrowserState.side-kind == 3 || BrowserState.side-kind == 8) {
+                                    root.menu-y = root.row-y(i) + root.row-h(i) + list.content-y;
+                                    menu.show();
+                                }
+                            }
                         }
                         // Preferences > Advanced > Browse > Edit Library: rename by double click.
                         double-clicked => { if (BrowserState.edit-library) { BrowserState.side-rename(); } }
@@ -100,6 +117,24 @@ export component TreeView inherits Rectangle {
         }
     }
     Rectangle { border-width: 1px; border-color: fs.has-focus ? Theme.accent : transparent; }
+    menu := PopupWindow {
+        x: Theme.space-md;
+        y: min(root.menu-y, max(0px, root.height - self.height));
+        width: 240px;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.radius;
+            VerticalLayout {
+                padding: 1px;
+                // Copies its music onto this computer, with cues, grid and key, and lists the copies in My Playlists.
+                if BrowserState.side-kind == 12: MenuItem { text: @tr("Import to Collection"); activated => { DeviceState.import-playlist(BrowserState.source-device, BrowserState.source-list); menu.close(); } }
+                // DEVICES > EXPORT with this playlist ticked, in every format picked for the device.
+                if BrowserState.side-kind == 3 || BrowserState.side-kind == 8: MenuItem { text: @tr("Export to a device"); activated => { LibraryState.action("playlist-export-device"); menu.close(); } }
+            }
+        }
+    }
 }
 
 /// The picker on the table's right edge (ADD TO playlist, tags of the track, tag filter, NEW, MORE).

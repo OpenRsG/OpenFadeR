@@ -136,6 +136,20 @@ impl Store {
                     (_, false) => update_row(db, t, &cols, old, new)?,
                     (_, true) => update_row(db, t, &cols, new, old)?,
                 }
+                if t == "cue"
+                    || (t == "track"
+                        && (old.contains("\"cues_set\"") || new.contains("\"cues_set\"")))
+                {
+                    let key: Option<String> = scalar::<Option<String>>(
+                        db,
+                        "SELECT COALESCE(json_extract(?1, '$.key'), json_extract(?2, '$.key'))",
+                        rusqlite::params![old, new],
+                    )?
+                    .flatten();
+                    if let Some(key) = key {
+                        super::super::track::cue_written(db, &key, &self.cue_changes)?;
+                    }
+                }
             }
             exec(
                 db,

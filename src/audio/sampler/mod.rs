@@ -12,7 +12,7 @@
 //! [`Handover`](super::handover::Handover) (the callback neither allocates, frees nor blocks). Children: [`voice`]
 //! (one slot's playback), [`seq`] (the pattern sequencer).
 //!
-//! ponytail: slots stay at their own sample rate and are resampled linearly like decks; they are not
+//! ponytail: slots stay at their own sample rate and are resampled like decks (windowed sinc); they are not
 //! loudness-matched; the sampler bypasses the Beat FX and the channel EQ/filters.
 
 mod seq;
@@ -204,7 +204,7 @@ impl Sampler {
     pub fn new(rate: u32) -> Sampler {
         Sampler {
             rate,
-            voices: std::array::from_fn(|_| Voice::new()),
+            voices: std::array::from_fn(|_| Voice::new(rate)),
             seq: seq::State::new(),
         }
     }

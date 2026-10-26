@@ -68,7 +68,11 @@ impl Default for State {
 /// "12 Oct 2026 21:03".
 fn when(ts: i64) -> String {
     chrono::DateTime::from_timestamp(ts, 0)
-        .map(|t| t.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
+        .map(|t| {
+            t.with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M")
+                .to_string()
+        })
         .unwrap_or_default()
 }
 
@@ -89,9 +93,16 @@ pub(super) fn why(w: &Why) -> String {
         Why::FileSystem(fs) => tr!("cannot read {}", fs_name(fs)),
         Why::Table(t) => tr!(
             "cannot read a {} partition table",
-            if t == "dos" { "MBR".to_owned() } else { t.to_uppercase() }
+            if t == "dos" {
+                "MBR".to_owned()
+            } else {
+                t.to_uppercase()
+            }
         ),
-        Why::NoLibrary(reads) => tr!("needs {}, this stick has none", reads.join(&format!(" {} ", tr!("or")))),
+        Why::NoLibrary(reads) => tr!(
+            "needs {}, this stick has none",
+            reads.join(&format!(" {} ", tr!("or")))
+        ),
         Why::Unreadable(n) => tr!("cannot open the {} of this stick", n),
         Why::Damaged(n) => tr!("finds the {} of this stick damaged (see WHAT IS WRONG)", n),
     }
@@ -547,23 +558,6 @@ impl Ctx {
         );
     }
 
-    /// A device appeared: finishes or undoes an export a pulled stick cut off, before anything else touches the device, says what
-    /// happened, and queues the first look.
-    pub(super) fn on_mounted(&self, d: &Device) {
-        if commit::pending(&d.mount).is_some() || d.mount.join(commit::JOURNAL).is_file() {
-            let r = if d.writable() {
-                commit::recover(&d.mount)
-            } else {
-                Err(tr!("it is mounted read-only").to_owned())
-            };
-            if let (Some(text), Some(app)) = (recovery_text(&d.label, &r), self.app()) {
-                toast::show(&app, &text);
-            }
-            device::forget(&d.mount);
-        }
-        self.recheck(&d.id);
-    }
-
     /// The callbacks of the card and the booth picker.
     pub(super) fn wire_check(cx: &Rc<Self>, app: &App) {
         let s = app.global::<DeviceState>();
@@ -612,6 +606,20 @@ impl Ctx {
     }
 }
 
+/// Recover a newly mounted library on its scan worker before queuing any automatic writes.
+pub(super) fn recover_mounted(d: &Device) -> Option<String> {
+    if commit::pending(&d.mount).is_none() && !d.mount.join(commit::JOURNAL).is_file() {
+        return None;
+    }
+    let r = if d.writable() {
+        commit::recover(&d.mount)
+    } else {
+        Err(tr!("it is mounted read-only").to_owned())
+    };
+    device::forget(&d.mount);
+    recovery_text(&d.label, &r)
+}
+
 /// Everything FIX THE STICK needs, moved to its worker.
 struct Fix {
     dev: Device,
@@ -645,7 +653,13 @@ impl Fix {
         ctl.set_phase(tr!("Finishing what was cut off"));
         match commit::recover(&dev.mount) {
             Ok(r) => said.extend(recovery_text(&dev.label, &Ok(r))),
-            Err(e) => return Err(tr!("{}: the cut-off export could not be put right ({}).", dev.label, e)),
+            Err(e) => {
+                return Err(tr!(
+                    "{}: the cut-off export could not be put right ({}).",
+                    dev.label,
+                    e
+                ));
+            }
         }
         for s in &self.steps {
             let Step::Plugin { plugin, fix } = s else {
@@ -740,9 +754,13 @@ impl Fix {
     }
 }
 
+/// How long a copy waits before it tries again after an input/output error: a USB link that resets is back after about a second.
+const EIO_PAUSE: std::time::Duration = std::time::Duration::from_secs(2);
+
 /// Copies `src` to `to`, which does not exist: into a `.part` file that is flushed to the stick, checked against the source's
-/// size and renamed, so a copy that is cut short never looks whole. The bytes count in the job's progress.
-fn copy_audio(src: &Path, to: &Path, ctl: &Control) -> Result<(), String> {
+/// size and renamed, so a copy that is cut short never looks whole. The bytes count in the job's progress. An input/output error
+/// (a USB link that resets) is tried once more after a pause.
+pub(super) fn copy_audio(src: &Path, to: &Path, ctl: &Control) -> Result<(), String> {
     use std::io::{Read, Write};
     let err = |p: &Path| {
         let p = p.display().to_string();
@@ -775,7 +793,12 @@ fn copy_audio(src: &Path, to: &Path, ctl: &Control) -> Result<(), String> {
         }
         std::fs::rename(&tmp, to).map_err(err(to))
     };
-    copy().inspect_err(|_| drop(std::fs::remove_file(&tmp)))?;
+    let counted = ctl.bytes_done.load(Relaxed);
+    openfader_plugin::library::retry_eio(EIO_PAUSE, || {
+        // A leftover part of a cut-off run is overwritten; the bytes of a failed try are taken back so the retry counts once.
+        copy().inspect_err(|_| ctl.bytes_done.store(counted, Relaxed))
+    })
+    .inspect_err(|_| drop(std::fs::remove_file(&tmp)))?;
     if let Some(dir) = to.parent() {
         commit::sync_dir(dir);
     }
@@ -909,6 +932,9 @@ mod tests {
         std::fs::create_dir_all(dir.join("src")).unwrap();
         std::fs::write(dir.join("src/a.mp3"), vec![7u8; 3_000_000]).unwrap();
         let ctl = Control::default();
+        // The part a run cut off by a lost device left is overwritten, not kept.
+        std::fs::create_dir_all(dir.join("stick/Contents/A/B")).unwrap();
+        std::fs::write(dir.join("stick/Contents/A/B/a.part"), b"half").unwrap();
         copy_audio(&dir.join("src/a.mp3"), &dir.join("stick/Contents/A/B/a.mp3"), &ctl).unwrap();
         assert_eq!(std::fs::read(dir.join("stick/Contents/A/B/a.mp3")).unwrap().len(), 3_000_000);
         assert_eq!(ctl.bytes_done.load(Relaxed), 3_000_000);

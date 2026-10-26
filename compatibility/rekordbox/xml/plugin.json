@@ -1,0 +1,37 @@
+{
+  "name": "rekordbox-xml",
+  "version": "0.1.0",
+  "suggest": "rekordbox",
+  "description": "Reads and writes rekordbox's \"Export Collection in xml format\" (rekordbox.xml): tracks, playlists, beat grids and cues.",
+  "library": {
+    "formats": [
+      "xml"
+    ],
+    "collection_writer": "Export Collection in xml format",
+    "collection_reader": "Import from rekordbox xml…",
+    "browser": {
+      "label": "rekordbox xml",
+      "path_setting": "file"
+    }
+  },
+  "settings": [
+    {
+      "id": "file",
+      "label": "Imported Library",
+      "type": "text",
+      "help": "path of a rekordbox xml, listed in the Media Browser"
+    },
+    {
+      "id": "path_map",
+      "label": "Path map",
+      "type": "text",
+      "help": "C:/Users/x/Music=>/home/y/Music;… (empty: $OPENFADER_PATH_MAP)"
+    },
+    {
+      "id": "export_grid",
+      "label": "Export BeatGrid information",
+      "type": "bool",
+      "default": true
+    }
+  ]
+}

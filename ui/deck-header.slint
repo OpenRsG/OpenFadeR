@@ -47,10 +47,9 @@ export component DeckTitle inherits VerticalLayout {
 export component DeckTimes inherits VerticalLayout {
     in property <int> index;
     in property <length> size: Theme.font-lg;
-    property <DeckView> v: DeckState.decks[root.index];
     alignment: center;
-    Text { text: root.v.remain-text; color: Theme.text-bright; font-size: root.size; font-weight: Theme.weight-bold; horizontal-alignment: right; }
-    Text { text: root.v.elapsed-text; color: Theme.text-dim; font-size: root.size; font-weight: Theme.weight-bold; horizontal-alignment: right; }
+    Text { text: DeckState.live[root.index].remain-text; color: Theme.text-bright; font-size: root.size; font-weight: Theme.weight-bold; horizontal-alignment: right; }
+    Text { text: DeckState.live[root.index].elapsed-text; color: Theme.text-dim; font-size: root.size; font-weight: Theme.weight-bold; horizontal-alignment: right; }
 }
 
 /// Right header cluster: KEY SYNC with `< key >` (double-click the key to reset it), SYNC (beat sync) and MASTER.

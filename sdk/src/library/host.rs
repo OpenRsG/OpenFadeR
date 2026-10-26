@@ -72,7 +72,8 @@ pub fn serving<R>(host: *const Host, f: impl FnOnce() -> R) -> R {
         }
     }
     let _reset = Reset(CURRENT.with(|c| c.replace(host)));
-    JOB.with(|j| *j.borrow_mut() = Job::default());
+    // A library dropped while its thread exits (the app keeps them in thread-locals) is served after JOB is gone.
+    let _ = JOB.try_with(|j| *j.borrow_mut() = Job::default());
     f()
 }
 
@@ -135,6 +136,14 @@ pub fn add_bytes(n: u64) -> bool {
             .is_none_or(|t| t.elapsed() >= std::time::Duration::from_millis(200))
     });
     due && send()
+}
+
+/// Takes back `n` bytes [`add_bytes`] counted: a copy that is tried again counts its bytes once.
+pub fn rewind_bytes(n: u64) {
+    JOB.with(|j| {
+        let mut j = j.borrow_mut();
+        j.bytes_done = j.bytes_done.saturating_sub(n);
+    });
 }
 
 fn send() -> bool {

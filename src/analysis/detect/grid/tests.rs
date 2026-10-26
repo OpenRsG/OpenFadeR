@@ -283,6 +283,42 @@ fn bpm_range_folds_octaves() {
     );
 }
 
+/// Onsets (400 Hz frames) every `step` frames for 60 s, `weight(k)` for the k-th.
+fn pattern(step: f64, weight: impl Fn(usize) -> f64) -> Vec<(f64, f64)> {
+    (0..(24_000.0 / step) as usize)
+        .map(|k| (70.0 + k as f64 * step, weight(k)))
+        .collect()
+}
+
+#[test]
+fn octave_follows_the_onset_pattern_inside_the_range() {
+    let fr = 400.0;
+    // 300 frames = 80 BPM, 150 frames = 160 BPM, 600 frames = 40 BPM
+    let wide = (60.0, 180.0);
+    // a kick on every 80 BPM beat and faint hats between: the beat is 80, whichever reading came in
+    let faint = pattern(150.0, |k| if k % 2 == 0 { 1.0 } else { 0.1 });
+    assert_eq!(octave(&faint, 300.0, fr, wide), 300.0);
+    assert_eq!(octave(&faint, 150.0, fr, wide), 300.0, "the double-time reading is dropped");
+    // hats as strong as the kick: the pattern is a plain 160 BPM pulse, half time (80) would keep half the onsets
+    let even = pattern(150.0, |_| 1.0);
+    assert_eq!(octave(&even, 300.0, fr, wide), 150.0, "a half-time reading of an even pulse doubles");
+    assert_eq!(octave(&even, 150.0, fr, wide), 150.0);
+    // onsets only every second 160 BPM beat: 80 BPM
+    let sparse = pattern(300.0, |_| 1.0);
+    assert_eq!(octave(&sparse, 150.0, fr, wide), 300.0);
+    // the prior stops the slide to ever slower readings: 40 BPM scores twice as high on onsets every 600 frames without it
+    let slow = pattern(600.0, |_| 1.0);
+    assert_eq!(octave(&slow, 300.0, fr, (30.0, 180.0)), 300.0);
+    // the range is the user's: the 160 BPM reading of the even pulse is outside 70-140, so it stays at 80
+    assert_eq!(octave(&even, 300.0, fr, (70.0, 140.0)), 300.0);
+    // an octave-wide range around the edge: 174 and 87 BPM readings of plain beats keep their own pulse
+    let plain = |bpm: f64| pattern(60.0 * fr / bpm, |_| 1.0);
+    for bpm in [87.0, 174.0] {
+        let p = 60.0 * fr / bpm;
+        assert_eq!(octave(&plain(bpm), p, fr, (85.0, 175.0)), p, "{bpm}");
+    }
+}
+
 #[test]
 fn modes_and_the_auto_decision() {
     let o = |mode, precision| GridOptions {

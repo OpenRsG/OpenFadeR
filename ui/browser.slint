@@ -53,15 +53,27 @@ export component Browser inherits Rectangle {
     in property <length> dock-height: 0px;
     /// The browser of the split-screen window: the main window's layout switch (browse view) is not its to flip.
     in property <bool> detached;
+    /// This browser is the one on screen (the window keeps the classic and the touch browser both built): its track table
+    /// answers the controller's menu button.
+    in property <bool> live: true;
     /// Moves the track selection by `d` rows, clamped (current-row is -1 when none).
     public function select-delta(d: int) {
         if (root.tree-focus) { tree.set-current-item(tree.current-item + d); }
         else { table.set-current-row(BrowserState.current-row + d); }
     }
-    /// MIDI BACK: the browse encoder walks the playlist tree.
-    public function browse-back() { root.touch-pane = 1; root.tree-focus = true; tree.focus(); }
-    /// MIDI browse push: from the tree, go to the tracks (false); on the tracks the caller loads the chosen one (true).
+    /// MIDI BACK: the browse encoder walks the playlist tree; BACK in the tree folds the chosen row's section and goes to its heading.
+    public function browse-back() {
+        if (root.tree-focus && tree.has-focus) {
+            let r = BrowserState.tree-back(tree.current-item);
+            if (r != tree.current-item) { tree.set-current-item(r); }
+            return;
+        }
+        root.touch-pane = 1; root.tree-focus = true; tree.focus();
+    }
+    /// MIDI browse push: on a tree heading, fold or unfold its section; elsewhere in the tree, go to the tracks (false); on the
+    /// tracks the caller loads the chosen one (true).
     public function browse-push() -> bool {
+        if (root.tree-focus && BrowserState.playlists[tree.current-item].head) { BrowserState.tree-toggle(tree.current-item); return false; }
         if (root.tree-focus) { root.touch-pane = 0; root.tree-focus = false; table.focus(); return false; }
         return true;
     }
@@ -342,6 +354,7 @@ export component Browser inherits Rectangle {
                     content-width: root.touch ? max(self.width, 540px) : self.width;
                     content-height: self.height;
                     table := TrackTable {
+                        live: root.live;
                         width: parent.content-width;
                         height: parent.height;
                         sorted-col: root.sorted-col;
@@ -416,6 +429,7 @@ export component Browser inherits Rectangle {
                 if BrowserState.side-kind == 12 && BrowserState.source-history: IconButton { icon: Icon.check; icon-size: 16px; tooltip: @tr("Import into the play history"); clicked => { DeviceState.import-history(BrowserState.source-device, BrowserState.source-list); } }
                 if BrowserState.side-kind == 12: IconButton { icon: Icon.trash; icon-size: 16px; tooltip: @tr("Delete from the device"); clicked => { DeviceState.delete-playlist(BrowserState.source-device, BrowserState.source-list); } }
                 if BrowserState.history-view: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: @tr("Save as M3U8"); clicked => { BrowserState.history-save(); } }
+                if BrowserState.history-view: IconButton { icon: Icon.clock; icon-size: 16px; tooltip: @tr("Save set list"); clicked => { BrowserState.history-save-set-list(); } }
                 if !root.detached: IconButton { icon: Icon.expand; icon-size: 16px; tooltip: @tr("Browse view (W)"); active: BrowserState.browse-max; clicked => { BrowserState.browse-max = !BrowserState.browse-max; } }
             }
             }

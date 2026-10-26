@@ -1,8 +1,8 @@
 //! The Track menu on the track chosen in the browser: Import To Collection, Analyze Track, Analysis Lock,
 //! Reload Tag, Show in file manager, Relocate, Auto Relocate, Remove from Collection.
 
-use super::{autocue, missing, show_in_folder, Ask, Confirm, Ctx};
-use crate::app::{analyze, browser};
+use super::{Ask, Confirm, Ctx, autocue, missing, show_in_folder};
+use crate::app::browser;
 use openfader::{
     library::{Track, folder},
     store,
@@ -17,7 +17,10 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
     let tracks = ctx.tracks;
     match id {
         "track-edit" => crate::app::trackinfo::open_editor(&c.app(), &t),
-        "track-import" => import(c, t),
+        "track-import" => match ctx.device {
+            Some(d) => crate::app::device::import_tracks(&d, &tracks),
+            None => import(c, t),
+        },
         "track-analyze" => analyze_tracks(c, tracks),
         "track-autocue" => autocue::start(c, tracks),
         "track-lock" => lock(c, &tracks),
@@ -54,39 +57,19 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
     }
 }
 
-/// Analyze Track on the selection: tracks with an Analysis Lock are skipped, and the status says how many.
+/// Analysis workers check locks and prepare source guides without holding the UI callback.
 fn analyze_tracks(c: &Rc<Ctx>, tracks: Vec<Track>) {
-    let (run, locked): (Vec<Track>, Vec<Track>) = tracks
-        .into_iter()
-        .partition(|t| !c.store.analysis_locked(&store::key(t)).unwrap_or(false));
-    match (run.as_slice(), locked.len()) {
-        ([], 1) => c.say(tr!("this track has an Analysis Lock: unlock it first")),
-        ([t], 0) => c.say(&tr!(
-            "analysing “{}”…{}",
-            t.title,
-            analyze::library_grid_notice(t)
-        )),
-        (run, skipped) => {
-            let mut msg = if run.is_empty() {
-                String::new()
-            } else {
-                tr!("analysing {} tracks…", run.len())
-            };
-            if skipped > 0 {
-                if !msg.is_empty() {
-                    msg += " · ";
-                }
-                msg += &tr!("{} skipped (Analysis Lock)", skipped);
-            }
-            c.say(&msg);
-        }
-    }
-    if !run.is_empty() {
-        c.analyze(run, true);
+    let msg = match tracks.as_slice() {
+        [t] => tr!("analysing “{}”…", t.title),
+        many => tr!("analysing {} tracks…", many.len()),
+    };
+    c.say(&msg);
+    if !tracks.is_empty() {
+        c.analyze(tracks, true);
     }
 }
 
-/// Import To Collection: a track of a device or another library joins ours.
+/// Import To Collection: a track of another library joins ours (a device's is copied: [`crate::app::device::import_tracks`]).
 fn import(c: &Rc<Ctx>, t: Track) {
     let Some(file) = t.file.clone() else {
         return c.say(tr!("this track has no file"));

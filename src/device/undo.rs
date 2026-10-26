@@ -9,10 +9,10 @@
 
 use super::link::Marks;
 use crate::analysis::{Beat, Cue, Phrases};
-use crate::store::{Edits, Store};
+use crate::store::Store;
 use serde::{Deserialize, Serialize};
 
-/// One field of a track's edits ([`Edits`]) with a value (`None`: no edit, the library's value stands).
+/// One field of a track's edits ([`crate::store::Edits`]) with a value (`None`: no edit, the library's value stands).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Field {
     Rating(Option<u8>),
@@ -21,19 +21,23 @@ pub enum Field {
     Cues(Option<Vec<Cue>>),
     Grid(Option<Vec<Beat>>),
     Phrases(Option<Phrases>),
+    /// The musical key of the Collection row (not an edit: the row's own value, `None` for a key that names no row).
+    Key(Option<String>),
 }
 
 impl Field {
-    /// The same field as `e` holds it now.
-    pub fn read(&self, e: &Edits) -> Field {
-        match self {
-            Field::Rating(_) => Field::Rating(e.rating),
-            Field::Comment(_) => Field::Comment(e.comment.clone()),
-            Field::Color(_) => Field::Color(e.color),
-            Field::Cues(_) => Field::Cues(e.cues.clone()),
-            Field::Grid(_) => Field::Grid(e.grid.clone()),
-            Field::Phrases(_) => Field::Phrases(e.phrases.clone()),
-        }
+    /// The same field as `store` holds it now for `key`.
+    pub fn read(&self, store: &Store, key: &str) -> Result<Field, String> {
+        let e = || store.edits(key);
+        Ok(match self {
+            Field::Rating(_) => Field::Rating(e()?.rating),
+            Field::Comment(_) => Field::Comment(e()?.comment),
+            Field::Color(_) => Field::Color(e()?.color),
+            Field::Cues(_) => Field::Cues(e()?.cues),
+            Field::Grid(_) => Field::Grid(e()?.grid),
+            Field::Phrases(_) => Field::Phrases(e()?.phrases),
+            Field::Key(_) => Field::Key(store.row_tkey(key)?),
+        })
     }
 
     /// Writes the value to the store as the edit of `key`.
@@ -47,6 +51,7 @@ impl Field {
             Field::Grid(None) => store.reset_grid(key).map(drop),
             Field::Phrases(Some(p)) => store.set_phrase_edit(key, p),
             Field::Phrases(None) => store.clear_phrase_edit(key),
+            Field::Key(v) => store.set_row_tkey(key, v.as_deref().unwrap_or_default()),
         }
     }
 }
@@ -63,7 +68,7 @@ pub struct Change {
 impl Change {
     /// The change of writing `after` over what `store` holds for `key` now; `None` when it would change nothing.
     pub fn of(store: &Store, key: &str, after: Field) -> Result<Option<Change>, String> {
-        let before = after.read(&store.edits(key)?);
+        let before = after.read(store, key)?;
         Ok((before != after).then(|| Change {
             key: key.to_owned(),
             before,
@@ -147,7 +152,7 @@ pub fn run(store: &Store, id: i64) -> Result<Undone, String> {
     let mut out = Undone::default();
     store.action("Undo import", || -> Result<(), String> {
         for c in entry.changes.iter().rev() {
-            let now = c.after.read(&store.edits(&c.key)?);
+            let now = c.after.read(store, &c.key)?;
             if now == c.after {
                 c.before.write(store, &c.key)?;
                 out.restored += 1;

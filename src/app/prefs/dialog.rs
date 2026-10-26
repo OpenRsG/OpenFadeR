@@ -48,11 +48,13 @@ pub fn refresh() {
 }
 
 fn choose(key: &str, i: usize) {
-    live::update(|p| {
-        if !p.choose(key, i) {
-            PAGES.iter().any(|(_, c)| c(p, key, i));
-        }
-    });
+    if !live::run_action(key) {
+        live::update(|p| {
+            if !p.choose(key, i) {
+                PAGES.iter().any(|(_, c)| c(p, key, i));
+            }
+        });
+    }
     refresh();
 }
 
@@ -110,6 +112,8 @@ pub fn wire(app: &App) -> Timer {
     controller::wire();
     extensions::wire();
     advanced::wire();
+    #[cfg(feature = "stems")]
+    super::lowpower::wire();
     keyboard::wire(app);
     refresh();
     look::apply(app, &p);
@@ -121,4 +125,27 @@ pub fn wire(app: &App) -> Timer {
         }
     });
     watch_window(app)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn action_can_read_and_edit_current_preferences() {
+        std::thread::spawn(|| {
+            live::set(Prefs {
+                tempo_range_default: 2,
+                ..Default::default()
+            });
+            live::on_action("analyze_now", || {
+                let range = live::with(|p| p.tempo_range_default);
+                live::set_for_test(|p| p.tempo_range_default = range + 1);
+            });
+            choose("analyze_now", 0);
+            assert_eq!(live::with(|p| p.tempo_range_default), 3);
+        })
+        .join()
+        .unwrap();
+    }
 }

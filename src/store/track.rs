@@ -6,7 +6,10 @@ use super::{R, Sql, Store, cue_at, exec, exists, query_all, query_opt, rgb, scal
 use crate::analysis::{Beat, Cue, Phrases};
 use crate::library::Track;
 use rusqlite::{Connection, ToSql, params};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 /// Track colours by colour id − 1: name and RGB.
 pub const TRACK_COLORS: [(&str, [u8; 3]); 8] = [
@@ -62,7 +65,7 @@ impl Edits {
 }
 
 /// The cheap fields of one track ([`Store::track_fields`]): what a track list needs, without cues and grids.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(super) struct Fields {
     pub rating: Option<u8>,
     pub comment: Option<String>,
@@ -99,7 +102,52 @@ fn grid_from(blob: &[u8]) -> Vec<Beat> {
 /// The `device_setting` scope listing the keys whose cue list CUE Analysis made.
 pub const AUTO_CUES: &str = "cue_analysis";
 
-fn put_cues(tx: &Connection, key: &str, cues: Option<&[Cue]>, auto: bool) -> R<()> {
+fn cue_revision(db: &Connection, key: &str) -> R<i64> {
+    let revision = scalar::<i64>(
+        db,
+        "SELECT CAST(value AS INTEGER) FROM device_setting WHERE scope = 'cue_revision' AND key = ?1",
+        [key],
+    )?.unwrap_or(0);
+    if revision < 0 {
+        return Err("negative cue revision in store".into());
+    }
+    Ok(revision)
+}
+
+pub(super) fn cue_written(tx: &Connection, key: &str, clock: &AtomicU64) -> R<()> {
+    let previous = u64::try_from(cue_revision(tx, key)?)
+        .map_err(|_| "negative cue revision in store".to_owned())?;
+    clock.fetch_max(previous, Ordering::Relaxed);
+    let previous = clock
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            i64::try_from(value)
+                .ok()?
+                .checked_add(1)
+                .and_then(|next| u64::try_from(next).ok())
+        })
+        .map_err(|_| "cue revision exceeds SQLite integer range".to_owned())?;
+    let revision = i64::try_from(previous)
+        .ok()
+        .and_then(|value| value.checked_add(1))
+        .ok_or_else(|| "cue revision exceeds SQLite integer range".to_owned())?;
+    exec(
+        tx,
+        "INSERT INTO device_setting(scope, key, value) VALUES ('cue_revision', ?1, ?2)
+         ON CONFLICT(scope, key) DO UPDATE SET value = ?2",
+        params![key, revision],
+    )
+}
+
+fn put_cues(
+    tx: &Connection,
+    key: &str,
+    cues: Option<&[Cue]>,
+    auto: bool,
+    clock: &AtomicU64,
+) -> R<()> {
+    if !auto {
+        cue_written(tx, key, clock)?;
+    }
     exec(
         tx,
         "INSERT INTO track(key, cues_set) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET cues_set = ?2",
@@ -198,12 +246,34 @@ impl Store {
     /// Stores the whole cue list of `key` (hot cues, memory cues, loops; list order kept); `None` drops it
     /// so the library's cues show again. The list is the user's from now on (no longer [`Store::cues_are_auto`]).
     pub fn set_cues(&self, key: &str, cues: Option<&[Cue]>) -> R<()> {
-        self.write(|tx| put_cues(tx, key, cues, false))
+        self.write(|tx| put_cues(tx, key, cues, false, &self.cue_changes))
     }
 
     /// [`Store::set_cues`] for cues CUE Analysis made: marked so a connected library's own cues may replace them.
     pub fn set_auto_cues(&self, key: &str, cues: &[Cue]) -> R<()> {
-        self.write(|tx| put_cues(tx, key, Some(cues), true))
+        self.write(|tx| put_cues(tx, key, Some(cues), true, &self.cue_changes))
+    }
+
+    /// Cheap submission boundary: a later per-track revision means the user changed cues while work was queued.
+    pub fn cue_generation(&self) -> u64 {
+        self.cue_changes.load(Ordering::Relaxed)
+    }
+
+    /// Revision of user cue writes, including explicit deletion and writes of an unchanged list.
+    pub fn cue_revision(&self, key: &str) -> R<i64> {
+        cue_revision(&self.db(), key)
+    }
+
+    /// Stores generated cues only if no user cue write occurred since preparation, in one transaction.
+    pub fn set_auto_cues_if_revision(&self, key: &str, cues: &[Cue], revision: i64) -> R<bool> {
+        self.write(|tx| {
+            let current = cue_revision(tx, key)?;
+            if current != revision {
+                return Ok(false);
+            }
+            put_cues(tx, key, Some(cues), true, &self.cue_changes)?;
+            Ok(true)
+        })
     }
 
     /// Whether the stored cue list of `key` is the one CUE Analysis made ([`Store::set_auto_cues`]), untouched since.
@@ -335,5 +405,43 @@ impl Store {
             [],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_cue_epoch_uses_sqlite_signed_integers_without_wrapping_at_the_limit() {
+        let store = Store::in_memory().unwrap();
+        store
+            .set_device_setting("cue_revision", "k", &(i64::MAX - 1).to_string())
+            .unwrap();
+        store.set_cues("k", Some(&[])).unwrap();
+        assert_eq!(store.cue_revision("k").unwrap(), i64::MAX);
+        assert_eq!(store.cue_generation(), u64::try_from(i64::MAX).unwrap());
+        assert!(
+            store
+                .set_cues("k", None)
+                .unwrap_err()
+                .contains("SQLite integer range")
+        );
+        assert_eq!(store.cue_revision("k").unwrap(), i64::MAX);
+        assert_eq!(store.edits("k").unwrap().cues, Some(Vec::new()));
+    }
+
+    #[test]
+    fn negative_persisted_cue_revisions_are_errors_not_unsigned_epochs() {
+        let store = Store::in_memory().unwrap();
+        store.set_device_setting("cue_revision", "k", "-1").unwrap();
+        assert!(
+            store
+                .cue_revision("k")
+                .unwrap_err()
+                .contains("negative cue revision")
+        );
+        assert!(store.set_cues("k", Some(&[])).is_err());
+        assert_eq!(store.cue_generation(), 0);
     }
 }

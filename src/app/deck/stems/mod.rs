@@ -121,6 +121,7 @@ fn knob_moved(mute: &mut [bool; STEM_COUNT], old: [f32; 3], new: [f32; 3], four:
 
 pub(super) struct State {
     job: Option<Job>,
+    lookup: Option<job::Lookup>,
     attached: Option<std::sync::Arc<openfader::audio::Stems>>,
     /// Stems are attached to the player and the buttons work (the separation may still be running).
     ready: bool,
@@ -145,6 +146,7 @@ impl Default for State {
     fn default() -> Self {
         State {
             job: None,
+            lookup: None,
             attached: None,
             ready: false,
             complete: false,
@@ -223,6 +225,7 @@ impl Deck {
         self.double.borrow_mut().take(); // a pending INSTANT DOUBLES belongs to the track that is going
         {
             let mut s = self.stems.borrow_mut();
+            s.lookup = None;
             s.job = None;
             s.attached = None;
             s.parts = None;

@@ -31,7 +31,18 @@ pub fn have_bundled() -> bool {
 pub fn bundled_all() -> &'static [Effect] {
     static ALL: LazyLock<Vec<Effect>> = LazyLock::new(|| {
         let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("extension/plugin");
-        let mut r = crate::plugin::discover(&[dir]);
+        // The companion checkout also contains legacy folders for readers now built into the app.
+        let mut dirs: Vec<_> = std::fs::read_dir(dir)
+            .expect("bundled plugin directory")
+            .map(|entry| entry.expect("bundled plugin entry").path())
+            .filter(|dir| {
+                !crate::plugin::builtin::is(
+                    dir.file_name().and_then(|name| name.to_str()).unwrap_or(""),
+                )
+            })
+            .collect();
+        dirs.sort();
+        let mut r = crate::plugin::discover(&dirs);
         let fx = load(&r.plugins, &mut r.errors);
         assert!(r.errors.is_empty(), "{:#?}", r.errors);
         fx

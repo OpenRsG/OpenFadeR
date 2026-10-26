@@ -1,4 +1,5 @@
 import { AutomixState, Browser, BrowserState } from "browser.slint";
+import { TrackMenuState } from "track-menu.slint";
 import { DeckCompact, DeckDetail, DeckDetailV, DeckPanel, DeckState, DeckView } from "deck.slint";
 import { FxPanel, FxSlot, FxState, FxUnit } from "fx.slint";
 import { FxRackState, RackView } from "fxrack.slint";
@@ -13,6 +14,7 @@ import { ReportOverlay, ReportState } from "report.slint";
 import { WelcomeOverlay, WelcomeState, SuggestView } from "welcome.slint";
 import { StemsModelCard, StemsModelState } from "stems-model.slint";
 import { MidiChip, MidiOverlay, MidiState } from "midi.slint";
+import { ResourceChip, ResourceState } from "resources.slint";
 import { ActionItem, BackupItem, CompareRow, DeviceChip, DeviceItem, DeviceOverlay, DeviceProgress, DeviceState, FormatItem, FormatOption, PickRow, ReviewRow } from "device.slint";
 import { CheckLib, CheckPlayer, CheckPreset, CheckProblem } from "device.slint";
 import { DupeRow, ImportReportState, ImportSkipRow, LibraryOverlays, LibraryState, MissingRow } from "library.slint";
@@ -46,6 +48,7 @@ import { StageWorkspace } from "stage/stage.slint";
 export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowView, DeckState, DeckView, DeviceItem, DeviceState, DjEditor, DjItem, DjSystemState, DragState, DupeRow, EditState, ExportDeck, ExportModeState, FixtureView, FxState, FxUnit, HelpLine, KeymapState, KeysState, LayoutState, LibraryState, LightingState, MidiState, MissingRow, MixDeckView, MixPointState, MixerState, PadOpt, PadView, PadsState, PaneState, PluginState, PrefRowData, PrefsState, SamplerState, SlotView, SplitWindow, Theme, ToastState, TrackInfoState, VideoDeckView, VideoItem, VideoState, VideoWindow }
 export { DrumSlotView, GrooveDeckView, GrooveState, HotCue, PhraseSeg }
 export { FxRackState, RackView, FxSlot }
+export { ResourceState }
 export { ActionItem, FormatItem, FormatOption }
 export { CheckLib, CheckPlayer, CheckPreset, CheckProblem }
 export { ArtCandidate, ArtworkState } // FIND ARTWORK (ui/artwork.slint, src/app/artwork)
@@ -161,18 +164,40 @@ export component App inherits Window {
 
     /// Ctrl+F (src/app/keys.rs).
     public function focus-search() { if root.touch { touch-workspace.focus-search(); } else if root.studio { StudioState.focus(0); } else { browser.focus-search(); } }
-    /// MIDI browse encoder (src/app/midi): move the track selection by `d` rows.
-    public function browse(d: int) { if root.touch { touch-workspace.browse(d); } else if root.studio { StudioState.browse(d); } else { browser.select-delta(d); } }
-    /// MIDI BACK / browse push / sort buttons (see Browser).
-    public function browse-back() { if root.touch { touch-workspace.browse-back(); } else if root.studio { StudioState.focus(1); } else { browser.browse-back(); } }
+    /// MIDI browse encoder (src/app/midi): move the track selection by `d` rows (the tree's row when it has the focus, the
+    /// item of the track menu while it is open).
+    public function browse(d: int) {
+        if TrackMenuState.open { TrackMenuState.move(d); }
+        else if root.touch { touch-workspace.browse(d); } else if root.studio { StudioState.browse(d); } else { browser.select-delta(d); }
+    }
+    /// MIDI BACK / browse push / sort buttons (see Browser). BACK closes an open track menu; in the tree it folds the section
+    /// the chosen row is in and goes to its heading.
+    public function browse-back() {
+        if TrackMenuState.open { TrackMenuState.toggle += 1; }
+        else if root.touch { touch-workspace.browse-back(); }
+        else if root.studio {
+            if StudioState.tree-focus {
+                BrowserState.tree-row = BrowserState.tree-back(BrowserState.tree-row);
+                BrowserState.playlist-selected(BrowserState.tree-row);
+            } else { StudioState.focus(1); }
+        } else { browser.browse-back(); }
+    }
+    /// Push: runs the item of an open track menu; on a tree heading it folds or unfolds the section; on a list it goes to the
+    /// tracks (false); on the tracks the caller loads the chosen one (true).
     public function browse-push() -> bool {
+        if TrackMenuState.open { TrackMenuState.fire += 1; return false; }
         if root.touch { return touch-workspace.browse-push(); }
         if root.studio {
-            if StudioState.tree-focus { StudioState.focus(2); return false; }
+            if StudioState.tree-focus {
+                if BrowserState.playlists[BrowserState.tree-row].head { BrowserState.tree-toggle(BrowserState.tree-row); } else { StudioState.focus(2); }
+                return false;
+            }
             return true;
         }
         return browser.browse-push();
     }
+    /// MIDI menu button (DDJ-FLX6: SHIFT + browse push) / Menu key: opens the track menu of the chosen track, or closes it.
+    public function browse-menu() { TrackMenuState.toggle += 1; }
     public function sort-by(col: int) { if root.touch { touch-workspace.sort-by(col); } else if root.studio { StudioState.sort-by(col); } else { browser.sort-by(col); } }
     /// MIDI VIEW (SwitchActiveWindow) / W: browse view on / off.
     public function browse-view() { if root.touch { touch-workspace.browse-view(); } else { BrowserState.browse-max = !BrowserState.browse-max; } }
@@ -372,6 +397,7 @@ export component App inherits Window {
         // EXPORT mode: the player panels over the browser, whose tree column carries the device dock.
         if !root.touch && ExportModeState.visible && ExportModeState.panel-h > 0px: ExportPlayers { x: 0; y: Theme.h-bar; width: root.width; height: ExportModeState.panel-h + root.bx; }
         browser := Browser {
+            live: !root.touch && !root.studio;
             x: 0;
             y: root.y-browser + root.bx;
             width: root.width;
@@ -510,26 +536,29 @@ export component App inherits Window {
                 if LightingState.enabled: IconButton { icon: Icon.light; active: root.mode == 3; tooltip: @tr("LIGHTING (BETA)"); clicked => { root.set-mode(root.mode == 3 ? 1 : 3); } }
             }
             if MixerState.bus.rec: Text { text: MixerState.bus.rec-text; vertical-alignment: center; horizontal-stretch: 0; color: Theme.rec.brighter(0.4); font-size: Theme.font-md; font-weight: Theme.weight-bold; }
-            Rectangle { horizontal-stretch: 1; }
+            zoom-space := Rectangle {
+                horizontal-stretch: 1;
+                min-width: root.mode == 1 && !root.browse-on ? 3 * Theme.h-ctl + 2 * Theme.gap : 0px;
+                // Keep zoom centred when there is room, inside the free gap when the bar is crowded.
+                if root.mode == 1 && !root.browse-on: HorizontalLayout {
+                    x: Math.clamp((root.width - self.width) / 2 - zoom-space.absolute-position.x, 0px, max(0px, zoom-space.width - self.width));
+                    width: self.preferred-width;
+                    spacing: Theme.gap;
+                    IconButton { icon: Icon.zoom-out; tooltip: @tr("Zoom out the waveforms"); clicked => { root.zoom-all(-1); } }
+                    IconButton { icon: Icon.zoom-reset; tooltip: @tr("Default waveform zoom"); clicked => { root.zoom-all(0); } }
+                    IconButton { icon: Icon.zoom-in; tooltip: @tr("Zoom in the waveforms"); clicked => { root.zoom-all(1); } }
+                }
+            }
             MidiChip { width: 44px; height: Theme.h-ctl; horizontal-stretch: 0; }
             DeviceChip { width: 70px; horizontal-stretch: 0; }
             IconButton { icon: Icon.info; active: KeysState.help-visible; tooltip: @tr("SHORTCUTS (?)"); clicked => { KeysState.help-visible = !KeysState.help-visible; } }
             Chip { text: @tr("PREFS"); width: 54px; horizontal-stretch: 0; clicked => { PrefsState.visible = true; } }
+            ResourceChip {}
             Rectangle {
                 width: 70px;
                 horizontal-stretch: 0;
                 Meter { y: (parent.height - self.height) / 2; width: 70px; height: 6px; level: MixerState.bus.level; peak: MixerState.bus.peak; }
             }
-        }
-        // Waveform zoom for every deck at once (enlarged waveforms, horizontal or vertical): in, out, default.
-        if root.mode == 1 && !root.browse-on: HorizontalLayout {
-            x: (parent.width - self.width) / 2;
-            width: self.preferred-width;
-            padding: 3px;
-            spacing: Theme.gap;
-            IconButton { icon: Icon.zoom-out; tooltip: @tr("Zoom out the waveforms"); clicked => { root.zoom-all(-1); } }
-            IconButton { icon: Icon.zoom-reset; tooltip: @tr("Default waveform zoom"); clicked => { root.zoom-all(0); } }
-            IconButton { icon: Icon.zoom-in; tooltip: @tr("Zoom in the waveforms"); clicked => { root.zoom-all(1); } }
         }
     }
     }

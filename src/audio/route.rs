@@ -11,6 +11,8 @@ use super::mono;
 
 /// External outputs: Decks 1-4, Sampler, Preview, in this order.
 pub const EXTERNAL: usize = 6;
+/// Automatic output buffer on a full-power machine; a rejected fixed request falls back to the driver default.
+pub const DEFAULT_BUFFER_FRAMES: u32 = 512;
 pub const EXTERNAL_NAMES: [&str; EXTERNAL] =
     ["DECK 1", "DECK 2", "DECK 3", "DECK 4", "SAMPLER", "PREVIEW"];
 
@@ -30,8 +32,10 @@ pub struct Settings {
     pub device: String,
     /// Sample rate in Hz, 0 = the device's default.
     pub rate: u32,
-    /// Buffer size in frames, 0 = the driver's default.
+    /// Buffer size in frames, 0 = [`DEFAULT_BUFFER_FRAMES`] unless [`Self::driver_buffer`] is set.
     pub buffer: u32,
+    /// Automatic uses the driver's default in low-power mode; explicit frame counts still win.
+    pub driver_buffer: bool,
     pub mixer: Mixer,
     /// Internal mode: pair numbers (see the module doc). `phones` 0 = automatic (`OPENFADER_HP_CHANNELS`, a
     /// controller interface with four outputs, else SPLIT on the master pair); `booth` 0 = off.
@@ -60,6 +64,7 @@ impl Default for Settings {
             device: String::new(),
             rate: 0,
             buffer: 0,
+            driver_buffer: false,
             mixer: Mixer::Internal,
             master: 1,
             phones: 0,
@@ -79,19 +84,30 @@ impl Default for Settings {
 }
 
 impl Settings {
+    /// The fixed buffer to request, or the driver's own buffering in low-power mode.
+    pub fn requested_buffer(&self) -> Option<u32> {
+        if self.buffer > 0 {
+            Some(self.buffer)
+        } else if self.driver_buffer {
+            None
+        } else {
+            Some(DEFAULT_BUFFER_FRAMES)
+        }
+    }
+
     /// Whether `o` asks for the same stream (device, rate, buffer, channel layout); the knobs do not matter.
     pub fn same_stream(&self, o: &Settings) -> bool {
         (
             &self.device,
             self.rate,
-            self.buffer,
+            self.requested_buffer(),
             self.mixer,
             self.master,
             self.phones,
             self.booth,
             self.external,
         ) == (
-            &o.device, o.rate, o.buffer, o.mixer, o.master, o.phones, o.booth, o.external,
+            &o.device, o.rate, o.requested_buffer(), o.mixer, o.master, o.phones, o.booth, o.external,
         )
     }
 }
@@ -278,6 +294,20 @@ mod tests {
         let mut s = Settings::default();
         f(&mut s);
         s
+    }
+
+    #[test]
+    fn automatic_buffer_is_fixed_except_in_low_power_mode_and_manual_values_win() {
+        let mut a = Settings::default();
+        assert_eq!(a.buffer, 0);
+        assert_eq!(a.requested_buffer(), Some(DEFAULT_BUFFER_FRAMES));
+        a.driver_buffer = true;
+        assert_eq!(a.requested_buffer(), None);
+        assert!(!a.same_stream(&Settings::default()), "low-power changes reopen the stream");
+        a.buffer = 512;
+        assert_eq!(a.requested_buffer(), Some(512));
+        let b = Settings { driver_buffer: false, ..a.clone() };
+        assert!(a.same_stream(&b), "low-power never overrides an explicit size");
     }
 
     #[test]

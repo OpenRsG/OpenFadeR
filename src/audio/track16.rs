@@ -2,7 +2,7 @@
 //! RAM of the f32 [`Pcm`] it is built from: 10.6 MB per minute of stereo at 44.1 kHz). The decoder can fill one directly
 //! ([`super::decode_track16_cancellable`]), so a loaded track never exists as a full-length f32 buffer.
 
-use super::{Frames, Pcm, Source, lerp_at};
+use super::{Frames, Pcm, Source, resample_at};
 use std::ops::Range;
 
 /// Stored value = sample × `SCALE`: the i16 range covers ±2.0, so a decoded file's overs up to +6 dBFS survive and a
@@ -60,10 +60,16 @@ impl Track16 {
         self.samples.len() / 2
     }
 
-    /// Stereo frame at fractional source-frame position `pos`, linearly interpolated exactly like [`Pcm::frame_at`]; None past the end.
+    /// Stereo frame at fractional source-frame position `pos`, interpolated exactly like [`Pcm::frame_at`]; None past the end.
     #[inline]
     pub fn frame_at(&self, pos: f64) -> Option<[f32; 2]> {
-        lerp_at(self.frames(), pos, |k, c| deq(self.samples[2 * k + c]))
+        self.frame_at_step(pos, 1.0)
+    }
+
+    /// [`Track16::frame_at`] for a read that advances `step` source frames per output frame, like [`Pcm::frame_at_step`].
+    #[inline]
+    pub fn frame_at_step(&self, pos: f64, step: f64) -> Option<[f32; 2]> {
+        resample_at(self.frames(), pos, step, |k, c| deq(self.samples[2 * k + c]))
     }
 
     /// The interleaved samples of frames `frames` as f32 (dequantised). Panics when the range is past the end.
@@ -90,6 +96,10 @@ impl Source for Track16 {
     #[inline]
     fn frame_at(&self, pos: f64) -> Option<[f32; 2]> {
         Track16::frame_at(self, pos)
+    }
+    #[inline]
+    fn frame_at_step(&self, pos: f64, step: f64) -> Option<[f32; 2]> {
+        Track16::frame_at_step(self, pos, step)
     }
 }
 
@@ -138,7 +148,8 @@ mod tests {
             let pos = n as f64 * 0.5;
             match (pcm.frame_at(pos), t.frame_at(pos)) {
                 (Some(a), Some(b)) => assert!(
-                    a.iter().zip(b).all(|(x, y)| (x - y).abs() <= LSB),
+                    // the kernel's weights sum to 1 but not their magnitudes: each stored sample's half-LSB error can add up
+                    a.iter().zip(b).all(|(x, y)| (x - y).abs() <= 2.0 * LSB),
                     "at {pos}"
                 ),
                 (a, b) => assert_eq!(a, b, "at {pos}"),

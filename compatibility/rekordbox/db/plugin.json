@@ -1,0 +1,43 @@
+{
+  "name": "rekordbox-db",
+  "version": "0.1.0",
+  "suggest": "rekordbox",
+  "description": "rekordbox's own collection database (master.db, SQLCipher) with its playlists, smart lists, histories and analysis files.",
+  "library": {
+    "formats": [
+      "db"
+    ],
+    "detect": {
+      "windows": [
+        "%APPDATA%/Pioneer/rekordbox/master.db"
+      ],
+      "macos": [
+        "~/Library/Pioneer/rekordbox/master.db"
+      ]
+    },
+    "browser": {
+      "label": "rekordbox collection",
+      "path_setting": "file"
+    }
+  },
+  "settings": [
+    {
+      "id": "file",
+      "label": "master.db",
+      "type": "text",
+      "help": "path of rekordbox's master.db, listed in the Media Browser"
+    },
+    {
+      "id": "key",
+      "label": "Database key",
+      "type": "secret",
+      "help": "SQLCipher key of master.db"
+    },
+    {
+      "id": "path_map",
+      "label": "Path map",
+      "type": "text",
+      "help": "C:/Users/x/Music=>/home/y/Music;… (empty: $OPENFADER_PATH_MAP)"
+    }
+  ]
+}

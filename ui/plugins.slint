@@ -28,6 +28,8 @@ export struct PluginView {
     provides: string,
     folder: string,
     enabled: bool,
+    /// Compiled into the app: always on, no folder, cannot be uninstalled.
+    builtin: bool,
     /// Installed by the user (bundled plugins can only be switched off).
     removable: bool,
     /// A change of this plugin waits for a restart.
@@ -131,7 +133,8 @@ component Card inherits Rectangle {
         spacing: Theme.space-sm;
         HorizontalLayout {
             spacing: Theme.space-md;
-            Toggle { width: 20px; checked: root.v.enabled; toggled => { PluginState.toggle(root.index); } }
+            if !root.v.builtin: Toggle { width: 20px; checked: root.v.enabled; toggled => { PluginState.toggle(root.index); } }
+            if root.v.builtin: Rectangle { width: 20px; }
             VerticalLayout {
                 // A short description must not shrink and centre the column (its children cap its width otherwise).
                 horizontal-stretch: 1;
@@ -151,7 +154,8 @@ component Card inherits Rectangle {
                     }
                     if root.v.version != "": Text { text: root.v.version; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
                     Badge { text: root.v.kind; tone: root.v.kind == "LUA" ? Theme.accent-hi : root.v.kind == "PYTHON" ? Theme.cue : root.v.kind == "JSON" ? Theme.play : Theme.text-dim; y: 2px; }
-                    if !root.v.removable: Badge { text: @tr("BUNDLED"); tone: Theme.text-dim; y: 2px; }
+                    if root.v.builtin: Badge { text: @tr("BUILT IN"); tone: Theme.text-dim; y: 2px; }
+                    if !root.v.removable && !root.v.builtin: Badge { text: @tr("BUNDLED"); tone: Theme.text-dim; y: 2px; }
                     if root.v.restart: Badge { text: @tr("RESTART"); tone: Theme.cue; y: 2px; }
                 }
                 Text {
@@ -170,13 +174,13 @@ component Card inherits Rectangle {
                 font-size: Theme.font-xs;
                 clicked => { PluginState.expand(root.index); }
             }
-            CardMenu { index: root.index; horizontal-stretch: 0; }
+            if !root.v.builtin: CardMenu { index: root.index; horizontal-stretch: 0; }
         }
         if root.v.open: VerticalLayout {
             spacing: Theme.space-sm;
             padding-left: 26px;
             if root.v.author != "": Text { text: @tr("by {}", root.v.author); color: Theme.text-dim; font-size: Theme.font-sm; }
-            Text { text: root.v.folder; color: Theme.text-faint; font-size: Theme.font-xs; overflow: elide; }
+            if !root.v.builtin: Text { text: root.v.folder; color: Theme.text-faint; font-size: Theme.font-xs; overflow: elide; }
             for s[k] in root.v.settings: VerticalLayout {
                 spacing: 2px;
                 HorizontalLayout {
@@ -195,7 +199,7 @@ component Card inherits Rectangle {
             HorizontalLayout {
                 spacing: Theme.space-md;
                 alignment: start;
-                Chip { text: @tr("OPEN FOLDER"); width: 100px; font-size: Theme.font-xs; clicked => { PluginState.open-folder(root.index); } }
+                if !root.v.builtin: Chip { text: @tr("OPEN FOLDER"); width: 100px; font-size: Theme.font-xs; clicked => { PluginState.open-folder(root.index); } }
                 if root.v.homepage != "": Chip { text: @tr("WEB PAGE"); width: 90px; font-size: Theme.font-xs; clicked => { PluginState.homepage(root.index); } }
             }
         }

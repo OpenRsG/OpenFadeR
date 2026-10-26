@@ -158,7 +158,7 @@ component DeckStrip inherits Rectangle {
                     horizontal-stretch: 0;
                     clicked => { DeckState.play-pause(root.index); }
                 }
-                Text { text: DeckState.decks[root.index].time-text; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; }
+                Text { text: DeckState.live[root.index].time-text; color: Theme.text-dim; font-size: Theme.font-size; vertical-alignment: center; }
             }
             Rectangle {
                 height: Theme.layout-profile == 1 ? Theme.touch-target : 10px;

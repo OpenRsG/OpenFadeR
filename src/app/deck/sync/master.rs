@@ -396,6 +396,10 @@ mod tests {
             crate::app::DeckScroll::default();
             DECKS
         ]));
+        let live = Rc::new(slint::VecModel::from(vec![
+            crate::app::DeckLive::default();
+            DECKS
+        ]));
         let link = Rc::new(crate::app::deck::sync::Link::default());
         let decks: [Rc<Deck>; DECKS] = std::array::from_fn(|i| {
             Deck::new(
@@ -403,6 +407,7 @@ mod tests {
                 i,
                 model.clone(),
                 scroll.clone(),
+                live.clone(),
                 link.clone(),
                 Rc::new(NoTracks),
             )

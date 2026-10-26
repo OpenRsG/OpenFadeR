@@ -49,6 +49,31 @@ pub(super) fn call(
     r.map_err(|e| format!("{name}: {}", plugin.tr(&e)))
 }
 
+type Cancel = Arc<std::sync::atomic::AtomicBool>;
+
+fn check_cancel(lua: &Lua) -> mlua::Result<()> {
+    if lua
+        .app_data_ref::<Cancel>()
+        .is_some_and(|c| c.load(std::sync::atomic::Ordering::Relaxed))
+    {
+        Err(mlua::Error::runtime("request cancelled"))
+    } else {
+        Ok(())
+    }
+}
+
+pub(super) fn call_cancellable(
+    plugin: &Plugin,
+    script: &str,
+    request: &Value,
+    timeout: Duration,
+    cancelled: Cancel,
+) -> Result<Value, String> {
+    load_with_cancel(plugin, script, timeout, Some(cancelled))
+        .and_then(|(lua, handle)| ask(&lua, &handle, request, timeout))
+        .map_err(|e| format!("{}: {}", plugin.manifest.name, plugin.tr(&e)))
+}
+
 /// A persistent plugin's loaded script, and what it was loaded from (folder, script, version, file time).
 struct Kept {
     key: String,
@@ -94,7 +119,8 @@ fn deadline(lua: &Lua, timeout: Duration) -> Result<(), String> {
     let secs = timeout.as_secs();
     lua.set_hook(
         HookTriggers::new().every_nth_instruction(10_000),
-        move |_, _| {
+        move |lua, _| {
+            check_cancel(lua)?;
             if Instant::now() < deadline {
                 Ok(VmState::Continue)
             } else {
@@ -107,9 +133,21 @@ fn deadline(lua: &Lua, timeout: Duration) -> Result<(), String> {
 
 /// A new state with `script` run and its `handle` function.
 fn load(plugin: &Plugin, script: &str, timeout: Duration) -> Result<(Lua, Function), String> {
+    load_with_cancel(plugin, script, timeout, None)
+}
+
+fn load_with_cancel(
+    plugin: &Plugin,
+    script: &str,
+    timeout: Duration,
+    cancelled: Option<Cancel>,
+) -> Result<(Lua, Function), String> {
     let file = plugin.dir.join(script);
     let source = std::fs::read_to_string(&file).map_err(|e| format!("{}: {e}", file.display()))?;
     let lua = Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()).map_err(|e| e.to_string())?;
+    if let Some(cancelled) = cancelled {
+        lua.set_app_data(cancelled);
+    }
     deadline(&lua, timeout)?;
     api(&lua, plugin).map_err(|e| e.to_string())?;
     let module: LuaValue = lua
@@ -137,9 +175,11 @@ fn load(plugin: &Plugin, script: &str, timeout: Duration) -> Result<(Lua, Functi
 /// One request to a loaded script.
 fn ask(lua: &Lua, handle: &Function, request: &Value, timeout: Duration) -> Result<Value, String> {
     deadline(lua, timeout)?;
+    check_cancel(lua).map_err(|e| e.to_string())?;
     let reply: LuaValue = handle
         .call(lua.to_value(request).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
+    check_cancel(lua).map_err(|e| e.to_string())?;
     let reply: Value = match reply {
         LuaValue::Nil => Value::Object(Default::default()),
         v => lua.from_value(v).map_err(|e| format!("reply: {e}"))?,
@@ -167,6 +207,7 @@ fn at(dir: &Path, p: &str) -> PathBuf {
 
 /// HTTP for `rk.http`: status codes come back to the script instead of failing the call.
 fn agent() -> ureq::Agent {
+    // ureq's blocking socket/DNS calls retain their 60 s deadline; bounded fetch workers check cancellation before/after calls and reads.
     ureq::Agent::config_builder()
         .http_status_as_error(false)
         .timeout_global(Some(Duration::from_secs(60)))
@@ -227,48 +268,64 @@ fn api(lua: &Lua, plugin: &Plugin) -> mlua::Result<()> {
     let http = lua.create_table()?;
     http.set(
         "get",
-        lua.create_function(|_, (url, h): (String, Option<Table>)| {
+        lua.create_function(|lua, (url, h): (String, Option<Table>)| {
+            check_cancel(lua)?;
             let mut req = agent().get(&url);
             for (k, v) in headers(h)? {
                 req = req.header(k, v);
             }
             let mut resp = req.call().map_err(mlua::Error::external)?;
+            check_cancel(lua)?;
             let status = resp.status().as_u16();
-            Ok((
-                resp.body_mut()
-                    .read_to_string()
-                    .map_err(mlua::Error::external)?,
-                status,
-            ))
+            let body = resp
+                .body_mut()
+                .read_to_string()
+                .map_err(mlua::Error::external)?;
+            check_cancel(lua)?;
+            Ok((body, status))
         })?,
     )?;
     http.set(
         "post",
-        lua.create_function(|_, (url, body, h): (String, String, Option<Table>)| {
+        lua.create_function(|lua, (url, body, h): (String, String, Option<Table>)| {
+            check_cancel(lua)?;
             let mut req = agent().post(&url);
             for (k, v) in headers(h)? {
                 req = req.header(k, v);
             }
             let mut resp = req.send(body).map_err(mlua::Error::external)?;
+            check_cancel(lua)?;
             let status = resp.status().as_u16();
-            Ok((
-                resp.body_mut()
-                    .read_to_string()
-                    .map_err(mlua::Error::external)?,
-                status,
-            ))
+            let body = resp
+                .body_mut()
+                .read_to_string()
+                .map_err(mlua::Error::external)?;
+            check_cancel(lua)?;
+            Ok((body, status))
         })?,
     )?;
     let d = dir.clone();
     http.set(
         "download",
-        lua.create_function(move |_, (url, path): (String, String)| {
+        lua.create_function(move |lua, (url, path): (String, String)| {
+            check_cancel(lua)?;
             let mut resp = agent().get(&url).call().map_err(mlua::Error::external)?;
+            check_cancel(lua)?;
             let status = resp.status().as_u16();
             let dest = at(&d, &path);
             let mut out = std::fs::File::create(&dest).map_err(mlua::Error::external)?;
-            std::io::copy(&mut resp.body_mut().as_reader(), &mut out)
-                .map_err(mlua::Error::external)?;
+            use std::io::{Read, Write};
+            let mut body = resp.body_mut().as_reader();
+            let mut chunk = [0; 16 * 1024];
+            loop {
+                check_cancel(lua)?;
+                let n = body.read(&mut chunk).map_err(mlua::Error::external)?;
+                check_cancel(lua)?;
+                if n == 0 {
+                    break;
+                }
+                out.write_all(&chunk[..n]).map_err(mlua::Error::external)?;
+            }
             Ok(status)
         })?,
     )?;
@@ -277,19 +334,35 @@ fn api(lua: &Lua, plugin: &Plugin) -> mlua::Result<()> {
     let d = dir.clone();
     rk.set(
         "run",
-        lua.create_function(move |_, (program, args): (String, Option<Vec<String>>)| {
+        lua.create_function(move |lua, (program, args): (String, Option<Vec<String>>)| {
+            check_cancel(lua)?;
             let mut cmd = std::process::Command::new(&program);
             cmd.args(args.unwrap_or_default())
                 .current_dir(&d)
                 .stderr(std::process::Stdio::inherit());
-            super::process::no_window(&mut cmd);
-            let out = cmd
-                .output()
+            cmd.stdout(std::process::Stdio::piped());
+            let mut child = super::process::spawn(cmd)
                 .map_err(|e| mlua::Error::runtime(format!("cannot start {program:?}: {e}")))?;
-            Ok((
-                String::from_utf8_lossy(&out.stdout).into_owned(),
-                out.status.code().unwrap_or(-1),
-            ))
+            let mut stdout = child.stdout.take().expect("piped");
+            let reader = std::thread::spawn(move || {
+                use std::io::Read;
+                let mut out = String::new();
+                stdout.read_to_string(&mut out).map(|_| out)
+            });
+            while child.running() {
+                if let Err(e) = check_cancel(lua) {
+                    let _ = child.end();
+                    let _ = reader.join();
+                    return Err(e);
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let status = child.end().map_err(mlua::Error::external)?;
+            let out = reader
+                .join()
+                .map_err(|_| mlua::Error::runtime("reader panicked"))?
+                .map_err(mlua::Error::external)?;
+            Ok((out, status.code().unwrap_or(-1)))
         })?,
     )?;
 
@@ -334,8 +407,16 @@ fn api(lua: &Lua, plugin: &Plugin) -> mlua::Result<()> {
     rk.set("fs", fs)?;
     rk.set(
         "sleep",
-        lua.create_function(|_, ms: u64| {
-            std::thread::sleep(Duration::from_millis(ms.min(60_000)));
+        lua.create_function(|lua, ms: u64| {
+            let until = Instant::now() + Duration::from_millis(ms.min(60_000));
+            while Instant::now() < until {
+                check_cancel(lua)?;
+                std::thread::sleep(
+                    until
+                        .saturating_duration_since(Instant::now())
+                        .min(Duration::from_millis(10)),
+                );
+            }
             Ok(())
         })?,
     )?;
@@ -372,6 +453,7 @@ mod tests {
             Plugin {
                 dir: dir.clone(),
                 manifest,
+                builtin: None,
             },
             dir,
         )
@@ -440,5 +522,28 @@ mod tests {
         p.manifest.persistent = false;
         assert_eq!(n(&p), json!(1));
         std::fs::remove_dir_all(dir).ok();
+    }
+    #[test]
+    fn cancellation_interrupts_a_sleeping_fetch_without_waiting_for_its_timeout() {
+        let (p, dir) = plugin("function handle(req) rk.sleep(60000) return {} end");
+        let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let c = cancelled.clone();
+        let cancel = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            c.store(true, std::sync::atomic::Ordering::Relaxed);
+        });
+        let start = Instant::now();
+        let error = call_cancellable(
+            &p,
+            "main.lua",
+            &serde_json::json!({"op":"fetch"}),
+            Duration::from_secs(60),
+            cancelled,
+        )
+        .unwrap_err();
+        cancel.join().unwrap();
+        assert!(error.contains("cancelled"), "{error}");
+        assert!(start.elapsed() < Duration::from_secs(3));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

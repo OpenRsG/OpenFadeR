@@ -93,9 +93,11 @@ pub(in crate::store) fn install(conn: &Connection) -> R<()> {
         "INSERT OR IGNORE INTO journal_action(id, at, label, undone) VALUES (0, 0, '', 2)",
         [],
     )?;
+    // The targets of INSERT / DELETE in a trigger body are unqualified (`main.` there is an error in the SQLite of SQLCipher, which
+    // the app links for the rekordbox extensions); the app opens no temp table of those names, so they are the main ones.
     let mut sql = format!(
         "CREATE TEMP TRIGGER jr_action_new AFTER INSERT ON main.journal_action BEGIN
-           DELETE FROM main.journal_action WHERE id > 0 AND (undone = 1 OR (id <= NEW.id - {KEEP} AND
+           DELETE FROM journal_action WHERE id > 0 AND (undone = 1 OR (id <= NEW.id - {KEEP} AND
              (id <= NEW.id - {HARD} OR id < COALESCE(
                (SELECT action FROM main.journal WHERE action > 0 AND seq > (SELECT MIN(last_seq) FROM main.connection WHERE mode = 1)
                 ORDER BY seq LIMIT 1), NEW.id))));
@@ -113,9 +115,9 @@ pub(in crate::store) fn install(conn: &Connection) -> R<()> {
             .join(" OR ");
         let record = |op: i64, old: &str, new: &str| {
             format!(
-                "INSERT INTO main.journal_action(id, at, label) SELECT jr_action(), unixepoch(), jr_label()
+                "INSERT INTO journal_action(id, at, label) SELECT jr_action(), unixepoch(), jr_label()
                    WHERE NOT EXISTS (SELECT 1 FROM main.journal_action WHERE id = jr_action());
-                 INSERT INTO main.journal(action, tbl, op, old, new) VALUES (jr_action(), '{t}', {op}, {old}, {new});"
+                 INSERT INTO journal(action, tbl, op, old, new) VALUES (jr_action(), '{t}', {op}, {old}, {new});"
             )
         };
         let (ins, upd, del) = (

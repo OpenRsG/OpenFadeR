@@ -517,6 +517,7 @@ fn plugin(name: &str, effects: serde_json::Value) -> Plugin {
             effects: Some(serde_json::from_value(effects).unwrap()),
             ..Manifest::default()
         },
+        builtin: None,
     }
 }
 

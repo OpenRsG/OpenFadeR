@@ -75,6 +75,7 @@ mod tests {
             plugin: Plugin {
                 dir: ".".into(),
                 manifest,
+                builtin: None,
             },
             api: &API,
         }

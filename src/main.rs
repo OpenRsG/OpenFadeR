@@ -75,6 +75,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         let mut cmd = std::process::Command::new(exe);
         cmd.args(std::env::args_os().skip(1));
+        if app::restart_software_requested() {
+            cmd.env("SLINT_BACKEND", "winit-software");
+        }
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;

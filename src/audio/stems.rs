@@ -272,15 +272,27 @@ impl Stems {
     }
 }
 
-/// A stereo signal readable at fractional source-frame positions (linear interpolation, `None` past the end).
+/// A stereo signal readable at fractional source-frame positions (windowed-sinc interpolation, `None` past the end).
 pub trait Source {
     fn frame_at(&self, pos: f64) -> Option<[f32; 2]>;
+
+    /// [`Source::frame_at`] for a read that advances `step` source frames per output frame: above 1 the interpolation
+    /// low-passes to the new Nyquist. The default ignores the step (a source built from several reads takes it from the
+    /// one that matters: [`Mixed`]).
+    #[inline]
+    fn frame_at_step(&self, pos: f64, _step: f64) -> Option<[f32; 2]> {
+        self.frame_at(pos)
+    }
 }
 
 impl Source for Pcm {
     #[inline]
     fn frame_at(&self, pos: f64) -> Option<[f32; 2]> {
         Pcm::frame_at(self, pos)
+    }
+    #[inline]
+    fn frame_at_step(&self, pos: f64, step: f64) -> Option<[f32; 2]> {
+        Pcm::frame_at_step(self, pos, step)
     }
 }
 
@@ -294,7 +306,11 @@ pub struct Mixed<'a> {
 
 impl Source for Mixed<'_> {
     fn frame_at(&self, pos: f64) -> Option<[f32; 2]> {
-        let mut out = self.pcm.frame_at(pos)?;
+        self.frame_at_step(pos, 1.0)
+    }
+
+    fn frame_at_step(&self, pos: f64, step: f64) -> Option<[f32; 2]> {
+        let mut out = self.pcm.frame_at_step(pos, step)?;
         let Some(at) = self.stems.around(pos) else {
             return Some(out);
         };

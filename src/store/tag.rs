@@ -112,16 +112,25 @@ impl Store {
     /// Tag ids of every tagged track, by key (for filtering a track list).
     pub fn all_track_mytags(&self) -> R<HashMap<String, Vec<i64>>> {
         let db = self.db();
+        // The primary key's order: a track's rows come together, its tags in ascending order; one String per track, no sort.
         let mut st = db
-            .prepare_cached("SELECT key, tag FROM track_mytag ORDER BY tag")
+            .prepare_cached("SELECT key, tag FROM track_mytag ORDER BY key, tag")
             .s()?;
         let mut out: HashMap<String, Vec<i64>> = HashMap::new();
-        for row in st
-            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
-            .s()?
-        {
-            let (k, t) = row.s()?;
-            out.entry(k).or_default().push(t);
+        let (mut key, mut tags) = (String::new(), Vec::new());
+        let mut rows = st.query([]).s()?;
+        while let Some(r) = rows.next().s()? {
+            let k = r.get_ref(0).s()?.as_str().map_err(|e| e.to_string())?;
+            if k != key {
+                if !tags.is_empty() {
+                    out.insert(std::mem::take(&mut key), std::mem::take(&mut tags));
+                }
+                key = k.to_owned();
+            }
+            tags.push(r.get(1).s()?);
+        }
+        if !tags.is_empty() {
+            out.insert(key, tags);
         }
         Ok(out)
     }

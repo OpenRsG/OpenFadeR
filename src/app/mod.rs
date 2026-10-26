@@ -86,6 +86,7 @@ mod mixer;
 mod plugins;
 mod prefs;
 mod render;
+mod resources;
 mod sampler;
 mod skin;
 mod split;
@@ -107,6 +108,7 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc};
 /// Set by [`restart`]: `main` starts the app again once the window has closed.
 static RESTART: AtomicBool = AtomicBool::new(false);
 static RESTART_EXE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+static RESTART_SOFTWARE: AtomicBool = AtomicBool::new(false);
 
 /// Closes the window and has `main` start the app again (plugin manager: RESTART NOW).
 pub fn restart() {
@@ -131,6 +133,20 @@ pub fn restart_requested() -> bool {
     RESTART.load(Ordering::Relaxed)
 }
 
+/// Whether this restart needs Slint's software renderer; set only after default-renderer startup failed.
+pub fn restart_software_requested() -> bool {
+    RESTART_SOFTWARE.load(Ordering::Relaxed)
+}
+
+fn startup_error(error: slint::PlatformError) -> Result<(), Box<dyn std::error::Error>> {
+    if !render::backend::retry_software(&error) {
+        return Err(error.into());
+    }
+    RESTART_SOFTWARE.store(true, Ordering::Relaxed);
+    restart();
+    Ok(())
+}
+
 /// When the process started (set first thing in `main`), for the start-up line [`log_first_frame`] writes.
 static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
 
@@ -139,33 +155,18 @@ pub fn started() {
     STARTED.get_or_init(std::time::Instant::now);
 }
 
-/// Writes `startup: window shown after <ms> ms (<n> tracks)` once, at the first frame the renderer draws (the software
-/// renderer has no notifier: then at the first turn of the event loop, which is right after the window is shown).
-/// `.github/smoke.sh` reads it.
-fn log_first_frame(app: &App) {
-    let done = Rc::new(std::cell::Cell::new(false));
-    let line = {
-        let (done, weak) = (done.clone(), app.as_weak());
-        move || {
-            if done.replace(true) {
-                return;
-            }
-            let ms = STARTED.get().map_or(0, |t| t.elapsed().as_millis());
-            let n = weak.upgrade().map_or(0, |a| {
-                slint::Model::row_count(&a.global::<BrowserState>().get_tracks())
-            });
-            eprintln!("startup: window shown after {ms} ms ({n} tracks)");
-        }
-    };
-    let first = line.clone();
-    let hooked = app.window().set_rendering_notifier(move |state, _| {
-        if matches!(state, slint::RenderingState::AfterRendering) {
-            first();
-        }
-    });
-    if hooked.is_err() {
-        slint::Timer::single_shot(std::time::Duration::ZERO, line);
+/// Writes `startup: window shown after <ms> ms (<n> tracks)` once. The decks' rendering notifier calls it after each frame
+/// (a window has one notifier: a second one would replace theirs and freeze the waveforms); without a notifier (software
+/// renderer) a timer calls it at the first turn of the event loop, right after the window is shown. `.github/smoke.sh` reads it.
+pub(crate) fn log_first_frame(app: &App) {
+    static DONE: AtomicBool = AtomicBool::new(false);
+    if DONE.swap(true, Ordering::Relaxed) {
+        return;
     }
+    render::backend::first_frame();
+    let ms = STARTED.get().map_or(0, |t| t.elapsed().as_millis());
+    let n = slint::Model::row_count(&app.global::<BrowserState>().get_tracks());
+    eprintln!("startup: window shown after {ms} ms ({n} tracks)");
 }
 
 pub use openfader_ui::*;
@@ -180,7 +181,13 @@ pub fn run(
     connect::adopt_startup(&store, legacy, music);
     // the store's edits (cues, grid, rating, comment) win over the Collection's rows
     let inner = openfader::store::overlay(Box::new(openfader::library::own::Own::new(store)));
-    let app = App::new()?;
+    if let Err(error) = render::backend::select() {
+        return startup_error(error);
+    }
+    let app = match App::new() {
+        Ok(app) => app,
+        Err(error) => return startup_error(error),
+    };
     // Wayland / X11 match the window to the menu entry `openfader.desktop` (its icon) by this id; set before the window shows.
     let _ = slint::set_xdg_app_id("openfader");
     about::wire(&app);
@@ -207,15 +214,17 @@ pub fn run(
     let _skin = skin::wire(&app); // PREFS > THEMES and the skin folder watcher; the guard holds the watcher's timer
     let _studio = studio::wire(&app); // the studio workspace's clock; the timer lives until the window closes
     catalog::wire(&app); // GET PLUGINS / THEMES / MAPPINGS; before the controller session, which asks it about a controller with no mapping
-                         // plugin effects join every FX unit, so they load before the engine makes its units; the count is what the smoke test reads
+                         // plugin effects join every FX unit, so they load before the engine makes its units; the "found" count (folders only) is what the smoke test reads
     let r = openfader::plugin::registry();
-    eprintln!(
-        "plugins: {} found, {} on",
-        r.plugins.len() + r.disabled.len(),
-        r.plugins.len()
+    let (on, off) = (
+        r.plugins.iter().filter(|p| p.builtin.is_none()).count(),
+        r.disabled.len(),
     );
+    eprintln!("plugins: {} found, {on} on", on + off);
+    eprintln!("plugins: {} built in", openfader::plugin::builtin::plugins().len());
     prefs::audio::wire(); // hands the AUDIO settings to the engine before the decks open the output
     let _diag = diag::wire(&app); // Help > Report a Problem and the crash offer; the guard holds the timer that reads the audio facts
+    let _resources = resources::wire(&app);
     let lib: Rc<dyn Library> = openfader::plugin::source::wrap(inner, plugins::notify(&app)).into(); // plugin sources join the tree, outside the store's overlay
     app.set_window_title("OpenFadeR".into());
     let selected = Rc::new(RefCell::new(None));
@@ -242,8 +251,11 @@ pub fn run(
     })?;
     let _analyzer = analyze::wire(&app, lib.clone()); // dropping it cancels the worker: lives until the window closes
     connect::wire(&app); // live sync of the connected libraries; after the browser, which it asks to reload
-    log_first_frame(&app);
-    app.run()?;
+    render::backend::watch(&app);
+    if let Err(error) = app.run().and_then(|()| render::backend::check_startup()) {
+        openfader::plugin::process::stop_all();
+        return startup_error(error);
+    }
     update::quit(); // a clean exit shows that the version just installed starts
     openfader::plugin::event::fire("app_quit", serde_json::json!({}));
     openfader::plugin::process::stop_all(); // closes their stdin, kills what has not exited within a second

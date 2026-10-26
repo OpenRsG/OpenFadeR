@@ -1,4 +1,4 @@
-import { TrackMenu } from "../track-menu.slint";
+import { TrackMenu, TrackMenuState } from "../track-menu.slint";
 import { ListView } from "std-widgets.slint";
 import { Glyph, Icon } from "../widgets.slint";
 import { Theme } from "../theme.slint";
@@ -122,6 +122,7 @@ export component StageTable inherits Rectangle {
     fs := FocusScope {
         key-pressed(e) => {
             if (e.modifiers.control && (e.text == "a" || e.text == "\u{1}")) { BrowserState.select-all(); return accept; }
+            if (e.text == Key.Menu) { TrackMenuState.toggle += 1; return accept; }
             if (e.text == Key.Escape && root.multi) { BrowserState.select-collapse(); return accept; }
             if (e.text == Key.UpArrow) { root.move(-1, e.modifiers.shift ? 2 : 0); return accept; }
             if (e.text == Key.DownArrow) { root.move(1, e.modifiers.shift ? 2 : 0); return accept; }
@@ -260,6 +261,18 @@ export component StageTable inherits Rectangle {
         y: min(root.menu-y, max(0px, root.height - self.height));
         width: body.menu-w;
         height: body.menu-h;
-        body := TrackMenu { two-decks: true; palettes: false; narrow: root.width < 440px; radius: Theme.stage-radius-ctl; done => { menu.close(); } }
+        body := TrackMenu { two-decks: true; palettes: false; narrow: root.width < 440px; radius: Theme.stage-radius-ctl; done => { menu.close(); fs.focus(); } }
+    }
+    // The controller (or the Menu key) opens the menu under the chosen row; the knob then walks it (TrackMenuState).
+    property <bool> menu-open: menu.is-open;
+    changed menu-open => { TrackMenuState.open = root.menu-open; TrackMenuState.sel = -1; }
+    property <int> menu-toggle: TrackMenuState.toggle;
+    changed menu-toggle => {
+        if (menu.is-open) { menu.close(); fs.focus(); }
+        else if (BrowserState.tracks.length > 0) {
+            if (BrowserState.current-row < 0) { root.choose(0, 0); } // no track chosen yet: the first one
+            root.place-menu(root.width / 4, Theme.h-header + (BrowserState.current-row + 1) * root.row-h + list.content-y);
+            menu.show();
+        }
     }
 }

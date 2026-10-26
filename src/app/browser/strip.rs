@@ -7,7 +7,7 @@
 //! strip (cues still drawn). Drawn strips are kept per track file ([`Strips::image`], at most [`CACHE_MAX`]) and reused while
 //! the track's store edits (every cue edit writes there) and the detected-analysis version are unchanged, so sorting,
 //! filtering and scrolling read no analysis again. ponytail: a track's library cues or analysis files changing under a
-//! running app are not noticed (sources are read-only); the cache is cleared whole when full, add LRU if that shows.
+//! running app are not noticed (sources are read-only); a full cache drops its least recently used strip.
 
 use super::View;
 use crate::app::{
@@ -34,8 +34,45 @@ const H: usize = 20;
 /// A click this close (logical px) to a cue marker counts as a click on the cue.
 const HIT_PX: f64 = 6.0;
 
-/// Most strips kept between row creations (≈9 KB each at scale 1); a full cache is cleared.
+/// Most strips kept between row creations (≈9 KB each at scale 1); a full cache drops the least recently used.
 const CACHE_MAX: usize = 512;
+
+/// A map of at most `cap` entries; inserting into a full one drops the least recently used (read or written).
+pub(super) struct Lru<K, V> {
+    cap: usize,
+    clock: u64,
+    map: HashMap<K, (V, u64)>,
+}
+
+impl<K: std::hash::Hash + Eq, V> Lru<K, V> {
+    pub fn new(cap: usize) -> Self {
+        Self {
+            cap,
+            clock: 0,
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn get(&mut self, key: &K) -> Option<&V> {
+        self.clock += 1;
+        let clock = self.clock;
+        self.map.get_mut(key).map(|e| {
+            e.1 = clock;
+            &e.0
+        })
+    }
+
+    pub fn insert(&mut self, key: K, value: V) {
+        self.clock += 1;
+        if self.map.len() >= self.cap && !self.map.contains_key(&key) {
+            // a scan over a few hundred entries, only on a miss that finds the cache full; ticks are unique
+            if let Some(oldest) = self.map.values().map(|e| e.1).min() {
+                self.map.retain(|_, e| e.1 != oldest);
+            }
+        }
+        self.map.insert(key, (value, self.clock));
+    }
+}
 
 /// A drawn strip and what it was drawn from.
 struct Drawn {
@@ -50,7 +87,7 @@ struct Drawn {
 /// strip scale and the cue-markers setting, so a sort, filter or scroll does not read the analysis again.
 pub(super) struct Strips {
     model: Rc<StripRows>,
-    cache: RefCell<HashMap<(PathBuf, usize, bool, bool), Drawn>>,
+    cache: RefCell<Lru<(PathBuf, usize, bool, bool), Drawn>>,
 }
 
 impl Strips {
@@ -60,7 +97,7 @@ impl Strips {
             .set_previews(model.clone().into());
         Self {
             model,
-            cache: RefCell::default(),
+            cache: RefCell::new(Lru::new(CACHE_MAX)),
         }
     }
 
@@ -92,9 +129,6 @@ impl Strips {
         }
         let a = analysis_of(lib, t);
         let image = draw(&a, duration_ms(t, &a), cues, scale);
-        if cache.len() >= CACHE_MAX {
-            cache.clear(); // ponytail: no LRU; the visible rows redraw once after a full cache, add LRU if that shows
-        }
         cache.insert(
             key,
             Drawn {
@@ -258,6 +292,21 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn lru_drops_the_least_recently_used() {
+        let mut c = Lru::new(2);
+        c.insert("a", 1);
+        c.insert("b", 2);
+        assert_eq!(c.get(&"a"), Some(&1)); // a is now newer than b
+        c.insert("c", 3);
+        assert_eq!(c.get(&"b"), None);
+        assert_eq!(c.get(&"a"), Some(&1));
+        assert_eq!(c.get(&"c"), Some(&3));
+        c.insert("c", 4); // replacing a key evicts nothing
+        assert_eq!(c.get(&"a"), Some(&1));
+        assert_eq!(c.get(&"c"), Some(&4));
+    }
+
     /// 100 s track on a 110 px strip: 1 px = 0.909 s.
     const LEN: u32 = 100_000;
 
@@ -265,7 +314,7 @@ mod tests {
     fn preview_rows_are_sparse_and_reset_with_the_display_order() {
         let strips = Strips {
             model: Rc::new(StripRows::default()),
-            cache: RefCell::default(),
+            cache: RefCell::new(Lru::new(CACHE_MAX)),
         };
         strips.model.reset(50_000);
         assert_eq!(strips.model.row_count(), 50_000);

@@ -1,8 +1,8 @@
 //! Filling slots: from a deck's playhead or loop, from the browser's track or a sample pack; Sequence Load and Export Loop As Wav.
 
 use super::{
-    App, BEATS, Bank, DECK_NAMES, DeckState, MAX_SECS, ME, Sampler, SamplerState, capture,
-    deck_source, prefs,
+    App, BEATS, Bank, DECK_NAMES, DeckState, ME, Sampler, SamplerState, capture,
+    deck_source, max_secs, prefs,
 };
 use openfader::audio::Player;
 use slint::{ComponentHandle, Model};
@@ -57,16 +57,16 @@ impl Sampler {
             if native <= 0.0 {
                 return Err(tr!("deck {} has no tempo to count beats with", name));
             }
-            Ok((p.position_ms(), (beats * 60.0 / native).min(MAX_SECS)))
+            Ok((p.position_ms(), (beats * 60.0 / native).min(max_secs())))
         })
     }
 
-    /// Deck `d`'s active loop (at most [`MAX_SECS`] of it).
+    /// Deck `d`'s active loop (at most [`max_secs`] of it).
     fn from_loop(&self, d: usize, i: usize) -> Result<(), String> {
         let name = DECK_NAMES[d];
         self.from_deck_span(d, i, |p, _| {
             p.looping()
-                .map(|lp| capture::loop_region(lp, MAX_SECS))
+                .map(|lp| capture::loop_region(lp, max_secs()))
                 .ok_or(tr!("deck {} has no loop", name))
         })
     }

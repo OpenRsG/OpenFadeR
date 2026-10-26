@@ -54,6 +54,22 @@ pub fn code() -> String {
 
 /// `text`, given by the extension in `dir` (a plugin folder, or the folder of a theme file), in the language set.
 pub fn tr(dir: &Path, text: &str) -> String {
+    tr_with(dir, text, |code| load(&dir.join("locales").join(format!("{code}.json"))))
+}
+
+/// [`tr`] for a plugin compiled into the app: `files` are its `(code, locales/<code>.json)` pairs, `name` the plugin's.
+pub fn tr_embedded(name: &str, files: &[(&str, &str)], text: &str) -> String {
+    let key = PathBuf::from(format!("builtin:{name}"));
+    tr_with(&key, text, |code| {
+        files
+            .iter()
+            .find(|(c, _)| *c == code)
+            .map_or_else(Catalog::default, |(_, json)| parse(json, &key))
+    })
+}
+
+/// `text` in the language set, with the catalog cached under `key` and made by `read` (given the language code) once.
+fn tr_with(key: &Path, text: &str, read: impl FnOnce(&str) -> Catalog) -> String {
     if text.is_empty() {
         return String::new();
     }
@@ -62,13 +78,13 @@ pub fn tr(dir: &Path, text: &str) -> String {
         if s.code.is_empty() {
             return text.to_string();
         }
-        match s.catalogs.get(dir) {
+        match s.catalogs.get(key) {
             Some(c) => c.clone(),
             None => {
                 let code = s.code.clone();
                 drop(s);
-                let c = Arc::new(load(&dir.join("locales").join(format!("{code}.json"))));
-                STATE.write().catalogs.insert(dir.to_path_buf(), c.clone());
+                let c = Arc::new(read(&code));
+                STATE.write().catalogs.insert(key.to_path_buf(), c.clone());
                 c
             }
         }
@@ -101,10 +117,12 @@ pub fn pick(translations: &[(String, String)], english: &str) -> String {
 
 /// A missing or broken file is an empty catalog (the texts stay English); a broken one is reported on stderr.
 fn load(path: &Path) -> Catalog {
-    let Ok(json) = std::fs::read_to_string(path) else {
-        return Catalog::default();
-    };
-    let map: HashMap<String, String> = match serde_json::from_str(&json) {
+    std::fs::read_to_string(path).map_or_else(|_| Catalog::default(), |json| parse(&json, path))
+}
+
+/// The catalog of `json`, read from `path` (named when it is broken).
+fn parse(json: &str, path: &Path) -> Catalog {
+    let map: HashMap<String, String> = match serde_json::from_str(json) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("{}: {e}", path.display());
@@ -220,6 +238,9 @@ mod tests {
         assert_eq!(c.tr("Unknown"), "Unknown");
         assert_eq!(load(&file).tr("Download"), "Download", "no file");
         assert_eq!(code(), "en");
+        // An embedded catalog (a built-in plugin's) is the same text parsed from memory, and English stays as written.
+        assert_eq!(parse(r#"{"Download": "Télécharger"}"#, &file).tr("Download"), "Télécharger");
+        assert_eq!(tr_embedded("p", &[("fr", r#"{"Download": "x"}"#)], "Download"), "Download");
         assert_eq!(
             tr(&file, "Download"),
             "Download",

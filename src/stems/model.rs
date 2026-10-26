@@ -12,11 +12,13 @@
 
 use crate::analysis::cache;
 use ort::{environment::Environment, ep, logging::LogLevel, session::Session, value::Tensor};
-use parking_lot::Mutex;
+use parking_lot::{Condvar, Mutex};
 use std::path::PathBuf;
 use std::sync::LazyLock;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering::Relaxed};
+use std::time::Duration;
+#[cfg(all(test, feature = "stems-gpu"))]
+use std::time::Instant;
 
 pub const URL: &str = "https://huggingface.co/StemSplitio/htdemucs-onnx/resolve/main/htdemucs.onnx";
 pub const SIZE: u64 = 316_446_953;
@@ -136,26 +138,38 @@ pub struct Model(Session);
 /// Free memory the one-off fold needs (it peaks at about 6.5 GB of RSS).
 const FOLD_MIN_KIB: u64 = 8 << 20;
 
-/// `MemAvailable` in KiB from the text of `/proc/meminfo`.
-fn mem_available_kib(meminfo: &str) -> Option<u64> {
-    let l = meminfo
-        .lines()
-        .find_map(|l| l.strip_prefix("MemAvailable:"))?;
-    l.split_whitespace().next()?.parse().ok()
+static LOW_MEMORY: AtomicU8 = AtomicU8::new(0);
+
+/// Apply the resolved low-power preference; before the UI applies it, use the hardware memory budget.
+pub fn set_low_memory(enabled: bool) {
+    LOW_MEMORY.store(if enabled { 1 } else { 2 }, Relaxed);
 }
 
-/// Refuses the fold when the machine lacks the memory for its peak (Linux; elsewhere, or if unreadable, no guard).
+pub(super) fn low_memory() -> bool {
+    match LOW_MEMORY.load(Relaxed) {
+        1 => true,
+        2 => false,
+        _ => crate::memory::constrained(),
+    }
+}
+
+/// Never attempt the multi-GiB fold without a known memory budget; the original model remains usable.
 fn fold_memory_ok() -> Result<(), String> {
-    let free = std::fs::read_to_string("/proc/meminfo")
-        .ok()
-        .and_then(|t| mem_available_kib(&t));
-    match free {
+    fold_memory_budget(crate::memory::available_bytes(), low_memory())
+}
+
+fn fold_memory_budget(available: Option<u64>, constrained: bool) -> Result<(), String> {
+    if constrained {
+        return Err("low-power memory budget; using the original model without folding".into());
+    }
+    match available.map(|bytes| bytes >> 10) {
         Some(k) if k < FOLD_MIN_KIB => Err(format!(
             "not enough free memory to fold the model ({} MiB available, {} MiB needed)",
             k >> 10,
             FOLD_MIN_KIB >> 10
         )),
-        _ => Ok(()),
+        Some(_) => Ok(()),
+        None => Err("available memory is unknown; using the original model without folding".into()),
     }
 }
 
@@ -221,6 +235,15 @@ impl Model {
     /// ([`folded`]): 0.6 GB, 0.50 s per segment (unfolded it slows to 0.8 s while the CPU engine runs). The CPU reads the
     /// original: 0.8 GB, 1.2 to 1.3 s per segment (folded it peaks at 2.7 GB for the same speed).
     fn open(threads: usize, gpu: bool) -> Result<Model, String> {
+        let cache = if low_memory() {
+            GpuCache::Disabled
+        } else {
+            GpuCache::Default
+        };
+        Self::open_with_gpu_cache(threads, gpu, cache)
+    }
+
+    fn open_with_gpu_cache(threads: usize, gpu: bool, _cache: GpuCache) -> Result<Model, String> {
         let p = match gpu.then(folded) {
             Some(Ok(p)) => p,
             Some(Err(e)) => {
@@ -232,7 +255,14 @@ impl Model {
         let cpu = ep::CPU::default().with_arena_allocator(false).build();
         let providers = if gpu {
             #[cfg(feature = "stems-gpu")]
-            let providers = vec![ep::WebGPU::default().build().error_on_failure(), cpu];
+            let providers = vec![
+                ep::WebGPU::default()
+                    // Tight budgets return temporary buffers promptly; roomy devices reuse them until the batch ends.
+                    .with_storage_buffer_cache_mode(_cache.mode())
+                    .build()
+                    .error_on_failure(),
+                cpu,
+            ];
             #[cfg(not(feature = "stems-gpu"))]
             let providers = vec![cpu];
             providers
@@ -284,12 +314,11 @@ impl Model {
 }
 
 /// Where a segment runs. The GPU is ONNX Runtime's WebGPU provider (Dawn over Vulkan: any GPU with a Vulkan driver, no CUDA or
-/// cuDNN); the CPU is the default provider. Both sessions live for the whole process and are shared by every deck's separation:
-/// opening one costs about 2 s, and a GPU's first run compiles its shaders (about 1 s more).
+/// cuDNN); the CPU is the default provider. Sessions are shared by all active separation batches and closed when the last
+/// batch ends. Opening costs about 2 s, and the GPU's first run compiles its shaders (about 1 s more).
 ///
-/// Measured 2026-10-13 on a Ryzen/RTX 3090 box under load (`examples/stems_bench.rs`, one 7.8 s segment): CPU 1.15 to 1.45 s
-/// whatever the thread count (8, 12 or 16; the graph does not scale), WebGPU 0.53 to 0.66 s. The two run side by side, so a
-/// separation uses both and takes each next segment as soon as an engine is free.
+/// On machines above the low-memory budget the two run side by side; smaller machines run one batch on the GPU, falling
+/// back to the CPU if needed, without retaining two models and their scratch space.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Engine {
     Gpu,
@@ -334,20 +363,99 @@ impl<T> Slot<T> {
 static GPU: Mutex<Slot<Model>> = Mutex::new(Slot::Untried);
 static CPU: Mutex<Option<(usize, Model)>> = Mutex::new(None);
 
-/// A GPU segment slower than this is a software rasteriser (llvmpipe), which only steals a core from the CPU engine. The
-/// first run compiles shaders (about 1 s on a fast GPU).
-const GPU_TOO_SLOW: Duration = Duration::from_secs(10);
+enum GpuCache {
+    Disabled,
+    Default,
+    #[cfg(all(test, feature = "stems-gpu"))]
+    Simple,
+}
 
-/// Why a GPU that just ran a segment is to be given up, if it is: the run failed, or took far too long.
-fn gpu_verdict<T>(out: &Result<T, String>, took: Duration) -> Option<String> {
-    match out {
-        Err(e) => Some(e.clone()),
-        Ok(_) if took > GPU_TOO_SLOW => Some(format!(
-            "{:.1} s per segment: a software renderer",
-            took.as_secs_f32()
-        )),
-        Ok(_) => None,
+#[cfg(feature = "stems-gpu")]
+impl GpuCache {
+    fn mode(self) -> ep::webgpu::BufferCacheMode {
+        match self {
+            Self::Disabled => ep::webgpu::BufferCacheMode::Disabled,
+            Self::Default => ep::webgpu::BufferCacheMode::Bucket,
+            #[cfg(test)]
+            Self::Simple => ep::webgpu::BufferCacheMode::Simple,
+        }
     }
+}
+
+struct BatchState {
+    active: usize,
+    serial: bool,
+}
+
+impl BatchState {
+    fn can_start(&self, serial: bool) -> bool {
+        !self.serial && (!serial || self.active == 0)
+    }
+}
+
+static ACTIVE_BATCHES: Mutex<BatchState> = Mutex::new(BatchState {
+    active: 0,
+    serial: false,
+});
+static BATCH_READY: Condvar = Condvar::new();
+
+/// Held on the job worker, never on the UI/audio thread or for a cache hit.
+pub(super) struct Batch {
+    serial: bool,
+}
+
+impl Batch {
+    pub(super) fn start(cancel: &AtomicBool) -> Result<Self, String> {
+        let serial = low_memory();
+        admit_batch(&ACTIVE_BATCHES, &BATCH_READY, serial, cancel)?;
+        Ok(Self { serial })
+    }
+
+    pub(super) fn serial(&self) -> bool {
+        self.serial
+    }
+}
+
+impl Drop for Batch {
+    fn drop(&mut self) {
+        finish_batch(&ACTIVE_BATCHES, release);
+        BATCH_READY.notify_all();
+    }
+}
+
+fn admit_batch(
+    active: &Mutex<BatchState>,
+    ready: &Condvar,
+    serial: bool,
+    cancel: &AtomicBool,
+) -> Result<(), String> {
+    let mut state = active.lock();
+    loop {
+        if cancel.load(Relaxed) {
+            return Err("cancelled".into());
+        }
+        if state.can_start(serial) {
+            state.active += 1;
+            state.serial = serial;
+            return Ok(());
+        }
+        ready.wait_for(&mut state, Duration::from_millis(100));
+    }
+}
+
+fn finish_batch(active: &Mutex<BatchState>, release: impl FnOnce()) {
+    let mut state = active.lock();
+    state.active -= 1;
+    if state.active == 0 {
+        state.serial = false;
+        // Keep admission locked through teardown so a new batch cannot lose its sessions.
+        release();
+    }
+}
+
+/// Elapsed time cannot distinguish a small GPU from a software renderer; only a failed run retires it.
+fn gpu_verdict<T>(out: &Result<T, String>) -> Option<String> {
+    out.as_ref().err().cloned()
 }
 
 /// `OPENFADER_STEMS_GPU=0` keeps the GPU out (comparisons, machines where Vulkan misbehaves); a build without the `stems-gpu`
@@ -385,9 +493,8 @@ pub fn shutdown() {
     *CPU.lock() = None;
 }
 
-/// Closes the open sessions to give their memory back (about 1 GB for both); the next run opens them again (2 to 3 s). An
-/// engine found unusable stays out. Waits for a segment in flight.
-pub fn release() {
+/// Closes idle sessions on the last batch's worker; an unusable GPU stays out.
+fn release() {
     let mut g = GPU.lock();
     if matches!(*g, Slot::Ready(_)) {
         *g = Slot::Untried;
@@ -403,12 +510,6 @@ impl Engine {
             Engine::Gpu => "GPU",
             Engine::Cpu(_) => "CPU",
         }
-    }
-
-    /// Opens the engine's session now if it is not open (the GPU: the first time per process). `Err` = this engine is out,
-    /// for the GPU with the reason logged once.
-    pub fn open(self) -> Result<(), String> {
-        self.open_cancellable(&std::sync::atomic::AtomicBool::new(false))
     }
 
     /// Preflights an engine before it reserves any segments, checking cancellation under its session lock.
@@ -440,13 +541,8 @@ impl Engine {
                 if cancel.load(std::sync::atomic::Ordering::Relaxed) {
                     return Err("cancelled".into());
                 }
-                let started = Instant::now();
-                let mut took = Duration::ZERO;
-                let out = m.run(mix, &mut |data| {
-                    took = started.elapsed();
-                    consume(data)
-                });
-                if let Some(why) = gpu_verdict(&out, took) {
+                let out = m.run(mix, consume);
+                if let Some(why) = gpu_verdict(&out) {
                     eprintln!("stems: GPU unusable ({why}); separating on the CPU");
                     *g = Slot::Unusable(why);
                 }
@@ -475,29 +571,200 @@ fn with_active<T>(
     run(&mut slot)
 }
 
-/// Opens the sessions in the background, so the first track loaded after STEMS is switched on does not wait for them.
-pub fn warm(engines: &[Engine]) {
-    for &e in engines {
-        std::thread::spawn(move || {
-            if e.open().is_ok() {
-                let _ = e.run(
-                    vec![0.0; 2 * SEGMENT],
-                    &std::sync::atomic::AtomicBool::new(false),
-                    &mut |_| Ok(()),
-                ); // shaders, thread pool, allocator
-            }
-        });
-    }
-}
-
-/// The engines a separation uses: the GPU, and the CPU with [`super::threads`] threads.
-pub fn engines(multithread: bool) -> [Engine; 2] {
-    [Engine::Gpu, Engine::Cpu(super::threads(multithread))]
+/// The engines a separation uses under the admitted batch's immutable memory budget.
+pub fn engines(multithread: bool, low_memory: bool) -> [Engine; 2] {
+    [
+        Engine::Gpu,
+        Engine::Cpu(super::threads(multithread, low_memory)),
+    ]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn folding_requires_known_free_memory_for_its_peak() {
+        assert!(fold_memory_budget(None, false).is_err());
+        assert!(fold_memory_budget(Some((FOLD_MIN_KIB << 10) - 1), false).is_err());
+        assert_eq!(fold_memory_budget(Some(FOLD_MIN_KIB << 10), false), Ok(()));
+        assert!(fold_memory_budget(Some(16 << 30), true).is_err());
+    }
+
+    #[test]
+    fn only_the_last_batch_releases_sessions_with_admission_still_locked() {
+        let active = Mutex::new(BatchState {
+            active: 2,
+            serial: false,
+        });
+        let releases = Cell::new(0);
+        finish_batch(&active, || panic!("another batch still needs its sessions"));
+        assert_eq!(active.lock().active, 1);
+        finish_batch(&active, || {
+            assert!(
+                active.try_lock().is_none(),
+                "teardown must exclude new admission"
+            );
+            releases.set(releases.get() + 1);
+        });
+        assert_eq!(active.lock().active, 0);
+        assert_eq!(releases.get(), 1);
+    }
+
+    #[test]
+    fn serial_budget_waits_for_parallel_batches_and_survives_preference_changes() {
+        let parallel = BatchState {
+            active: 2,
+            serial: false,
+        };
+        assert!(parallel.can_start(false));
+        assert!(!parallel.can_start(true));
+        let serial = BatchState {
+            active: 1,
+            serial: true,
+        };
+        assert!(
+            !serial.can_start(false),
+            "turning low-power off cannot overlap an exclusive job"
+        );
+        assert!(!serial.can_start(true));
+        let idle = BatchState {
+            active: 0,
+            serial: false,
+        };
+        assert!(idle.can_start(false));
+        assert!(idle.can_start(true));
+    }
+
+    #[test]
+    fn cancelled_batch_waiter_releases_its_payload_without_waiting_for_active_inference() {
+        let active = Mutex::new(BatchState {
+            active: 1,
+            serial: true,
+        });
+        let ready = Condvar::new();
+        let cancel = AtomicBool::new(false);
+        std::thread::scope(|scope| {
+            let (started, rx) = std::sync::mpsc::channel();
+            let (done, result) = std::sync::mpsc::channel();
+            let (active, ready, cancel) = (&active, &ready, &cancel);
+            let waiter = scope.spawn(move || {
+                started.send(()).unwrap();
+                done.send(admit_batch(active, ready, true, cancel)).unwrap();
+            });
+            rx.recv().unwrap();
+            std::thread::sleep(Duration::from_millis(30));
+            cancel.store(true, Relaxed);
+            let stopped = result.recv_timeout(Duration::from_secs(2));
+            ready.notify_all(); // let a broken waiter exit too, rather than hanging the suite
+            waiter.join().unwrap();
+            assert_eq!(stopped.unwrap(), Err("cancelled".into()));
+        });
+        assert_eq!(active.lock().active, 1);
+    }
+
+    fn probe_mix() -> Vec<f32> {
+        (0..2 * SEGMENT)
+            .map(|i| {
+                let phase = (i % SEGMENT) as f32;
+                let carrier = if i < SEGMENT { 0.031 } else { 0.047 };
+                0.2 * (phase * carrier).sin() + 0.1 * (phase * 0.013).cos()
+            })
+            .collect()
+    }
+
+    fn report_memory(phase: &str) {
+        let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
+        let memory: Vec<_> = status
+            .lines()
+            .filter(|l| l.starts_with("VmRSS:") || l.starts_with("VmHWM:"))
+            .collect();
+        eprintln!(
+            "model-memory pid={} phase={phase} {}",
+            std::process::id(),
+            memory.join(" ")
+        );
+    }
+
+    #[cfg(feature = "stems-gpu")]
+    fn gpu_memory_probe(cache: GpuCache) {
+        gpu_allowed().expect("GPU probe needs the stems-gpu feature and a GPU");
+        report_memory("before-open");
+        let mut model = Model::open_with_gpu_cache(1, true, cache).expect("open real GPU model");
+        report_memory("opened");
+        for segment in 0..3 {
+            let start = Instant::now();
+            model
+                .run(probe_mix(), &mut |data| {
+                    assert!(data.iter().all(|v| v.is_finite()));
+                    let energy: f64 = data.iter().map(|&v| (v as f64).powi(2)).sum();
+                    assert!(energy > 0.0, "nonzero input must produce nonzero stems");
+                    let hash = data.iter().fold(0xcbf29ce484222325u64, |hash, v| {
+                        (hash ^ u64::from(v.to_bits())).wrapping_mul(0x100000001b3)
+                    });
+                    eprintln!(
+                        "model-memory segment={segment} energy={energy:.12} hash={hash:016x}"
+                    );
+                    Ok(())
+                })
+                .expect("real GPU inference");
+            eprintln!(
+                "model-memory segment={segment} seconds={:.6}",
+                start.elapsed().as_secs_f64()
+            );
+            report_memory("segment-finished");
+        }
+        drop(model);
+        trim_heap();
+        report_memory("released");
+    }
+
+    #[cfg(feature = "stems-gpu")]
+    #[test]
+    #[ignore = "real model/GPU memory probe; run alone with --nocapture"]
+    fn gpu_default_cache_memory_probe() {
+        gpu_memory_probe(GpuCache::Default);
+    }
+
+    #[cfg(feature = "stems-gpu")]
+    #[test]
+    #[ignore = "real model/GPU memory probe; run alone with --nocapture"]
+    fn gpu_simple_cache_memory_probe() {
+        gpu_memory_probe(GpuCache::Simple);
+    }
+
+    #[cfg(feature = "stems-gpu")]
+    #[test]
+    #[ignore = "real model/GPU memory probe; run alone with --nocapture"]
+    fn gpu_disabled_cache_memory_probe() {
+        gpu_memory_probe(GpuCache::Disabled);
+    }
+
+    #[test]
+    #[ignore = "real model lifecycle/memory probe; run alone with --nocapture"]
+    fn cpu_batch_releases_the_model_after_multiple_segments() {
+        let cancel = AtomicBool::new(false);
+        report_memory("before-batch");
+        let batch = Batch::start(&cancel).unwrap();
+        for _ in 0..3 {
+            Engine::Cpu(2)
+                .run(probe_mix(), &cancel, &mut |data| {
+                    assert!(data.iter().all(|v| v.is_finite()));
+                    assert!(data.iter().any(|&v| v != 0.0));
+                    Ok(())
+                })
+                .expect("real CPU inference");
+            assert!(CPU.lock().is_some());
+            report_memory("segment-finished");
+        }
+        drop(batch);
+        assert!(
+            CPU.lock().is_none(),
+            "last batch must release model weights"
+        );
+        assert!(!matches!(*GPU.lock(), Slot::Ready(_)));
+        report_memory("released");
+    }
 
     #[test]
     fn cancellation_while_waiting_for_session_skips_the_run() {
@@ -560,12 +827,6 @@ mod tests {
         assert!(matches!(*slot.lock(), Slot::Ready(7)));
     }
 
-    #[test]
-    fn meminfo_parse() {
-        let t = "MemTotal:       32000000 kB\nMemAvailable:    7340032 kB\nBuffers: 1 kB\n";
-        assert_eq!(mem_available_kib(t), Some(7_340_032));
-        assert_eq!(mem_available_kib("MemTotal: 1 kB\n"), None);
-    }
     use std::cell::Cell;
 
     #[test]
@@ -622,20 +883,10 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_or_software_rendered_run_gives_the_gpu_up_a_fast_one_does_not() {
-        assert_eq!(gpu_verdict(&Ok(()), Duration::from_millis(600)), None);
+    fn only_an_inference_error_retires_the_gpu() {
+        assert_eq!(gpu_verdict(&Ok(())), None);
         assert_eq!(
-            gpu_verdict(&Ok(()), Duration::from_secs(1)),
-            None,
-            "shader compile on the first run"
-        );
-        assert!(
-            gpu_verdict(&Ok(()), Duration::from_secs(30))
-                .unwrap()
-                .contains("software")
-        );
-        assert_eq!(
-            gpu_verdict::<()>(&Err("device lost".into()), Duration::ZERO).as_deref(),
+            gpu_verdict::<()>(&Err("device lost".into())).as_deref(),
             Some("device lost")
         );
     }

@@ -7,7 +7,7 @@ use crate::app::browser::{
 };
 use openfader::store::{self, NodeKind};
 use crate::app::{Icon, TreeRow};
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Model};
 
 /// "Folder › Playlist" path of node `id`.
 fn path_of(nodes: &[store::Node], mut id: i64) -> String {
@@ -184,11 +184,7 @@ impl View {
         self.mytags = self.ok(app, store.mytags(), Vec::new());
         self.banks = self.ok(app, store.banks(), Vec::new());
         self.read_stages(app);
-        let days = self.ok(app, store.history_days(), Vec::new());
-        let days: Vec<(String, usize)> = days
-            .into_iter()
-            .map(|d| (d.clone(), store.history_day(&d).map_or(0, |v| v.len())))
-            .collect();
+        let days = self.ok(app, store.history_day_counts(), Vec::new());
         let src_rows = self.source_rows();
         let (cue_on, all_tracks, banks_on) = crate::app::prefs::with(|p| {
             let v = &p.view;
@@ -271,6 +267,31 @@ impl View {
             None => self.open.push(e),
         }
         self.rebuild(app);
+    }
+
+    /// BACK (or Left) on `row`: the section it is in folds and its heading becomes the chosen entry; the caller chooses the
+    /// returned row (the heading's, or `row` when it is under none), which shows that entry.
+    pub(in crate::app::browser) fn tree_back(&mut self, app: &App, row: usize) -> usize {
+        let Some(e) = self.entries.get(row) else {
+            return row;
+        };
+        let head = if sidebar::is_heading(e) {
+            row
+        } else if self.sidebar.row_data(row).is_some_and(|r| r.depth == 0) {
+            return row; // a top row under no heading (All tracks, a library source …)
+        } else {
+            // The shown rows above, back to the first one that is not indented.
+            let top = (0..row).rev().find(|&k| self.sidebar.row_data(k).is_some_and(|r| r.depth == 0));
+            match top.filter(|&k| sidebar::is_heading(&self.entries[k])) {
+                Some(k) => k,
+                None => return row,
+            }
+        };
+        let e = self.entries[head].clone();
+        self.open.retain(|o| *o != e);
+        self.entry = e;
+        self.rebuild(app);
+        head
     }
 
     /// The glyph before a row: what kind of list it is.

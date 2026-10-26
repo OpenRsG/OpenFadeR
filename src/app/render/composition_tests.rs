@@ -122,6 +122,172 @@ fn scrolling_cached_detail_preserves_grid_cues_and_loop_at_each_zoom() {
     prefs::set_for_test(|p| p.view = old);
 }
 
+// Independent pre-culling reference: retain every beat/cue iteration and let the canvas clip it.
+fn grid_cues_reference(a: &Analysis, axis: Axis, w: usize, h: usize) -> Image {
+    use prefs::view::{BeatGrid, CueMarkers};
+    let view = prefs::with(|p| p.view.clone());
+    let mut c = Canvas::new(w, h);
+    for b in &a.beats {
+        let x = axis.col(b.time_ms as f64);
+        match view.beat_grid {
+            BeatGrid::Normal => c.vline(
+                x,
+                0..h,
+                if b.bar_pos == 1 {
+                    [230, 40, 40]
+                } else {
+                    [128; 3]
+                },
+            ),
+            BeatGrid::Bold => c.bold_grid(x, b.bar_pos == 1),
+        }
+    }
+    let large = view.cue_markers == CueMarkers::Large;
+    let memory_w = if view.beat_grid == BeatGrid::Bold {
+        6
+    } else {
+        2
+    } + 2 * usize::from(large);
+    let box_y = font::H * (h / 90).max(1) + 5;
+    for cue in &a.cues {
+        let x = axis.col(cue.time_ms as f64);
+        let rgb = hot_cue_rgb(view.hot_cue_colors, cue);
+        if cue.hot_cue == 0 {
+            c.memory_cue(x, memory_w, rgb, (h >= 40).then_some(box_y), large);
+        } else {
+            c.vline(x, (0..h).step_by(2), rgb);
+            if h >= 40 {
+                c.cue_box(x, box_y, cue_letter(cue.hot_cue as u8), rgb, large);
+            }
+        }
+    }
+    cue_marker(&mut c, axis.col(u32::MAX as f64), (h / 12).clamp(5, 12));
+    c.image()
+}
+
+#[test]
+fn detail_viewport_culling_matches_all_markers_at_fractional_edges() {
+    use prefs::view::{BeatGrid, CueMarkers};
+    let mut a = fixture();
+    a.beats = (0..1000)
+        .map(|i| Beat {
+            time_ms: i * 10,
+            bar_pos: (i % 4 + 1) as u16,
+            bpm_x100: 12000,
+        })
+        .collect();
+    // Deliberately unordered: cues do not promise chronological storage.
+    a.cues = [1130, 970, 1010, 1000, 990, 1140, 0, 9999]
+        .into_iter()
+        .enumerate()
+        .map(|(i, time_ms)| Cue {
+            time_ms,
+            hot_cue: (i % 3) as u16,
+            loop_end_ms: None,
+            color: None,
+            comment: None,
+        })
+        .collect();
+    let old = prefs::with(|p| p.view.clone());
+    for grid in [BeatGrid::Normal, BeatGrid::Bold] {
+        for large in [false, true] {
+            prefs::set_for_test(|p| {
+                p.view.beat_grid = grid;
+                p.view.cue_markers = if large {
+                    CueMarkers::Large
+                } else {
+                    CueMarkers::Normal
+                };
+                p.view.phrase_enlarged = false;
+                p.view.vocal_enlarged = false;
+            });
+            for start_ms in [-10.5, 0.0, 980.0, 999.9, 1000.0, 1000.1, 10000.0] {
+                for px_per_ms in [0.016, 0.256, 1.0, 2.0] {
+                    let axis = Axis {
+                        start_ms,
+                        px_per_ms,
+                    };
+                    let expected = grid_cues_reference(&a, axis, 128, 60).to_rgba8().unwrap();
+                    let actual = detail::render_strip(
+                        None,
+                        &a,
+                        start_ms,
+                        px_per_ms,
+                        u32::MAX,
+                        None,
+                        128,
+                        60,
+                        false,
+                    )
+                    .to_rgba8()
+                    .unwrap();
+                    assert_eq!(
+                        actual.as_bytes(),
+                        expected.as_bytes(),
+                        "start={start_ms}, scale={px_per_ms}, grid={grid:?}, large={large}"
+                    );
+                }
+            }
+        }
+    }
+    prefs::set_for_test(|p| p.view = old);
+}
+
+#[test]
+#[ignore = "release timing; run with --ignored --nocapture"]
+fn benchmark_detail_viewport_metadata() {
+    use std::{hint::black_box, time::Instant};
+    let mut a = fixture();
+    a.beats = (0..100_000)
+        .map(|i| Beat {
+            time_ms: i * 400,
+            bar_pos: (i % 4 + 1) as u16,
+            bpm_x100: 15000,
+        })
+        .collect();
+    let old = prefs::with(|p| p.view.clone());
+    prefs::set_for_test(|p| {
+        p.view.beat_grid = prefs::view::BeatGrid::Bold;
+        p.view.phrase_enlarged = false;
+        p.view.vocal_enlarged = false;
+    });
+    let axis = Axis {
+        start_ms: 20_000_000.0,
+        px_per_ms: 0.128,
+    };
+    let n = 100;
+    for reference in [true, false] {
+        let start = Instant::now();
+        for _ in 0..n {
+            black_box(if reference {
+                grid_cues_reference(&a, axis, 1024, 120)
+            } else {
+                detail::render_strip(
+                    None,
+                    &a,
+                    axis.start_ms,
+                    axis.px_per_ms,
+                    u32::MAX,
+                    None,
+                    1024,
+                    120,
+                    false,
+                )
+            });
+        }
+        println!(
+            "detail metadata {}: {:.3} ms/strip",
+            if reference {
+                "whole-track reference"
+            } else {
+                "viewport"
+            },
+            start.elapsed().as_secs_f64() * 1000.0 / n as f64
+        );
+    }
+    prefs::set_for_test(|p| p.view = old);
+}
+
 #[test]
 #[ignore = "release timing; run with --ignored --nocapture"]
 fn benchmark_waveform_composition() {

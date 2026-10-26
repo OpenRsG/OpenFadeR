@@ -53,6 +53,7 @@ fn plugin_updates() -> Vec<String> {
         now.plugins
             .iter()
             .chain(&now.disabled)
+            .filter(|p| p.builtin.is_none()) // a plugin of the app is updated with the app
             .find(|p| p.manifest.name == name)
             .map(|p| p.manifest.version.clone())
     };

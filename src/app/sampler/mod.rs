@@ -2,7 +2,7 @@
 //!
 //! The pads (4, 8 or 16 in use: CONTROLLER > Sampler > SLOT) fill from the playhead of any deck A to D (`N beats` at the deck's tempo, copied from the
 //! deck's own audio with [`audio::Player::capture`]) or from the browser's selected track (decoded on a
-//! worker thread, first [`MAX_SECS`] kept). A slice remembers its tempo (the deck's grid tempo, effective
+//! worker thread, first [`max_secs`] kept). A slice remembers its tempo (the deck's grid tempo, effective
 //! BPM / playback rate, or the library BPM) so BPM SYNC can follow the master deck (the one `fx` follows).
 //! Per-slot settings live here (`Cfg`) and are mirrored into the audio [`Controls`](audio::sampler::Controls);
 //! a 50 ms timer lights the playing pads, hands over the finished track decode and pushes the master tempo.
@@ -16,7 +16,8 @@
 //!
 //! Children: [`load`] (filling slots, Sequence Load, Export Loop As Wav), [`controls`] (the `SamplerState` callbacks), [`seq`] (the SEQUENCER),
 //! [`capture`] (loop span, WAV file, frequency band).
-//! ponytail: a TRK load decodes the whole file to keep 30 s of it, and only the newest TRK load is awaited; Sequence Load loops those 30 s.
+//! Low-power mode ([`prefs::lowpower`]) keeps [`prefs::lowpower::SAMPLER_SECS`] per slot instead of 30 s ([`max_secs`]): 16 slots of 48 kHz stereo f32 are 60 MB instead of 180 MB.
+//! ponytail: a TRK load decodes the whole file (f32) to keep 30 s of it, and only the newest TRK load is awaited; Sequence Load loops those 30 s.
 
 mod capture;
 mod controls;
@@ -50,6 +51,15 @@ use std::{
 /// Beat counts of a deck capture and the one selected at start.
 const BEATS: [u32; 6] = [1, 2, 4, 8, 16, 32];
 const DEFAULT_BEATS: usize = 2;
+
+/// Longest slice a slot keeps, seconds: [`MAX_SECS`], or [`prefs::lowpower::SAMPLER_SECS`] in low-power mode (UI thread).
+fn max_secs() -> f64 {
+    if prefs::lowpower::active() {
+        MAX_SECS.min(prefs::lowpower::SAMPLER_SECS)
+    } else {
+        MAX_SECS
+    }
+}
 
 fn deck_source(source: i32) -> Option<usize> {
     usize::try_from(source).ok().filter(|&d| d < DECKS)
@@ -309,7 +319,7 @@ impl Sampler {
                     .and_then(|mut pcm| {
                         self.check(p.slot)?; // the slot may have been filled / dropped from use while the track decoded
                         pcm.samples
-                            .truncate(2 * (MAX_SECS * pcm.rate as f64) as usize);
+                            .truncate(2 * (max_secs() * pcm.rate as f64) as usize);
                         self.give(p.slot, pcm, p.bpm)?;
                         self.sequence(p.slot);
                         Ok(())

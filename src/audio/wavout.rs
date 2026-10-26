@@ -1,5 +1,5 @@
 //! A [`Pcm`] slice as a canonical 16-bit stereo PCM WAV (Microsoft RIFF WAVE, 44-byte header) at a chosen sampling
-//! rate: the sampler's capture files and Export Loop As Wav. The slice is resampled linearly ([`Pcm::frame_at`]) when
+//! rate: the sampler's capture files and Export Loop As Wav. The slice is resampled by windowed sinc ([`Pcm::frame_at_step`]) when
 //! its rate differs from `hz`; samples are clamped to ±1 and scaled by 32767, like the recorder ([`super::rec`]),
 //! which shares [`header`] and [`to_i16`] (and so does [`crate::edit`]'s arrangement render).
 
@@ -57,7 +57,7 @@ pub fn wav_bytes(pcm: &Pcm, hz: u32) -> Vec<u8> {
     b.reserve(frames * FRAME_BYTES);
     let step = pcm.rate as f64 / hz as f64;
     for i in 0..frames {
-        for x in pcm.frame_at(i as f64 * step).unwrap_or([0.0; 2]) {
+        for x in pcm.frame_at_step(i as f64 * step, step).unwrap_or([0.0; 2]) {
             b.extend(to_i16(x).to_le_bytes());
         }
     }

@@ -7,7 +7,7 @@
 //! device channels 1/2); a mono device delivers its one channel on both sides. The stream runs at the device's
 //! default rate; nothing resamples, the recording takes `tap.rate()`.
 
-use super::{Tap, device};
+use super::Tap;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SampleRate, SizedSample, Stream, StreamConfig};
 use std::sync::atomic::Ordering::Relaxed;
@@ -167,7 +167,10 @@ fn open_with(device: &str, pair: u8, tap: Option<Arc<Tap>>) -> Result<Input, Str
         .map_err(|e| format!("{name}: {e}"))?
         .sample_rate();
     let need = 2 * pair.max(1) as usize;
-    let have = device::input_caps(&name).map_or(0, |c| c.channels);
+    let have = || {
+        dev.supported_input_configs()
+            .map_or(0, |c| c.map(|c| c.channels()).max().unwrap_or(0))
+    };
     // The configuration with the fewest channels that has the pair, at the default rate, f32 preferred.
     let sup = dev
         .supported_input_configs()
@@ -186,8 +189,9 @@ fn open_with(device: &str, pair: u8, tap: Option<Arc<Tap>>) -> Result<Input, Str
         .map(|c| c.with_sample_rate(SampleRate(rate.0)))
         .ok_or_else(|| {
             format!(
-                "{name}: no input with {need} channels at {} Hz (it has {have})",
-                rate.0
+                "{name}: no input with {need} channels at {} Hz (it has {})",
+                rate.0,
+                have()
             )
         })?;
     let channels = sup.channels() as usize;

@@ -53,8 +53,21 @@ pub fn phrase_band(
     rows: Range<usize>,
     label_scale: Option<usize>,
 ) {
-    let mood = a.phrases.as_ref().map_or(Mood::Mid, |p| p.mood);
-    for ph in a.phrases.iter().flat_map(|p| &p.list) {
+    let Some(phrases) = &a.phrases else {
+        return;
+    };
+    let mood = phrases.mood;
+    // Contiguous phrases are ordered by their beat boundaries, including tails extrapolated past the grid.
+    let first = phrases
+        .list
+        .partition_point(|ph| axis.col(ph.span_ms(&a.beats).1) <= 0);
+    let last = phrases
+        .list
+        .partition_point(|ph| axis.col(ph.span_ms(&a.beats).0) < c.w as i64);
+    if first >= last {
+        return;
+    }
+    for ph in &phrases.list[first..last] {
         let (s, e) = ph.span_ms(&a.beats);
         let (x0, x1) = (axis.col(s), axis.col(e));
         if x1 <= 0 || x0 >= c.w as i64 {
@@ -173,5 +186,84 @@ mod tests {
         // the label is white text inside the phrase and is cut before the phrase's last column
         assert!((0..9).any(|y| (11..19).any(|x| rgb(x, y) == [255; 3])));
         assert!((0..9).all(|y| rgb(19, y) != [255; 3] && rgb(20, y) != [255; 3]));
+    }
+
+    #[test]
+    fn visible_phrases_match_full_scan_at_edges_and_extrapolated_tail() {
+        let a = Analysis {
+            beats: (0..64)
+                .map(|i| Beat {
+                    time_ms: i * 500,
+                    bar_pos: (i % 4 + 1) as u16,
+                    bpm_x100: 12000,
+                })
+                .collect(),
+            phrases: Some(Phrases {
+                mood: Mood::Mid,
+                list: (0..16)
+                    .map(|i| Phrase {
+                        beat: 1 + i * 8,
+                        end_beat: 9 + i * 8,
+                        kind: PhraseKind::Verse,
+                        variant: (i % 6 + 1) as u8,
+                        fill: Some(7 + i * 8),
+                    })
+                    .collect(),
+            }),
+            ..Default::default()
+        };
+        for start_ms in [
+            -1000.5, 0.0, 3999.9, 4000.0, 4000.1, 31000.0, 63000.0, 70000.0,
+        ] {
+            for px_per_ms in [0.003, 0.05, 1.0] {
+                for scale in [None, Some(1), Some(2)] {
+                    let axis = Axis {
+                        start_ms,
+                        px_per_ms,
+                    };
+                    let (mut actual, mut expected) = (Canvas::new(128, 24), Canvas::new(128, 24));
+                    phrase_band(&mut actual, &axis, &a, 0..22, scale);
+                    // Original full scan, independent of the viewport searches.
+                    for ph in &a.phrases.as_ref().unwrap().list {
+                        let (s, e) = ph.span_ms(&a.beats);
+                        let (x0, x1) = (axis.col(s), axis.col(e));
+                        if x1 <= 0 || x0 >= expected.w as i64 {
+                            continue;
+                        }
+                        expected.shade(
+                            x0,
+                            x1,
+                            0..22,
+                            phrase_color(Mood::Mid, ph.kind, ph.variant),
+                            1.0,
+                        );
+                        if let Some(f) = ph.fill_ms(&a.beats) {
+                            expected.shade(axis.col(f), x1, 0..22, [255; 3], 0.35);
+                        }
+                        expected.vline(x0, 0..22, [0; 3]);
+                        if let Some(scale) = scale {
+                            let y = 22usize.saturating_sub(font::H * scale) / 2;
+                            expected.text(x0.max(0) + 2, y, &ph.label(), scale, [255; 3], x1 - 1);
+                        }
+                    }
+                    assert_eq!(
+                        actual.buf.as_bytes(),
+                        expected.buf.as_bytes(),
+                        "start={start_ms}, scale={px_per_ms}, label={scale:?}"
+                    );
+                }
+            }
+        }
+        let mut empty = Canvas::new(0, 24);
+        phrase_band(
+            &mut empty,
+            &Axis {
+                start_ms: 80000.0,
+                px_per_ms: 1.0,
+            },
+            &a,
+            0..22,
+            Some(1),
+        );
     }
 }

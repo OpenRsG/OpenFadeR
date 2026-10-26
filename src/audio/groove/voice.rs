@@ -4,8 +4,8 @@
 //! `begin` runs once per buffer (UI requests, whether the deck can hold sync, gains), `tick` once per output frame with the deck's source
 //! position (the loop phase is the deck's beat advance, see [`super::phase`]), `end` publishes what the UI shows. A pressed slot waits for the
 //! next whole beat of the deck and then plays from the start of its loop; its loop phase is a plain beat counter that the grid moves, so a
-//! quantized jump of the deck leaves it playing in time. At the source tempo (ratio within 0.1 %) the loop is read by linear
-//! interpolation at the exact position, else by the WSOLA stretcher (pitch kept; its grain search moves the audio up to ~9 ms around the
+//! quantized jump of the deck leaves it playing in time. At the source tempo (ratio within 0.1 %) the loop is read by interpolation
+//! at the exact position, else by the WSOLA stretcher (pitch kept; its grain search moves the audio up to ~9 ms around the
 //! nominal position, like the deck's own key lock). Stopping fades out over [`STOP_S`].
 
 use super::super::fx::Unit;
@@ -57,7 +57,7 @@ struct SlotVoice {
 }
 
 impl SlotVoice {
-    fn new() -> SlotVoice {
+    fn new(rate: u32) -> SlotVoice {
         SlotVoice {
             drum: None,
             st: St::Idle,
@@ -67,7 +67,7 @@ impl SlotVoice {
             to: 1.0,
             presses: 0,
             stops: 0,
-            stretch: Stretch::new(),
+            stretch: Stretch::new(rate),
         }
     }
 
@@ -110,7 +110,7 @@ pub(crate) struct Voice {
 impl Voice {
     pub(crate) fn new(rate: u32) -> Voice {
         Voice {
-            slots: std::array::from_fn(|_| SlotVoice::new()),
+            slots: std::array::from_fn(|_| SlotVoice::new(rate)),
             t: Tracker::default(),
             fx: Unit::new(rate),
             halts: 0,
@@ -248,7 +248,7 @@ impl Voice {
             let at = v.phase * spb;
             let x = if (ratio - 1.0).abs() < EXACT {
                 v.stretch.reset();
-                d.pcm.frame_at(at).unwrap_or([0.0; 2])
+                d.pcm.frame_at_step(at, d.pcm.rate as f64 / self.rate as f64).unwrap_or([0.0; 2])
             } else {
                 v.stretch.next(
                     &d.pcm,

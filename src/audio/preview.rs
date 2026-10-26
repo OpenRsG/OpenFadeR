@@ -70,6 +70,17 @@ impl Controls {
         self.playing.store(false, Relaxed);
     }
 
+    /// Releases the browser's track on its owner thread, not in the audio callback.
+    pub fn unload(&self) {
+        self.playing.store(false, Relaxed);
+        let old = self.pcm.lock().take();
+        self.rate.store(0, Relaxed);
+        self.frames.store(0, Relaxed);
+        self.pos.store(0f64.to_bits(), Relaxed);
+        self.seek.store(NO_SEEK, Relaxed);
+        drop(old);
+    }
+
     pub fn is_playing(&self) -> bool {
         self.playing.load(Relaxed)
     }
@@ -132,7 +143,7 @@ impl Voice {
         Voice { applied: 1.0 }
     }
 
-    /// Hands up to `n` frames of the playing track to `put(i, frame)` (linear resample to `dev_rate`, gain ramped
+    /// Hands up to `n` frames of the playing track to `put(i, frame)` (windowed-sinc resample to `dev_rate`, gain ramped
     /// from the last buffer's value). Calls `put` for no frame while stopped; stops at the end of the track.
     pub fn render(
         &mut self,
@@ -153,7 +164,7 @@ impl Voice {
         let mut pos = c.head(c.seek.swap(NO_SEEK, Relaxed));
         let step = pcm.rate as f64 / dev_rate as f64;
         for i in 0..n {
-            let Some(f) = pcm.frame_at(pos) else {
+            let Some(f) = pcm.frame_at_step(pos, step) else {
                 c.playing.store(false, Relaxed); // end of the track
                 break;
             };
@@ -162,6 +173,9 @@ impl Voice {
             pos += step;
         }
         c.pos.store(pos.to_bits(), Relaxed);
+        if pos >= pcm.frames() as f64 {
+            c.playing.store(false, Relaxed);
+        }
     }
 }
 
@@ -232,5 +246,31 @@ mod tests {
         assert!(out[0].unwrap()[0] > out[1].unwrap()[0] && out[0].unwrap()[0] > 0.0);
         c.set_gain(f32::NAN);
         assert_eq!(c.gain(), 1.0);
+    }
+
+    #[test]
+    fn unloading_after_stop_or_natural_end_releases_the_owner() {
+        for ended in [false, true] {
+            let (c, mut v) = (Controls::default(), Voice::new());
+            let pcm = track(1000, 8);
+            let weak = Arc::downgrade(&pcm);
+            c.load(pcm);
+            c.play();
+            if ended {
+                render(&mut v, &c, 1000, 8);
+            } else {
+                c.stop();
+            }
+            assert!(!c.is_playing());
+            assert!(
+                weak.upgrade().is_some(),
+                "callback never releases the track"
+            );
+            c.unload();
+            assert!(weak.upgrade().is_none());
+            assert_eq!((c.position_ms(), c.duration_ms()), (0.0, 0));
+            c.play();
+            assert!(!c.is_playing());
+        }
     }
 }

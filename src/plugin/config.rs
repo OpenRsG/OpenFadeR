@@ -1,9 +1,10 @@
 //! What the user decided about the plugins, kept in `<config dir>/plugins.json`: the plugins switched on (a plugin is off
-//! until the user switches it on or installs it), the plugins uninstalled (a bundled copy stays hidden until the plugin is
+//! until the user switches it on or installs it; before the user ever decided, the [`DEFAULT_ON`] ones are on, see
+//! [`seed`]), the plugins uninstalled (a bundled copy stays hidden until the plugin is
 //! installed again) and every plugin's [`SettingDecl`] values. Read once ([`get`]), written on every change ([`update`]).
 //!
 //! ```json
-//! {"enabled": ["now-playing"], "removed": ["mix-log"], "settings": {"yt-dlp": {"results": 50}}}
+//! {"enabled": ["now-playing"], "removed": ["yt-dlp"], "settings": {"yt-dlp": {"results": 50}}}
 //! ```
 
 use super::{Manifest, SettingDecl};
@@ -12,10 +13,30 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{path::PathBuf, sync::LazyLock};
 
+/// The plugins that are on until the user decides: the readers of the devices and libraries other DJ software writes and
+/// the effect packs. Only bundled names count (a plugin cannot ask to be on by itself), and only while there is no
+/// `plugins.json` ([`seed`]): a file that exists, even one listing none of them, is the user's choice. The rekordbox
+/// readers are not here: they are built into the app ([`super::builtin`]) and always on.
+pub const DEFAULT_ON: &[&str] = &[
+    "engine-dj",
+    "serato",
+    "traktor",
+    "virtualdj",
+    "beat-fx",
+    "send-fx",
+    "lever-fx",
+    "mic-fx",
+    "soft-mix",
+    "cross-pass",
+];
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Config {
     #[serde(default)]
     pub enabled: Vec<String>,
+    /// There was no `plugins.json` when this was read: the user has decided nothing yet ([`Config::seed`]).
+    #[serde(skip)]
+    fresh: bool,
     /// The older file listed the plugins switched off and had every other one on; [`Config::adopt`] turns it into
     /// `enabled` once.
     #[serde(default, skip_serializing)]
@@ -39,6 +60,18 @@ impl Config {
             self.enabled.push(plugin.to_owned());
             self.enabled.sort();
         }
+    }
+
+    /// Before any decision (no file was read): switches on the [`DEFAULT_ON`] plugins among `found`, once. The next write
+    /// to the file records them like the user's own switches. Whether it did anything.
+    fn seed(&mut self, found: &[&str]) -> bool {
+        if !std::mem::take(&mut self.fresh) {
+            return false;
+        }
+        for p in found.iter().filter(|p| DEFAULT_ON.contains(p)) {
+            self.set_enabled(p, true);
+        }
+        true
     }
 
     /// An older file kept every plugin on but the ones it listed: `found` minus those is switched on, so an upgrade
@@ -98,16 +131,26 @@ fn file() -> Option<PathBuf> {
 }
 
 static CONFIG: LazyLock<RwLock<Config>> = LazyLock::new(|| {
-    let read = file().and_then(|f| std::fs::read_to_string(f).ok());
-    RwLock::new(
-        read.and_then(|t| serde_json::from_str(&t).ok())
-            .unwrap_or_default(),
-    )
+    let file = file();
+    let read = file.as_ref().and_then(|f| std::fs::read_to_string(f).ok());
+    let mut c: Config = read
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
+    // No folder to write to (no HOME) or an unreadable file is not "never decided": nothing is switched on behind it.
+    c.fresh = file.is_some_and(|f| !f.exists());
+    RwLock::new(c)
 });
 
 /// The current configuration (a copy).
 pub fn get() -> Config {
     CONFIG.read().clone()
+}
+
+/// Switches on the [`DEFAULT_ON`] plugins among `found` when the user has decided nothing yet (no `plugins.json`), in
+/// memory only: nothing is written until the user changes something (the write then records them like the user's own
+/// switches). Later calls do nothing.
+pub fn seed(found: &[&str]) {
+    CONFIG.write().seed(found);
 }
 
 /// Changes the configuration and writes it.
@@ -128,6 +171,29 @@ pub fn update(f: impl FnOnce(&mut Config)) -> Result<(), String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn defaults_apply_only_before_the_user_decided() {
+        let found = ["beat-fx", "engine-dj", "now-playing", "mic-fx"];
+        // No plugins.json yet: the defaults among the found plugins are on, once; others stay off.
+        let mut c = Config { fresh: true, ..Config::default() };
+        assert!(c.seed(&found));
+        assert_eq!(c.enabled, ["beat-fx", "engine-dj", "mic-fx"]);
+        assert!(!c.seed(&found), "once");
+        // A switch the user makes afterwards wins, and is what the file then says.
+        c.set_enabled("mic-fx", false);
+        assert!(!c.seed(&found) && !c.enabled("mic-fx"));
+        // An existing file, whatever it lists, is the user's choice: even one that lists none of them.
+        for text in [r#"{"enabled": ["now-playing"]}"#, r#"{"settings": {}}"#, "{}"] {
+            let mut c: Config = serde_json::from_str(text).unwrap();
+            let before = c.enabled.clone();
+            assert!(!c.seed(&found) && c.enabled == before, "{text}");
+        }
+        // A default that is not installed is not invented.
+        let mut c = Config { fresh: true, ..Config::default() };
+        c.seed(&["now-playing"]);
+        assert!(c.enabled.is_empty());
+    }
 
     #[test]
     fn values_fall_back_to_the_default_when_missing_or_of_the_wrong_type() {

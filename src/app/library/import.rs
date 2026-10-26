@@ -1,8 +1,9 @@
 //! File > Import: tracks, a folder, a playlist file (M3U / M3U8 / PLS), a collection file through a library plugin. The reading
 //! runs on a thread ([`openfader::library::import`]); here are the dialogs' answers going in and the result coming out
-//! (status line, browser reload, analysis of the new files when Auto Analysis is on).
+//! (status line, browser reload, analysis of the new files when Auto Analysis is on: files that came with cues are analysed for
+//! the waveform and grid only, [`analyze::request_keep_cues`]).
 
-use super::{BrowserState, Ctx};
+use super::{analyze, prefs, BrowserState, Ctx};
 use openfader::{
     library::{
         self,
@@ -52,16 +53,23 @@ fn finished(c: &Rc<Ctx>, r: Result<Report, String>) {
         Ok(r) => {
             c.say(&r.text());
             c.reload(r.node);
-            c.analyze(
-                r.files
-                    .into_iter()
-                    .map(|f| library::Track {
-                        file: Some(f),
-                        ..Default::default()
-                    })
-                    .collect(),
-                false,
-            );
+            // Tracks that came with cues (another library's) are analysed for the waveform only: CUE Analysis would replace them.
+            let (keep, todo): (Vec<library::Track>, Vec<library::Track>) = r
+                .files
+                .into_iter()
+                .map(|f| library::Track {
+                    file: Some(f),
+                    ..Default::default()
+                })
+                .partition(|t| {
+                    c.store
+                        .edits(&c.store.key_of(t))
+                        .is_ok_and(|e| e.cues.is_some_and(|cues| !cues.is_empty()))
+                });
+            c.analyze(todo, false);
+            if !keep.is_empty() && prefs::with(|p| p.analysis.auto_analysis) {
+                analyze::request_keep_cues(&keep);
+            }
         }
         Err(e) => c.say(&tr!("import failed: {}", e)),
     }
@@ -125,6 +133,9 @@ impl library::Library for Tagged<'_> {
     }
     fn analysis(&self, track: &library::Track) -> Option<openfader::analysis::Analysis> {
         self.0.analysis(track)
+    }
+    fn analysis_reader(&self) -> Option<library::AnalysisReader> {
+        self.0.analysis_reader()
     }
 }
 
@@ -228,4 +239,44 @@ pub fn source(c: &Rc<Ctx>) {
         },
         finished,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use library::Library;
+
+    struct Source;
+    impl Library for Source {
+        fn kind(&self) -> &str {
+            "source"
+        }
+        fn playlists(&self) -> Result<Vec<library::Playlist>, String> {
+            Ok(Vec::new())
+        }
+        fn tracks(&self, _: Option<&str>) -> Result<Vec<library::Track>, String> {
+            Ok(Vec::new())
+        }
+        fn analysis(&self, _: &library::Track) -> Option<openfader::analysis::Analysis> {
+            panic!("reader creation must not call the source")
+        }
+        fn analysis_reader(&self) -> Option<library::AnalysisReader> {
+            Some(Arc::new(|_| {
+                Some(openfader::analysis::Analysis {
+                    key: Some("8A".into()),
+                    ..Default::default()
+                })
+            }))
+        }
+    }
+
+    #[test]
+    fn tagged_import_sources_keep_their_worker_analysis_reader() {
+        let tagged = Tagged(&Source);
+        let reader = tagged.analysis_reader().unwrap();
+        assert_eq!(
+            reader(&library::Track::default()).unwrap().key.as_deref(),
+            Some("8A")
+        );
+    }
 }

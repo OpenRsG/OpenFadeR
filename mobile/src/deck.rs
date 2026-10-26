@@ -47,7 +47,9 @@ impl Deck {
         let result = match self.pending.as_ref()?.try_recv() {
             Ok(r) => r,
             Err(mpsc::TryRecvError::Empty) => return None,
-            Err(mpsc::TryRecvError::Disconnected) => Err("Track worker stopped; load the track again".into()),
+            Err(mpsc::TryRecvError::Disconnected) => {
+                Err("Track worker stopped; load the track again".into())
+            }
         };
         self.pending = None;
         Some(result.and_then(|loaded| {
@@ -69,17 +71,35 @@ impl Deck {
         let i = beats.partition_point(|b| f64::from(b.time_ms) <= pos).saturating_sub(1);
         beats.get(i).map(|b| f64::from(b.bpm_x100) / 100.0)
             .filter(|b| *b > 0.0)
-            .or_else(|| self.track.as_ref().map(|t| t.bpm_x100 as f64 / 100.0).filter(|b| *b > 0.0))
+            .or_else(|| {
+                self.track
+                    .as_ref()
+                    .map(|t| t.bpm_x100 as f64 / 100.0)
+                    .filter(|b| *b > 0.0)
+            })
             .unwrap_or(0.0)
     }
 
     pub fn cue(&mut self, hot: u16, mode: i32) -> Result<(), String> {
-        let Some(p) = self.player.as_mut() else { return Ok(()) };
-        let Some(track) = self.track.as_ref() else { return Ok(()) };
-        let existing = self.analysis.cues.iter().find(|c| c.hot_cue == hot).cloned();
-        if mode == 0 && let Some(c) = existing {
-            if hot == 0 { p.pause(); }
-            p.set_loop(c.loop_end_ms.map(|e| (c.time_ms, e)));
+        let Some(p) = self.player.as_mut() else {
+            return Ok(());
+        };
+        let Some(track) = self.track.as_ref() else {
+            return Ok(());
+        };
+        let existing = self
+            .analysis
+            .cues
+            .iter()
+            .find(|c| c.hot_cue == hot)
+            .cloned();
+        if mode == 0
+            && let Some(c) = existing
+        {
+            if hot == 0 {
+                p.pause();
+            }
+            p.set_loop(c.loop_end_ms.map(|e| (f64::from(c.time_ms), f64::from(e))));
             p.seek(c.time_ms);
             return Ok(());
         }
@@ -99,16 +119,29 @@ impl Deck {
 
     pub fn toggle_loop(&mut self, index: i32) -> Result<(), String> {
         let bpm = self.bpm();
-        let Some(p) = self.player.as_mut() else { return Ok(()) };
-        if p.looping().is_some() { p.set_loop(None); return Ok(()) }
-        if bpm <= 0.0 { return Err("No beat grid found for this track; load a track with a detected BPM".into()); }
+        let Some(p) = self.player.as_mut() else {
+            return Ok(());
+        };
+        if p.looping().is_some() {
+            p.set_loop(None);
+            return Ok(());
+        }
+        if bpm <= 0.0 {
+            return Err(
+                "No beat grid found for this track; load a track with a detected BPM".into(),
+            );
+        }
         let pos = p.position_ms();
         let beats = &self.analysis.beats;
-        let i = beats.partition_point(|b| f64::from(b.time_ms) <= pos).saturating_sub(1);
-        let start = beats.get(i).map_or(pos as u32, |b| b.time_ms);
+        let i = beats
+            .partition_point(|b| f64::from(b.time_ms) <= pos)
+            .saturating_sub(1);
+        let start = beats.get(i).map_or(pos, |b| f64::from(b.time_ms));
         let count = 1u32 << index.clamp(0, 4);
-        let end = start.saturating_add((60000.0 / bpm * f64::from(count)).round() as u32);
-        if end > p.duration_ms() { return Err("Not enough audio remains for this loop; choose a shorter loop".into()); }
+        let end = start + 60000.0 / bpm * f64::from(count);
+        if end > f64::from(p.duration_ms()) {
+            return Err("Not enough audio remains for this loop; choose a shorter loop".into());
+        }
         p.set_loop(Some((start, end)));
         Ok(())
     }
@@ -133,7 +166,9 @@ pub fn sync_target(own: &[Beat], pos: f64, bpm: f64, master: &[Beat], master_pos
 fn waveform(bands: &[[u8; 3]]) -> Image {
     let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(640, 88);
     for x in 0..640usize {
-        let Some(b) = bands.get(x * bands.len() / 640) else { continue };
+        let Some(b) = bands.get(x * bands.len() / 640) else {
+            continue;
+        };
         let height = usize::from(*b.iter().max().unwrap()).min(127) * 42 / 127;
         let color = Rgba8Pixel::new(b[0].saturating_add(48), b[1].saturating_add(64), b[2].saturating_add(80), 255);
         for y in 44 - height..44 + height + 1 {
@@ -148,7 +183,15 @@ mod tests {
     use super::*;
     #[test]
     fn sync_matches_audible_tempo_and_phase_and_rejects_out_of_range() {
-        let grid = |bpm: u16, step: u32| (0..12).map(|i| Beat { time_ms: i * step, bpm_x100: bpm, bar_pos: 1 }).collect::<Vec<_>>();
+        let grid = |bpm: u16, step: u32| {
+            (0..12)
+                .map(|i| Beat {
+                    time_ms: i * step,
+                    bpm_x100: bpm,
+                    bar_pos: 1,
+                })
+                .collect::<Vec<_>>()
+        };
         let a = grid(12000, 500);
         let b = grid(12500, 480);
         let (rate, seek) = sync_target(&a, 1100.0, 120.0, &b, 1320.0, 125.0, 1.02).unwrap();

@@ -276,6 +276,8 @@ pub(super) const TABLE: &[Action] = &[
     press("browse-back", |a, _| a.invoke_browse_back()),
     press("browse-view", |a, _| a.invoke_browse_view()),
     press("browse-area", |a, _| a.invoke_browse_area()),
+    // The chosen track's menu: opens it, or closes it; while it is open the knob walks it and its push runs the item.
+    press("browse-menu", |a, _| a.invoke_browse_menu()),
     // Tree focused: open it (move to the tracks); tracks focused: load the chosen track into the first idle deck.
     press("browse-push", |a, _| {
         if !a.invoke_browse_push() {

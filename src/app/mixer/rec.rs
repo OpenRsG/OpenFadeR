@@ -39,6 +39,8 @@ pub(super) struct Rec {
     seen: Option<PathBuf>,
     /// Every track that led the mix so far, on the recorder's clock.
     tracks: Tracklist,
+    /// The files written so far with where each began (ms on the recorder's clock), for the running sheets.
+    files: Vec<(PathBuf, u64)>,
     /// The control log while the setting is on.
     controls: Option<Capture>,
 }
@@ -129,6 +131,7 @@ impl Mixer {
                     input,
                     seen,
                     tracks: Tracklist::default(),
+                    files: Vec::new(),
                     controls: None,
                 });
             }
@@ -143,6 +146,7 @@ impl Mixer {
             input: _input,
             seen,
             tracks,
+            files: _,
             controls,
         }) = self.rec.borrow_mut().take()
         else {
@@ -200,6 +204,9 @@ impl Mixer {
         let (path, elapsed) = (r.recorder.path(), r.recorder.elapsed());
         let previous = (path != r.seen).then(|| std::mem::replace(&mut r.seen, path.clone()));
         let previous_seen = previous.is_some();
+        if let (true, Some(p)) = (previous_seen, &path) {
+            r.files.push((p.clone(), elapsed.as_millis() as u64));
+        }
         drop(guard);
         if let Some(prev) = previous {
             if let Some(done) = prev {
@@ -260,12 +267,26 @@ impl Mixer {
                 entry(&app, &self.decks, lead.map_or(0, |l| l.0), at)
             })
             .cloned();
+        let changed = took_over.is_some() || new_file;
         if let (Some(e), Some((deck, _))) = (took_over, lead) {
             let track = self.decks[deck].with_track(source::track_json);
             event::fire(
                 "recording_track",
                 json!({"deck": deck + 1, "position_ms": e.at_ms, "track": track}),
             );
+        }
+        if changed && !r.files.is_empty() {
+            let (cue, list, min) = prefs::with(|p| {
+                (
+                    p.advanced.rec_cue,
+                    p.advanced.rec_tracklist,
+                    p.advanced.min_track(),
+                )
+            });
+            if cue || list {
+                // best effort: the final write at the end reports a failure
+                let _ = sheet::write_live(&r.files, at, r.tracks.entries(), min, cue, list);
+            }
         }
         match (state, r.controls.as_mut()) {
             (Some(s), Some(c)) => {

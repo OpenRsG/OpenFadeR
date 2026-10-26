@@ -404,13 +404,16 @@ mod tests {
         assert_ne!(dark, light);
         restyle(&app, &s, "a");
         let got = read_all(&app);
+        let set = |n: &str| match n {
+            "accent" => Some(color(1, 2, 3)),
+            "font-size" => Some(Value::Length(15.0)),
+            _ => None,
+        };
         for (i, (name, _)) in TOKENS.iter().enumerate() {
-            let want = match *name {
-                "accent" => &color(1, 2, 3),
-                "font-size" => &Value::Length(15.0),
-                _ => &light[i],
-            };
-            assert_eq!(&got[i], want, "{name}");
+            // A token that follows an overridden one (`menu-focus` follows `accent`) takes the override too.
+            let follows = FOLLOWS.iter().find(|f| f.0 == *name).and_then(|f| set(f.1));
+            let want = set(name).or(follows).unwrap_or_else(|| light[i].clone());
+            assert_eq!(got[i], want, "{name}");
         }
     }
 

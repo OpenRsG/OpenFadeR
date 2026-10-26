@@ -71,6 +71,9 @@ uptime: 342 s
 
 A program reads a report by finding `## <heading>` and the fenced block under it: `openfader::diag::block(report, "Environment")` does that and returns the pairs. To find the failing area start with `area`, then `location` and `Backtrace`, and read the end of `Log`.
 
+`ram` uses native physical capacity capped by the current Linux cgroup v2 limit, when present. It is the effective
+device budget, not the RAM currently used by the process; the top-right RAM readout shows process resident usage.
+
 ### What is taken out
 
 A word that starts with `/`, `~/`, `X:\` or `\\` is a path and becomes `<path>` (a quoted one up to its closing quote; an unquoted one with spaces keeps the part after the first space). The value of a `key=value` whose key names a token, secret, password or API key, the word after `Bearer` / `token` / `password` / `secret`, the password of a `scheme://user:pass@host` address, words that start like a GitHub, OpenAI, Slack or AWS key, and any 32+ character word of letters and digits (a full hash too) become `<redacted>`. Your home folder reads `~`.

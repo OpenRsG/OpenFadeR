@@ -346,3 +346,12 @@ fn random_never_repeats_and_stays_inside_the_enabled_set() {
     assert_eq!(pick(&[], None, 1), None);
     assert_ne!(random_u64(), random_u64());
 }
+
+#[test]
+fn a_fixed_length_style_spans_its_bars_of_the_grids_meter() {
+    let r = style("CUT");
+    let per = 3.0; // a 3/4 grid: the caller passes bars × the grid's beats per bar
+    let t = r.timeline(r.bars.unwrap() as f64 * per);
+    assert_eq!(t.len(), 3.0, "one bar of three beats");
+    assert_eq!(t.at(t.len()).crossfader, 1.0);
+}

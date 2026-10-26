@@ -11,13 +11,12 @@ use super::pace::approx;
 use super::{format_label, Ctx, DeviceState, PreviewRow};
 use openfader::{
     device::{
-        self,
+        self, Device,
         plan::{self, Preview, Speeds},
-        Device,
     },
-    library::snapshot::Snapshot,
+    library::snapshot::{Pending as Collection, Snapshot},
     plugin::device::{Control, ExportOptions, Feature, PlanItem, Provider},
-    store::device_settings::Behaviour,
+    store::{device_settings::Behaviour, Store},
 };
 use parking_lot::Mutex;
 use slint::{ComponentHandle, ModelRc, VecModel};
@@ -45,9 +44,10 @@ pub(super) struct Built {
 }
 
 impl Built {
-    pub fn of(snap: Arc<Snapshot>) -> Self {
+    /// The collection `pending` with its analyses read now ([`Collection::read`]): call it on the worker.
+    pub fn read(pending: &Collection, store: &Store) -> Self {
         Self {
-            snap,
+            snap: Arc::new(pending.read(store)),
             added: 0,
             skipped: 0,
             idle: None,
@@ -61,8 +61,8 @@ pub(super) type Go = Box<dyn FnOnce(&Rc<Ctx>)>;
 /// Where a write goes and with which formats.
 #[derive(Clone)]
 pub(super) struct Target {
-    /// `None`: a plain folder.
-    pub dev: Option<Device>,
+    /// The device, or a plain folder taken as one ([`device::folder`]).
+    pub dev: Device,
     pub dest: PathBuf,
     /// The device's label, else the folder.
     pub name: String,
@@ -73,32 +73,31 @@ pub(super) struct Target {
 }
 
 impl Target {
-    /// `dev` (or the folder `dest`) written by `writers`; `folder_plans` = the folder's plugin lists `Feature::Plan`.
-    pub fn new(
-        cx: &Ctx,
-        dev: Option<&Device>,
-        dest: PathBuf,
-        writers: Vec<Provider>,
-        folder_plans: bool,
-    ) -> Self {
-        let plans = match dev {
-            Some(d) => d
-                .formats
-                .iter()
-                .filter(|(_, i)| i.features.contains(&Feature::Plan))
-                .map(|(n, _)| n.clone())
-                .collect(),
-            None if folder_plans => writers.iter().map(|w| w.name().to_owned()).collect(),
-            None => Vec::new(),
-        };
+    /// `dev` (a device or a folder) written by `writers`.
+    pub fn new(cx: &Ctx, dev: &Device, writers: Vec<Provider>) -> Self {
+        let plans = dev
+            .formats
+            .iter()
+            .filter(|(_, i)| i.features.contains(&Feature::Plan))
+            .map(|(n, _)| n.clone())
+            .collect();
         Self {
-            name: dev.map_or_else(|| dest.display().to_string(), |d| d.label.clone()),
-            o: cx.options(dev),
-            dev: dev.cloned(),
-            dest,
+            name: dev.label.clone(),
+            o: cx.options(Some(dev)),
+            dev: dev.clone(),
+            dest: dev.mount.clone(),
             writers,
             plans,
         }
+    }
+}
+
+impl Target {
+    pub(super) fn validate_folder(&self) -> Result<(), String> {
+        if self.dev.is_folder() && !self.dest.is_dir() {
+            return Err(tr!("No such folder: {}", self.dest.display()));
+        }
+        Ok(())
     }
 }
 
@@ -253,11 +252,14 @@ impl Ctx {
     ) {
         let (slot, t) = (Arc::new(Mutex::new(None)), t.clone());
         let put = slot.clone();
-        let id = t.dev.as_ref().map(|d| d.id.clone());
+        let id = Some(t.dev.id.clone());
         self.start_then(
             id,
             tr!("Preparing the preview"),
             move |ctl| {
+                let mut t = t;
+                t.validate_folder()?;
+                t.o.free = openfader::device::space(&t.dest).map(|s| s.1);
                 let built = build(&ctl)?;
                 if let Some(m) = built.idle {
                     return Ok(m);
@@ -302,7 +304,7 @@ impl Ctx {
 
     /// Fills the card and opens it; START runs `go`.
     pub(super) fn show_preview(self: &Rc<Self>, t: &Target, p: Preview, go: Go) {
-        let speeds = Speeds::load(&self.store, t.dev.as_ref().map_or("", |d| d.id.as_str()));
+        let speeds = Speeds::load(&self.store, &t.dev.id);
         let behaviour = Behaviour::load(&self.store);
         let short =
             t.o.free
@@ -331,9 +333,9 @@ impl Ctx {
             tr!("Takes {} (estimate)", secs)
         });
         if behaviour.backup_before_write
-            && t.dev
-                .as_ref()
-                .is_some_and(|d| d.has_library() && d.can(Feature::Backup))
+            && !t.dev.is_folder()
+            && t.dev.has_library()
+            && t.dev.can(Feature::Backup)
         {
             lines.push(tr!("The current library is backed up first").to_owned());
         }
@@ -341,19 +343,20 @@ impl Ctx {
         let formats = p
             .formats
             .iter()
-            .map(|f| format_label(t.dev.as_ref(), f))
+            .map(|f| format_label(Some(&t.dev), f))
             .collect::<Vec<_>>()
             .join(" + ");
-        let trouble = trouble(&p, t.dev.as_ref(), t.o.max_file, short);
+        let trouble = trouble(&p, Some(&t.dev), t.o.max_file, short);
         self.prep.add.set_vec(rows(&p.add));
         self.prep.update.set_vec(rows(&p.update));
         *self.prep.pending.borrow_mut() = Some(Pending { go, files: p.files });
         self.with_state(|s| {
             s.set_preview_title(tr!("Write to {}", t.name).into());
             s.set_preview_device(
-                match &t.dev {
-                    Some(d) => format!("{} · {}", d.summary(), formats),
-                    None => format!("{} · {}", t.dest.display(), formats),
+                if t.dev.is_folder() {
+                    format!("{} · {}", tr!("folder {}", t.dest.display()), formats)
+                } else {
+                    format!("{} · {}", t.dev.summary(), formats)
                 }
                 .into(),
             );

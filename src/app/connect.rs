@@ -1,6 +1,7 @@
 //! Connections in the window ([`openfader::library::connect`]): the sync of each connected library on a worker thread (its
-//! steps in the browser's loading line, a toast when done), the live sync (every [`POLL`] the source's stamp is compared with
-//! the last sync's, and a changed source syncs again), the write-back of two-way connections (a dry run, then a confirm
+//! steps in the browser's loading line, a toast when done), the live sync (when the OS reports a change in a source, or after
+//! a long fallback ([`FILE_FALLBACK`], [`FOLDER_FALLBACK`]), its stamp is compared with the last sync's, and a changed source syncs
+//! again; without change notification, [`watch`], every [`POLL`] for a file and every [`FOLDER_POLL`] for a folder), the write-back of two-way connections (a dry run, then a confirm
 //! dialog in [`super::library`], then the write) and what Preferences > Libraries ([`super::prefs::libraries`]) shows and
 //! does. UI thread only, except the workers.
 
@@ -10,6 +11,7 @@ use openfader::{
     store::{self, Store},
 };
 use slint::{ComponentHandle, Timer, TimerMode, Weak};
+use watch::Watch;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -17,11 +19,24 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// How often the connected sources are looked at.
+mod watch;
+
+/// How often the tick runs (it also reads the journal of two-way connections); without change notification it reads each
+/// connected library file's stamp too.
 const POLL: Duration = Duration::from_secs(5);
 
-/// How often a connected folder (walked whole by [`connect::stamp`]) is looked at.
+/// Without change notification: how often a connected folder (walked whole by [`connect::stamp`]) is looked at.
 const FOLDER_POLL: Duration = Duration::from_secs(30);
+
+/// With change notification, the longest a library file goes unread (what the notification may miss: a source on a stick plugged
+/// in again, more folders than watches).
+const FILE_FALLBACK: Duration = Duration::from_secs(60);
+
+/// The same for a folder.
+const FOLDER_FALLBACK: Duration = Duration::from_secs(300);
+
+/// Folders below a plugin's folder that [`connect::stamp`] looks at (its `STAMP_DEPTH`).
+const PLUGIN_DEPTH: usize = 3;
 
 #[derive(Default)]
 struct State {
@@ -40,6 +55,12 @@ struct State {
     plan: Option<Plan>,
     /// Libraries other apps keep in their usual places, not connected.
     found: Vec<Found>,
+    /// The change notification of the sources; `None` where there is none.
+    watch: Option<Watch>,
+    /// A change was reported while its connection was busy: read the stamps again at the next tick.
+    rearm: bool,
+    /// Connections whose source stamp a worker is reading ([`tick`]).
+    stamping: HashSet<i64>,
 }
 
 thread_local! {
@@ -269,39 +290,80 @@ fn update(id: i64, f: impl FnOnce(Mode, Wins) -> (Mode, Wins)) {
     }
 }
 
-/// Looks at every connection once: a changed source syncs, new edits of a two-way connection are planned for write-back.
+/// What the watcher is told to watch for `c`: the folder (to the depth its stamp reads), or the parent of a library file.
+fn root(c: &Connection) -> watch::Root {
+    if c.path.is_file() {
+        (c.path.parent().unwrap_or(&c.path).to_owned(), 0)
+    } else {
+        (c.path.clone(), if c.plugin.is_empty() { usize::MAX } else { PLUGIN_DEPTH })
+    }
+}
+
+/// Whether a source's stamp is read at this tick: when something in it changed, or when it was last read `since` ago and that is
+/// longer than the interval that applies (a folder is walked whole, so it waits longer than a file).
+fn due(is_file: bool, watching: bool, changed: bool, since: Option<Duration>) -> bool {
+    let every = match (watching, is_file) {
+        (false, true) => Duration::ZERO,
+        (false, false) => FOLDER_POLL,
+        (true, true) => FILE_FALLBACK,
+        (true, false) => FOLDER_FALLBACK,
+    };
+    changed || since.is_none_or(|t| t >= every)
+}
+
+/// Looks at every connection once: a changed source syncs, new edits of a two-way connection are planned for write-back. A
+/// source's stamp (a whole folder walk for a folder) is read on a worker, so neither the start nor a tick waits for the disk.
 fn tick() {
-    let store = store::global();
-    for c in store.connections().unwrap_or_default() {
+    let connections = store::global().connections().unwrap_or_default();
+    let (watching, changed) = with(|s| {
+        let watching = s.watch.as_ref().is_some_and(Watch::alive);
+        if let Some(w) = s.watch.as_mut().filter(|_| watching) {
+            w.set(connections.iter().map(root).collect());
+        }
+        let changed = std::mem::take(&mut s.rearm) | s.watch.as_ref().is_some_and(Watch::take);
+        (watching, changed)
+    });
+    for c in connections {
         if with(|s| s.busy.contains(&c.id)) {
+            if changed {
+                with(|s| s.rearm = true);
+            }
             continue;
         }
-        // a folder is walked whole: looked at every FOLDER_POLL, not every POLL
-        if !c.path.is_file()
-            && c.last_sync != 0
-            && with(|s| {
-                let due = s
-                    .checked
-                    .get(&c.id)
-                    .is_none_or(|t| t.elapsed() >= FOLDER_POLL);
+        let read = c.last_sync == 0
+            || with(|s| {
+                let since = s.checked.get(&c.id).map(Instant::elapsed);
+                let due = due(c.path.is_file(), watching, changed, since);
                 if due {
                     s.checked.insert(c.id, Instant::now());
                 }
-                !due
-            })
-        {
-            continue;
+                due
+            });
+        if !read {
+            let stamp = c.stamp.clone();
+            decide(c, stamp);
+        } else if with(|s| s.stamping.insert(c.id)) {
+            std::thread::spawn(move || {
+                let stamp = connect::stamp(&c);
+                let _ = slint::invoke_from_event_loop(move || {
+                    with(|s| s.stamping.remove(&c.id));
+                    decide(c, stamp);
+                });
+            });
         }
-        let stamp = connect::stamp(&c);
-        let skip = stamp.is_empty() && c.last_sync != 0 // source gone (USB out): wait for it
-            || with(|s| s.failed.get(&c.id) == Some(&stamp));
-        if !skip && (c.last_sync == 0 || stamp != c.stamp) {
-            start_sync(c);
-        } else if c.mode == Mode::TwoWay && !skip && with(|s| s.plan.is_none() && !s.planning) {
-            let seq = store.journal_seq().unwrap_or(0);
-            if with(|s| s.seen.insert(c.id, seq)).is_some_and(|old| old != seq) {
-                start_plan(c);
-            }
+    }
+}
+
+/// What [`tick`] does with connection `c` once its source's `stamp` is known: sync a changed source, else plan a write-back.
+fn decide(c: Connection, stamp: String) {
+    let skip = stamp.is_empty() && c.last_sync != 0 // source gone (USB out): wait for it
+        || with(|s| s.failed.get(&c.id) == Some(&stamp));
+    if !skip && (c.last_sync == 0 || stamp != c.stamp) {
+        start_sync(c);
+    } else if c.mode == Mode::TwoWay && !skip && with(|s| s.plan.is_none() && !s.planning) {
+        let seq = store::global().journal_seq().unwrap_or(0);
+        if with(|s| s.seen.insert(c.id, seq)).is_some_and(|old| old != seq) {
+            start_plan(c);
         }
     }
 }
@@ -364,7 +426,8 @@ pub fn writeback_answer(yes: bool) {
     });
 }
 
-/// Connects the start-up libraries: `legacy` (the path given at start or the old Database setting) and the own music folder.
+/// Connects the start-up libraries: `legacy` (the path given at start or the old Database setting) and the own music folder,
+/// then reads the Collection on a worker while the window is built: the browser finds the list ready.
 pub fn adopt_startup(store: &Store, legacy: Option<PathBuf>, music: Option<PathBuf>) {
     if let Some(p) = legacy {
         if let Err(e) = connect::adopt(store, &p) {
@@ -376,6 +439,11 @@ pub fn adopt_startup(store: &Store, legacy: Option<PathBuf>, music: Option<PathB
             eprintln!("{}: {e}", m.display());
         }
     }
+    std::thread::spawn(|| {
+        if let Err(e) = store::global().collection_edited() {
+            eprintln!("store: {e}");
+        }
+    });
 }
 
 /// Starts the live sync and offers detected libraries on a first run (UI thread, once).
@@ -391,6 +459,7 @@ pub fn wire(app: &App) {
             .map(|c| (c.id, c.last_seq))
             .collect();
     });
+    with(|s| s.watch = Watch::start());
     rescan();
     if let Some(f) = found()
         .first()
@@ -403,4 +472,26 @@ pub fn wire(app: &App) {
     }
     TIMER.with(|t| t.start(TimerMode::Repeated, POLL, tick));
     tick();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn without_notification_files_are_read_every_tick_and_folders_every_30_s() {
+        assert!(due(true, false, false, Some(Duration::ZERO)));
+        assert!(!due(false, false, false, Some(Duration::from_secs(29))));
+        assert!(due(false, false, false, Some(FOLDER_POLL)));
+        assert!(due(false, false, false, None), "never read: now");
+    }
+
+    #[test]
+    fn with_notification_a_source_is_read_on_change_or_after_the_long_fallback() {
+        assert!(!due(true, true, false, Some(Duration::from_secs(59))));
+        assert!(due(true, true, false, Some(FILE_FALLBACK)));
+        assert!(!due(false, true, false, Some(Duration::from_secs(299))));
+        assert!(due(false, true, false, Some(FOLDER_FALLBACK)));
+        assert!(due(false, true, true, Some(Duration::ZERO)), "a reported change reads at once");
+    }
 }

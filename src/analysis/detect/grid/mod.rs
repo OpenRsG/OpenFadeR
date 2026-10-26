@@ -33,6 +33,17 @@
 //! drum & bass track the reference counts at 87 BPM is left out. ponytail: few real tracks set the bands and the
 //! thresholds; other genres may need other bands. Drift tracking is verified on synthetic click tracks only (no real
 //! variable-tempo audio available).
+//!
+//! Octave: the preferences' BPM ranges each span an octave, so the range alone picks the reading ([`fold_bpm`]); where a
+//! range leaves two (the overlap at its edges, or a wider custom one) [`octave`] takes the one the onsets support, with a
+//! tempo prior around 125 BPM as the tie-break.
+//!
+//! Meter: detection always numbers bars in fours; a 3/4 grid comes from other software, the grid editor or an import (the
+//! `bar_pos` of a beat carries it) and everything downstream that counts bars follows the grid's own length. shortcut: triple
+//! meter is not detected. The bar evidence above is a 64.6% pick between 4 phases on 4/4 music (Ballroom, see above), so an
+//! accent-period test of 3 against 4 beats would rest on features that are right about two times in three at 4/4 and
+//! would turn a missed accent into a 3/4 grid on a 4/4 track, the costlier error (bars, phrases, loops and automix all
+//! follow it). No waltz audio with downbeats was available to measure a false-positive rate; add the test with that data.
 
 mod dynamic;
 #[cfg(test)]
@@ -160,9 +171,9 @@ fn flux(e: &[Vec<f32>; 3], fr: f64) -> Vec<f32> {
         .collect()
 }
 
-// ponytail: a plain octave fold; a track whose true tempo is outside the range reads at the octave inside it. Upgrade:
-// pick the octave by onset-pattern salience instead of folding.
-/// `b` doubled or halved into `range` (BPM).
+/// `b` doubled or halved into `range` (BPM). The range is the user's promise of which reading they want ("Every range spans
+/// an octave", [`GridOptions::bpm_range`]), so a track whose true tempo is outside it reads at the octave inside it; only
+/// [`octave`] chooses between two readings that both fit.
 fn fold_bpm(mut b: f64, range: (f64, f64)) -> f64 {
     while b < range.0 {
         b *= 2.0;
@@ -171,6 +182,40 @@ fn fold_bpm(mut b: f64, range: (f64, f64)) -> f64 {
         b /= 2.0;
     }
     b
+}
+
+/// Centre and width (octaves, one standard deviation) of the tempo prior of [`octave`]: log-normal around the 120-130 BPM
+/// band most dance and pop music sits in, wide enough that 87 and 174 BPM weigh about the same (0.81 and 0.84) and the onsets
+/// decide there.
+const PRIOR_BPM: f64 = 125.0;
+const PRIOR_OCTAVES: f64 = 0.8;
+
+/// How likely a tempo is before listening: 1.0 at [`PRIOR_BPM`], falling off per octave.
+fn prior(bpm: f64) -> f64 {
+    let d = (bpm / PRIOR_BPM).log2() / PRIOR_OCTAVES;
+    (-0.5 * d * d).exp()
+}
+
+/// The octave reading of period `p` frames that the onset pattern supports best: `p` itself, half of it or twice it, the two
+/// others only when their tempo is inside `range` too, by [`score`] times [`prior`]. [`score`] is already the salience: a
+/// reading that skips onsets (half time over a steady beat) keeps half of them on its grid, one that adds beats between
+/// the real ones (double time over a plain kick) puts the same weight on twice as many beats, and only a pattern
+/// whose off-beats are about as strong as its beats (8th-note hats, a ghost-kick groove) wins by doubling. `p` wins ties.
+/// Only a range wider than an octave leaves a choice; the preferences' ranges (70-140 to 110-220) do so in their overlap
+/// of a few BPM at the edges (85-87.5 against 170-175).
+fn octave(onsets: &[(f64, f64)], p: f64, fr: f64, range: (f64, f64)) -> f64 {
+    let mut bins = Vec::new();
+    let mut at = |q: f64| score(onsets, q, &mut bins) * prior(60.0 * fr / q);
+    let mut best = (at(p), p);
+    for q in [p / 2.0, p * 2.0] {
+        if (range.0..=range.1).contains(&(60.0 * fr / q)) {
+            let s = at(q);
+            if s > best.0 {
+                best = (s, q);
+            }
+        }
+    }
+    best.1
 }
 
 /// Onsets folded modulo `p` frames into 1-frame `bins`.
@@ -612,6 +657,7 @@ pub(super) fn from_hops_cancellable(
     let Some(p0) = period else {
         return Some(Vec::new());
     };
+    let p0 = octave(&onsets, p0, fr, (opt.bpm_range.0 as f64, opt.bpm_range.1 as f64));
     let amp = e.map(|b| b.iter().map(|v| v.sqrt()).collect::<Vec<f32>>());
     let low = &amp[0];
     let grid: Vec<f64> = (0..(n as f64 / p0) as usize)

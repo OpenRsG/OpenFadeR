@@ -14,7 +14,7 @@
 mod fetch;
 mod reply;
 
-pub use fetch::{fetch, fetch_in};
+pub use fetch::{FetchJob, fetch, fetch_async, fetch_in};
 pub use reply::track_json;
 
 use super::{Plugin, SourceDecl, registry};
@@ -206,6 +206,11 @@ impl Library for Sources {
         }
         all.splice(at..at, mine);
         Ok(all)
+    }
+
+    /// The whole library is `inner`'s (no source adds to it): its shared list, not a copy.
+    fn tracks_all(&self) -> Result<std::sync::Arc<Vec<Track>>, String> {
+        self.inner.tracks_all()
     }
 
     fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {

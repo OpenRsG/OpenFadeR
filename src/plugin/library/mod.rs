@@ -160,8 +160,11 @@ pub fn load(plugins: &[Plugin], errors: &mut Vec<String>) -> Vec<Loaded> {
         let Some(d) = &p.manifest.library else {
             continue;
         };
-        let file = p.dir.join(d.lib.file().unwrap_or_default());
-        match open_api(&file) {
+        let api = match p.builtin {
+            Some(b) => Ok(b.api),
+            None => open_api(&p.dir.join(d.lib.file().unwrap_or_default())),
+        };
+        match api {
             Ok(api) => out.push(Loaded {
                 plugin: p.clone(),
                 api,

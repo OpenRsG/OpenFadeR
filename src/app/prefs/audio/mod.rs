@@ -32,12 +32,11 @@ pub use page::rows;
 
 use super::{Prefs, choice, section};
 use openfader::audio::{
-    self,
-    device::{self, card, Caps},
+    self, Status,
+    device::{self, Caps, card},
     metronome::TONES,
     mic,
     route::{self, Mixer, Settings},
-    Status,
 };
 use std::{cell::RefCell, rc::Rc};
 
@@ -172,6 +171,7 @@ impl Audio {
             device: self.output_device.clone(),
             rate: self.sample_rate,
             buffer: self.buffer_size,
+            driver_buffer: false,
             mixer: if self.mixer_mode == MixerMode::External {
                 Mixer::External
             } else {
@@ -243,11 +243,13 @@ fn pairs_of(caps: Option<&Caps>) -> (usize, usize) {
     (ch, route::pairs(ch).min(MAX_PAIRS))
 }
 
-fn buffer_in_use(p: &Prefs, st: &Status) -> u32 {
-    match (p.audio.buffer_size, st.buffer) {
-        (b, Some(_)) if b > 0 => b,
-        _ => audio::live_bus().map_or(0, |b| b.buffer_frames()),
-    }
+fn buffer_in_use(_p: &Prefs, st: &Status) -> u32 {
+    // A callback contains a period, not the full ALSA buffer. Unknown driver buffering must not be labelled as its size.
+    st.buffer.unwrap_or(0)
+}
+
+fn effective_settings(p: &Prefs) -> Settings {
+    Settings { driver_buffer: super::lowpower::on(p), ..p.audio.settings() }
 }
 
 pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
@@ -264,6 +266,7 @@ pub fn choose(p: &mut Prefs, key: &str, i: usize) -> bool {
                     audio::release_controller();
                     if n == a.output_device {
                         let _ = audio::set_output(None);
+                        refresh_when_settled();
                     }
                 }
                 a.output_device = n;
@@ -337,19 +340,39 @@ fn aux_choices(a: &Audio) -> Vec<(String, String)> {
     out
 }
 
+/// The status (device, rate, notes) changes again when a device being looked for is found and the stream moves: redraw then.
+fn refresh_when_settled() {
+    audio::when_settled(|_| {
+        super::refresh();
+        cards::sync();
+    });
+}
+
 /// Hands the settings to the audio engine now and after every change ([`audio::configure`]: live knobs at once, the device /
 /// rate / buffer / layout by moving the stream). Call after `prefs::wire` has loaded the file and before the decks are created
 /// (the first `Player` opens the stream with these settings).
 pub fn wire() {
+    // Lookups and coalesced output faults both settle on the stream-owning UI thread.
+    audio::set_waker(|| {
+        _ = slint::invoke_from_event_loop(|| {
+            let before = audio::status();
+            audio::settle();
+            if audio::status() != before {
+                super::refresh();
+                cards::sync();
+            }
+        })
+    });
+    device::never_block_here(); // the page reads the lists the background refresh keeps (cards::sync)
     let ins = super::get().audio;
     mic::open(ins.mic_on, &ins.input_device, ins.mic_pair);
-    let last = Rc::new(RefCell::new(super::get().audio.settings()));
+    let last = Rc::new(RefCell::new(effective_settings(&super::get())));
     if let Err(e) = audio::configure(last.borrow().clone()) {
         eprintln!("prefs: audio: {e}");
     }
     super::on_change(move |p| {
         mic::open(p.audio.mic_on, &p.audio.input_device, p.audio.mic_pair); // device / pair are not stream knobs
-        let s = p.audio.settings();
+        let s = effective_settings(p);
         if s == *last.borrow() {
             return;
         }
@@ -357,6 +380,7 @@ pub fn wire() {
         if let Err(e) = audio::configure(s) {
             eprintln!("prefs: audio: {e}");
         }
+        refresh_when_settled();
         super::refresh(); // the status (device, rate, latency, notes) changed with the stream
     });
     super::on_change(|_| cards::sync()); // after the closure above: the cards show the status it produced

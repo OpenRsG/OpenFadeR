@@ -7,14 +7,44 @@ use super::{
 };
 use openfader::{library::Track, store};
 use slint::ComponentHandle;
+use std::sync::Arc;
 
 impl View {
-    /// Rebuilds `list` from the current source and refreshes the rows.
-    // ponytail: the whole-library list is cloned out of the cache per view change; share it (Arc) if that shows up in profiles.
+    /// Rebuilds `list` from the current source and refreshes the rows. The whole library is the cache's own list, shared.
     pub(super) fn load(&mut self, app: &App) {
         let (home, anchor) = (self.home.clone(), self.related.clone());
         self.slots.clear();
-        let list = match (&anchor, &home) {
+        let all = anchor.is_none() && matches!(home, Home::Playlist(None));
+        let list = if all {
+            self.cache().map(|c| c.tracks.clone())
+        } else {
+            self.built_list(&anchor, &home).map(Arc::new)
+        };
+        let state = app.global::<BrowserState>();
+        let plain = anchor.is_none();
+        let editing = plain && !self.suggest.on; // a ranked list is no longer in the order its edit buttons act on
+        state.set_related(!plain);
+        state.set_tag_view(editing && matches!(home, Home::Tags));
+        state.set_user_view(editing && matches!(home, Home::User(_) | Home::Bank(_)));
+        state.set_history_view(editing && matches!(home, Home::History | Home::Day(_)));
+        state.set_health_view(editing && matches!(home, Home::Health(_)));
+        state.set_remote_search(self.search_entry().is_some());
+        match list {
+            Ok(list) => {
+                let old = std::mem::replace(&mut self.list, list);
+                self.sel.remap(&old, &self.list);
+                self.rank_list(app);
+                self.rows
+                    .replace(self.list.clone(), self.suggest.notes.clone());
+                self.refresh(app);
+            }
+            Err(e) => state.set_status(tr!("query failed: {}", e).into()),
+        }
+    }
+
+    /// The list of every source but the whole library (that one is the cache's, shared): `anchor` = the Related track.
+    fn built_list(&mut self, anchor: &Option<Track>, home: &Home) -> Result<Vec<Track>, String> {
+        match (anchor, home) {
             (Some(a), _) => self.cache().map(|all| {
                 let partners = self.store.matches_of(&store::key(a)).unwrap_or_default();
                 filter::related_with(a, &all.tracks, &partners, &Look::now())
@@ -25,7 +55,6 @@ impl View {
             (None, Home::Nothing) => Ok(Vec::new()),
             (None, Home::Tags) => Ok(self.tags.clone()),
             (None, Home::History) => Ok(self.history.clone()),
-            (None, Home::Playlist(None)) => self.cache().map(|c| c.tracks.to_vec()),
             (None, Home::Playlist(id)) => self.lib.tracks(id.as_deref()),
             (None, Home::User(id)) => self.user_list(*id),
             (None, Home::Smart(id)) => self.smart_list(*id),
@@ -42,26 +71,6 @@ impl View {
                 .and_then(|s| s.lib.clone())
                 .ok_or_else(|| tr!("the source is not open").to_owned())
                 .and_then(|l| l.tracks(id.as_deref())),
-        };
-        let state = app.global::<BrowserState>();
-        let plain = anchor.is_none();
-        let editing = plain && !self.suggest.on; // a ranked list is no longer in the order its edit buttons act on
-        state.set_related(!plain);
-        state.set_tag_view(editing && matches!(home, Home::Tags));
-        state.set_user_view(editing && matches!(home, Home::User(_) | Home::Bank(_)));
-        state.set_history_view(editing && matches!(home, Home::History | Home::Day(_)));
-        state.set_health_view(editing && matches!(home, Home::Health(_)));
-        state.set_remote_search(self.search_entry().is_some());
-        match list {
-            Ok(list) => {
-                let old = std::mem::replace(&mut self.list, std::rc::Rc::new(list));
-                self.sel.remap(&old, &self.list);
-                self.rank_list(app);
-                self.rows
-                    .replace(self.list.clone(), self.suggest.notes.clone());
-                self.refresh(app);
-            }
-            Err(e) => state.set_status(tr!("query failed: {}", e).into()),
         }
     }
 
@@ -219,7 +228,7 @@ impl View {
             }
         };
         [
-            std::rc::Rc::make_mut(&mut self.list),
+            Arc::make_mut(&mut self.list),
             &mut self.tags,
             &mut self.history,
         ]

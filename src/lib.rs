@@ -11,6 +11,7 @@ pub mod inbox;
 pub mod library;
 pub mod lighting;
 pub mod locale;
+pub mod memory;
 pub mod mixstyle;
 pub mod models;
 pub mod paths;

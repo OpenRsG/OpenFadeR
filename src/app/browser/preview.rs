@@ -20,7 +20,7 @@ type Pending = (audio::DecodeJob<(audio::Track16, String)>, u32);
 
 /// Decodes `file`; the preview starts at `from_ms` when the audio is there.
 fn start(app: &App, pending: &RefCell<Option<Pending>>, file: PathBuf, from_ms: u32) {
-    audio::live_bus().iter().for_each(|b| b.preview.stop());
+    audio::live_bus().iter().for_each(|b| b.preview.unload());
     *pending.borrow_mut() = Some((audio::decode_track16_async(file), from_ms));
     let state = app.global::<BrowserState>();
     state.set_preview_playing(true);
@@ -35,7 +35,7 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) -> Timer {
         let app = weak.unwrap();
         let state = app.global::<BrowserState>();
         if state.get_preview_playing() {
-            audio::live_bus().iter().for_each(|b| b.preview.stop());
+            audio::live_bus().iter().for_each(|b| b.preview.unload());
             *p.borrow_mut() = None;
             state.set_preview_playing(false);
             return;
@@ -84,6 +84,11 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) -> Timer {
                 Err(TryRecvError::Disconnected) => {}
             }
             *slot = None;
+        }
+        if let Some(b) = &bus
+            && !b.preview.is_playing()
+        {
+            b.preview.unload();
         }
         state.set_preview_playing(bus.is_some_and(|b| b.preview.is_playing()));
     });

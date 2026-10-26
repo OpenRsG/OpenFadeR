@@ -7,7 +7,7 @@
 //!
 //! # Sections (one child per dialog category)
 //! [`view`], [`audio`], [`analysis`], [`controller`], [`extensions`], [`keyboard`], [`advanced`] own typed
-//! sections of [`Prefs`]; [`dj_system`] keeps its settings elsewhere. Every category exports the same two
+//! sections of [`Prefs`]; [`dj_system`] keeps its settings elsewhere ([`lowpower`] is the ADVANCED > Others LOW-POWER MODE setting's logic). Every category exports the same two
 //! functions:
 //!
 //! * `pub fn rows(p: &Prefs) -> Vec<Row>`: the rows shown for the category (rebuilt after every click and
@@ -41,6 +41,7 @@ pub mod keyboard;
 pub mod libraries;
 mod live;
 mod look;
+pub mod lowpower;
 mod panes;
 mod rows;
 mod section;
@@ -51,11 +52,11 @@ pub use dialog::{refresh, wire};
 pub use file::{load, path, save};
 #[cfg(test)]
 pub use live::set_for_test;
-pub use live::{get, notify, on_action, on_change, on_text, run_action, update, with};
+pub use live::{get, notify, on_action, on_change, on_text, update, with};
 pub use look::apply_theme;
 pub use rows::Row;
-pub(crate) use section::{choice, section};
 pub use section::{Choice, Section, Setting};
+pub(crate) use section::{choice, section};
 pub use view::{FontSize, HotCueColors, KeyNotation, LineSpace, WaveColors};
 
 use openfader::audio::fx::DEFAULT_BEAT;
