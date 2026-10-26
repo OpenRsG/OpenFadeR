@@ -21,7 +21,7 @@ jobs:
         include:
           - { name: linux, os: ubuntu-latest, arch: x86_64 }
           - { name: windows, os: windows-latest, arch: x86_64 }
-          - { name: macos, os: macos-latest, arch: arm64 }
+          - { name: macos, os: macos-15, arch: arm64 }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     defaults:
