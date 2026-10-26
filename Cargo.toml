@@ -1,6 +1,6 @@
 [package]
 name = "openfader"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2024"
 
 # The rekordbox extensions are compiled into the app (crates/, src/plugin/builtin.rs). Path dependencies (sdk, ui) are members
