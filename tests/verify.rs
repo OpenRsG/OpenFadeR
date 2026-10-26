@@ -150,16 +150,24 @@ fn the_builtin_rekordbox_reader_is_on_with_an_empty_home() {
             &Arc::new(Control::default()),
         )
         .unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_openfader"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_openfader"));
+    command
         .args(["verify", "--json", stick.to_str().unwrap()])
         .env_clear()
         .env("HOME", &home)
         .env("XDG_CONFIG_HOME", home.join("config"))
         .env("XDG_DATA_HOME", home.join("data"))
         .env("XDG_CACHE_HOME", home.join("cache"))
-        .env("OPENFADER_DEVICE_ROOTS", &stick)
-        .output()
-        .unwrap();
+        .env("OPENFADER_DEVICE_ROOTS", &stick);
+    #[cfg(windows)]
+    {
+        // SQLCipher/OpenSSL still needs the Windows system environment, even with an empty app profile.
+        if let Some(system_root) = std::env::var_os("SystemRoot") {
+            command.env("SystemRoot", system_root);
+        }
+        command.env("TEMP", &home).env("TMP", &home);
+    }
+    let out = command.output().unwrap();
     let text = String::from_utf8_lossy(&out.stdout);
     let j: Value = serde_json::from_str(&text)
         .unwrap_or_else(|e| panic!("{e}: {text}{}", String::from_utf8_lossy(&out.stderr)));
