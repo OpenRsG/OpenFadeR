@@ -16,5 +16,5 @@ if [ ! -f "$out/libonnxruntime.$version.dylib" ]; then
     mkdir -p "$out"
     cp -L "$source_dir/build/MacOS/Release/"*.dylib "$out/"
 fi
-lipo -verify_arch x86_64 "$out/libonnxruntime.$version.dylib"
+lipo "$out/libonnxruntime.$version.dylib" -verify_arch x86_64
 printf 'ORT_LIB_LOCATION=%s\nORT_PREFER_DYNAMIC_LINK=1\n' "$out" >> "$GITHUB_ENV"

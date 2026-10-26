@@ -57,7 +57,7 @@ jobs:
             .
             extension/plugin
           key: release-${{ matrix.name }}
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         if: matrix.name == 'macos'
         with:
           path: .local/onnxruntime-intel
@@ -65,6 +65,11 @@ jobs:
       - name: Intel ONNX Runtime
         if: matrix.name == 'macos'
         run: bash .github/macos-ort.sh
+      - uses: actions/cache/save@v4
+        if: always() && matrix.name == 'macos' && hashFiles('.local/onnxruntime-intel/*.dylib') != ''
+        with:
+          path: .local/onnxruntime-intel
+          key: macos-ort-intel-${{ hashFiles('.github/macos-ort.sh') }}
       - name: Version
         id: version
         run: |
