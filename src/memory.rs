@@ -129,6 +129,10 @@ fn native() -> (Option<u64>, Option<u64>) {
 #[cfg(target_os = "macos")]
 #[allow(deprecated)]
 fn mac_available() -> Option<u64> {
+    // libc supplies the Mach types but does not expose this send-right release function.
+    unsafe extern "C" {
+        fn mach_port_deallocate(task: libc::mach_port_t, name: libc::mach_port_t) -> libc::kern_return_t;
+    }
     let mut info = std::mem::MaybeUninit::<libc::vm_statistics64_data_t>::zeroed();
     let mut count = libc::HOST_VM_INFO64_COUNT;
     // SAFETY: libc supplies the Mach ABI; release the acquired host send right on every outcome.
@@ -141,7 +145,7 @@ fn mac_available() -> Option<u64> {
             &mut count,
         )
     };
-    unsafe { libc::mach_port_deallocate(libc::mach_task_self(), host) };
+    unsafe { mach_port_deallocate(libc::mach_task_self(), host) };
     if status != libc::KERN_SUCCESS || count != libc::HOST_VM_INFO64_COUNT {
         return None;
     }
