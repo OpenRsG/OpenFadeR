@@ -60,6 +60,14 @@ jobs:
             extension/plugin
           key: ${{ matrix.name }}
           cache-on-failure: true
+      - uses: actions/cache@v4
+        if: matrix.name == 'macos'
+        with:
+          path: .local/onnxruntime-intel
+          key: macos-ort-intel-${{ hashFiles('.github/macos-ort.sh') }}
+      - name: Intel ONNX Runtime
+        if: matrix.name == 'macos'
+        run: bash .github/macos-ort.sh
       # The app links SQLCipher with its own OpenSSL (the rekordbox extensions): Git Bash's perl lacks modules, Strawberry Perl (on
       # the runners) has them.
       - name: OpenSSL build tools (Windows)
@@ -69,7 +77,13 @@ jobs:
           echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
       - name: Build the plugins
         run: extension/plugin/build.sh --quiet
-      - run: cargo build --release
+      - name: Build the app
+        run: |
+          if [ "${{ matrix.name }}" = macos ]; then
+            cargo build --release --no-default-features --features app
+          else
+            cargo build --release
+          fi
       # Windows: one process per test. The binary's tests share one process on the other OSes; on Windows the headless-Slint tests
       # together crash it (STATUS_ACCESS_VIOLATION) although each passes alone; the cause is not found, the app itself is not affected
       # (the smoke test below runs it).
@@ -77,7 +91,13 @@ jobs:
         if: matrix.name == 'windows'
       - name: Tests
         run: |
-          if [ "${{ matrix.name }}" = windows ]; then cargo nextest run --release --workspace --no-fail-fast; else cargo test --release --workspace; fi
+          if [ "${{ matrix.name }}" = windows ]; then
+            cargo nextest run --release --workspace --no-fail-fast
+          elif [ "${{ matrix.name }}" = macos ]; then
+            cargo test --release --workspace --no-default-features --features openfader/app
+          else
+            cargo test --release --workspace
+          fi
       - name: Plugin tests
         run: cargo test --release --no-fail-fast --manifest-path extension/plugin/Cargo.toml
       - name: Smoke test (Linux, under Xvfb)

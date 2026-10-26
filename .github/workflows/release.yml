@@ -57,6 +57,14 @@ jobs:
             .
             extension/plugin
           key: release-${{ matrix.name }}
+      - uses: actions/cache@v4
+        if: matrix.name == 'macos'
+        with:
+          path: .local/onnxruntime-intel
+          key: macos-ort-intel-${{ hashFiles('.github/macos-ort.sh') }}
+      - name: Intel ONNX Runtime
+        if: matrix.name == 'macos'
+        run: bash .github/macos-ort.sh
       - name: Version
         id: version
         run: |
@@ -75,7 +83,12 @@ jobs:
         # macOS: cross-crate LTO drops the compiler runtime's `__isPlatformVersionAtLeast`, which ONNX Runtime's CoreML code needs at link time.
         env:
           CARGO_PROFILE_DIST_LTO: ${{ matrix.name == 'macos' && 'false' || 'thin' }}
-        run: cargo build --profile dist
+        run: |
+          if [ "${{ matrix.name }}" = macos ]; then
+            cargo build --profile dist --no-default-features --features app
+          else
+            cargo build --profile dist
+          fi
       - name: Native macOS smoke
         if: matrix.name == 'macos'
         run: |
@@ -90,6 +103,7 @@ jobs:
           CARGO_BUILD_TARGET: aarch64-apple-darwin
           CARGO_PROFILE_DIST_LTO: "false"
         run: |
+          unset ORT_LIB_LOCATION ORT_PREFER_DYNAMIC_LINK
           extension/plugin/build.sh --quiet
           cargo build --profile dist
       - name: Package
