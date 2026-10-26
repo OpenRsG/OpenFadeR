@@ -33,11 +33,11 @@ use engine::{Engine, ENGINE};
 pub use output::{controller, release_controller, set_waker, status, Status};
 use parking_lot::Mutex;
 use std::rc::{Rc, Weak};
+use std::sync::Arc;
 use std::sync::atomic::{
     AtomicBool, AtomicI64, AtomicU32, AtomicU64,
     Ordering::{Relaxed, Release},
 };
-use std::sync::Arc;
 use std::time::Instant;
 use voice::{Done, Voice, render};
 
@@ -679,6 +679,7 @@ impl Player {
         // Paused, or a seek not yet consumed: no extrapolation, report the resting position. A scratch moves the paused playhead too.
         let f = if (self.is_playing() || self.is_scratching())
             && self.shared.seek.load(Relaxed) == NO_SEEK
+            && self.engine.available()
         {
             heard_frames(&self.shared.clock.lock(), Instant::now(), frames)
         } else {
@@ -691,6 +692,7 @@ impl Player {
     /// since the last seek or start is past its output latency (until then the position holds at the target).
     pub fn settled(&self) -> bool {
         self.shared.seek.load(Relaxed) == NO_SEEK
+            && self.engine.available()
             && audible(&self.shared.clock.lock(), Instant::now())
     }
 

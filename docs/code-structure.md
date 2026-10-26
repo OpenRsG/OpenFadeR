@@ -12,7 +12,7 @@ src/
   export/            device export writer: format-neutral plan and per-track writes; the on-device formats are written by plugins
   stems/             STEMS separation (Demucs ONNX job, model fetch, stems cache); playback mixing lives in audio/stems.rs; a stem file's own parts (audio/stemfile.rs) take the place of the separation in `Job::from_stem_file`
   inbox/             INBOX → REVIEW → COLLECTION: mod.rs = base (Config); children = scan (watched folders, zips, duplicates), rules (where a file goes: stage folder + pattern), moves (a batch of moves, undo of a batch); the stages and batches live in store/inbox.rs, the undo of a move's files in the journal replay
-  stems/             STEMS separation (Demucs ONNX job, model fetch, stems cache); playback mixing lives in audio/stems.rs
+  memory.rs          native total/available RAM and Linux cgroup v2 capacity/headroom; shared by device profiles, inference admission and diagnostics
   edit/              EDIT mode: edit-decision list over source PCM, snapping, WAV export
   lighting/          LIGHTING mode: fixtures, DMX, phrase scenes, Art-Net/sACN output
   video/             VIDEO: ffmpeg pipe decoder, playhead→frame clock, crossfader mix

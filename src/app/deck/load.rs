@@ -31,7 +31,8 @@ static DECODE_WORK: std::sync::LazyLock<(
     parking_lot::Mutex<std::collections::VecDeque<DecodeWork>>,
     parking_lot::Condvar,
 )> = std::sync::LazyLock::new(|| {
-    for _ in 0..4 {
+    let workers = if prefs::lowpower::active() { 2 } else { 4 };
+    for _ in 0..workers {
         std::thread::spawn(|| {
             loop {
                 let work = {
@@ -489,7 +490,7 @@ impl Deck {
             });
         }
         if self.player.is_some() && pending.is_some() && !reused {
-            self.stems_warm(t.file.as_deref());
+            self.stems_prepare(t.file.as_deref());
         }
         let loading = pending.is_some() || downloading;
         let cue_views = cuelist::views(&a);

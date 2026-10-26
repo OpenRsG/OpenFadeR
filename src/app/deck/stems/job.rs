@@ -6,19 +6,17 @@ use openfader::audio::{self, stemfile};
 use openfader::stems::{Phase, Quality};
 use parking_lot::{Condvar, Mutex};
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, LazyLock};
-use std::{path::PathBuf, time::Instant};
 
 struct Prepared {
     parts: Option<stemfile::Info>,
-    separates: bool,
 }
 
 struct LookupWork {
     file: PathBuf,
-    quality: Quality,
     from_file: bool,
     cancelled: Arc<AtomicBool>,
     back: mpsc::Sender<Prepared>,
@@ -27,17 +25,12 @@ struct LookupWork {
 fn prepare(
     cancelled: &AtomicBool,
     parts: impl FnOnce() -> Option<stemfile::Info>,
-    cached: impl FnOnce() -> bool,
 ) -> Option<Prepared> {
     if cancelled.load(Relaxed) {
         return None;
     }
     let parts = parts();
-    if cancelled.load(Relaxed) {
-        return None;
-    }
-    let separates = parts.is_none() && !cached();
-    (!cancelled.load(Relaxed)).then_some(Prepared { parts, separates })
+    (!cancelled.load(Relaxed)).then_some(Prepared { parts })
 }
 
 static LOOKUPS: LazyLock<(Mutex<VecDeque<LookupWork>>, Condvar)> = LazyLock::new(|| {
@@ -53,15 +46,11 @@ static LOOKUPS: LazyLock<(Mutex<VecDeque<LookupWork>>, Condvar)> = LazyLock::new
                     queue.pop_front().expect("not empty")
                 };
                 let prepared = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    prepare(
-                        &work.cancelled,
-                        || {
-                            work.from_file
-                                .then(|| stemfile::read_info(&work.file))
-                                .flatten()
-                        },
-                        || openfader::stems::cache::has(&work.file, work.quality),
-                    )
+                    prepare(&work.cancelled, || {
+                        work.from_file
+                            .then(|| stemfile::read_info(&work.file))
+                            .flatten()
+                    })
                 }))
                 .ok()
                 .flatten();
@@ -95,7 +84,6 @@ impl Lookup {
         if queue.len() < 8 {
             queue.push_back(LookupWork {
                 file: file.clone(),
-                quality,
                 from_file,
                 cancelled: cancelled.clone(),
                 back,
@@ -142,40 +130,9 @@ fn compatible_stems(stems: &audio::Stems, pcm: &audio::Track16, fast: bool) -> b
         && (stems.grid() == quality || (fast && stems.grid() == speed))
 }
 
-static FIRST_TICK: LazyLock<Instant> = LazyLock::new(Instant::now);
-/// The engines were opened (a warm-up or a job) and not released since.
-static WARM: AtomicBool = AtomicBool::new(false);
-/// Seconds after [`FIRST_TICK`] of the last tick with a job running, or of the last warm-up.
-static LAST_BUSY: AtomicU64 = AtomicU64::new(0);
-/// No separation on any deck for this long closes the engines (about 1 GB with both open).
-const IDLE_S: u64 = 90;
-
-fn now_s() -> u64 {
-    FIRST_TICK.elapsed().as_secs()
-}
-
-/// Every deck tick (`busy`: this deck has a job): after [`IDLE_S`] without a job on any deck, the engines are closed, off the
-/// UI thread (closing waits for a segment in flight). The next load opens them again ([`Deck::stems_warm`]).
-fn engines_tick(busy: bool) {
-    let now = now_s();
-    if busy {
-        LAST_BUSY.store(now, Relaxed);
-        WARM.store(true, Relaxed);
-    } else if WARM.load(Relaxed) && now.saturating_sub(LAST_BUSY.load(Relaxed)) >= IDLE_S {
-        WARM.store(false, Relaxed);
-        std::thread::spawn(openfader::stems::model::release);
-    }
-}
-
 impl Deck {
-    /// A track starts decoding: with STEMS on the engines open meanwhile (2 to 3 s, overlapping the decode), so an idle app
-    /// holds no model. Not in the first 2 s of the event loop: Dawn loading the Vulkan driver while the main thread loads GLX
-    /// (the same NVIDIA libraries) hangs the window for good (seen: main thread busy in `dlopen`, no window); a job
-    /// started that early opens them itself.
-    pub(in crate::app::deck) fn stems_warm(&self, file: Option<&std::path::Path>) {
-        if WARM.load(Relaxed) || now_s() < 2 {
-            return;
-        }
+    /// A track starts decoding: probe stem-file metadata off the UI thread; models open only for uncached inference.
+    pub(in crate::app::deck) fn stems_prepare(&self, file: Option<&std::path::Path>) {
         let (enabled, fast, multithread, from_file) = prefs::with(|p| {
             (
                 p.stems,
@@ -280,14 +237,6 @@ impl Deck {
             .is_some_and(|f| *f == lookup.file);
         if !current || !same_file {
             return;
-        }
-        if prepared.separates
-            && now_s() >= 2
-            && WARM.compare_exchange(false, true, Relaxed, Relaxed).is_ok()
-        {
-            LAST_BUSY.store(now_s(), Relaxed);
-            let multithread = lookup.multithread;
-            std::thread::spawn(move || openfader::stems::warm(multithread));
         }
         if let Some(pcm) = lookup.pcm.take() {
             let job = match prepared.parts.clone() {
@@ -403,7 +352,6 @@ impl Deck {
     /// Tick: shows the job's progress, keeps it pointed at the play position and takes its outcome.
     pub(in crate::app::deck) fn poll_stems(&self) {
         self.poll_stems_lookup();
-        engines_tick(self.stems.borrow().job.is_some());
         let pending = {
             let s = self.stems.borrow();
             (!s.ready)
@@ -553,7 +501,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cancelled_blocked_preflight_cannot_publish_or_probe_the_cache() {
+    fn cancelled_blocked_preflight_cannot_publish_metadata() {
         let cancelled = Arc::new(AtomicBool::new(false));
         let (_back, rx) = mpsc::channel();
         let owner = Lookup {
@@ -569,15 +517,11 @@ mod tests {
         let (started, begin) = mpsc::channel();
         let (release, wait) = mpsc::channel();
         let worker = std::thread::spawn(move || {
-            prepare(
-                &cancelled,
-                || {
-                    started.send(()).unwrap();
-                    wait.recv().unwrap();
-                    None
-                },
-                || panic!("cancelled metadata cannot lead to cache or model work"),
-            )
+            prepare(&cancelled, || {
+                started.send(()).unwrap();
+                wait.recv().unwrap();
+                None
+            })
         });
         begin
             .recv_timeout(std::time::Duration::from_secs(1))
@@ -588,9 +532,8 @@ mod tests {
     }
 
     #[test]
-    fn cached_preflight_does_not_admit_a_model_warmup() {
-        let prepared = prepare(&AtomicBool::new(false), || None, || true).unwrap();
-        assert!(!prepared.separates);
+    fn preflight_without_a_stem_file_needs_no_model_or_cache_probe() {
+        let prepared = prepare(&AtomicBool::new(false), || None).unwrap();
         assert!(prepared.parts.is_none());
     }
 

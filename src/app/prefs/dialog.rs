@@ -112,6 +112,8 @@ pub fn wire(app: &App) -> Timer {
     controller::wire();
     extensions::wire();
     advanced::wire();
+    #[cfg(feature = "stems")]
+    super::lowpower::wire();
     keyboard::wire(app);
     refresh();
     look::apply(app, &p);

@@ -3,7 +3,7 @@
 //!
 //! Base: [`Job`], the background job a deck starts per loaded track: its [`Stems`] are allocated on the worker and fill
 //! segment by segment (frames not separated yet play as the original track), from the cache if the track was separated
-//! before, else by the GPU and CPU side by side, then cached. [`Progress`] is what it reports and
+//! before, else by GPU/CPU inference within the device's memory budget, then cached. [`Progress`] is what it reports and
 //! [`Quality`] (STEMS Analysis Process: sound quality or speed) what it separates at. Children: [`model`] (the open
 //! Demucs v4 `htdemucs` ONNX model, its download, the GPU and CPU [`Engine`](model::Engine)s), [`schedule`] (the order of the
 //! segments), [`separate`] (one engine's loop over segments), [`cache`] (on-disk results keyed like the analysis cache, one
@@ -115,22 +115,21 @@ impl Drop for Job {
     }
 }
 
-/// ONNX Runtime threads of the CPU engine: half the cores (the UI, the audio thread and analysis keep the rest), at least 2;
-/// one when `multithread` is off (PREFS > Extensions > STEMS > Multi-thread). The graph does not scale past a few threads
-/// (measured: 8, 12 and 16 threads run a segment in the same time), so more would only take cores from the rest of the app.
-pub fn threads(multithread: bool) -> usize {
+/// ONNX Runtime threads of the CPU engine: half the cores, capped at 2 in low-memory mode and 8 otherwise;
+/// one when `multithread` is off (PREFS > Extensions > STEMS > Multi-thread). The UI and audio keep the remaining cores.
+/// The graph does not scale beyond the normal budget (measured: 8, 12 and 16 threads run a segment in the same time).
+pub fn threads(multithread: bool, low_memory: bool) -> usize {
     if !multithread {
         return 1;
     }
-    std::thread::available_parallelism().map_or(2, |n| (n.get() / 2).max(2))
+    thread_budget(
+        std::thread::available_parallelism().map_or(1, usize::from),
+        low_memory,
+    )
 }
 
-/// Opens the engines in the background (about 2 s each, the GPU's shaders another second) so the first track after STEMS is
-/// switched on finds them ready. Does nothing without the model; a missing model is reported by the first [`Job`].
-pub fn warm(multithread: bool) {
-    if model::usable() {
-        model::warm(&model::engines(multithread));
-    }
+fn thread_budget(cores: usize, low_memory: bool) -> usize {
+    (cores / 2).clamp(1, if low_memory { 2 } else { 8 })
 }
 
 impl Job {
@@ -238,7 +237,7 @@ impl Job {
     }
 }
 
-/// The job's thread: the cache, else the model download, then one thread per [`Engine`] working through the schedule.
+/// The job's thread: cache, else model download and one active inference batch (GPU-first on low-memory devices).
 /// `Ok(true)` = separated now (to be cached), `Ok(false)` = came from the cache.
 fn work(
     audio: &std::path::Path,
@@ -264,6 +263,7 @@ fn work(
         p.set(Phase::Download, 0.0);
         model::fetch(&|f| p.set(Phase::Download, f))?;
     }
+    let batch = model::Batch::start(&ctl.cancel)?;
     p.set(Phase::Separate, 0.0);
     let (t0, n) = (Instant::now(), stems.segments());
     let (finished, per_engine) = (
@@ -271,34 +271,35 @@ fn work(
         [AtomicUsize::new(0), AtomicUsize::new(0)],
     );
     let errors = Mutex::new(Vec::<String>::new());
-    let engines = model::engines(multithread);
-    std::thread::scope(|sc| {
-        for (i, &engine) in engines.iter().enumerate() {
-            let (finished, per_engine, errors) = (&finished, &per_engine, &errors);
-            sc.spawn(move || {
-                let done = |_: usize| {
-                    per_engine[i].fetch_add(1, Relaxed);
-                    p.set(
-                        Phase::Separate,
-                        (finished.fetch_add(1, Relaxed) + 1) as f32 / n as f32,
-                    );
-                };
-                let result = engine.open_cancellable(&ctl.cancel).and_then(|()| {
-                    separate::work(
-                        pcm,
-                        stems,
-                        &ctl.sched,
-                        &mut |mix, consume| engine.run(mix, &ctl.cancel, consume),
-                        &ctl.cancel,
-                        &done,
-                    )
-                });
-                if let Err(e) = result {
-                    errors.lock().push(e);
-                }
-            });
+    let engines = model::engines(multithread, batch.serial());
+    let run = |i: usize, engine: model::Engine| {
+        let done = |_: usize| {
+            per_engine[i].fetch_add(1, Relaxed);
+            p.set(
+                Phase::Separate,
+                (finished.fetch_add(1, Relaxed) + 1) as f32 / n as f32,
+            );
+        };
+        let result = engine.open_cancellable(&ctl.cancel).and_then(|()| {
+            separate::work(
+                pcm,
+                stems,
+                &ctl.sched,
+                &mut |mix, consume| engine.run(mix, &ctl.cancel, consume),
+                &ctl.cancel,
+                &done,
+            )
+        });
+        if let Err(e) = result {
+            errors.lock().push(e);
         }
-    });
+    };
+    run_engines(
+        batch.serial(),
+        engines,
+        || stems.is_complete() || ctl.cancel.load(Relaxed),
+        run,
+    );
     if ctl.cancel.load(Relaxed) {
         return Err("cancelled".into());
     }
@@ -320,14 +321,89 @@ fn work(
     Ok(true)
 }
 
+fn run_engines(
+    serial: bool,
+    engines: [model::Engine; 2],
+    stop: impl Fn() -> bool,
+    run: impl Fn(usize, model::Engine) + Sync,
+) {
+    if serial {
+        for (i, engine) in engines.into_iter().enumerate() {
+            if stop() {
+                break;
+            }
+            run(i, engine);
+        }
+    } else {
+        std::thread::scope(|sc| {
+            for (i, engine) in engines.into_iter().enumerate() {
+                let run = &run;
+                sc.spawn(move || run(i, engine));
+            }
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn multithread_off_is_one_thread_on_is_at_least_two() {
-        assert_eq!(threads(false), 1);
-        assert!(threads(true) >= 2);
+    fn multithread_off_is_one_thread_on_stays_in_the_cpu_budget() {
+        for limited in [false, true] {
+            assert_eq!(threads(false, limited), 1);
+            assert!((1..=if limited { 2 } else { 8 }).contains(&threads(true, limited)));
+        }
+    }
+
+    #[test]
+    fn small_devices_cap_inference_at_two_threads_without_losing_single_core_support() {
+        for (cores, normal, small) in [
+            (0, 1, 1),
+            (1, 1, 1),
+            (2, 1, 1),
+            (4, 2, 2),
+            (8, 4, 2),
+            (16, 8, 2),
+            (64, 8, 2),
+        ] {
+            assert_eq!(thread_budget(cores, false), normal);
+            assert_eq!(thread_budget(cores, true), small);
+        }
+    }
+
+    #[test]
+    fn serial_inference_uses_cpu_only_after_gpu_leaves_work_and_stops_on_completion_or_cancel() {
+        let engines = [model::Engine::Gpu, model::Engine::Cpu(1)];
+        for stop_after in 0..=2 {
+            let calls = Mutex::new(Vec::new());
+            run_engines(
+                true,
+                engines,
+                || calls.lock().len() >= stop_after,
+                |_, engine| calls.lock().push(engine),
+            );
+            assert_eq!(*calls.lock(), engines[..stop_after]);
+        }
+    }
+
+    #[test]
+    fn unrestricted_inference_keeps_both_engines_parallel() {
+        let engines = [model::Engine::Gpu, model::Engine::Cpu(1)];
+        let rendezvous = std::sync::Barrier::new(2);
+        let calls = Mutex::new(Vec::new());
+        run_engines(
+            false,
+            engines,
+            || false,
+            |_, engine| {
+                calls.lock().push(engine);
+                rendezvous.wait();
+            },
+        );
+        let calls = calls.lock();
+        assert_eq!(calls.len(), 2);
+        assert!(engines.iter().all(|engine| calls.contains(engine)));
     }
 
     #[test]

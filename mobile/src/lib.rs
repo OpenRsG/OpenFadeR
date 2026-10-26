@@ -109,6 +109,7 @@ pub fn run(music: PathBuf) -> Result<(), String> {
     options.parts.vocal = false;
     openfader::analysis::options::set(options);
     let app = App::new().map_err(|e| e.to_string())?;
+    audio::set_waker(|| _ = slint::invoke_from_event_loop(audio::settle));
     app.global::<Palette>()
         .set_color_scheme(slint::language::ColorScheme::Dark);
     app.global::<MobileState>()

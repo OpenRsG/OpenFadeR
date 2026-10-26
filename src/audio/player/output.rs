@@ -152,6 +152,9 @@ enum Lookup {
     Controller(String),
     /// The Preferences' device: the exact cpal name.
     Settings(String),
+    /// Reconnect the actual output without changing the saved preference or controller override.
+    Recovery(String),
+    RecoveryCue(String),
 }
 
 /// What a lookup found: the device and its name, or why not.
@@ -159,7 +162,11 @@ type Found = Result<(String, cpal::Device), String>;
 
 impl Lookup {
     fn name(&self) -> &str {
-        let (Lookup::Env(n) | Lookup::Controller(n) | Lookup::Settings(n)) = self;
+        let (Lookup::Env(n)
+        | Lookup::Controller(n)
+        | Lookup::Settings(n)
+        | Lookup::Recovery(n)
+        | Lookup::RecoveryCue(n)) = self;
         n
     }
 
@@ -167,6 +174,10 @@ impl Lookup {
     fn find(&self) -> Found {
         match self {
             Lookup::Env(want) => find_output(want, bus::OUTPUT_ENV),
+            Lookup::RecoveryCue(want) => find_output(want, cue::ENV),
+            Lookup::Recovery(name) => device::output_named(name)
+                .map(|d| (name.clone(), d))
+                .ok_or_else(|| format!("{name:?} is not available")),
             Lookup::Controller(want) => find_wanted(want),
             Lookup::Settings(name) => {
                 // An HDMI port without a screen opens fine and plays silence: the default plays until something is plugged in.
@@ -189,10 +200,35 @@ static FOUND: Mutex<Vec<(Lookup, Instant, Found)>> = Mutex::new(Vec::new());
 static RUNNING: Mutex<Vec<Lookup>> = Mutex::new(Vec::new());
 static WAKE: OnceLock<fn()> = OnceLock::new();
 
-/// Lets lookups run on a worker thread: `wake` is called from that thread when one ends, and must run `super::settle` on the
-/// UI thread. Without it every lookup blocks its caller.
+/// Runs device lookups and output-health notifications off-thread; `wake` must post `super::settle` to the
+/// stream-owning UI thread. Install before opening players for automatic recovery. Without it ordinary lookups block.
 pub fn set_waker(wake: fn()) {
     let _ = WAKE.set(wake);
+}
+
+pub(super) fn wake() -> bool {
+    let Some(wake) = WAKE.get() else { return false };
+    wake();
+    true
+}
+
+pub(super) fn forget_recovery(name: &str) {
+    let key = Lookup::Recovery(name.to_owned());
+    FOUND
+        .lock()
+        .retain(|(k, _, _)| k != &key && !matches!(k, Lookup::RecoveryCue(_)));
+}
+
+/// Reconnecting never substitutes the system default or enumerates devices on the stream owner.
+pub(super) fn recover(name: &str, source: &'static str) -> Option<Result<Output, String>> {
+    let main = resolve(&Lookup::Recovery(name.to_owned()));
+    let cue = match std::env::var(cue::ENV).ok().filter(|v| !v.is_empty()) {
+        Some(name) => Some(resolve(&Lookup::RecoveryCue(name))?),
+        None => None,
+    };
+    main.map(|found| {
+        found.and_then(|(name, dev)| prepare(name, dev, source, Vec::new(), None, cue))
+    })
 }
 
 fn cached(l: &Lookup) -> Option<Found> {
@@ -215,7 +251,9 @@ fn resolve(l: &Lookup) -> Option<Found> {
     if let Some(f) = cached(l) {
         return Some(f);
     }
-    if WAKE.get().is_none() || matches!(l, Lookup::Env(_)) {
+    if !matches!(l, Lookup::Recovery(_) | Lookup::RecoveryCue(_))
+        && (WAKE.get().is_none() || matches!(l, Lookup::Env(_)))
+    {
         let f = l.find();
         store(l, &f);
         return Some(f);
@@ -227,9 +265,7 @@ fn resolve(l: &Lookup) -> Option<Found> {
         std::thread::spawn(move || {
             store(&l, &l.find());
             RUNNING.lock().retain(|k| k != &l);
-            if let Some(wake) = WAKE.get() {
-                wake();
-            }
+            wake();
         });
     }
     None
@@ -255,8 +291,6 @@ pub(super) fn unresolved() -> Option<String> {
 /// Device, config and layout for the next stream (see the module doc for the precedence). A device not found yet is
 /// [`Status::pending`]: the system default is what this returns, the stream moves when the answer is there.
 pub(super) fn choose() -> Result<Output, String> {
-    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-    let set = settings();
     let mut notes = Vec::new();
     let mut pending = None;
     let look = lookup_now();
@@ -280,6 +314,19 @@ pub(super) fn choose() -> Result<Output, String> {
             (n, d, "system default")
         }
     };
+    prepare(name, dev, source, notes, pending, None)
+}
+
+fn prepare(
+    name: String,
+    dev: cpal::Device,
+    source: &'static str,
+    mut notes: Vec<String>,
+    pending: Option<String>,
+    cue_device: Option<Found>,
+) -> Result<Output, String> {
+    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    let set = settings();
     let rate_want = (set.rate > 0).then_some(set.rate);
     let external = set.mixer == Mixer::External;
     let (cue_want, hp_env) = (env(cue::ENV), env(bus::HP_ENV));
@@ -367,7 +414,10 @@ pub(super) fn choose() -> Result<Output, String> {
                 None,
                 Headphones::Device(format!("{name} ch {}/{}", a + 1, b + 1)),
             ),
-            (None, Some(want), _) => match cue::open(&want, rate) {
+            (None, Some(want), _) => match cue_device.map_or_else(
+                || cue::open(&want, rate),
+                |found| found.and_then(|(name, dev)| cue::open_device(name, dev, rate)),
+            ) {
                 Ok(c) => {
                     let name = c.name.clone();
                     (Some(c), Headphones::Device(name))
@@ -445,6 +495,30 @@ pub(super) fn config_for(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retry_forgets_only_recovery_handles_without_changing_output_intent() {
+        let name = "unit-test-disconnected-output";
+        let recovery = Lookup::Recovery(name.into());
+        let preference = Lookup::Settings(name.into());
+        let missing: Found = Err("disconnected".into());
+        let old_settings = replace_settings(Settings {
+            device: name.into(),
+            ..settings()
+        });
+        let old_controller = replace_wanted(Some("unit-test-controller".into()));
+        store(&recovery, &missing);
+        store(&preference, &missing);
+        assert!(cached(&recovery).unwrap().is_err());
+        forget_recovery(name);
+        assert!(cached(&recovery).is_none());
+        assert!(cached(&preference).unwrap().is_err());
+        assert_eq!(settings().device, name);
+        assert_eq!(controller().as_deref(), Some("unit-test-controller"));
+        replace_settings(old_settings);
+        replace_wanted(old_controller);
+        FOUND.lock().retain(|(key, _, _)| key != &preference);
+    }
 
     #[test]
     fn a_controller_name_finds_its_alsa_card_without_punctuation_or_case() {

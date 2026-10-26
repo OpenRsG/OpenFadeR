@@ -588,7 +588,8 @@ fn input_stream_worker(
             poll_descriptors_and_prepare_buffer(&rx, stream, &mut ctxt).unwrap_or_else(|err| {
                 error_callback(err.into());
                 PollDescriptorsFlow::Continue
-            });
+            })
+            .report_fatal(error_callback);
 
         match flow {
             PollDescriptorsFlow::Continue => {
@@ -601,6 +602,7 @@ fn input_stream_worker(
                 continue;
             }
             PollDescriptorsFlow::Return => return,
+            PollDescriptorsFlow::Fatal(_) => unreachable!("reported before dispatch"),
             PollDescriptorsFlow::Ready {
                 status,
                 avail_frames: _,
@@ -639,7 +641,8 @@ fn output_stream_worker(
             poll_descriptors_and_prepare_buffer(&rx, stream, &mut ctxt).unwrap_or_else(|err| {
                 error_callback(err.into());
                 PollDescriptorsFlow::Continue
-            });
+            })
+            .report_fatal(error_callback);
 
         match flow {
             PollDescriptorsFlow::Continue => continue,
@@ -650,6 +653,7 @@ fn output_stream_worker(
                 continue;
             }
             PollDescriptorsFlow::Return => return,
+            PollDescriptorsFlow::Fatal(_) => unreachable!("reported before dispatch"),
             PollDescriptorsFlow::Ready {
                 status,
                 avail_frames,
@@ -680,6 +684,7 @@ fn output_stream_worker(
 enum PollDescriptorsFlow {
     Continue,
     Return,
+    Fatal(BackendSpecificError),
     Ready {
         stream_type: StreamType,
         status: alsa::pcm::Status,
@@ -687,6 +692,72 @@ enum PollDescriptorsFlow {
         delay_frames: usize,
     },
     XRun,
+}
+
+impl PollDescriptorsFlow {
+    fn report_fatal(self, error_callback: &mut dyn FnMut(StreamError)) -> Self {
+        match self {
+            Self::Fatal(err) => {
+                error_callback(err.into());
+                Self::Return
+            }
+            flow => flow,
+        }
+    }
+}
+
+fn poll_error_flow(state: alsa::pcm::State) -> PollDescriptorsFlow {
+    if state == alsa::pcm::State::XRun {
+        return PollDescriptorsFlow::XRun;
+    }
+    // OpenFadeR: a dead PCM keeps POLLERR readable forever; report once and let the owner reopen it.
+    PollDescriptorsFlow::Fatal(BackendSpecificError {
+        description: String::from("`alsa::poll()` returned POLLERR"),
+    })
+}
+
+fn poll_ready(result: Result<usize, alsa::Error>) -> Result<Option<usize>, BackendSpecificError> {
+    match result {
+        Err(err) if err.errno() == libc::EINTR => Ok(None),
+        result => result.map(Some).map_err(Into::into),
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[test]
+    fn fatal_poll_error_reports_once_then_stops_the_worker() {
+        let mut errors = Vec::new();
+        let flow = poll_error_flow(alsa::pcm::State::Disconnected)
+            .report_fatal(&mut |error| errors.push(error));
+        assert!(matches!(flow, PollDescriptorsFlow::Return));
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].to_string().contains("POLLERR"));
+    }
+
+    #[test]
+    fn pollerr_during_an_xrun_keeps_the_existing_prepare_recovery() {
+        let flow = poll_error_flow(alsa::pcm::State::XRun)
+            .report_fatal(&mut |_| panic!("an underrun is not a disconnected device"));
+        assert!(matches!(flow, PollDescriptorsFlow::XRun));
+        assert!(matches!(
+            PollDescriptorsFlow::Continue.report_fatal(&mut |_| panic!("no error")),
+            PollDescriptorsFlow::Continue
+        ));
+    }
+
+    #[test]
+    fn an_interrupted_poll_retries_without_hiding_other_errors_or_timeouts() {
+        assert_eq!(
+            poll_ready(Err(alsa::Error::new("poll", libc::EINTR))).unwrap(),
+            None
+        );
+        assert_eq!(poll_ready(Ok(0)).unwrap(), Some(0));
+        assert_eq!(poll_ready(Ok(2)).unwrap(), Some(2));
+        assert!(poll_ready(Err(alsa::Error::new("poll", libc::EIO))).is_err());
+    }
 }
 
 // This block is shared between both input and output stream worker functions.
@@ -724,7 +795,9 @@ fn poll_descriptors_and_prepare_buffer(
     debug_assert_eq!(filled, stream.num_descriptors);
 
     // Don't timeout, wait forever.
-    let res = alsa::poll::poll(descriptors, *poll_timeout)?;
+    let Some(res) = poll_ready(alsa::poll::poll(descriptors, *poll_timeout))? else {
+        return Ok(PollDescriptorsFlow::Continue);
+    };
     if res == 0 {
         let description = String::from("`alsa::poll()` spuriously returned");
         return Err(BackendSpecificError { description });
@@ -738,8 +811,7 @@ fn poll_descriptors_and_prepare_buffer(
 
     let revents = stream.channel.revents(&descriptors[1..])?;
     if revents.contains(alsa::poll::Flags::ERR) {
-        let description = String::from("`alsa::poll()` returned POLLERR");
-        return Err(BackendSpecificError { description });
+        return Ok(poll_error_flow(stream.channel.state()));
     }
     let stream_type = match revents {
         alsa::poll::Flags::OUT => StreamType::Output,

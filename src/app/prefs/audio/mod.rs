@@ -32,12 +32,11 @@ pub use page::rows;
 
 use super::{Prefs, choice, section};
 use openfader::audio::{
-    self,
-    device::{self, card, Caps},
+    self, Status,
+    device::{self, Caps, card},
     metronome::TONES,
     mic,
     route::{self, Mixer, Settings},
-    Status,
 };
 use std::{cell::RefCell, rc::Rc};
 
@@ -353,8 +352,17 @@ fn refresh_when_settled() {
 /// rate / buffer / layout by moving the stream). Call after `prefs::wire` has loaded the file and before the decks are created
 /// (the first `Player` opens the stream with these settings).
 pub fn wire() {
-    // A device is looked up on a worker thread; the UI thread moves the stream when it is found.
-    audio::set_waker(|| _ = slint::invoke_from_event_loop(audio::settle));
+    // Lookups and coalesced output faults both settle on the stream-owning UI thread.
+    audio::set_waker(|| {
+        _ = slint::invoke_from_event_loop(|| {
+            let before = audio::status();
+            audio::settle();
+            if audio::status() != before {
+                super::refresh();
+                cards::sync();
+            }
+        })
+    });
     device::never_block_here(); // the page reads the lists the background refresh keeps (cards::sync)
     let ins = super::get().audio;
     mic::open(ins.mic_on, &ins.input_device, ins.mic_pair);

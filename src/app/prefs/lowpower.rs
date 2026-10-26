@@ -1,11 +1,12 @@
-//! The low-power device profile (Preferences > Advanced > Others > LOW-POWER MODE: AUTO / ON / OFF) for a Raspberry Pi or another small machine
-//! (issue #24). AUTO follows [`detect`]; ON and OFF override it. [`active`] is the effective answer, read where the profile changes behaviour:
+//! The low-power device profile (Preferences > Advanced > Others > LOW-POWER MODE: AUTO / ON / OFF).
+//! AUTO covers Raspberry Pi and machines with at most 8 GiB of effective RAM; ON and OFF override it.
 //!
 //! | where | low-power mode |
 //! | --- | --- |
 //! | automatic audio buffer ([`super::audio`]) | driver default instead of the low-latency fixed buffer; explicit frame counts still win |
 //! | sampler ([`crate::app::sampler`]) | a slot keeps at most [`SAMPLER_SECS`] instead of 30 s (16 slots at 48 kHz stereo f32: 180 MB down to 60 MB) |
 //! | analysis workers ([`crate::app::analyze::workers`]) | at most [`ANALYSIS_WORKERS`] ([`analysis_workers`]); each worker holds a whole decoded track |
+//! | stem inference | one batch, at most two CPU threads, no concurrent CPU/GPU scratch |
 //!
 //! Decks, previews and analysis already decode to 16-bit [`openfader::audio::Track16`] on every machine, so the profile does not switch that.
 
@@ -21,40 +22,19 @@ choice!(
 pub const SAMPLER_SECS: f64 = 10.0;
 /// Analysis workers at most in low-power mode (our choice: the Pi 4's four cores are shared with the UI and the audio thread).
 pub const ANALYSIS_WORKERS: usize = 2;
-/// A machine with this much RAM or less counts as small (8 GiB, in KiB as `/proc/meminfo` gives it; a Pi's 8 GB board reports a bit less).
-const SMALL_RAM_KIB: u64 = 8 * 1024 * 1024;
+/// A machine at or below the shared memory budget counts as small (including cgroup-limited machines).
+const SMALL_RAM_KIB: u64 = openfader::memory::SMALL_BYTES / 1024;
 
-/// Is this a small machine: a Raspberry Pi (its device-tree `model` says so), or Linux on 64-bit / 32-bit ARM
-/// (`std::env::consts::ARCH`: `aarch64`, `arm`) with at most 8 GB of RAM. Unknown RAM does not count as small.
-pub fn detect(os: &str, arch: &str, ram_kib: Option<u64>, model: Option<&str>) -> bool {
-    os == "linux"
-        && (model.is_some_and(|m| m.contains("Raspberry Pi"))
-            || (matches!(arch, "aarch64" | "arm") && ram_kib.is_some_and(|k| k <= SMALL_RAM_KIB)))
+/// Raspberry Pi remains low-power even on larger boards; RAM policy applies to every OS and architecture.
+pub fn detect(os: &str, ram_kib: Option<u64>, model: Option<&str>) -> bool {
+    (os == "linux" && model.is_some_and(|m| m.contains("Raspberry Pi")))
+        || ram_kib.is_some_and(|k| k <= SMALL_RAM_KIB)
 }
 
-/// `MemTotal` of a `/proc/meminfo` text, KiB.
-fn mem_total_kib(meminfo: &str) -> Option<u64> {
-    meminfo
-        .lines()
-        .find_map(|l| l.strip_prefix("MemTotal:"))?
-        .split_whitespace()
-        .next()?
-        .parse()
-        .ok()
-}
-
-/// [`detect`] for this machine (read once: neither the hardware nor the architecture changes while we run).
 static DETECTED: LazyLock<bool> = LazyLock::new(|| {
-    let ram = std::fs::read_to_string("/proc/meminfo")
-        .ok()
-        .and_then(|t| mem_total_kib(&t));
+    let ram = openfader::memory::total_bytes().map(|bytes| bytes / 1024);
     let model = std::fs::read_to_string("/proc/device-tree/model").ok();
-    detect(
-        std::env::consts::OS,
-        std::env::consts::ARCH,
-        ram,
-        model.as_deref(),
-    )
+    detect(std::env::consts::OS, ram, model.as_deref())
 });
 
 /// The effective mode of `setting` when detection says `detected`.
@@ -81,6 +61,20 @@ pub fn analysis_workers(n: usize) -> usize {
     if active() { n.min(ANALYSIS_WORKERS) } else { n }
 }
 
+#[cfg(feature = "stems")]
+pub(super) fn wire() {
+    let apply = |p: &Prefs| {
+        let limited = match p.advanced.low_power {
+            LowPower::Auto => on(p) || openfader::memory::constrained(),
+            LowPower::On => true,
+            LowPower::Off => false,
+        };
+        openfader::stems::model::set_low_memory(limited);
+    };
+    super::with(apply);
+    super::on_change(apply);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,54 +83,17 @@ mod tests {
     const GIB: u64 = 1024 * 1024;
 
     #[test]
-    fn a_raspberry_pi_or_a_small_arm_linux_box_is_low_power() {
-        let pi = Some("Raspberry Pi 4 Model B Rev 1.5\0");
-        assert!(detect("linux", "aarch64", Some(4 * GIB), pi));
-        assert!(
-            detect("linux", "aarch64", None, pi),
-            "the model alone is enough"
-        );
-        assert!(
-            detect("linux", "aarch64", Some(7_900_000), None),
-            "an 8 GB board reports a little less than 8 GiB"
-        );
-        assert!(detect("linux", "arm", Some(GIB), None), "armv7");
-        assert!(detect(
-            "linux",
-            "aarch64",
-            Some(8 * GIB),
-            Some("Pine64 RockPro64")
-        ));
-    }
-
-    #[test]
-    fn big_x86_and_non_linux_machines_are_not() {
-        assert!(
-            !detect("linux", "x86_64", Some(4 * GIB), None),
-            "small x86 is a PC, not a Pi"
-        );
-        assert!(!detect(
-            "linux",
-            "aarch64",
-            Some(16 * GIB),
-            Some("Apple MacBook Air")
-        ));
-        assert!(!detect("linux", "aarch64", None, None), "unknown RAM");
-        assert!(!detect("macos", "aarch64", Some(8 * GIB), None));
-        assert!(!detect(
-            "windows",
-            "aarch64",
-            Some(4 * GIB),
-            Some("Raspberry Pi")
-        ));
-    }
-
-    #[test]
-    fn meminfo_gives_the_total() {
-        let t = "MemTotal:        7918300 kB\nMemFree:          123 kB\n";
-        assert_eq!(mem_total_kib(t), Some(7_918_300));
-        assert_eq!(mem_total_kib("MemFree: 1 kB\n"), None);
-        assert_eq!(mem_total_kib("MemTotal: lots kB\n"), None);
+    fn raspberry_pi_and_small_memory_devices_share_the_profile() {
+        let pi = Some("Raspberry Pi 5 Model B Rev 1.0\0");
+        assert!(detect("linux", Some(16 * GIB), pi));
+        assert!(detect("linux", None, pi));
+        for os in ["linux", "macos", "windows"] {
+            assert!(detect(os, Some(4 * GIB), None));
+            assert!(detect(os, Some(8 * GIB), None));
+            assert!(!detect(os, Some(8 * GIB + 1), None));
+            assert!(!detect(os, None, None));
+        }
+        assert!(!detect("windows", Some(16 * GIB), pi));
     }
 
     #[test]

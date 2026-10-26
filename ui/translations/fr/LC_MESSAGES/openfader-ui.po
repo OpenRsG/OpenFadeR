@@ -2570,7 +2570,7 @@ msgid "VOLUME {}"
 msgstr "VOLUME {}"
 
 #: ui/exportmode.slint:168
-#: src/app/prefs/audio/mod.rs:50
+#: src/app/prefs/audio/mod.rs:49
 #: src/app/prefs/audio/page.rs:285
 msgid "INPUT"
 msgstr "ENTRÉE"
@@ -3631,7 +3631,7 @@ msgstr "SYSTÈME DJ"
 
 #: ui/prefs.slint:49
 #: ui/prefs.slint:68
-#: src/app/prefs/audio/mod.rs:54
+#: src/app/prefs/audio/mod.rs:53
 msgid "ADVANCED"
 msgstr "AVANCÉ"
 
@@ -6465,59 +6465,59 @@ msgstr "key sync : {} st → {}"
 msgid "key sync: {} st → {} (relative key)"
 msgstr "key sync : {} st → {} (KEY relative)"
 
-#: src/app/deck/load.rs:124
-#: src/app/deck/load.rs:392
+#: src/app/deck/load.rs:125
+#: src/app/deck/load.rs:393
 msgid "no file path"
 msgstr "aucun chemin de fichier"
 
-#: src/app/deck/load.rs:264
+#: src/app/deck/load.rs:265
 msgid "downloading…"
 msgstr "téléchargement…"
 
-#: src/app/deck/load.rs:266
-#: src/app/deck/load.rs:682
-#: src/app/deck/load.rs:846
+#: src/app/deck/load.rs:267
+#: src/app/deck/load.rs:683
+#: src/app/deck/load.rs:847
 msgid "not analysed"
 msgstr "non analysée"
 
-#: src/app/deck/load.rs:299
+#: src/app/deck/load.rs:300
 msgid "the download stopped"
 msgstr "le téléchargement s'est arrêté"
 
-#: src/app/deck/load.rs:323
+#: src/app/deck/load.rs:324
 msgid "download failed: {}"
 msgstr "échec du téléchargement : {}"
 
-#: src/app/deck/load.rs:529
+#: src/app/deck/load.rs:530
 msgid "loading… · {}"
 msgstr "chargement… · {}"
 
-#: src/app/deck/load.rs:708
+#: src/app/deck/load.rs:709
 #: src/app/midi/session.rs:283
 msgid "audio: {}"
 msgstr "audio : {}"
 
-#: src/app/deck/load.rs:789
+#: src/app/deck/load.rs:790
 msgid "eject lock: pause the deck before loading another track"
 msgstr "verrou d'éjection : mettez le deck en pause avant de charger une autre piste"
 
-#: src/app/deck/load.rs:814
+#: src/app/deck/load.rs:815
 msgid "continuous playing: no next track in the list"
 msgstr "lecture continue : pas de piste suivante dans la liste"
 
-#: src/app/deck/load.rs:882
+#: src/app/deck/load.rs:883
 msgid "grid: analysed"
 msgstr "grille : analysée"
 
-#: src/app/deck/load.rs:887
+#: src/app/deck/load.rs:888
 msgid "waveform: analysed"
 msgstr "forme d'onde : analysée"
 
-#: src/app/deck/load.rs:904
+#: src/app/deck/load.rs:905
 msgid "{} — {} beats @ {}, {} automatic cues"
 msgstr "{} — {} beats @ {}, {} cues automatiques"
 
-#: src/app/deck/load.rs:912
+#: src/app/deck/load.rs:913
 msgid "{} — {} beats @ {}, {} cues"
 msgstr "{} — {} beats @ {}, {} cues"
 
@@ -6855,41 +6855,41 @@ msgstr "doubles instantanés : l'autre deck a changé de piste"
 msgid "instant double {}: {} here, muted on {}"
 msgstr "double instantané {} : {} ici, coupé sur {}"
 
-#: src/app/deck/stems/job.rs:131
+#: src/app/deck/stems/job.rs:119
 msgid "STEMS 0%"
 msgstr "STEMS 0%"
 
-#: src/app/deck/stems/job.rs:132
+#: src/app/deck/stems/job.rs:120
 msgid "MODEL {}%"
 msgstr "MODÈLE {}%"
 
-#: src/app/deck/stems/job.rs:133
+#: src/app/deck/stems/job.rs:121
 msgid "STEMS {}%"
 msgstr "STEMS {}%"
 
-#: src/app/deck/stems/job.rs:262
-#: src/app/deck/stems/job.rs:475
+#: src/app/deck/stems/job.rs:219
+#: src/app/deck/stems/job.rs:423
 msgid "NO STEMS"
 msgstr "PAS DE STEMS"
 
-#: src/app/deck/stems/job.rs:349
-#: src/app/deck/stems/job.rs:457
+#: src/app/deck/stems/job.rs:298
+#: src/app/deck/stems/job.rs:405
 msgid "100% READY"
 msgstr "100% PRÊT"
 
-#: src/app/deck/stems/job.rs:366
+#: src/app/deck/stems/job.rs:315
 msgid "stems: {}"
 msgstr "stems : {}"
 
-#: src/app/deck/stems/job.rs:370
+#: src/app/deck/stems/job.rs:319
 msgid "no audio"
 msgstr "pas d'audio"
 
-#: src/app/deck/stems/job.rs:455
+#: src/app/deck/stems/job.rs:403
 msgid "STEM FILE"
 msgstr "STEM FILE"
 
-#: src/app/deck/stems/job.rs:473
+#: src/app/deck/stems/job.rs:421
 msgid "NO MODEL"
 msgstr "PAS DE MODÈLE"
 
@@ -10321,21 +10321,21 @@ msgstr "Latence : {}"
 msgid "~{} ms ({} frames at {} Hz)"
 msgstr "~{} ms ({} frames à {} Hz)"
 
-#: src/app/prefs/audio/mod.rs:335
+#: src/app/prefs/audio/mod.rs:334
 msgid "SAME AS INPUT DEVICE"
 msgstr "COMME L'ENTRÉE"
 
-#: src/app/prefs/audio/mod.rs:46
+#: src/app/prefs/audio/mod.rs:45
 #: src/app/prefs/audio/page.rs:201
 msgid "INTERNAL"
 msgstr "INTERNE"
 
-#: src/app/prefs/audio/mod.rs:46
+#: src/app/prefs/audio/mod.rs:45
 #: src/app/prefs/audio/page.rs:201
 msgid "EXTERNAL"
 msgstr "EXTERNE"
 
-#: src/app/prefs/audio/mod.rs:54
+#: src/app/prefs/audio/mod.rs:53
 #: src/app/prefs/controller/mod.rs:30
 #: src/app/prefs/view.rs:49
 msgid "NORMAL"

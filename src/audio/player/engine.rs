@@ -9,16 +9,128 @@
 
 use super::super::bus::{self, Bus};
 use super::super::cue;
-use super::super::route::{self, Settings, EXTERNAL};
-use super::mix::{callback, Mix};
-use super::output::{self, choose, Output};
+use super::super::route::{self, EXTERNAL, Settings};
 use super::Shared;
+use super::mix::{Mix, callback};
+use super::output::{self, Output, choose};
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{FromSample, SizedSample, Stream};
 use std::cell::{Cell, RefCell};
 use std::rc::Weak;
-use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
+use std::sync::atomic::{
+    AtomicBool, AtomicU8, AtomicU64,
+    Ordering::{AcqRel, Relaxed},
+};
+use std::time::{Duration, Instant};
+
+const RUNNING: u8 = 0;
+const DEVICE_GONE: u8 = 1;
+const BACKEND_ERROR: u8 = 2;
+const STALLED: u8 = 3;
+const RECOVERING: u8 = 4;
+const RETRY: Duration = Duration::from_secs(1);
+const STALL: Duration = Duration::from_secs(2);
+
+#[derive(Default)]
+struct Health {
+    state: AtomicU8,
+    callbacks: AtomicU64,
+    generation: AtomicU64,
+    posted: AtomicBool,
+    cue_failed: parking_lot::Mutex<Option<Arc<AtomicBool>>>,
+}
+
+impl Health {
+    fn arm(&self) {
+        self.generation.fetch_add(1, Relaxed);
+        self.state.store(RUNNING, Relaxed);
+    }
+
+    fn fail(&self, reason: u8) {
+        let _ = self
+            .state
+            .compare_exchange(RUNNING, reason, AcqRel, Relaxed);
+    }
+
+    fn failed(&self) -> bool {
+        self.state.load(Relaxed) != RUNNING
+    }
+}
+
+struct Watchdog {
+    callbacks: u64,
+    generation: u64,
+    last_callback: Instant,
+    notified: Option<Instant>,
+    running: bool,
+}
+
+impl Watchdog {
+    fn new(now: Instant) -> Self {
+        Self {
+            callbacks: 0,
+            generation: 0,
+            last_callback: now,
+            notified: None,
+            running: false,
+        }
+    }
+
+    fn poll(&mut self, h: &Health, now: Instant) -> bool {
+        if h.cue_failed
+            .lock()
+            .as_ref()
+            .is_some_and(|failed| failed.load(Relaxed))
+        {
+            h.fail(BACKEND_ERROR);
+        }
+        let callbacks = h.callbacks.load(Relaxed);
+        let running = !h.failed();
+        let generation = h.generation.load(Relaxed);
+        if callbacks != self.callbacks
+            || generation != self.generation
+            || (running && !self.running)
+        {
+            self.last_callback = now;
+            self.callbacks = callbacks;
+            self.generation = generation;
+        }
+        self.running = running;
+        if running && now.duration_since(self.last_callback) >= STALL {
+            h.fail(STALLED);
+        }
+        if !h.failed() {
+            self.notified = None;
+            return false;
+        }
+        if self
+            .notified
+            .is_none_or(|at| now.duration_since(at) >= RETRY)
+            && !h.posted.swap(true, AcqRel)
+        {
+            self.notified = Some(now);
+            return true;
+        }
+        false
+    }
+}
+
+fn watch(health: &Arc<Health>) {
+    let health = Arc::downgrade(health);
+    std::thread::spawn(move || {
+        let mut watchdog = Watchdog::new(Instant::now());
+        loop {
+            std::thread::sleep(Duration::from_millis(100));
+            let Some(health) = health.upgrade() else {
+                break;
+            };
+            if watchdog.poll(&health, Instant::now()) && !output::wake() {
+                health.posted.store(false, Relaxed);
+            }
+        }
+    });
+}
 
 /// Mixer channels one stream carries.
 pub(super) const SLOTS: usize = bus::CHANNELS;
@@ -31,12 +143,26 @@ fn open<T: SizedSample + FromSample<f32> + Send + 'static>(
     dev: &cpal::Device,
     cfg: &cpal::StreamConfig,
     mut mix: Mix,
+    health: &Arc<Health>,
 ) -> Result<Stream, cpal::BuildStreamError> {
     let (rate, ch) = (cfg.sample_rate.0, cfg.channels as usize);
+    let (data, error) = (health.clone(), health.clone());
     dev.build_output_stream(
         cfg,
-        move |o: &mut [T], i| callback(&mut mix, rate, ch, o, i),
-        |e| eprintln!("audio: {e}"),
+        move |o: &mut [T], i| {
+            if data.failed() {
+                o.fill(T::from_sample(0.0));
+                return;
+            }
+            data.callbacks.fetch_add(1, Relaxed);
+            callback(&mut mix, rate, ch, o, i);
+        },
+        move |e| {
+            error.fail(match e {
+                cpal::StreamError::DeviceNotAvailable => DEVICE_GONE,
+                _ => BACKEND_ERROR,
+            })
+        },
         None,
     )
 }
@@ -54,11 +180,16 @@ fn mix_for(out: &Output, shared: &[Arc<Shared>; SLOTS], bus: &Arc<Bus>) -> Mix {
     )
 }
 
-fn build(out: &Output, cfg: &cpal::StreamConfig, mix: Mix) -> Result<Stream, String> {
+fn build(
+    out: &Output,
+    cfg: &cpal::StreamConfig,
+    mix: Mix,
+    health: &Arc<Health>,
+) -> Result<Stream, String> {
     let stream = match out.fmt {
-        cpal::SampleFormat::F32 => open::<f32>(&out.dev, cfg, mix),
-        cpal::SampleFormat::I16 => open::<i16>(&out.dev, cfg, mix),
-        cpal::SampleFormat::U16 => open::<u16>(&out.dev, cfg, mix),
+        cpal::SampleFormat::F32 => open::<f32>(&out.dev, cfg, mix, health),
+        cpal::SampleFormat::I16 => open::<i16>(&out.dev, cfg, mix, health),
+        cpal::SampleFormat::U16 => open::<u16>(&out.dev, cfg, mix, health),
         f => return Err(format!("unsupported sample format {f:?}")),
     };
     stream.map_err(|e| e.to_string())
@@ -70,23 +201,31 @@ fn start(
     out: &mut Output,
     shared: &[Arc<Shared>; SLOTS],
     bus: &Arc<Bus>,
+    health: &Arc<Health>,
 ) -> Result<Stream, String> {
     for s in shared {
         s.raw.store(out.plan.external, Relaxed);
     }
+    *health.cue_failed.lock() = out.cue.as_ref().map(|cue| cue.failed.clone());
+    health.arm();
     let cfg = out.cfg.clone();
-    let stream = match build(out, &cfg, mix_for(out, shared, bus)) {
+    let stream = match build(out, &cfg, mix_for(out, shared, bus), health) {
         Err(e) if matches!(cfg.buffer_size, cpal::BufferSize::Fixed(_)) => {
             out.cfg.buffer_size = cpal::BufferSize::Default;
             out.status.notes.push(format!(
                 "the driver refused the buffer size ({e}): driver default"
             ));
             out.status.buffer = None;
-            build(out, &out.cfg, mix_for(out, shared, bus))?
+            health.arm();
+            build(out, &out.cfg, mix_for(out, shared, bus), health)
         }
-        r => r?,
-    };
-    stream.play().map_err(|e| e.to_string())?; // runs for the engine's lifetime; silence while paused
+        r => r,
+    }
+    .inspect_err(|_| health.state.store(RECOVERING, Relaxed))?;
+    if let Err(e) = stream.play() {
+        health.state.store(RECOVERING, Relaxed);
+        return Err(e.to_string());
+    }
     Ok(stream)
 }
 
@@ -96,10 +235,18 @@ pub(super) struct Engine {
     pub(super) bus: Arc<Bus>,
     /// Next unclaimed slot. ponytail: slots are never recycled; a dropped `Player` leaves its channel silent.
     pub(super) claimed: Cell<usize>,
-    /// `None` only inside [`Engine::reopen`] (and after a failed one that could not restore the old device).
+    /// Absent while an output is unavailable; the same channel state survives every retry.
     stream: RefCell<Option<Stream>>,
     /// The headphone device's stream, kept alive with the main one.
     cue: RefCell<Option<cue::Cue>>,
+    health: Arc<Health>,
+    recovery: RefCell<Option<Recovery>>,
+}
+
+struct Recovery {
+    name: String,
+    source: &'static str,
+    retry_at: Instant,
 }
 
 thread_local! {
@@ -144,7 +291,9 @@ impl Engine {
         }
         let bus = Arc::new(Bus::new(out.cfg.sample_rate.0, out.headphones.clone()));
         bus.apply(&output::settings());
-        let stream = start(&mut out, shared, &bus)?;
+        let health = Arc::new(Health::default());
+        let stream = start(&mut out, shared, &bus, &health)?;
+        watch(&health);
         output::publish(out.status.clone());
         Ok(Engine {
             shared: shared.clone(),
@@ -152,22 +301,84 @@ impl Engine {
             claimed: Cell::new(0),
             stream: RefCell::new(Some(stream)),
             cue: RefCell::new(out.cue.take()),
+            health,
+            recovery: RefCell::new(None),
         })
     }
 
     /// Moves the channels to the device [`choose`] now picks, keeping their state and the bus knobs; returns its name.
     /// The old stream stops first: two callbacks must never render the same channels. On an error the engine has no stream.
     fn reopen(&self) -> Result<String, String> {
+        self.stop();
+        self.install(choose()?)
+    }
+
+    fn stop(&self) {
+        self.health.state.store(RECOVERING, Relaxed);
         drop(self.stream.borrow_mut().take());
         drop(self.cue.borrow_mut().take());
-        let mut out = choose()?;
-        let stream = start(&mut out, &self.shared, &self.bus)?;
+        for shared in &self.shared {
+            shared
+                .clock
+                .lock()
+                .freeze(f64::from_bits(shared.pos.load(Relaxed)));
+        }
+    }
+
+    fn install(&self, mut out: Output) -> Result<String, String> {
+        let stream = start(&mut out, &self.shared, &self.bus, &self.health)?;
         self.bus
             .route(out.cfg.sample_rate.0, out.headphones.clone());
         output::publish(out.status.clone());
         *self.stream.borrow_mut() = Some(stream);
         *self.cue.borrow_mut() = out.cue.take();
+        self.recovery.borrow_mut().take();
         Ok(out.status.device)
+    }
+
+    pub(super) fn available(&self) -> bool {
+        !self.health.failed()
+    }
+
+    fn recover(&self, now: Instant) {
+        self.health.posted.store(false, Relaxed);
+        if self.available() {
+            return;
+        }
+        let mut recovery = self.recovery.borrow_mut().take().unwrap_or_else(|| {
+            let status = output::status();
+            let reason = match self.health.state.load(Relaxed) {
+                DEVICE_GONE => "device disconnected",
+                STALLED => "no audio callbacks for two seconds",
+                _ => "audio backend stopped",
+            };
+            self.stop();
+            output::note_error(format!("{}: {reason}; reconnecting", status.device));
+            output::forget_recovery(&status.device);
+            Recovery {
+                name: status.device,
+                source: status.source,
+                retry_at: now,
+            }
+        });
+        if now < recovery.retry_at {
+            self.recovery.replace(Some(recovery));
+            return;
+        }
+        let Some(found) = output::recover(&recovery.name, recovery.source) else {
+            self.recovery.replace(Some(recovery));
+            return;
+        };
+        match found.and_then(|out| self.install(out)) {
+            Ok(_) => {}
+            Err(e) => {
+                self.health.state.store(RECOVERING, Relaxed);
+                output::note_error(format!("{}: {e}; reconnecting", recovery.name));
+                output::forget_recovery(&recovery.name);
+                recovery.retry_at = now + RETRY;
+                self.recovery.replace(Some(recovery));
+            }
+        }
     }
 }
 
@@ -232,18 +443,21 @@ fn request(undo: impl FnOnce() + 'static, note: bool) -> Result<Switch, String> 
     finish(p).map(Switch::Done)
 }
 
-/// A device lookup ended (the waker of [`output::set_waker`] runs this on the UI thread): moves the stream to the device the
-/// requests so far asked for, and tells [`when_settled`]. Nothing to do when no request waits, or a newer one waits for
-/// another lookup.
+/// Handles completed device lookups and coalesced stream-health notifications on the stream-owning UI thread.
 pub fn settle() {
-    let Some(p) = PENDING.take() else { return };
-    if let Some(name) = output::unresolved() {
-        output::set_pending(Some(name));
-        return PENDING.set(Some(p));
+    if let Some(p) = PENDING.take() {
+        if let Some(name) = output::unresolved() {
+            output::set_pending(Some(name));
+            PENDING.set(Some(p));
+        } else {
+            match finish(p) {
+                Ok(dev) => eprintln!("audio: output moved to {dev}"),
+                Err(e) => eprintln!("audio: output not moved: {e}"),
+            }
+        }
     }
-    match finish(p) {
-        Ok(dev) => eprintln!("audio: output moved to {dev}"),
-        Err(e) => eprintln!("audio: output not moved: {e}"),
+    if let Some(engine) = ENGINE.with_borrow(Weak::upgrade) {
+        engine.recover(Instant::now());
     }
 }
 
@@ -302,6 +516,142 @@ mod tests {
     use std::time::{Duration, Instant};
 
     static LOOKED_UP: AtomicBool = AtomicBool::new(false);
+
+    #[test]
+    fn an_error_storm_posts_one_wake_and_retries_at_most_once_a_second() {
+        let (h, t0) = (Health::default(), Instant::now());
+        let mut watchdog = Watchdog::new(t0);
+        h.fail(DEVICE_GONE);
+        for _ in 0..10_000 {
+            h.fail(BACKEND_ERROR);
+        }
+        assert_eq!(h.state.load(Relaxed), DEVICE_GONE);
+        assert!(watchdog.poll(&h, t0));
+        assert!(
+            !watchdog.poll(&h, t0 + RETRY * 2),
+            "one notification can remain outstanding"
+        );
+        h.posted.store(false, Relaxed);
+        assert!(watchdog.poll(&h, t0 + RETRY * 2));
+        h.posted.store(false, Relaxed);
+        assert!(!watchdog.poll(&h, t0 + RETRY * 2 + RETRY / 2));
+        assert!(watchdog.poll(&h, t0 + RETRY * 3));
+    }
+
+    #[test]
+    fn missing_callbacks_trip_the_watchdog_but_a_new_stream_gets_a_fresh_deadline() {
+        let (h, t0) = (Health::default(), Instant::now());
+        let mut watchdog = Watchdog::new(t0);
+        h.arm();
+        assert!(!watchdog.poll(&h, t0));
+        h.callbacks.fetch_add(1, Relaxed);
+        assert!(!watchdog.poll(&h, t0 + STALL));
+        assert!(!watchdog.poll(&h, t0 + STALL * 2 - Duration::from_millis(1)));
+        assert!(watchdog.poll(&h, t0 + STALL * 2));
+        assert_eq!(h.state.load(Relaxed), STALLED);
+        h.posted.store(false, Relaxed);
+        // A reconnect can finish entirely between two watchdog turns.
+        h.state.store(RECOVERING, Relaxed);
+        h.arm();
+        assert!(!watchdog.poll(&h, t0 + STALL * 10));
+        assert!(!h.failed());
+        assert!(watchdog.poll(&h, t0 + STALL * 11));
+    }
+
+    #[test]
+    fn a_headphone_stream_fault_reconnects_through_the_same_latch() {
+        let (h, t0) = (Health::default(), Instant::now());
+        let failed = Arc::new(AtomicBool::new(false));
+        *h.cue_failed.lock() = Some(failed.clone());
+        let mut watchdog = Watchdog::new(t0);
+        assert!(!watchdog.poll(&h, t0));
+        failed.store(true, Relaxed);
+        assert!(watchdog.poll(&h, t0 + Duration::from_millis(100)));
+        assert_eq!(h.state.load(Relaxed), BACKEND_ERROR);
+        *h.cue_failed.lock() = None;
+        h.arm();
+        assert!(!watchdog.poll(&h, t0 + RETRY * 5));
+    }
+
+    #[test]
+    fn stopping_a_failed_stream_keeps_the_loaded_audio_and_pending_transport_commands() {
+        use super::super::{Anchor, Pcm, Track16, Voice, heard_frames, pack, render};
+        let shared = [(); SLOTS].map(|_| Arc::new(Shared::new()));
+        let track = Arc::new(Track16::from(Pcm {
+            rate: 44100,
+            samples: vec![0.25; 44100 * 2],
+        }));
+        *shared[0].pcm.lock() = track.clone();
+        shared[0].playing.store(true, Relaxed);
+        shared[0].rate.store(1.08f64.to_bits(), Relaxed);
+        let lp = pack(Some((100.0, 500.0)));
+        shared[0].lp.store(lp, Relaxed);
+        shared[0].pos.store(8000f64.to_bits(), Relaxed);
+        shared[0].seek_to(12000.0);
+        shared[0].clock.lock().push(
+            Anchor {
+                at: Instant::now() - STALL,
+                pos: 7500.0,
+                latency: Duration::from_millis(40),
+                fps: 44100.0,
+                lp: None,
+            },
+            true,
+            true,
+        );
+        let engine = Engine {
+            shared,
+            bus: Arc::new(Bus::new(44100, bus::Headphones::Split)),
+            claimed: Cell::new(1),
+            stream: RefCell::new(None),
+            cue: RefCell::new(None),
+            health: Arc::new(Health::default()),
+            recovery: RefCell::new(None),
+        };
+        let engine = std::rc::Rc::new(engine);
+        let mut player = Player {
+            shared: engine.shared[0].clone(),
+            engine: engine.clone(),
+            src_rate: 44100,
+            frames: 44100,
+            has_stems: false,
+        };
+        engine.health.fail(BACKEND_ERROR);
+        let pending = player.shared.seek.swap(super::super::NO_SEEK, Relaxed);
+        assert_eq!(player.position_ms(), 8000.0 * 1000.0 / 44100.0);
+        assert!(
+            !player.settled(),
+            "a stale hardware anchor is not audible output"
+        );
+        player.shared.seek.store(pending, Relaxed);
+        player.pause();
+        assert!(!player.is_playing());
+        player.play();
+        assert!(player.is_playing());
+        engine.stop();
+        let sh = &engine.shared[0];
+        assert!(Arc::ptr_eq(&track, &sh.pcm.lock()));
+        assert_eq!(sh.seek.load(Relaxed), 12000f64.to_bits());
+        assert!(sh.playing.load(Relaxed));
+        assert_eq!(sh.lp.load(Relaxed), lp);
+        assert_eq!(sh.rate.load(Relaxed), 1.08f64.to_bits());
+        assert_eq!(
+            heard_frames(&sh.clock.lock(), Instant::now() + STALL * 10, 44100.0),
+            8000.0
+        );
+        engine.health.arm();
+        let mut voice = Voice::new(44100);
+        let mut peak = 0.0f32;
+        let rendered = render(sh, &mut voice, 44100, 256, |_, m, _| {
+            peak = peak.max(m[0].abs())
+        });
+        assert!(rendered.seeked);
+        assert!(
+            peak > 0.0,
+            "the replacement stream can render the retained track"
+        );
+        assert!(f64::from_bits(sh.pos.load(Relaxed)) > 12000.0);
+    }
 
     /// Plays the UI thread: waits for the worker's waker, then runs what the app posts (`settle`).
     fn settled() {

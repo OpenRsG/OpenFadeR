@@ -38,10 +38,6 @@ fn main() {
     let minutes = frames as f64 / rate as f64 / 60.0;
     let play = ((play_s * rate as f64) as usize).min(frames - 1);
 
-    if std::env::var_os("WARM").is_some() {
-        openfader::stems::warm(true); // what the deck does when STEMS is switched on: the engines open before the track
-        std::thread::sleep(Duration::from_secs(8));
-    }
     let t0 = Instant::now();
     let pcm = std::sync::Arc::new(audio::Track16::from(pcm)); // the deck's own form: 16-bit, shared with the job
     let job = Job::start(path, pcm.clone(), quality, true);

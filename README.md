@@ -51,7 +51,7 @@ To install it for your user on Linux instead (the `openfader` command and an app
 
 ### Raspberry Pi
 
-For a Raspberry Pi 3, 4 or CM4 (64-bit Raspberry Pi OS, Debian 13), `docker buildx build -f Dockerfile.pi -o dist/pi .` cross-compiles an optimised archive on any x86_64 machine. See [docs/raspberry-pi.md](docs/raspberry-pi.md) for memory use (about 200 MB with two tracks playing, software renderer) and settings. On a Pi (or any ARM Linux machine with 8 GB of RAM or less) PREFS > ADVANCED > LOW-POWER MODE switches on by itself: smaller sampler slots and fewer analysis workers.
+For a Raspberry Pi 3, 4 or CM4 (64-bit Raspberry Pi OS, Debian 13), `docker buildx build -f Dockerfile.pi -o dist/pi .` cross-compiles an optimised archive on any x86_64 machine. See [docs/raspberry-pi.md](docs/raspberry-pi.md) for memory use and settings. On a Pi, or a machine with at most 8 GiB of effective RAM, PREFS > ADVANCED > LOW-POWER MODE switches on automatically: smaller sampler slots, fewer loading/analysis workers and one stem-inference batch at a time.
 
 ### Android
 
@@ -98,6 +98,11 @@ shared-memory-only GPUs show **—**, not a fabricated zero. Hover either row fo
 put the same readout in the existing status line to preserve space for their controls.
 
 PREFERENCES > AUDIO > BUFFER shows what AUTO requests: 512 frames on a full-power machine, or the driver's default in LOW-POWER MODE. An explicit frame count overrides either choice; a driver that refuses it falls back to its own buffer and reports that in the audio status. The Linux backend requests two periods per fixed buffer. Smaller buffers reduce output delay but can underrun under load: increase the buffer if audio crackles. Output-device lookup runs off the UI thread; the status shows a pending lookup and then the device actually in use. MIDI dispatch, drawing time and the sound card's output delay are separate costs, not zero physical latency.
+
+If an output stops delivering callbacks or reports a fatal error, the engine reconnects to that same device without
+discarding the loaded tracks, cues, loops or transport commands. Device lookup runs off the UI thread; retries are
+coalesced and spaced at least a second apart. Recovery does not silently substitute another output. ALSA underruns
+retain their existing prepare/retry path; a fatal `POLLERR` stops its worker instead of spinning and flooding the log.
 
 The interface is in English, French, Spanish, German, Portuguese (Brazil), Italian or Dutch: PREFERENCES > VIEW > LANGUAGE, where SYSTEM follows the computer's language. Button labels that match DJ hardware (CUE, SYNC, LOOP, BEAT FX …) stay in English in every language.
 
@@ -152,6 +157,12 @@ Sixteen slots in two banks, loaded from a deck or from a file. Slots play as a s
 Enable STEMS in PREFERENCES > EXTENSIONS and each loaded track is separated into vocal, instrument, bass and drums (a 3-stem mode exists too) by an ONNX model that runs on the CPU or the GPU. Switching STEMS on downloads that model once (316 MB), with a progress card at the bottom right. A deck's stem button is filled while its stem plays at full level; a click turns that stem off, another brings it back. The pads and a controller can mute or solo, and the mixer's knobs can act on stems. The waveform follows what you hear.
 
 Stem buffers allocate on a worker while the original track remains playable. STEM INSTANT DOUBLES shares completed audio and stems between decks, with independent transport and stem gains.
+
+Model sessions open only for uncached inference and are shared by active batches. The last batch releases the CPU/GPU
+sessions immediately; no speculative warm-up or 90-second idle hold remains. Low-power mode runs one batch, prefers
+the GPU with CPU fallback, and caps CPU inference at two threads; other devices use at most eight. Native RAM detection
+also respects Linux cgroup v2 limits. Full-quality inference still needs substantial temporary memory, and retained
+16-bit track/stem data grows with track length. Smaller budgets reduce concurrency, not audio quality.
 
 Separated-stem disk caches are trimmed to a 4 GiB budget when storing new results. Oldest stored entries and interrupted writes are removed first; active cache reads/writes are protected by a directory lock across app processes. A result too large for the budget remains playable in memory but is not cached. Cache and embedded-stem metadata lookup runs on bounded, cancel-owned workers.
 

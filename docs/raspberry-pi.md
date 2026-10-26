@@ -50,8 +50,9 @@ tight, start it with the software renderer:
 SLINT_BACKEND=winit-software ./openfader
 ```
 
-STEMS stays off unless you switch it on: its model is 316 MB and separating takes about 0.8 GB more, so it is for a 4 GB Pi or
-larger.
+These baseline figures exclude STEMS. Its 316 MB model and operator scratch still need substantial temporary RAM:
+a 4 GB Pi or larger remains the conservative recommendation for full-quality separation. Model sessions now release
+as soon as the last active batch ends; loaded 16-bit tracks and completed stems remain available for immediate cue/scratch.
 
 ## Speed
 
@@ -69,11 +70,19 @@ two-second deadline; an unusually slow driver may therefore fall back to CPU. An
 ## Low-power mode
 
 PREFS > ADVANCED > OTHERS > LOW-POWER MODE is AUTO (default), ON or OFF; its hint shows the effective mode. AUTO counts
-the machine as low-power when `/proc/device-tree/model` says Raspberry Pi, or when it runs Linux on ARM (aarch64 or armv7)
-with 8 GB of RAM or less. While it is on:
+Raspberry Pi boards and machines with at most 8 GiB of effective RAM, on every supported desktop OS. Linux cgroup v2
+limits count towards that budget. While it is on:
 
 - a sampler slot keeps at most 10 s instead of 30 s (16 slots at 48 kHz stereo f32: 60 MB instead of 180 MB);
-- the analysis pool runs at most 2 workers (Performance would use up to 3 on a 4-core Pi, each holding a whole track).
+- the analysis pool runs at most 2 workers; the loading pool is sized to 2 workers at its first load;
+- only one uncached stem-inference batch runs at a time, with at most 2 CPU threads and no simultaneous CPU/GPU scratch.
+  A usable GPU runs first; failure falls back to CPU. The Pi build uses the CPU provider.
+
+An x86_64 software-renderer smoke with full-quality CPU stems, two generated three-minute 24 kHz tracks and a third
+replacement load stayed within a real 2 GiB cgroup with swap disabled: 1.37 GiB peak RSS and 1.76 GiB peak cgroup charge
+(including file cache), with no OOM/limit events. Retained tracks/stems settled near 352 MiB RSS. Sustained playback,
+output-server loss/restart, cue, pause and play were checked against captured PCM. These are not Pi performance figures
+or a guarantee that longer tracks and larger libraries fit the same budget.
 
 Decks, previews and analysis decode to 16-bit on every machine, so that is not part of the mode.
 
