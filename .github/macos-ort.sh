@@ -11,7 +11,7 @@ if [ ! -f "$out/libonnxruntime.$version.dylib" ]; then
     (
         cd "$source_dir"
         ./build.sh --config Release --update --build --build_shared_lib --parallel 2 \
-            --compile_no_warning_as_error --cmake_extra_defines CMAKE_OSX_ARCHITECTURES=x86_64
+            --compile_no_warning_as_error --cmake_extra_defines CMAKE_OSX_ARCHITECTURES=x86_64 onnxruntime_BUILD_UNIT_TESTS=OFF
     )
     mkdir -p "$out"
     cp -L "$source_dir/build/MacOS/Release/"*.dylib "$out/"
