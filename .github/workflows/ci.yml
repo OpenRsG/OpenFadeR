@@ -2,8 +2,8 @@ name: CI
 
 # Build, test and run the app on Linux, Windows and macOS (arm64), with the companion repositories checked out in place:
 # the plugins are built and tested, then the built app is started with a private home, left running, screenshotted and closed
-# (.github/smoke.sh). The screenshot and the app's output are uploaded. The rekordbox extensions are part of the app
-# (crates/rekordbox-*): `--workspace` tests them, and the `readers` job checks what they write with other programs' readers.
+# (.github/smoke.sh). The screenshot and the app's output are uploaded. Built-in compatibility adapters live in
+# compatibility/: `--workspace` tests them, and the `readers` job checks their exports with independent readers.
 on:
   push:
     branches: [main]
@@ -12,7 +12,7 @@ on:
     inputs:
       plugins_ref:
         description: Branch or tag of OpenFadeR-Plugins to build against
-        default: main
+        default: v0.2.7
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Companions (plugins, themes, mappings)
         run: |
-          git clone --depth 1 --branch "${{ inputs.plugins_ref || 'main' }}" https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
+          git clone --depth 1 --branch "${{ inputs.plugins_ref || 'v0.2.7' }}" https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
           git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
           git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
       - name: System libraries
@@ -116,7 +116,7 @@ jobs:
           key: readers
       - run: pip install pyrekordbox==0.5.0
       - name: Write the fixture stick
-        run: cargo run --release -p rekordbox-export --example fixture -- "$RUNNER_TEMP/fixture"
+        run: cargo run --release -p compat-rekordbox-export --example fixture -- "$RUNNER_TEMP/fixture"
       # A second, independent reader of export.pdb; the job goes on without it when it does not install.
       - name: Install rekordcrate
         id: rekordcrate

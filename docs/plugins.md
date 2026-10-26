@@ -44,11 +44,11 @@ The app reads plugins from
 
 An entry of that search path is either one plugin folder or a folder of plugin folders; the first plugin of a name wins.
 
-PREFERENCES > EXTENSIONS lists every plugin as a card. The rekordbox extensions `rekordbox-device`, `rekordbox-xml` and `rekordbox-db`
-come first, marked **BUILT IN**: they are compiled into the app ([The built-in rekordbox extensions](#the-built-in-rekordbox-extensions)),
+PREFERENCES > EXTENSIONS lists every plugin as a card. The built-in compatibility adapters `rekordbox-device`, `rekordbox-xml` and `rekordbox-db`
+come first, marked **BUILT IN**: they are compiled into the app ([Built-in adapters](#built-in-adapters)),
 always on, with no switch, folder or uninstall, and their settings work as any plugin's. The other cards have a switch to turn the plugin on or off (a plugin starts off and installing one switches it on; the exception is a fresh
-profile with no `plugins.json`, where the reader `engine-dj` and the effect packs `beat-fx`,
-`send-fx`, `lever-fx`, `mic-fx`, `soft-mix` and `cross-pass` start on, so a plugged-in Engine DJ stick is read at once;
+profile with no `plugins.json`, where the readers `engine-dj`, `serato`, `traktor`, `virtualdj` and the effect packs `beat-fx`,
+`send-fx`, `lever-fx`, `mic-fx`, `soft-mix` and `cross-pass` start on;
 once the file exists it is your choice and nothing is switched on behind it), what it runs on (LUA, PYTHON, PROGRAM or
 JSON), what it brings, its settings (**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`), then whatever went wrong while
 reading the plugins. The card's **⋮** menu opens its folder or **uninstalls** it: an installed plugin's folder is deleted, and a
@@ -622,6 +622,30 @@ The hardware's own algorithms are not published; each effect is a classic design
 
 ## Library plugins
 
+### Compatibility layer
+
+OpenFadeR stores its Collection in its own plain SQLite [`store.db`](library-format.md#2-the-library-database), with schema
+and migrations in `src/store/`. The compatibility layer translates external libraries and device formats through the SDK's
+library/device operations. Import copies metadata into the Collection; export, device edits and cue-sync writeback use each
+adapter's supported operations. Format-specific paths, table names and fields stay inside those adapters.
+
+| Adapter / format | Delivery | Supported operations |
+|---|---|---|
+| Rekordbox Device Library (`export.pdb`) and OneLibrary (`exportLibrary.db`) | Built in, `rekordbox-device` | Read USB/SD libraries and analysis; export, update Collection, back up/restore, convert, check/fix and edit device settings |
+| Rekordbox XML (`rekordbox.xml`) | Built in, `rekordbox-xml` | Read and write collection XML, including playlists, grids and cues |
+| Rekordbox desktop collection (`master.db`) | Built in, `rekordbox-db` | Read the SQLCipher collection with a supplied key |
+| Engine DJ (`Engine Library/Database2/m.db`) | Companion, `engine-dj` | Read desktop/device libraries; export tracks, cues, loops, grids, waveforms and playlists to devices |
+| Serato (`_Serato_`, database V2, crates and audio tags) | Companion, `serato` | Read desktop/device libraries; write device libraries and tagged cues/grids |
+| Traktor (`collection.nml`) | Companion, `traktor` | Read desktop/device collections; write a device collection for Traktor's Import another Collection |
+| VirtualDJ (`database.xml`) | Companion, `virtualdj` | Read desktop libraries/lists; export device libraries with cues, loops, grids and playlists |
+| iTunes / Music (`Library.xml`) | Companion, `itunes` | Read tracks and playlists |
+| Sampler packs (`.spp`, `sampler_pack.xml`) | Companion, `sample-pack` | Extract audio to the plugin cache and read pack lists/BPM; populate the sampler on import |
+
+The companion plugins remain in [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins), checked out as
+`extension/plugin/` and built separately. Its `mixxx` adapter runs Mixxx controller mappings and JavaScript through the
+[controller interface](#controller-plugins); it is not a collection reader. Physical-player compatibility is recorded separately
+in the built-in device adapter's [compatibility table](../compatibility/rekordbox/device/COMPATIBILITY.md).
+
 A library plugin teaches the app a **format of track libraries**: a file or folder it can open as a library (playlists and tracks,
 and optionally the beat grids, cues and waveforms the format holds), and optionally write the whole Collection as a file in
 that format. It is a native shared library (Rust or C) built against the library interface of [`sdk/`](../sdk), declared in
@@ -848,20 +872,22 @@ analysis of a stored track without the library being open, asks that plugin with
 plugin that declares `"legacy_analysis_refs": true` also answers references stored before they carried a plugin name (bare paths):
 the app prefixes them with its name at start-up.
 
-### The built-in rekordbox extensions
+### Built-in adapters
 
-`crates/` of the core repository holds the rekordbox extensions as crates of the app's Cargo workspace: `rekordbox-device` (the device
+`compatibility/rekordbox/` holds the built-in family as Cargo workspace packages: `compat-rekordbox-device` (the device
 libraries on USB sticks and SD cards, Device Library `export.pdb` and OneLibrary `exportLibrary.db`: reads them, exports to them,
-updates the collection from them, backs them up, converts them and edits their settings), `rekordbox-xml` (reads and writes a
-rekordbox XML collection file), `rekordbox-db` (the desktop collection `master.db`, a key as a `secret` setting), and the crates
-`rekordbox-common` and `rekordbox-export` they share (`itunes` and `sample-pack` of the plugins repository use `rekordbox-common` too).
+updates the collection from them, backs them up, converts them and edits their settings), `compat-rekordbox-xml` (reads and writes a
+Rekordbox XML collection file), `compat-rekordbox-db` (reads the desktop collection `master.db`, a key as a `secret` setting), and
+`compat-rekordbox-common` and `compat-rekordbox-export` (shared readers/helpers and the device writer). The companion `itunes`
+and `sample-pack` plugins also use `compat-rekordbox-common`. Runtime plugin IDs remain `rekordbox-device`, `rekordbox-xml` and
+`rekordbox-db`, preserving settings, analysis references, device selections and journals independently of Cargo package names.
 
 They are the same library plugins as the ones below, with one difference: they are linked into the app, so they cannot go missing or be
 switched off. A crate does not export `openfader_library_v2`; it implements `LibraryPlugin` and the host (`src/plugin/builtin.rs`)
 holds a table per extension: its `plugin.json` (without `lib`), its `locales/`, its `players.json`, and the static
 `openfader_plugin::library::api::<Plugin>()`. Requests go through that table's JSON `call` exactly as through a loaded library: there
 is one protocol. The registry lists the built-ins first and on, whatever `plugins.json` says; their settings are stored there under
-their names as before. A plugin folder of the same name is skipped with a note in the plugin list. They are behind the `rekordbox` feature of the `openfader` crate, which the `app` feature turns on (so
+their names as before. A plugin folder of the same name is skipped with a note in the plugin list. They are behind the `compatibility` feature of the `openfader` crate, which the `app` feature turns on (so
 Pi builds with `--no-default-features --features app` have them). It also swaps the bundled SQLite for SQLCipher with its own
 OpenSSL; a build without it, like the mobile crate, has no built-in plugins, plain SQLite and no OpenSSL. Their tests run with the app's:
 `cargo test --release --workspace`.
@@ -882,27 +908,30 @@ What `rekordbox-device` guarantees when it writes a stick, and how that is check
 - **Check and fix.** `device_check` reads what is on a stick without writing and lists problems (missing or unreadable library, the two
   libraries disagreeing, missing audio or analysis files, leftovers of an interrupted write) with cause, consequence and action.
   `device_fix` repairs one of them: rebuild one library from the other, rewrite the analysis files, clean leftovers.
-- **Players.** `crates/rekordbox-device/players.json` lists the players the checker knows, what each reads and what is only inferred.
-  `crates/rekordbox-device/COMPATIBILITY.md` says which rows are confirmed on hardware (none yet) and which are not; the test
+- **Players.** `compatibility/rekordbox/device/players.json` lists the players the checker knows, what each reads and what is only inferred.
+  `compatibility/rekordbox/device/COMPATIBILITY.md` says which rows are confirmed on hardware (none yet) and which are not; the test
   `compatibility_lists_every_player_and_library` keeps the two together.
 
-Readers that are not ours check the output in CI (job `readers` of `ci.yml`): `crates/rekordbox-export/examples/fixture.rs` writes a
+Readers that are not ours check the output in CI (job `readers` of `ci.yml`): `compatibility/rekordbox/export/examples/fixture.rs` writes a
 small stick (unicode, emoji and long names, cues, loops, a playlist folder), and `.github/check_stick.py` reads it with pyrekordbox
 (the analysis files and `exportLibrary.db`), with a small DeviceSQL reader and with `rekordcrate` (`export.pdb`), and fails on any
-difference from the manifest. Locally: `cargo run --release -p rekordbox-export --example fixture -- /tmp/fx && pip install
+difference from the manifest. Locally: `cargo run --release -p compat-rekordbox-export --example fixture -- /tmp/fx && pip install
 pyrekordbox==0.5.0 && python .github/check_stick.py /tmp/fx`. rekordcrate 0.3.0 cannot parse cue entries of type 1, so it is used for
 `export.pdb` only.
 
 ### The bundled library plugins
 
-Rust crates of one Cargo workspace, the plugins repository's `Cargo.toml` (`extension/plugin/Cargo.toml` in a core checkout), are library plugins: `itunes` (reads a media player's
-library file), four device plugins that write the libraries of other players and apps beside the built-in rekordbox one on the same stick and also read those apps' desktop
-libraries (with `detect` patterns, so PREFERENCES > LIBRARIES offers to connect them), and one for sampler packs (a zip of audio and a list file; the
-samples are extracted to the plugin's cache folder and served as a library; with `"samples": true` the first list also fills the
-sampler after File > Import). They need building once: `extension/plugin/build.sh` builds
-the workspace in release mode and copies each library next to its `plugin.json` (`start.sh` runs it first); the workspace builds against
-`sdk/` and `crates/rekordbox-common` of the core checkout. Their settings are on their
-cards in PREFERENCES > EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
+The companion repository's Cargo workspace (`extension/plugin/Cargo.toml` in a core checkout) builds `itunes`, `sample-pack`
+and the four device adapters `engine-dj`, `serato`, `traktor` and `virtualdj` listed [above](#compatibility-layer). Their
+desktop-library `detect` patterns let PREFERENCES > LIBRARIES offer to connect them. `extension/plugin/build.sh` builds the
+workspace in release mode and copies each library next to its `plugin.json`; `start.sh` runs it first. The workspace uses
+`sdk/` and `compatibility/rekordbox/common` from the core checkout. Their settings are on their cards in PREFERENCES >
+EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
+
+Core 0.2.7 builds use the matching OpenFadeR-Plugins tag `v0.2.7`: CI's `plugins_ref` input, Docker's `PLUGINS_REF` build arg
+and the `PLUGINS_REF` environment variable for `start.sh` / `install.sh` can select another compatible ref. Existing companion
+checkouts are used as they stand; switch an older checkout to that tag before building this core. The generic GET PLUGINS
+catalog still reads repositories' default branches and downloads their prebuilt native libraries.
 
 ## Controller plugins
 

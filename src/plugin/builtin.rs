@@ -1,4 +1,4 @@
-//! Plugins compiled into the app: the rekordbox extensions (`crates/rekordbox-*`). They are library plugins like any other
+//! Built-in compatibility adapters (`compatibility/`). They are library plugins like any other
 //! and are called through the same JSON `call` of a [`LibraryApi`] ([`super::library`]); they only have no folder, no
 //! `libloading` and no switch. A [`Builtin`] holds what a folder would: the `plugin.json` text, the `locales/`, the
 //! `players.json`. The registry lists them first and always on, whatever `plugins.json` says; a folder of the same name
@@ -6,7 +6,7 @@
 
 use super::{Manifest, Plugin};
 use openfader_plugin::library::LibraryApi;
-#[cfg(feature = "rekordbox")]
+#[cfg(feature = "compatibility")]
 use openfader_plugin::library::api;
 use std::sync::LazyLock;
 
@@ -20,44 +20,44 @@ pub struct Builtin {
     pub(super) api: &'static LibraryApi,
 }
 
-#[cfg(feature = "rekordbox")]
+#[cfg(feature = "compatibility")]
 macro_rules! locales {
     ($dir:literal) => {
         &[
             (
                 "de",
-                include_str!(concat!("../../crates/", $dir, "/locales/de.json")),
+                include_str!(concat!("../../compatibility/", $dir, "/locales/de.json")),
             ),
             (
                 "es",
-                include_str!(concat!("../../crates/", $dir, "/locales/es.json")),
+                include_str!(concat!("../../compatibility/", $dir, "/locales/es.json")),
             ),
             (
                 "fr",
-                include_str!(concat!("../../crates/", $dir, "/locales/fr.json")),
+                include_str!(concat!("../../compatibility/", $dir, "/locales/fr.json")),
             ),
             (
                 "it",
-                include_str!(concat!("../../crates/", $dir, "/locales/it.json")),
+                include_str!(concat!("../../compatibility/", $dir, "/locales/it.json")),
             ),
             (
                 "nl",
-                include_str!(concat!("../../crates/", $dir, "/locales/nl.json")),
+                include_str!(concat!("../../compatibility/", $dir, "/locales/nl.json")),
             ),
             (
                 "pt",
-                include_str!(concat!("../../crates/", $dir, "/locales/pt.json")),
+                include_str!(concat!("../../compatibility/", $dir, "/locales/pt.json")),
             ),
         ]
     };
 }
 
-#[cfg(feature = "rekordbox")]
+#[cfg(feature = "compatibility")]
 macro_rules! builtin {
     ($dir:literal, $plugin:ty, $players:expr) => {{
         static API: LibraryApi = api::<$plugin>();
         Builtin {
-            manifest: include_str!(concat!("../../crates/", $dir, "/plugin.json")),
+            manifest: include_str!(concat!("../../compatibility/", $dir, "/plugin.json")),
             locales: locales!($dir),
             players: $players,
             api: &API,
@@ -65,19 +65,25 @@ macro_rules! builtin {
     }};
 }
 
-#[cfg(feature = "rekordbox")]
+#[cfg(feature = "compatibility")]
 static ALL: [Builtin; 3] = [
     builtin!(
-        "rekordbox-device",
-        rekordbox_device::Device,
-        Some(include_str!("../../crates/rekordbox-device/players.json"))
+        "rekordbox/device",
+        compat_rekordbox_device::Device,
+        Some(include_str!(
+            "../../compatibility/rekordbox/device/players.json"
+        ))
     ),
-    builtin!("rekordbox-xml", rekordbox_xml::RekordboxXmlPlugin, None),
-    builtin!("rekordbox-db", rekordbox_db::MasterDb, None),
+    builtin!(
+        "rekordbox/xml",
+        compat_rekordbox_xml::RekordboxXmlPlugin,
+        None
+    ),
+    builtin!("rekordbox/db", compat_rekordbox_db::MasterDb, None),
 ];
 
-/// A build without the `rekordbox` feature (the mobile crate) has no built-in plugins, and so no SQLCipher.
-#[cfg(not(feature = "rekordbox"))]
+/// A build without the `compatibility` feature (the mobile crate) has no built-in plugins, and so no SQLCipher.
+#[cfg(not(feature = "compatibility"))]
 static ALL: [Builtin; 0] = [];
 
 impl Builtin {
@@ -117,7 +123,7 @@ pub fn is(name: &str) -> bool {
     PLUGINS.iter().any(|p| p.manifest.name == name)
 }
 
-#[cfg(all(test, not(feature = "rekordbox")))]
+#[cfg(all(test, not(feature = "compatibility")))]
 mod tests_without {
     #[test]
     fn there_are_none() {
@@ -125,7 +131,7 @@ mod tests_without {
     }
 }
 
-#[cfg(all(test, feature = "rekordbox"))]
+#[cfg(all(test, feature = "compatibility"))]
 mod tests {
     use super::*;
 

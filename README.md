@@ -64,6 +64,8 @@ The standalone phone/tablet app lives in [`mobile/`](mobile/): two decks, local 
 
 BPM, beat grid, downbeat, key, a three-band waveform, phrases (intro, up, chorus, down) and automatic cues are computed in the background and cached. The pictures above show them: coloured phrase bars over the enlarged waveforms, hot cues A to H under each deck, and a key colour in the track list. Decks sync tempo and beats, key sync follows the key, and key lock keeps the pitch while you push the tempo (its time stretch places each grain at the drum hits, so kicks stay sharp far from the original tempo). Tracks whose sample rate differs from the sound card's are resampled with a windowed-sinc filter, not linear interpolation. Grids keep their meter: a 3/4 grid counts bars of three beats in automix, the ruler, beat sync phase and the slicer.
 
+Master Tempo matches stereo continuations over a search range scaled to the output sample rate. This keeps low bass from following small tempo changes and avoids losing the matching signal when the channels are out of phase. The WSOLA search covers complete periods down to about 29 Hz at unshifted pitch; dense polyphony, lower pitches and extreme tempo/key shifts still have quality limits. Its buffers are allocated before playback, not inside the audio callback.
+
 Loading publishes playable audio after decoding and preparing its initial gain and auto-cue position. Initial source/cache reads and stem-file preflight run off the UI thread. Missing waveform, grid and key analysis can finish during playback without replacing cue or grid edits made meanwhile. Replacing a deck load or preview cancels obsolete work; stopped and finished browser previews release their decoded audio.
 
 Bulk analysis reuses workers under one execution budget. Prepared jobs are bounded, and extra simultaneous runs receive a visible busy message instead of growing an unlimited queue. Cue edits and explicit deletions made while work is queued or running survive its completion. Same-track work stays ordered; a late alias cannot overwrite a newer bulk cache result. Device and folder probes also run in bounded background work, so stalled storage does not block those UI callbacks. Blocking filesystem calls still occupy their worker until the operating system returns.
@@ -273,7 +275,15 @@ Three companion repositories feed the app, and PREFERENCES lists them from the f
 
 INSTALL installs one. Add any repository by its GitHub path (`user/name`) and the app finds the plugins, themes or mappings in it too, so sharing a theme is publishing a GitHub repository.
 
-The rekordbox extensions (USB sticks and SD cards in rekordbox's Device Library and OneLibrary formats, rekordbox XML, the rekordbox collection) are part of the app: always on, nothing to install. A fresh profile also starts with Engine DJ, Serato, Traktor and VirtualDJ and the effect packs on (`beat-fx`, `send-fx`, `lever-fx`, `mic-fx`, `soft-mix`, `cross-pass`); the other plugins start switched off. Existing plugin choices are preserved. At the first start a welcome window offers the suggested ones and STEMS; ACCEPT switches them on, SKIP leaves them off. Help > Welcome opens it again. Plugging in a stick whose reader is off opens the same window with that reader.
+### Compatibility layer
+
+OpenFadeR's Collection uses its own plain SQLite `store.db` and independent schema in `src/store/`. External library and device
+formats are handled by the compatibility layer: built-in adapters under `compatibility/` and companion plugins built separately.
+Import, export and supported device/cue writeback translate through those adapters without replacing the native collection schema.
+The [adapter inventory](docs/plugins.md#compatibility-layer) lists the formats and their supported operations, including iTunes/Music,
+sampler packs and the companion's separate Mixxx controller-mapping integration.
+
+The built-in Rekordbox adapters (USB sticks and SD cards in Device Library and OneLibrary formats, collection XML and the desktop collection) are always on, with nothing to install. A fresh profile also starts with the companion Engine DJ, Serato, Traktor and VirtualDJ adapters and the effect packs on (`beat-fx`, `send-fx`, `lever-fx`, `mic-fx`, `soft-mix`, `cross-pass`); the other plugins start switched off. Existing plugin choices are preserved. At the first start a welcome window offers the suggested ones and STEMS; ACCEPT switches them on, SKIP leaves them off. Help > Welcome opens it again. Plugging in a stick whose reader is off opens the same window with that reader.
 
 At each start the app asks GitHub for the newest release; when it is newer than the running version a window offers to open its download page. Offline, nothing is shown.
 
@@ -315,7 +325,7 @@ Each kind is looked up in an environment-variable folder list (`:`-separated), a
 | Themes | `OPENFADER_SKINS` | `~/.config/openfader/extension/skin/` | `extension/skin/` |
 | Controller mappings | `OPENFADER_MAPPINGS` | `~/.config/openfader/mappings/` | `mappings/` |
 
-`start.sh` clones the three repositories into those bundled folders (git ignores them here) and the native plugins build with `extension/plugin/build.sh` against this checkout's `sdk/`. Settings live in `$XDG_CONFIG_HOME/openfader/` (default `~/.config/openfader/`), the Collection (`store.db`) and our analysis in `$XDG_DATA_HOME/openfader/` (default `~/.local/share/openfader/`).
+`start.sh` clones the three repositories into those bundled folders (git ignores them here) and the native plugins build with `extension/plugin/build.sh` against this checkout's `sdk/` and compatibility helpers. Core 0.2.7 uses OpenFadeR-Plugins tag `v0.2.7`; `PLUGINS_REF` overrides that ref for the first clone in `start.sh` and `install.sh`. Existing checkouts are left untouched: switch an older plugin checkout to the matching tag before building. Settings live in `$XDG_CONFIG_HOME/openfader/` (default `~/.config/openfader/`), the Collection (`store.db`) and our analysis in `$XDG_DATA_HOME/openfader/` (default `~/.local/share/openfader/`).
 
 ### Linux, Windows and macOS
 

@@ -57,7 +57,7 @@ struct SlotVoice {
 }
 
 impl SlotVoice {
-    fn new() -> SlotVoice {
+    fn new(rate: u32) -> SlotVoice {
         SlotVoice {
             drum: None,
             st: St::Idle,
@@ -67,7 +67,7 @@ impl SlotVoice {
             to: 1.0,
             presses: 0,
             stops: 0,
-            stretch: Stretch::new(),
+            stretch: Stretch::new(rate),
         }
     }
 
@@ -110,7 +110,7 @@ pub(crate) struct Voice {
 impl Voice {
     pub(crate) fn new(rate: u32) -> Voice {
         Voice {
-            slots: std::array::from_fn(|_| SlotVoice::new()),
+            slots: std::array::from_fn(|_| SlotVoice::new(rate)),
             t: Tracker::default(),
             fx: Unit::new(rate),
             halts: 0,

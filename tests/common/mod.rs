@@ -18,8 +18,10 @@ fn root() -> &'static Path {
 pub fn device_plugin() -> &'static str {
     const NAME: &str = "rekordbox-device";
     static READY: LazyLock<()> = LazyLock::new(|| {
-        let manifest: Value =
-            serde_json::from_str(include_str!("../../crates/rekordbox-device/plugin.json")).unwrap();
+        let manifest: Value = serde_json::from_str(include_str!(
+            "../../compatibility/rekordbox/device/plugin.json"
+        ))
+        .unwrap();
         let key = std::fs::read_to_string(root().join(".local/device-key")).unwrap_or_default();
         let secrets: serde_json::Map<String, Value> = manifest["settings"]
             .as_array()

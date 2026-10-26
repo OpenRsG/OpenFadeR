@@ -1,7 +1,7 @@
 //! Our own persistent store (base): the edits to the collection (cues, loops, beat grids, ratings, comments,
 //! track colours, tags, user playlists and the play history), reproduced in a plain SQLite file `store.db` under
-//! [`paths::data_dir`]. The user's library sources (the library database, USB, XML) are never written; the store is overlaid on what
-//! they load, and the store wins.
+//! [`paths::data_dir`], with OpenFadeR's own schema and migrations. The store overlays loaded library data and wins.
+//! External schemas stay in compatibility adapters; export, device edits and cue-sync writeback use their supported operations.
 //!
 //! Track identity ([`key`]): `t<id>`, `id` the track's row in `collection` ([`Track::id`]): our own Collection is the
 //! library and every track in it has one, so the identity survives a move, a rename or a new file. A track without an id

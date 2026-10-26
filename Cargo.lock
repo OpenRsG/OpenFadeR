@@ -806,6 +806,60 @@ dependencies = [
 ]
 
 [[package]]
+name = "compat-rekordbox-common"
+version = "0.1.0"
+dependencies = [
+ "openfader-plugin",
+ "rusqlite",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "compat-rekordbox-db"
+version = "0.1.0"
+dependencies = [
+ "compat-rekordbox-common",
+ "openfader-plugin",
+ "rusqlite",
+ "serde_json",
+]
+
+[[package]]
+name = "compat-rekordbox-device"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "compat-rekordbox-common",
+ "compat-rekordbox-export",
+ "openfader-plugin",
+ "ring",
+ "rusqlite",
+ "serde_json",
+]
+
+[[package]]
+name = "compat-rekordbox-export"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "compat-rekordbox-common",
+ "image",
+ "openfader-plugin",
+ "rusqlite",
+ "serde_json",
+]
+
+[[package]]
+name = "compat-rekordbox-xml"
+version = "0.1.0"
+dependencies = [
+ "compat-rekordbox-common",
+ "openfader-plugin",
+ "serde_json",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3691,10 +3745,13 @@ dependencies = [
 
 [[package]]
 name = "openfader"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "alsa 0.9.1",
  "chrono",
+ "compat-rekordbox-db",
+ "compat-rekordbox-device",
+ "compat-rekordbox-xml",
  "cpal",
  "embed-resource",
  "fatfs",
@@ -3708,9 +3765,6 @@ dependencies = [
  "openfader-ui",
  "ort",
  "parking_lot",
- "rekordbox-db",
- "rekordbox-device",
- "rekordbox-xml",
  "ring",
  "rusqlite",
  "semver",
@@ -4367,60 +4421,6 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
-
-[[package]]
-name = "rekordbox-common"
-version = "0.1.0"
-dependencies = [
- "openfader-plugin",
- "rusqlite",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "rekordbox-db"
-version = "0.1.0"
-dependencies = [
- "openfader-plugin",
- "rekordbox-common",
- "rusqlite",
- "serde_json",
-]
-
-[[package]]
-name = "rekordbox-device"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "openfader-plugin",
- "rekordbox-common",
- "rekordbox-export",
- "ring",
- "rusqlite",
- "serde_json",
-]
-
-[[package]]
-name = "rekordbox-export"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "image",
- "openfader-plugin",
- "rekordbox-common",
- "rusqlite",
- "serde_json",
-]
-
-[[package]]
-name = "rekordbox-xml"
-version = "0.1.0"
-dependencies = [
- "openfader-plugin",
- "rekordbox-common",
- "serde_json",
-]
 
 [[package]]
 name = "renderdoc-sys"

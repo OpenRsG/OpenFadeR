@@ -1,30 +1,29 @@
 [package]
 name = "openfader"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2024"
 
-# The rekordbox extensions are compiled into the app (crates/, src/plugin/builtin.rs). Path dependencies (sdk, ui) are members
-# too. The companion checkouts and the Android project are separate workspaces.
+# Built-in format adapters live in compatibility/ (src/plugin/builtin.rs). The SDK and UI are workspace members too.
+# The companion checkouts and the Android project are separate workspaces.
 [workspace]
-members = ["crates/*"]
+members = ["sdk", "ui", "compatibility/rekordbox/*"]
 exclude = ["extension", "mobile", "mappings", "vendor/cpal"]
 
 [workspace.dependencies]
 openfader-plugin = { path = "sdk", features = ["library"] }
-rekordbox-common = { path = "crates/rekordbox-common" }
-rekordbox-export = { path = "crates/rekordbox-export" }
+compat-rekordbox-common = { path = "compatibility/rekordbox/common" }
+compat-rekordbox-export = { path = "compatibility/rekordbox/export" }
 serde_json = "1"
-# SQLCipher: rekordbox's databases are encrypted. `openfader` takes it only with its `rekordbox` feature (it opens plain SQLite
-# files too, so the app's own databases then use it as well).
+# SQLCipher is required by encrypted adapter formats. It also opens the app's own plain SQLite databases without changing their schema.
 rusqlite = { version = "0.40", features = ["bundled-sqlcipher-vendored-openssl"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [features]
 default = ["app", "stems-gpu"]
-app = ["stems", "rekordbox", "dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend", "dep:sys-locale"]
-# The rekordbox extensions built into the app (crates/, src/plugin/builtin.rs). They read SQLCipher databases, so this swaps the
-# bundled SQLite for SQLCipher with its own OpenSSL; a build without it (the mobile crate) keeps plain SQLite and needs no OpenSSL.
-rekordbox = ["dep:rekordbox-device", "dep:rekordbox-db", "dep:rekordbox-xml", "rusqlite/bundled-sqlcipher-vendored-openssl"]
+app = ["stems", "compatibility", "dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend", "dep:sys-locale"]
+# Built-in compatibility adapters (src/plugin/builtin.rs) need SQLCipher with its own OpenSSL.
+# A build without them (the mobile crate) keeps plain SQLite and needs no OpenSSL.
+compatibility = ["dep:compat-rekordbox-device", "dep:compat-rekordbox-db", "dep:compat-rekordbox-xml", "rusqlite/bundled-sqlcipher-vendored-openssl"]
 stems = ["dep:ort"]
 # STEMS on the GPU (ONNX Runtime's WebGPU provider, Dawn). ONNX Runtime ships no WebGPU build for ARM Linux: the Raspberry
 # Pi build (`--no-default-features --features app`, docs/raspberry-pi.md) separates on the CPU only.
@@ -56,9 +55,9 @@ flate2 = "1"
 libloading = "0.8" # Beat FX plugin libraries (src/plugin/effect.rs)
 openfader-plugin.workspace = true # the plugin ABIs (effects, track libraries) and the shared library types: one definition for host and plugins
 mlua = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"] } # Lua plugins, run in-process (src/plugin/lua.rs)
-rekordbox-device = { path = "crates/rekordbox-device", optional = true } # the built-in rekordbox extensions (src/plugin/builtin.rs)
-rekordbox-db = { path = "crates/rekordbox-db", optional = true }
-rekordbox-xml = { path = "crates/rekordbox-xml", optional = true }
+compat-rekordbox-device = { path = "compatibility/rekordbox/device", optional = true } # built-in format adapters (src/plugin/builtin.rs)
+compat-rekordbox-db = { path = "compatibility/rekordbox/db", optional = true }
+compat-rekordbox-xml = { path = "compatibility/rekordbox/xml", optional = true }
 openfader-ui = { path = "ui", optional = true } # the Slint UI, built as its own crate
 sys-locale = { version = "0.3", optional = true } # the system's language for PREFS > VIEW > LANGUAGE = SYSTEM (src/app/i18n.rs); already in the tree through Slint
 
@@ -74,22 +73,22 @@ zbus = "5" # udisks2 over the system D-Bus: the built-in formatter (src/device/f
 [target.'cfg(target_os = "android")'.dependencies]
 cpal = { version = "0.15", features = ["oboe-shared-stdcxx"] }
 
-# These need the built-in rekordbox extensions.
+# These need the built-in compatibility adapters.
 [[test]]
 name = "device_plugin"
-required-features = ["rekordbox"]
+required-features = ["compatibility"]
 
 [[test]]
 name = "transfer"
-required-features = ["rekordbox"]
+required-features = ["compatibility"]
 
 [[test]]
 name = "verify"
-required-features = ["rekordbox", "app"]
+required-features = ["compatibility", "app"]
 
 [[test]]
 name = "library_plugin"
-required-features = ["rekordbox"]
+required-features = ["compatibility"]
 
 [[example]]
 name = "stems_bench"

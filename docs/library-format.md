@@ -5,8 +5,13 @@ Two things are documented here, so other tools can read and write a collection w
 1. the **open export** (File > Export Collection): a JSON file, a CSV table and an M3U8 playlist;
 2. the **library database** `store.db`, the SQLite file that holds the Collection itself.
 
-The export is the stable interface. The database is documented as it is today (schema version 20); it can only grow:
+The export is the stable interface. The database is documented as it is today (schema version 23); it can only grow:
 migrations append columns and tables, they never rename or reuse one.
+
+External libraries and device formats cross the [compatibility layer](plugins.md#compatibility-layer). Built-in adapters live
+under `compatibility/`; companion plugins add other formats. Their databases, XML fields and device paths remain format-specific
+contracts. Import adds their data to OpenFadeR's own Collection; export, device edits and cue-sync writeback use the adapters'
+supported operations. This organization does not change `store.db`, its schema or existing user data.
 
 ## 1. Open export
 

@@ -32,7 +32,7 @@ pub(super) struct Voice {
 }
 
 impl Voice {
-    pub(super) fn new() -> Voice {
+    pub(super) fn new(rate: u32) -> Voice {
         Voice {
             pcm: None,
             pos: 0.0,
@@ -42,7 +42,7 @@ impl Voice {
             seen_stops: 0,
             gain: 1.0,
             fired: false,
-            stretch: Stretch::new(),
+            stretch: Stretch::new(rate),
         }
     }
 

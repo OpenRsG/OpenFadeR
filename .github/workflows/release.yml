@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Companions (plugins, themes, mappings)
         run: |
-          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
+          git clone --depth 1 --branch v0.2.7 https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
           git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
           git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
       - name: System libraries
@@ -200,7 +200,7 @@ jobs:
             out/*.tar.gz
           generate_release_notes: true
           body: |
-            Archives (each holds the app with its themes, controller mappings and plugins, ready to run; the rekordbox extensions are part of the app itself):
+            Archives (each holds the app with its themes, controller mappings and plugins, ready to run; built-in compatibility adapters are part of the app itself):
 
             - **Linux** (x86_64): `openfader-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
             - **Raspberry Pi 3, 4, 5 and CM4** (aarch64, 64-bit Raspberry Pi OS based on Debian 13): `openfader-<version>-linux-aarch64-pi.tar.gz`. Unpack and run `./openfader-<version>-linux-aarch64-pi/openfader`. See docs/raspberry-pi.md.

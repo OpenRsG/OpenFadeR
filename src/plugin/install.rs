@@ -259,7 +259,7 @@ mod tests {
         assert!(install_into(&src, &root).unwrap_err().contains("main.lua"));
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
         // A plugin of the app itself is not installed again as a folder.
-        if cfg!(feature = "rekordbox") {
+        if cfg!(feature = "compatibility") {
             fs::write(src.join("plugin.json"), r#"{"name": "rekordbox-device"}"#).unwrap();
             assert!(install_into(&src, &root).unwrap_err().contains("built into the app"));
             assert_eq!(fs::read_dir(&root).unwrap().count(), 0);

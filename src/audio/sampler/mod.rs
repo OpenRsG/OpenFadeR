@@ -204,7 +204,7 @@ impl Sampler {
     pub fn new(rate: u32) -> Sampler {
         Sampler {
             rate,
-            voices: std::array::from_fn(|_| Voice::new()),
+            voices: std::array::from_fn(|_| Voice::new(rate)),
             seq: seq::State::new(),
         }
     }

@@ -59,7 +59,7 @@ fn discovery_takes_plugin_folders_and_folders_of_them_first_name_wins() {
     assert_eq!(r.errors.len(), 2, "{:?}", r.errors); // the bad manifest and the duplicate
 }
 
-#[cfg(feature = "rekordbox")]
+#[cfg(feature = "compatibility")]
 #[test]
 fn a_folder_named_like_a_built_in_plugin_is_skipped_with_a_note() {
     let d = temp("builtin-name");
