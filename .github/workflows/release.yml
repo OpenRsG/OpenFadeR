@@ -1,334 +1,98 @@
-name: Release
-
-# Tag v*: package Linux, Windows, Apple silicon and Raspberry Pi archives, then create a draft release.
-# macOS uses native Intel smoke tests plus an ARM cross-build with archive architecture/signature checks.
-# A manual run uploads workflow artifacts only.
-# Publish a draft with: gh release edit <tag> --draft=false
+name: Promote verified 0.2.8 packages
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
-
-env:
-  CARGO_TERM_COLOR: always
-  CARGO_BUILD_JOBS: "1"
-
+permissions:
+  contents: read
+  actions: read
 jobs:
-  package:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { name: linux, os: ubuntu-latest, arch: x86_64 }
-          - { name: windows, os: windows-latest, arch: x86_64 }
-          - {
-              name: macos,
-              os: macos-15-intel,
-              arch: arm64,
-              target: aarch64-apple-darwin,
-            }
-    runs-on: ${{ matrix.os }}
-    # macOS builds two architectures serially under the single-job memory policy.
-    timeout-minutes: ${{ matrix.name == 'macos' && 240 || 120 }}
-    defaults:
-      run:
-        shell: bash
+  promote:
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
-      - run: git config --global core.autocrlf false
-      - uses: actions/checkout@v4
-      - name: Companions (plugins, themes, mappings)
-        run: |
-          git clone --depth 1 --branch v0.2.11 https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
-          git clone --depth 1 --branch openfader-v0.2.8 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
-          git clone --depth 1 --branch openfader-v0.2.8 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
-      - name: System libraries
-        if: matrix.name == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev libfontconfig1-dev libxkbcommon-dev libwayland-dev libudev-dev pkg-config \
-            xvfb imagemagick libxkbcommon-x11-0 libgl1 libegl1 libgl1-mesa-dri libxcursor1 libxi6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            .
-            extension/plugin
-          key: release-${{ matrix.name }}
-      - uses: actions/cache/restore@v4
-        if: matrix.name == 'macos'
-        with:
-          path: .local/onnxruntime-intel
-          key: macos-ort-intel-${{ hashFiles('.github/macos-ort.sh') }}
-      - name: Intel ONNX Runtime
-        if: matrix.name == 'macos'
-        run: bash .github/macos-ort.sh
-      - uses: actions/cache/save@v4
-        if: always() && matrix.name == 'macos' && hashFiles('.local/onnxruntime-intel/*.dylib') != ''
-        with:
-          path: .local/onnxruntime-intel
-          key: macos-ort-intel-${{ hashFiles('.github/macos-ort.sh') }}
-      - name: Version
-        id: version
-        run: |
-          if [ "${GITHUB_REF_TYPE}" = tag ]; then v=${GITHUB_REF_NAME#v}; else v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)-dev; fi
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-      # The app links SQLCipher with its own OpenSSL (the rekordbox extensions): Git Bash's perl lacks modules, Strawberry Perl (on
-      # the runners) has them.
-      - name: OpenSSL build tools (Windows)
-        if: matrix.name == 'windows'
-        run: |
-          echo "OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl.exe" >> "$GITHUB_ENV"
-          echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
-      - name: Build the plugins
-        env:
-          CARGO_PROFILE_RELEASE_STRIP: symbols
-        run: extension/plugin/build.sh --quiet
-      - name: Build the app
-        # macOS: cross-crate LTO drops the compiler runtime's `__isPlatformVersionAtLeast`, which ONNX Runtime's CoreML code needs at link time.
-        env:
-          CARGO_PROFILE_DIST_LTO: ${{ matrix.name == 'macos' && 'false' || 'thin' }}
-        run: |
-          if [ "${{ matrix.name }}" = macos ]; then
-            cargo build --profile dist --no-default-features --features app
-          else
-            cargo build --profile dist
-          fi
-      - name: Native macOS smoke
-        if: matrix.name == 'macos'
-        run: |
-          mkdir native-smoke
-          cp target/dist/openfader native-smoke/
-          cp -L target/dist/*.dylib native-smoke/
-          python .github/bundle.py native-smoke
-          bash .github/smoke.sh native-smoke/openfader smoke
-      - name: Cross-build Apple silicon app and plugins
-        if: matrix.name == 'macos'
-        env:
-          CARGO_BUILD_TARGET: aarch64-apple-darwin
-          CARGO_PROFILE_DIST_LTO: "false"
-          CARGO_TARGET_AARCH64_APPLE_DARWIN_RUSTFLAGS: "-C target-cpu=apple-m1"
-          CARGO_PROFILE_RELEASE_STRIP: symbols
-        run: |
-          unset ORT_LIB_LOCATION ORT_PREFER_DYNAMIC_LINK
-          extension/plugin/build.sh --quiet
-          cargo build --profile dist
-      - name: Package
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          mkdir -p out
-          case "${{ matrix.name }}" in
-          linux)
-            d=openfader-$VERSION-linux-x86_64
-            mkdir "$d"
-            cp target/dist/openfader "$d/"
-            # Keep runtime families aligned with install.sh; plugins are bundled in their own folders.
-            for runtime in target/dist/libonnxruntime*.so* target/dist/libwebgpu_dawn.so*; do
-              [ -f "$runtime" ] || continue
-              cp -L "$runtime" "$d/"
-            done
-            python .github/bundle.py "$d"
-            cp LICENSE README.md "$d/"
-            cp assets/icon.png "$d/openfader.png"
-            tar czf "out/$d.tar.gz" "$d"
-            ;;
-          windows)
-            d=openfader-$VERSION-windows-x86_64
-            mkdir "$d"
-            cp target/dist/openfader.exe "$d/"
-            cp target/dist/*.dll "$d/"
-            # The Visual C++ runtime next to the program: it starts on a machine that never installed the redistributable.
-            for f in vcruntime140.dll vcruntime140_1.dll msvcp140.dll msvcp140_1.dll msvcp140_atomic_wait.dll; do cp "/c/Windows/System32/$f" "$d/"; done
-            python .github/bundle.py "$d"
-            cp LICENSE README.md "$d/"
-            7z a -tzip "out/$d.zip" "$d" > /dev/null
-            ;;
-          macos)
-            d=OpenFadeR.app
-            mkdir -p "$d/Contents/MacOS" "$d/Contents/Resources"
-            cp target/aarch64-apple-darwin/dist/openfader "$d/Contents/MacOS/"
-            cp -L target/aarch64-apple-darwin/dist/*.dylib "$d/Contents/MacOS/"
-            python .github/bundle.py "$d/Contents/Resources"
-            cp LICENSE README.md "$d/Contents/Resources/"
-            cp assets/openfader.icns "$d/Contents/Resources/"
-            cat > "$d/Contents/Info.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleName</key><string>OpenFadeR</string>
-            <key>CFBundleDisplayName</key><string>OpenFadeR</string>
-            <key>CFBundleIdentifier</key><string>org.openrsg.openfader</string>
-            <key>CFBundleExecutable</key><string>openfader</string>
-            <key>CFBundleIconFile</key><string>openfader</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleVersion</key><string>$VERSION</string>
-            <key>CFBundleShortVersionString</key><string>$VERSION</string>
-            <key>LSMinimumSystemVersion</key><string>11.0</string>
-            <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
-            <key>NSHighResolutionCapable</key><true/>
-            <key>NSMicrophoneUsageDescription</key><string>OpenFadeR records from an audio input when you use REC or the microphone.</string>
-          </dict>
-          </plist>
-          EOF
-            # Ad-hoc signature (no developer identity): Apple silicon wants every program signed at least this way.
-            codesign --force --deep -s - "$d"
-            ditto -c -k --keepParent "$d" "out/OpenFadeR-$VERSION-macos-arm64.zip"
-            ;;
-          esac
-          ls -l out
-      # Linux/Windows execute their unpacked packages; the ARM macOS bundle is checked after the native Intel smoke.
-      - name: Unpack the archive
-        run: |
-          mkdir unpacked
-          cd unpacked
-          case "${{ matrix.name }}" in
-          linux) tar xzf ../out/*.tar.gz ;;
-          windows) 7z x -y ../out/*.zip > /dev/null ;;
-          macos) ditto -x -k ../out/*.zip . ;;
-          esac
-          ls
-      - name: Smoke test of the packaged app (Linux, under Xvfb)
-        if: matrix.name == 'linux'
-        run: xvfb-run -a -s "-screen 0 1600x1000x24" bash .github/smoke.sh unpacked/openfader-*/openfader smoke
-      - name: Smoke test of the packaged app
-        if: matrix.name == 'windows'
-        run: bash .github/smoke.sh unpacked/openfader-*/openfader.exe smoke
-      - name: Validate Apple silicon package
-        if: matrix.name == 'macos'
+      - name: Promote the successful matrix without recompilation
         run: |
           python - <<'PY'
-          from pathlib import Path
+          import copy
+          import hashlib
+          import json
+          import pathlib
+          import plistlib
+          import shutil
           import subprocess
-          bundle = Path("unpacked/OpenFadeR.app")
-          binary = bundle / "Contents/MacOS/openfader"
-          assert binary.is_file()
-          for path in [binary, *bundle.rglob("*.dylib")]:
-              arches = subprocess.check_output(["lipo", "-archs", str(path)], text=True).split()
-              assert "arm64" in arches, f"{path}: expected arm64, got {arches}"
+          import tarfile
+          import zipfile
+
+          source_run = '40907951215'
+          source_sha = '71da28803ac82bf684f5162c8fb85868e4155f6f'
+          run = json.loads(subprocess.check_output(['gh', 'api', f'repos/OpenRsG/OpenFadeR/actions/runs/{source_run}']))
+          assert run['head_sha'] == source_sha and run['conclusion'] == 'success'
+          names = ['package-linux', 'package-windows', 'package-macos', 'package-pi', 'package-pi4']
+          command = ['gh', 'run', 'download', source_run, '--dir', 'original']
+          for name in names:
+              command += ['--name', name]
+          subprocess.run(command, check=True)
+          original = pathlib.Path('original')
+          out = pathlib.Path('out')
+          out.mkdir()
+
+          old = 'openfader-0.2.8-dev-linux-x86_64'
+          new = 'openfader-0.2.8-linux-x86_64'
+          with tarfile.open(original / 'package-linux' / (old + '.tar.gz')) as source, tarfile.open(out / (new + '.tar.gz'), 'w:gz') as target:
+              for member in source:
+                  assert member.name == old or member.name.startswith(old + '/')
+                  assert '..' not in pathlib.PurePosixPath(member.name).parts and not member.issym() and not member.islnk()
+                  stream = source.extractfile(member) if member.isfile() else None
+                  member.name = new + member.name[len(old):]
+                  target.addfile(member, stream)
+
+          old = 'openfader-0.2.8-dev-windows-x86_64'
+          new = 'openfader-0.2.8-windows-x86_64'
+          with zipfile.ZipFile(original / 'package-windows' / (old + '.zip')) as source, zipfile.ZipFile(out / (new + '.zip'), 'w') as target:
+              for member in source.infolist():
+                  assert member.filename.startswith(old + '/') and '..' not in pathlib.PurePosixPath(member.filename).parts
+                  renamed = copy.copy(member)
+                  renamed.filename = new + member.filename[len(old):]
+                  with source.open(member) as reader, target.open(renamed, 'w') as writer:
+                      shutil.copyfileobj(reader, writer)
+
+          for variant in ('pi', 'pi4'):
+              name = f'openfader-0.2.8-linux-aarch64-{variant}.tar.gz'
+              shutil.copy2(original / f'package-{variant}' / name, out / name)
+
+          subprocess.run(['ditto', '-x', '-k', str(original / 'package-macos/OpenFadeR-0.2.8-dev-macos-arm64.zip'), 'mac'], check=True)
+          app = pathlib.Path('mac/OpenFadeR.app')
+          executable = app / 'Contents/MacOS/openfader'
+          shutil.copy2(executable, 'before-unsigned')
+          subprocess.run(['codesign', '--remove-signature', 'before-unsigned'], check=True)
+          plist_path = app / 'Contents/Info.plist'
+          with plist_path.open('rb') as file:
+              plist = plistlib.load(file)
+          assert plist['CFBundleVersion'] == '0.2.8-dev' and plist['CFBundleShortVersionString'] == '0.2.8-dev'
+          plist['CFBundleVersion'] = plist['CFBundleShortVersionString'] = '0.2.8'
+          with plist_path.open('wb') as file:
+              plistlib.dump(plist, file)
+          subprocess.run(['codesign', '--force', '-s', '-', str(app)], check=True)
+          subprocess.run(['codesign', '--verify', '--deep', '--strict', '--verbose=2', str(app)], check=True)
+          assert subprocess.check_output(['lipo', '-archs', str(executable)], text=True).strip() == 'arm64'
+          shutil.copy2(executable, 'after-unsigned')
+          subprocess.run(['codesign', '--remove-signature', 'after-unsigned'], check=True)
+          def digest(path):
+              with open(path, 'rb') as file:
+                  return hashlib.file_digest(file, 'sha256').hexdigest()
+          assert digest('before-unsigned') == digest('after-unsigned'), 'Unsigned executable changed'
+          subprocess.run(['ditto', '-c', '-k', '--keepParent', str(app), str(out / 'OpenFadeR-0.2.8-macos-arm64.zip')], check=True)
+          expected = {'openfader-0.2.8-linux-x86_64.tar.gz', 'openfader-0.2.8-windows-x86_64.zip', 'OpenFadeR-0.2.8-macos-arm64.zip', 'openfader-0.2.8-linux-aarch64-pi.tar.gz', 'openfader-0.2.8-linux-aarch64-pi4.tar.gz'}
+          assert {path.name for path in out.iterdir()} == expected
+          print('Promoted all five packages from', source_sha, 'without compilation; macOS metadata/signature validated and unsigned executable unchanged.')
           PY
-          codesign --verify --deep --strict unpacked/OpenFadeR.app
-      # Upload only after the platform smoke test and, for cross-built macOS, archive validation.
-      - name: Upload validated package
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: package-${{ matrix.name }}
+          name: promoted-v0.2.8
           path: out/*
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: package-smoke-${{ matrix.name }}
-          path: smoke/
-          if-no-files-found: ignore
-
-  # Both archives keep whole-program LTO; Pi4/CM4 also uses Cortex-A72 code generation.
-  pi:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { variant: pi, cpu: cortex-a53 }
-          - { variant: pi4, cpu: cortex-a72 }
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-      - name: Allow fat LTO to page on the hosted runner
-        run: |
-          sudo fallocate -l 16G "$RUNNER_TEMP/openfader-pi.swap"
-          sudo chmod 600 "$RUNNER_TEMP/openfader-pi.swap"
-          sudo mkswap "$RUNNER_TEMP/openfader-pi.swap"
-          sudo swapon "$RUNNER_TEMP/openfader-pi.swap"
-      - name: Build the Pi archive
-        run: docker buildx build -f Dockerfile.pi --build-arg PI_VARIANT=${{ matrix.variant }} --build-arg TARGET_CPU=${{ matrix.cpu }} --build-arg OPENFADER_COMMIT=${GITHUB_SHA::9} -o dist/pi .
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-      - name: Inspect and run the ARM archive
-        run: |
-          d="openfader-$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)-linux-aarch64-${{ matrix.variant }}"
-          readelf_dir="$RUNNER_TEMP/pi-elf"
-          mkdir -p "$readelf_dir" pi-smoke
-          tar -xzf "dist/pi/$d.tar.gz" -C "$readelf_dir"
-          readelf -h "$readelf_dir/$d/openfader" | grep -q 'Machine:.*AArch64'
-          if readelf -S "$readelf_dir/$d/openfader" | grep -q '\.symtab'; then
-            echo "Pi executable unexpectedly retains its symbol table" >&2
-            exit 1
-          fi
-          docker run --rm --platform linux/arm64 --cpus=4 --memory=2g --memory-swap=2g \
-            -e QEMU_CPU=${{ matrix.cpu }} -e SLINT_BACKEND=winit-software \
-            -e OPENFADER_MIDI_PORT=none-release-smoke \
-            -v "$readelf_dir:/bundle:ro" -v "$PWD/.github:/checks:ro" -v "$PWD/pi-smoke:/smoke" \
-            debian:trixie-slim bash -ec '
-              export DEBIAN_FRONTEND=noninteractive
-              apt-get update -qq
-              apt-get install -y -qq --no-install-recommends libasound2t64 libfontconfig1 libxkbcommon0 libxkbcommon-x11-0 libwayland-client0 libudev1 libstdc++6 libgomp1 libx11-6 libxcursor1 libxi6 libxrandr2 fonts-dejavu-core python3 xvfb xauth imagemagick
-              printf "pcm.null { type null }\npcm.!default { type null }\n" > /tmp/alsa.conf
-              export ALSA_CONFIG_PATH=/tmp/alsa.conf
-              xvfb-run -a -s "-screen 0 1600x1000x24" bash /checks/smoke.sh /bundle/'"$d"'/openfader /smoke
-            '
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pi-smoke-${{ matrix.variant }}
-          path: pi-smoke/
-          if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
-        with:
-          name: package-${{ matrix.variant }}
-          path: dist/pi/*.tar.gz
-          if-no-files-found: error
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [package, pi]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: package-*
-          path: out
-          merge-multiple: true
-      - name: Require every platform archive
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: |
-          python3 - <<'PY'
-          import os, pathlib
-          v = os.environ["VERSION"].removeprefix("v")
-          expected = {
-              f"openfader-{v}-linux-x86_64.tar.gz",
-              f"openfader-{v}-windows-x86_64.zip",
-              f"OpenFadeR-{v}-macos-arm64.zip",
-              f"openfader-{v}-linux-aarch64-pi.tar.gz",
-              f"openfader-{v}-linux-aarch64-pi4.tar.gz",
-          }
-          actual = {p.name for p in pathlib.Path("out").iterdir() if p.name.endswith((".zip", ".tar.gz"))}
-          assert actual == expected, f"Missing: {sorted(expected - actual)}; unexpected: {sorted(actual - expected)}"
-          PY
-      - uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          # the smoke artifacts (app.log, screenshot.png) are downloaded too: only the archives are release assets
-          files: |
-            out/*.zip
-            out/*.tar.gz
-          generate_release_notes: true
-          body: |
-            Archives (each holds the app with its themes, controller mappings and plugins, ready to run; built-in compatibility adapters are part of the app itself):
-
-            - **Linux** (x86_64): `openfader-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
-            - **Raspberry Pi 3, 4, 5 and CM4** (aarch64, 64-bit Raspberry Pi OS based on Debian 13): `openfader-<version>-linux-aarch64-pi.tar.gz`. Unpack and run `./openfader-<version>-linux-aarch64-pi/openfader`. See docs/raspberry-pi.md.
-            - **Raspberry Pi 4 and CM4, CPU-tuned** (aarch64, Debian 13): `openfader-<version>-linux-aarch64-pi4.tar.gz` uses Cortex-A72 code generation and whole-program LTO. Its updater stays on this variant; it is not for Pi 3.
-            - **Windows** (x86_64): `openfader-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
-            - **macOS** (Apple silicon): `OpenFadeR-<version>-macos-arm64.zip` holds `OpenFadeR.app`. It is ad-hoc signed, not developer-signed or notarized: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/OpenFadeR.app`. Native tests/smoke run on Intel macOS; the ARM archive is cross-built and checked for ARM libraries and signatures, without an ARM runtime smoke test.
-
-            Optional: `ffmpeg` on the PATH for video; `python` (3) for the Python plugins. Volume sliders of the audio page exist on Linux only: on Windows and macOS the volume is the system's.
+          compression-level: 0
