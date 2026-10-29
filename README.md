@@ -405,7 +405,7 @@ Each kind is looked up in an environment-variable folder list (`:`-separated), a
 | Themes | `OPENFADER_SKINS` | `~/.config/openfader/extension/skin/` | `extension/skin/` |
 | Controller mappings | `OPENFADER_MAPPINGS` | `~/.config/openfader/mappings/` | `mappings/` |
 
-`start.sh` clones the three repositories into those bundled folders (git ignores them here) and the native plugins build with `extension/plugin/build.sh` against this checkout's `sdk/` and compatibility helpers. Core 0.2.8 uses OpenFadeR-Plugins tag `v0.2.9`; `PLUGINS_REF` overrides that ref for the first clone in `start.sh` and `install.sh`. Existing checkouts are left untouched: switch an older plugin checkout to the matching tag before building. Settings live in `$XDG_CONFIG_HOME/openfader/` (default `~/.config/openfader/`), the Collection (`store.db`) and our analysis in `$XDG_DATA_HOME/openfader/` (default `~/.local/share/openfader/`).
+`start.sh` clones the three repositories into those bundled folders (git ignores them here) and the native plugins build with `extension/plugin/build.sh` against this checkout's `sdk/` and compatibility helpers. Core 0.2.8 uses OpenFadeR-Plugins tag `v0.2.10`; `PLUGINS_REF` overrides that ref for the first clone in `start.sh` and `install.sh`. Existing checkouts are left untouched: switch an older plugin checkout to the matching tag before building. Settings live in `$XDG_CONFIG_HOME/openfader/` (default `~/.config/openfader/`), the Collection (`store.db`) and our analysis in `$XDG_DATA_HOME/openfader/` (default `~/.local/share/openfader/`).
 
 ### Linux, Windows and macOS
 

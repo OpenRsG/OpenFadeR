@@ -128,12 +128,30 @@ component DeviceConfirm inherits DialogFrame {
     }
 }
 
-/// Both, placed once in the window (ui/app.slint).
+// Separate persistent item trees keep dialog constructors within a 1 MiB stack without resetting hidden drafts.
 export component DeviceOverlay inherits Rectangle {
-    DeviceWindow {}
-    DeviceConfirm {}
-    DevicePreview {}
-    DeviceSyncAsk {}
-    DeviceFormat {}
-    ReviewOverlay {}
+    if true: Rectangle {
+        width: root.width; height: root.height;
+        DeviceWindow {}
+    }
+    if true: Rectangle {
+        width: root.width; height: root.height;
+        DeviceConfirm {}
+    }
+    if true: Rectangle {
+        width: root.width; height: root.height;
+        DevicePreview {}
+    }
+    if true: Rectangle {
+        width: root.width; height: root.height;
+        DeviceSyncAsk {}
+    }
+    if true: Rectangle {
+        width: root.width; height: root.height;
+        DeviceFormat {}
+    }
+    if true: Rectangle {
+        width: root.width; height: root.height;
+        ReviewOverlay {}
+    }
 }

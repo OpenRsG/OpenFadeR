@@ -26,7 +26,7 @@ Fat LTO can exceed 12 GiB during final compilation. The release job uses a hoste
 limits are not raised and the shipping optimization profile is not weakened to fit them.
 
 The archive holds the same plugins, themes and controller mappings as a release archive. Core 0.2.8 builds the companion
-OpenFadeR-Plugins tag `v0.2.9`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
+OpenFadeR-Plugins tag `v0.2.10`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
 pick the other companions' branch or tag). Checkouts already present in `extension/plugin`, `extension/skin` or `mappings`
 are used as they are, so switch an older plugin checkout to the matching tag first. The cargo registry and target folders stay
 in BuildKit cache mounts, so the next build only recompiles what changed.
