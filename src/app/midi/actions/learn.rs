@@ -98,7 +98,11 @@ fn merge_at<const VOLUME: bool>(a: &App, u: i32) -> Option<f32> {
         .global::<FxState>()
         .get_units()
         .row_data(u.max(0) as usize)?;
-    Some(if VOLUME { unit.merge_volume } else { unit.merge_knob })
+    Some(if VOLUME {
+        unit.merge_volume
+    } else {
+        unit.merge_knob
+    })
 }
 
 /// Fader position for a hardware tempo value `v`: such faders report 0 at the top (the + end:
@@ -217,8 +221,10 @@ pub(super) const TABLE: &[Action] = &[
     knob_cb!("fader", MixerState::invoke_fader).read_by(fader_at),
     knob("crossfader", |a, _, v| {
         let m = a.global::<MixerState>();
-        m.set_crossfader(v);
-        m.invoke_crossfade(v);
+        if m.get_crossfader_enabled() {
+            m.set_crossfader(v);
+            m.invoke_crossfade(v);
+        }
     })
     .read_by(|a, _| Some(a.global::<MixerState>().get_crossfader())),
     knob("trim", mix_knob::<0>).read_by(mix_knob_at::<0>),

@@ -127,6 +127,7 @@ export component CrossFader inherits Rectangle {
         HorizontalLayout {
             alignment: center;
             Fader {
+                enabled: MixerState.crossfader-enabled;
                 min-width: Theme.target-size(22px);
                 vertical: true;
                 detent: true;

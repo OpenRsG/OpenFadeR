@@ -514,6 +514,59 @@ mod tests {
     }
 
     #[test]
+    fn disabled_crossfader_ignores_midi_but_preserves_automix() {
+        use crate::app::{mixer, prefs};
+
+        let (app, guard) = fixture();
+        let original = prefs::with(|p| (p.controller.crossfader_enabled, p.crossfader_curve));
+        prefs::set_for_test(|p| {
+            p.controller.crossfader_enabled = false;
+            p.crossfader_curve = prefs::CrossfaderCurve::Smooth;
+        });
+        mixer::wire(&app, guard.midi.decks.clone());
+        let state = app.global::<MixerState>();
+        state.invoke_xf_assigned(2, 0); // Channel 3 stays THRU when the crossfader is re-enabled.
+        let m = &guard.midi;
+        let b = binding(0xB0, 7, "crossfader", 0, 0);
+        m.file_binds.borrow_mut().insert((b.status, b.d1), b);
+
+        for value in [0, 64, 127] {
+            m.handle(event(0xB0, 7, value));
+            assert_eq!(state.get_crossfader(), 0.5);
+            assert_eq!(mixer::sides(&app), [1.0; 4]);
+        }
+
+        prefs::set_for_test(|p| p.controller.crossfader_enabled = true);
+        m.handle(event(0xB0, 7, 0));
+        assert_eq!(mixer::sides(&app), [1.0, 0.0, 1.0, 0.0]);
+        m.handle(event(0xB0, 7, 127));
+        assert_eq!(mixer::sides(&app), [0.0, 1.0, 1.0, 1.0]);
+
+        prefs::set_for_test(|p| p.controller.crossfader_enabled = false);
+        assert_eq!(mixer::sides(&app), [1.0; 4]);
+        state.set_auto_fade(true);
+        state.set_crossfader(0.5);
+        state.invoke_crossfade(0.5);
+        m.handle(event(0xB0, 7, 0));
+        assert_eq!(state.get_crossfader(), 0.5);
+        let automatic = mixer::sides(&app);
+        for channel in [0, 1, 3] {
+            assert!((automatic[channel] - std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-6);
+        }
+        assert_eq!(automatic[2], 1.0);
+
+        state.set_auto_fade(false);
+        state.invoke_crossfade(state.get_crossfader());
+        assert_eq!(mixer::sides(&app), [1.0; 4]);
+        prefs::set_for_test(|p| p.controller.crossfader_enabled = true);
+        assert_eq!(mixer::sides(&app), [0.5, 0.5, 1.0, 0.5]);
+        prefs::set_for_test(|p| {
+            p.controller.crossfader_enabled = original.0;
+            p.crossfader_curve = original.1;
+        });
+    }
+
+    #[test]
     fn low_continuous_cc_values_and_state_dumps_remain_unowned() {
         let (app, guard) = fixture();
         let m = &guard.midi;

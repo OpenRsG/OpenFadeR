@@ -126,6 +126,7 @@ component MixerPage inherits Rectangle {
             spacing: Theme.space-md;
             Caption { text: "A"; width: 12px; horizontal-stretch: 0; font-size: Theme.font-sm; }
             Fader {
+                enabled: MixerState.crossfader-enabled;
                 detent: true;
                 value: MixerState.crossfader;
                 edited(v) => { MixerState.crossfader = v; MixerState.crossfade(v); }

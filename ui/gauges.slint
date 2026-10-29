@@ -5,6 +5,7 @@ import { Theme } from "theme.slint";
 /// the top. The groove fills from the left / bottom (from the centre with `detent`) in `fill-color`.
 export component Fader inherits Rectangle {
     in property <float> value;
+    in property <bool> enabled: true;
     /// Draw a centre mark (tempo 0%, crossfader middle) and fill from it.
     in property <bool> detent;
     in property <bool> vertical;
@@ -35,6 +36,7 @@ export component Fader inherits Rectangle {
     }
     // filled part
     Rectangle {
+        opacity: root.enabled ? 1 : 0.4;
         x: root.vertical ? (root.width - self.width) / 2 : min(root.from, root.at);
         y: root.vertical ? min(root.from, root.at) : (root.height - self.height) / 2;
         width: root.vertical ? 2px : abs(root.at - root.from);
@@ -50,6 +52,7 @@ export component Fader inherits Rectangle {
     }
     // cap
     Rectangle {
+        opacity: root.enabled ? 1 : 0.4;
         x: root.vertical ? (root.width - self.width) / 2 : root.at - root.cap / 2;
         y: root.vertical ? root.at - root.cap / 2 : (root.height - self.height) / 2;
         width: root.vertical ? min(root.width - 2px, 22px) : root.cap;
@@ -67,6 +70,7 @@ export component Fader inherits Rectangle {
         }
     }
     ta := TouchArea {
+        enabled: root.enabled;
         pointer-event(e) => {
             if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
                 root.edited(root.pick(root.vertical ? self.mouse-y : self.mouse-x));

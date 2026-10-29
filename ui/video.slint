@@ -294,6 +294,7 @@ export component VideoView inherits Rectangle {
             vertical-stretch: 0;
             Text { text: "A"; color: Theme.accent; font-weight: Theme.weight-bold; vertical-alignment: center; horizontal-stretch: 0; }
             Fader {
+                enabled: MixerState.crossfader-enabled;
                 detent: true;
                 value: MixerState.crossfader;
                 edited(v) => { MixerState.crossfader = v; MixerState.crossfade(v); }

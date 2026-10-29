@@ -49,6 +49,7 @@ export global MixerState {
     in-out property <[ChannelView]> channels;
     in-out property <BusView> bus;
     in-out property <float> crossfader: 0.5;
+    in property <bool> crossfader-enabled: true;
     /// Crossfader curve index in the order of prefs::CrossfaderCurve (smooth, sharp, constant); Rust mirrors the setting.
     in-out property <int> curve: 2;
     /// Colour FX type shared by both channels' CFX knobs: index into `cfx-names` (audio::cfx::Kind::ALL order, then the
@@ -275,6 +276,7 @@ export component MixerBar inherits Rectangle {
         spacing: Theme.space-md;
         XfGrid { side: 0; }
         Fader {
+            enabled: MixerState.crossfader-enabled;
             width: 96px;
             detent: true;
             value: MixerState.crossfader;
@@ -286,7 +288,8 @@ export component MixerBar inherits Rectangle {
     Chip {
         x: centre.x + centre.width + Theme.space-md;
         y: (root.height - self.height) / 2;
-        text: [@tr("SMOOTH"), @tr("SHARP"), @tr("CONST")][MixerState.curve];
+        text: MixerState.crossfader-enabled ? [@tr("SMOOTH"), @tr("SHARP"), @tr("CONST")][MixerState.curve] : @tr("OFF");
+        enabled: MixerState.crossfader-enabled;
         font-size: Theme.font-xs;
         width: 52px;
         height: 16px;

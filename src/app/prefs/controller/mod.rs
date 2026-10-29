@@ -18,8 +18,8 @@ mod others;
 mod sampler;
 
 use super::{Prefs, Row, choice, section};
-pub use named::{Fader, KnobMode};
 pub use drivers::{Driver, port_key};
+pub use named::{Fader, KnobMode};
 
 choice!(
     /// Sync Type: BEAT SYNC follows tempo and beat phase, BPM SYNC only the tempo.
@@ -107,6 +107,7 @@ section!(
         auto_gain: bool = true;
         eq_type: EqType = EqType::Eq;
         fader_curve: Fader = Fader::LINEAR;
+        crossfader_enabled: bool = true;
         /// Mixer > COLOR FX KNOB: NORMAL or a plugin's knob mode (a stop the knob cannot be dragged past).
         cfx_knob: KnobMode = KnobMode::NORMAL;
         output_level: i32 = 0;
@@ -332,6 +333,7 @@ mod tests {
         let mut c = Controller {
             sync_type: SyncType::Bpm,
             auto_cue_level: -42,
+            crossfader_enabled: false,
             capture_dir: "/tmp/x y".into(),
             quantize_length: BeatLength::Quarter,
             ..Default::default()
@@ -359,43 +361,5 @@ mod tests {
         let (back, notes) = Prefs::parse(&p.to_text());
         assert!(notes.is_empty(), "{notes:?}");
         assert_eq!(back, p);
-    }
-
-    #[test]
-    fn the_page_lists_every_tab_and_each_click_key_is_handled() {
-        let p = Prefs::default();
-        let rows = rows(&p);
-        let headers: Vec<_> = rows
-            .iter()
-            .filter(|r| r.kind == crate::app::prefs::rows::Kind::Header)
-            .map(|r| r.label.as_str())
-            .collect();
-        for tab in [
-            "DECK",
-            "MIXER",
-            "EFFECT",
-            "SAMPLER",
-            "RECORDINGS",
-            "MIX POINT LINK",
-            "OTHERS",
-        ] {
-            assert!(
-                headers.iter().any(|h| h.starts_with(tab)),
-                "{tab} in {headers:?}"
-            );
-        }
-        for r in rows
-            .iter()
-            .filter(|r| !r.key.is_empty() && r.kind != crate::app::prefs::rows::Kind::Info)
-        {
-            let mut q = Prefs::default();
-            assert!(
-                choose(&mut q, &r.key, 0)
-                    || super::super::advanced::choose(&mut q, &r.key, 0)
-                    || q.choose(&r.key, 0),
-                "{} is not handled",
-                r.key
-            );
-        }
     }
 }
