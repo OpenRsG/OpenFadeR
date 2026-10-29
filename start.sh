@@ -6,7 +6,7 @@
 # Add your own via OPENFADER_PLUGINS / OPENFADER_SKINS / OPENFADER_MAPPINGS. The native plugins are built first.
 set -euo pipefail
 root="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
-[ -e "$root/extension/plugin" ] || git clone --quiet --branch "${PLUGINS_REF:-v0.2.10}" \
+[ -e "$root/extension/plugin" ] || git clone --quiet --branch "${PLUGINS_REF:-v0.2.11}" \
 	https://github.com/OpenRsG/OpenFadeR-Plugins.git "$root/extension/plugin"
 for pair in extension/skin:OpenFadeR-Themes mappings:OpenFadeR-Map; do
 	dir="$root/${pair%%:*}"

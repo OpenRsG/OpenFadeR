@@ -11,7 +11,7 @@
 ARG RUST_VERSION=1.99
 
 FROM rust:${RUST_VERSION}-trixie AS build
-ARG PLUGINS_REF=v0.2.10
+ARG PLUGINS_REF=v0.2.11
 ARG THEMES_REF=openfader-v0.2.8
 ARG MAPPINGS_REF=openfader-v0.2.8
 # Cortex-A53 (Pi 3) code also runs on the A72 of the Pi 4 / CM4 and on later cores.
@@ -39,9 +39,24 @@ ENV TARGET=aarch64-unknown-linux-gnu \
     CARGO_TERM_COLOR=never \
     CARGO_INCREMENTAL=0 \
     CARGO_BUILD_JOBS=1
-ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C target-cpu=${TARGET_CPU}"
+# Pi 3/4 omit the optional crypto instructions assumed by LLVM's CPU presets.
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C target-cpu=${TARGET_CPU} -C target-feature=-aes,-sha2"
 ENV OPENFADER_BUILD_VARIANT=${PI_VARIANT}
 ENV OPENFADER_COMMIT=${OPENFADER_COMMIT}
+
+RUN python3 - <<'PY'
+import os
+import shlex
+import subprocess
+
+flags = shlex.split(os.environ["CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS"])
+features = set(subprocess.check_output(
+    ["rustc", "--print", "cfg", "--target", "aarch64-unknown-linux-gnu", *flags],
+    text=True,
+).splitlines())
+unsupported = features & {'target_feature="aes"', 'target_feature="sha2"'}
+assert not unsupported, f"Pi 3/4 do not support {sorted(unsupported)}"
+PY
 
 WORKDIR /src
 COPY . .

@@ -26,7 +26,7 @@ Fat LTO can exceed 12 GiB during final compilation. The release job uses a hoste
 limits are not raised and the shipping optimization profile is not weakened to fit them.
 
 The archive holds the same plugins, themes and controller mappings as a release archive. Core 0.2.8 builds the companion
-OpenFadeR-Plugins tag `v0.2.10`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
+OpenFadeR-Plugins tag `v0.2.11`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
 pick the other companions' branch or tag). Checkouts already present in `extension/plugin`, `extension/skin` or `mappings`
 are used as they are, so switch an older plugin checkout to the matching tag first. The cargo registry and target folders stay
 in BuildKit cache mounts, so the next build only recompiles what changed.
@@ -42,7 +42,7 @@ extra software.
 ## What the build changes
 
 - Profile `pi` (`Cargo.toml`): the `dist` profile with whole-program LTO and no symbol table. The earlier measured baseline was 82 MB with fat LTO versus 104 MB with thin LTO; those are not size promises for current releases.
-- `-C target-cpu=cortex-a53` for the generic archive; the dedicated Pi4/CM4 archive sets `PI_VARIANT=pi4` and `TARGET_CPU=cortex-a72`. Both variants are mandatory in the release workflow.
+- `-C target-cpu=cortex-a53` for the generic archive; the dedicated Pi4/CM4 archive sets `PI_VARIANT=pi4` and `TARGET_CPU=cortex-a72`. Both variants are mandatory in the release workflow. Both disable optional AES/SHA2 assumptions (`-C target-feature=-aes,-sha2`) missing from Pi 3/4 hardware; NEON and CRC remain enabled.
 - `--no-default-features --features app`: STEMS separates on the CPU. `app` still enables the `compatibility` feature and
   its built-in format adapters. ONNX Runtime has no WebGPU build for ARM Linux; its ARM build is also why the program needs
   Debian 13 (glibc 2.38, GCC 14's C++ library).
