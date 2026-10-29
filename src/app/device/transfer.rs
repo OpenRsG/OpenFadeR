@@ -192,38 +192,36 @@ impl Ctx {
         let (out, store) = (Arc::new(Mutex::new(None)), self.store.clone());
         let (ready, to) = (out.clone(), to.clone());
         self.mirror.set(true);
-        self.start_then(
-            Some(d.id.clone()),
-            tr!("Preparing transfer"),
-            move |ctl| {
-                let gathered = g
-                    .read(&store, &|| ctl.cancelled())
-                    .ok_or_else(|| "cancelled".to_owned())?;
-                let todo = if analysed {
-                    None
-                } else {
-                    Some(
-                        gathered
-                            .todo(&|| ctl.cancelled())
-                            .ok_or_else(|| "cancelled".to_owned())?,
-                    )
-                };
-                if ctl.cancelled() {
-                    return Err("cancelled".into());
+        self.start_then(true, Some(d.id.clone()),
+        tr!("Preparing transfer"),
+        move |ctl| {
+            let gathered = g
+                .read(&store, &|| ctl.cancelled())
+                .ok_or_else(|| "cancelled".to_owned())?;
+            let todo = if analysed {
+                None
+            } else {
+                Some(
+                    gathered
+                        .todo(&|| ctl.cancelled())
+                        .ok_or_else(|| "cancelled".to_owned())?,
+                )
+            };
+            if ctl.cancelled() {
+                return Err("cancelled".into());
+            }
+            *out.lock() = Some((gathered, todo));
+            Ok(String::new())
+        },
+        move |cx, result| {
+            cx.mirror.set(false);
+            cx.clear_loading();
+            if result.is_ok() {
+                if let Some((gathered, todo)) = ready.lock().take() {
+                    cx.transfer_ready(d, t, to, pack, gathered, todo);
                 }
-                *out.lock() = Some((gathered, todo));
-                Ok(String::new())
-            },
-            move |cx, result| {
-                cx.mirror.set(false);
-                cx.clear_loading();
-                if result.is_ok() {
-                    if let Some((gathered, todo)) = ready.lock().take() {
-                        cx.transfer_ready(d, t, to, pack, gathered, todo);
-                    }
-                }
-            },
-        );
+            }
+        },);
         Some(())
     }
 
@@ -240,7 +238,7 @@ impl Ctx {
             self.write_transfer(d, t, &to, g);
             return;
         };
-        let batch = analyze::batch(&todo);
+        let batch = analyze::batch(todo.into());
         let analyse = batch.as_ref().map_or(0, |b| b.len());
         let (bd, bto, bg) = (d.clone(), to.clone(), g.clone());
         let (go_t, dest) = (t.clone(), to.clone());
@@ -284,33 +282,31 @@ impl Ctx {
         let found = Arc::new(Mutex::new(Vec::new()));
         let (out, store, n, id) = (found.clone(), self.store.clone(), batch.len(), d.id.clone());
         self.mirror.set(true);
-        self.start_then(
-            Some(d.id.clone()),
-            tr!("Analysing"),
-            move |ctl| {
-                let say = |done: usize| ctl.set_phase(&tr!("Analysing {} of {}…", done, n));
-                say(0);
-                let started = Instant::now();
-                let r = batch.run(store.clone(), &|| ctl.cancelled(), &say)?;
-                if ctl.cancelled() {
-                    return Err("cancelled".into());
-                }
-                if n > 0 {
-                    let analyse_s = Some(started.elapsed().as_secs_f64() / n as f64);
-                    Speeds::remember(&store, &id, Speeds { analyse_s, ..Speeds::default() });
-                }
-                *out.lock() = r;
-                Ok(String::new())
-            },
-            move |cx, r| {
-                analyze::publish(std::mem::take(&mut *found.lock()));
-                cx.mirror.set(false);
-                cx.clear_loading();
-                if r.is_ok() {
-                    cx.go_on(&to, pack);
-                }
-            },
-        );
+        self.start_then(true, Some(d.id.clone()),
+        tr!("Analysing"),
+        move |ctl| {
+            let say = |done: usize| ctl.set_phase(&tr!("Analysing {} of {}…", done, n));
+            say(0);
+            let started = Instant::now();
+            let r = batch.run(store.clone(), &|| ctl.cancelled(), &say)?;
+            if ctl.cancelled() {
+                return Err("cancelled".into());
+            }
+            if n > 0 {
+                let analyse_s = Some(started.elapsed().as_secs_f64() / n as f64);
+                Speeds::remember(&store, &id, Speeds { analyse_s, ..Speeds::default() });
+            }
+            *out.lock() = r;
+            Ok(String::new())
+        },
+        move |cx, r| {
+            analyze::publish(std::mem::take(&mut *found.lock()));
+            cx.mirror.set(false);
+            cx.clear_loading();
+            if r.is_ok() {
+                cx.go_on(&to, pack);
+            }
+        },);
     }
 
     /// The transfer after its analysis: no second analysis, a refusal is toasted as in [`Self::go`].

@@ -114,60 +114,58 @@ impl Ctx {
         let (o, store, dev, safety) = (self.options(Some(d)), self.store.clone(), d.clone(), self.safety());
         let out: Arc<Mutex<Option<(link::Links, Vec<Conflict>)>>> = Arc::default();
         let (found, id) = (out.clone(), d.id.clone());
-        self.start_then(
-            Some(d.id.clone()),
-            tr!("Matching tracks"),
-            move |ctl| {
-                let lib = device::open_library(&dev)?;
-                let links = link::links(&*lib, &dev.mount, collection, &store)?;
-                let filled = link::fill(&links, &*lib, &reader, &store)?;
-                let (pulled, mut push, conflicts) = (filled.pulled, filled.push, filled.conflicts.len());
-                *found.lock() = Some((links, filled.conflicts));
-                if writers.is_empty() {
-                    push.clear();
-                }
-                let pushed = push.len();
-                if pushed > 0 {
-                    safety.recover(&dev.mount, &dev.label)?;
-                    let done = device::export::export(
-                        &writers,
-                        &dev.mount,
-                        &Snapshot::of_tracks(push),
-                        &o,
-                        &ctl,
-                    )?;
-                    record_all(&store, Some(&dev), &done, &dev.label)?;
-                }
-                Ok(match (pulled + pushed, conflicts) {
-                    (0, 0) => String::new(),
-                    (0, c) => tr_n!(
-                        "{}: {n} track has different cues or grid than in your collection. Nothing was changed: choose which copy to keep with CUES DIFFER in the DEVICES window",
-                        "{}: {n} tracks have different cues or grid than in your collection. Nothing was changed: choose which copy to keep with CUES DIFFER in the DEVICES window",
-                        c,
-                        dev.label
-                    ),
-                    (_, 0) => tr!(
-                        "{}: cue sync filled {} track(s) here and {} on the device",
-                        dev.label,
-                        pulled,
-                        pushed
-                    ),
-                    (_, c) => tr!(
-                        "{}: cue sync filled {} track(s) here and {} on the device; {} track(s) have different cues or grid in both places and wait for your choice (CUES DIFFER)",
-                        dev.label,
-                        pulled,
-                        pushed,
-                        c
-                    ),
-                })
-            },
-            move |cx, _| {
-                if let Some((links, conflicts)) = out.lock().take() {
-                    cx.links.borrow_mut().insert(id.clone(), Rc::new(links));
-                    cx.set_conflicts(&id, conflicts);
-                }
-            },
-        );
+        self.start_then(true, Some(d.id.clone()),
+        tr!("Matching tracks"),
+        move |ctl| {
+            let lib = device::open_library(&dev)?;
+            let links = link::links(&*lib, &dev.mount, collection, &store)?;
+            let filled = link::fill(&links, &*lib, &reader, &store)?;
+            let (pulled, mut push, conflicts) = (filled.pulled, filled.push, filled.conflicts.len());
+            *found.lock() = Some((links, filled.conflicts));
+            if writers.is_empty() {
+                push.clear();
+            }
+            let pushed = push.len();
+            if pushed > 0 {
+                safety.recover(&dev.mount, &dev.label)?;
+                let done = device::export::export(
+                    &writers,
+                    &dev.mount,
+                    &Snapshot::of_tracks(push),
+                    &o,
+                    &ctl,
+                )?;
+                record_all(&store, Some(&dev), &done, &dev.label)?;
+            }
+            Ok(match (pulled + pushed, conflicts) {
+                (0, 0) => String::new(),
+                (0, c) => tr_n!(
+                    "{}: {n} track has different cues or grid than in your collection. Nothing was changed: choose which copy to keep with CUES DIFFER in the DEVICES window",
+                    "{}: {n} tracks have different cues or grid than in your collection. Nothing was changed: choose which copy to keep with CUES DIFFER in the DEVICES window",
+                    c,
+                    dev.label
+                ),
+                (_, 0) => tr!(
+                    "{}: cue sync filled {} track(s) here and {} on the device",
+                    dev.label,
+                    pulled,
+                    pushed
+                ),
+                (_, c) => tr!(
+                    "{}: cue sync filled {} track(s) here and {} on the device; {} track(s) have different cues or grid in both places and wait for your choice (CUES DIFFER)",
+                    dev.label,
+                    pulled,
+                    pushed,
+                    c
+                ),
+            })
+        },
+        move |cx, _| {
+            if let Some((links, conflicts)) = out.lock().take() {
+                cx.links.borrow_mut().insert(id.clone(), Rc::new(links));
+                cx.set_conflicts(&id, conflicts);
+            }
+        },);
     }
 
     /// Matches device `id` again when no job runs (an export just added or changed tracks on it).
@@ -290,7 +288,7 @@ impl Ctx {
             return;
         };
         let (o, store, n, safety) = (self.options(Some(&d)), self.store.clone(), tracks.len(), self.safety());
-        self.start(Some(id), tr!("Writing cues"), move |ctl| {
+        self.start(true, Some(id), tr!("Writing cues"), move |ctl| {
             safety.recover(&d.mount, &d.label)?;
             let done =
                 device::export::export(&writers, &d.mount, &Snapshot::of_tracks(tracks), &o, &ctl)?;

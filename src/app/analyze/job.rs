@@ -1,6 +1,7 @@
 //! Process-wide bulk scheduling and per-request completion. Compatible queued or in-flight jobs share decoding and
 //! analysis; every subscriber keeps its own cue guide, tag settings, cancellation and result channel.
 
+mod submission;
 use super::{Outcome, summary};
 use openfader::{
     analysis::{
@@ -17,10 +18,13 @@ use std::{
     path::PathBuf,
     sync::{
         Arc, Condvar, LazyLock, Mutex, Weak,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc,
     },
 };
+#[cfg(test)]
+use submission::spawn;
+pub(super) use submission::{Tracks, publication, spawn_tracks};
 
 const MAX_RUNS: usize = 8;
 const COMMIT_KEYS: usize = 8192;
@@ -106,7 +110,7 @@ fn notice(sub: &Subscriber, text: String) {
     }
 }
 
-/// The cues and tag of one analysed track (`a`), the part of [`spawn`]'s work that is not decoding.
+/// The cues and tag of one analysed track (`a`), the part of [`spawn_tracks`]'s work that is not decoding.
 fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> Outcome {
     let g = &job.guide;
     let (beats, phrases) = if g.beats.is_empty() {
@@ -180,15 +184,38 @@ pub(in crate::app) fn lower_priority() {
     }
 }
 
-pub struct Cancellation(Arc<AtomicBool>);
+pub struct Cancellation {
+    cancelled: Arc<AtomicBool>,
+    total: Arc<AtomicUsize>,
+    registered: Arc<AtomicBool>,
+}
+
+impl Cancellation {
+    pub fn total(&self) -> usize {
+        self.total.load(Ordering::Relaxed)
+    }
+
+    pub fn registered(&self) -> bool {
+        self.registered.load(Ordering::Acquire)
+    }
+
+    #[cfg(test)]
+    fn test(cancelled: Arc<AtomicBool>) -> Self {
+        Self {
+            cancelled,
+            total: Arc::new(AtomicUsize::new(0)),
+            registered: Arc::new(AtomicBool::new(true)),
+        }
+    }
+}
 
 impl Drop for Cancellation {
     fn drop(&mut self) {
-        self.0.store(true, Ordering::Relaxed);
+        self.cancelled.store(true, Ordering::Relaxed);
         pool()
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .cancel(&self.0);
+            .cancel(&self.cancelled);
         wake().notify_all();
     }
 }
@@ -266,6 +293,11 @@ struct Pool {
     threads: [usize; 2],
     sequence: u64,
     generations: HashMap<PathBuf, Weak<Mutex<Generations>>>,
+    generation_sweep: VecDeque<PathBuf>,
+    staging: VecDeque<submission::Submission>,
+    staging_active: bool,
+    admitted: VecDeque<submission::Submission>,
+    retired: Vec<submission::Submission>,
     learning: VecDeque<(Arc<super::Learner>, Arc<Store>, bool)>,
     learning_running: usize,
     runs: Vec<Weak<AtomicBool>>,
@@ -288,6 +320,7 @@ impl Pool {
     }
 
     fn cancel(&mut self, cancelled: &Arc<AtomicBool>) {
+        self.cancel_submissions(cancelled);
         self.pending
             .retain(|s| !Arc::ptr_eq(&s.cancelled, cancelled));
         for work in &self.queued {
@@ -305,8 +338,6 @@ impl Pool {
                 index += 1;
             }
         }
-        self.generations
-            .retain(|_, ticket| ticket.strong_count() > 0);
     }
 
     fn grow(&mut self, low_priority: bool) -> usize {
@@ -452,6 +483,8 @@ fn prepare(sub: &mut Subscriber) -> Result<bool, String> {
 }
 
 enum Task {
+    Stage(submission::Submission),
+    Discard(submission::Submission),
     Prepare(Subscriber, (String, PathBuf)),
     Analyze(Arc<Work>),
     Learn(Arc<super::Learner>, Arc<Store>),
@@ -459,6 +492,16 @@ enum Task {
 
 impl Pool {
     fn next(&mut self, low_priority: bool) -> Option<Task> {
+        if let Some(submission) = self.retired.pop() {
+            return Some(Task::Discard(submission));
+        }
+        if !self.staging_active {
+            if let Some(submission) = self.staging.pop_front() {
+                self.staging_active = true;
+                return Some(Task::Stage(submission));
+            }
+        }
+        self.refill();
         // One key stays ordered through preparation, cache commit, cue/tag writes and result delivery.
         if self.running.len() + self.learning_running < self.limit {
             self.learning
@@ -538,6 +581,16 @@ fn worker(low_priority: bool) {
             }
         };
         match task {
+            Task::Discard(submission) => drop(submission),
+            Task::Stage(mut submission) => {
+                submission.reserve();
+                let retired = {
+                    let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
+                    pool.stage(submission)
+                };
+                drop(retired);
+                wake().notify_all();
+            }
             Task::Learn(learner, store) => {
                 if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     learner.learned(&store)
@@ -712,55 +765,6 @@ pub(super) fn learn(
         .retain(|(learner, _, _)| Arc::strong_count(learner) > 1);
     pool.learning.push_back((learner, store, low_priority));
     wake().notify_all();
-}
-
-/// Runs share a process-wide budget; compatible requests share computation but retain their own completion settings.
-pub fn spawn(
-    jobs: Vec<Job>,
-    settings: Settings,
-    store: Arc<Store>,
-    tx: mpsc::Sender<(PathBuf, Result<Outcome, String>)>,
-) -> Result<Cancellation, String> {
-    let cue_epoch = store.cue_generation();
-    let cancelled = Arc::new(AtomicBool::new(jobs.is_empty()));
-    let mut pool = pool().lock().unwrap_or_else(|e| e.into_inner());
-    pool.admit(&cancelled, settings.workers)?;
-    pool.configure(settings.workers, settings.low_priority);
-    pool.generations
-        .retain(|_, ticket| ticket.strong_count() > 0);
-    for mut job in jobs {
-        pool.sequence += 1;
-        job.generation = pool.sequence;
-        job.cue_epoch = cue_epoch;
-        let ticket = pool
-            .generations
-            .get(&job.path)
-            .and_then(Weak::upgrade)
-            .unwrap_or_else(|| {
-                let ticket = Arc::new(Mutex::new(Generations::default()));
-                pool.generations
-                    .insert(job.path.clone(), Arc::downgrade(&ticket));
-                ticket
-            });
-        {
-            let mut generations = ticket.lock().unwrap_or_else(|e| e.into_inner());
-            generations.latest();
-            generations
-                .pending
-                .push((job.generation, Arc::downgrade(&cancelled)));
-        }
-        job.ticket = Some(ticket);
-        pool.pending.push_back(Subscriber {
-            source: None,
-            job,
-            settings: settings.clone(),
-            store: store.clone(),
-            tx: tx.clone(),
-            cancelled: cancelled.clone(),
-        });
-    }
-    wake().notify_all();
-    Ok(Cancellation(cancelled))
 }
 
 #[cfg(test)]
@@ -1269,7 +1273,7 @@ mod tests {
         let (off, off_rx) = subscriber(path, true, settings(false));
         let (on, on_rx) = subscriber(path, true, settings(true));
         let (cancelled, cancelled_rx) = subscriber(path, true, settings(true));
-        let cancel = Cancellation(cancelled.cancelled.clone());
+        let cancel = Cancellation::test(cancelled.cancelled.clone());
         pool.submit(off);
         let work = pool.take_ready().pop().unwrap();
         pool.submit(on);
@@ -1300,7 +1304,7 @@ mod tests {
             ..Default::default()
         };
         let (sub, rx) = subscriber("cancelled", false, settings(false));
-        let cancelled = Cancellation(sub.cancelled.clone());
+        let cancelled = Cancellation::test(sub.cancelled.clone());
         pool.submit(sub);
         drop(cancelled);
         pool.submit(subscriber("live", false, settings(false)).0);

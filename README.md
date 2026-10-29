@@ -25,7 +25,24 @@ Every screenshot on this page comes from the running app, with a library of synt
 
 ## Download
 
-Get the archive for your system from the [releases page](https://github.com/OpenRsG/OpenFadeR/releases): Linux (x86_64), Windows (x86_64) or macOS (Apple silicon). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `OpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
+Get the archive for your system from the [releases page](https://github.com/OpenRsG/OpenFadeR/releases): Linux (x86_64), Windows (x86_64), macOS (Apple silicon), or Raspberry Pi (64-bit Debian 13; generic and Pi4/CM4-tuned archives). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `OpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
+
+### Release builds
+
+Every release requires all five archives below. Shipping executables use optimization level 3, one codegen unit for the app
+and stripped symbols; bundled native libraries are stripped too. Local `--release` builds keep symbols for diagnostics.
+
+| Target | CPU baseline | App LTO |
+|---|---|---|
+| Linux x86_64 | Portable x86_64 | Thin |
+| Windows x86_64 | Portable x86_64 | Thin |
+| macOS ARM64 | Apple M1 and newer | Off: preserves the CoreML compiler-runtime link |
+| Generic Raspberry Pi ARM64 | Cortex-A53; also compatible with Pi 4 / 5 / CM4 | Fat |
+| Raspberry Pi 4 / CM4 ARM64 | Cortex-A72 | Fat |
+
+CI starts the packaged Linux/Windows applications and both Pi archives (under QEMU/software rendering). macOS has a native
+Intel smoke plus ARM architecture/signature checks, not an ARM runtime check. A missing required archive blocks the release
+draft. These build settings are not a hardware performance guarantee.
 
 ### Updates
 
@@ -48,6 +65,9 @@ The first run clones the plugins, themes and mappings next to the code, builds e
 `start.sh` without a path opens the Collection as you left it; every connected library and folder syncs at start and whenever it changes, and `$XDG_MUSIC_DIR` (else `~/Music/OpenFadeR`) is always connected. To build only the core: `cargo build --release`.
 
 To install it for your user on Linux instead (the `openfader` command and an application menu entry, with the plugins, themes and mappings bundled): `./install.sh`. It also sets the default plugin, theme and mapping repositories of PREFERENCES (GET PLUGINS / GET THEMES / GET MAPPINGS), which the app uses anyway until you edit the list. Run it again to update; `./install.sh --uninstall` removes it.
+
+Linux installation keeps ONNX/WebGPU runtime libraries beside the executable and companion libraries inside their plugin folders.
+Unrelated shared libraries left in the build directory are not installed. Local release builds retain their backtrace symbols.
 
 ### Raspberry Pi
 
@@ -82,11 +102,17 @@ The playing deck leads the tempo. SYNC on the only playing deck keeps its tempo 
 
 For clearer waveforms, open PREFERENCES > VIEW > WAVEFORM. Set BEAT GRID to BOLD for outlined lines over the enlarged waveform, with wider downbeats that do not rely on colour alone. The whole-track overview keeps thin bar lines behind the audio in either setting, so track dynamics and phrases stay readable. Set HOT CUE MARKERS to LARGE for double-size flags and letters on the decks and browser previews (when preview cue markers are enabled). Memory cues are solid bars in the theme's memory-cue colour with an M flag, drawn over the grid and wider than a bold downbeat, and they grow with LARGE too. Both settings apply immediately and are saved; NORMAL keeps the original sizes.
 
-The same WAVEFORM section has RENDERER: AUTO (default), GPU or CPU. AUTO uses cached image cropping when a hardware
-graphics API is available; CPU translates cached raster strips. Both paths keep the overview static and move small
-playhead/slip textures instead of copying the overview every tick. GPU also permits emulated OpenGL for diagnosis;
+The same WAVEFORM section has RENDERER: AUTO (default), GPU or CPU. AUTO selects hardware image composition when a
+graphics API is available. Both paths use the same source-pixel crop of the cached enlarged strip; they keep the overview
+static and move small playhead/slip textures instead of copying it every tick. GPU also permits emulated OpenGL for diagnosis;
 without a graphics API it falls back to CPU. Changes apply while playing without restarting or interrupting audio.
 The startup log identifies the graphics API, OpenGL renderer and waveform path.
+
+Cue markers, waveform columns and the fixed playhead share physical-pixel coordinates on both renderers, including fractional
+display scaling. The moving waveform follows the audible-position clock; briefly busy UI reads retain callback timing history
+rather than jumping to audio still queued for output. Each seek keeps its target until the matching audio position and clock
+are published. CUE prepares its resting frame before redraw; holding the button after a return cannot restart a preview through
+key repeat, and cancelling a held pointer releases it. Cue quantization and stored cue positions are unchanged.
 
 If the default graphics backend fails before its first frame, the app retries once with Slint's native software renderer.
 Windowless startup has a two-second deadline so a deferred driver error cannot leave an invisible process running.
@@ -99,12 +125,54 @@ Linux DRM resident/local-memory counters, never whole-device usage or an estimat
 shared-memory-only GPUs show **—**, not a fabricated zero. Hover either row for details. Touch and Stage layouts
 put the same readout in the existing status line to preserve space for their controls.
 
+The browser and device window share background device/source discovery; the browser timer does not repeat filesystem or plugin
+probes. Selected-track analysis reads use cached summaries and one background read at a time, with the latest waiting selection
+replacing older requests. Late answers refresh analysis labels only, preserving unsaved comments and the editor's pinned track.
+
+Search and filter changes reuse one cached sort order per track list. Metadata and detected-value changes invalidate the affected
+ordering; manual playlists keep their own order. Unrelated store writes reuse library key indexes when the shared list is unchanged.
+Bulk analysis captures shared tracks and row indices, stages work on the existing workers, and publishes bounded result batches
+across event-loop turns. Superseded requests retain their identity checks, and a full backlog continues without waiting for the
+normal idle polling interval.
+Scrolling keeps a bounded recent-row cache rather than every visited formatted row. Models still held by the UI remain
+live and receive reference, played-state and metadata updates.
+
+Metadata undo/reload builds a temporary lookup only for sources it actually needs, preserving source precedence and inherited
+values without scanning each library again for every retained track.
+Suggest's refresh timer runs only while Suggest is active; Playlist Palette's runs only while enabled and open. Opening either
+requests an immediate refresh. Background analysis continues while these panels are closed.
+While open, Playlist Palette reuses its snapshot instead of rereading unchanged playlist entries. Store edits, assignments,
+Tag List changes, playlist names and BPM precision invalidate it; failed playlist reads are retried.
+Playlist chooser and move-menu paths share one temporary node index per operation instead of rescanning the hierarchy
+for every parent. Menu ordering and the existing cycle limits are preserved.
+Expanded My Playlists sidebar rows reuse that node-index helper for icon selection during rebuilds. Folded sections
+avoid building the index; no hierarchy cache is retained between rebuilds.
+EXPORT's player panels refresh only while EXPORT is open and catch up on entry. Background device/export jobs continue
+when another mode is selected.
+
+Track-list dividers resize only their own column, including TITLE; those widths are saved. Overflow scrolls horizontally
+with the column headings in the desktop, Studio and Stage tables. Loaded-deck badges identify the media, not its title,
+so two tracks with the same name do not both appear loaded. Sorting or replacing a row between clicks does not turn
+the second click into a load of a different track.
+
+Held CUE, scratch and pad controls release their original deck, pad and mode, including after a deck-layer or sampler-bank
+change. Leaving a pad mode ends its momentary action; replacing a deck track does not release independent sampler slots.
+Clearing a sampler slot also cancels its pending load, so a late decode cannot refill it.
+
+Theme deletion asks for confirmation. Path dialogs focus their input on every opening; an empty submission leaves the
+dialog open, and a late file-chooser answer cannot replace a newer request. Device jobs offer cancellation only when
+the worker supports it; progress stays CANCELLING until completion. Cancellation can leave completed changes on the device.
+
 PREFERENCES > AUDIO > BUFFER shows what AUTO requests: 512 frames on a full-power machine, or the driver's default in LOW-POWER MODE. An explicit frame count overrides either choice; a driver that refuses it falls back to its own buffer and reports that in the audio status. The Linux backend requests two periods per fixed buffer. Smaller buffers reduce output delay but can underrun under load: increase the buffer if audio crackles. Output-device lookup runs off the UI thread; the status shows a pending lookup and then the device actually in use. MIDI dispatch, drawing time and the sound card's output delay are separate costs, not zero physical latency.
+The shared resampling table is initialized during stream preparation, before the first audio callback needs a fractional read.
+Non-stretched stem FX reuses the selected-stem sample for both subtraction and effect processing. Key lock and pitch shift
+keep independent stretchers for the selected part and the rest of the mix, with their existing interpolation behavior.
 
 If an output stops delivering callbacks or reports a fatal error, the engine reconnects to that same device without
 discarding the loaded tracks, cues, loops or transport commands. Device lookup runs off the UI thread; retries are
 coalesced and spaced at least a second apart. Recovery does not silently substitute another output. ALSA underruns
 retain their existing prepare/retry path; a fatal `POLLERR` stops its worker instead of spinning and flooding the log.
+Teardown joins that worker even if its shutdown pipe receiver has already closed, and retries interrupted wake-up writes.
 
 The interface is in English, French, Spanish, German, Portuguese (Brazil), Italian or Dutch: PREFERENCES > VIEW > LANGUAGE, where SYSTEM follows the computer's language. Button labels that match DJ hardware (CUE, SYNC, LOOP, BEAT FX …) stay in English in every language.
 
@@ -159,6 +227,9 @@ Sixteen slots in two banks, loaded from a deck or from a file. Slots play as a s
 Enable STEMS in PREFERENCES > EXTENSIONS and each loaded track is separated into vocal, instrument, bass and drums (a 3-stem mode exists too) by an ONNX model that runs on the CPU or the GPU. Switching STEMS on downloads that model once (316 MB), with a progress card at the bottom right. A deck's stem button is filled while its stem plays at full level; a click turns that stem off, another brings it back. The pads and a controller can mute or solo, and the mixer's knobs can act on stems. The waveform follows what you hear.
 
 Stem buffers allocate on a worker while the original track remains playable. STEM INSTANT DOUBLES shares completed audio and stems between decks, with independent transport and stem gains.
+Compatible ordinary loads also share in-flight separation and output. Each deck keeps its own completion and SPEED-mode
+play/cue focus; unloading one subscriber does not cancel the others. Changed source versions, decoded audio, rate, length,
+quality, threading or stem-file settings do not share that work.
 
 Model sessions open only for uncached inference and are shared by active batches. The last batch releases the CPU/GPU
 sessions immediately; no speculative warm-up or 90-second idle hold remains. Low-power mode runs one batch, prefers
@@ -166,7 +237,16 @@ the GPU with CPU fallback, and caps CPU inference at two threads; other devices 
 also respects Linux cgroup v2 limits. Full-quality inference still needs substantial temporary memory, and retained
 16-bit track/stem data grows with track length. Smaller budgets reduce concurrency, not audio quality.
 
+Stem outputs reserve space before allocation, including cache hits and embedded stem files. Their process-wide budget is
+one eighth of effective RAM (including Linux cgroup limits); unknown capacity uses a 256 MiB output budget. Completed stems
+remain charged until their last audio/waveform consumer releases them, with shared outputs charged only once. **RAM WAIT**
+means the original audio remains usable while output space is held elsewhere. Unloading a track or turning STEMS off releases
+its consumers; waiting work resumes automatically. A single output larger than the budget reports an error instead of waiting
+forever. This budgets stem output, not the whole process.
+
 Separated-stem disk caches are trimmed to a 4 GiB budget when storing new results. Oldest stored entries and interrupted writes are removed first; active cache reads/writes are protected by a directory lock across app processes. A result too large for the budget remains playable in memory but is not cached. Cache and embedded-stem metadata lookup runs on bounded, cancel-owned workers.
+Cache reads, writes and lock waits check cancellation between chunks; a cancelled replacement preserves the previous complete
+entry and removes its partial file. Embedded parts are capped to the mix length while decoding, not trimmed only after growing.
 
 **Stem files** (`.stem.mp4` / `.stem.m4a`: an MP4 with the stereo mix as its first audio track and four stem tracks after it, the part names in a JSON box) play their own parts. The mix plays as the track; with STEMS on, the four parts feed the stem buttons, pads and knobs exactly as separated stems would, with no model run and no cache entry (it needs no model download either). The parts are mapped by their names: vocals (vocal, vox, voice, acapella) to VOCAL, drums (drum, perc, kick) to DRUMS, bass to BASS, anything else to INST. When the names do not give each stem exactly once, the usual order applies: drums, bass, melody, vocals. The browser marks stem files with a STEMS badge, the track info lists their part names and a stem button's tooltip names its part. PREFERENCES > EXTENSIONS > STEMS > "Use the parts of stem files" (on by default) switches this off: the file then plays and separates like any other MP4. Without STEMS on, or with the setting off, a stem file is just its mix.
 
@@ -283,7 +363,7 @@ Import, export and supported device/cue writeback translate through those adapte
 The [adapter inventory](docs/plugins.md#compatibility-layer) lists the formats and their supported operations, including iTunes/Music,
 sampler packs and the companion's separate Mixxx controller-mapping integration.
 
-The built-in Rekordbox adapters (USB sticks and SD cards in Device Library and OneLibrary formats, collection XML and the desktop collection) are always on, with nothing to install. A fresh profile also starts with the companion Engine DJ, Serato, Traktor and VirtualDJ adapters and the effect packs on (`beat-fx`, `send-fx`, `lever-fx`, `mic-fx`, `soft-mix`, `cross-pass`); the other plugins start switched off. Existing plugin choices are preserved. At the first start a welcome window offers the suggested ones and STEMS; ACCEPT switches them on, SKIP leaves them off. Help > Welcome opens it again. Plugging in a stick whose reader is off opens the same window with that reader.
+The built-in Rekordbox adapters (USB sticks and SD cards in Device Library and OneLibrary formats, collection XML and the desktop collection) are always on, with nothing to install. Traktor is also compiled into the app, with an on/off switch and no separate installation. A fresh profile starts with Traktor, the companion Engine DJ, Serato and VirtualDJ adapters and the effect packs on (`beat-fx`, `send-fx`, `lever-fx`, `mic-fx`, `soft-mix`, `cross-pass`); the other plugins start switched off. Existing plugin choices, including disabled or removed Traktor, are preserved. At the first start a welcome window offers the suggested ones and STEMS; ACCEPT switches them on, SKIP leaves them off. Help > Welcome opens it again. Plugging in a stick whose reader is off opens the same window with that reader.
 
 At each start the app asks GitHub for the newest release; when it is newer than the running version a window offers to open its download page. Offline, nothing is shown.
 
@@ -325,7 +405,7 @@ Each kind is looked up in an environment-variable folder list (`:`-separated), a
 | Themes | `OPENFADER_SKINS` | `~/.config/openfader/extension/skin/` | `extension/skin/` |
 | Controller mappings | `OPENFADER_MAPPINGS` | `~/.config/openfader/mappings/` | `mappings/` |
 
-`start.sh` clones the three repositories into those bundled folders (git ignores them here) and the native plugins build with `extension/plugin/build.sh` against this checkout's `sdk/` and compatibility helpers. Core 0.2.7 uses OpenFadeR-Plugins tag `v0.2.8`; `PLUGINS_REF` overrides that ref for the first clone in `start.sh` and `install.sh`. Existing checkouts are left untouched: switch an older plugin checkout to the matching tag before building. Settings live in `$XDG_CONFIG_HOME/openfader/` (default `~/.config/openfader/`), the Collection (`store.db`) and our analysis in `$XDG_DATA_HOME/openfader/` (default `~/.local/share/openfader/`).
+`start.sh` clones the three repositories into those bundled folders (git ignores them here) and the native plugins build with `extension/plugin/build.sh` against this checkout's `sdk/` and compatibility helpers. Core 0.2.8 uses OpenFadeR-Plugins tag `v0.2.9`; `PLUGINS_REF` overrides that ref for the first clone in `start.sh` and `install.sh`. Existing checkouts are left untouched: switch an older plugin checkout to the matching tag before building. Settings live in `$XDG_CONFIG_HOME/openfader/` (default `~/.config/openfader/`), the Collection (`store.db`) and our analysis in `$XDG_DATA_HOME/openfader/` (default `~/.local/share/openfader/`).
 
 ### Linux, Windows and macOS
 

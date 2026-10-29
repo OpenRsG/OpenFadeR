@@ -68,7 +68,7 @@ fn finished(c: &Rc<Ctx>, r: Result<Report, String>) {
                 });
             c.analyze(todo, false);
             if !keep.is_empty() && prefs::with(|p| p.analysis.auto_analysis) {
-                analyze::request_keep_cues(&keep);
+                analyze::request_keep_cues(keep.into());
             }
         }
         Err(e) => c.say(&tr!("import failed: {}", e)),

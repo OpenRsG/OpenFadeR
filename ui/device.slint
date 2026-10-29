@@ -30,15 +30,16 @@ export component DeviceProgress inherits Rectangle {
     background: Theme.panel-raised;
     border-radius: Theme.radius;
     visible: DeviceState.busy;
+    property <length> cancel-width: DeviceState.can-cancel ? root.height : 0px;
     Rectangle {
-        width: (parent.width - parent.height) * DeviceState.progress;
+        width: (parent.width - root.cancel-width) * DeviceState.progress;
         height: parent.height;
         background: Theme.accent;
         border-radius: Theme.radius;
     }
     Text {
         x: Theme.space-md;
-        width: parent.width - parent.height - Theme.space-md;
+        width: parent.width - root.cancel-width - Theme.space-md;
         height: parent.height;
         text: DeviceState.phase + " " + round(DeviceState.progress * 100) + "%";
         vertical-alignment: center;
@@ -49,6 +50,7 @@ export component DeviceProgress inherits Rectangle {
         font-weight: Theme.weight-bold;
     }
     IconButton {
+        visible: DeviceState.can-cancel;
         x: parent.width - self.width;
         width: parent.height;
         height: parent.height;

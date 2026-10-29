@@ -11,6 +11,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: "1"
 
 jobs:
   package:
@@ -36,9 +37,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Companions (plugins, themes, mappings)
         run: |
-          git clone --depth 1 --branch v0.2.8 https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
-          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
-          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
+          git clone --depth 1 --branch v0.2.9 https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
+          git clone --depth 1 --branch openfader-v0.2.8 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
+          git clone --depth 1 --branch openfader-v0.2.8 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
       - name: System libraries
         if: matrix.name == 'linux'
         run: |
@@ -83,6 +84,8 @@ jobs:
           echo "OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl.exe" >> "$GITHUB_ENV"
           echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
       - name: Build the plugins
+        env:
+          CARGO_PROFILE_RELEASE_STRIP: symbols
         run: extension/plugin/build.sh --quiet
       - name: Build the app
         # macOS: cross-crate LTO drops the compiler runtime's `__isPlatformVersionAtLeast`, which ONNX Runtime's CoreML code needs at link time.
@@ -107,6 +110,8 @@ jobs:
         env:
           CARGO_BUILD_TARGET: aarch64-apple-darwin
           CARGO_PROFILE_DIST_LTO: "false"
+          CARGO_TARGET_AARCH64_APPLE_DARWIN_RUSTFLAGS: "-C target-cpu=apple-m1"
+          CARGO_PROFILE_RELEASE_STRIP: symbols
         run: |
           unset ORT_LIB_LOCATION ORT_PREFER_DYNAMIC_LINK
           extension/plugin/build.sh --quiet
@@ -121,7 +126,11 @@ jobs:
             d=openfader-$VERSION-linux-x86_64
             mkdir "$d"
             cp target/dist/openfader "$d/"
-            cp -L target/dist/*.so* "$d/"
+            # Keep runtime families aligned with install.sh; plugins are bundled in their own folders.
+            for runtime in target/dist/libonnxruntime*.so* target/dist/libwebgpu_dawn.so*; do
+              [ -f "$runtime" ] || continue
+              cp -L "$runtime" "$d/"
+            done
             python .github/bundle.py "$d"
             cp LICENSE README.md "$d/"
             cp assets/icon.png "$d/openfader.png"
@@ -217,17 +226,61 @@ jobs:
           path: smoke/
           if-no-files-found: ignore
 
-  # The Raspberry Pi archive (aarch64, Debian 13), cross-compiled in Docker as in docs/raspberry-pi.md.
+  # Both archives keep whole-program LTO; Pi4/CM4 also uses Cortex-A72 code generation.
   pi:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { variant: pi, cpu: cortex-a53 }
+          - { variant: pi4, cpu: cortex-a72 }
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+      - name: Allow fat LTO to page on the hosted runner
+        run: |
+          sudo fallocate -l 16G "$RUNNER_TEMP/openfader-pi.swap"
+          sudo chmod 600 "$RUNNER_TEMP/openfader-pi.swap"
+          sudo mkswap "$RUNNER_TEMP/openfader-pi.swap"
+          sudo swapon "$RUNNER_TEMP/openfader-pi.swap"
       - name: Build the Pi archive
-        run: docker buildx build -f Dockerfile.pi -o dist/pi .
+        run: docker buildx build -f Dockerfile.pi --build-arg PI_VARIANT=${{ matrix.variant }} --build-arg TARGET_CPU=${{ matrix.cpu }} --build-arg OPENFADER_COMMIT=${GITHUB_SHA::9} -o dist/pi .
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Inspect and run the ARM archive
+        run: |
+          d="openfader-$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)-linux-aarch64-${{ matrix.variant }}"
+          readelf_dir="$RUNNER_TEMP/pi-elf"
+          mkdir -p "$readelf_dir" pi-smoke
+          tar -xzf "dist/pi/$d.tar.gz" -C "$readelf_dir"
+          readelf -h "$readelf_dir/$d/openfader" | grep -q 'Machine:.*AArch64'
+          if readelf -S "$readelf_dir/$d/openfader" | grep -q '\.symtab'; then
+            echo "Pi executable unexpectedly retains its symbol table" >&2
+            exit 1
+          fi
+          docker run --rm --platform linux/arm64 --cpus=4 --memory=2g --memory-swap=2g \
+            -e QEMU_CPU=${{ matrix.cpu }} -e SLINT_BACKEND=winit-software \
+            -e OPENFADER_MIDI_PORT=none-release-smoke \
+            -v "$readelf_dir:/bundle:ro" -v "$PWD/.github:/checks:ro" -v "$PWD/pi-smoke:/smoke" \
+            debian:trixie-slim bash -ec '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends libasound2t64 libfontconfig1 libxkbcommon0 libxkbcommon-x11-0 libwayland-client0 libudev1 libstdc++6 libgomp1 libx11-6 libxcursor1 libxi6 libxrandr2 fonts-dejavu-core python3 xvfb xauth imagemagick
+              printf "pcm.null { type null }\npcm.!default { type null }\n" > /tmp/alsa.conf
+              export ALSA_CONFIG_PATH=/tmp/alsa.conf
+              xvfb-run -a -s "-screen 0 1600x1000x24" bash /checks/smoke.sh /bundle/'"$d"'/openfader /smoke
+            '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pi-smoke-${{ matrix.variant }}
+          path: pi-smoke/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
-          name: package-pi
+          name: package-${{ matrix.variant }}
           path: dist/pi/*.tar.gz
           if-no-files-found: error
 
@@ -243,6 +296,23 @@ jobs:
           pattern: package-*
           path: out
           merge-multiple: true
+      - name: Require every platform archive
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib
+          v = os.environ["VERSION"].removeprefix("v")
+          expected = {
+              f"openfader-{v}-linux-x86_64.tar.gz",
+              f"openfader-{v}-windows-x86_64.zip",
+              f"OpenFadeR-{v}-macos-arm64.zip",
+              f"openfader-{v}-linux-aarch64-pi.tar.gz",
+              f"openfader-{v}-linux-aarch64-pi4.tar.gz",
+          }
+          actual = {p.name for p in pathlib.Path("out").iterdir() if p.name.endswith((".zip", ".tar.gz"))}
+          assert actual == expected, f"Missing: {sorted(expected - actual)}; unexpected: {sorted(actual - expected)}"
+          PY
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
@@ -256,6 +326,7 @@ jobs:
 
             - **Linux** (x86_64): `openfader-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
             - **Raspberry Pi 3, 4, 5 and CM4** (aarch64, 64-bit Raspberry Pi OS based on Debian 13): `openfader-<version>-linux-aarch64-pi.tar.gz`. Unpack and run `./openfader-<version>-linux-aarch64-pi/openfader`. See docs/raspberry-pi.md.
+            - **Raspberry Pi 4 and CM4, CPU-tuned** (aarch64, Debian 13): `openfader-<version>-linux-aarch64-pi4.tar.gz` uses Cortex-A72 code generation and whole-program LTO. Its updater stays on this variant; it is not for Pi 3.
             - **Windows** (x86_64): `openfader-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
             - **macOS** (Apple silicon): `OpenFadeR-<version>-macos-arm64.zip` holds `OpenFadeR.app`. It is ad-hoc signed, not developer-signed or notarized: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/OpenFadeR.app`. Native tests/smoke run on Intel macOS; the ARM archive is cross-built and checked for ARM libraries and signatures, without an ARM runtime smoke test.
 

@@ -11,7 +11,13 @@ use super::{Manifest, SettingDecl};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::{path::PathBuf, sync::LazyLock};
+use std::{
+    path::PathBuf,
+    sync::{
+        LazyLock,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
 /// The plugins that are on until the user decides: the readers of the devices and libraries other DJ software writes and
 /// the effect packs. Only bundled names count (a plugin cannot ask to be on by itself), and only while there is no
@@ -141,6 +147,13 @@ static CONFIG: LazyLock<RwLock<Config>> = LazyLock::new(|| {
     RwLock::new(c)
 });
 
+static REVISION: AtomicU64 = AtomicU64::new(0);
+
+/// Changes to the in-memory settings, including a change whose file could not be written.
+pub fn revision() -> u64 {
+    REVISION.load(Ordering::Relaxed)
+}
+
 /// The current configuration (a copy).
 pub fn get() -> Config {
     CONFIG.read().clone()
@@ -150,13 +163,16 @@ pub fn get() -> Config {
 /// memory only: nothing is written until the user changes something (the write then records them like the user's own
 /// switches). Later calls do nothing.
 pub fn seed(found: &[&str]) {
-    CONFIG.write().seed(found);
+    if CONFIG.write().seed(found) {
+        REVISION.fetch_add(1, Ordering::Relaxed);
+    }
 }
 
 /// Changes the configuration and writes it.
 pub fn update(f: impl FnOnce(&mut Config)) -> Result<(), String> {
     let mut c = CONFIG.write();
     f(&mut c);
+    REVISION.fetch_add(1, Ordering::Relaxed);
     let Some(path) = file() else {
         return Err("no config folder (set HOME)".into());
     };
@@ -193,6 +209,19 @@ mod tests {
         let mut c = Config { fresh: true, ..Config::default() };
         c.seed(&["now-playing"]);
         assert!(c.enabled.is_empty());
+        #[cfg(feature = "compatibility")]
+        {
+            let found: Vec<&str> = super::super::builtin::plugins()
+                .iter()
+                .map(|p| p.manifest.name.as_str())
+                .collect();
+            let mut c = Config {
+                fresh: true,
+                ..Config::default()
+            };
+            c.seed(&found);
+            assert!(c.enabled("traktor"));
+        }
     }
 
     #[test]

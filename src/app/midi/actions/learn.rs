@@ -3,8 +3,8 @@
 use super::{Action, App, JogMode, Kind, jog, knob, press, rel};
 use crate::app::prefs;
 use crate::app::{
-    mixer::{iso_at, knob_at, AUX_CH},
     BrowserState, DeckState, FxSlot, FxState, GrooveState, KeysState, MixerState,
+    mixer::{AUX_CH, iso_at, knob_at},
 };
 use openfader::audio::fx::BEATS;
 use slint::{ComponentHandle, Model};
@@ -31,12 +31,12 @@ macro_rules! knob_cb {
 fn pad<const N: i32>(a: &App, d: i32) {
     a.global::<DeckState>().invoke_pad(d, N);
 }
-fn pad_up(a: &App, d: i32, _: i32) {
-    a.global::<DeckState>().invoke_pad_released(d);
+fn pad_up<const N: i32>(a: &App, d: i32, mode: i32) {
+    a.global::<DeckState>().invoke_pad_released_at(d, N, mode);
 }
 /// A hot-cue pad: the release hands back to the slip playhead.
-const fn hot(name: &'static str, f: fn(&App, i32)) -> Action {
-    press(name, f).released_by(pad_up)
+const fn hot<const N: i32>(name: &'static str) -> Action {
+    press(name, pad::<N>).released_by(pad_up::<N>)
 }
 
 fn mix_knob<const K: i32>(a: &App, ch: i32, v: f32) {
@@ -168,14 +168,14 @@ pub(super) const TABLE: &[Action] = &[
         let mode = slint::Model::row_data(&decks.get_decks(), d as usize).map_or(0, |v| v.pad_mode);
         decks.invoke_pad_mode(d, (mode + 1) % crate::app::deck::PadMode::count());
     }),
-    hot("pad1", pad::<0>),
-    hot("pad2", pad::<1>),
-    hot("pad3", pad::<2>),
-    hot("pad4", pad::<3>),
-    hot("pad5", pad::<4>),
-    hot("pad6", pad::<5>),
-    hot("pad7", pad::<6>),
-    hot("pad8", pad::<7>),
+    hot::<0>("pad1"),
+    hot::<1>("pad2"),
+    hot::<2>("pad3"),
+    hot::<3>("pad4"),
+    hot::<4>("pad5"),
+    hot::<5>("pad6"),
+    hot::<6>("pad7"),
+    hot::<7>("pad8"),
     press_cb!("cue-monitor", MixerState::invoke_cue_toggled),
     press_any!("split", MixerState::invoke_split_toggled),
     press_any!("rec", MixerState::invoke_rec_toggled),

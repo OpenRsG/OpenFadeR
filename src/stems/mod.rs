@@ -14,6 +14,7 @@
 
 pub mod cache;
 pub mod model;
+pub(crate) mod output;
 pub mod schedule;
 pub mod separate;
 
@@ -73,6 +74,8 @@ pub enum Phase {
     /// Downloading the model (first use only).
     Download,
     Separate,
+    /// Output memory is retained by other consumers; playback continues using the original audio.
+    Waiting,
 }
 
 /// Shared between the worker and the UI.
@@ -89,8 +92,12 @@ impl Progress {
     }
 
     pub fn get(&self) -> (Phase, f32) {
-        let p = [Phase::Opening, Phase::Download, Phase::Separate]
-            [self.phase.load(Relaxed) as usize % 3];
+        let p = [
+            Phase::Opening,
+            Phase::Download,
+            Phase::Separate,
+            Phase::Waiting,
+        ][self.phase.load(Relaxed) as usize % 4];
         (p, self.permille.load(Relaxed) as f32 / 1000.0)
     }
 }
@@ -154,21 +161,31 @@ impl Job {
         let (tx, rx) = channel();
         let (p, s, c) = (progress.clone(), stems.clone(), ctl.clone());
         std::thread::spawn(move || {
-            if c.cancel.load(Relaxed) {
-                return;
-            }
-            let allocated = Arc::new(Stems::new(frames, grid));
-            if c.cancel.load(Relaxed) {
-                return;
-            }
-            let _ = s.set(allocated);
-            let s = s.get().unwrap();
-            let result = work(&audio, &pcm, quality, multithread, s, &c, &p).map(|fresh| {
-                // Stored before the outcome is announced: whoever starts the same track next finds it.
-                if fresh && let Err(e) = cache::store(&audio, pcm.rate, s, quality) {
-                    eprintln!("stems cache: {e}");
+            let result = (|| {
+                let lease =
+                    output::reserve(frames, grid, &c.cancel, || p.set(Phase::Waiting, 0.0))?;
+                if c.cancel.load(Relaxed) {
+                    return Err("cancelled".into());
                 }
-            });
+                p.set(Phase::Opening, 0.0);
+                let allocated = Arc::new(Stems::new(frames, grid).with_memory(lease));
+                if c.cancel.load(Relaxed) {
+                    return Err("cancelled".into());
+                }
+                let _ = s.set(allocated);
+                let s = s.get().unwrap();
+                let fresh = work(&audio, &pcm, quality, multithread, s, &c, &p)?;
+                // Stored before the outcome is announced: whoever starts the same track next finds it.
+                if fresh
+                    && let Err(e) =
+                        cache::store(&audio, pcm.rate, s, quality, &|| c.cancel.load(Relaxed))
+                {
+                    if !c.cancel.load(Relaxed) {
+                        eprintln!("stems cache: {e}");
+                    }
+                }
+                Ok(())
+            })();
             let _ = tx.send(result);
             model::trim_heap(); // the segments' buffers, spread over the engine threads' heaps
         });
@@ -205,12 +222,20 @@ impl Job {
         let (p, s, c) = (progress.clone(), stems.clone(), ctl.clone());
         std::thread::spawn(move || {
             let cancelled = || c.cancel.load(Relaxed);
-            let result = stemfile::decode_parts(&audio, &info, frames, &cancelled, &|f| {
-                p.set(Phase::Separate, f)
-            })
-            .map(|parts| {
-                let _ = s.set(Arc::new(Stems::complete(parts)));
-            });
+            let result = (|| {
+                let grid = Grid {
+                    len: frames.max(1),
+                    overlap: 0,
+                };
+                let lease =
+                    output::reserve(frames, grid, &c.cancel, || p.set(Phase::Waiting, 0.0))?;
+                p.set(Phase::Separate, 0.0);
+                let parts = stemfile::decode_parts(&audio, &info, frames, &cancelled, &|f| {
+                    p.set(Phase::Separate, f)
+                })?;
+                let _ = s.set(Arc::new(Stems::complete(parts).with_memory(lease)));
+                Ok(())
+            })();
             let _ = tx.send(result);
         });
         Job {
@@ -251,9 +276,12 @@ fn work(
     if ctl.cancel.load(Relaxed) {
         return Err("cancelled".into());
     }
-    match cache::load(audio, pcm.rate, stems, quality) {
+    match cache::load(audio, pcm.rate, stems, quality, &|| {
+        ctl.cancel.load(Relaxed)
+    }) {
         Ok(true) => return Ok(false),
         Ok(false) => {}
+        Err(_) if ctl.cancel.load(Relaxed) => return Err("cancelled".into()),
         Err(e) => eprintln!("stems cache: {e} (recomputing)"),
     }
     if ctl.cancel.load(Relaxed) {

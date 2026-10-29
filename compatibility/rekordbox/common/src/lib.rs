@@ -1,16 +1,12 @@
-//! Shared by the rekordbox plugins (the xml collection, iTunes, the device and database libraries): the mini XML reader,
-//! path remapping, `file://` locations, and the readers of the formats the libraries are made of: the DeviceSQL byte
-//! readers ([`pdb`]), the analysis files ([`anlz`]), SQLCipher databases ([`sql`]) and the library helpers they share
-//! ([`list`]).
+//! Shared rekordbox library helpers: path remapping, `file://` locations, DeviceSQL byte readers ([`pdb`]),
+//! analysis files ([`anlz`]), SQLCipher databases ([`sql`]) and library helpers ([`list`]).
 
 pub mod anlz;
 pub mod list;
-pub mod markup;
 pub mod pathmap;
 pub mod pdb;
 pub mod sql;
 
-pub use markup::{Edge, Tag, tags};
 pub use pathmap::{PathMap, parse_path_map, path_map, remap_path};
 use serde_json::Value;
 use std::path::{Path, PathBuf};

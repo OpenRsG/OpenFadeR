@@ -7,7 +7,8 @@
 //! offset whose first half best matches (normalised stereo cross-correlation, every
 //! `DECIM`-th frame) the natural continuation of the previous grain; that keeps the overlap in phase.
 //! The player's `advance` stays the only position truth: the clock reports the nominal position and the
-//! audio lags/leads it by the chosen offset, at most ~17.4 ms. Reads are resampled to the
+//! grain starts may lead/lag it by the chosen offset (at most ~17.4 ms at unity pitch). Within each grain,
+//! pitch-rate reads and the nominal tempo advance can differ. Reads are resampled to the
 //! device rate by `Source::frame_at_step` (windowed sinc) and wrap at an active loop end like the plain path, so a loop
 //! boundary inside a grain is seamless.
 //!

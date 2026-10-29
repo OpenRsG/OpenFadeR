@@ -98,6 +98,7 @@ export component DeckPanel inherits Rectangle {
                     cue-comment(row, t) => { DeckState.cue-comment(root.index, row, t); }
                 }
                 if !root.v.grid-edit && !root.show-cues: PadGrid {
+                    index: root.index;
                     y: 0;
                     height: 94px;
                     pads: root.v.pads;
@@ -105,8 +106,8 @@ export component DeckPanel inherits Rectangle {
                     enabled: root.v.loaded;
                     delete-mode: root.v.delete-mode;
                     fx-color: DeckState.pad-fx-color;
-                    pad(p) => { DeckState.pad(root.index, p); }
-                    pad-released => { DeckState.pad-released(root.index); }
+                    pad(d, p) => { DeckState.pad(d, p); }
+                    pad-released(d, p, m) => { DeckState.pad-released-at(d, p, m); }
                 }
                 if !root.v.grid-edit && !root.show-cues && root.v.pad-mode >= 7 && root.v.pad-mode <= 10: PadOptions { y: 96px; height: Theme.h-ctl; index: root.index; }
                 if !root.v.grid-edit && !root.show-cues && !(root.v.pad-mode >= 7 && root.v.pad-mode <= 10): HorizontalLayout {

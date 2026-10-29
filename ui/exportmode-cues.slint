@@ -1,7 +1,7 @@
 import { Chip, Glyph, Icon, IconButton, SegmentedChips, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DeckState } from "deck-state.slint";
-import { ExportModeState } from "exportmode-state.slint";
+import { ExportModeState, HotCue } from "exportmode-state.slint";
 
 /// One MEMORY or HOT CUE row: the marker (click: its colour), the time (click: jump there; an empty hot cue
 /// saves one), the comment, the loop length (click: activates the loop) and ×. `row` is the row in `DeckView.cues`.
@@ -113,7 +113,8 @@ export component HotRow inherits HorizontalLayout {
     in property <int> index;
     spacing: 2px;
     horizontal-stretch: 0;
-    for p[k] in ExportModeState.decks[root.index].hot: Rectangle {
+    for k in 8: Rectangle {
+        property <HotCue> p: ExportModeState.decks[root.index].hot[k];
         width: Theme.target-size(26px);
         height: Theme.target-size(22px);
         border-radius: Theme.radius;
@@ -121,8 +122,19 @@ export component HotRow inherits HorizontalLayout {
         background: p.set ? (btn.pressed ? p.color.darker(0.3) : btn.has-hover ? p.color.brighter(0.2) : p.color) : (btn.pressed ? Theme.bg-deep : btn.has-hover ? Theme.panel-high : Theme.panel-raised);
         Text { text: p.label; color: p.set ? Theme.bg-deep : Theme.text-dim; font-size: Theme.font-md; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
         btn := TouchArea {
+            property <int> owner: -1;
             enabled: DeckState.decks[root.index].loaded;
-            clicked => { ExportModeState.hot-cue(root.index, k); }
+            pointer-event(e) => {
+                if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                    self.owner = root.index;
+                    ExportModeState.hot-cue(self.owner, k);
+                }
+                if (self.owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up))) {
+                    let owner = self.owner;
+                    self.owner = -1;
+                    DeckState.pad-released-at(owner, k, 0);
+                }
+            }
         }
         if Theme.layout-profile != 1 && p.set && btn.has-hover: Rectangle {
             x: parent.width - self.width;

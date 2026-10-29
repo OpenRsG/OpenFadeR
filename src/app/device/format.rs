@@ -64,7 +64,7 @@ fn explain(e: &Error, label: &str) -> String {
         Error::System => tr!("{} is on the disk this computer runs from. Nothing was erased. Only USB sticks and SD cards can be formatted here.", label),
         Error::NotRemovable => tr!("{} is on a disk that is not removable. Nothing was erased. Only USB sticks and SD cards can be formatted here.", label),
         Error::ReadOnly => tr!("{} is write-protected or mounted read-only. Nothing was erased. Slide the lock switch of the card to unlocked or plug it in again, then try again.", label),
-        Error::JobBusy => tr!("A job is writing to {}. Nothing was erased. Wait for it or cancel it (X), then format.", label),
+        Error::JobBusy => tr!("A job is writing to {}. Nothing was erased. Wait for it to finish, then format.", label),
         Error::Unseen(v) => tr!("The disk holds a volume ({}) that was not listed when you confirmed. Nothing was erased. Press FORMAT… again to see everything on the disk.", v),
         Error::Confirm(word) => tr!("The confirmation does not match. Nothing was erased. Type {} exactly as shown.", word),
         Error::ExFatOnSd => tr!("Players refuse exFAT SD cards. Nothing was erased. Choose FAT32 for the card.").to_owned(),
@@ -123,6 +123,7 @@ fn ask(cx: &Rc<Ctx>, dev: &Device) {
     let d = dev.clone();
     let shown = dev.clone();
     cx.start_then(
+        false,
         Some(dev.id.clone()),
         phase(Step::Read),
         move |_| {
@@ -234,39 +235,37 @@ fn start(cx: &Rc<Ctx>, dev: Device, spec: Spec, typed: String, seen: Vec<String>
     let made: Arc<Mutex<Option<Done>>> = Arc::default();
     let (job, kept) = (made.clone(), made.clone());
     let id = dev.id.clone();
-    cx.start_then(
-        Some(id),
-        phase(Step::Unmount),
-        move |ctl| {
-            let req = Request {
-                spec,
-                typed: &typed,
-                seen: &seen,
-                busy: false,
-            };
-            let done = format::format(&dev, &req, &|s| ctl.set_phase(phase(s)))
-                .map_err(|e| explain(&e, &dev.label))?;
-            let name = Some(done.label.as_str()).filter(|l| !l.is_empty()).unwrap_or(&dev.label);
-            let text = match &done.short {
-                None => tr!(
-                    "{} formatted: {} on one MBR partition. Choose EXPORT to put music on it.",
-                    name,
-                    fs_name(done.fs)
-                ),
-                Some(v) => tr!(
-                    "{} formatted as {} instead of FAT32: the system makes FAT32 on a card this small only with an extra permission. DJ players read it all the same. Press FORMAT… again and enter your password when asked if you want FAT32.",
-                    name,
-                    v
-                ),
-            };
-            *job.lock().unwrap() = Some(done);
-            Ok(text)
-        },
-        move |cx, r| {
-            let Some(done) = kept.lock().unwrap().take().filter(|_| r.is_ok()) else {
-                return;
-            };
-            cx.select_after_scan(done.source);
-        },
-    );
+    cx.start_then(false, Some(id),
+    phase(Step::Unmount),
+    move |ctl| {
+        let req = Request {
+            spec,
+            typed: &typed,
+            seen: &seen,
+            busy: false,
+        };
+        let done = format::format(&dev, &req, &|s| ctl.set_phase(phase(s)))
+            .map_err(|e| explain(&e, &dev.label))?;
+        let name = Some(done.label.as_str()).filter(|l| !l.is_empty()).unwrap_or(&dev.label);
+        let text = match &done.short {
+            None => tr!(
+                "{} formatted: {} on one MBR partition. Choose EXPORT to put music on it.",
+                name,
+                fs_name(done.fs)
+            ),
+            Some(v) => tr!(
+                "{} formatted as {} instead of FAT32: the system makes FAT32 on a card this small only with an extra permission. DJ players read it all the same. Press FORMAT… again and enter your password when asked if you want FAT32.",
+                name,
+                v
+            ),
+        };
+        *job.lock().unwrap() = Some(done);
+        Ok(text)
+    },
+    move |cx, r| {
+        let Some(done) = kept.lock().unwrap().take().filter(|_| r.is_ok()) else {
+            return;
+        };
+        cx.select_after_scan(done.source);
+    },);
 }

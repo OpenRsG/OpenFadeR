@@ -14,9 +14,10 @@
 use super::super::actions::{Kind, ACTIONS};
 use super::super::pickup::Pickup;
 use super::super::{App, Binding, Ev, Midi};
+use super::State;
 use crate::app::{
-    deck::{active, DECKS},
     DeckState, FxState, MixerState,
+    deck::{DECKS, active},
 };
 use slint::{ComponentHandle, Model};
 use std::collections::HashMap;
@@ -131,12 +132,29 @@ impl Midi {
         }
     }
 
-    /// Sets control `key` to `v` for a plugin; `false` when there is no such control (or it is not in the layout). `pick` is the
-    /// plugin's soft takeover table, `takeover` whether the plugin asked for it on this key.
-    pub(super) fn ctl_set(&self, pick: &Pickup, takeover: bool, key: &str, v: f64) -> bool {
+    /// Sets control `key` to `v` for a plugin; `st` owns its holds and pickup table.
+    pub(super) fn ctl_set(&self, st: &State, takeover: bool, key: &str, v: f64) -> bool {
         let (Some(k), Some(app)) = (Key::parse(key), self.app.upgrade()) else {
             return false;
         };
+        let act = index().get(k.name).copied();
+        let down = v >= 0.5;
+        if let Some(act) = act.filter(|&i| ACTIONS[i].momentary()) {
+            let held = {
+                let mut held = st.held.borrow_mut();
+                if down {
+                    held.get(&(act, k.col, k.arg)).copied()
+                } else {
+                    held.remove(&(act, k.col, k.arg))
+                }
+            };
+            if let Some(held) = held {
+                if !down {
+                    self.release_held(&app, held);
+                }
+                return true;
+            }
+        }
         let d = k.col as usize;
         if d >= active() {
             return false;
@@ -152,7 +170,7 @@ impl Midi {
             }
             _ => {}
         }
-        let Some(&act) = index().get(k.name) else {
+        let Some(act) = act else {
             return false;
         };
         let b = Binding {
@@ -163,13 +181,12 @@ impl Midi {
             arg: k.arg,
             hires: false,
         };
-        let down = v >= 0.5;
         match ACTIONS[act].kind {
             // The controller's own layer keys: a plugin has no layers, it addresses decks directly.
             Kind::Layer | Kind::Dual => return false,
             Kind::Knob(_) => {
                 let slot = takeover.then(|| Pickup::plugin_slot(act, k.col));
-                self.absolute_in(pick, slot, &app, &b, v.clamp(0.0, 1.0) as f32);
+                self.absolute_in(&st.pick, slot, &app, &b, v.clamp(0.0, 1.0) as f32);
             }
             Kind::Rel { f, .. } => f(&app, k.col, v.round() as i32),
             Kind::Jog { mode, .. } => {
@@ -185,7 +202,14 @@ impl Midi {
                     d1: 0,
                     d2: if down { 127 } else { 0 },
                 };
-                self.run(&app, ev, &b);
+                let momentary = ACTIONS[act].momentary();
+                if !momentary || down {
+                    let held = self.prepare_hold(&app, &b);
+                    if momentary {
+                        st.held.borrow_mut().insert((act, k.col, k.arg), held);
+                    }
+                    self.fire_recipients(&app, ev, held);
+                }
             }
         }
         true

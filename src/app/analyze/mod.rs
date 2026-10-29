@@ -39,7 +39,7 @@ use super::{
     },
     trackinfo,
 };
-use job::{Guide, Job, Settings, TagText};
+use job::{Settings, TagText};
 use openfader::{
     analysis::{Analysis, cache, cache::Source, options},
     library::{Library, Track},
@@ -52,11 +52,12 @@ use std::{
     collections::HashSet,
     rc::Rc,
     sync::{Arc, mpsc},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /// Results are drained (and the browser told) this often.
 const TICK: Duration = Duration::from_millis(500);
+const UI_BATCH: usize = 128;
 
 /// (BPM × 100, Camelot key); 0 / "" = this part was not found.
 pub type Found = (i64, String);
@@ -326,39 +327,43 @@ fn run_pending() {
             return trackinfo::set_progress(&app, &tr!("analysis: library query failed: {}", e));
         }
     };
-    let todo = detected::pending(&tracks, &detected(), &options::get().parts);
-    start_run(&app, jobs(&*lib, &todo, false), prefs::with(settings));
+    let mut jobs = jobs(&*lib, tracks, false);
+    jobs.pending = Some((options::get().parts, detected().reader()));
+    start_run(&app, jobs, prefs::with(settings));
 }
 
 /// Explicit analysis (the track menu's ANALYZE TRACK): `tracks` are analysed again, whatever the cache holds and whether
 /// the library has their BPM and key; tracks without a file or with the analysis lock are skipped. A run that is not
 /// `explicit` (files just imported) uses the cache and leaves a key tag the file has alone. Does nothing before [`wire`].
-pub fn request(tracks: &[Track], explicit: bool) {
+pub fn request(tracks: Arc<Vec<Track>>, explicit: bool) {
     let Some((app, lib)) = context() else { return };
-    let refs: Vec<&Track> = tracks.iter().collect();
-    start_run(&app, jobs(&*lib, &refs, explicit), prefs::with(settings));
+    start_run(&app, jobs(&*lib, tracks, explicit), prefs::with(settings));
+}
+
+/// Explicit browser analysis of row indices into a shared list, without cloning selected track metadata.
+pub fn request_selected(tracks: Arc<Vec<Track>>, rows: Vec<usize>) {
+    let Some((app, lib)) = context() else { return };
+    let mut jobs = jobs(&*lib, tracks, true);
+    jobs.rows = Some(rows);
+    start_run(&app, jobs, prefs::with(settings));
 }
 
 /// [`request`] for tracks that came with cues (an import): the analysis fills the cache (waveform, grid, key) and stores no cues,
 /// so the cue list they came with stays whatever "Prohibit overwriting CUEs" says. Never explicit: a key tag the library gave
 /// is left alone.
-pub fn request_keep_cues(tracks: &[Track]) {
+pub fn request_keep_cues(tracks: Arc<Vec<Track>>) {
     let Some((app, lib)) = context() else { return };
-    let refs: Vec<&Track> = tracks.iter().collect();
-    let jobs = jobs(&*lib, &refs, false)
-        .into_iter()
-        .map(|j| Job { keep_cues: true, ..j })
-        .collect();
+    let mut jobs = jobs(&*lib, tracks, false);
+    jobs.keep_cues = true;
     start_run(&app, jobs, prefs::with(settings));
 }
 
 /// What [`request`] would run for `tracks`, captured without reading source analysis. The shared workers prepare each track.
-/// `None` before [`wire`] or when no track has a file; locked tracks are skipped by the worker.
-pub fn batch(tracks: &[Track]) -> Option<Batch> {
+/// `None` before [`wire`] or for an empty snapshot; workers exclude tracks without a file and skip locked tracks.
+pub fn batch(tracks: Arc<Vec<Track>>) -> Option<Batch> {
     let (_, lib) = context()?;
-    let refs: Vec<&Track> = tracks.iter().collect();
-    let jobs = jobs(&*lib, &refs, false);
-    (!jobs.is_empty()).then(|| Batch {
+    let jobs = jobs(&*lib, tracks, false);
+    (jobs.len() > 0).then(|| Batch {
         jobs,
         settings: prefs::with(settings),
     })
@@ -366,7 +371,7 @@ pub fn batch(tracks: &[Track]) -> Option<Batch> {
 
 /// The jobs of [`batch`], with the settings of the moment.
 pub struct Batch {
-    jobs: Vec<Job>,
+    jobs: job::Tracks,
     settings: Settings,
 }
 
@@ -379,6 +384,7 @@ pub struct Published {
 }
 
 impl Batch {
+    /// Candidate count before workers exclude tracks without a file.
     pub fn len(&self) -> usize {
         self.jobs.len()
     }
@@ -391,11 +397,13 @@ impl Batch {
         cancelled: &dyn Fn() -> bool,
         progress: &dyn Fn(usize),
     ) -> Result<Vec<Published>, String> {
-        let total = self.jobs.len();
         let (tx, rx) = mpsc::channel();
-        let _run = job::spawn(self.jobs, self.settings, store, tx)?;
+        let run = job::spawn_tracks(self.jobs, self.settings, store, tx)?;
         let (mut done, mut found) = (0, Vec::new());
-        while done < total && !cancelled() {
+        while !cancelled() {
+            if run.registered() && done == run.total() {
+                break;
+            }
             match rx.recv_timeout(Duration::from_millis(200)) {
                 Ok((path, r)) => {
                     done += 1;
@@ -424,18 +432,106 @@ impl Batch {
 pub fn publish(found: Vec<Published>) {
     let Some((app, _)) = context() else { return };
     let have = detected();
-    for Published {
-        path,
-        found,
-        generation,
-        ticket,
-    } in found
-    {
-        if job::current(ticket.as_ref(), generation) {
-            have.insert(path.clone(), found);
-            trackinfo::detected_changed(&app, &path);
+    let weak = app.as_weak();
+    let mut found = found.into_iter();
+    let pump: Rc<RefCell<dyn FnMut() -> Option<Duration>>> = Rc::new(RefCell::new(move || {
+        let app = weak.upgrade()?;
+        let Some(publication) = job::publication() else {
+            return Some(TICK);
+        };
+        let (paths, count) = publish_chunk(&have, &mut found);
+        drop(publication);
+        trackinfo::detected_changed(&app, &paths);
+        (count == UI_BATCH).then_some(Duration::ZERO)
+    }));
+    schedule(pump, Rc::new(Cell::new(false)), Duration::ZERO);
+}
+
+fn publish_one(have: &Detected, result: Published) -> Option<std::path::PathBuf> {
+    if !job::current(result.ticket.as_ref(), result.generation) {
+        return None;
+    }
+    have.insert(result.path.clone(), result.found);
+    Some(result.path)
+}
+
+fn publish_chunk(
+    have: &Detected,
+    found: &mut impl Iterator<Item = Published>,
+) -> (Vec<std::path::PathBuf>, usize) {
+    let mut paths = Vec::new();
+    let mut count = 0;
+    for result in found.take(UI_BATCH) {
+        count += 1;
+        if let Some(path) = publish_one(have, result) {
+            paths.push(path);
         }
     }
+    (paths, count)
+}
+
+fn receive(
+    have: &Detected,
+    progress: &mut Progress,
+    rx: &mpsc::Receiver<(std::path::PathBuf, Result<Outcome, String>)>,
+) -> (Vec<std::path::PathBuf>, usize) {
+    let mut paths = Vec::new();
+    let mut count = 0;
+    for (path, result) in rx.try_iter().take(UI_BATCH) {
+        count += 1;
+        progress.done += 1;
+        match result {
+            Ok(o) if o.cancelled => progress.cancelled += 1,
+            Ok(o) if o.skipped => progress.skipped += 1,
+            Ok(o) => {
+                progress.record(&o);
+                if let Some(path) = publish_one(
+                    have,
+                    Published {
+                        path,
+                        found: o.found,
+                        generation: o.generation,
+                        ticket: o.ticket,
+                    },
+                ) {
+                    paths.push(path);
+                }
+            }
+            Err(e) => {
+                progress.failed += 1;
+                eprintln!("analyze: {e}");
+            }
+        }
+    }
+    (paths, count)
+}
+
+fn receive_notices(rx: &mpsc::Receiver<job::Notice>) -> (Option<String>, usize) {
+    let mut latest = None;
+    let mut count = 0;
+    for notice in rx.try_iter().take(UI_BATCH) {
+        count += 1;
+        if job::current(notice.ticket.as_ref(), notice.generation) {
+            latest = Some(notice.text);
+        }
+    }
+    (latest, count)
+}
+
+fn schedule(
+    pump: Rc<RefCell<dyn FnMut() -> Option<Duration>>>,
+    queued: Rc<Cell<bool>>,
+    delay: Duration,
+) {
+    if queued.replace(true) {
+        return;
+    }
+    Timer::single_shot(delay, move || {
+        queued.set(false);
+        if let Some(delay) = pump.borrow_mut()() {
+            schedule(pump.clone(), queued, delay);
+        }
+    });
 }
 
 fn notice_for(source: GridSource, library_beats: bool, edited: bool) -> &'static str {
@@ -476,31 +572,16 @@ fn listed(store: &Store, t: &Track) -> Track {
 }
 
 /// Lightweight submissions only: source analysis, Collection metadata and locks are read by the shared workers.
-fn jobs(lib: &dyn Library, tracks: &[&Track], explicit: bool) -> Vec<Job> {
-    let reader = lib.analysis_reader();
-    tracks
-        .iter()
-        .filter_map(|t| {
-            let path = t.file.clone()?;
-            let key =
-                t.id.map(store::id_key)
-                    .unwrap_or_else(|| format!("pending:{}", path.display()));
-            Some(Job {
-                path,
-                track: (*t).clone(),
-                key,
-                explicit,
-                refresh: false,
-                keep_cues: false,
-                library_key: !t.key.is_empty(),
-                guide: Guide::default(),
-                reader: reader.clone(),
-                generation: 0,
-                ticket: None,
-                cue_epoch: 0,
-            })
-        })
-        .collect()
+fn jobs(lib: &dyn Library, tracks: Arc<Vec<Track>>, explicit: bool) -> job::Tracks {
+    job::Tracks {
+        tracks,
+        rows: None,
+        reader: lib.analysis_reader(),
+        explicit,
+        refresh: false,
+        keep_cues: false,
+        pending: None,
+    }
 }
 
 fn progress_text() -> String {
@@ -514,8 +595,8 @@ fn progress_text() -> String {
 }
 
 /// Starts the pool on `jobs` and a timer that collects its results into [`Detected`] and the progress text.
-fn start_run(app: &App, jobs: Vec<Job>, mut settings: Settings) {
-    if jobs.is_empty() {
+fn start_run(app: &App, jobs: job::Tracks, mut settings: Settings) {
+    if jobs.len() == 0 {
         return;
     }
     let have = detected();
@@ -523,10 +604,10 @@ fn start_run(app: &App, jobs: Vec<Job>, mut settings: Settings) {
     let progress = Rc::new(RefCell::new(Progress::new(jobs.len())));
     let (tx, rx) = mpsc::channel();
     let (notice_tx, notice_rx) = mpsc::channel();
-    if jobs.len() == 1 && jobs[0].explicit {
+    if jobs.len() == 1 && jobs.explicit {
         settings.notice = Some(notice_tx);
     }
-    let cancel = match job::spawn(jobs, settings, store::global(), tx) {
+    let cancel = match job::spawn_tracks(jobs, settings, store::global(), tx) {
         Ok(cancel) => cancel,
         Err(error) => {
             trackinfo::set_progress(app, &error);
@@ -537,41 +618,41 @@ fn start_run(app: &App, jobs: Vec<Job>, mut settings: Settings) {
     let run_progress = progress.clone();
     let (timer, done) = (Rc::new(Timer::default()), Rc::new(Cell::new(false)));
     let (weak, weak_timer, finished) = (app.as_weak(), Rc::downgrade(&timer), done.clone());
-    timer.start(TimerMode::Repeated, TICK, move || {
-        let Some(app) = weak.upgrade() else { return };
-        for notice in notice_rx.try_iter() {
-            if job::current(notice.ticket.as_ref(), notice.generation) {
-                app.global::<crate::app::BrowserState>()
-                    .set_status(notice.text.clone().into());
-                crate::app::toast::show(&app, &notice.text);
-            }
+    let last_progress = Cell::new(Instant::now());
+    let pump: Rc<RefCell<dyn FnMut() -> Option<Duration>>> = Rc::new(RefCell::new(move || {
+        let _live = weak_timer.upgrade()?;
+        let app = weak.upgrade()?;
+        if finished.get() {
+            return None;
         }
+        let Some(publication) = job::publication() else {
+            return Some(TICK);
+        };
+        let (latest_notice, notices) = receive_notices(&notice_rx);
         let mut progress = progress.borrow_mut();
-        for (path, r) in rx.try_iter() {
-            progress.done += 1;
-            match r {
-                Ok(o) => {
-                    if o.cancelled {
-                        progress.cancelled += 1;
-                    } else if o.skipped {
-                        progress.skipped += 1;
-                    } else {
-                        progress.record(&o);
-                        if job::current(o.ticket.as_ref(), o.generation) {
-                            have.insert(path.clone(), o.found);
-                            trackinfo::detected_changed(&app, &path);
-                        }
-                    }
-                }
-                Err(e) => {
-                    progress.failed += 1;
-                    eprintln!("analyze: {e}");
-                }
+        RUNS.with_borrow(|runs| {
+            if let Some(cancel) = runs
+                .iter()
+                .find(|r| Rc::ptr_eq(&r.done, &finished))
+                .and_then(|r| r._cancel.as_ref())
+            {
+                progress.total = cancel.total();
             }
-        }
+        });
+        let (paths, results) = receive(&have, &mut progress, &rx);
         let complete = progress.done == progress.total;
         drop(progress);
-        trackinfo::set_progress(&app, &progress_text());
+        drop(publication);
+        if let Some(text) = latest_notice {
+            app.global::<crate::app::BrowserState>()
+                .set_status(text.clone().into());
+            crate::app::toast::show(&app, &text);
+        }
+        trackinfo::detected_changed(&app, &paths);
+        if complete || (results > 0 && last_progress.get().elapsed() >= TICK) {
+            trackinfo::set_progress(&app, &progress_text());
+            last_progress.set(Instant::now());
+        }
         if complete {
             finished.set(true);
             RUNS.with(|runs| {
@@ -585,7 +666,14 @@ fn start_run(app: &App, jobs: Vec<Job>, mut settings: Settings) {
             });
             weak_timer.upgrade().inspect(|t| t.stop());
         }
+        (!complete && (results == UI_BATCH || notices == UI_BATCH)).then_some(Duration::ZERO)
+    }));
+    let queued = Rc::new(Cell::new(false));
+    let (tick_pump, tick_queued) = (pump.clone(), queued.clone());
+    timer.start(TimerMode::Repeated, TICK, move || {
+        schedule(tick_pump.clone(), tick_queued.clone(), Duration::ZERO);
     });
+    schedule(pump, queued, Duration::ZERO);
     RUNS.with(|r| {
         let mut r = r.borrow_mut();
         r.retain(|x| !x.done.get());
@@ -602,6 +690,223 @@ fn start_run(app: &App, jobs: Vec<Job>, mut settings: Settings) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn notice_bursts_coalesce_the_last_current_text_per_bounded_turn() {
+        let (tx, rx) = mpsc::channel();
+        for i in 0..UI_BATCH * 2 + 1 {
+            tx.send(job::Notice {
+                ticket: None,
+                generation: 0,
+                text: i.to_string(),
+            })
+            .unwrap();
+        }
+        for (count, last) in [
+            (UI_BATCH, UI_BATCH - 1),
+            (UI_BATCH, UI_BATCH * 2 - 1),
+            (1, UI_BATCH * 2),
+        ] {
+            assert_eq!(receive_notices(&rx), (Some(last.to_string()), count));
+        }
+        assert_eq!(receive_notices(&rx), (None, 0));
+    }
+
+    fn cached(generation: u64) -> Outcome {
+        Outcome {
+            found: (12300, "8A".into()),
+            src: Source::Cache,
+            cues: false,
+            tag: None,
+            generation,
+            skipped: false,
+            cancelled: false,
+            ticket: None,
+        }
+    }
+
+    #[test]
+    fn ten_and_hundred_thousand_result_bursts_yield_without_losing_identity_or_progress() {
+        for total in [10_000, 100_000] {
+            let have = Detected::default();
+            let (tx, rx) = mpsc::channel();
+            for i in 0..total {
+                tx.send((format!("/burst/{i}.wav").into(), Ok(cached(i as u64))))
+                    .unwrap();
+            }
+            drop(tx);
+            let mut progress = Progress::new(total);
+            let mut turns = 0;
+            while progress.done < total {
+                let before = progress.done;
+                let (paths, count) = receive(&have, &mut progress, &rx);
+                assert!(count > 0 && count <= UI_BATCH);
+                assert_eq!(progress.done - before, count);
+                assert_eq!(paths.len(), count);
+                turns += 1;
+            }
+            assert_eq!(turns, total.div_ceil(UI_BATCH));
+            assert_eq!(have.version(), total as u64);
+            assert_eq!(progress.failed + progress.skipped + progress.cancelled, 0);
+            for i in 0..total {
+                assert_eq!(
+                    have.get(&std::path::PathBuf::from(format!("/burst/{i}.wav"))),
+                    Some((12300, "8A".into()))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn published_batches_yield_and_cancelled_skipped_and_failed_outcomes_still_finish() {
+        let have = Detected::default();
+        let mut found = (0..UI_BATCH * 3 + 1).map(|i| Published {
+            path: format!("/published/{i}.wav").into(),
+            found: (12500, "9A".into()),
+            generation: i as u64,
+            ticket: None,
+        });
+        for expected in [UI_BATCH, UI_BATCH, UI_BATCH, 1, 0] {
+            let (paths, count) = publish_chunk(&have, &mut found);
+            assert_eq!((paths.len(), count), (expected, expected));
+        }
+        assert_eq!(have.version(), (UI_BATCH * 3 + 1) as u64);
+        let (tx, rx) = mpsc::channel();
+        let mut cancelled = cached(0);
+        cancelled.cancelled = true;
+        let mut skipped = cached(1);
+        skipped.skipped = true;
+        tx.send(("/cancelled".into(), Ok(cancelled))).unwrap();
+        tx.send(("/skipped".into(), Ok(skipped))).unwrap();
+        tx.send(("/failed".into(), Err("test failure".into())))
+            .unwrap();
+        tx.send(("/ok".into(), Ok(cached(3)))).unwrap();
+        let mut progress = Progress::new(4);
+        let (paths, count) = receive(&have, &mut progress, &rx);
+        assert_eq!(count, 4);
+        assert_eq!(paths, [std::path::PathBuf::from("/ok")]);
+        assert_eq!(
+            (
+                progress.done,
+                progress.cancelled,
+                progress.skipped,
+                progress.failed
+            ),
+            (4, 1, 1, 1)
+        );
+        assert!(have.get(std::path::Path::new("/cancelled")).is_none());
+        assert!(have.get(std::path::Path::new("/skipped")).is_none());
+        assert!(progress.text().contains('1'));
+    }
+
+    #[test]
+    #[ignore = "warm-cache producer benchmark; requires OPENFADER_ANALYSIS_BENCH=1 and isolated XDG_DATA_HOME under /tmp"]
+    fn warm_cache_submission_and_result_burst_benchmark() {
+        assert_eq!(
+            std::env::var("OPENFADER_ANALYSIS_BENCH").as_deref(),
+            Ok("1")
+        );
+        let data = std::path::PathBuf::from(
+            std::env::var_os("XDG_DATA_HOME").expect("isolated data root"),
+        );
+        assert!(
+            data.starts_with(std::env::temp_dir()),
+            "never write fixtures to user data"
+        );
+        let _pool = job::TEST_RUNS.lock().unwrap_or_else(|e| e.into_inner());
+        let root =
+            std::env::temp_dir().join(format!("openfader-warm-admission-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let options = options::Options::default();
+        let fixture = Analysis {
+            beats: vec![openfader::analysis::Beat {
+                bar_pos: 1,
+                bpm_x100: 12300,
+                time_ms: 0,
+            }],
+            key: Some("8A".into()),
+            ..Default::default()
+        };
+        for total in [10_000, 100_000] {
+            let tracks: Arc<Vec<Track>> = Arc::new(
+                (0..total)
+                    .map(|i| {
+                        let path = root.join(format!("{i}.wav"));
+                        std::fs::write(&path, b"cache hit needs no decoder").unwrap();
+                        let t = Track {
+                            id: Some(i as i64 + 1),
+                            file: Some(path),
+                            ..Default::default()
+                        };
+                        cache::store(&t, &fixture, options.profile()).unwrap();
+                        t
+                    })
+                    .collect(),
+            );
+            let capture_started = Instant::now();
+            let source = job::Tracks {
+                tracks: tracks.clone(),
+                rows: Some((0..total).collect()),
+                reader: None,
+                explicit: false,
+                refresh: false,
+                keep_cues: true,
+                pending: None,
+            };
+            let snapshot_capture = capture_started.elapsed();
+            let settings = Settings {
+                options,
+                tag: None,
+                workers: 4,
+                low_priority: false,
+                grid_source: GridSource::Ours,
+                notice: None,
+                learner: None,
+            };
+            let (tx, rx) = mpsc::channel();
+            let store = Arc::new(Store::in_memory().unwrap());
+            let started = Instant::now();
+            let run = job::spawn_tracks(source, settings, store, tx).unwrap();
+            let admission = started.elapsed();
+            let outcomes: Vec<_> = rx.iter().collect();
+            let produced = started.elapsed();
+            assert_eq!(outcomes.len(), total);
+            assert!(run.registered());
+            for (_, result) in &outcomes {
+                assert!(
+                    matches!(result, Ok(o) if matches!(o.src, Source::Cache) && !o.cancelled && !o.skipped)
+                );
+            }
+            let (tx, rx) = mpsc::channel();
+            for outcome in outcomes {
+                tx.send(outcome).unwrap();
+            }
+            drop(tx);
+            let have = Detected::default();
+            let mut progress = Progress::new(total);
+            let (mut turns, mut longest) = (0, Duration::ZERO);
+            let consumer_started = Instant::now();
+            while progress.done < total {
+                let turn = Instant::now();
+                let (_, count) = receive(&have, &mut progress, &rx);
+                longest = longest.max(turn.elapsed());
+                assert!(count > 0 && count <= UI_BATCH);
+                turns += 1;
+            }
+            assert_eq!(have.version(), total as u64);
+            let consumer = consumer_started.elapsed();
+            let end_to_end = started.elapsed();
+            eprintln!(
+                "analysis warm n={total} snapshot_capture={snapshot_capture:?} admission={admission:?} producer={produced:?} consumer={consumer:?} end_to_end={end_to_end:?} consumer_turns={turns} longest_consumer_turn={longest:?}"
+            );
+            drop(run);
+            for track in tracks.iter() {
+                let name = format!("{:016x}.bin", cache::fnv1a(store::key(track).bytes()));
+                std::fs::remove_file(cache::dir().unwrap().join(name)).unwrap();
+            }
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn stored_cues_replace_the_list_and_mark_the_track() {
@@ -706,7 +1011,7 @@ mod tests {
                 file: Some("/missing/blocked-reader.wav".into()),
                 ..Default::default()
             };
-            let jobs = jobs(&SlowLibrary(reader), &[&track], true);
+            let jobs = jobs(&SlowLibrary(reader), vec![track].into(), true);
             let settings = Settings {
                 options: options::Options::default(),
                 tag: None,
@@ -718,7 +1023,8 @@ mod tests {
             };
             let (tx, rx) = mpsc::channel();
             let cancel =
-                job::spawn(jobs, settings, Arc::new(Store::in_memory().unwrap()), tx).unwrap();
+                job::spawn_tracks(jobs, settings, Arc::new(Store::in_memory().unwrap()), tx)
+                    .unwrap();
             assert!(returned_tx.send((cancel, rx)).is_ok());
         });
         let returned = returned_rx.recv_timeout(Duration::from_secs(2));

@@ -7,30 +7,25 @@
 //! EQ) act on `MixerState` directly, the layout selector and the device dock are placed by ui/app.slint.
 //! The PHRASE EDIT row of the GRID panel is the child [`phrase`].
 //!
-//! One timer (100 ms) copies the cheap per-deck state into `ExportModeState.decks` while the mode is on; a row is written only
-//! when something in it changed.
+//! The window refreshes these panels every 100 ms only in EXPORT mode; entering the mode requests an immediate refresh.
+//! A row is written only when something in it changed.
 
 mod info;
 mod phrase;
 
 use super::{
-    App, DeckState, ExportDeck, ExportModeState, HotCue, analyze,
+    analyze,
     deck::{Deck, Decks},
-    prefs, toast,
+    prefs, toast, App, DeckState, ExportDeck, ExportModeState, HotCue,
 };
 use openfader::{library::Track, store};
-use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use std::{cell::RefCell, rc::Rc};
 
 /// Players shown: decks A and B.
 const PLAYERS: usize = 2;
 /// DUAL PLAYER is layout 2 of `ExportModeState.layout`.
 const DUAL: i32 = 2;
-
-/// Keeps the refresh timer (and with it the whole mode) alive for as long as the window runs.
-pub struct Guard {
-    _timer: Timer,
-}
 
 /// A BPM typed into the GRID panel: 30-300, a comma counts as the decimal point.
 fn parse_bpm(text: &str) -> Option<f64> {
@@ -90,8 +85,8 @@ fn refresh(app: &App, decks: &Decks, model: &VecModel<ExportDeck>, seen: &mut Lo
         phrase::fill(deck, &mut row, g.locked);
         let cues = views.row_data(i).map(|v| v.cues);
         let hot = hot_cues(deck, cues.as_ref());
-        if !row.hot.iter().eq(hot.iter().cloned()) {
-            row.hot = ModelRc::new(VecModel::from(hot));
+        if let Some(model) = super::update_rows(&row.hot, hot) {
+            row.hot = model;
         }
         if seen.0[i] != serials.0[i] {
             seen.0[i] = serials.0[i];
@@ -134,7 +129,7 @@ fn play(decks: &Decks, i: usize, dual: bool) {
     }
 }
 
-pub fn wire(app: &App, decks: Decks) -> Guard {
+pub fn wire(app: &App, decks: Decks) {
     let state = app.global::<ExportModeState>();
     let model = Rc::new(VecModel::from(vec![ExportDeck::default(); PLAYERS]));
     state.set_decks(ModelRc::from(model.clone()));
@@ -185,8 +180,9 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
                     tr!("this track has an Analysis Lock: unlock it first").to_owned()
                 }
                 Some((_, t)) => {
-                    analyze::request(std::slice::from_ref(&t), true);
-                    tr!("analysing “{}”…", t.title)
+                    let message = tr!("analysing “{}”…", t.title);
+                    analyze::request(vec![t].into(), true);
+                    message
                 }
             };
             toast::show(&app, &msg);
@@ -238,8 +234,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
     prefs::on_change(mirror);
 
     let (w, seen) = (weak, RefCell::new(Loads::default()));
-    let timer = Timer::default();
-    timer.start(TimerMode::Repeated, Duration::from_millis(100), move || {
+    state.on_refresh(move || {
         if let Some(app) = w
             .upgrade()
             .filter(|a| a.global::<ExportModeState>().get_visible())
@@ -247,12 +242,61 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
             refresh(&app, &decks, &model, &mut seen.borrow_mut());
         }
     });
-    Guard { _timer: timer }
+    state.invoke_refresh();
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pump(duration: std::time::Duration) {
+        let until = std::time::Instant::now() + duration;
+        loop {
+            slint::platform::update_timers_and_animations();
+            if std::time::Instant::now() >= until {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    }
+
+    #[test]
+    fn export_panels_catch_up_on_entry_and_poll_only_while_visible() {
+        use openfader::{
+            library::{own::Own, Library},
+            store::Store,
+        };
+        use std::time::Duration;
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let lib: Rc<dyn Library> =
+            Rc::new(Own::new(std::sync::Arc::new(Store::in_memory().unwrap())));
+        let decks = crate::app::deck::wire(&app, lib, Default::default());
+        wire(&app, decks.clone());
+        app.show().unwrap();
+        let state = app.global::<ExportModeState>();
+        decks[0].grid_range(true);
+        pump(Duration::from_millis(250));
+        assert!(!state.get_decks().row_data(0).unwrap().from_here);
+        state.set_visible(true);
+        pump(Duration::from_millis(20));
+        assert!(
+            state.get_decks().row_data(0).unwrap().from_here,
+            "entering EXPORT must not wait for its polling interval"
+        );
+        decks[0].grid_range(false);
+        pump(Duration::from_millis(150));
+        assert!(!state.get_decks().row_data(0).unwrap().from_here);
+        state.set_visible(false);
+        pump(Duration::ZERO);
+        decks[0].grid_range(true);
+        pump(Duration::from_millis(150));
+        assert!(!state.get_decks().row_data(0).unwrap().from_here);
+        state.set_visible(true);
+        pump(Duration::from_millis(20));
+        assert!(state.get_decks().row_data(0).unwrap().from_here);
+        app.hide().unwrap();
+    }
 
     #[test]
     fn a_typed_bpm_is_a_tempo_in_range() {

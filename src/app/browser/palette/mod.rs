@@ -72,10 +72,12 @@ struct Palette {
     choice_ids: RefCell<Vec<Option<i64>>>,
     /// What each palette lists now, in row order; the rows of a drag or click are looked up here.
     shown: RefCell<Vec<Vec<Track>>>,
-    /// Palette names, track keys, store generation and BPM display precision used for `shown`.
-    seen: RefCell<(Vec<String>, Vec<Vec<String>>, (u64, usize))>,
+    /// Palette names, track keys, and (store generation, BPM precision, assignments, reads succeeded).
+    seen: RefCell<(Vec<String>, Vec<Vec<String>>, (u64, usize, Assign, bool))>,
     on_track: Rc<dyn Fn(&Track)>,
     _timer: Timer,
+    #[cfg(test)]
+    dispatches: std::cell::Cell<u64>,
 }
 
 pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>, on_track: Rc<dyn Fn(&Track)>) {
@@ -92,18 +94,12 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>, on_track: Rc<dyn Fn(&Tra
         seen: RefCell::default(),
         on_track,
         _timer: Timer::default(),
+        #[cfg(test)]
+        dispatches: std::cell::Cell::new(0),
     });
     state.set_palette_names(p.names.clone().into());
     state.set_palette_tracks(p.tracks.clone().into());
     state.set_palette_choices(p.choices.clone().into());
-    state.set_palette_enabled(prefs::with(|p| p.view.panel_palette));
-    let weak = app.as_weak();
-    prefs::on_change(move |pr| {
-        if let Some(app) = weak.upgrade() {
-            app.global::<BrowserState>()
-                .set_palette_enabled(pr.view.panel_palette);
-        }
-    });
 
     state.on_drag_track(|r| DataTransfer::from(Drag::Track(r as usize).text()));
     state.on_drag_tree(|r| DataTransfer::from(Drag::Tree(r as usize).text()));
@@ -206,19 +202,53 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>, on_track: Rc<dyn Fn(&Tra
         }
     });
 
-    let (weak, q) = (app.as_weak(), Rc::downgrade(&p));
-    p._timer
-        .start(TimerMode::Repeated, Duration::from_millis(300), move || {
-            let (Some(app), Some(q)) = (weak.upgrade(), q.upgrade()) else {
-                return;
-            };
-            if app.global::<BrowserState>().get_palette_open() {
-                q.sync_if_free();
-            }
-        });
+    p.follow(app);
 }
 
 impl Palette {
+    fn update_timer(&self, app: &App) {
+        let state = app.global::<BrowserState>();
+        if state.get_palette_enabled() && state.get_palette_open() {
+            self.sync_if_free();
+            self._timer.restart();
+        } else {
+            self._timer.stop();
+        }
+    }
+
+    fn follow(self: &Rc<Self>, app: &App) {
+        let (weak, q) = (app.as_weak(), Rc::downgrade(self));
+        self._timer
+            .start(TimerMode::Repeated, Duration::from_millis(300), move || {
+                if let (Some(app), Some(q)) = (weak.upgrade(), q.upgrade()) {
+                    #[cfg(test)]
+                    q.dispatches.set(q.dispatches.get() + 1);
+                    if app.global::<BrowserState>().get_palette_open() {
+                        q.sync_if_free();
+                    }
+                }
+            });
+        let (weak, q) = (app.as_weak(), self.clone());
+        app.global::<BrowserState>()
+            .on_palette_toggled(move |open| {
+                let Some(app) = weak.upgrade() else { return };
+                app.global::<BrowserState>().set_palette_open(open);
+                q.update_timer(&app);
+            });
+        let (weak, q) = (app.as_weak(), self.clone());
+        prefs::on_change(move |pr| {
+            let Some(app) = weak.upgrade() else { return };
+            let state = app.global::<BrowserState>();
+            if state.get_palette_enabled() != pr.view.panel_palette {
+                state.set_palette_enabled(pr.view.panel_palette);
+                q.update_timer(&app);
+            }
+        });
+        app.global::<BrowserState>()
+            .set_palette_enabled(prefs::with(|p| p.view.panel_palette));
+        self.update_timer(app);
+    }
+
     fn track(&self, pal: i32, row: i32) -> Option<Track> {
         self.shown
             .borrow()
@@ -238,9 +268,15 @@ impl Palette {
     fn sync(&self, v: &mut View) {
         let store = v.store.clone();
         let nodes = &v.nodes;
-        let (names, keys) = {
+        let (names, keys, revision) = {
             let mut a = self.assign.borrow_mut();
             a.prune(&store, |id| nodes.iter().any(|n| n.id == id));
+            let mut revision = (
+                store.generation(),
+                prefs::with(|p| p.view.tempo_decimals.digits()),
+                *a,
+                true,
+            );
             let mut names = vec![tr!("TAG LIST").to_owned()];
             let mut keys = vec![v.tags.iter().map(store::key).collect::<Vec<_>>()];
             for slot in 0..SLOTS {
@@ -249,14 +285,24 @@ impl Palette {
                     id.and_then(|id| nodes.iter().find(|n| n.id == id))
                         .map_or_else(|| BLANK.to_owned(), |n| n.name.clone()),
                 );
-                keys.push(id.map_or_else(Vec::new, |id| store.entries(id).unwrap_or_default()));
             }
-            (names, keys)
+            {
+                let seen = self.seen.borrow();
+                if seen.2 == revision && seen.0 == names && seen.1.first() == keys.first() {
+                    return;
+                }
+            }
+            for slot in 0..SLOTS {
+                keys.push(match a.get(slot).map(|id| store.entries(id)).transpose() {
+                    Ok(keys) => keys.unwrap_or_default(),
+                    Err(_) => {
+                        revision.3 = false; // Failed reads must be retried on the next poll.
+                        Vec::new()
+                    }
+                });
+            }
+            (names, keys, revision)
         };
-        let revision = (
-            store.generation(),
-            prefs::with(|p| p.view.tempo_decimals.digits()),
-        );
         if self.seen.borrow().0 == names
             && self.seen.borrow().1 == keys
             && self.seen.borrow().2 == revision
@@ -285,6 +331,155 @@ impl Palette {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use slint::Model;
+    fn rig() -> (App, Rc<Palette>) {
+        crate::app::headless::init();
+        prefs::set_for_test(|p| p.view.panel_palette = true);
+        let app = App::new().unwrap();
+        let view = crate::app::browser::timer_test_view(&app);
+        let p = Rc::new(Palette {
+            assign: RefCell::new(Assign::load(&view.borrow().store)),
+            view: view.clone(),
+            names: Rc::default(),
+            tracks: Rc::default(),
+            choices: Rc::default(),
+            choice_ids: RefCell::default(),
+            shown: RefCell::new(vec![Vec::new(); PALETTES]),
+            seen: RefCell::default(),
+            on_track: Rc::new(|_| {}),
+            _timer: Timer::default(),
+            dispatches: std::cell::Cell::new(0),
+        });
+        p.follow(&app);
+        (app, p)
+    }
+
+    #[test]
+    fn palette_refresh_tracks_assignment_membership_and_late_tree_names() {
+        let (_app, p) = rig();
+        let mut v = p.view.borrow_mut();
+        let store = v.store.clone();
+        let input = |name: &str| Track {
+            title: name.into(),
+            file: Some(format!("/palette/{name}.wav").into()),
+            ..Default::default()
+        };
+        store
+            .collection_put(&[input("A"), input("B")], false)
+            .unwrap();
+        let tracks = v.lib.tracks(None).unwrap();
+        let a = tracks.iter().find(|t| t.title == "A").unwrap().clone();
+        let b = tracks.iter().find(|t| t.title == "B").unwrap().clone();
+        let first = store
+            .add_node(None, "Same", store::NodeKind::Playlist)
+            .unwrap();
+        let second = store
+            .add_node(None, "Same", store::NodeKind::Playlist)
+            .unwrap();
+        store.set_entries(first, &[store::key(&a)]).unwrap();
+        store.set_entries(second, &[store::key(&b)]).unwrap();
+        v.nodes = store.nodes().unwrap();
+        p.assign.borrow_mut().set(&store, 0, Some(first)).unwrap();
+        p.sync(&mut v);
+        assert_eq!(p.track(1, 0).unwrap().title, "A");
+        p.assign.borrow_mut().set(&store, 0, Some(second)).unwrap();
+        p.sync(&mut v);
+        assert_eq!(p.track(1, 0).unwrap().title, "B");
+        store.set_entries(second, &[store::key(&a)]).unwrap();
+        p.sync(&mut v);
+        assert_eq!(p.track(1, 0).unwrap().title, "A");
+        store.rename_node(second, "Renamed").unwrap();
+        p.sync(&mut v); // The browser's tree snapshot has not caught up yet.
+        v.nodes = store.nodes().unwrap();
+        p.sync(&mut v);
+        assert_eq!(p.names.row_data(1).unwrap(), "Renamed");
+        v.tags = vec![a];
+        p.sync(&mut v);
+        v.tags = vec![b];
+        p.sync(&mut v);
+        assert_eq!(p.track(0, 0).unwrap().title, "B");
+        store.delete_node(second).unwrap();
+        v.nodes = store.nodes().unwrap();
+        p.sync(&mut v);
+        assert!(p.track(1, 0).is_none());
+        assert_eq!(p.names.row_data(1).unwrap(), BLANK);
+    }
+
+    #[test]
+    fn palette_timer_tracks_open_and_preferences_and_refreshes_immediately() {
+        use crate::app::browser::timer_test_pump;
+        let (app, p) = rig();
+        let state = app.global::<BrowserState>();
+        assert!(!p._timer.running());
+        state.invoke_palette_toggled(true);
+        assert!(p._timer.running());
+        assert_eq!(p.names.row_count(), PALETTES);
+        state.invoke_palette_toggled(false);
+        assert!(!p._timer.running());
+        let before = p.dispatches.get();
+        timer_test_pump(Duration::from_millis(350));
+        assert_eq!(p.dispatches.get(), before);
+        let t = Track {
+            title: "added while closed".into(),
+            ..Default::default()
+        };
+        p.view.borrow_mut().tags.push(t.clone());
+        state.invoke_palette_toggled(true);
+        assert_eq!(
+            p.shown.borrow()[0],
+            [t.clone()],
+            "reopening refreshes before the next tick"
+        );
+        prefs::set_for_test(|pr| pr.view.panel_palette = false);
+        assert!(!p._timer.running());
+        assert!(
+            state.get_palette_open(),
+            "the open choice survives a hidden preference"
+        );
+        p.view.borrow_mut().tags.clear();
+        prefs::set_for_test(|pr| pr.view.panel_palette = true);
+        assert!(p._timer.running());
+        assert!(
+            p.shown.borrow()[0].is_empty(),
+            "re-enabled palettes refresh immediately"
+        );
+        p.view.borrow_mut().tags.push(t.clone());
+        timer_test_pump(Duration::from_millis(350));
+        assert_eq!(
+            p.shown.borrow()[0],
+            [t],
+            "open palettes still follow background store/Tag List changes"
+        );
+    }
+
+    #[test]
+    #[ignore = "16 s real Slint timer dispatch comparison; --release --ignored --nocapture"]
+    fn bench_palette_timer_dispatch() {
+        use crate::app::browser::timer_test_pump;
+        let (app, p) = rig();
+        let state = app.global::<BrowserState>();
+        let duration = Duration::from_secs(2);
+        for unconditional in [true, false] {
+            for (phase, open) in [
+                ("closed", false),
+                ("open", true),
+                ("closed-again", false),
+                ("reopened", true),
+            ] {
+                state.invoke_palette_toggled(open);
+                if unconditional {
+                    p._timer.restart(); // former scheduling, same production callback
+                }
+                let before = p.dispatches.get();
+                timer_test_pump(duration);
+                eprintln!(
+                    "palette unconditional={unconditional} phase={phase} duration_ms={} dispatches={}",
+                    duration.as_millis(),
+                    p.dispatches.get() - before
+                );
+            }
+        }
+    }
 
     #[test]
     fn a_line_shows_title_artist_and_bpm() {

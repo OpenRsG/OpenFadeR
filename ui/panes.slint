@@ -15,7 +15,8 @@ export global PaneState {
     in-out property <length> tree-d;
     in-out property <length> info-d;
     in-out property <length> palette-d;
-    /// Browser track table: the width of every column but the title, which takes what is left.
+    /// Browser track table: independent deltas from each column's default width.
+    in-out property <length> col-title-d;
     in-out property <length> col-artist-d;
     in-out property <length> col-genre-d;
     in-out property <length> col-comment-d;

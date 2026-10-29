@@ -5,16 +5,25 @@ use crate::app::browser::{
     sidebar::{self, Entry, Inputs},
     App, BrowserState, Home, View,
 };
-use openfader::store::{self, NodeKind};
 use crate::app::{Icon, TreeRow};
+use openfader::store::{self, NodeKind};
 use slint::{ComponentHandle, Model};
+use std::collections::HashMap;
+
+fn node_index(nodes: &[store::Node]) -> HashMap<i64, &store::Node> {
+    let mut index = HashMap::with_capacity(nodes.len());
+    for node in nodes {
+        index.entry(node.id).or_insert(node); // Duplicate IDs retain their first entry.
+    }
+    index
+}
 
 /// "Folder › Playlist" path of node `id`.
-fn path_of(nodes: &[store::Node], mut id: i64) -> String {
+fn path_of(nodes: &HashMap<i64, &store::Node>, mut id: i64) -> String {
     let mut parts = Vec::new();
     // The store lists nodes depth-first, so a parent is always found; the bound only guards a corrupt cycle.
     for _ in 0..64 {
-        let Some(n) = nodes.iter().find(|n| n.id == id) else {
+        let Some(n) = nodes.get(&id) else {
             break;
         };
         parts.push(n.name.as_str());
@@ -29,20 +38,26 @@ fn path_of(nodes: &[store::Node], mut id: i64) -> String {
 
 /// "Folder › Playlist" labels of every plain playlist, with their node ids, for the ADD TO panel.
 pub fn playlist_labels(nodes: &[store::Node]) -> (Vec<String>, Vec<Option<i64>>) {
-    nodes
+    let mut playlists = nodes
         .iter()
         .filter(|n| n.kind == NodeKind::Playlist)
-        .map(|n| (path_of(nodes, n.id), Some(n.id)))
+        .peekable();
+    if playlists.peek().is_none() {
+        return Default::default();
+    }
+    let index = node_index(nodes);
+    playlists
+        .map(|n| (path_of(&index, n.id), Some(n.id)))
         .unzip()
 }
 
 /// Whether `of` is `id` or sits somewhere under it.
-fn inside(nodes: &[store::Node], of: i64, id: i64) -> bool {
+fn inside(nodes: &HashMap<i64, &store::Node>, of: i64, id: i64) -> bool {
     let mut at = Some(of);
     for _ in 0..64 {
         match at {
             Some(n) if n == id => return true,
-            Some(n) => at = nodes.iter().find(|x| x.id == n).and_then(|x| x.parent),
+            Some(n) => at = nodes.get(&n).and_then(|x| x.parent),
             None => return false,
         }
     }
@@ -69,12 +84,17 @@ pub fn more_rows(nodes: &[store::Node], id: i64) -> Vec<(String, Act)> {
     if me.parent.is_some() {
         rows.push((tr!("Move to the top level").to_owned(), Act::Into(None)));
     }
-    let folders = nodes.iter().filter(|f| {
-        f.kind == NodeKind::Folder && Some(f.id) != me.parent && !inside(nodes, f.id, id)
-    });
-    rows.extend(folders.map(|f| {
+    let mut folders = nodes
+        .iter()
+        .filter(|f| f.kind == NodeKind::Folder && Some(f.id) != me.parent)
+        .peekable();
+    if folders.peek().is_none() {
+        return rows;
+    }
+    let index = node_index(nodes);
+    rows.extend(folders.filter(|f| !inside(&index, f.id, id)).map(|f| {
         (
-            tr!("Move into ▸ {}", path_of(nodes, f.id)),
+            tr!("Move into ▸ {}", path_of(&index, f.id)),
             Act::Into(Some(f.id)),
         )
     }));
@@ -223,6 +243,11 @@ impl View {
             }
         }
         let (entries, labels) = sidebar::fold(entries, labels, &self.open);
+        let nodes = if entries.iter().any(|e| matches!(e, Entry::User(_))) {
+            node_index(&self.nodes)
+        } else {
+            HashMap::new()
+        };
         let mut heads = 0;
         let rows: Vec<TreeRow> = entries
             .iter()
@@ -232,7 +257,7 @@ impl View {
                 let row = TreeRow {
                     text: l.trim_start().trim_start_matches("▸ ").into(),
                     depth: sidebar::depth(l) as i32,
-                    icon: self.icon_of(e),
+                    icon: self.icon_of(e, &nodes),
                     head,
                     open: head && self.open.contains(e),
                     heads,
@@ -295,7 +320,7 @@ impl View {
     }
 
     /// The glyph before a row: what kind of list it is.
-    fn icon_of(&self, e: &Entry) -> Icon {
+    fn icon_of(&self, e: &Entry, nodes: &HashMap<i64, &store::Node>) -> Icon {
         match e {
             Entry::All | Entry::PlaylistsAll | Entry::SourceAll(_) => Icon::Browse,
             Entry::Tags => Icon::Star,
@@ -303,7 +328,7 @@ impl View {
             Entry::Dupes => Icon::Grid,
             Entry::CueAnalysis => Icon::MixPoint,
             Entry::UserRoot => Icon::List,
-            Entry::User(id) => match self.node(*id).map(|n| n.kind) {
+            Entry::User(id) => match nodes.get(id).map(|n| n.kind) {
                 Some(NodeKind::Folder) => Icon::Folder,
                 Some(NodeKind::Smart) => Icon::Smart,
                 _ => Icon::List,
@@ -396,6 +421,51 @@ mod tests {
     }
 
     #[test]
+    fn rebuilt_sidebar_keeps_icons_depth_and_selection_across_folding() {
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let view = crate::app::browser::timer_test_view(&app);
+        let mut v = view.borrow_mut();
+        let store = v.store.clone();
+        let folder = store.add_node(None, "Set", NodeKind::Folder).unwrap();
+        let playlist = store
+            .add_node(Some(folder), "Warmup", NodeKind::Playlist)
+            .unwrap();
+        let smart = store.add_node(None, "Smart", NodeKind::Smart).unwrap();
+        v.entry = Entry::User(playlist);
+        v.rebuild(&app);
+        let selected = v
+            .entries
+            .iter()
+            .position(|e| *e == Entry::User(playlist))
+            .unwrap();
+        assert_eq!(
+            app.global::<BrowserState>().get_side_row() as usize,
+            selected
+        );
+        for (id, icon, depth) in [
+            (folder, Icon::Folder, 1),
+            (playlist, Icon::List, 2),
+            (smart, Icon::Smart, 1),
+        ] {
+            let row = v
+                .entries
+                .iter()
+                .position(|e| *e == Entry::User(id))
+                .unwrap();
+            let shown = v.sidebar.row_data(row).unwrap();
+            assert_eq!(shown.icon, icon);
+            assert_eq!(shown.depth, depth);
+        }
+        v.entry = Entry::All;
+        v.open.clear();
+        v.rebuild(&app);
+        assert!(!v.entries.iter().any(|e| matches!(e, Entry::User(_))));
+        assert_eq!(v.sidebar.row_data(0).unwrap().icon, Icon::Browse);
+        assert_eq!(app.global::<BrowserState>().get_side_row(), 0);
+    }
+
+    #[test]
     fn add_to_lists_only_plain_playlists_with_their_folder_path() {
         let nodes = [
             node(1, None, "Sets", NodeKind::Folder),
@@ -406,6 +476,34 @@ mod tests {
         let (labels, ids) = playlist_labels(&nodes);
         assert_eq!(labels, ["Sets › Friday", "Loose"]);
         assert_eq!(ids, [Some(2), Some(4)]);
+    }
+
+    #[test]
+    fn menu_paths_keep_orphans_duplicates_and_cycle_limits() {
+        let nodes = [
+            node(2, Some(1), "Child", NodeKind::Playlist),
+            node(1, None, "Parent", NodeKind::Folder),
+            node(1, None, "Duplicate", NodeKind::Folder),
+            node(3, Some(99), "Orphan", NodeKind::Playlist),
+            node(4, Some(4), "Cycle", NodeKind::Playlist),
+        ];
+        let (labels, ids) = playlist_labels(&nodes);
+        assert_eq!(
+            labels,
+            [
+                "Parent › Child".to_owned(),
+                "Orphan".to_owned(),
+                vec!["Cycle"; 64].join(" › ")
+            ]
+        );
+        assert_eq!(ids, [Some(2), Some(3), Some(4)]);
+        let cyclic = [
+            node(1, Some(2), "A", NodeKind::Folder),
+            node(2, Some(1), "B", NodeKind::Folder),
+        ];
+        assert!(!more_rows(&cyclic, 1)
+            .iter()
+            .any(|(_, act)| matches!(act, Act::Into(Some(_)))));
     }
 
     #[test]

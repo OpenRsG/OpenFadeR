@@ -3,6 +3,8 @@
 /sdk/Cargo.lock
 /sdk/examples/*/*.so
 /mobile/target/
+/vendor/cpal/target/
+/vendor/cpal/Cargo.lock
 /mobile/android/.gradle/
 /mobile/android/app/build/
 /mobile/android/app/src/main/jniLibs/

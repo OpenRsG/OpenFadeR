@@ -41,16 +41,22 @@ use std::{
     collections::HashSet,
     path::{Path, PathBuf},
     rc::Rc,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering::Relaxed},
+    },
 };
 
 pub use dialog::{Ask, Confirm, Pick, browse, chooser, open_external, show_in_folder};
 pub use export::labels as menu_labels;
 pub use missing::is_missing;
 
+static PATH_REQUEST: AtomicU64 = AtomicU64::new(1);
+
 #[derive(Default)]
 pub struct State {
     ask: Option<Ask>,
+    path_request: u64,
     confirm: Option<Confirm>,
     missing: missing::State,
     dupes: dupes::State,
@@ -155,8 +161,11 @@ impl Ctx {
         s.set_path_title(title.into());
         s.set_path_note(note.into());
         s.set_path_text(initial.unwrap_or(text).into());
+        let mut state = self.state.borrow_mut();
+        state.path_request = PATH_REQUEST.fetch_add(1, Relaxed);
+        state.ask = Some(ask);
+        drop(state);
         s.set_path_open(true);
-        self.state.borrow_mut().ask = Some(ask);
     }
 
     pub fn confirm(&self, what: Confirm, title: &str, text: &str, yes: &str, no: &str) {
@@ -190,7 +199,7 @@ impl Ctx {
     /// Analysis > Auto Analysis is on; `force` (the Analyze Track action) always.
     pub fn analyze(&self, tracks: Vec<Track>, force: bool) {
         if force || prefs::with(|p| p.analysis.auto_analysis) {
-            analyze::request(&tracks, force);
+            analyze::request(tracks.into(), force);
         }
     }
 }
@@ -199,15 +208,20 @@ impl Ctx {
 fn path_done(c: &Rc<Ctx>, ok: bool) {
     let app = c.app();
     let s = app.global::<LibraryState>();
-    s.set_path_open(false);
-    let (ask, text) = (
-        c.state.borrow_mut().ask.take(),
-        s.get_path_text().trim().to_owned(),
-    );
-    let (Some(ask), true) = (ask, ok) else { return };
-    if text.is_empty() {
+    if !s.get_path_open() || c.state.borrow().ask.is_none() {
+        return;
+    }
+    let text = s.get_path_text().trim().to_owned();
+    if ok && text.is_empty() {
         return c.say(tr!("a path is needed"));
     }
+    s.set_path_open(false);
+    let ask = {
+        let mut state = c.state.borrow_mut();
+        state.path_request = 0;
+        state.ask.take()
+    };
+    let (Some(ask), true) = (ask, ok) else { return };
     let path = PathBuf::from(&text);
     match ask {
         Ask::ImportFiles => import::files(
@@ -241,7 +255,47 @@ fn confirm_done(c: &Rc<Ctx>, answer: i32) {
         (Confirm::AutoCue(j), 1) => autocue::run(c, j, autocue::Mode::Replace, false),
         (Confirm::AutoCue(j), 2) => autocue::run(c, j, autocue::Mode::Keep, false),
         (Confirm::RemoveMissing(t), 1) => missing::remove(c, t),
+        (Confirm::RemoveTheme(name), 1) => super::skin::remove_named(&name),
         _ => {}
+    }
+}
+
+fn browse_request(c: &Ctx) -> Option<(Pick, String, u64)> {
+    let app = c.app();
+    let s = app.global::<LibraryState>();
+    if !s.get_path_open() {
+        return None;
+    }
+    let mut state = c.state.borrow_mut();
+    let pick = state.ask.as_ref()?.pick();
+    state.path_request = PATH_REQUEST.fetch_add(1, Relaxed);
+    Some((pick, s.get_path_text().to_string(), state.path_request))
+}
+
+fn browse_done(c: &Rc<Ctx>, request: u64, found: Option<String>) {
+    let app = c.app();
+    let s = app.global::<LibraryState>();
+    let state = c.state.borrow();
+    if state.path_request == request && state.ask.is_some() && s.get_path_open() {
+        if let Some(path) = found {
+            s.set_path_text(path.into());
+        }
+    }
+}
+
+pub(in crate::app) fn ask_remove_theme(name: String) {
+    if let Some(c) = CTX.with(|c| c.borrow().clone()) {
+        let text = tr!(
+            "Delete theme {}? This removes its saved file and discards unsaved changes to this theme.",
+            name
+        );
+        c.confirm(
+            Confirm::RemoveTheme(name),
+            tr!("DELETE THEME"),
+            &text,
+            tr!("DELETE"),
+            "",
+        );
     }
 }
 
@@ -374,20 +428,12 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) {
     s.on_confirm_done(move |a| confirm_done(&k, a));
     let k = c.clone();
     s.on_path_browse_clicked(move || {
-        let (pick, start) = {
-            let st = k.state.borrow();
-            (
-                st.ask.as_ref().map_or(Pick::File, Ask::pick),
-                k.app().global::<LibraryState>().get_path_text().to_string(),
-            )
+        let Some((pick, start, request)) = browse_request(&k) else {
+            return;
         };
         k.spawn(
             move || browse(pick, &start),
-            |c, found| {
-                if let Some(p) = found {
-                    c.app().global::<LibraryState>().set_path_text(p.into());
-                }
-            },
+            move |c, found| browse_done(c, request, found),
         );
     });
     undo::wire(&c);
@@ -406,4 +452,76 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) {
     export::wire(app, &c);
     inbox::wire(&c);
     super::artwork::wire(app, &c);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use openfader::library::own::Own;
+
+    fn context(app: &App) -> Rc<Ctx> {
+        let store = Arc::new(Store::in_memory().unwrap());
+        let lib: Rc<dyn Library> = Rc::new(Own::new(store.clone()));
+        let decks = super::super::deck::wire(app, lib.clone(), Default::default());
+        Rc::new(Ctx {
+            app: app.as_weak(),
+            lib,
+            store,
+            decks,
+            state: RefCell::default(),
+        })
+    }
+
+    #[test]
+    fn chooser_results_belong_to_the_latest_open_request_not_the_current_dialog_by_accident() {
+        super::super::headless::init();
+        let app = App::new().unwrap();
+        let c = context(&app);
+        let s = app.global::<LibraryState>();
+        c.ask_path(Ask::ImportFiles, Some("original".into()));
+        let old = browse_request(&c).unwrap().2;
+        path_done(&c, false);
+        assert!(browse_request(&c).is_none());
+        c.ask_path(Ask::ImportFolder, Some("new folder".into()));
+        browse_done(&c, old, Some("stale file".into()));
+        assert_eq!(s.get_path_text(), "new folder");
+        let first = browse_request(&c).unwrap().2;
+        let latest = browse_request(&c).unwrap().2;
+        browse_done(&c, first, Some("older chooser".into()));
+        assert_eq!(s.get_path_text(), "new folder");
+        browse_done(&c, latest, Some("chosen folder".into()));
+        assert_eq!(s.get_path_text(), "chosen folder");
+        path_done(&c, false);
+        c.ask_path(Ask::ImportFolder, Some("same action reopened".into()));
+        browse_done(&c, latest, Some("stale same action".into()));
+        assert_eq!(s.get_path_text(), "same action reopened");
+        let old = browse_request(&c).unwrap().2;
+        let replacement = context(&app);
+        replacement.ask_path(Ask::ImportFiles, Some("new context".into()));
+        browse_done(&replacement, old, Some("old context result".into()));
+        assert_eq!(s.get_path_text(), "new context");
+    }
+
+    #[test]
+    fn empty_acceptance_keeps_the_path_dialog_and_action_available() {
+        super::super::headless::init();
+        let app = App::new().unwrap();
+        let c = context(&app);
+        let s = app.global::<LibraryState>();
+        c.ask_path(Ask::ImportFolder, Some("   ".into()));
+        path_done(&c, true);
+        assert!(s.get_path_open());
+        assert!(matches!(
+            c.state.borrow().ask.as_ref(),
+            Some(Ask::ImportFolder)
+        ));
+        let request = browse_request(&c).unwrap().2;
+        browse_done(&c, request, Some("a valid folder".into()));
+        assert_eq!(s.get_path_text(), "a valid folder");
+        path_done(&c, false);
+        assert!(!s.get_path_open());
+        assert!(c.state.borrow().ask.is_none());
+        browse_done(&c, request, Some("late".into()));
+        assert_eq!(s.get_path_text(), "a valid folder");
+    }
 }

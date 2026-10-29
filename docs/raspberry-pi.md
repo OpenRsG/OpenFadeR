@@ -1,8 +1,13 @@
 # Raspberry Pi 3, 4, 5 and CM4
 
-OpenFadeR runs on the 64-bit Raspberry Pi OS based on Debian 13 ("trixie"). Each release has a Pi archive,
-`openfader-<version>-linux-aarch64-pi.tar.gz`. It runs on the Pi 3, 4, 5 and CM4. To build that archive yourself, cross-compile
-it in Docker on any x86_64 machine, then copy it to the Pi:
+OpenFadeR runs on the 64-bit Raspberry Pi OS based on Debian 13 ("trixie"). Every release requires both Pi archives:
+
+- `openfader-<version>-linux-aarch64-pi.tar.gz`: Cortex-A53 code, compatible with Pi 3, 4, 5 and CM4.
+- `openfader-<version>-linux-aarch64-pi4.tar.gz`: Cortex-A72 code for Pi 4 / CM4; do not run it on Pi 3.
+
+Both keep whole-program LTO, opt-level 3 and stripped executable/native-library symbols. The Pi4 build's updater selects
+the next Pi4 archive, not the generic one. ARM software-rendered startup is checked under QEMU in CI; that is not a physical
+Pi performance or graphics-driver measurement. To build the generic archive yourself on an x86_64 machine:
 
 ```sh
 docker buildx build -f Dockerfile.pi -o dist/pi .
@@ -11,8 +16,17 @@ scp dist/pi/openfader-*-linux-aarch64-pi.tar.gz pi@raspberrypi.local:
 tar xzf openfader-*-linux-aarch64-pi.tar.gz && ./openfader-*-linux-aarch64-pi/openfader
 ```
 
-The archive holds the same plugins, themes and controller mappings as a release archive. Core 0.2.7 builds the companion
-OpenFadeR-Plugins tag `v0.2.8`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
+For the dedicated Pi4 build:
+
+```sh
+docker buildx build -f Dockerfile.pi --build-arg PI_VARIANT=pi4 --build-arg TARGET_CPU=cortex-a72 -o dist/pi .
+```
+
+Fat LTO can exceed 12 GiB during final compilation. The release job uses a hosted runner with additional swap; local memory
+limits are not raised and the shipping optimization profile is not weakened to fit them.
+
+The archive holds the same plugins, themes and controller mappings as a release archive. Core 0.2.8 builds the companion
+OpenFadeR-Plugins tag `v0.2.9`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
 pick the other companions' branch or tag). Checkouts already present in `extension/plugin`, `extension/skin` or `mappings`
 are used as they are, so switch an older plugin checkout to the matching tag first. The cargo registry and target folders stay
 in BuildKit cache mounts, so the next build only recompiles what changed.
@@ -20,15 +34,15 @@ in BuildKit cache mounts, so the next build only recompiles what changed.
 To build on the Pi itself, with the menu entry and the `openfader` command, run `./install.sh` from a checkout. On ARM Linux it
 builds without the GPU STEMS engine; a plain `cargo build` needs `--no-default-features --features app` there.
 
-The Pi archive updates itself too: Help > Check for Updates (and the daily check at start) offers a newer release's
-`openfader-<version>-linux-aarch64-pi.tar.gz`, checks its SHA-256 and swaps it in next to the old version (kept in
-`<folder>.prev`). Untick PREFERENCES > ADVANCED > Check for updates to stop the daily request; the update needs no GPU and no
+The Pi archives update themselves too: Help > Check for Updates (and the daily check at start) selects the same build variant,
+checks its SHA-256 and swaps it in next to the old version (kept in `<folder>.prev`).
+Untick PREFERENCES > ADVANCED > Check for updates to stop the daily request; the update needs no GPU and no
 extra software.
 
 ## What the build changes
 
-- Profile `pi` (`Cargo.toml`): the `dist` profile with whole-program LTO and no symbol table (an 82 MB program instead of 104 MB).
-- `-C target-cpu=cortex-a53`: the Pi 3's core. The code also runs on the Pi 4 / CM4 (Cortex-A72) and the Pi 5 (Cortex-A76). To build for one of those only, pass `--build-arg TARGET_CPU=cortex-a72` or `cortex-a76`.
+- Profile `pi` (`Cargo.toml`): the `dist` profile with whole-program LTO and no symbol table. The earlier measured baseline was 82 MB with fat LTO versus 104 MB with thin LTO; those are not size promises for current releases.
+- `-C target-cpu=cortex-a53` for the generic archive; the dedicated Pi4/CM4 archive sets `PI_VARIANT=pi4` and `TARGET_CPU=cortex-a72`. Both variants are mandatory in the release workflow.
 - `--no-default-features --features app`: STEMS separates on the CPU. `app` still enables the `compatibility` feature and
   its built-in format adapters. ONNX Runtime has no WebGPU build for ARM Linux; its ARM build is also why the program needs
   Debian 13 (glibc 2.38, GCC 14's C++ library).

@@ -4,6 +4,7 @@
 
 use super::{Deck, beat_at, cue::at_cue, ms_at, prefs, tempo_at};
 use openfader::{analysis::Beat, audio::Player};
+use slint::ComponentHandle;
 
 /// Tempo fader travel per range step: ± this fraction, label shown on the button. ±6/±10/±16/WIDE
 /// are the usual choices; the first is the start-up default. WIDE is ±100%: the fader's
@@ -55,11 +56,17 @@ impl Deck {
 
     /// Pauses and puts the playhead on `ms`.
     pub(super) fn pause_at(&self, ms: u32) {
+        self.pending.set(None);
         self.with_player(|p| {
             p.pause();
             p.slip_settle();
             p.seek(ms);
         });
+        // Publish the resting frame before a queued redraw prepares its dirty regions.
+        if let Some(app) = self.app.upgrade() {
+            self.scroll(&app, &mut self.loaded.borrow_mut(), f64::from(ms));
+            app.window().request_redraw();
+        }
     }
 
     /// PLAY / PAUSE. A synced deck starts on the master's next beat; a press while that is armed
@@ -74,6 +81,9 @@ impl Deck {
             self.with_player(|p| p.brake(s));
         } else if !self.play_quantized() {
             self.with_player(|p| p.start());
+        }
+        if let Some(app) = self.app.upgrade() {
+            app.window().request_redraw();
         }
     }
 

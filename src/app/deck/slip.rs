@@ -61,6 +61,7 @@ impl Deck {
     /// cue (HOT CUE gate,) goes back to its cue and pauses; a hot-cue / beat-jump pad in slip mode returns playback
     /// to the shadow playhead. Beat-loop, keyboard and key-shift pads need no return (a loop hands back by itself).
     pub fn pad_released(&self) {
+        self.pad_owner.set(None);
         self.plugin_release();
         self.pad_fx_off();
         self.slicer_release();
@@ -68,11 +69,15 @@ impl Deck {
         if let Some(ms) = self.gate.take() {
             self.pause_at(ms);
         } else if matches!(self.pad_mode(), PadMode::HotCue | PadMode::BeatJump) {
-            self.with_player(|p| {
-                if p.slip() {
-                    p.slip_return();
-                }
-            });
+            self.beat_jump_released();
         }
+    }
+
+    pub fn beat_jump_released(&self) {
+        self.with_player(|p| {
+            if p.slip() {
+                p.slip_return();
+            }
+        });
     }
 }

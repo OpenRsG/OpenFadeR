@@ -13,8 +13,8 @@ mod control;
 mod tests;
 
 use super::pickup::Pickup;
-use super::port::{self, Sink, Wake, OUT_MS};
-use super::Midi;
+use super::port::{self, OUT_MS, Sink, Wake};
+use super::{HeldAction, Midi};
 use crate::app::prefs::{
     self,
     controller::{port_key, Controller, Driver},
@@ -22,7 +22,7 @@ use crate::app::prefs::{
 use midir::MidiInputConnection;
 use openfader::plugin::controller::{self, Backend, Loaded, Session};
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -65,6 +65,7 @@ struct State {
     takeover: RefCell<HashSet<String>>,
     label: RefCell<String>,
     pick: Pickup,
+    held: RefCell<HashMap<(usize, i32, i32), HeldAction>>,
     polled: Cell<Instant>,
 }
 
@@ -78,6 +79,7 @@ impl State {
             takeover: RefCell::default(),
             label: RefCell::default(),
             pick: Pickup::new(),
+            held: RefCell::default(),
             polled: Cell::new(Instant::now()),
         }
     }
@@ -150,7 +152,7 @@ impl Backend for Ctl<'_> {
 
     fn set(&self, key: &str, value: f64) -> bool {
         let takeover = self.st.takeover.borrow().contains(key);
-        self.midi.ctl_set(&self.st.pick, takeover, key, value)
+        self.midi.ctl_set(self.st, takeover, key, value)
     }
 
     fn midi_out(&self, msg: &[u8]) {
@@ -289,6 +291,12 @@ impl Midi {
                     midi: self,
                     st: &c.st,
                 });
+            }
+            let held = c.st.held.take();
+            if let Some(app) = self.app.upgrade() {
+                for (_, held) in held {
+                    self.release_held(&app, held);
+                }
             }
         }
     }

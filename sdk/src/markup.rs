@@ -1,4 +1,4 @@
-//! The minimal XML reader the rekordbox xml and iTunes plugins share.
+//! Minimal XML tag scanning for controller maps and library formats; nesting is not validated.
 
 use std::collections::HashMap;
 

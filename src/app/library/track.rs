@@ -2,7 +2,7 @@
 //! Reload Tag, Show in file manager, Relocate, Auto Relocate, Remove from Collection.
 
 use super::{Ask, Confirm, Ctx, autocue, missing, show_in_folder};
-use crate::app::browser;
+use crate::app::{analyze, browser};
 use openfader::{
     library::{Track, folder},
     store,
@@ -10,6 +10,9 @@ use openfader::{
 use std::rc::Rc;
 
 pub fn act(c: &Rc<Ctx>, id: &str) {
+    if id == "track-analyze" {
+        return analyze_tracks(c);
+    }
     let ctx = browser::context();
     let Some(t) = ctx.track else {
         return c.say(tr!("choose a track first"));
@@ -21,7 +24,6 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
             Some(d) => crate::app::device::import_tracks(&d, &tracks),
             None => import(c, t),
         },
-        "track-analyze" => analyze_tracks(c, tracks),
         "track-autocue" => autocue::start(c, tracks),
         "track-lock" => lock(c, &tracks),
         "track-reload-tag" => reload_tag(c, &tracks, true),
@@ -58,14 +60,17 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
 }
 
 /// Analysis workers check locks and prepare source guides without holding the UI callback.
-fn analyze_tracks(c: &Rc<Ctx>, tracks: Vec<Track>) {
-    let msg = match tracks.as_slice() {
-        [t] => tr!("analysing “{}”…", t.title),
+fn analyze_tracks(c: &Rc<Ctx>) {
+    let Some((tracks, rows)) = browser::analysis_selection() else {
+        return c.say(tr!("choose a track first"));
+    };
+    let msg = match rows.as_slice() {
+        [i] => tr!("analysing “{}”…", tracks[*i].title),
         many => tr!("analysing {} tracks…", many.len()),
     };
     c.say(&msg);
-    if !tracks.is_empty() {
-        c.analyze(tracks, true);
+    if !rows.is_empty() {
+        analyze::request_selected(tracks, rows);
     }
 }
 

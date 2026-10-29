@@ -54,11 +54,17 @@ component Pad inherits Rectangle {
         font-weight: Theme.weight-bold;
     }
     TouchArea {
+        property <int> owner: -1;
         mouse-cursor: pointer;
         pointer-event(e) => {
-            if (e.button == PointerEventButton.left) {
-                if (e.kind == PointerEventKind.down) { SamplerState.pad-pressed(root.slot); }
-                if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) { SamplerState.pad-released(root.slot); }
+            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                self.owner = root.slot;
+                SamplerState.pad-pressed(self.owner);
+            }
+            if (self.owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up))) {
+                let owner = self.owner;
+                self.owner = -1;
+                SamplerState.pad-released(owner);
             }
         }
     }

@@ -3,7 +3,7 @@ import { Glyph, Icon } from "../icons.slint";
 import { Tooltip } from "../widgets.slint";
 import { DeckState, DeckView } from "../deck-state.slint";
 import { DeckBadge, DeckOverview, WaveStrip } from "../deck-wave.slint";
-import { PadOptions, PadsState } from "../pads.slint";
+import { PadOptions, PadsState, PadView } from "../pads.slint";
 import { FxState, FxUnit } from "../fx.slint";
 import { StageButton, StageKnob, StageFader, StageSelect, StageTabs, StageTone } from "controls.slint";
 
@@ -185,30 +185,38 @@ export component StageWave inherits Rectangle {
         }
         // Drag = scratch: press holds the platter, release lets go; a click without a drag is PLAY / PAUSE (VIEW > Click on the waveform), a right press the CUE button.
         TouchArea {
+            property <int> scratch-owner: -1;
+            property <int> cue-owner: -1;
             mouse-cursor: crosshair;
             enabled: root.v.loaded;
             pointer-event(e) => {
-                if (e.button == PointerEventButton.left) {
-                    if (e.kind == PointerEventKind.down) {
-                        root.last-x = self.mouse-x;
-                        root.down-x = self.mouse-x;
-                        root.scratching = true;
-                        DeckState.scratch-begin(root.index);
-                    }
-                    if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) {
-                        root.scratching = false;
-                        DeckState.scratch-end(root.index);
-                        if (e.kind == PointerEventKind.up && abs(self.mouse-x - root.down-x) < 4px && DeckState.click-wave) { DeckState.play-pause(root.index); }
-                    }
+                if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                    self.scratch-owner = root.index;
+                    root.last-x = self.mouse-x;
+                    root.down-x = self.mouse-x;
+                    root.scratching = true;
+                    DeckState.scratch-begin(self.scratch-owner);
                 }
-                if (e.button == PointerEventButton.right && DeckState.click-wave) {
-                    if (e.kind == PointerEventKind.down) { DeckState.cue(root.index); }
-                    if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) { DeckState.cue-released(root.index); }
+                if (self.scratch-owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up))) {
+                    let owner = self.scratch-owner;
+                    self.scratch-owner = -1;
+                    root.scratching = false;
+                    DeckState.scratch-end(owner);
+                    if (e.kind == PointerEventKind.up && abs(self.mouse-x - root.down-x) < 4px && DeckState.click-wave) { DeckState.play-pause(owner); }
+                }
+                if (e.button == PointerEventButton.right && DeckState.click-wave && e.kind == PointerEventKind.down) {
+                    self.cue-owner = root.index;
+                    DeckState.cue(self.cue-owner);
+                }
+                if (self.cue-owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.right && e.kind == PointerEventKind.up))) {
+                    let owner = self.cue-owner;
+                    self.cue-owner = -1;
+                    DeckState.cue-released(owner);
                 }
             }
             moved => {
-                if (self.pressed && root.scratching) {
-                    DeckState.scratch-move(root.index, self.mouse-x - root.last-x);
+                if (self.pressed && self.scratch-owner >= 0) {
+                    DeckState.scratch-move(self.scratch-owner, self.mouse-x - root.last-x);
                     root.last-x = self.mouse-x;
                 }
             }
@@ -406,17 +414,24 @@ export component StageJog inherits Rectangle {
         }
         // Scratch under the figure's own double-click.
         TouchArea {
+            property <int> owner: -1;
             enabled: root.v.loaded;
             mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
             pointer-event(e) => {
-                if e.button == PointerEventButton.left {
-                    if e.kind == PointerEventKind.down { root.last-x = self.mouse-x; DeckState.scratch-begin(root.index); }
-                    if e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel { DeckState.scratch-end(root.index); }
+                if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                    self.owner = root.index;
+                    root.last-x = self.mouse-x;
+                    DeckState.scratch-begin(self.owner);
+                }
+                if self.owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up)) {
+                    let owner = self.owner;
+                    self.owner = -1;
+                    DeckState.scratch-end(owner);
                 }
             }
             moved => {
-                if self.pressed {
-                    DeckState.scratch-move(root.index, self.mouse-x - root.last-x);
+                if self.pressed && self.owner >= 0 {
+                    DeckState.scratch-move(self.owner, self.mouse-x - root.last-x);
                     root.last-x = self.mouse-x;
                 }
             }
@@ -438,6 +453,21 @@ export component StageJog inherits Rectangle {
 /// (SAMPLER bank, ...) sit under the pads.
 export component StagePads inherits Rectangle {
     in property <int> index;
+    property <int> owner: -1;
+    property <int> owner-pad: -1;
+    property <int> owner-mode;
+    property <int> gesture-mode: root.v.pad-mode;
+    function release-held() {
+        if (root.owner < 0) { return; }
+        let deck = root.owner;
+        let pad = root.owner-pad;
+        let mode = root.owner-mode;
+        root.owner = -1;
+        root.owner-pad = -1;
+        DeckState.pad-released-at(deck, pad, mode);
+    }
+    changed index => { if (root.owner >= 0 && root.owner != root.index) { root.release-held(); } }
+    changed gesture-mode => { if (root.owner >= 0 && root.owner-mode != root.gesture-mode) { root.release-held(); } }
     in property <color> tone;
     in property <bool> tabbed;
     property <DeckView> v: DeckState.decks[root.index];
@@ -495,7 +525,9 @@ export component StagePads inherits Rectangle {
         enabled: root.v.loaded;
         clicked => { DeckState.cue-delete(root.index); }
     }
-    for p[i] in root.v.pads: pad := Rectangle {
+    for i in 8: pad := Rectangle {
+        property <PadView> p: root.v.pads[i];
+        property <bool> held: root.owner == root.index && root.owner-pad == i && root.owner-mode == root.v.pad-mode;
         // BEAT JUMP pairs pad 2k (-n) with pad 2k+1 (+n) in a column.
         property <bool> pairs: root.v.pad-mode == 1;
         property <int> c: self.pairs ? Math.floor(i / 2) : Math.mod(i, 4);
@@ -515,10 +547,10 @@ export component StagePads inherits Rectangle {
         border-color: root.v.delete-mode && p.set && root.v.pad-mode == 0 ? Theme.danger
             : self.filled ? (p.set ? p.color : Theme.line) : self.lit && !root.list ? self.lit-c : root.list ? Theme.line : Theme.line-strong.with-alpha(0.8);
         background: self.filled && p.set ? p.color
-            : self.lit && !root.list ? (ta.pressed ? self.lit-c : self.lit-c.with-alpha(root.cues ? 0.2 : 0.4))
-            : ta.pressed ? Theme.bg-deep : ta.has-hover ? Theme.panel-raised.with-alpha(0.7) : root.list ? Theme.bg-deep.with-alpha(0.5) : transparent;
-        drop-shadow-blur: (ta.pressed || (self.lit && !root.cues)) && !root.list && !self.filled && Theme.glow > 0 ? 14px * Theme.glow : 0px;
-        drop-shadow-color: (ta.pressed || (self.lit && !root.cues)) && !root.list && !self.filled && Theme.glow > 0 ? self.lit-c.with-alpha(0.7 * Theme.glow) : transparent;
+            : self.lit && !root.list ? (self.held ? self.lit-c : self.lit-c.with-alpha(root.cues ? 0.2 : 0.4))
+            : self.held ? Theme.bg-deep : ta.has-hover ? Theme.panel-raised.with-alpha(0.7) : root.list ? Theme.bg-deep.with-alpha(0.5) : transparent;
+        drop-shadow-blur: (self.held || (self.lit && !root.cues)) && !root.list && !self.filled && Theme.glow > 0 ? 14px * Theme.glow : 0px;
+        drop-shadow-color: (self.held || (self.lit && !root.cues)) && !root.list && !self.filled && Theme.glow > 0 ? self.lit-c.with-alpha(0.7 * Theme.glow) : transparent;
         animate background { duration: Theme.t-fast; }
         // Grid: the number (hot cues) or the pad's own label, the cue time under it when filled.
         if !root.list: Text {
@@ -527,7 +559,7 @@ export component StagePads inherits Rectangle {
             width: parent.width;
             height: pad.filled && p.time != "" ? parent.height * 0.6 : parent.height;
             text: root.v.delete-mode && p.set && root.v.pad-mode == 0 ? "×" : root.cues ? "" + (i + 1) : p.label;
-            color: pad.filled && p.set ? StageTone.on(p.color) : ta.pressed && p.set && !pad.filled ? StageTone.on(pad.lit-c) : p.set ? pad.lit-c.brighter(0.3) : Theme.text-dim;
+            color: pad.filled && p.set ? StageTone.on(p.color) : pad.held && p.set && !pad.filled ? StageTone.on(pad.lit-c) : p.set ? pad.lit-c.brighter(0.3) : Theme.text-dim;
             font-family: Theme.font;
             font-size: root.v.pad-mode == 4 || root.v.pad-mode == 11 ? Theme.font-xs : Theme.font-md;
             font-weight: Theme.weight-bold;
@@ -579,9 +611,17 @@ export component StagePads inherits Rectangle {
             enabled: root.live;
             width: root.list ? parent.width - parent.height : parent.width;
             pointer-event(e) => {
-                if (e.button == PointerEventButton.left) {
-                    if (e.kind == PointerEventKind.down) { DeckState.pad(root.index, i); }
-                    if (e.kind == PointerEventKind.up) { DeckState.pad-released(root.index); }
+                if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                    root.release-held();
+                    let deck = root.index;
+                    let mode = root.v.pad-mode;
+                    root.owner-pad = i;
+                    root.owner-mode = mode;
+                    root.owner = deck;
+                    DeckState.pad(deck, i);
+                }
+                if (root.owner-pad == i && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up))) {
+                    root.release-held();
                 }
             }
         }

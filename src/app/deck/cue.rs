@@ -8,6 +8,7 @@
 //! The cue point is chosen at LOAD ([`autocue`](super::autocue): nearest cue, first sound, first memory cue) until the user sets another (session only).
 
 use super::{Deck, at_end, fmt_ms};
+use slint::ComponentHandle;
 
 /// A paused playhead this close to the cue point counts as being on it.
 const AT_CUE_MS: f64 = 30.0;
@@ -17,6 +18,8 @@ const AT_CUE_MS: f64 = 30.0;
 pub enum Preview {
     #[default]
     Off,
+    /// CUE held after returning from playback; repeats wait for release.
+    Returned,
     /// CUE held, playing from the cue point.
     Held,
     /// PLAY pressed during the preview: keeps playing after CUE is released.
@@ -85,7 +88,10 @@ impl Deck {
             _ => cue,
         };
         match act {
-            Press::Return => self.pause_at(at),
+            Press::Return => {
+                self.cue_state.set(Preview::Returned);
+                self.pause_at(at);
+            }
             Press::Preview { .. } => {
                 self.cue_state.set(Preview::Held);
                 self.with_player(|p| {
@@ -93,6 +99,9 @@ impl Deck {
                     p.play();
                 });
             }
+        }
+        if let Some(app) = self.app.upgrade() {
+            app.window().request_redraw();
         }
     }
 
@@ -170,5 +179,7 @@ mod tests {
         assert_eq!(Preview::Held.play().release(), (Preview::Off, false));
         assert_eq!(Preview::Off.release(), (Preview::Off, false));
         assert_eq!(Preview::Off.play(), Preview::Off);
+        assert_eq!(Preview::Returned.release(), (Preview::Off, false));
+        assert_eq!(Preview::Returned.play(), Preview::Returned);
     }
 }

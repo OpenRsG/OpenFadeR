@@ -57,7 +57,7 @@ impl Deck {
         sh.playing.store(true, Relaxed);
         sh.rate.store(rate.to_bits(), Relaxed);
         sh.key_lock.store(key_lock, Relaxed);
-        sh.seek.store((CUE - 4.0 * BEAT).to_bits(), Relaxed);
+        sh.seek_to(CUE - 4.0 * BEAT);
         let mut d = Deck {
             sh,
             v: Voice::new(44100),
@@ -89,6 +89,7 @@ impl Deck {
             lp: d.lp,
         };
         clock.push(a, d.playing, reset);
+        clock.epoch = d.epoch;
         self.buffers += 1;
         (out, d.start)
     }
@@ -100,12 +101,13 @@ impl Deck {
 
     /// What `Player::position_ms` reports `after` the last callback, in source frames.
     fn heard(&self, after: Duration) -> f64 {
-        let seek = self.sh.seek.load(Relaxed);
-        if seek != NO_SEEK {
-            return f64::from_bits(seek);
+        let seek = *self.sh.seek.lock();
+        let clock = self.sh.clock.lock();
+        if seek.epoch != clock.epoch {
+            return seek.target;
         }
         let now = self.at(self.buffers - 1) + after;
-        heard_frames(&self.sh.clock.lock(), now, FRAMES as f64)
+        heard_frames(&clock, now, FRAMES as f64)
     }
 
     /// The press of a hot cue pad `after` the last callback: without Q a plain seek; with Q the grid's beat that the heard playhead is in
@@ -280,4 +282,126 @@ fn a_press_right_after_a_release_in_the_same_buffer_beats_the_slip_return() {
             "its own release returns to the shadow"
         );
     }
+}
+
+fn real_player() -> (Player, Voice) {
+    let shared = [(); engine::SLOTS].map(|_| Arc::new(Shared::new()));
+    *shared[0].pcm.lock() = Arc::new(Track16::from(Pcm {
+        rate: 44100,
+        samples: vec![0.25; 2 * FRAMES],
+    }));
+    let player = engine::test_player(shared);
+    (player, Voice::new(44100))
+}
+
+fn publish(sh: &Shared, d: &Done) {
+    let mut clock = sh.clock.lock();
+    let reset = d.seeked || !clock.playing;
+    clock.push(
+        Anchor {
+            at: Instant::now(),
+            pos: d.start,
+            latency: Duration::from_millis(200),
+            fps: d.fps,
+            lp: d.lp,
+        },
+        d.playing,
+        reset,
+    );
+    clock.epoch = d.epoch;
+}
+
+#[test]
+fn cue_targets_survive_consumption_and_older_callbacks_cannot_acknowledge_new_presses() {
+    let (mut player, mut voice) = real_player();
+    let sh = player.shared.clone();
+    player.seek(3000);
+    player.play();
+    let old = render(&sh, &mut voice, 44100, BUFFER, |_, _, _| {});
+    publish(&sh, &old);
+    for press in 0..64 {
+        let target = 1000 + (press % 2) * 1000;
+        player.pause();
+        player.seek(target);
+        player.play();
+        let mut latest = target;
+        let resume = press % 2 == 0;
+        let d = render(&sh, &mut voice, 44100, BUFFER, |i, _, _| {
+            if i != 0 {
+                return;
+            }
+            assert_eq!(
+                player.position_ms(),
+                target as f64,
+                "consumed, not published"
+            );
+            assert_eq!(player.written_ms(), target as f64);
+            assert!(!player.settled());
+            // Release and press again while the earlier preview is still rendering.
+            player.pause();
+            latest = if press % 3 == 0 { target + 500 } else { target };
+            player.seek(latest);
+            if resume {
+                player.play();
+            }
+            assert_eq!(player.position_ms(), latest as f64);
+            assert_eq!(player.written_ms(), latest as f64);
+        });
+        assert_eq!(d.start, target as f64 * RATE / 1000.0);
+        assert_eq!(
+            player.position_ms(),
+            latest as f64,
+            "before clock publication"
+        );
+        assert_eq!(
+            player.written_ms(),
+            latest as f64,
+            "older position publication"
+        );
+        publish(&sh, &d);
+        assert_eq!(
+            player.position_ms(),
+            latest as f64,
+            "older clock publication"
+        );
+        assert!(
+            !player.settled(),
+            "even an identical target needs its own epoch"
+        );
+        let d = render(&sh, &mut voice, 44100, BUFFER, |_, _, _| {});
+        assert_eq!(d.start, latest as f64 * RATE / 1000.0);
+        assert_eq!(player.position_ms(), latest as f64);
+        publish(&sh, &d);
+        assert_eq!(player.position_ms(), latest as f64);
+        let epoch = sh.clock.lock().epoch;
+        assert_eq!(epoch, sh.seek.lock().epoch);
+        assert_eq!(player.settled(), !resume);
+    }
+}
+
+#[test]
+fn a_busy_seek_mailbox_defers_the_whole_command_without_blocking_render() {
+    let (mut player, mut voice) = real_player();
+    let sh = player.shared.clone();
+    player.play();
+    player.seek_on_beat(4000, 0.0, 500.0, 200.0);
+    let held = sh.seek.lock();
+    let d = render(&sh, &mut voice, 44100, BUFFER, |_, _, _| {});
+    assert!(!d.seeked);
+    assert!(held.pending, "a partial publication is never consumed");
+    drop(held);
+    assert_eq!(player.position_ms(), 4000.0);
+    let written = f64::from_bits(sh.pos.load(Relaxed));
+    let d = render(&sh, &mut voice, 44100, BUFFER, |i, _, _| {
+        if i == 0 {
+            player.seek(2000); // the next command must not inherit the beat or wrap
+        }
+    });
+    assert_eq!(d.start, CUE + phase(written, 0.4 * BEAT));
+    publish(&sh, &d);
+    assert_eq!(player.position_ms(), 2000.0);
+    let d = render(&sh, &mut voice, 44100, BUFFER, |_, _, _| {});
+    assert_eq!(d.start, 2.0 * RATE);
+    publish(&sh, &d);
+    assert_eq!(player.position_ms(), 2000.0);
 }

@@ -2,9 +2,9 @@
 //! library plugins that name a library file in their settings (each enabled one with a file set gets a row under its
 //! manifest's label) and (when Preferences > View > Layout > Media Browser enables it) Explorer (a folder of music). A source
 //! opens when its row is chosen; its lists are read-only and join the Collection through IMPORT TO COLLECTION (File and
-//! Track menus, the strip button). Devices are polled once a second: plugging one in or out updates the tree, and a device
-//! with a library is read as soon as it appears. Every source is read on a worker thread (a USB stick or a big Explorer tree
-//! takes seconds), with its steps in the status bar's loading line ([`loading`]) and a toast when done.
+//! Track menus, the strip button). The device worker publishes discovery snapshots: plugging one in or out updates the tree,
+//! and a device with a library is read as soon as it appears. Every source is read on a worker thread (a USB stick or a big
+//! Explorer tree takes seconds), with its steps in the status bar's loading line ([`loading`]) and a toast when done.
 
 use super::{
     App, BrowserState, Home, View, loading,
@@ -41,6 +41,17 @@ pub struct Source {
     pub playlists: Vec<Playlist>,
     /// Being read on a worker thread ([`View::read_source`]).
     reading: bool,
+}
+
+#[cfg(test)]
+pub(super) fn test_source(lib: Option<Rc<dyn Library>>) -> Source {
+    Source {
+        kind: Kind::Explorer("metadata-test".into()),
+        name: "metadata-test".into(),
+        lib,
+        playlists: Vec::new(),
+        reading: false,
+    }
 }
 
 impl Kind {
@@ -117,31 +128,30 @@ impl Library for Blank {
 
 /// What a worker read: the library, its playlists, its track count.
 type Read = Result<(Box<dyn Library + Send>, Vec<Playlist>, usize), String>;
-/// The sources the settings and the mounted devices call for now; those already in `old` keep their opened library (and
-/// get their label refreshed).
-pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
-    let mut kinds: Vec<Kind> = device::scan()
-        .into_iter()
+/// Merge the worker's latest discovery snapshot; opened libraries keep their identity and get their label refreshed.
+fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
+    crate::app::device::with_snapshot(|snapshot| collect_snapshot(old, media_explorer, snapshot))
+}
+
+fn collect_snapshot(
+    old: Vec<Source>,
+    media_explorer: bool,
+    snapshot: &crate::app::device::Discovery,
+) -> Vec<Source> {
+    let mut kinds: Vec<Kind> = snapshot
+        .mounted
+        .iter()
         .filter(|d| d.has_library() || (d.writable() && d.can(Feature::Export)))
+        .cloned()
         .map(Kind::Device)
         .collect();
-    kinds.extend(
-        plugin::library::sources()
-            .into_iter()
-            .map(|s| Kind::Plugin {
-                plugin: s.plugin,
-                label: s.label,
-                path: s.path,
-            }),
-    );
-    // `$XDG_MUSIC_DIR`, else `~/Music`, else home: the whole home holds caches and build trees, read for minutes.
-    let home = openfader::paths::home();
-    let music = std::env::var_os("XDG_MUSIC_DIR")
-        .map(PathBuf::from)
-        .or_else(|| home.as_ref().map(|h| h.join("Music")))
-        .filter(|p| p.is_dir());
-    if let (true, Some(p)) = (media_explorer, music.or(home).filter(|p| p.is_dir())) {
-        kinds.push(Kind::Explorer(p));
+    kinds.extend(snapshot.plugins.iter().map(|s| Kind::Plugin {
+        plugin: s.plugin.clone(),
+        label: s.label.clone(),
+        path: s.path.clone(),
+    }));
+    if media_explorer && let Some(p) = &snapshot.explorer {
+        kinds.push(Kind::Explorer(p.clone()));
     }
     let mut old: Vec<Option<Source>> = old.into_iter().map(Some).collect();
     kinds
@@ -409,7 +419,7 @@ impl View {
         }
     }
 
-    /// Re-reads what is mounted and what the Media Browser settings enable; rebuilds the tree when that changed. The chosen
+    /// Applies the worker's discovery snapshot and Media Browser settings; rebuilds the tree when they changed. The chosen
     /// row follows its source when the indexes shift, and falls back to All tracks when its source is gone.
     pub(super) fn refresh_sources(&mut self, app: &App) {
         let explorer = prefs::with(|p| p.view.media_explorer);
@@ -423,10 +433,7 @@ impl View {
         let old = std::mem::take(&mut self.sources);
         self.sources = collect(old, explorer);
         if before.len() == self.sources.len()
-            && before
-                .iter()
-                .zip(&self.sources)
-                .all(|(a, s)| a.same(&s.kind))
+            && before.iter().zip(&self.sources).all(|(a, s)| a == &s.kind)
         {
             return;
         }
@@ -505,9 +512,8 @@ fn read(app: &App, kind: Kind) {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_source_is_the_same_by_id_or_path_not_by_label() {
-        let dev = |id: &str, label: &str| Device {
+    fn dev(id: &str, label: &str) -> Device {
+        Device {
             id: id.into(),
             mount: "/m".into(),
             source: String::new(),
@@ -523,7 +529,11 @@ mod tests {
             provider: None,
             info: Default::default(),
             formats: Vec::new(),
-        };
+        }
+    }
+
+    #[test]
+    fn a_source_is_the_same_by_id_or_path_not_by_label() {
         assert!(Kind::Device(dev("u1", "A")).same(&Kind::Device(dev("u1", "B"))));
         assert!(!Kind::Device(dev("u1", "A")).same(&Kind::Device(dev("u2", "A"))));
         let plugin = |name: &str, path: &str| Kind::Plugin {
@@ -534,5 +544,89 @@ mod tests {
         assert!(plugin("a", "/a.xml").same(&plugin("a", "/a.xml")));
         assert!(!plugin("a", "/a.xml").same(&plugin("b", "/a.xml")));
         assert!(!plugin("a", "/a.xml").same(&plugin("a", "/b.xml")));
+    }
+
+    fn export_device(id: &str, label: &str) -> Device {
+        let mut d = dev(id, label);
+        d.info.features.push(Feature::Export);
+        d
+    }
+
+    fn plugin_source(label: &str, path: &str) -> plugin::library::Source {
+        plugin::library::Source {
+            plugin: "test".into(),
+            label: label.into(),
+            path: path.into(),
+        }
+    }
+
+    #[test]
+    fn source_collection_uses_snapshot_without_discovering_paths() {
+        let mut read_only = dev("read-only", "Library");
+        read_only.read_only = true;
+        read_only.info.libraries.push("Library".into());
+        let mut blank_read_only = export_device("blank-read-only", "Not writable");
+        blank_read_only.read_only = true;
+        let snapshot = crate::app::device::Discovery {
+            mounted: vec![
+                export_device("blank", "Blank"),
+                read_only,
+                blank_read_only,
+                dev("unsupported", "No export"),
+            ],
+            plugins: vec![plugin_source(
+                "Configured",
+                "/not-a-real-library/source.xml",
+            )],
+            explorer: Some("/not-a-real-folder/music".into()),
+        };
+        let sources = collect_snapshot(Vec::new(), true, &snapshot);
+        assert_eq!(sources.len(), 4);
+        assert!(matches!(&sources[0].kind, Kind::Device(d) if d.id == "blank"));
+        assert!(matches!(&sources[1].kind, Kind::Device(d) if d.id == "read-only"));
+        assert!(
+            matches!(&sources[2].kind, Kind::Plugin { path, .. } if path == &PathBuf::from("/not-a-real-library/source.xml"))
+        );
+        assert!(
+            matches!(&sources[3].kind, Kind::Explorer(path) if path == &PathBuf::from("/not-a-real-folder/music"))
+        );
+        assert_eq!(collect_snapshot(sources, false, &snapshot).len(), 3);
+    }
+
+    #[test]
+    fn snapshot_updates_preserve_open_sources_while_adding_removing_and_relabeling() {
+        let mut snapshot = crate::app::device::Discovery {
+            mounted: vec![
+                export_device("keep", "Old"),
+                export_device("remove", "Removed"),
+            ],
+            plugins: vec![plugin_source("Old plugin label", "/old.xml")],
+            ..Default::default()
+        };
+        let mut old = collect_snapshot(Vec::new(), false, &snapshot);
+        let library: Rc<dyn Library> = Rc::new(Blank);
+        old[0].lib = Some(library.clone());
+        old[0].reading = true;
+        old[2].lib = Some(library.clone());
+        snapshot.mounted = vec![
+            export_device("new", "New"),
+            export_device("keep", "Renamed"),
+        ];
+        snapshot.plugins[0].label = "New plugin label".into();
+        let sources = collect_snapshot(old, false, &snapshot);
+        assert_eq!(sources.len(), 3);
+        assert!(matches!(&sources[0].kind, Kind::Device(d) if d.id == "new"));
+        assert!(sources[0].lib.is_none());
+        assert!(sources[1].name.contains("Renamed"));
+        assert!(sources[1].reading);
+        assert!(Rc::ptr_eq(sources[1].lib.as_ref().unwrap(), &library));
+        assert_eq!(sources[2].name, "New plugin label");
+        assert!(Rc::ptr_eq(sources[2].lib.as_ref().unwrap(), &library));
+        snapshot.plugins[0].path = "/replacement.xml".into();
+        let sources = collect_snapshot(sources, false, &snapshot);
+        assert!(sources[2].lib.is_none(), "a changed path is a new source");
+        snapshot.plugins.clear();
+        snapshot.mounted.clear();
+        assert!(collect_snapshot(sources, false, &snapshot).is_empty());
     }
 }

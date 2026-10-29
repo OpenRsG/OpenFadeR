@@ -78,16 +78,18 @@ impl Ctx {
     /// [`Self::start_then`] with nothing to do when the job ends.
     pub(super) fn start(
         self: &Rc<Self>,
+        cancellable: bool,
         device: Option<String>,
         phase: &str,
         work: impl FnOnce(Arc<Control>) -> Result<String, String> + Send + 'static,
     ) {
-        self.start_then(device, phase, work, |_, _| {});
+        self.start_then(cancellable, device, phase, work, |_, _| {});
     }
 
     /// Runs `work` on a thread with a fresh [`Control`]; `then` sees its result on the UI thread. Refuses while another job runs.
     pub(super) fn start_then(
         self: &Rc<Self>,
+        cancellable: bool,
         device: Option<String>,
         phase: &str,
         work: impl FnOnce(Arc<Control>) -> Result<String, String> + Send + 'static,
@@ -105,6 +107,7 @@ impl Ctx {
             .unwrap_or_default();
         *self.job.borrow_mut() = Some(Job {
             ctl,
+            cancellable,
             rx,
             device,
             before,
@@ -114,6 +117,7 @@ impl Ctx {
         });
         self.with_state(|s| {
             s.set_busy(true);
+            s.set_can_cancel(cancellable);
             s.set_progress(0.0);
             s.set_phase(phase.into());
             s.set_failed(false);
@@ -135,6 +139,7 @@ impl Ctx {
     ) {
         let (safety, phase_text) = (self.safety(), format!("{phase}…"));
         self.start_then(
+            true,
             Some(t.dev.id.clone()),
             phase,
             move |ctl| {
@@ -204,6 +209,7 @@ impl Ctx {
         let Some(job) = self.job.take() else { return };
         self.with_state(|s| {
             s.set_busy(false);
+            s.set_can_cancel(false);
             s.set_progress(0.0);
         });
         if let Some(id) = job.device.as_deref() {
@@ -219,7 +225,7 @@ impl Ctx {
             Ok(m) if m.is_empty() || m.starts_with('\u{1}') => None,
             Ok(m) => Some((m.as_str(), false)),
             Err(e) if e == "cancelled" => {
-                Some((tr!("Cancelled: the device was left as it was"), true))
+                Some((tr!("Cancelled; check the device for completed changes"), false))
             }
             Err(e) => Some((e.as_str(), true)),
         };
@@ -239,7 +245,7 @@ impl Ctx {
     fn show_progress(&self, job: &mut Job) {
         let ctl = &job.ctl;
         let (done, total) = (ctl.done.load(Relaxed), ctl.total.load(Relaxed));
-        let phase = ctl.phase();
+        let phase = if ctl.cancelled() { tr!("Cancelling…").to_owned() } else { ctl.phase() };
         let r = Reading {
             phase: &phase,
             done,
@@ -269,5 +275,54 @@ impl Ctx {
             s.set_phase(phase.clone().into());
             s.set_status(why.map_or(status.clone(), |w| format!("{status}\n{w}")).into());
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::{App, DeviceState, headless};
+    use openfader::{library::own::Own, store::Store};
+
+    #[test]
+    fn irreversible_jobs_refuse_cancel_and_the_next_job_gets_its_own_capability() {
+        headless::init();
+        let app = App::new().unwrap();
+        let lib: Rc<dyn Library> = Rc::new(Own::new(Arc::new(Store::in_memory().unwrap())));
+        let decks = crate::app::deck::wire(&app, lib.clone(), Default::default());
+        let guard = super::super::wire(&app, lib, decks);
+        let cx = &guard._ctx;
+        let state = app.global::<DeviceState>();
+        for cancellable in [false, true] {
+            let (finish, release) = mpsc::channel();
+            cx.start(cancellable, None, "safe fixture", move |ctl| {
+                release.recv().unwrap();
+                if ctl.cancelled() { Err("cancelled".into()) } else { Ok("finished".into()) }
+            });
+            let ctl = cx.job.borrow().as_ref().unwrap().ctl.clone();
+            assert!(state.get_busy());
+            assert_eq!(state.get_can_cancel(), cancellable);
+            cx.poll_job();
+            let before = state.get_phase();
+            state.invoke_cancel();
+            assert_eq!(
+                ctl.cancelled(),
+                cancellable,
+                "a hidden or programmatic Cancel cannot interrupt an irreversible job"
+            );
+            assert!(!state.get_can_cancel());
+            cx.poll_job();
+            assert_eq!(state.get_phase() != before, cancellable, "pending cancellation retains distinct feedback");
+            finish.send(()).unwrap();
+            let deadline = Instant::now() + std::time::Duration::from_secs(2);
+            while cx.busy() && Instant::now() < deadline {
+                cx.poll_job();
+                thread::sleep(std::time::Duration::from_millis(1));
+            }
+            assert!(!cx.busy());
+            assert!(!state.get_busy());
+            assert!(!state.get_can_cancel());
+            assert!(!state.get_failed(), "user cancellation is not an I/O failure");
+        }
     }
 }

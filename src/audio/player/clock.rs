@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 /// Never extrapolate further than this past the last callback (stalled audio thread: freeze, don't run away).
 const MAX_EXTRAPOLATE: Duration = Duration::from_millis(250);
 /// Upper bound on kept anchors (latency / buffer duration stays far below this).
-const MAX_ANCHORS: usize = 64;
+pub(super) const MAX_ANCHORS: usize = 64;
 
 /// What the audio thread knew at one callback.
 #[derive(Clone, Copy)]
@@ -34,6 +34,8 @@ pub(super) struct Anchor {
 }
 
 pub(super) struct Clock {
+    /// Seek command represented by the newest published anchor.
+    pub(super) epoch: u64,
     /// Oldest first; `[0]` is the anchor audible at the newest callback.
     anchors: VecDeque<Anchor>,
     /// Reported position never goes below this (start of play / seek target) before the first
@@ -44,7 +46,12 @@ pub(super) struct Clock {
 
 impl Clock {
     pub(super) fn new() -> Clock {
-        Clock { anchors: VecDeque::with_capacity(MAX_ANCHORS + 1), floor: 0.0, playing: false }
+        Clock {
+            epoch: 0,
+            anchors: VecDeque::with_capacity(MAX_ANCHORS + 1),
+            floor: 0.0,
+            playing: false,
+        }
     }
 
     /// Record a callback. `reset`: seek or start of play, older anchors no longer describe the audio.
@@ -127,7 +134,12 @@ mod tests {
     const MS: fn(u64) -> Duration = Duration::from_millis;
 
     fn clock() -> Clock {
-        Clock { anchors: VecDeque::new(), floor: 0.0, playing: true }
+        Clock {
+            epoch: 0,
+            anchors: VecDeque::new(),
+            floor: 0.0,
+            playing: true,
+        }
     }
 
     /// Drive `ms` of wall clock the way the device would: a callback every 10 ms (rate from

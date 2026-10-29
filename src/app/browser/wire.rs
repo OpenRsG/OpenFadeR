@@ -1,7 +1,7 @@
 //! Builds the [`View`] and connects the `BrowserState` callbacks to it.
 
 use super::{
-    cover, editor,
+    DOUBLE_CLICK, Home, View, cover, editor,
     filter::Filter,
     history, palette,
     playlists::{self, Panel},
@@ -9,7 +9,7 @@ use super::{
     sidebar::{Entry, TAG_ROW},
     stages, strip, suggest,
     table::Reference,
-    tagging, track_at, Home, View, DOUBLE_CLICK,
+    tagging, track_at,
 };
 use crate::app::{
     App, AutomixState, BrowserState, DeckState, analyze::detected, automix, deck::Decks,
@@ -19,7 +19,7 @@ use openfader::{
     library::{Library, Track},
     store,
 };
-use slint::{ComponentHandle, Model, Timer, VecModel};
+use slint::{ComponentHandle, Model, SharedString, Timer, VecModel};
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
@@ -556,21 +556,109 @@ fn wire_selection(
             }
         }
     });
-    // Two left presses on one row within DOUBLE_CLICK select it and load it into the first deck that is not playing.
+    // A sort or source update between presses must not turn a single click on another track into LOAD.
     let (last, weak, view) = (
-        Cell::new(None::<(Instant, i32)>),
+        RefCell::new(None::<(Instant, i32, SharedString)>),
         app.as_weak(),
         view.clone(),
     );
     state.on_track_pressed(move |i| {
-        let now = Instant::now();
-        let double = last
-            .get()
-            .is_some_and(|(t, row)| row == i && now - t < DOUBLE_CLICK);
-        last.set((!double).then_some((now, i)));
-        let Some(t) = track_at(&view, i).filter(|_| double) else {
+        let Some(app) = weak.upgrade() else { return };
+        let identity = app
+            .global::<BrowserState>()
+            .get_tracks()
+            .row_data(i.max(0) as usize)
+            .and_then(|row| row.row_data(super::table::TRACK_ID))
+            .map(|cell| cell.text);
+        let Some(identity) = identity.filter(|_| i >= 0) else {
+            last.take();
             return;
         };
-        load_to_deck(&weak.unwrap(), &*on_track, &t);
+        let now = Instant::now();
+        let double = last
+            .borrow()
+            .as_ref()
+            .is_some_and(|(t, row, id)| *row == i && *id == identity && now - *t < DOUBLE_CLICK);
+        last.replace((!double).then_some((now, i, identity)));
+        if !double {
+            return;
+        }
+        let Some(t) = track_at(&view, i) else {
+            return;
+        };
+        load_to_deck(&app, &*on_track, &t);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use slint::{ModelRc, StandardListViewItem};
+
+    #[test]
+    fn changing_the_track_under_a_clicked_row_requires_a_new_double_click() {
+        crate::app::headless::init();
+        let app = App::new().unwrap();
+        let view = super::super::timer_test_view(&app);
+        let (decks, lib) = {
+            let v = view.borrow();
+            (v.decks.clone(), v.lib.clone())
+        };
+        let automix = automix::wire(&app, decks, lib);
+        let loaded = Rc::new(RefCell::new(Vec::new()));
+        let seen = loaded.clone();
+        wire_selection(&app, &view, automix, move |t| {
+            seen.borrow_mut().push(t.file.clone().unwrap())
+        });
+        let tracks = Arc::new(vec![
+            Track {
+                title: "Duplicate title".into(),
+                file: Some("/first.wav".into()),
+                ..Default::default()
+            },
+            Track {
+                title: "Duplicate title".into(),
+                file: Some("/second.wav".into()),
+                ..Default::default()
+            },
+        ]);
+        {
+            let mut v = view.borrow_mut();
+            v.list = tracks.clone();
+            v.shown = vec![0, 1];
+        }
+        let rows = Rc::new(VecModel::from(
+            tracks
+                .iter()
+                .map(|t| {
+                    let mut cells =
+                        vec![StandardListViewItem::default(); super::super::table::COLUMNS];
+                    cells[0].text = t.title.as_str().into();
+                    cells[super::super::table::TRACK_ID].text =
+                        crate::app::track_identity(t).into();
+                    ModelRc::new(VecModel::from(cells))
+                })
+                .collect::<Vec<_>>(),
+        ));
+        let state = app.global::<BrowserState>();
+        state.set_tracks(rows.clone().into());
+        state.invoke_track_pressed(0);
+        view.borrow_mut().shown = vec![1, 0];
+        let first = rows.row_data(0).unwrap();
+        rows.set_row_data(0, rows.row_data(1).unwrap());
+        rows.set_row_data(1, first);
+        state.invoke_track_pressed(0);
+        assert!(
+            loaded.borrow().is_empty(),
+            "a different track at the same row is only a single click"
+        );
+        state.invoke_track_pressed(0);
+        assert_eq!(*loaded.borrow(), [std::path::PathBuf::from("/second.wav")]);
+        state.invoke_track_pressed(0);
+        assert_eq!(
+            loaded.borrow().len(),
+            1,
+            "a completed double click starts a new click sequence"
+        );
+    }
 }

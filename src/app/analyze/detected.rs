@@ -1,21 +1,22 @@
 //! The session map of what our own analysis found, and the choice of which tracks a background run still has to analyse.
 
-use super::{Found, summary};
+use super::Found;
 use crate::app::camelot::camelot;
 use openfader::{
     analysis::{cache, options::Parts},
     library::Track,
 };
 use std::{
-    cell::{Cell, RefCell},
+    cell::Cell,
     collections::HashMap,
     path::{Path, PathBuf},
     rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 #[derive(Default)]
 struct Inner {
-    map: RefCell<HashMap<PathBuf, Found>>,
+    map: Arc<Mutex<HashMap<PathBuf, Found>>>,
     version: Cell<u64>,
 }
 
@@ -30,12 +31,20 @@ impl Detected {
     }
 
     pub fn get(&self, audio: &Path) -> Option<Found> {
-        self.0.map.borrow().get(audio).cloned()
+        self.0
+            .map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(audio)
+            .cloned()
     }
 
     /// `t`'s BPM × 100 and key, the detected value standing in for each one the library leaves empty.
     pub fn fill(&self, t: &Track) -> Found {
-        let map = self.0.map.borrow();
+        if t.bpm_x100 > 0 && !t.key.is_empty() {
+            return (t.bpm_x100, t.key.clone());
+        }
+        let map = self.0.map.lock().unwrap_or_else(|e| e.into_inner());
         let found = t.file.as_deref().and_then(|f| map.get(f));
         (
             if t.bpm_x100 > 0 {
@@ -51,27 +60,40 @@ impl Detected {
         )
     }
 
-    /// [`get`](Self::get), else whatever the stored analysis holds for `t` (remembered, so a repeat is free).
-    pub fn lookup(&self, t: &Track) -> Option<Found> {
-        let audio = t.file.as_deref()?;
-        self.get(audio).or_else(|| {
-            let found = summary(&cache::load(t).ok()??);
-            self.insert(audio.to_owned(), found.clone());
-            Some(found)
-        })
+    /// The validated BPM/key prefix of the stored analysis; call on a worker, not the UI thread.
+    pub fn read(t: &Track) -> Option<Found> {
+        let glance = cache::glance(t)?;
+        Some((glance.bpm_x100, glance.key.unwrap_or_default()))
+    }
+
+    /// A selected-track cache read must not replace a newer deck or bulk-analysis result.
+    pub fn remember(&self, t: &Track, found: Found) {
+        if let Some(audio) = &t.file
+            && self.get(audio).is_none()
+        {
+            self.insert(audio.clone(), found);
+        }
     }
 
     /// What a deck's own analysis of `audio` found: the lists show it from now on like a bulk run's result. Does nothing when the
     /// map already holds exactly this, so a deck loaded again does not make every list rebuild.
     pub(super) fn note(&self, audio: &Path, found: Found) {
-        if self.0.map.borrow().get(audio) != Some(&found) {
+        if self.get(audio).as_ref() != Some(&found) {
             self.insert(audio.to_owned(), found);
         }
     }
 
     pub(super) fn insert(&self, audio: PathBuf, found: Found) {
-        self.0.map.borrow_mut().insert(audio, found);
+        self.0
+            .map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(audio, found);
         self.0.version.set(self.0.version.get() + 1);
+    }
+
+    pub(super) fn reader(&self) -> Arc<Mutex<HashMap<PathBuf, Found>>> {
+        self.0.map.clone()
     }
 }
 
@@ -83,13 +105,17 @@ pub fn keys_differ(a: &str, b: &str) -> bool {
     }
 }
 
+/// Shared eligibility for queued automatic analysis and stale-cache exclusions.
+pub(super) fn lacking(t: &Track, parts: &Parts) -> bool {
+    (parts.grid && t.bpm_x100 == 0) || (parts.key && t.key.is_empty())
+}
+
 /// The tracks `parts` would fill in: those lacking a BPM (BPM / Grid part on) or a key (KEY part on), with a file that
 /// nobody has analysed yet this session.
 pub(super) fn pending<'a>(tracks: &'a [Track], have: &Detected, parts: &Parts) -> Vec<&'a Track> {
-    let lacking = |t: &&Track| (parts.grid && t.bpm_x100 == 0) || (parts.key && t.key.is_empty());
     tracks
         .iter()
-        .filter(lacking)
+        .filter(|t| lacking(t, parts))
         .filter(|t| t.file.as_deref().is_some_and(|f| have.get(f).is_none()))
         .collect()
 }
@@ -105,6 +131,21 @@ mod tests {
             file: (!file.is_empty()).then(|| file.into()),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn a_late_selected_track_summary_never_replaces_newer_detected_analysis() {
+        let have = Detected::default();
+        let t = track("/m/selected.flac", 0, "");
+        have.note(t.file.as_deref().unwrap(), (12800, "8A".into()));
+        let version = have.version();
+        have.remember(&t, (12500, "7A".into()));
+        assert_eq!(have.fill(&t), (12800, "8A".into()));
+        assert_eq!(have.version(), version);
+        let other = track("/m/other.flac", 0, "");
+        have.remember(&other, (12500, "7A".into()));
+        assert_eq!(have.fill(&other), (12500, "7A".into()));
+        assert_eq!(have.version(), version + 1);
     }
 
     fn files(t: Vec<&Track>) -> Vec<PathBuf> {

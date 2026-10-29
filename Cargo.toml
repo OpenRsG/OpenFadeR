@@ -1,12 +1,12 @@
 [package]
 name = "openfader"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2024"
 
 # Built-in format adapters live in compatibility/ (src/plugin/builtin.rs). The SDK and UI are workspace members too.
 # The companion checkouts and the Android project are separate workspaces.
 [workspace]
-members = ["sdk", "ui", "compatibility/rekordbox/*"]
+members = ["sdk", "ui", "compatibility/rekordbox/*", "compatibility/traktor"]
 exclude = ["extension", "mobile", "mappings", "vendor/cpal"]
 
 [workspace.dependencies]
@@ -23,7 +23,7 @@ default = ["app", "stems-gpu"]
 app = ["stems", "compatibility", "dep:slint", "dep:openfader-ui", "dep:midir", "dep:wayland-client", "dep:wayland-backend", "dep:sys-locale"]
 # Built-in compatibility adapters (src/plugin/builtin.rs) need SQLCipher with its own OpenSSL.
 # A build without them (the mobile crate) keeps plain SQLite and needs no OpenSSL.
-compatibility = ["dep:compat-rekordbox-device", "dep:compat-rekordbox-db", "dep:compat-rekordbox-xml", "rusqlite/bundled-sqlcipher-vendored-openssl"]
+compatibility = ["dep:compat-rekordbox-device", "dep:compat-rekordbox-db", "dep:compat-rekordbox-xml", "dep:compat-traktor", "rusqlite/bundled-sqlcipher-vendored-openssl"]
 stems = ["dep:ort"]
 # STEMS on the GPU (ONNX Runtime's WebGPU provider, Dawn). ONNX Runtime ships no WebGPU build for ARM Linux: the Raspberry
 # Pi build (`--no-default-features --features app`, docs/raspberry-pi.md) separates on the CPU only.
@@ -58,6 +58,7 @@ mlua = { version = "0.12", features = ["lua54", "vendored", "serialize", "send"]
 compat-rekordbox-device = { path = "compatibility/rekordbox/device", optional = true } # built-in format adapters (src/plugin/builtin.rs)
 compat-rekordbox-db = { path = "compatibility/rekordbox/db", optional = true }
 compat-rekordbox-xml = { path = "compatibility/rekordbox/xml", optional = true }
+compat-traktor = { path = "compatibility/traktor", optional = true }
 openfader-ui = { path = "ui", optional = true } # the Slint UI, built as its own crate
 sys-locale = { version = "0.3", optional = true } # the system's language for PREFS > VIEW > LANGUAGE = SYSTEM (src/app/i18n.rs); already in the tree through Slint
 
@@ -137,6 +138,6 @@ lto = "fat"
 codegen-units = 1
 strip = "symbols"
 
-# cpal 0.15.3, unchanged except ALSA Fixed buffers request two periods rather than four.
+# cpal 0.15.3: ALSA two-period Fixed buffers, fatal poll recovery and exited-worker-safe shutdown.
 [patch.crates-io]
 cpal = { path = "vendor/cpal" }

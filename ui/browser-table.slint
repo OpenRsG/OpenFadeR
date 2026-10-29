@@ -33,17 +33,15 @@ component HeaderCell inherits Rectangle {
     ta := TouchArea { clicked => { root.clicked(); } }
 }
 
-/// The drag handle on a column's border in the header: `value` is the column's `PaneState` delta from its default width `dflt`, and the
-/// title column pays for it (`slack`: what the title still has over its minimum, so the column grows by no more than that). `invert`:
-/// the border is the column's left one (the title's right border drags the column after it).
+/// A column's right border: resizing changes only that column; the list scrolls when its columns no longer fit.
 component ColEdge inherits Splitter {
     in property <length> dflt;
-    in property <length> slack;
+    in property <length> minimum: PaneState.min-col;
     in property <length> border;
     x: root.border - 3px;
     width: 6px;
-    lo: PaneState.min-col - root.dflt;
-    hi: root.value + root.slack;
+    lo: root.minimum - root.dflt;
+    hi: 4096px;
 }
 
 component Cell inherits Text {
@@ -87,13 +85,12 @@ export component TrackTable inherits Rectangle {
         BrowserState.current-row = i;
         if (mode == 0) { BrowserState.track-selected(i); } else { BrowserState.track-picked(i, mode); }
         if (BrowserState.center-selected) {
-            list.content-y = max(list.height - BrowserState.tracks.length * Theme.h-row, min(0px, (list.height - Theme.h-row) / 2 - i * Theme.h-row));
+            list.content-y = max(list.visible-height - BrowserState.tracks.length * Theme.h-row, min(0px, (list.visible-height - Theme.h-row) / 2 - i * Theme.h-row));
         } else if (i * Theme.h-row + list.content-y < 0) { list.content-y = -i * Theme.h-row; }
-        else if ((i + 1) * Theme.h-row + list.content-y > list.height) { list.content-y = list.height - (i + 1) * Theme.h-row; }
+        else if ((i + 1) * Theme.h-row + list.content-y > list.visible-height) { list.content-y = list.visible-height - (i + 1) * Theme.h-row; }
     }
 
-    // Column geometry: the title takes what the fixed columns leave. Genre and comment drop out below 900 px, the Preview
-    // column (a waveform strip per row, `w-strip` wide, src/app/browser/strip.rs) below 720 px.
+    // Optional columns follow the viewport, not the scrollable content width.
     property <bool> wide: root.width >= 900px;
     property <length> w-strip: 110px;
     property <length> w-lead: 30px;
@@ -107,7 +104,9 @@ export component TrackTable inherits Rectangle {
     property <length> w-time: Math.max(PaneState.min-col, 50px + PaneState.col-time-d);
     property <length> w-key: Math.max(PaneState.min-col, 52px + PaneState.col-key-d);
     property <length> w-scroll: 14px;
-    property <length> w-title: max(PaneState.min-title, root.width - root.w-scroll - root.w-lead - root.w-art - root.w-preview - root.w-artist - root.w-genre - root.w-comment - root.w-bpm - root.w-rating - root.w-time - root.w-key);
+    property <length> title-default: max(PaneState.min-title, root.width - root.w-scroll - root.w-lead - root.w-art - root.w-preview - 130px - (root.wide ? 90px + 130px : 0px) - 60px - 78px - 50px - 52px);
+    property <length> w-title: max(PaneState.min-title, root.title-default + PaneState.col-title-d);
+    property <length> columns-w: max(root.width, root.x-key + root.w-key + root.w-scroll);
     property <length> x-art: root.w-lead;
     property <length> x-preview: root.x-art + root.w-art;
     property <length> x-title: root.x-preview + root.w-preview;
@@ -122,6 +121,7 @@ export component TrackTable inherits Rectangle {
     property <length> menu-y;
     /// A press on one of several selected rows waits for the release: a drag from it carries the whole selection.
     property <int> collapse-row: -1;
+    property <string> collapse-id;
     property <bool> multi: BrowserState.selected-count > 1;
     // The menu keeps itself inside the table (its x / y bindings).
     function place-menu(x: length, y: length) {
@@ -160,6 +160,11 @@ export component TrackTable inherits Rectangle {
             Rectangle {
                 height: Theme.h-header;
                 background: Theme.list-head;
+                clip: true;
+                Rectangle {
+                x: list.content-x;
+                width: root.columns-w;
+                height: parent.height;
                 if root.w-preview > 0px: HeaderCell { x: root.x-preview; width: root.w-preview; height: parent.height; title: @tr("PREVIEW"); }
                 HeaderCell { x: root.x-title; width: root.w-title; height: parent.height; title: @tr("TRACK TITLE"); sorted: root.sorted-col == 0; asc: root.sorted-asc; clicked => { root.sort-clicked(0); } }
                 HeaderCell { x: root.x-artist; width: root.w-artist; height: parent.height; title: @tr("ARTIST"); sorted: root.sorted-col == 1; asc: root.sorted-asc; clicked => { root.sort-clicked(1); } }
@@ -169,19 +174,21 @@ export component TrackTable inherits Rectangle {
                 HeaderCell { x: root.x-rating; width: root.w-rating; height: parent.height; title: @tr("RATING"); sorted: root.sorted-col == 6; asc: root.sorted-asc; clicked => { root.sort-clicked(6); } }
                 HeaderCell { x: root.x-time; width: root.w-time; height: parent.height; title: @tr("TIME"); right: true; sorted: root.sorted-col == 5; asc: root.sorted-asc; clicked => { root.sort-clicked(5); } }
                 HeaderCell { x: root.x-key; width: root.w-key; height: parent.height; title: @tr("KEY"); sorted: root.sorted-col == 3; asc: root.sorted-asc; clicked => { root.sort-clicked(3); } }
-                // The column borders (drag; double-click = the default width); the title's right border drags the artist column.
-                ColEdge { dflt: 130px; invert: true; border: root.x-artist; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-artist-d; }
-                ColEdge { dflt: 130px; border: root.x-artist + root.w-artist; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-artist-d; }
-                if root.wide: ColEdge { dflt: 90px; border: root.x-genre + root.w-genre; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-genre-d; }
-                if root.wide: ColEdge { dflt: 130px; border: root.x-comment + root.w-comment; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-comment-d; }
-                ColEdge { dflt: 60px; border: root.x-bpm + root.w-bpm; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-bpm-d; }
-                ColEdge { dflt: 78px; border: root.x-rating + root.w-rating; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-rating-d; }
-                ColEdge { dflt: 50px; border: root.x-time + root.w-time; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-time-d; }
-                ColEdge { dflt: 52px; border: root.x-key + root.w-key; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-key-d; }
+                ColEdge { dflt: root.title-default; minimum: PaneState.min-title; border: root.x-artist; value <=> PaneState.col-title-d; }
+                ColEdge { dflt: 130px; border: root.x-genre; value <=> PaneState.col-artist-d; }
+                if root.wide: ColEdge { dflt: 90px; border: root.x-comment; value <=> PaneState.col-genre-d; }
+                if root.wide: ColEdge { dflt: 130px; border: root.x-bpm; value <=> PaneState.col-comment-d; }
+                ColEdge { dflt: 60px; border: root.x-rating; value <=> PaneState.col-bpm-d; }
+                ColEdge { dflt: 78px; border: root.x-time; value <=> PaneState.col-rating-d; }
+                ColEdge { dflt: 50px; border: root.x-key; value <=> PaneState.col-time-d; }
+                ColEdge { dflt: 52px; border: root.x-key + root.w-key; value <=> PaneState.col-key-d; }
+                }
             }
             list := ListView {
+                content-width: root.columns-w;
                 for cells[i] in BrowserState.tracks: Rectangle {
                     height: Theme.h-row;
+                    width: root.columns-w - root.w-scroll;
                     property <bool> current: i == BrowserState.current-row;
                     property <bool> picked: BrowserState.selected-rows[i];
                     property <string> hints: cells[9].text;
@@ -192,7 +199,7 @@ export component TrackTable inherits Rectangle {
                     changed preview-enabled => { if (self.preview-enabled) { BrowserState.preview-wanted(i); } }
                     changed cover-generation => { BrowserState.cover-wanted(i); }
                     /// The track is the one a deck has loaded (its row wears `row-loaded`).
-                    property <bool> on-deck: cells[0].text != "" && (DeckState.decks[0].title == cells[0].text || DeckState.decks[1].title == cells[0].text || DeckState.decks[2].title == cells[0].text || DeckState.decks[3].title == cells[0].text);
+                    property <bool> on-deck: DeckState.loaded-deck(cells[14].text) >= 0;
                     background: current || picked ? Theme.select : (row-ta.has-hover ? Theme.hover-row : (Math.mod(i, 2) == 0 ? Theme.bg-deep : Theme.row-alt));
                     Cell { x: 0; width: root.w-lead - Theme.space-md; text: "\{i + 1}"; right: true; color: Theme.text-faint; }
                     Image { x: root.x-art; y: 2px; width: 18px; height: 18px; source: BrowserState.covers[i]; image-fit: cover; }
@@ -230,7 +237,7 @@ export component TrackTable inherits Rectangle {
                                 if (e.kind == PointerEventKind.cancel) { hold.running = false; root.collapse-row = -1; return; }
                                 if (e.kind == PointerEventKind.up) {
                                     hold.running = false;
-                                    if (e.button == PointerEventButton.left && root.collapse-row == i) { root.collapse-row = -1; root.choose(i, 0); }
+                                    if (e.button == PointerEventButton.left && root.collapse-row == i) { root.collapse-row = -1; if (root.collapse-id == cells[14].text) { root.choose(i, 0); } }
                                     return;
                                 }
                                 if (e.kind != PointerEventKind.down) { return; }
@@ -240,7 +247,7 @@ export component TrackTable inherits Rectangle {
                                 if (e.button == PointerEventButton.left) {
                                     if (e.modifiers.control || e.modifiers.meta) { root.choose(i, 1); }
                                     else if (e.modifiers.shift) { root.choose(i, 2); }
-                                    else if (picked) { root.collapse-row = i; }
+                                    else if (picked) { root.collapse-row = i; root.collapse-id = cells[14].text; }
                                     else { root.choose(i, 0); }
                                     if (!e.modifiers.control && !e.modifiers.meta && !e.modifiers.shift) { BrowserState.track-pressed(i); }
                                     root.place-menu(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);

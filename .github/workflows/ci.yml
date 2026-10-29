@@ -12,7 +12,7 @@ on:
     inputs:
       plugins_ref:
         description: Branch or tag of OpenFadeR-Plugins to build against
-        default: v0.2.8
+        default: v0.2.9
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -20,6 +20,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: "1"
 
 jobs:
   test:
@@ -40,9 +41,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Companions (plugins, themes, mappings)
         run: |
-          git clone --depth 1 --branch "${{ inputs.plugins_ref || 'v0.2.8' }}" https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
-          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
-          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
+          git clone --depth 1 --branch "${{ inputs.plugins_ref || 'v0.2.9' }}" https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
+          git clone --depth 1 --branch openfader-v0.2.8 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
+          git clone --depth 1 --branch openfader-v0.2.8 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
       - name: System libraries
         if: matrix.name == 'linux'
         run: |
@@ -52,6 +53,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      - name: Linux installer packaging
+        if: matrix.name == 'linux'
+        run: python .github/test_install.py -v
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:

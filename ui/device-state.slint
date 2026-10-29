@@ -150,8 +150,9 @@ export global DeviceState {
     /// The buttons the chosen device's plugin lists (`run-action` takes the id).
     in property <[ActionItem]> actions;
     in-out property <string> backup-dir;
-    /// A job runs: `phase`, `progress` 0..1 and the cancel button show.
+    /// A job runs: `phase` and `progress` 0..1 show; only cancellable jobs offer Cancel.
     in property <bool> busy;
+    in property <bool> can-cancel;
     in property <string> phase;
     in property <float> progress;
     in property <string> status;

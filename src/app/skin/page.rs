@@ -8,9 +8,9 @@ use super::{
     values_of,
 };
 use crate::app::{
-    library::{browse, chooser, show_in_folder, Pick},
-    prefs::{self, view},
     App, ThemeCard, ThemeState, TokenRow,
+    library::{Pick, browse, chooser, show_in_folder},
+    prefs::{self, view},
 };
 use slint::{Color, ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use std::{
@@ -334,15 +334,24 @@ fn duplicate(s: &ThemeState) {
 }
 
 fn remove(s: &ThemeState) {
-    let name = chosen();
-    let done = store::ensure_user_dir().and_then(|dir| store::remove_in(&dir, &found(), &name));
+    if s.get_current_user() {
+        crate::app::library::ask_remove_theme(chosen());
+    }
+}
+
+pub fn remove_named(name: &str) {
+    let Some(app) = app() else { return };
+    let s = app.global::<ThemeState>();
+    let done = store::ensure_user_dir().and_then(|dir| store::remove_in(&dir, &found(), name));
     match done {
-        Err(e) => say(s, e, true),
+        Err(e) => say(&s, e, true),
         Ok(()) => {
-            close_editor(s);
-            prefs::update(|p| p.set_extra("skin", BUILTIN[0]));
+            if chosen().eq_ignore_ascii_case(name) {
+                close_editor(&s);
+                prefs::update(|p| p.set_extra("skin", BUILTIN[0]));
+            }
             rescan();
-            say(s, tr!("Deleted {}; back to {}", name, BUILTIN[0]), false);
+            say(&s, tr!("Deleted theme {}", name), false);
         }
     }
 }

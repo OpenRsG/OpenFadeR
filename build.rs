@@ -21,6 +21,20 @@ fn main() {
         .unwrap_or_else(|| "unknown".into());
     println!("cargo:rustc-env=OPENFADER_COMMIT={commit}");
     println!("cargo:rerun-if-env-changed=OPENFADER_COMMIT");
+    let variant = std::env::var("OPENFADER_BUILD_VARIANT").unwrap_or_default();
+    assert!(
+        matches!(variant.as_str(), "" | "pi" | "pi4"),
+        "unsupported build variant: {variant}"
+    );
+    if !variant.is_empty() {
+        assert_eq!(std::env::var("CARGO_CFG_TARGET_OS").as_deref(), Ok("linux"));
+        assert_eq!(
+            std::env::var("CARGO_CFG_TARGET_ARCH").as_deref(),
+            Ok("aarch64")
+        );
+    }
+    println!("cargo:rustc-env=OPENFADER_BUILD_VARIANT={variant}");
+    println!("cargo:rerun-if-env-changed=OPENFADER_BUILD_VARIANT");
     if let Some(head) = git(&["rev-parse", "--git-path", "HEAD"]) {
         println!("cargo:rerun-if-changed={head}");
     }

@@ -318,10 +318,9 @@ impl Engine {
         drop(self.stream.borrow_mut().take());
         drop(self.cue.borrow_mut().take());
         for shared in &self.shared {
-            shared
-                .clock
-                .lock()
-                .freeze(f64::from_bits(shared.pos.load(Relaxed)));
+            let mut clock = shared.clock.lock();
+            clock.freeze(f64::from_bits(shared.pos.load(Relaxed)));
+            clock.epoch = shared.pos_epoch.load(Relaxed);
         }
     }
 
@@ -507,6 +506,29 @@ pub fn live_bus() -> Option<Arc<Bus>> {
 }
 
 #[cfg(test)]
+pub(super) fn test_player(shared: [Arc<Shared>; SLOTS]) -> super::Player {
+    let pcm = shared[0].pcm.lock();
+    let (src_rate, frames) = (pcm.rate, pcm.frames() as u64);
+    drop(pcm);
+    let engine = std::rc::Rc::new(Engine {
+        shared,
+        bus: Arc::new(Bus::new(44100, bus::Headphones::Split)),
+        claimed: Cell::new(1),
+        stream: RefCell::new(None),
+        cue: RefCell::new(None),
+        health: Arc::new(Health::default()),
+        recovery: RefCell::new(None),
+    });
+    super::Player {
+        shared: engine.shared[0].clone(),
+        engine,
+        src_rate,
+        frames,
+        has_stems: false,
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::super::super::route::Settings;
     use super::super::{status, Player};
@@ -599,31 +621,21 @@ mod tests {
             true,
             true,
         );
-        let engine = Engine {
-            shared,
-            bus: Arc::new(Bus::new(44100, bus::Headphones::Split)),
-            claimed: Cell::new(1),
-            stream: RefCell::new(None),
-            cue: RefCell::new(None),
-            health: Arc::new(Health::default()),
-            recovery: RefCell::new(None),
-        };
-        let engine = std::rc::Rc::new(engine);
-        let mut player = Player {
-            shared: engine.shared[0].clone(),
-            engine: engine.clone(),
-            src_rate: 44100,
-            frames: 44100,
-            has_stems: false,
-        };
+        let mut player = test_player(shared);
+        let engine = player.engine.clone();
         engine.health.fail(BACKEND_ERROR);
-        let pending = player.shared.seek.swap(super::super::NO_SEEK, Relaxed);
+        let pending = *player.shared.seek.lock();
+        *player.shared.seek.lock() = super::super::Seek {
+            epoch: player.shared.pos_epoch.load(Relaxed),
+            pending: false,
+            ..pending
+        };
         assert_eq!(player.position_ms(), 8000.0 * 1000.0 / 44100.0);
         assert!(
             !player.settled(),
             "a stale hardware anchor is not audible output"
         );
-        player.shared.seek.store(pending, Relaxed);
+        *player.shared.seek.lock() = pending;
         player.pause();
         assert!(!player.is_playing());
         player.play();
@@ -631,7 +643,7 @@ mod tests {
         engine.stop();
         let sh = &engine.shared[0];
         assert!(Arc::ptr_eq(&track, &sh.pcm.lock()));
-        assert_eq!(sh.seek.load(Relaxed), 12000f64.to_bits());
+        assert_eq!(sh.seek.lock().target, 12000.0);
         assert!(sh.playing.load(Relaxed));
         assert_eq!(sh.lp.load(Relaxed), lp);
         assert_eq!(sh.rate.load(Relaxed), 1.08f64.to_bits());

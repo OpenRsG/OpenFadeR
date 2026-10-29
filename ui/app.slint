@@ -95,6 +95,12 @@ export component App inherits Window {
     property <bool> browse-on: BrowserState.browse-max;
     /// 0 EXPORT, 1 PERFORMANCE, 2 EDIT, 3 LIGHTING, 4 VIDEO.
     property <int> mode: ExportModeState.visible ? 0 : EditState.visible ? 2 : LightingState.visible ? 3 : VideoState.visible ? 4 : 1;
+    changed mode => { if root.mode == 0 { ExportModeState.refresh(); } }
+    Timer {
+        interval: 100ms;
+        running: ExportModeState.visible;
+        triggered => { ExportModeState.refresh(); }
+    }
     /// The deck stage (waveforms, decks, mixer, FX, sampler) exists in every mode but EXPORT: its players show decks A and B, and one
     /// deck's waveform image has one size.
     property <bool> stage: !ExportModeState.visible;

@@ -66,6 +66,8 @@ pub struct State {
     /// Queue the list's tracks again in the index, also the ones that had no features (the mode or the anchor changed).
     retry: bool,
     timer: Timer,
+    #[cfg(test)]
+    dispatches: std::cell::Cell<u64>,
 }
 
 impl Default for State {
@@ -83,6 +85,8 @@ impl Default for State {
             lists: Lists::default(),
             retry: false,
             timer: Timer::default(),
+            #[cfg(test)]
+            dispatches: std::cell::Cell::new(0),
         }
     }
 }
@@ -310,12 +314,18 @@ impl View {
             self.suggest.pinned = self.selected.clone().or(self.suggest.pinned.take());
         }
         (self.suggest.on, self.suggest.retry, self.suggest.links) = (on, on, None);
+        if on {
+            self.suggest.timer.restart();
+        } else {
+            self.suggest.timer.stop();
+        }
         self.load(app);
     }
 
     /// Turns the tab off without reloading (Related takes the list).
     pub(in crate::app::browser) fn suggest_off(&mut self) {
         self.suggest.on = false;
+        self.suggest.timer.stop();
     }
 
     /// A chip changed what the ranking depends on: rank again.
@@ -378,6 +388,8 @@ pub fn wire(app: &App, view: &Rc<RefCell<View>>) {
                 return;
             };
             let mut v = v.borrow_mut();
+            #[cfg(test)]
+            v.suggest.dispatches.set(v.suggest.dispatches.get() + 1);
             if !v.suggest.on || v.related.is_some() {
                 return;
             }
@@ -389,4 +401,175 @@ pub fn wire(app: &App, view: &Rc<RefCell<View>>) {
                 v.load(&app);
             }
         });
+    view.borrow().suggest.timer.stop(); // explicit activation starts following; the index worker stays independent
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::browser::{timer_test_pump, timer_test_view};
+
+    fn rig() -> (App, Rc<RefCell<View>>) {
+        crate::app::headless::init();
+        prefs::set_for_test(|p| p.view.media_track_suggestion = true);
+        let app = App::new().unwrap();
+        let v = timer_test_view(&app);
+        wire(&app, &v);
+        (app, v)
+    }
+
+    #[test]
+    fn suggestion_timer_sleeps_until_activation_and_stops_for_related_and_preferences() {
+        let (app, v) = rig();
+        let state = app.global::<BrowserState>();
+        assert!(!v.borrow().suggest.timer.running());
+        state.invoke_suggest_toggled(true);
+        assert!(v.borrow().suggest.timer.running());
+        assert!(state.get_suggest());
+        state.invoke_suggest_toggled(false);
+        let before = v.borrow().suggest.dispatches.get();
+        timer_test_pump(TICK + Duration::from_millis(50));
+        assert_eq!(v.borrow().suggest.dispatches.get(), before);
+        state.invoke_suggest_toggled(true);
+        v.borrow_mut().suggest_off(); // shared Related callback's handover, including Studio
+        assert!(!v.borrow().suggest.timer.running());
+        state.invoke_suggest_toggled(true);
+        prefs::set_for_test(|p| p.view.media_track_suggestion = false);
+        assert!(!v.borrow().suggest.timer.running());
+        assert!(!state.get_suggest());
+        state.invoke_suggest_toggled(true);
+        assert!(!v.borrow().suggest.timer.running());
+        prefs::set_for_test(|p| p.view.media_track_suggestion = true);
+        assert!(
+            !v.borrow().suggest.timer.running(),
+            "enabling the preference does not open the tab"
+        );
+        state.invoke_suggest_toggled(true);
+        assert!(v.borrow().suggest.timer.running());
+        assert!(state.get_suggest());
+    }
+
+    #[test]
+    fn suggestion_follows_background_completion_and_catches_up_after_reopening() {
+        use openfader::analysis::{Analysis, similar::Features};
+        use std::sync::mpsc;
+        let (app, v) = rig();
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let track = |name: &str| Track {
+            title: name.into(),
+            file: Some(format!("/nonexistent/suggest-{unique}-{name}.wav").into()),
+            ..Default::default()
+        };
+        let (anchor, candidate) = (track("anchor"), track("candidate"));
+        let analysis = Analysis {
+            three_band_detail: vec![[80, 70, 60]; 600],
+            ..Default::default()
+        };
+        index().insert(
+            anchor.file.clone().unwrap(),
+            Profile {
+                features: Features::of(&analysis, false),
+                ..Default::default()
+            },
+        );
+        let (release, wait) = mpsc::channel();
+        index().request(
+            [(
+                candidate.file.clone().unwrap(),
+                Some(Box::new(move || {
+                    wait.recv_timeout(Duration::from_secs(5)).ok()?;
+                    Some(analysis)
+                }) as Theirs),
+            )],
+            false,
+        );
+        {
+            let mut v = v.borrow_mut();
+            v.store.collection_put(&[candidate.clone()], false).unwrap();
+            v.suggest.anchor = Anchor::List;
+            v.suggest.mode = Mode::Mood;
+            v.selected = Some(anchor.clone());
+        }
+        let state = app.global::<BrowserState>();
+        state.invoke_suggest_toggled(true);
+        assert!(
+            v.borrow().list.is_empty(),
+            "the pending candidate has no profile yet"
+        );
+        release.send(()).unwrap();
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        while v.borrow().list.is_empty() && std::time::Instant::now() < until {
+            timer_test_pump(Duration::from_millis(20));
+        }
+        let candidate_id = v
+            .borrow()
+            .store
+            .id_of_path(candidate.file.as_deref().unwrap())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            v.borrow().list.iter().map(|t| t.id).collect::<Vec<_>>(),
+            [Some(candidate_id)]
+        );
+        state.invoke_suggest_toggled(false);
+        let before = v.borrow().suggest.dispatches.get();
+        let off_file = track("completed-while-off").file.unwrap();
+        index().request([(off_file.clone(), None)], false);
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        while index().get(&off_file).is_none() && std::time::Instant::now() < until {
+            timer_test_pump(Duration::from_millis(20));
+        }
+        assert!(
+            index().get(&off_file).is_some(),
+            "stopping the UI timer does not stop the worker"
+        );
+        assert_eq!(v.borrow().suggest.dispatches.get(), before);
+        let mut changed = anchor.clone();
+        changed.title = "changed while off".into();
+        v.borrow_mut().selected = Some(changed.clone());
+        state.invoke_suggest_toggled(true);
+        assert_eq!(
+            v.borrow().suggest.seen.0,
+            id_of(&changed),
+            "reopening catches up synchronously"
+        );
+        assert_eq!(v.borrow().suggest.seen.1, index().version());
+        // MASTER without a loaded deck follows the pinned row, through the same anchor check as deck changes.
+        state.invoke_suggest_anchor_chosen(1);
+        changed.title = "followed anchor".into();
+        v.borrow_mut().suggest.pinned = Some(changed.clone());
+        timer_test_pump(TICK + Duration::from_millis(50));
+        assert_eq!(v.borrow().suggest.seen.0, id_of(&changed));
+    }
+
+    #[test]
+    #[ignore = "16 s real Slint timer dispatch comparison; --release --ignored --nocapture"]
+    fn bench_suggestion_timer_dispatch() {
+        let (app, v) = rig();
+        let state = app.global::<BrowserState>();
+        let duration = Duration::from_secs(2);
+        for unconditional in [true, false] {
+            for (phase, on) in [
+                ("closed", false),
+                ("open", true),
+                ("closed-again", false),
+                ("reopened", true),
+            ] {
+                state.invoke_suggest_toggled(on);
+                if unconditional {
+                    v.borrow().suggest.timer.restart(); // former scheduling, same production callback
+                }
+                let before = v.borrow().suggest.dispatches.get();
+                timer_test_pump(duration);
+                eprintln!(
+                    "suggest unconditional={unconditional} phase={phase} duration_ms={} dispatches={}",
+                    duration.as_millis(),
+                    v.borrow().suggest.dispatches.get() - before
+                );
+            }
+        }
+    }
 }

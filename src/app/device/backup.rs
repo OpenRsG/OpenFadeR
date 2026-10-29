@@ -151,6 +151,7 @@ pub(super) fn now(
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
     cx.start_then(
+        true,
         Some(dev.id.clone()),
         tr!("Backing up"),
         move |ctl| {
@@ -188,6 +189,7 @@ fn restore(cx: &Rc<Ctx>, dev: &Device, b: &DeviceBackup, go_on: bool) {
     let (dev, b) = (dev.clone(), b.clone());
     let (asked_dev, asked_b) = (dev.clone(), b.clone());
     cx.start_then(
+        true,
         Some(dev.id.clone()),
         tr!("Restoring"),
         move |ctl| {
@@ -273,7 +275,7 @@ impl Ctx {
         let refusal = self.job.borrow().as_ref().map(|j| {
             if j.device.as_deref() == Some(dev.id.as_str()) {
                 tr!(
-                    "A transfer to {} is running: cancel it (X) before ejecting",
+                    "A job on {} is running: wait for it to finish before ejecting",
                     dev.label
                 )
             } else {
@@ -288,7 +290,7 @@ impl Ctx {
         }
         let go = |cx: &Rc<Ctx>, dev: &Device| {
             let d = dev.clone();
-            cx.start(Some(dev.id.clone()), tr!("Ejecting"), move |_| {
+            cx.start(false, Some(dev.id.clone()), tr!("Ejecting"), move |_| {
                 device::eject::eject(&d)
             });
         };
@@ -297,9 +299,11 @@ impl Ctx {
             && device_settings::Behaviour::load(&self.store).auto_backup
         {
             let d = dev.clone();
-            now(self, dev, move |cx, r| match r {
+            now(self, dev, move |cx, r| {
+                match r {
                 Ok(_) => go(cx, &d),
                 Err(e) => cx.say(&tr!("Not ejected: the backup failed ({}). Fix that, or switch the backup off in PREFERENCES > DJ SYSTEM, then eject again.", e), true),
+            }
             });
         } else {
             go(self, dev);

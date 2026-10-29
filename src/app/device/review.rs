@@ -14,11 +14,10 @@ use crate::app::{toast, CompareRow, ReviewRow};
 use openfader::{
     analysis::{Beat, Cue},
     device::{
-        history,
+        Device, history,
         link::{self, Conflict, Marks},
         undo::{self, Entry},
         update::{self, Diff},
-        Device,
     },
     store::{device_settings::Behaviour, TRACK_COLORS},
 };
@@ -544,6 +543,7 @@ impl Ctx {
             } => {
                 let id = device.id.clone();
                 self.start_then(
+                    false,
                     Some(id),
                     tr!("Updating the collection"),
                     move |_| {
@@ -573,6 +573,7 @@ impl Ctx {
                 let (id, provider) = (device.id.clone(), device.provider());
                 let config = openfader::store::device_settings::config(&self.store, &device.id);
                 self.start_then(
+                    true,
                     Some(id),
                     tr!("Importing histories"),
                     move |ctl| {

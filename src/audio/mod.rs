@@ -301,8 +301,8 @@ fn bessel_i0(x: f64) -> f64 {
 }
 
 /// Half of the interpolation kernel, `x` = `i / RES` source frames from the centre: `sinc(x)` under a Kaiser window `HALF`
-/// wide, zero at and beyond `HALF`. Built once, on first use (a few hundred microseconds); one entry past the end so a
-/// linear read between two entries never leaves the table.
+/// wide, zero at and beyond `HALF`. Prepared by the mixer before callback publication; lazy for analysis-only callers.
+/// One entry past the end keeps a linear read between entries inside the table.
 fn kernel() -> &'static [f32] {
     static TABLE: OnceLock<Vec<f32>> = OnceLock::new();
     TABLE.get_or_init(|| {

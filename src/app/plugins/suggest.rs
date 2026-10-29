@@ -1,8 +1,7 @@
 //! Suggesting a reader by what a device holds: a stick with `Engine Library/` on it has an Engine DJ library, but with
-//! `engine-dj` off no plugin handles the stick and the device list does not show it at all. [`devices`] looks at the
-//! top-level folders of every mounted device (cheap: one directory listing, once per device per run) and, for a reader that
-//! is installed and off, opens the welcome window with just that extension ([`crate::app::welcome::offer`]). The rekordbox
-//! readers are built into the app and always on, so `PIONEER/` is never offered.
+//! `engine-dj` off no plugin handles the stick and the device list does not show it at all. [`discover`] reads each unseen
+//! device's top-level folders on the device worker; [`devices`] offers an installed reader that is off through the welcome
+//! window ([`crate::app::welcome::offer`]). The rekordbox readers are built into the app and always on.
 
 use crate::app::{App, welcome};
 use openfader::{device::Device, plugin::current};
@@ -37,25 +36,49 @@ fn readers<S: AsRef<str>>(names: &[S]) -> Vec<&'static str> {
     out
 }
 
+pub(crate) struct Detected {
+    id: String,
+    label: String,
+    readers: Vec<&'static str>,
+}
+
+pub(crate) fn looked() -> HashSet<String> {
+    LOOKED.with_borrow(Clone::clone)
+}
+
+/// Filesystem discovery for the scan worker; the UI owns which devices have already been offered.
+pub(crate) fn discover(devices: &[Device], looked: &HashSet<String>) -> Vec<Detected> {
+    devices
+        .iter()
+        .filter(|d| !looked.contains(&d.id))
+        .map(|d| {
+            let names: Vec<String> = std::fs::read_dir(&d.mount)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect();
+            Detected {
+                id: d.id.clone(),
+                label: d.label.clone(),
+                readers: readers(&names),
+            }
+        })
+        .collect()
+}
+
 /// Offers the extensions that are off and read what a device in `devices` holds that was not looked at before. A device seen
 /// while the welcome window is up is looked at again by the next call, so the offer does not replace what the user reads.
-pub fn devices(app: &App, devices: &[Device]) {
+pub(crate) fn devices(app: &App, devices: &[Detected]) {
     for d in devices {
         if LOOKED.with(|l| l.borrow().contains(&d.id)) || welcome::visible(app) {
             continue;
         }
         LOOKED.with(|l| l.borrow_mut().insert(d.id.clone()));
-        let names: Vec<String> = std::fs::read_dir(&d.mount)
-            .into_iter()
-            .flatten()
-            .flatten()
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-            .collect();
-        let wanted = readers(&names);
         let off: Vec<_> = current()
             .disabled
             .iter()
-            .filter(|p| wanted.iter().any(|w| *w == p.manifest.name))
+            .filter(|p| d.readers.iter().any(|w| *w == p.manifest.name))
             .cloned()
             .collect();
         if !off.is_empty() {

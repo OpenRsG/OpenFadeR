@@ -67,6 +67,14 @@ pub struct Action {
 }
 
 impl Action {
+    pub(super) fn momentary(&self) -> bool {
+        match self.kind {
+            Kind::Touch | Kind::Deck(_, Some(_)) => true,
+            Kind::Press(_) | Kind::Arg(_) => self.release.is_some(),
+            _ => false,
+        }
+    }
+
     /// Offered by MIDI LEARN and accepted in midi.map.
     pub fn learnable(&self) -> bool {
         !matches!(

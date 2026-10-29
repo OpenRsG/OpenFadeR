@@ -90,8 +90,9 @@ export component StageController inherits Rectangle {
                 enabled: root.v.loaded;
                 accent: StageTone.cue(root.index);
                 rim: Theme.deck-tint == 1;
-                pressed => { DeckState.cue(root.index); }
-                released => { DeckState.cue-released(root.index); }
+                property <int> owner: -1;
+                pressed => { self.owner = root.index; DeckState.cue(self.owner); }
+                released => { let owner = self.owner; self.owner = -1; if (owner >= 0) { DeckState.cue-released(owner); } }
             }
             StageButton {
                 tooltip: @tr("Play / pause");

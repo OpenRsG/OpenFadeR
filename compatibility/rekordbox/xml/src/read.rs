@@ -3,7 +3,8 @@
 use openfader_plugin::library::{
     playlist_tree, Analysis, Beat, Cue, Playlist, PlaylistRow, Source, Track,
 };
-use compat_rekordbox_common::{at, location, tags, Edge, PathMap};
+use compat_rekordbox_common::{at, location, PathMap};
+use openfader_plugin::markup::{Edge, tags};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 

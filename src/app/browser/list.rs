@@ -7,7 +7,43 @@ use super::{
 };
 use openfader::{library::Track, store};
 use slint::ComponentHandle;
-use std::sync::Arc;
+use std::{
+    cell::OnceCell,
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+
+fn restored_track(
+    t: &Track,
+    collection: Option<&super::Cache>,
+    source: impl FnOnce(String) -> Option<Track>,
+) -> Option<Track> {
+    let key = store::key(t);
+    let collection = collection.and_then(|c| c.by_key.get(&key).map(|&i| &c.tracks[i]));
+    if t.id.is_some() && collection.is_some() {
+        return collection.cloned();
+    }
+    source(key).or_else(|| collection.cloned())
+}
+
+fn metadata_index<'a>(
+    snapshots: &'a [Arc<Vec<Track>>],
+    wanted: &HashSet<Option<PathBuf>>,
+) -> HashMap<(Option<&'a Path>, String), &'a Track> {
+    let mut index = HashMap::new();
+    // Match paths before computing store keys: unrelated missing files must not add a reload-wide stat scan.
+    for track in snapshots
+        .iter()
+        .flat_map(|list| list.iter())
+        .filter(|t| wanted.contains(&t.file))
+    {
+        index
+            .entry((track.file.as_deref(), store::key(track)))
+            .or_insert(track);
+    }
+    index
+}
 
 impl View {
     /// Rebuilds `list` from the current source and refreshes the rows. The whole library is the cache's own list, shared.
@@ -76,8 +112,7 @@ impl View {
 
     /// Search box, filter bar, tag filter and header sort over `list`, then the rows and the status line.
     ///
-    /// BPM and key are cached per track ([`super::table::Facts`]) and the search compares without lowercasing each field
-    /// ([`filter::shown`], [`filter::sort`]).
+    /// BPM/key facts and the full-list sort permutation are cached; filter changes only select indices from that order.
     pub(super) fn refresh(&mut self, app: &App) {
         let look = Look::now();
         let q = if self.search_entry().is_some() {
@@ -85,22 +120,14 @@ impl View {
         } else {
             self.query.to_lowercase()
         };
-        let shown = {
-            let facts = self.rows.facts();
-            let mut shown = filter::shown(
-                &self.list,
-                &facts,
-                &q,
-                &self.filter,
-                &self.reference,
-                &look,
-                |t| super::tagging::passes(&self.tag_map, &self.tag_filter, t),
-            );
-            if let Some((col, asc)) = self.sort.filter(|_| !self.ordered()) {
-                filter::sort(&mut shown, &self.list, &facts, col, asc, &look);
-            }
-            shown
-        };
+        let shown = self.rows.shown(
+            &q,
+            &self.filter,
+            &self.reference,
+            &look,
+            self.sort.filter(|_| !self.ordered()),
+            |t| super::tagging::passes(&self.tag_map, &self.tag_filter, t),
+        );
         self.shown = shown;
         self.sel.retain(&self.shown);
         if self.rows.update(&self.shown, look, self.reference.clone()) {
@@ -154,48 +181,95 @@ impl View {
         self.reference = r;
     }
 
-    // ponytail: source snapshots are scanned per refreshed track; index them if large source playlists make undo lag.
+    /// A single details-panel refresh; bulk restoration below indexes its source snapshots once.
     pub(super) fn fresh_track(&mut self, t: &Track) -> Option<Track> {
-        let key = store::key(t);
-        let collection = self
-            .cache()
-            .ok()
-            .and_then(|c| c.by_key.get(&key).map(|&i| c.tracks[i].clone()));
-        if t.id.is_some() && collection.is_some() {
-            return collection;
-        }
-        let find = |lib: &dyn openfader::library::Library| {
-            lib.tracks_all()
-                .ok()?
+        let collection = self.cache().ok();
+        restored_track(t, collection.as_deref(), |key| {
+            let find = |lib: &dyn openfader::library::Library| {
+                lib.tracks_all()
+                    .ok()?
+                    .iter()
+                    .find(|fresh| fresh.file == t.file && store::key(fresh) == key)
+                    .cloned()
+            };
+            if let Home::Source(i, _) = self.home
+                && let Some(fresh) = self
+                    .sources
+                    .get(i)
+                    .and_then(|s| s.lib.as_ref())
+                    .and_then(|lib| find(&**lib))
+            {
+                return Some(fresh);
+            }
+            self.sources
                 .iter()
-                .find(|fresh| fresh.file == t.file && store::key(fresh) == key)
-                .cloned()
-        };
-        if let Home::Source(i, _) = self.home
-            && let Some(fresh) = self
-                .sources
-                .get(i)
-                .and_then(|s| s.lib.as_ref())
-                .and_then(|lib| find(&**lib))
-        {
-            return Some(fresh);
-        }
-        self.sources
-            .iter()
-            .filter_map(|s| s.lib.as_ref())
-            .find_map(|lib| find(&**lib))
-            .or(collection)
+                .filter_map(|s| s.lib.as_ref())
+                .find_map(|lib| find(&**lib))
+        })
     }
 
     /// Undo/redo and Reload Tag change what the library lists for a track (an override removed, BPM, key, length read from the
     /// file again): every copy kept here becomes the library's current one, so it stays equal to its row in the list.
     pub(super) fn reread_metadata(&mut self) {
+        let collection = self.cache().ok();
+        let wanted: HashSet<_> = self
+            .tags
+            .iter()
+            .chain(&self.history)
+            .chain(self.selected.iter())
+            .chain(self.related.iter())
+            .map(|t| t.file.clone())
+            .chain(
+                self.decks
+                    .iter()
+                    .filter_map(|d| d.with_track(|t| t.file.clone())),
+            )
+            .collect();
+        let snapshots = OnceCell::new();
+        let index = OnceCell::new();
+        let active = match self.home {
+            Home::Source(i, _) => Some(i),
+            _ => None,
+        };
+        let sources = &self.sources;
+        let fresh = |t: &Track| {
+            restored_track(t, collection.as_deref(), |key| {
+                let snapshots = snapshots.get_or_init(|| {
+                    (0..sources.len())
+                        .map(|_| OnceCell::new())
+                        .collect::<Vec<_>>()
+                });
+                let index = index.get_or_init(|| {
+                    (0..sources.len())
+                        .map(|_| OnceCell::new())
+                        .collect::<Vec<_>>()
+                });
+                let identity = (t.file.as_deref(), key);
+                for i in active
+                    .into_iter()
+                    .chain((0..sources.len()).filter(|i| Some(*i) != active))
+                {
+                    let Some(lib) = sources.get(i).and_then(|s| s.lib.as_ref()) else {
+                        continue;
+                    };
+                    let Some(snapshot) = snapshots[i].get_or_init(|| lib.tracks_all().ok()) else {
+                        continue;
+                    };
+                    let index = index[i]
+                        .get_or_init(|| metadata_index(std::slice::from_ref(snapshot), &wanted));
+                    if let Some(track) = index.get(&identity) {
+                        return Some((*track).clone());
+                    }
+                }
+                None
+            })
+        };
         let mut kept = [
             std::mem::take(&mut self.tags),
             std::mem::take(&mut self.history),
         ];
         for t in kept.iter_mut().flatten() {
-            if let Some(fresh) = self.fresh_track(t) {
+            if let Some(fresh) = fresh(t) {
                 *t = fresh;
             }
         }
@@ -203,7 +277,7 @@ impl View {
         (self.tags, self.history) = (tags, history);
         let mut chosen = [self.selected.take(), self.related.take()];
         for t in chosen.iter_mut().flatten() {
-            if let Some(fresh) = self.fresh_track(t) {
+            if let Some(fresh) = fresh(t) {
                 *t = fresh;
             }
         }
@@ -211,7 +285,7 @@ impl View {
         (self.selected, self.related) = (selected, related);
         for i in 0..self.decks.len() {
             if let Some(t) = self.decks[i].with_track(Clone::clone)
-                && let Some(fresh) = self.fresh_track(&t)
+                && let Some(fresh) = fresh(&t)
             {
                 self.decks[i].refresh_metadata(&fresh);
             }
@@ -250,3 +324,7 @@ impl View {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "list_tests.rs"]
+mod tests;

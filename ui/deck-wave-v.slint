@@ -116,6 +116,8 @@ export component DeckDetailV inherits Rectangle {
     // Drag = scratch (the waveform follows the hand: dragging down moves the track back), a click without a drag is PLAY / PAUSE
     // (VIEW > Click on the waveform for PLAY and CUE; the right button is CUE), or picks the MIX POINT with the panel open.
     TouchArea {
+        property <int> scratch-owner: -1;
+        property <int> cue-owner: -1;
         x: 0;
         y: root.top;
         width: root.wt;
@@ -123,30 +125,36 @@ export component DeckDetailV inherits Rectangle {
         mouse-cursor: crosshair;
         enabled: DeckState.decks[root.index].loaded;
         pointer-event(e) => {
-            if (e.button == PointerEventButton.left) {
-                if (e.kind == PointerEventKind.down) {
-                    root.last-y = self.mouse-y;
-                    root.down-y = self.mouse-y;
-                    root.scratching = true;
-                    DeckState.scratch-begin(root.index);
-                }
-                if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) {
-                    root.scratching = false;
-                    DeckState.scratch-end(root.index);
-                    if (e.kind == PointerEventKind.up && abs(self.mouse-y - root.down-y) < 4px) {
-                        if (MixPointState.active) { MixPointState.wave-click(root.index, self.mouse-y / self.height); }
-                        else if (DeckState.click-wave) { DeckState.play-pause(root.index); }
-                    }
+            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                self.scratch-owner = root.index;
+                root.last-y = self.mouse-y;
+                root.down-y = self.mouse-y;
+                root.scratching = true;
+                DeckState.scratch-begin(self.scratch-owner);
+            }
+            if (self.scratch-owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up))) {
+                let owner = self.scratch-owner;
+                self.scratch-owner = -1;
+                root.scratching = false;
+                DeckState.scratch-end(owner);
+                if (e.kind == PointerEventKind.up && abs(self.mouse-y - root.down-y) < 4px) {
+                    if (MixPointState.active) { MixPointState.wave-click(owner, self.mouse-y / self.height); }
+                    else if (DeckState.click-wave) { DeckState.play-pause(owner); }
                 }
             }
-            if (e.button == PointerEventButton.right && DeckState.click-wave) {
-                if (e.kind == PointerEventKind.down) { DeckState.cue(root.index); }
-                if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) { DeckState.cue-released(root.index); }
+            if (e.button == PointerEventButton.right && DeckState.click-wave && e.kind == PointerEventKind.down) {
+                self.cue-owner = root.index;
+                DeckState.cue(self.cue-owner);
+            }
+            if (self.cue-owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.right && e.kind == PointerEventKind.up))) {
+                let owner = self.cue-owner;
+                self.cue-owner = -1;
+                DeckState.cue-released(owner);
             }
         }
         moved => {
-            if (self.pressed && root.scratching) {
-                DeckState.scratch-move(root.index, self.mouse-y - root.last-y);
+            if (self.pressed && self.scratch-owner >= 0) {
+                DeckState.scratch-move(self.scratch-owner, self.mouse-y - root.last-y);
                 root.last-y = self.mouse-y;
             }
         }

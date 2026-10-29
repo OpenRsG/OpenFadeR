@@ -23,14 +23,16 @@
 //! channel state is read through atomics and `try_lock`s ([`render`]), the clock through `try_lock` too.
 
 use super::super::bus::{self, Bus, Params};
-use super::super::route::{self, Plan, EXTERNAL};
-use super::super::{auxin, fx, merge, metronome, mic, preview, sampler, Ring};
+use super::super::route::{self, EXTERNAL, Plan};
+use super::super::{Ring, auxin, fx, merge, metronome, mic, preview, sampler};
+use super::clock::MAX_ANCHORS;
 use super::engine::SLOTS;
 use super::{Anchor, Shared, Voice, gain_at, render};
 use cpal::{FromSample, SizedSample};
 use openfader_plugin::Slot;
-use std::sync::atomic::Ordering::Relaxed;
+use std::collections::VecDeque;
 use std::sync::Arc;
+use std::sync::atomic::Ordering::Relaxed;
 use std::time::{Duration, Instant};
 
 type Frame = ([f32; 2], [f32; 2]);
@@ -56,8 +58,8 @@ pub(super) struct Mix {
     booth: f32,
     /// External mode: the sampler (`.0`) and the preview (`.1`) per frame. Grows once like `buf`.
     side: Vec<Frame>,
-    /// Per channel: the last clock anchor could not be recorded (lock busy), so the next one resets the history.
-    clock_missed: [bool; SLOTS],
+    /// Anchors awaiting the UI-held clock lock: (anchor, playing, reset, seek epoch), bounded like the clock's history.
+    clock_missed: [VecDeque<(Anchor, bool, bool, u64)>; SLOTS],
     /// Beat FX slots FX1-1 … FX2-3 ([`fx`]): each on one channel's master path, or on their sum, before the bus.
     fx: [[fx::Unit; bus::FX_SLOTS]; bus::FX_UNITS],
     /// PAD FX units, one per channel: second [`fx::Unit`]s the performance pads switch on while held, after the Beat FX.
@@ -266,23 +268,33 @@ impl Mix {
                 b[i] = (m, c)
             });
             hits[k] = shared[k].beat_hits(&d, dev_rate, n);
-            // A UI read holding the clock costs this buffer its anchor; the next one then restarts the history.
-            let Some(mut clock) = shared[k].clock.try_lock() else {
-                clock_missed[k] = true;
-                continue;
+            let anchor = Anchor {
+                at,
+                pos: d.start,
+                latency,
+                fps: d.fps,
+                lp: d.lp,
             };
-            let reset = d.seeked || !clock.playing || std::mem::take(&mut clock_missed[k]);
-            clock.push(
-                Anchor {
-                    at,
-                    pos: d.start,
-                    latency,
-                    fps: d.fps,
-                    lp: d.lp,
-                },
-                d.playing,
-                reset,
-            );
+            let missed = &mut clock_missed[k];
+            if let Some(mut clock) = shared[k].clock.try_lock() {
+                for (anchor, playing, reset, epoch) in missed.drain(..) {
+                    let reset = reset || !clock.playing;
+                    clock.push(anchor, playing, reset);
+                    clock.epoch = epoch;
+                }
+                let reset = d.seeked || !clock.playing;
+                clock.push(anchor, d.playing, reset);
+                clock.epoch = d.epoch;
+            } else {
+                if missed.len() == MAX_ANCHORS {
+                    missed.pop_front();
+                    // Beyond the history window, the earliest retained buffer starts a new clock epoch.
+                    if let Some((_, _, reset, _)) = missed.front_mut() {
+                        *reset = true;
+                    }
+                }
+                missed.push_back((anchor, d.playing, d.seeked, d.epoch));
+            }
         }
         let external = plan.external;
         {
@@ -392,9 +404,11 @@ impl Mix {
         shared: &[Arc<Shared>; SLOTS],
         bus: &Arc<Bus>,
     ) -> Mix {
+        // All playback sources share this table; prepare it before publishing the callback.
+        super::super::kernel();
         let target = bus.params();
         Mix {
-            clock_missed: [false; SLOTS],
+            clock_missed: [(); SLOTS].map(|_| VecDeque::with_capacity(MAX_ANCHORS)),
             voices: [(); SLOTS].map(|_| Voice::new(rate)),
             shared: shared.clone(),
             bus: bus.clone(),
@@ -671,6 +685,41 @@ mod tests {
     }
 
     #[test]
+    fn the_first_fractional_callback_needs_no_lazy_allocation() {
+        const CHILD: &str = "OPENFADER_TEST_COLD_MIX";
+        if std::env::var_os(CHILD).is_none() {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "audio::player::mix::tests::the_first_fractional_callback_needs_no_lazy_allocation",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .status()
+                .unwrap();
+            assert!(status.success(), "the cold-process callback allocated");
+            return;
+        }
+        let (shared, _bus, mut mix) = silent_rig();
+        let sh = &shared[0];
+        *sh.pcm.lock() = Arc::new(super::super::super::Track16::from(
+            super::super::super::Pcm {
+                rate: 44100,
+                samples: vec![0.25; 8192],
+            },
+        ));
+        sh.pos.store(0.5f64.to_bits(), Relaxed);
+        sh.playing.store(true, Relaxed);
+        sh.raw.store(true, Relaxed);
+        let mut out = [0.0f32; 1024];
+        let at = Instant::now();
+        let before = ALLOCS.with(|c| c.get());
+        mix.fill(&mut out, 44100, 2, at, Duration::from_millis(10));
+        assert_eq!(ALLOCS.with(|c| c.get()) - before, 0);
+        assert!(out.iter().any(|&sample| sample.abs() > 0.1));
+    }
+
+    #[test]
     fn effect_selection_and_activation_allocate_and_destroy_nothing_in_the_callback() {
         let plugins = crate::plugin::effect::fake_effects();
         let mut units: [fx::Unit; 10] = std::array::from_fn(|_| fx::Unit::with(48_000, &plugins));
@@ -752,6 +801,252 @@ mod tests {
         let bus = Arc::new(Bus::new(44100, bus::Headphones::Split));
         let mix = Mix::new(44100, 2, Plan::stereo(), None, &shared, &bus);
         (shared, bus, mix)
+    }
+
+    #[test]
+    fn a_deferred_clock_never_acknowledges_a_later_same_target_seek() {
+        let (shared, _bus, mut mix) = silent_rig();
+        let sh = &shared[0];
+        *sh.pcm.lock() = Arc::new(
+            super::super::super::Pcm {
+                rate: 44100,
+                samples: vec![0.25; 2 * 44100],
+            }
+            .into(),
+        );
+        let mut player = super::super::engine::test_player(shared.clone());
+        player.play();
+        let mut out = vec![0f32; 2 * 441];
+        let at = Instant::now();
+        let latency = Duration::from_millis(200);
+        mix.fill(&mut out, 44100, 2, at, latency);
+        let before = (ALLOCS.with(|c| c.get()), DEALLOCS.with(|c| c.get()));
+        player.pause();
+        player.seek(500);
+        player.play();
+        let held = sh.clock.lock();
+        mix.fill(&mut out, 44100, 2, at + Duration::from_millis(10), latency);
+        assert_eq!(mix.clock_missed[0].len(), 1);
+        player.pause();
+        player.seek(500); // same target, but this release belongs to the next callback
+        player.play();
+        drop(held);
+        assert_eq!(player.position_ms(), 500.0);
+        assert!(!player.settled());
+        // Publish the earlier callback while the newer command is still UI-owned.
+        let held = sh.seek.lock();
+        mix.fill(&mut out, 44100, 2, at + Duration::from_millis(20), latency);
+        let epoch = held.epoch;
+        assert!(held.pending);
+        drop(held);
+        assert_ne!(sh.clock.lock().epoch, epoch);
+        assert_eq!(player.position_ms(), 500.0);
+        assert_eq!(player.written_ms(), 500.0);
+        assert!(!player.settled());
+        mix.fill(&mut out, 44100, 2, at + Duration::from_millis(30), latency);
+        assert_eq!(player.position_ms(), 500.0);
+        assert_eq!(player.written_ms(), 510.0);
+        assert_eq!(
+            (ALLOCS.with(|c| c.get()), DEALLOCS.with(|c| c.get())),
+            before,
+            "command handover and deferred epochs allocate and destroy nothing"
+        );
+    }
+
+    #[test]
+    fn a_busy_clock_keeps_continuous_playback_at_the_audible_position() {
+        use super::super::heard_frames;
+        let (shared, _bus, mut mix) = silent_rig();
+        let sh = &shared[0];
+        *sh.pcm.lock() = Arc::new(
+            super::super::super::Pcm {
+                rate: 44100,
+                samples: vec![0.25; 2 * 44100],
+            }
+            .into(),
+        );
+        sh.playing.store(true, Relaxed);
+        let mut out = vec![0f32; 2 * 441];
+        let t0 = Instant::now();
+        let latency = Duration::from_millis(40);
+        for buffer in 0u64..=8 {
+            let at = t0 + Duration::from_millis(buffer * 10);
+            let held = (buffer == 6).then(|| sh.clock.lock());
+            mix.fill(&mut out, 44100, 2, at, latency);
+            drop(held);
+            let heard = heard_frames(&sh.clock.lock(), at, 44100.0);
+            let expected = buffer.saturating_sub(4) as f64 * 441.0;
+            assert!(
+                (heard - expected).abs() < 1e-6,
+                "buffer {buffer}: {heard} vs {expected}"
+            );
+        }
+        // Before the fix, buffer 7 reset the floor to 3087 written frames instead of 1323 heard frames.
+    }
+
+    #[test]
+    fn a_busy_clock_preserves_buffered_rate_loop_and_seek_boundaries() {
+        use super::super::{audible, heard_frames};
+        let (shared, _bus, mut mix) = silent_rig();
+        let sh = &shared[0];
+        *sh.pcm.lock() = Arc::new(
+            super::super::super::Pcm {
+                rate: 44100,
+                samples: vec![0.25; 2 * 44100],
+            }
+            .into(),
+        );
+        sh.playing.store(true, Relaxed);
+        let mut out = vec![0f32; 2 * 441];
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        let latency = Duration::from_millis(40);
+        for buffer in 0..=5 {
+            mix.fill(&mut out, 44100, 2, at(buffer * 10), latency);
+        }
+        let held = sh.clock.lock();
+        sh.rate.store(2f64.to_bits(), Relaxed);
+        mix.fill(&mut out, 44100, 2, at(60), latency);
+        sh.set_loop(Some((70.0, 90.0)));
+        mix.fill(&mut out, 44100, 2, at(70), latency);
+        drop(held);
+        mix.fill(&mut out, 44100, 2, at(80), latency);
+        {
+            let clock = sh.clock.lock();
+            for (ms, expected) in [
+                (95, 2425.5),
+                (100, 2646.0),
+                (105, 3087.0),
+                (110, 3528.0),
+                (114, 3880.8),
+                (115, 3087.0),
+                (120, 3528.0),
+            ] {
+                let heard = heard_frames(&clock, at(ms), 44100.0);
+                assert!(
+                    (heard - expected).abs() < 1e-6,
+                    "{ms} ms: {heard} vs {expected}"
+                );
+            }
+        }
+        let held = sh.clock.lock();
+        sh.seek_to(22050.0);
+        mix.fill(&mut out, 44100, 2, at(130), latency);
+        drop(held);
+        mix.fill(&mut out, 44100, 2, at(140), latency);
+        let clock = sh.clock.lock();
+        assert_eq!(heard_frames(&clock, at(140), 44100.0), 22050.0);
+        assert!(!audible(&clock, at(169)));
+        assert!(audible(&clock, at(170)));
+    }
+
+    #[test]
+    fn a_busy_clock_bounds_pending_history_without_callback_allocations() {
+        use super::super::heard_frames;
+        let (shared, _bus, mut mix) = silent_rig();
+        let sh = &shared[0];
+        *sh.pcm.lock() = Arc::new(
+            super::super::super::Pcm {
+                rate: 44100,
+                samples: vec![0.25; 2 * 44100],
+            }
+            .into(),
+        );
+        sh.playing.store(true, Relaxed);
+        let mut out = vec![0f32; 2 * 441];
+        let t0 = Instant::now();
+        let latency = Duration::from_millis(40);
+        for buffer in 0..8 {
+            mix.fill(
+                &mut out,
+                44100,
+                2,
+                t0 + Duration::from_millis(buffer * 10),
+                latency,
+            );
+        }
+        let capacity = mix.clock_missed[0].capacity();
+        let before = (ALLOCS.with(|c| c.get()), DEALLOCS.with(|c| c.get()));
+        let held = sh.clock.lock();
+        for buffer in 8..=MAX_ANCHORS + 8 {
+            mix.fill(
+                &mut out,
+                44100,
+                2,
+                t0 + Duration::from_millis(buffer as u64 * 10),
+                latency,
+            );
+        }
+        assert_eq!(mix.clock_missed[0].len(), MAX_ANCHORS);
+        assert!(mix.clock_missed[0].front().unwrap().2);
+        drop(held);
+        let buffer = MAX_ANCHORS as u64 + 9;
+        let now = t0 + Duration::from_millis(buffer * 10);
+        mix.fill(&mut out, 44100, 2, now, latency);
+        assert_eq!(
+            (ALLOCS.with(|c| c.get()), DEALLOCS.with(|c| c.get())),
+            before
+        );
+        assert_eq!(mix.clock_missed[0].capacity(), capacity);
+        assert!(mix.clock_missed[0].is_empty());
+        let heard = heard_frames(&sh.clock.lock(), now, 44100.0);
+        assert!((heard - (buffer - 4) as f64 * 441.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_busy_clock_remembers_discontinuities_without_resetting_twice() {
+        use super::super::{audible, heard_frames};
+        let (shared, _bus, mut mix) = silent_rig();
+        let sh = &shared[0];
+        *sh.pcm.lock() = Arc::new(
+            super::super::super::Pcm {
+                rate: 44100,
+                samples: vec![0.25; 2 * 44100],
+            }
+            .into(),
+        );
+        sh.playing.store(true, Relaxed);
+        let mut out = vec![0f32; 2 * 441];
+        let t0 = Instant::now();
+        let latency = Duration::from_millis(40);
+        for buffer in 0..=8 {
+            mix.fill(
+                &mut out,
+                44100,
+                2,
+                t0 + Duration::from_millis(buffer * 10),
+                latency,
+            );
+        }
+        let held = sh.clock.lock();
+        sh.seek_to(22050.0);
+        mix.fill(&mut out, 44100, 2, t0 + Duration::from_millis(90), latency);
+        drop(held);
+        sh.seek_to(11025.0);
+        mix.fill(&mut out, 44100, 2, t0 + Duration::from_millis(100), latency);
+        mix.fill(&mut out, 44100, 2, t0 + Duration::from_millis(110), latency);
+        {
+            let clock = sh.clock.lock();
+            assert_eq!(
+                heard_frames(&clock, t0 + Duration::from_millis(110), 44100.0),
+                11025.0
+            );
+            assert!(audible(&clock, t0 + Duration::from_millis(140)));
+        }
+        let held = sh.clock.lock();
+        sh.playing.store(false, Relaxed);
+        mix.fill(&mut out, 44100, 2, t0 + Duration::from_millis(120), latency);
+        drop(held);
+        sh.playing.store(true, Relaxed);
+        let resumed = f64::from_bits(sh.pos.load(Relaxed));
+        mix.fill(&mut out, 44100, 2, t0 + Duration::from_millis(130), latency);
+        let clock = sh.clock.lock();
+        assert_eq!(
+            heard_frames(&clock, t0 + Duration::from_millis(130), 44100.0),
+            resumed
+        );
+        assert!(!audible(&clock, t0 + Duration::from_millis(169)));
+        assert!(audible(&clock, t0 + Duration::from_millis(170)));
     }
 
     #[test]

@@ -133,8 +133,8 @@ fn slot_deck(r: &Row) -> i32 {
 }
 
 #[rustfmt::skip]
-fn dispatch(app: &App, r: &Row, n: usize) {
-    let (decks, deck) = (app.global::<DeckState>(), slot_deck(r));
+fn dispatch(app: &App, r: &Row, n: usize, deck: i32) {
+    let decks = app.global::<DeckState>();
     match r.act {
         Act::PlayPause => decks.invoke_play_pause(deck),
         Act::Cue => decks.invoke_cue(deck),
@@ -194,7 +194,7 @@ fn dispatch(app: &App, r: &Row, n: usize) {
 pub(super) fn run(app: &App, id: &str) -> bool {
     let row = LIVE.with(|l| l.borrow().iter().find(|r| r.id == id).cloned());
     row.is_some_and(|r| {
-        dispatch(app, &r, 0);
+        dispatch(app, &r, 0, slot_deck(&r));
         true
     })
 }
@@ -205,32 +205,39 @@ fn released(r: &Row) -> bool {
     matches!(r.act, Act::Cue | Act::Pad | Act::BeatJump(_))
 }
 
-/// The physical key behind a key event: shifted digits / braces and capitals fold to the unshifted
-/// key (US layout), so a press and its release agree even when Shift went up in between.
+/// Release identity ignores modifier changes, including control characters emitted by Ctrl+letter.
 fn physical(text: &str) -> String {
-    let c = text.chars().next().unwrap_or(' ');
-    match ("!@#$%^&*".find(c), c) {
-        (Some(i), _) => (i + 1).to_string(),
-        (_, '{') => "[".into(),
-        (_, '}') => "]".into(),
-        _ => c.to_lowercase().collect(),
+    let (key, _) = normalize(text, false, true).unwrap_or_default();
+    match key.as_str() {
+        "{" => "[".into(),
+        "}" => "]".into(),
+        _ => key,
     }
 }
 
-type Held = HashMap<String, Row>;
+#[derive(Clone, Copy)]
+struct HeldAction {
+    deck: i32,
+    act: Act,
+    pad: usize,
+    mode: i32,
+}
+type Held = HashMap<String, HeldAction>;
 
-/// Remember a press whose release matters, so the release hits the same row whatever Shift says then.
-fn hold(held: &mut Held, text: &str, r: &Row) {
+/// Keep the physical deck and pad from the press, even if the visible layer or keymap changes.
+fn hold(held: &mut Held, text: &str, r: &Row, deck: i32, pad: usize, mode: i32) {
     if released(r) {
-        held.insert(physical(text), r.clone());
+        held.entry(physical(text)).or_insert(HeldAction {
+            deck,
+            act: r.act,
+            pad,
+            mode,
+        });
     }
 }
 
-/// The row a release belongs to: the pressed one, else (press never seen) the plain lookup.
-fn release(held: &mut Held, text: &str, shift: bool, ctrl: bool) -> Option<Row> {
+fn release(held: &mut Held, text: &str) -> Option<HeldAction> {
     held.remove(&physical(text))
-        .or_else(|| lookup(text, shift, ctrl).map(|(r, _)| r))
-        .filter(released)
 }
 
 /// Makes the keymap `map` (the `keymap` setting) the live table and publishes it to the help overlay.
@@ -270,6 +277,9 @@ pub fn wire(app: &App) {
     let eaten = Rc::new(RefCell::new(HashSet::<String>::new()));
     let (h, e) = (held.clone(), eaten.clone());
     keys.on_key(move |text: SharedString, shift, ctrl| {
+        if h.borrow().contains_key(&physical(&text)) {
+            return true;
+        }
         let hook = HOOK.with(|k| k.borrow().clone());
         if hook.is_some_and(|f| f(&text, shift, ctrl)) {
             e.borrow_mut().insert(physical(&text)); // its release is not a shortcut either
@@ -278,26 +288,27 @@ pub fn wire(app: &App) {
         let (Some((r, n)), Some(app)) = (lookup(&text, shift, ctrl), weak.upgrade()) else {
             return false;
         };
-        hold(&mut h.borrow_mut(), &text, &r);
-        dispatch(&app, &r, n);
+        let deck = slot_deck(&r);
+        let mode = if r.act == Act::Pad {
+            app.global::<DeckState>().get_decks().row_data(deck as usize).map_or(0, |v| v.pad_mode)
+        } else { 0 };
+        hold(&mut h.borrow_mut(), &text, &r, deck, n, mode);
+        dispatch(&app, &r, n, deck);
         true
     });
     let weak = app.as_weak();
-    keys.on_key_released(move |text: SharedString, shift, ctrl| {
+    keys.on_key_released(move |text: SharedString, _, _| {
         if eaten.borrow_mut().remove(&physical(&text)) {
             return true;
         }
-        let (Some(r), Some(app)) = (
-            release(&mut held.borrow_mut(), &text, shift, ctrl),
-            weak.upgrade(),
-        ) else {
+        let (Some(r), Some(app)) = (release(&mut held.borrow_mut(), &text), weak.upgrade()) else {
             return false;
         };
-        let (state, deck) = (app.global::<DeckState>(), slot_deck(&r));
-        if r.act == Act::Cue {
-            state.invoke_cue_released(deck)
-        } else {
-            state.invoke_pad_released(deck)
+        let state = app.global::<DeckState>();
+        match r.act {
+            Act::Cue => state.invoke_cue_released(r.deck),
+            Act::Pad => state.invoke_pad_released_at(r.deck, r.pad as i32, r.mode),
+            _ => state.invoke_beat_jump_released(r.deck),
         }
         true
     });

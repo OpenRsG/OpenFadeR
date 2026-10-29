@@ -65,7 +65,13 @@ use openfader::{
 use playlists::{Ask, Panel};
 use sidebar::Entry;
 use slint::{ComponentHandle, Model, StandardListViewItem, Timer, VecModel};
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+    sync::Arc,
+    time::Duration,
+};
 use table::Reference;
 
 /// Two presses on one row closer than this load it.
@@ -132,6 +138,19 @@ pub fn context() -> Context {
     )
 }
 
+/// Analysis keeps the list shared and captures row indices instead of cloning every selected track.
+pub fn analysis_selection() -> Option<(Arc<Vec<Track>>, Vec<usize>)> {
+    let browser = view()?;
+    let browser = browser.borrow();
+    let selected = browser.selected.as_ref()?;
+    let rows = browser.sel.ordered(&browser.shown);
+    if rows.len() > 1 {
+        Some((browser.list.clone(), rows))
+    } else {
+        Some((Arc::new(vec![selected.clone()]), vec![0]))
+    }
+}
+
 /// The status bar's loading line: `text` beside a bar filled to `progress` (0 to 1); `None` hides both. Each step also goes to
 /// the terminal, the readable log of a device being mounted and read.
 // ponytail: one line for the whole app; two sticks read at once take turns writing it.
@@ -194,10 +213,41 @@ enum Home {
 
 /// The whole library with each track's store key, read again only when the store changed ([`Store::generation`]).
 struct Cache {
-    generation: u64,
+    generation: Cell<u64>,
     tracks: Arc<Vec<Track>>,
     keys: Vec<String>,
     by_key: HashMap<String, usize>,
+}
+
+impl Cache {
+    fn read(
+        kept: &mut Option<Rc<Self>>,
+        generation: u64,
+        library: &dyn Library,
+    ) -> Result<Rc<Self>, String> {
+        if let Some(cache) = kept.as_ref().filter(|c| c.generation.get() == generation) {
+            return Ok(cache.clone());
+        }
+        let tracks = library.tracks_all()?;
+        if let Some(cache) = kept.as_ref().filter(|c| Arc::ptr_eq(&c.tracks, &tracks)) {
+            // Other UI consumers may retain this Rc; its immutable indexes still describe the same list.
+            cache.generation.set(generation);
+            return Ok(cache.clone());
+        }
+        let keys: Vec<String> = tracks.iter().map(store::key).collect();
+        let mut by_key = HashMap::with_capacity(keys.len());
+        for (i, key) in keys.iter().enumerate() {
+            by_key.entry(key.clone()).or_insert(i);
+        }
+        Ok(kept
+            .insert(Rc::new(Self {
+                generation: Cell::new(generation),
+                tracks,
+                keys,
+                by_key,
+            }))
+            .clone())
+    }
 }
 
 /// The current list plus the search/filter/sort state that turns it into the visible rows.
@@ -326,25 +376,7 @@ impl View {
     /// The library with store keys: read once per [`Store::generation`], so a refresh or a Related toggle never reads the
     /// whole library again while nothing changed.
     fn cache(&mut self) -> Result<Rc<Cache>, String> {
-        let generation = self.store.generation();
-        if let Some(c) = self.cache.as_ref().filter(|c| c.generation == generation) {
-            return Ok(c.clone());
-        }
-        let tracks = self.lib.tracks_all()?;
-        let keys: Vec<String> = tracks.iter().map(store::key).collect();
-        let mut by_key = HashMap::with_capacity(keys.len());
-        for (i, k) in keys.iter().enumerate() {
-            by_key.entry(k.clone()).or_insert(i);
-        }
-        Ok(self
-            .cache
-            .insert(Rc::new(Cache {
-                generation,
-                tracks,
-                keys,
-                by_key,
-            }))
-            .clone())
+        Cache::read(&mut self.cache, self.store.generation(), self.lib.as_ref())
     }
 
     /// The table row of the chosen track, as an index into `list`.
@@ -468,6 +500,74 @@ fn contains_ignore_case(hay: &str, needle: &str) -> bool {
 }
 
 #[cfg(test)]
+fn timer_test_pump(duration: Duration) {
+    let until = std::time::Instant::now() + duration;
+    while std::time::Instant::now() < until {
+        slint::platform::update_timers_and_animations();
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[cfg(test)]
+fn timer_test_view(app: &App) -> Rc<RefCell<View>> {
+    let store = Arc::new(Store::in_memory().unwrap());
+    let lib: Rc<dyn Library> = Rc::new(openfader::library::own::Own::new(store.clone()));
+    let decks = crate::app::deck::wire(app, lib.clone(), Default::default());
+    Rc::new(RefCell::new(View {
+        lib,
+        store,
+        decks,
+        rows: Rc::new(table::Rows::new(Default::default())),
+        sidebar: Rc::default(),
+        panel_rows: Rc::default(),
+        list: Arc::default(),
+        shown: Vec::new(),
+        query: String::new(),
+        filter: Filter::default(),
+        tag_filter: Vec::new(),
+        saved: Vec::new(),
+        sort: None,
+        home: Home::Playlist(None),
+        related: None,
+        tags: Vec::new(),
+        history: Vec::new(),
+        history_at: Vec::new(),
+        selected: None,
+        sel: Default::default(),
+        sel_entry: Entry::All,
+        marks: Rc::default(),
+        status_base: String::new(),
+        reference: Reference::default(),
+        detected_ver: 0,
+        sel_at: None,
+        entries: Vec::new(),
+        entry: Entry::All,
+        open: Vec::new(),
+        lib_playlists: Vec::new(),
+        nodes: Vec::new(),
+        cats: Vec::new(),
+        mytags: Vec::new(),
+        banks: Vec::new(),
+        tag_map: HashMap::new(),
+        cache: None,
+        slots: Vec::new(),
+        dupe_groups: 0,
+        health: health::Monitor::new(),
+        ask: None,
+        panel: Panel::Closed,
+        editing: None,
+        confirm: None,
+        sources: Vec::new(),
+        _timer: Timer::default(),
+        _preview: Timer::default(),
+        suggest: suggest::State::default(),
+        strips: strip::Strips::new(app),
+        stages: stages::Stages::default(),
+        covers: cover::Covers::new(app),
+    }))
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -488,5 +588,104 @@ mod tests {
         assert_eq!(row_among(&list, &[2, 3], Some(0), &list[0]), Some(0));
         assert_eq!(row_among(&list, &[2, 3], Some(2), &list[0]), Some(0));
         assert_eq!(row_among(&list, &[1, 3], Some(2), &list[0]), None);
+    }
+
+    #[test]
+    fn library_indexes_survive_history_writes_but_follow_metadata_and_collection_changes() {
+        let store = Arc::new(Store::in_memory().unwrap());
+        let track = |name: &str| Track {
+            title: name.into(),
+            file: Some(format!("/audit/{name}.wav").into()),
+            ..Default::default()
+        };
+        store
+            .collection_put(&[track("a"), track("b")], false)
+            .unwrap();
+        let library = openfader::library::own::Own::new(store.clone());
+        let mut kept = None;
+        let first = Cache::read(&mut kept, store.generation(), &library).unwrap();
+        let b = first
+            .tracks
+            .iter()
+            .position(|track| track.title == "b")
+            .unwrap();
+        let key = first.keys[b].clone();
+        store.history_append("2026-10-27", &key, 1).unwrap();
+        assert_ne!(store.generation(), first.generation.get());
+        let history = Cache::read(&mut kept, store.generation(), &library).unwrap();
+        assert!(
+            Rc::ptr_eq(&first, &history),
+            "an unrelated write must retain the indexes"
+        );
+        assert_eq!(history.by_key[&key], b);
+        store.set_rating(&key, Some(5)).unwrap();
+        let edited = Cache::read(&mut kept, store.generation(), &library).unwrap();
+        assert!(!Rc::ptr_eq(&history, &edited));
+        assert_eq!(edited.tracks[edited.by_key[&key]].rating, 5);
+        assert_eq!(
+            first.tracks[b].rating, 0,
+            "retained snapshots stay immutable"
+        );
+        store.collection_put(&[track("c")], false).unwrap();
+        let added = Cache::read(&mut kept, store.generation(), &library).unwrap();
+        let c = added
+            .keys
+            .iter()
+            .find(|key| added.tracks[added.by_key[*key]].title == "c")
+            .unwrap();
+        assert_eq!(
+            added.tracks[added.by_key[c]].file.as_deref(),
+            Some(std::path::Path::new("/audit/c.wav"))
+        );
+        assert_eq!(added.tracks[added.by_key[&key]].rating, 5);
+    }
+
+    #[test]
+    #[ignore = "10k/100k unchanged-library index refresh timings"]
+    fn benchmark_unchanged_library_index_refresh() {
+        struct Shared(Arc<Vec<Track>>);
+        impl Library for Shared {
+            fn kind(&self) -> &str {
+                "shared benchmark"
+            }
+            fn playlists(&self) -> Result<Vec<Playlist>, String> {
+                Ok(Vec::new())
+            }
+            fn tracks(&self, _: Option<&str>) -> Result<Vec<Track>, String> {
+                Ok(self.0.as_ref().clone())
+            }
+            fn tracks_all(&self) -> Result<Arc<Vec<Track>>, String> {
+                Ok(self.0.clone())
+            }
+        }
+        for count in [10_000, 100_000] {
+            let library = Shared(Arc::new(
+                (0..count)
+                    .map(|i| Track {
+                        id: Some(i as i64 + 1),
+                        title: format!("Track {i}"),
+                        ..Default::default()
+                    })
+                    .collect(),
+            ));
+            let start = std::time::Instant::now();
+            for generation in 0..5 {
+                let fresh = Cache::read(&mut None, generation, &library).unwrap();
+                assert_eq!(fresh.by_key[&store::id_key(count as i64)], count - 1);
+            }
+            let rebuilding = start.elapsed();
+            let mut kept = None;
+            let first = Cache::read(&mut kept, 0, &library).unwrap();
+            let start = std::time::Instant::now();
+            for generation in 1..=5 {
+                let reused = Cache::read(&mut kept, generation, &library).unwrap();
+                assert!(Rc::ptr_eq(&first, &reused));
+                assert_eq!(reused.by_key[&store::id_key(count as i64)], count - 1);
+            }
+            eprintln!(
+                "{count} tracks, five generation changes: rebuilding={rebuilding:?}, shared-index-reuse={:?}",
+                start.elapsed()
+            );
+        }
     }
 }

@@ -1,11 +1,13 @@
 //! The separation job of a deck: start, focus, progress polling and the PREFS reaction.
 
 use super::super::{Deck, PadMode};
+use super::shared::{Source, Subscription, Version};
 use crate::app::prefs;
 use openfader::audio::{self, stemfile};
 use openfader::stems::{Phase, Quality};
 use parking_lot::{Condvar, Mutex};
 use std::collections::VecDeque;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
@@ -13,6 +15,8 @@ use std::sync::{Arc, LazyLock};
 
 struct Prepared {
     parts: Option<stemfile::Info>,
+    source: Option<Source>,
+    identified: bool,
 }
 
 struct LookupWork {
@@ -20,6 +24,7 @@ struct LookupWork {
     from_file: bool,
     cancelled: Arc<AtomicBool>,
     back: mpsc::Sender<Prepared>,
+    pcm: Option<Arc<audio::Track16>>,
 }
 
 fn prepare(
@@ -30,7 +35,11 @@ fn prepare(
         return None;
     }
     let parts = parts();
-    (!cancelled.load(Relaxed)).then_some(Prepared { parts })
+    (!cancelled.load(Relaxed)).then_some(Prepared {
+        parts,
+        source: None,
+        identified: false,
+    })
 }
 
 static LOOKUPS: LazyLock<(Mutex<VecDeque<LookupWork>>, Condvar)> = LazyLock::new(|| {
@@ -46,11 +55,23 @@ static LOOKUPS: LazyLock<(Mutex<VecDeque<LookupWork>>, Condvar)> = LazyLock::new
                     queue.pop_front().expect("not empty")
                 };
                 let prepared = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    prepare(&work.cancelled, || {
+                    let before = work.pcm.as_ref().and_then(|_| Version::at(&work.file));
+                    let mut prepared = prepare(&work.cancelled, || {
                         work.from_file
                             .then(|| stemfile::read_info(&work.file))
                             .flatten()
-                    })
+                    })?;
+                    if let Some(pcm) = &work.pcm {
+                        prepared.source = Source::identify(
+                            &work.file,
+                            pcm,
+                            prepared.parts.is_some(),
+                            before,
+                            &|| work.cancelled.load(Relaxed),
+                        );
+                        prepared.identified = true;
+                    }
+                    (!work.cancelled.load(Relaxed)).then_some(prepared)
                 }))
                 .ok()
                 .flatten();
@@ -87,6 +108,7 @@ impl Lookup {
                 from_file,
                 cancelled: cancelled.clone(),
                 back,
+                pcm: None,
             });
             LOOKUPS.1.notify_one();
         }
@@ -99,6 +121,23 @@ impl Lookup {
             rx,
             ready: None,
             pcm: None,
+        }
+    }
+
+    fn identify(&mut self) {
+        let (back, rx) = mpsc::channel();
+        self.rx = rx;
+        let mut queue = LOOKUPS.0.lock();
+        queue.retain(|w| !w.cancelled.load(Relaxed));
+        if queue.len() < 8 {
+            queue.push_back(LookupWork {
+                file: self.file.clone(),
+                from_file: self.from_file,
+                cancelled: self.cancelled.clone(),
+                back,
+                pcm: self.pcm.clone(),
+            });
+            LOOKUPS.1.notify_one();
         }
     }
 }
@@ -117,9 +156,18 @@ fn progress_text(phase: Phase, f: f32) -> String {
     let pct = (f * 100.0) as u32;
     match phase {
         Phase::Opening => tr!("STEMS 0%").into(),
+        Phase::Waiting => tr!("RAM WAIT").into(),
         Phase::Download => tr!("MODEL {}%", pct),
         Phase::Separate => tr!("STEMS {}%", pct),
     }
+}
+
+fn cue_key(cues: impl Iterator<Item = usize>) -> u64 {
+    let mut hash = DefaultHasher::new();
+    for cue in cues {
+        cue.hash(&mut hash);
+    }
+    hash.finish()
 }
 
 fn compatible_stems(stems: &audio::Stems, pcm: &audio::Track16, fast: bool) -> bool {
@@ -238,16 +286,21 @@ impl Deck {
         if !current || !same_file {
             return;
         }
+        if lookup.pcm.is_some() && !prepared.identified {
+            lookup.identify();
+            self.stems.borrow_mut().lookup = Some(lookup);
+            return;
+        }
         if let Some(pcm) = lookup.pcm.take() {
-            let job = match prepared.parts.clone() {
-                Some(info) => openfader::stems::Job::from_stem_file(lookup.file.clone(), pcm, info),
-                None => openfader::stems::Job::start(
-                    lookup.file.clone(),
-                    pcm,
-                    lookup.quality,
-                    lookup.multithread,
-                ),
-            };
+            let job = Subscription::start(
+                lookup.file.clone(),
+                pcm,
+                lookup.quality,
+                lookup.multithread,
+                lookup.from_file,
+                prepared.parts.clone(),
+                prepared.source,
+            );
             let mut s = self.stems.borrow_mut();
             s.parts = prepared.parts;
             s.job = Some(job);
@@ -324,7 +377,7 @@ impl Deck {
     }
 
     /// SPEED separates the play position and the HOT CUEs first: tells the job where they are, when the play position
-    /// moved to another segment or a cue was added or removed. The cue list is only collected when that key changed.
+    /// moved to another segment or a cue was edited. The cue list is only collected when that key changed.
     fn stems_focus(&self) {
         let Some(dur) = self.with_player(|p| p.duration_ms()).filter(|&d| d > 0) else {
             return;
@@ -341,7 +394,10 @@ impl Deck {
                 .min(frames.saturating_sub(1))
         };
         let play = at(pos);
-        let key = (play / stems.grid().stride(), hot().count());
+        let key = (
+            play / stems.grid().stride(),
+            cue_key(hot().map(|c| at(f64::from(c.time_ms)))),
+        );
         if s.focus != Some(key) {
             let cues: Vec<usize> = hot().map(|c| at(f64::from(c.time_ms))).collect();
             job.focus(play, &cues);
@@ -355,7 +411,7 @@ impl Deck {
         let pending = {
             let s = self.stems.borrow();
             (!s.ready)
-                .then(|| s.job.as_ref().and_then(|j| j.stems().cloned()))
+                .then(|| s.job.as_ref().and_then(|j| j.stems()))
                 .flatten()
         };
         if let Some(stems) = pending {
@@ -370,7 +426,7 @@ impl Deck {
             let Some(job) = &s.job else { return };
             match job.poll() {
                 None => {
-                    let (phase, f) = job.progress.get();
+                    let (phase, f) = job.progress();
                     let text = progress_text(phase, f);
                     let changed = text != s.text;
                     s.text = text;
@@ -382,7 +438,7 @@ impl Deck {
                     return;
                 }
                 Some(r) => {
-                    let stems = s.job.take().and_then(|j| j.stems().cloned());
+                    let stems = s.job.take().and_then(|j| j.stems());
                     r.map(|()| stems)
                 }
             }
@@ -568,5 +624,18 @@ mod tests {
         );
         wrong_length.finish();
         assert!(!compatible_stems(&wrong_length, &pcm, true));
+    }
+
+    #[test]
+    fn cue_focus_changes_when_a_cue_moves_without_changing_the_count() {
+        assert_ne!(
+            cue_key([100, 200].into_iter()),
+            cue_key([100, 300].into_iter())
+        );
+        assert_ne!(cue_key([100, 200].into_iter()), cue_key([100].into_iter()));
+        assert_eq!(
+            cue_key([100, 200].into_iter()),
+            cue_key([100, 200].into_iter())
+        );
     }
 }

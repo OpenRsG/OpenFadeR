@@ -70,7 +70,8 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
     on!(state, at decks, on_cue_color, |d, row, c| d.cue_color(row as usize, c as usize)); // -1 = default colour (wraps out of range)
     on!(state, at decks, on_cue_comment, |d, row, t| d.cue_comment(row as usize, t.to_string()));
     on!(state, at decks, on_pad_mode, |d, m| d.set_pad_mode(m));
-    on!(state, at decks, on_pad_released, |d| d.pad_released());
+    on!(state, at decks, on_beat_jump_released, |d| d.beat_jump_released());
+    on!(state, at decks, on_pad_released_at, |d, p, m| d.pad_released_at(m, p.max(0) as usize));
     on!(state, at decks, on_key_step, |d, n| d.key_step(n));
     on!(state, at decks, on_key_reset, |d| d.set_key_shift(0));
     on!(state, at decks, on_slip, |d| d.toggle_slip());

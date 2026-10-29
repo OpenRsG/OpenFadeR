@@ -72,6 +72,93 @@ fn a_folder_named_like_a_built_in_plugin_is_skipped_with_a_note() {
     assert!(r.errors[0].contains("built into the app"), "{:?}", r.errors);
 }
 
+#[cfg(feature = "compatibility")]
+#[test]
+fn optional_compiled_reader_keeps_companion_precedence_and_custom_order() {
+    let r = Registry {
+        plugins: ["z-custom", "engine-dj", "serato", "virtualdj"]
+            .into_iter()
+            .map(|name| Plugin {
+                dir: PathBuf::new(),
+                manifest: Manifest {
+                    name: name.into(),
+                    ..Manifest::default()
+                },
+                builtin: None,
+            })
+            .collect(),
+        ..Registry::default()
+    }
+    .with_builtins();
+    let readers: Vec<&str> = r
+        .plugins
+        .iter()
+        .filter(|p| !p.always_on())
+        .map(|p| p.manifest.name.as_str())
+        .collect();
+    assert_eq!(
+        readers,
+        ["z-custom", "engine-dj", "serato", "traktor", "virtualdj"]
+    );
+}
+
+#[cfg(feature = "compatibility")]
+#[test]
+fn compiled_adapters_preserve_activation_and_removal_choices() {
+    for (text, traktor_on) in [
+        (json!({"enabled": ["traktor"], "removed": ["other"]}), true),
+        (json!({"enabled": [], "removed": ["other"]}), false),
+        (
+            json!({"enabled": ["traktor"], "removed": ["traktor", "other"]}),
+            false,
+        ),
+        (
+            json!({"disabled": ["traktor"], "removed": ["other"]}),
+            false,
+        ),
+        (json!({"disabled": [], "removed": ["other"]}), true),
+    ] {
+        let mut cfg: config::Config = serde_json::from_value(text.clone()).unwrap();
+        let mut r = Registry {
+            plugins: builtin::plugins().to_vec(),
+            ..Registry::default()
+        };
+        r.plugins.push(Plugin {
+            dir: PathBuf::new(),
+            manifest: Manifest {
+                name: "other".into(),
+                ..Manifest::default()
+            },
+            builtin: None,
+        });
+        let found: Vec<&str> = r.plugins.iter().map(|p| p.manifest.name.as_str()).collect();
+        cfg.adopt(&found);
+        for p in builtin::plugins().iter().filter(|p| p.always_on()) {
+            cfg.set_enabled(&p.manifest.name, false);
+            cfg.removed.push(p.manifest.name.clone());
+        }
+        let r = r.configured(&cfg);
+        assert_eq!(r.get("traktor").is_some(), traktor_on, "{text}");
+        assert_eq!(
+            r.disabled.iter().any(|p| p.manifest.name == "traktor"),
+            !traktor_on,
+            "{text}"
+        );
+        for p in builtin::plugins().iter().filter(|p| p.always_on()) {
+            assert!(
+                r.get(&p.manifest.name).is_some(),
+                "{text}: {}",
+                p.manifest.name
+            );
+        }
+        assert!(r.get("other").is_none(), "{text}");
+        assert!(
+            !r.disabled.iter().any(|p| p.manifest.name == "other"),
+            "{text}"
+        );
+    }
+}
+
 #[test]
 fn manifests_need_a_command_for_process_features_and_a_plain_name() {
     let d = temp("manifest");

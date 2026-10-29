@@ -81,81 +81,79 @@ impl Ctx {
         );
         let slot = Arc::new(Mutex::new(Copied::default()));
         let (out, dev) = (slot.clone(), d.clone());
-        self.start_then(
-            Some(d.id.clone()),
-            &tr!("Copying from {}", d.label),
-            move |ctl| {
-                let lib = device::open_library(&dev)?;
-                let (tracks, list) = match &pick {
-                    Pick::Tracks(files) => {
-                        let all = lib.tracks(None)?;
-                        (
-                            all.into_iter()
-                                .filter(|t| t.file.as_ref().is_some_and(|f| files.contains(f)))
-                                .collect(),
-                            None,
-                        )
-                    }
-                    Pick::Playlist(id) => {
-                        let pls = lib.playlists()?;
-                        let at = pls
-                            .iter()
-                            .position(|p| p.id == *id)
-                            .ok_or(tr!("that playlist is not on the device any more"))?;
-                        (under(&*lib, &pls, at)?, Some((pls, at)))
-                    }
-                };
-                let c = copy_in(&store, &*lib, &reader, &tracks, &dev.mount, &dest, &ctl)?;
-                if let Some((pls, at)) = &list {
-                    store.system(|| make_node(&store, &*lib, pls, *at, None))?;
+        self.start_then(true, Some(d.id.clone()),
+        &tr!("Copying from {}", d.label),
+        move |ctl| {
+            let lib = device::open_library(&dev)?;
+            let (tracks, list) = match &pick {
+                Pick::Tracks(files) => {
+                    let all = lib.tracks(None)?;
+                    (
+                        all.into_iter()
+                            .filter(|t| t.file.as_ref().is_some_and(|f| files.contains(f)))
+                            .collect(),
+                        None,
+                    )
                 }
-                let mut text = match &list {
-                    Some((pls, at)) => tr!(
-                        "Imported {} from {} into My Playlists",
-                        pls[*at].name,
-                        dev.label
-                    ),
-                    None => tr!("Imported from {}", dev.label),
-                };
-                text += &tr!(
-                    ": {} track(s) copied to {}, {} already in your collection",
-                    c.added.len() + c.moved,
-                    dest.display(),
-                    tracks.len().saturating_sub(c.added.len() + c.moved + c.missing)
-                );
-                if c.missing > 0 {
-                    text += &tr!("; {} file(s) missing on the device", c.missing);
+                Pick::Playlist(id) => {
+                    let pls = lib.playlists()?;
+                    let at = pls
+                        .iter()
+                        .position(|p| p.id == *id)
+                        .ok_or(tr!("that playlist is not on the device any more"))?;
+                    (under(&*lib, &pls, at)?, Some((pls, at)))
                 }
-                *out.lock() = c;
-                Ok(text)
-            },
-            move |cx, r| {
-                let c = std::mem::take(&mut *slot.lock());
-                match r {
-                    Ok(text) => cx.tell(text.clone(), false),
-                    Err(e) if e == "cancelled" => {}
-                    Err(e) => cx.tell(e.clone(), true),
+            };
+            let c = copy_in(&store, &*lib, &reader, &tracks, &dev.mount, &dest, &ctl)?;
+            if let Some((pls, at)) = &list {
+                store.system(|| make_node(&store, &*lib, pls, *at, None))?;
+            }
+            let mut text = match &list {
+                Some((pls, at)) => tr!(
+                    "Imported {} from {} into My Playlists",
+                    pls[*at].name,
+                    dev.label
+                ),
+                None => tr!("Imported from {}", dev.label),
+            };
+            text += &tr!(
+                ": {} track(s) copied to {}, {} already in your collection",
+                c.added.len() + c.moved,
+                dest.display(),
+                tracks.len().saturating_sub(c.added.len() + c.moved + c.missing)
+            );
+            if c.missing > 0 {
+                text += &tr!("; {} file(s) missing on the device", c.missing);
+            }
+            *out.lock() = c;
+            Ok(text)
+        },
+        move |cx, r| {
+            let c = std::mem::take(&mut *slot.lock());
+            match r {
+                Ok(text) => cx.tell(text.clone(), false),
+                Err(e) if e == "cancelled" => {}
+                Err(e) => cx.tell(e.clone(), true),
+            }
+            cx.reload_browser();
+            if prefs::with(|p| p.analysis.auto_analysis) {
+                // What the device brought cues or BPM and key with is analysed for the waveform only: CUE Analysis would
+                // replace the cues it brought.
+                let (keep, todo): (Vec<Track>, Vec<Track>) = c.added.into_iter().partition(|t| {
+                    (t.bpm_x100 > 0 && !t.key.is_empty())
+                        || cx.store.edits(&cx.store.key_of(t)).is_ok_and(|e| e.cues.is_some_and(|cues| !cues.is_empty()))
+                });
+                if !todo.is_empty() {
+                    analyze::request(todo.into(), false);
                 }
-                cx.reload_browser();
-                if prefs::with(|p| p.analysis.auto_analysis) {
-                    // What the device brought cues or BPM and key with is analysed for the waveform only: CUE Analysis would
-                    // replace the cues it brought.
-                    let (keep, todo): (Vec<Track>, Vec<Track>) = c.added.into_iter().partition(|t| {
-                        (t.bpm_x100 > 0 && !t.key.is_empty())
-                            || cx.store.edits(&cx.store.key_of(t)).is_ok_and(|e| e.cues.is_some_and(|cues| !cues.is_empty()))
-                    });
-                    if !todo.is_empty() {
-                        analyze::request(&todo, false);
-                    }
-                    if !keep.is_empty() {
-                        analyze::request_keep_cues(&keep);
-                    }
+                if !keep.is_empty() {
+                    analyze::request_keep_cues(keep.into());
                 }
-                if !c.rows.is_empty() {
-                    cx.open_update_review(&d, update::of_rows(c.rows), true);
-                }
-            },
-        );
+            }
+            if !c.rows.is_empty() {
+                cx.open_update_review(&d, update::of_rows(c.rows), true);
+            }
+        },);
     }
 
     /// The window's status line and a toast: an import is started from the browser, with the window closed.

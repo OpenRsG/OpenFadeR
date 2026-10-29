@@ -49,8 +49,10 @@ export component DeckCompact inherits Rectangle {
                         active: root.v.pads[i].set;
                         active-color: root.v.pads[i].color;
                         enabled: root.v.loaded || root.v.pad-mode == 6 || root.v.pad-mode == 9 || root.v.pad-mode == 10;
-                        pressed => { DeckState.pad(root.index, i); }
-                        released => { DeckState.pad-released(root.index); }
+                        property <int> owner: -1;
+                        property <int> owner-mode;
+                        pressed => { self.owner = root.index; self.owner-mode = root.v.pad-mode; DeckState.pad(self.owner, i); }
+                        released => { let owner = self.owner; self.owner = -1; if (owner >= 0) { DeckState.pad-released-at(owner, i, self.owner-mode); } }
                     }
                     if root.v.stems && root.v.stem-buttons: StemRow { index: root.index; h: 22px; }
                     Rectangle { horizontal-stretch: 1; }

@@ -168,17 +168,24 @@ export component StudioMid inherits Rectangle {
         width: root.jog-d;
         height: root.jog-d;
         TouchArea {
+            property <int> owner: -1;
             enabled: root.v.loaded;
             mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
             pointer-event(e) => {
-                if e.button == PointerEventButton.left {
-                    if e.kind == PointerEventKind.down { root.last-x = self.mouse-x; DeckState.scratch-begin(root.index); }
-                    if e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel { DeckState.scratch-end(root.index); }
+                if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                    self.owner = root.index;
+                    root.last-x = self.mouse-x;
+                    DeckState.scratch-begin(self.owner);
+                }
+                if self.owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up)) {
+                    let owner = self.owner;
+                    self.owner = -1;
+                    DeckState.scratch-end(owner);
                 }
             }
             moved => {
-                if self.pressed {
-                    DeckState.scratch-move(root.index, self.mouse-x - root.last-x);
+                if self.pressed && self.owner >= 0 {
+                    DeckState.scratch-move(self.owner, self.mouse-x - root.last-x);
                     root.last-x = self.mouse-x;
                 }
             }
@@ -248,8 +255,9 @@ export component StudioMid inherits Rectangle {
             lit: root.v.at-cue;
             enabled: root.v.loaded;
             tooltip: @tr("Cue: hold to preview, release to return");
-            pressed => { DeckState.cue(root.index); }
-            released => { DeckState.cue-released(root.index); }
+            property <int> owner: -1;
+            pressed => { self.owner = root.index; DeckState.cue(self.owner); }
+            released => { let owner = self.owner; self.owner = -1; if (owner >= 0) { DeckState.cue-released(owner); } }
         }
         BigButton {
             height: parent.bh;
@@ -294,6 +302,7 @@ export component StudioPads inherits Rectangle {
             Chip { text: "×"; width: Theme.h-ctl; horizontal-stretch: 0; tooltip: @tr("Delete a hot cue: press its pad"); active: root.v.delete-mode; active-color: Theme.danger; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.cue-delete(root.index); } }
         }
         PadGrid {
+            index: root.index;
             vertical-stretch: 1;
             min-height: 0px;
             pads: root.v.pads;
@@ -301,8 +310,8 @@ export component StudioPads inherits Rectangle {
             enabled: root.v.loaded;
             delete-mode: root.v.delete-mode;
             fx-color: DeckState.pad-fx-color;
-            pad(p) => { DeckState.pad(root.index, p); }
-            pad-released => { DeckState.pad-released(root.index); }
+            pad(d, p) => { DeckState.pad(d, p); }
+            pad-released(d, p, m) => { DeckState.pad-released-at(d, p, m); }
         }
         if root.options: PadOptions { index: root.index; height: Theme.h-ctl; }
     }

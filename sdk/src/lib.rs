@@ -246,6 +246,7 @@ macro_rules! export_effects {
 
 pub mod controller;
 pub mod dsp;
+pub mod markup;
 
 #[cfg(feature = "library")]
 pub mod library;
