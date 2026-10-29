@@ -1,8 +1,9 @@
-//! STEMS on a deck: the PREFS switch starts a background separation
-//! ([`openfader::stems::Job`]) for each loaded library track, shown as a progress text in the stem row. The stems go to
-//! the player ([`openfader::audio::Player::set_stems`]) as soon as the job starts and fill in while the track plays: frames not
-//! separated yet play as the original track. SPEED separates the play position and the HOT CUEs first, QUALITY goes from the start of the track
-//! ([`openfader::stems::schedule`]). The VOCAL / INST / BASS / DRUMS buttons (pills filled while their part plays at full
+//! STEMS on a deck: the PREFS switch starts a background separation shared by compatible loaded tracks, shown as progress
+//! text in each stem row. Each deck owns a subscription; unloading the last one cancels the native job
+//! ([`openfader::stems::Job`]). The stems go to the player ([`openfader::audio::Player::set_stems`]) as soon as the worker
+//! allocates them and fill in while the track plays: frames not separated yet play as the original. SPEED prioritizes every
+//! subscriber's play position and HOT CUEs; QUALITY stays sequential ([`openfader::stems::schedule`]).
+//! The VOCAL / INST / BASS / DRUMS buttons (pills filled while their part plays at full
 //! level, outlined below it; clickable as soon as a track is loaded), the STEMS pad mode, the controller's ACTIVE PART buttons
 //! and the mixer's STEM-mode knobs drive
 //! per-stem gains, ramped in the audio thread, so nothing clicks and key lock, scratch, loops and slip carry on.
@@ -22,11 +23,11 @@
 //! This file holds the gain maths, the per-deck state and the button side; `job` runs the separation.
 
 mod job;
+mod shared;
 
 use super::Deck;
 use crate::app::prefs;
 use openfader::audio::{BASS, DRUMS, INST, STEM_COUNT, VOCAL, stemfile};
-use openfader::stems::Job;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 /// The file's part names for VOCAL, INST, BASS, DRUMS, as the buttons' tooltips show them.
@@ -120,7 +121,7 @@ fn knob_moved(mute: &mut [bool; STEM_COUNT], old: [f32; 3], new: [f32; 3], four:
 }
 
 pub(super) struct State {
-    job: Option<Job>,
+    job: Option<shared::Subscription>,
     lookup: Option<job::Lookup>,
     attached: Option<std::sync::Arc<openfader::audio::Stems>>,
     /// Stems are attached to the player and the buttons work (the separation may still be running).
@@ -138,8 +139,8 @@ pub(super) struct State {
     /// (STEMS, 4 stems, SOLO, ACTIVE STEM buttons shown, SPEED, stem files used) as last applied, to ignore unrelated
     /// settings changes.
     seen: Option<(bool, bool, bool, bool, bool, bool)>,
-    /// (play position's segment, hot cues) the job was last pointed at.
-    focus: Option<(usize, usize)>,
+    /// (play position's segment, hot cue frame hash) the subscription was last pointed at.
+    focus: Option<(usize, u64)>,
 }
 
 impl Default for State {

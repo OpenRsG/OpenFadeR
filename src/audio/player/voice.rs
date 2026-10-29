@@ -3,7 +3,7 @@
 //! Varispeed: source frames advance by `rate * src_rate / dev_rate` per output frame, so frames
 //! heard per second = `rate * src_rate` (windowed-sinc interpolation; pitch follows rate). With key lock
 //! ([`super::super::stretch`]) the output runs at 1:1 pitch while this same `advance` clock still moves at
-//! `rate`; the clock reports the nominal position, the audio is within ~9 ms of it. A key shift
+//! `rate`; it reports the nominal position, not the overlapping grains' individual source positions. A key shift
 //! ([`super::super::transport`]) rides the same stretcher at `pitch` times its read step, so tempo (the clock)
 //! stays put. Reverse flips the sign of the step (the clock's `fps` goes negative; playback at 0 pauses),
 //! brake scales it by a factor falling to 0 and pauses; both stay on `advance`, so loops and the clock keep
@@ -47,7 +47,7 @@ use crate::plugin::{
     effect::{Effect as PluginEffect, Slot},
     registry,
 };
-use std::sync::atomic::Ordering::{Acquire, Relaxed};
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 /// Fade-in (output frames) when the source path switches between varispeed and the stretcher.
 const FADE: u32 = 128;
@@ -135,6 +135,7 @@ impl Voice {
 /// What `render` leaves for the clock.
 pub(super) struct Done {
     pub(super) seeked: bool,
+    pub(super) epoch: u64,
     pub(super) start: f64,
     pub(super) playing: bool,
     pub(super) fps: f64,
@@ -169,16 +170,24 @@ pub(super) fn render(
     mut put: impl FnMut(usize, [f32; 2], [f32; 2]),
 ) -> Done {
     let t = &sh.t;
-    let s = sh.seek.swap(NO_SEEK, Acquire);
-    if s != NO_SEEK {
+    let mut epoch = sh.pos_epoch.load(Acquire);
+    let seek = sh.seek.try_lock().and_then(|mut seek| {
+        if !seek.pending {
+            return None;
+        }
+        seek.pending = false;
+        Some(*seek)
+    });
+    if let Some(seek) = seek {
+        epoch = seek.epoch;
         // A phase-kept seek moves on by what the deck played since the press was heard (latency + the wait for this buffer).
         // Forward only and within CATCH_UP: anything else (reverse, an older press time) does not apply. Inside the loop of the last
         // buffer that is the way round it, wrapped or not (a lap shorter than the latency is lost); the loop may be gone by now.
         // A seek on the beat lands at its target plus the phase of the frame this buffer continues from: the same beat phase the
         // listener hears the jump come in at, however long the press, the buffer and the output latency took.
-        let from = sh.seek_from.swap(NO_SEEK, Relaxed);
-        let beat = super::unpack_beat(sh.seek_beat.swap(NO_SEEK, Relaxed));
-        let wrap = f32::from_bits(sh.seek_wrap.swap(0, Relaxed)) as f64;
+        let from = seek.from;
+        let beat = super::unpack_beat(seek.beat);
+        let wrap = seek.wrap as f64;
         let (written, heard) = (f64::from_bits(sh.pos.load(Relaxed)), f64::from_bits(from));
         let played = match v.lp_was {
             Some((ls, le)) if (ls..le).contains(&written) && (ls..le).contains(&heard) => {
@@ -189,12 +198,12 @@ pub(super) fn render(
         let s = match beat {
             Some((start, len)) => {
                 let phase = (written - start).rem_euclid(len);
-                (f64::from_bits(s) + if wrap > 0.0 { phase % wrap } else { phase }).to_bits()
+                (seek.target + if wrap > 0.0 { phase % wrap } else { phase }).to_bits()
             }
             None if from != NO_SEEK && (0.0..CATCH_UP).contains(&played) && !sh.t.reverse() => {
-                (f64::from_bits(s) + played).to_bits()
+                (seek.target + played).to_bits()
             }
-            None => s,
+            None => seek.target.to_bits(),
         };
         sh.pos.store(s, Relaxed);
         v.stretch.reset();
@@ -239,7 +248,7 @@ pub(super) fn render(
     if reverse && playing {
         start = start.min(frames - 1.0); // a seek to the very end plays backwards from the last frame
     }
-    let mut seeked = s != NO_SEEK;
+    let mut seeked = seek.is_some();
     if let Some(shadow) = t.begin(start) {
         start = shadow; // slip return
         sh.pos.store(start.to_bits(), Relaxed);
@@ -363,28 +372,33 @@ pub(super) fn render(
             let st = stretched.then_some(&mut v.stretch);
             match (stems, mixed) {
                 (Some(s), _) if split => {
-                    let part = || Part {
-                        stems: s,
-                        gain: sg,
-                        mask,
-                    };
-                    let rest = read(
-                        &Rest {
-                            mixed: Mixed {
-                                pcm: p,
-                                stems: s,
-                                gain: sg,
-                            },
-                            part: part(),
+                    let source = Rest {
+                        mixed: Mixed {
+                            pcm: p,
+                            stems: s,
+                            gain: sg,
                         },
-                        st,
-                        pos,
-                        frames,
-                        (kp, vel),
-                        lp,
-                    )?;
-                    let sp = stretched.then_some(&mut v.part_stretch);
-                    let x = read(&part(), sp, pos, frames, (kp, vel), lp).unwrap_or([0.0; 2]);
+                        part: Part {
+                            stems: s,
+                            gain: sg,
+                            mask,
+                        },
+                    };
+                    let (rest, x) = if let Some(st) = st {
+                        let rest = read(&source, Some(st), pos, frames, (kp, vel), lp)?;
+                        let x = read(
+                            &source.part,
+                            Some(&mut v.part_stretch),
+                            pos,
+                            frames,
+                            (kp, vel),
+                            lp,
+                        )
+                        .unwrap_or([0.0; 2]);
+                        (rest, x)
+                    } else {
+                        source.frame_with_part(pos)?
+                    };
                     let y = v.part_fx.process(x);
                     Some([rest[0] + y[0], rest[1] + y[1]])
                 }
@@ -482,6 +496,7 @@ pub(super) fn render(
     }
     sh.level.store(peak.to_bits(), Relaxed);
     sh.pos.store(pos.max(0.0).to_bits(), Relaxed); // a seek racing in here is still pending and wins next callback
+    sh.pos_epoch.store(epoch, Release);
     sh.steady.store(!(braking || spinning), Relaxed);
     let speed = if braking || spinning {
         fsum / n as f64
@@ -495,6 +510,7 @@ pub(super) fn render(
     };
     Done {
         seeked,
+        epoch,
         start,
         playing,
         fps,

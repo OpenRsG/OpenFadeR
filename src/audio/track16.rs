@@ -78,6 +78,25 @@ impl Track16 {
             .iter()
             .map(|&v| deq(v))
     }
+
+    /// Exact sample identity for in-process work sharing. Linear: call on a preparation worker, not the UI thread.
+    pub fn content_digest(&self, cancelled: &dyn Fn() -> bool) -> Option<[u8; 32]> {
+        let mut digest = ring::digest::Context::new(&ring::digest::SHA256);
+        // i16 has no padding; the native-endian byte view is only compared within this process.
+        let bytes = unsafe {
+            std::slice::from_raw_parts(
+                self.samples.as_ptr().cast::<u8>(),
+                std::mem::size_of_val(self.samples.as_ref()),
+            )
+        };
+        for chunk in bytes.chunks(1 << 16) {
+            if cancelled() {
+                return None;
+            }
+            digest.update(chunk);
+        }
+        (!cancelled()).then(|| digest.finish().as_ref().try_into().expect("SHA-256"))
+    }
 }
 
 impl Frames for Track16 {
@@ -156,5 +175,32 @@ mod tests {
             }
         }
         assert_eq!(t.frame_at(32.0), None);
+    }
+
+    #[test]
+    fn content_digest_matches_independent_decodes_and_checks_every_chunk() {
+        let pcm = Pcm {
+            rate: 44100,
+            samples: vec![0.5; 1 << 17],
+        };
+        let a = Track16::from(&pcm);
+        let b = Track16::from(&pcm);
+        assert_eq!(a.content_digest(&|| false), b.content_digest(&|| false));
+        let mut changed = pcm;
+        *changed.samples.last_mut().unwrap() = -0.5;
+        assert_ne!(
+            a.content_digest(&|| false),
+            Track16::from(changed).content_digest(&|| false)
+        );
+        let calls = std::cell::Cell::new(0);
+        assert!(
+            a.content_digest(&|| {
+                calls.set(calls.get() + 1);
+                calls.get() == 2
+            })
+            .is_none()
+        );
+        assert_eq!(calls.get(), 2);
+        assert!(Track16::default().content_digest(&|| true).is_none());
     }
 }

@@ -118,7 +118,12 @@ fn accept(app: &App) {
     let names: Vec<String> = shown.into_iter().filter(|n| n != STEMS).collect();
     let mut done = Vec::new();
     if !names.is_empty() {
-        match config::update(|c| names.iter().for_each(|n| c.set_enabled(n, true))) {
+        match config::update(|c| {
+            c.removed.retain(|n| !names.contains(n));
+            for name in &names {
+                c.set_enabled(name, true);
+            }
+        }) {
             Ok(()) => {
                 plugins::installed(app, &names);
                 done.push(tr!("{} extensions switched on", names.len()));

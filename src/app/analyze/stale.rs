@@ -4,9 +4,9 @@
 //! IN THE BACKGROUND re-analyses them quietly, WHEN A TRACK IS LOADED leaves each one to its next load (the old way).
 //!
 //! Whatever the choice, a re-analysis only replaces the track's cache entry: its own cues, grid, phrases and tags and the
-//! analysis lock are never touched ([`Job::refresh`], and locked tracks are not listed).
+//! analysis lock are never touched ([`super::job::Job::refresh`], and locked tracks are not listed).
 
-use super::{detected, Job};
+use super::detected;
 use crate::app::{
     AnalysisNoticeState, App,
     prefs::{self, analysis::AnalysisUpdate},
@@ -157,7 +157,7 @@ fn found(app: &App, stale: Vec<Track>, factor: Option<f64>) {
     STALE.take();
     app.global::<AnalysisNoticeState>().set_visible(false);
     match prefs::with(|p| p.analysis.analysis_update) {
-        AnalysisUpdate::Background => refresh(app, &stale),
+        AnalysisUpdate::Background => refresh(app, stale),
         AnalysisUpdate::Ask => {
             let workers = super::workers(prefs::with(|p| p.analysis.process));
             let took = factor.map(|f| estimate(&stale, f, workers));
@@ -171,15 +171,12 @@ fn found(app: &App, stale: Vec<Track>, factor: Option<f64>) {
 }
 
 /// Starts the re-analysis of `tracks`: their cache entries are replaced, nothing else of theirs is.
-fn refresh(app: &App, tracks: &[Track]) {
+fn refresh(app: &App, tracks: Vec<Track>) {
     let Some((_, lib)) = super::context() else {
         return;
     };
-    let refs: Vec<&Track> = tracks.iter().collect();
-    let jobs = super::jobs(&*lib, &refs, false)
-        .into_iter()
-        .map(|j| Job { refresh: true, ..j })
-        .collect();
+    let mut jobs = super::jobs(&*lib, tracks.into(), false);
+    jobs.refresh = true;
     super::start_run(app, jobs, prefs::with(super::settings));
 }
 
@@ -190,7 +187,7 @@ pub(super) fn wire(app: &App) {
     s.on_reanalyse(move || {
         let Some(app) = weak.upgrade() else { return };
         app.global::<AnalysisNoticeState>().set_visible(false);
-        refresh(&app, &STALE.take());
+        refresh(&app, STALE.take());
     });
     let weak = app.as_weak();
     s.on_later(move || {

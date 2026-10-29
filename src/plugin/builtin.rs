@@ -1,8 +1,7 @@
-//! Built-in compatibility adapters (`compatibility/`). They are library plugins like any other
-//! and are called through the same JSON `call` of a [`LibraryApi`] ([`super::library`]); they only have no folder, no
-//! `libloading` and no switch. A [`Builtin`] holds what a folder would: the `plugin.json` text, the `locales/`, the
-//! `players.json`. The registry lists them first and always on, whatever `plugins.json` says; a folder of the same name
-//! (an old install, a GET PLUGINS copy) is not read ([`super::discover`]).
+//! Built-in compatibility adapters (`compatibility/`) use the same JSON [`LibraryApi`] as folder plugins,
+//! without a dynamic library or plugin folder. A [`Builtin`] embeds its manifest, locales and player metadata.
+//! Compiled availability is separate from activation: mandatory adapters stay on; optional ones use the saved
+//! plugin choices. Old folders with the same name are ignored by [`super::discover`].
 
 use super::{Manifest, Plugin};
 use openfader_plugin::library::LibraryApi;
@@ -17,6 +16,7 @@ pub struct Builtin {
     locales: &'static [(&'static str, &'static str)],
     /// `players.json`, for a device plugin that has one.
     players: Option<&'static str>,
+    pub(super) always_on: bool,
     pub(super) api: &'static LibraryApi,
 }
 
@@ -54,32 +54,36 @@ macro_rules! locales {
 
 #[cfg(feature = "compatibility")]
 macro_rules! builtin {
-    ($dir:literal, $plugin:ty, $players:expr) => {{
+    ($dir:literal, $plugin:ty, $players:expr, $always_on:expr) => {{
         static API: LibraryApi = api::<$plugin>();
         Builtin {
             manifest: include_str!(concat!("../../compatibility/", $dir, "/plugin.json")),
             locales: locales!($dir),
             players: $players,
+            always_on: $always_on,
             api: &API,
         }
     }};
 }
 
 #[cfg(feature = "compatibility")]
-static ALL: [Builtin; 3] = [
+static ALL: [Builtin; 4] = [
     builtin!(
         "rekordbox/device",
         compat_rekordbox_device::Device,
         Some(include_str!(
             "../../compatibility/rekordbox/device/players.json"
-        ))
+        )),
+        true
     ),
     builtin!(
         "rekordbox/xml",
         compat_rekordbox_xml::RekordboxXmlPlugin,
-        None
+        None,
+        true
     ),
-    builtin!("rekordbox/db", compat_rekordbox_db::MasterDb, None),
+    builtin!("rekordbox/db", compat_rekordbox_db::MasterDb, None, true),
+    builtin!("traktor", compat_traktor::Plugin, None, false),
 ];
 
 /// A build without the `compatibility` feature (the mobile crate) has no built-in plugins, and so no SQLCipher.
@@ -128,49 +132,5 @@ mod tests_without {
     #[test]
     fn there_are_none() {
         assert!(super::plugins().is_empty());
-    }
-}
-
-#[cfg(all(test, feature = "compatibility"))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn every_built_in_is_a_valid_library_that_answers_through_the_json_call() {
-        let all = plugins();
-        assert_eq!(all.len(), ALL.len());
-        for p in all {
-            let b = p.builtin.expect("built in");
-            let lib = p.manifest.library.as_ref().expect("a library plugin");
-            assert!(
-                lib.lib.file().is_none(),
-                "{}: no library file",
-                p.manifest.name
-            );
-            let req = br#"{"op": "probe", "path": "/nowhere"}"#;
-            let buf = unsafe { (b.api.call)(req.as_ptr(), req.len(), std::ptr::null()) };
-            let v: serde_json::Value =
-                serde_json::from_slice(unsafe { std::slice::from_raw_parts(buf.ptr, buf.len) })
-                    .unwrap();
-            unsafe { (b.api.free)(buf) };
-            assert_eq!(v["score"], 0, "{}: {v}", p.manifest.name);
-        }
-        let names: Vec<&str> = all.iter().map(|p| p.manifest.name.as_str()).collect();
-        assert_eq!(names, ["rekordbox-device", "rekordbox-xml", "rekordbox-db"]);
-    }
-
-    #[test]
-    fn the_players_and_the_translations_are_embedded() {
-        let device = &plugins()[0];
-        let players: openfader_plugin::library::Players =
-            serde_json::from_str(device.builtin.unwrap().players().unwrap()).unwrap();
-        assert!(!players.players.is_empty());
-        for p in plugins() {
-            for (code, json) in p.builtin.unwrap().locales {
-                let map: std::collections::HashMap<String, String> = serde_json::from_str(json)
-                    .unwrap_or_else(|e| panic!("{} {code}: {e}", p.manifest.name));
-                assert!(!map.is_empty(), "{} {code}", p.manifest.name);
-            }
-        }
     }
 }

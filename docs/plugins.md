@@ -44,18 +44,21 @@ The app reads plugins from
 
 An entry of that search path is either one plugin folder or a folder of plugin folders; the first plugin of a name wins.
 
-PREFERENCES > EXTENSIONS lists every plugin as a card. The built-in compatibility adapters `rekordbox-device`, `rekordbox-xml` and `rekordbox-db`
-come first, marked **BUILT IN**: they are compiled into the app ([Built-in adapters](#built-in-adapters)),
-always on, with no switch, folder or uninstall, and their settings work as any plugin's. The other cards have a switch to turn the plugin on or off (a plugin starts off and installing one switches it on; the exception is a fresh
-profile with no `plugins.json`, where the readers `engine-dj`, `serato`, `traktor`, `virtualdj` and the effect packs `beat-fx`,
-`send-fx`, `lever-fx`, `mic-fx`, `soft-mix` and `cross-pass` start on;
-once the file exists it is your choice and nothing is switched on behind it), what it runs on (LUA, PYTHON, PROGRAM or
-JSON), what it brings, its settings (**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`), then whatever went wrong while
-reading the plugins. The card's **⋮** menu opens its folder or **uninstalls** it: an installed plugin's folder is deleted, and a
-bundled one is hidden (listed under `removed`) until you install it again, from GET PLUGINS or a drop. **RELOAD** reads the folders
-again (after you edit a plugin). Actions, events and settings apply at once; effects, sources, knob and pad modes are part of the
-mixer and the browser from start-up, so a change to those shows a **RESTART NOW** banner. The switches, the uninstalled plugins and
-the settings are kept in `~/.config/openfader/plugins.json`.
+PREFERENCES > EXTENSIONS lists every plugin as a card. The built-in compatibility adapters come first, marked **BUILT IN**:
+they are compiled into the app ([Built-in adapters](#built-in-adapters)). The mandatory `rekordbox-device`, `rekordbox-xml`
+and `rekordbox-db` adapters are always on, with no switch. The optional `traktor` adapter has an on/off switch. Built-ins have
+no folder or uninstall; their settings work as any plugin's. A fresh profile with no `plugins.json` starts with `traktor`,
+the companion readers `engine-dj`, `serato`, `virtualdj` and the effect packs `beat-fx`, `send-fx`, `lever-fx`, `mic-fx`,
+`soft-mix` and `cross-pass` on. Existing choices are preserved, including disabled or removed Traktor; a removed Traktor
+remains visible but off so you can switch it on explicitly.
+
+Folder plugin cards have a switch, what they run on (LUA, PYTHON, PROGRAM or JSON), what they bring, their settings
+(**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`), then whatever went wrong while reading them. A folder plugin starts
+off; installing one switches it on. The card's **⋮** menu opens its folder or **uninstalls** it: an installed plugin's folder is
+deleted, and a bundled one is hidden (listed under `removed`) until you install it again, from GET PLUGINS or a drop.
+**RELOAD** reads the folders again (after you edit a plugin). Actions, events and settings apply at once; effects, sources,
+knob and pad modes are part of the mixer and the browser from start-up, so a change to those shows a **RESTART NOW** banner.
+The switches, the uninstalled plugins and the settings are kept in `~/.config/openfader/plugins.json`.
 
 A plugin folder named like a built-in extension (an old copy in the plugin folders, or one from GET PLUGINS) is not read: the card
 list shows the folder with a note to delete it, and installing a plugin of that name is refused. Built-ins are not offered or updated
@@ -636,7 +639,7 @@ adapter's supported operations. Format-specific paths, table names and fields st
 | Rekordbox desktop collection (`master.db`) | Built in, `rekordbox-db` | Read the SQLCipher collection with a supplied key |
 | Engine DJ (`Engine Library/Database2/m.db`) | Companion, `engine-dj` | Read desktop/device libraries; export tracks, cues, loops, grids, waveforms and playlists to devices |
 | Serato (`_Serato_`, database V2, crates and audio tags) | Companion, `serato` | Read desktop/device libraries; write device libraries and tagged cues/grids |
-| Traktor (`collection.nml`) | Companion, `traktor` | Read desktop/device collections; write a device collection for Traktor's Import another Collection |
+| Traktor (`collection.nml`) | Built in, optional `traktor` | Read desktop/device collections; write a device collection for Traktor's Import another Collection |
 | VirtualDJ (`database.xml`) | Companion, `virtualdj` | Read desktop libraries/lists; export device libraries with cues, loops, grids and playlists |
 | iTunes / Music (`Library.xml`) | Companion, `itunes` | Read tracks and playlists |
 | Sampler packs (`.spp`, `sampler_pack.xml`) | Companion, `sample-pack` | Extract audio to the plugin cache and read pack lists/BPM; populate the sampler on import |
@@ -882,15 +885,27 @@ Rekordbox XML collection file), `compat-rekordbox-db` (reads the desktop collect
 and `sample-pack` plugins also use `compat-rekordbox-common`. Runtime plugin IDs remain `rekordbox-device`, `rekordbox-xml` and
 `rekordbox-db`, preserving settings, analysis references, device selections and journals independently of Cargo package names.
 
-They are the same library plugins as the ones below, with one difference: they are linked into the app, so they cannot go missing or be
-switched off. A crate does not export `openfader_library_v2`; it implements `LibraryPlugin` and the host (`src/plugin/builtin.rs`)
-holds a table per extension: its `plugin.json` (without `lib`), its `locales/`, its `players.json`, and the static
-`openfader_plugin::library::api::<Plugin>()`. Requests go through that table's JSON `call` exactly as through a loaded library: there
-is one protocol. The registry lists the built-ins first and on, whatever `plugins.json` says; their settings are stored there under
-their names as before. A plugin folder of the same name is skipped with a note in the plugin list. They are behind the `compatibility` feature of the `openfader` crate, which the `app` feature turns on (so
-Pi builds with `--no-default-features --features app` have them). It also swaps the bundled SQLite for SQLCipher with its own
-OpenSSL; a build without it, like the mobile crate, has no built-in plugins, plain SQLite and no OpenSSL. Their tests run with the app's:
-`cargo test --release --workspace`.
+Controller maps, Rekordbox XML and smart lists, iTunes plists and sampler-pack metadata share
+`openfader_plugin::markup`, the SDK's standard-library-only XML tag scanner. Its Rust imports replace the former
+core/common scanner paths; native plugin entry points and ABI versions are unchanged. Companion plugins using this
+module need the matching core SDK checkout. Publish the core SDK change before a companion release that imports it.
+
+
+`compatibility/traktor/` holds `compat-traktor`, the optional compiled-in Traktor adapter. It keeps the runtime ID `traktor`,
+NML 19 collection format, desktop detection, analysis references, locales and device operations. It reads desktop or device
+collections and merges exports into `Traktor/collection.nml` for Traktor's Import another Collection. Its tests cover the native
+NML reader, read-back validation, dry run, journalled commit, rollback and check/fix behavior.
+
+These adapters implement `LibraryPlugin` without exporting `openfader_library_v2`. The host (`src/plugin/builtin.rs`) holds
+a table per extension: its `plugin.json` (without `lib`), its `locales/`, any `players.json`, and the static
+`openfader_plugin::library::api::<Plugin>()`. Requests go through that table's JSON `call` exactly as through a loaded library.
+The mandatory Rekordbox adapters are listed first and always on. Traktor keeps its place among the companion readers so
+equal-scoring formats retain their preference order on a multi-format device. It follows its saved activation choice and starts
+on only for a fresh profile. Settings stay under the runtime plugin names in `plugins.json`; a folder of the same name is
+skipped with a note in the plugin list. Built-ins are behind the `compatibility` feature of the `openfader` crate, which the
+`app` feature turns on (so Pi builds with `--no-default-features --features app` have them). It also swaps the bundled SQLite
+for SQLCipher with its own OpenSSL; a build without it, like the mobile crate, has no built-in plugins, plain SQLite and no
+OpenSSL. Their tests run with the app's: `cargo test --release --workspace`.
 
 What `rekordbox-device` guarantees when it writes a stick, and how that is checked:
 
@@ -922,16 +937,19 @@ pyrekordbox==0.5.0 && python .github/check_stick.py /tmp/fx`. rekordcrate 0.3.0 
 ### The bundled library plugins
 
 The companion repository's Cargo workspace (`extension/plugin/Cargo.toml` in a core checkout) builds `itunes`, `sample-pack`
-and the four device adapters `engine-dj`, `serato`, `traktor` and `virtualdj` listed [above](#compatibility-layer). Their
+and the three device adapters `engine-dj`, `serato` and `virtualdj` listed [above](#compatibility-layer). Their
 desktop-library `detect` patterns let PREFERENCES > LIBRARIES offer to connect them. `extension/plugin/build.sh` builds the
 workspace in release mode and copies each library next to its `plugin.json`; `start.sh` runs it first. The workspace uses
 `sdk/` and `compatibility/rekordbox/common` from the core checkout. Their settings are on their cards in PREFERENCES >
 EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
 
-Core 0.2.7 builds use the matching OpenFadeR-Plugins tag `v0.2.8`: CI's `plugins_ref` input, Docker's `PLUGINS_REF` build arg
+Core 0.2.8 builds use the matching OpenFadeR-Plugins tag `v0.2.11`: CI's `plugins_ref` input, Docker's `PLUGINS_REF` build arg
 and the `PLUGINS_REF` environment variable for `start.sh` / `install.sh` can select another compatible ref. Existing companion
 checkouts are used as they stand; switch an older checkout to that tag before building this core. The generic GET PLUGINS
 catalog still reads repositories' default branches and downloads their prebuilt native libraries.
+
+The companion no longer contains external Traktor. Older companion checkouts may still have that folder; this core
+ignores the duplicate and shows a note to delete it. Traktor's implementation and tests live in the core workspace.
 
 ## Controller plugins
 

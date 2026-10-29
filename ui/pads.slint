@@ -35,6 +35,21 @@ export struct CueRowView { time: string, tag: string, kind: string, len: string,
 /// colour and its time; empty = dim letter. Other modes: a lit pad is filled with its colour, an idle one carries it as a
 /// 3 px bar. Height needed: 4 × 24 − 2 = 94 px.
 export component PadGrid inherits Rectangle {
+    in property <int> index;
+    property <int> owner: -1;
+    property <int> owner-pad: -1;
+    property <int> owner-mode;
+    function release-held() {
+        if (root.owner < 0) { return; }
+        let deck = root.owner;
+        let pad = root.owner-pad;
+        let mode = root.owner-mode;
+        root.owner = -1;
+        root.owner-pad = -1;
+        root.pad-released(deck, pad, mode);
+    }
+    changed index => { if (root.owner >= 0 && root.owner != root.index) { root.release-held(); } }
+    changed mode => { if (root.owner >= 0 && root.owner-mode != root.mode) { root.release-held(); } }
     in property <[PadView]> pads;
     /// Pad mode: 0 HOT CUE, 1 BEAT JUMP, 2 KEYBOARD, 3 BEAT LOOP, 4 PAD FX (held pad = effect on), 5 KEY SHIFT, 6 S.SCRATCH (pads load sampler slots onto the deck), 7 SLICER, 8 SLICE LOOP (a held pad rolls its slice), 9 SAMPLER (pads = the slots of the sampler's bank), 10 SEQ. CALL (pads = saved sequences), 11 STEMS (pads 1-4 = the parts), 12 and up plugin modes (the pads show the hot cues like HOT CUE); Rust fills `pads`.
     in property <int> mode;
@@ -44,9 +59,9 @@ export component PadGrid inherits Rectangle {
     in property <bool> delete-mode;
     /// VIEW > PAD FX colour (0 blue, 1 green, 2 orange, 3 red, 4 purple) of the PAD FX pads (mode 4).
     in property <int> fx-color;
-    callback pad(int);
-    /// A pad's mouse button was released (a held pad in slip mode hands back to the shadow playhead).
-    callback pad-released();
+    callback pad(int, int);
+    /// Release the deck and pad captured at press time, including cancellation.
+    callback pad-released(int, int, int);
     /// Theme.pad-style 1: 4 columns of 2 rows, each pad filled in its cue's colour ; 0: 2 columns of 4 rows.
     property <bool> grid: Theme.pad-style == 1;
     property <int> cols: root.grid ? 4 : 2;
@@ -57,7 +72,10 @@ export component PadGrid inherits Rectangle {
     /// HOT CUE and the plugin modes draw the hot cue pads (letter badge, time).
     property <bool> cues: root.mode == 0 || root.mode >= 12;
     min-height: Theme.layout-profile == 1 && !root.grid ? 4 * Theme.touch-target + 3 * Theme.gap : 4 * 24px - 2px;
-    for p[i] in root.pads: Rectangle {
+    // Slot identity must survive feedback and mode changes while a pad is held.
+    for i in 8: Rectangle {
+        property <PadView> p: root.pads[i];
+        property <bool> held: root.owner == root.index && root.owner-pad == i && root.owner-mode == root.mode;
         /// The pad's colour: its own, but the PAD FX pads wear the VIEW > PAD FX COLOR.
         property <color> tone: root.mode == 4 ? [Theme.accent, Theme.play, Theme.deck2, Theme.danger, Theme.sampler][root.fx-color] : p.color;
         // BEAT JUMP pairs pad 2k (-n) with pad 2k+1 (+n): over it on the 4x2 grid, beside it on 2 columns. The pad index, so the jump, is unchanged.
@@ -72,7 +90,7 @@ export component PadGrid inherits Rectangle {
         border-radius: Theme.radius;
         border-width: root.delete-mode && p.set && root.mode == 0 ? 1px : 0px;
         border-color: Theme.danger;
-        background: root.cues && root.grid && p.set ? p.color : !root.cues && p.set ? tone : (ta.pressed ? Theme.bg-deep : ta.has-hover ? Theme.panel-high : Theme.panel-raised);
+        background: root.cues && root.grid && p.set ? p.color : !root.cues && p.set ? tone : (self.held ? Theme.bg-deep : ta.has-hover ? Theme.panel-high : Theme.panel-raised);
         animate background { duration: Theme.t-fast; }
         if root.cues && root.grid: Text {
             x: 4px;
@@ -130,9 +148,17 @@ export component PadGrid inherits Rectangle {
         ta := TouchArea {
             enabled: root.live;
             pointer-event(e) => {
-                if (e.button == PointerEventButton.left) {
-                    if (e.kind == PointerEventKind.down) { root.pad(i); }
-                    if (e.kind == PointerEventKind.up) { root.pad-released(); }
+                if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                    root.release-held();
+                    let deck = root.index;
+                    let mode = root.mode;
+                    root.owner-pad = i;
+                    root.owner-mode = mode;
+                    root.owner = deck;
+                    root.pad(deck, i);
+                }
+                if (root.owner-pad == i && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up))) {
+                    root.release-held();
                 }
             }
         }

@@ -112,12 +112,17 @@ export component Chip inherits Rectangle {
         tint: !root.enabled ? Theme.text-disabled : root.active ? Theme.text-bright : Theme.text;
     }
     ta := TouchArea {
+        property <bool> momentary-held;
         enabled: root.enabled;
         clicked => { root.clicked(); }
         pointer-event(e) => {
-            if e.button == PointerEventButton.left {
-                if e.kind == PointerEventKind.down { root.pressed(); }
-                if e.kind == PointerEventKind.up { root.released(); }
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                self.momentary-held = true;
+                root.pressed();
+            }
+            if self.momentary-held && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up)) {
+                self.momentary-held = false;
+                root.released();
             }
         }
     }
@@ -241,12 +246,17 @@ export component RingButton inherits Rectangle {
         tint: !root.enabled ? Theme.text-faint : Theme.text-bright;
     }
     ta := TouchArea {
+        property <bool> momentary-held;
         enabled: root.enabled;
         clicked => { root.clicked(); }
         pointer-event(e) => {
-            if e.button == PointerEventButton.left {
-                if e.kind == PointerEventKind.down { root.pressed(); }
-                if e.kind == PointerEventKind.up { root.released(); }
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                self.momentary-held = true;
+                root.pressed();
+            }
+            if self.momentary-held && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up)) {
+                self.momentary-held = false;
+                root.released();
             }
         }
     }
@@ -489,8 +499,8 @@ export component TextField inherits Rectangle {
 }
 
 /// A drag handle on the border between two panes . `value` is the size being dragged, as a delta
-/// from the default (see `PaneState`, ui/panes.slint); the owner binds it two-way and gives the range `lo`..`hi` (0 is the default
-/// and always inside). Give it a few px of thickness over the border: it draws only a 2 px `accent` line while hovered or dragged.
+/// from the default (see `PaneState`, ui/panes.slint); the owner binds it two-way and gives the range `lo`..`hi`.
+/// Give it a few px of thickness over the border: it draws only a 2 px `accent` line while hovered or dragged.
 /// `horizontal`: a bar dragged up and down (ns-resize); else a column dragged left and right (ew-resize). `invert`: the value grows
 /// as the pointer goes up / left (a pane on the far side of the border). Double-click sets the default.
 export component Splitter inherits Rectangle {
@@ -501,6 +511,8 @@ export component Splitter inherits Rectangle {
     in-out property <length> value;
     property <length> start-value;
     property <length> start-pointer;
+    property <bool> dragging;
+    property <bool> left-press;
     // The pointer in window coordinates, so that it does not move with the handle the drag moves.
     function pointer() -> length { return root.horizontal ? ta.absolute-position.y + ta.mouse-y : ta.absolute-position.x + ta.mouse-x; }
     function clamped(v: length) -> length { return Math.max(root.lo, Math.min(root.hi, v)); }
@@ -515,14 +527,18 @@ export component Splitter inherits Rectangle {
         mouse-cursor: root.horizontal ? MouseCursor.ns-resize : MouseCursor.ew-resize;
         pointer-event(e) => {
             if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left) {
+                root.dragging = true;
+                root.left-press = true;
                 root.start-value = root.clamped(root.value);
                 root.start-pointer = root.pointer();
             }
+            if (e.kind == PointerEventKind.down && e.button != PointerEventButton.left) { root.left-press = false; }
+            if (e.kind == PointerEventKind.cancel || (e.kind == PointerEventKind.up && e.button == PointerEventButton.left)) { root.dragging = false; }
         }
         moved => {
-            if (self.pressed) { root.value = root.clamped(root.start-value + (root.invert ? -1 : 1) * (root.pointer() - root.start-pointer)); }
+            if (root.dragging && self.pressed) { root.value = root.clamped(root.start-value + (root.invert ? -1 : 1) * (root.pointer() - root.start-pointer)); }
         }
-        double-clicked => { root.value = 0px; }
+        double-clicked => { if (root.left-press) { root.value = root.clamped(0px); } }
     }
 }
 

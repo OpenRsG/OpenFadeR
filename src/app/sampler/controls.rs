@@ -125,8 +125,11 @@ pub fn wire(app: &App, decks: &Decks, track: Rc<RefCell<Option<Track>>>) {
     });
     on!(st, me, on_load_clicked, |s| s.load());
     on!(st, me, on_clear_clicked, |s| {
-        if let (Some((_, i)), Some(bus)) = (s.state(), &s.bus) {
-            bus.sampler.clear(i);
+        if let Some((_, i)) = s.state() {
+            s.invalidate_load(i);
+            if let Some(bus) = &s.bus {
+                bus.sampler.clear(i);
+            }
             s.cfg.borrow_mut()[i] = Cfg::default();
             s.apply(i);
             s.select(i);

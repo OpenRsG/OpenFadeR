@@ -298,8 +298,9 @@ impl Watch {
 mod tests {
     use super::*;
 
-    fn tree() -> PathBuf {
-        let root = std::env::temp_dir().join(format!("openfader-dirs-{}", std::process::id()));
+    fn tree(name: &str) -> PathBuf {
+        let root =
+            std::env::temp_dir().join(format!("openfader-dirs-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("a/b/c")).unwrap();
         std::fs::create_dir_all(root.join("d")).unwrap();
@@ -309,7 +310,7 @@ mod tests {
 
     #[test]
     fn dirs_stop_at_the_depth_and_skip_files() {
-        let root = tree();
+        let root = tree("depth");
         let sorted = |mut v: Vec<PathBuf>| {
             v.sort();
             v
@@ -325,7 +326,7 @@ mod tests {
 
     #[test]
     fn dirs_respect_the_cap_and_list_a_folder_once() {
-        let root = tree();
+        let root = tree("cap");
         assert_eq!(dirs(&[(root.clone(), usize::MAX)], 2).len(), 2);
         let twice = dirs(&[(root.join("a"), 0), (root.clone(), 1)], 100);
         assert_eq!(twice.iter().filter(|d| **d == root.join("a")).count(), 1);

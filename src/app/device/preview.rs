@@ -253,35 +253,33 @@ impl Ctx {
         let (slot, t) = (Arc::new(Mutex::new(None)), t.clone());
         let put = slot.clone();
         let id = Some(t.dev.id.clone());
-        self.start_then(
-            id,
-            tr!("Preparing the preview"),
-            move |ctl| {
-                let mut t = t;
-                t.validate_folder()?;
-                t.o.free = openfader::device::space(&t.dest).map(|s| s.1);
-                let built = build(&ctl)?;
-                if let Some(m) = built.idle {
-                    return Ok(m);
-                }
-                let can = |n: &str| t.plans.iter().any(|p| p == n);
-                *put.lock() = Some(plan::build(
-                    &t.writers,
-                    &can,
-                    &t.dest,
-                    &built.snap,
-                    &t.o,
-                    analyse,
-                    &ctl,
-                )?);
-                Ok(String::new())
-            },
-            move |cx, _| {
-                if let Some(p) = slot.lock().take() {
-                    then(cx, p);
-                }
-            },
-        );
+        self.start_then(true, id,
+        tr!("Preparing the preview"),
+        move |ctl| {
+            let mut t = t;
+            t.validate_folder()?;
+            t.o.free = openfader::device::space(&t.dest).map(|s| s.1);
+            let built = build(&ctl)?;
+            if let Some(m) = built.idle {
+                return Ok(m);
+            }
+            let can = |n: &str| t.plans.iter().any(|p| p == n);
+            *put.lock() = Some(plan::build(
+                &t.writers,
+                &can,
+                &t.dest,
+                &built.snap,
+                &t.o,
+                analyse,
+                &ctl,
+            )?);
+            Ok(String::new())
+        },
+        move |cx, _| {
+            if let Some(p) = slot.lock().take() {
+                then(cx, p);
+            }
+        },);
     }
 
     /// The gate of every write: preview off → `go` at once; on → the card first, `go` on START. `build` makes what the write

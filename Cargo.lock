@@ -860,6 +860,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "compat-traktor"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "openfader-plugin",
+ "serde_json",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3745,13 +3754,14 @@ dependencies = [
 
 [[package]]
 name = "openfader"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "alsa 0.9.1",
  "chrono",
  "compat-rekordbox-db",
  "compat-rekordbox-device",
  "compat-rekordbox-xml",
+ "compat-traktor",
  "cpal",
  "embed-resource",
  "fatfs",

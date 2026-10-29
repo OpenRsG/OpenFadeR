@@ -105,6 +105,35 @@ use openfader::library::Library;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
+/// Media identity for loaded-row indicators, independent of titles and cached remote downloads.
+fn track_identity(track: &openfader::library::Track) -> String {
+    let encoded = if let Some(remote) = &track.remote {
+        serde_json::to_string(remote)
+    } else if let Some(file) = &track.file {
+        serde_json::to_string(file.as_os_str().as_encoded_bytes())
+    } else {
+        return String::new();
+    };
+    encoded.expect("media identity contains only strings or bytes")
+}
+
+/// Replace changed row data; fixed-slot repeaters keep their controls while the model changes.
+fn update_rows<T: Clone + PartialEq + 'static>(
+    current: &slint::ModelRc<T>,
+    rows: Vec<T>,
+) -> Option<slint::ModelRc<T>> {
+    use slint::Model;
+    if current.row_count() == rows.len()
+        && rows
+            .iter()
+            .enumerate()
+            .all(|(i, row)| current.row_data(i).as_ref() == Some(row))
+    {
+        return None;
+    }
+    Some(slint::ModelRc::new(slint::VecModel::from(rows)))
+}
+
 /// Set by [`restart`]: `main` starts the app again once the window has closed.
 static RESTART: AtomicBool = AtomicBool::new(false);
 static RESTART_EXE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
@@ -235,7 +264,7 @@ pub fn run(
     groove::wire(&app, &decks, selected.clone());
     let _midi = midi::wire(&app, decks.clone()); // dropping the guard (end of run) turns the controller LEDs off
     mixer::wire(&app, decks.clone());
-    let _export = exportmode::wire(&app, decks.clone()); // EXPORT mode: the player panels over decks A and B; the guard holds its timer
+    exportmode::wire(&app, decks.clone());
     let _video = video::wire(&app, lib.clone(), decks.clone()); // the guard holds the video workers until the window closes
     let _lighting = lighting::wire(&app, decks.clone()); // the timer lives in the guard: lights follow the decks until the window closes
     keys::wire(&app);
@@ -260,4 +289,63 @@ pub fn run(
     openfader::plugin::event::fire("app_quit", serde_json::json!({}));
     openfader::plugin::process::stop_all(); // closes their stdin, kills what has not exited within a second
     Ok(())
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::*;
+    use openfader::library::{Remote, Track};
+    use slint::{ComponentHandle, ModelRc, VecModel};
+
+    #[test]
+    fn loaded_rows_use_media_identity_across_metadata_edits_and_all_four_decks() {
+        let mut first = Track {
+            file: Some("/one/track.wav".into()),
+            title: "Same title".into(),
+            ..Default::default()
+        };
+        let other = Track {
+            file: Some("/two/track.wav".into()),
+            ..first.clone()
+        };
+        let identity = track_identity(&first);
+        assert_ne!(identity, track_identity(&other));
+        first.title = "Renamed".into();
+        first.artist = "Edited".into();
+        assert_eq!(identity, track_identity(&first));
+        let mut remote = Track {
+            remote: Some(Remote {
+                plugin: "reader".into(),
+                source: "library".into(),
+                id: "one".into(),
+            }),
+            ..Default::default()
+        };
+        let remote_id = track_identity(&remote);
+        remote.file = Some("/cache/download.wav".into());
+        assert_eq!(remote_id, track_identity(&remote));
+        remote.remote.as_mut().unwrap().id = "two".into();
+        assert_ne!(remote_id, track_identity(&remote));
+        headless::init();
+        let app = App::new().unwrap();
+        let state = app.global::<DeckState>();
+        let mut decks = vec![DeckView::default(); 4];
+        decks[3] = DeckView {
+            title: first.title.into(),
+            track_id: identity.clone().into(),
+            loaded: true,
+            ..Default::default()
+        };
+        state.set_decks(ModelRc::new(VecModel::from(decks.clone())));
+        assert_eq!(state.invoke_loaded_deck(identity.clone().into()), 3);
+        assert_eq!(state.invoke_loaded_deck(track_identity(&other).into()), -1);
+        assert_eq!(state.invoke_loaded_deck("".into()), -1);
+        decks[3].loaded = false;
+        decks[3].loading = true;
+        state.set_decks(ModelRc::new(VecModel::from(decks.clone())));
+        assert_eq!(state.invoke_loaded_deck(identity.clone().into()), 3);
+        decks[3].loading = false;
+        state.set_decks(ModelRc::new(VecModel::from(decks)));
+        assert_eq!(state.invoke_loaded_deck(identity.into()), -1);
+    }
 }

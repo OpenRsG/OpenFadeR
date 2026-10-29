@@ -5,7 +5,7 @@
 //! Replacing the loaded track cancels its worker at decode packet and analysis stage boundaries.
 
 use super::{
-    Deck, Loaded, Pending, at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm, render,
+    Deck, Loaded, PadMode, Pending, at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm, render,
     tempo_at, tempo_text,
 };
 use crate::app::prefs::{self, analysis::GridSource};
@@ -359,6 +359,10 @@ impl Deck {
         shared: Option<(Arc<audio::Track16>, Arc<audio::Stems>)>,
         reader: Option<openfader::library::AnalysisReader>,
     ) {
+        // Sampler gates are independent of the track loaded on their deck.
+        if self.pad_mode() != PadMode::Sampler {
+            self.pad_released();
+        }
         self.download.borrow_mut().take(); // sampler/bank installs supersede remote LOAD too
         // LOAD SETTING: the track's own cue nearest the start wins over the others (before the automatic cues are added).
         let nearest = prefs::with(|p| p.controller.load_nearest_cue)
@@ -517,12 +521,11 @@ impl Deck {
             gain_adjust,
             ..Default::default()
         };
-        let pad_views = self.pad_views(&self.loaded.borrow());
         self.show(|v| {
             v.loaded = !loading;
             v.loading = loading;
-            v.pads = ModelRc::new(VecModel::from(pad_views));
             v.title = t.title.clone().into();
+            v.track_id = if library { crate::app::track_identity(t).into() } else { Default::default() };
             v.artist = t.artist.clone().into();
             v.genre = t.genre.clone().into();
             v.total_text = fmt_ms(duration).into();
@@ -546,6 +549,7 @@ impl Deck {
             v.grid_edit = false;
             v.grid_here = false;
         });
+        self.refresh_pads();
         self.set_live(|r| {
             (r.elapsed_text, r.remain_text) =
                 (fmt_ms(0).into(), format!("-{}", fmt_ms(duration)).into());
@@ -755,14 +759,20 @@ impl Deck {
             l.pending = Some(pending);
         }
         drop(l);
+        let replacement_pads = pad_views.and_then(|pads| {
+            let current = self.view.borrow().pads.clone();
+            crate::app::update_rows(&current, pads)
+        });
         self.show(|v| {
             v.loaded = ready;
             v.loading = !ready;
             v.status = status.into();
             v.has_grid = grid.is_some();
-            if let (Some(c), Some(p)) = (cue_views, pad_views) {
+            if let Some(c) = cue_views {
                 v.cues = ModelRc::new(VecModel::from(c));
-                v.pads = ModelRc::new(VecModel::from(p));
+            }
+            if let Some(p) = replacement_pads {
+                v.pads = p;
             }
             v.bpm_text = bpm_text(here, rate);
             v.bpm = (base * rate) as f32;

@@ -139,8 +139,19 @@ struct TriggerReceiver(libc::c_int);
 impl TriggerSender {
     fn wakeup(&self) {
         let buf = 1u64;
-        let ret = unsafe { libc::write(self.0, &buf as *const u64 as *const _, 8) };
-        assert_eq!(ret, 8);
+        loop {
+            let ret = unsafe { libc::write(self.0, &buf as *const u64 as *const _, 8) };
+            if ret == 8 {
+                return;
+            }
+            let error = std::io::Error::last_os_error();
+            match error.raw_os_error() {
+                Some(libc::EINTR) => continue,
+                // A fatal PCM error can close the receiver before Stream::drop joins the worker.
+                Some(libc::EPIPE) => return,
+                _ => panic!("could not wake ALSA worker: {error}"),
+            }
+        }
     }
 }
 
@@ -726,6 +737,63 @@ fn poll_ready(result: Result<usize, alsa::Error>) -> Result<Option<usize>, Backe
 #[cfg(test)]
 mod recovery_tests {
     use super::*;
+
+    #[test]
+    fn stopping_after_the_worker_closes_its_receiver_still_joins_and_releases_the_pcm() {
+        let device = Device {
+            name: "null".to_owned(),
+            handles: Arc::new(Mutex::new(DeviceHandles::default())),
+        };
+        let config = StreamConfig {
+            channels: 2,
+            sample_rate: SampleRate(44100),
+            buffer_size: BufferSize::Fixed(512),
+        };
+        let inner = Arc::new(
+            device
+                .build_stream_inner(&config, SampleFormat::F32, alsa::Direction::Playback)
+                .unwrap(),
+        );
+        let released = Arc::downgrade(&inner);
+        let (tx, rx) = trigger();
+        let (closed_tx, closed_rx) = std::sync::mpsc::channel();
+        let (finish_tx, finish_rx) = std::sync::mpsc::channel();
+        let owned = inner.clone();
+        let thread = thread::spawn(move || {
+            drop(rx);
+            closed_tx.send(()).unwrap();
+            finish_rx.recv().unwrap();
+            drop(owned);
+        });
+        closed_rx.recv().unwrap();
+        assert!(!thread.is_finished());
+        tx.wakeup(); // the receiver can disappear before the worker finishes
+        finish_tx.send(()).unwrap();
+        drop(Stream {
+            thread: Some(thread),
+            inner,
+            trigger: tx,
+        });
+        assert!(
+            released.upgrade().is_none(),
+            "shutdown must join and release the PCM"
+        );
+    }
+
+    #[test]
+    fn stopping_a_live_worker_delivers_the_wake_up() {
+        let (tx, rx) = trigger();
+        tx.wakeup();
+        let mut descriptor = [libc::pollfd {
+            fd: rx.0,
+            events: libc::POLLIN,
+            revents: 0,
+        }];
+        assert_eq!(alsa::poll::poll(&mut descriptor, 100).unwrap(), 1);
+        assert_eq!(descriptor[0].revents & libc::POLLIN, libc::POLLIN);
+        rx.clear_pipe();
+        assert_eq!(alsa::poll::poll(&mut descriptor, 0).unwrap(), 0);
+    }
 
     #[test]
     fn fatal_poll_error_reports_once_then_stops_the_worker() {

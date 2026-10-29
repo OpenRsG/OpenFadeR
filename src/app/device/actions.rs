@@ -71,28 +71,26 @@ fn run_action(cx: &Rc<Ctx>, d: &Device, id: &str, confirmed: bool) {
     let config = device_settings::config(&cx.store, &d.id);
     let (dev, id) = (d.clone(), id.to_owned());
     let again = (dev.clone(), id.clone());
-    cx.start_then(
-        Some(d.id.clone()),
-        &a.label,
-        move |ctl| {
-            let r = provider.action(&dev.mount, &id, confirmed, &config, &ctl)?;
-            Ok(match r.confirm {
-                Some(q) => format!("{ASK}{}\n{}", q.yes, q.text),
-                None => r.message,
-            })
-        },
-        move |cx, r| {
-            let Some((yes, text)) = r
-                .as_ref()
-                .ok()
-                .and_then(|t| t.strip_prefix(ASK)?.split_once('\n'))
-            else {
-                return;
-            };
-            let (d, id) = again;
-            cx.confirm(text, yes, move |c| run_action(c, &d, &id, true));
-        },
-    );
+    cx.start_then(true, Some(d.id.clone()),
+    &a.label,
+    move |ctl| {
+        let r = provider.action(&dev.mount, &id, confirmed, &config, &ctl)?;
+        Ok(match r.confirm {
+            Some(q) => format!("{ASK}{}\n{}", q.yes, q.text),
+            None => r.message,
+        })
+    },
+    move |cx, r| {
+        let Some((yes, text)) = r
+            .as_ref()
+            .ok()
+            .and_then(|t| t.strip_prefix(ASK)?.split_once('\n'))
+        else {
+            return;
+        };
+        let (d, id) = again;
+        cx.confirm(text, yes, move |c| run_action(c, &d, &id, true));
+    },);
 }
 
 fn update_collection(cx: &Rc<Ctx>, d: &Device) {
@@ -113,34 +111,32 @@ fn update_collection(cx: &Rc<Ctx>, d: &Device) {
     let (store, d) = (cx.store.clone(), d.clone());
     let slot: Arc<Mutex<Option<Planned<update::Plan>>>> = Arc::default();
     let (out, dev) = (slot.clone(), d.clone());
-    cx.start_then(
-        Some(d.id.clone()),
-        tr!("Updating the collection"),
-        move |ctl| {
-            let plan = update::plan(&provider, &d.mount, &d.id, &snap, &store, &ctl)?;
-            if review && !plan.rows.is_empty() {
-                *out.lock() = Some(Planned::Review(plan));
-                return Ok(String::new()); // the review opens when the job ends; nothing is written before the go
-            }
-            let ticked = vec![true; plan.rows.len()];
-            let label = tr!("Update Collection of {}", d.label);
-            let a = update::apply(
-                &plan,
-                &ticked,
-                &d.id,
-                &label,
-                &store,
-                chrono::Utc::now().timestamp(),
-            )?;
-            *out.lock() = Some(Planned::Done(a.undo));
-            Ok(review::updated_text(&a.updated))
-        },
-        move |cx, r| match (slot.lock().take(), r) {
-            (Some(Planned::Review(plan)), _) => cx.open_update_review(&dev, plan, false),
-            (Some(Planned::Done(id)), Ok(text)) => cx.offer_undo(id, text),
-            _ => {}
-        },
-    );
+    cx.start_then(true, Some(d.id.clone()),
+    tr!("Updating the collection"),
+    move |ctl| {
+        let plan = update::plan(&provider, &d.mount, &d.id, &snap, &store, &ctl)?;
+        if review && !plan.rows.is_empty() {
+            *out.lock() = Some(Planned::Review(plan));
+            return Ok(String::new()); // the review opens when the job ends; nothing is written before the go
+        }
+        let ticked = vec![true; plan.rows.len()];
+        let label = tr!("Update Collection of {}", d.label);
+        let a = update::apply(
+            &plan,
+            &ticked,
+            &d.id,
+            &label,
+            &store,
+            chrono::Utc::now().timestamp(),
+        )?;
+        *out.lock() = Some(Planned::Done(a.undo));
+        Ok(review::updated_text(&a.updated))
+    },
+    move |cx, r| match (slot.lock().take(), r) {
+        (Some(Planned::Review(plan)), _) => cx.open_update_review(&dev, plan, false),
+        (Some(Planned::Done(id)), Ok(text)) => cx.offer_undo(id, text),
+        _ => {}
+    },);
 }
 
 /// Imports every history of `d` (`auto`: it was the app's own doing, so nothing is said when there is nothing to do).
@@ -162,54 +158,52 @@ fn import_histories_of(cx: &Rc<Ctx>, d: &Device, which: Option<String>, auto: bo
     );
     let slot: Arc<Mutex<Option<Planned<history::Plan>>>> = Arc::default();
     let (out, dev) = (slot.clone(), d.clone());
-    cx.start_then(
-        Some(d.id.clone()),
-        tr!("Importing histories"),
-        move |ctl| {
-            let lib = device::open_library(&d)?;
-            let keys: HashSet<String> = snap.tracks().iter().map(|(t, _)| store::key(t)).collect();
-            let which = which.map(|w| vec![w]);
-            let plan = history::plan(&d.info, &d.id, &*lib, &keys, &store, which.as_deref())?;
-            if review && plan.items.iter().any(|h| !h.already) {
-                *out.lock() = Some(Planned::Review(plan));
-                return Ok(String::new()); // the review opens when the job ends; nothing is written before the go
+    cx.start_then(true, Some(d.id.clone()),
+    tr!("Importing histories"),
+    move |ctl| {
+        let lib = device::open_library(&d)?;
+        let keys: HashSet<String> = snap.tracks().iter().map(|(t, _)| store::key(t)).collect();
+        let which = which.map(|w| vec![w]);
+        let plan = history::plan(&d.info, &d.id, &*lib, &keys, &store, which.as_deref())?;
+        if review && plan.items.iter().any(|h| !h.already) {
+            *out.lock() = Some(Planned::Review(plan));
+            return Ok(String::new()); // the review opens when the job ends; nothing is written before the go
+        }
+        let ticked = vec![true; plan.items.len()];
+        let label = tr!("Histories of {}", d.label);
+        let r = history::apply(&plan, &ticked, &d.id, &label, &store, chrono::Utc::now().timestamp())?;
+        *out.lock() = Some(Planned::Done(r.undo));
+        let mut text = review::imported_text(&r, &d.label);
+        if delete_after && !r.done.is_empty() {
+            match provider.ok_or(tr!("its plugin is not available").to_owned()).and_then(|p| history::delete(&p, &d.mount, &r.done, &config, &ctl)) {
+                Ok(n) => text.push_str(&tr!("; deleted {} from the device", n)),
+                Err(e) => text.push_str(&tr!("; not deleted from the device: {}", e)),
             }
-            let ticked = vec![true; plan.items.len()];
-            let label = tr!("Histories of {}", d.label);
-            let r = history::apply(&plan, &ticked, &d.id, &label, &store, chrono::Utc::now().timestamp())?;
-            *out.lock() = Some(Planned::Done(r.undo));
-            let mut text = review::imported_text(&r, &d.label);
-            if delete_after && !r.done.is_empty() {
-                match provider.ok_or(tr!("its plugin is not available").to_owned()).and_then(|p| history::delete(&p, &d.mount, &r.done, &config, &ctl)) {
-                    Ok(n) => text.push_str(&tr!("; deleted {} from the device", n)),
-                    Err(e) => text.push_str(&tr!("; not deleted from the device: {}", e)),
-                }
+        }
+        if auto && r.histories == 0 && r.already == 0 && r.skipped == 0 {
+            return Ok(String::new());
+        }
+        Ok(text)
+    },
+    move |cx, r| match (slot.lock().take(), r) {
+        // An automatic import waits for the go like a manual one: it only says that there is something to look at.
+        (Some(Planned::Review(plan)), _) if auto => {
+            let n = plan.items.iter().filter(|h| !h.already).count();
+            let text = tr_n!(
+                "{}: {n} history is waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows it first",
+                "{}: {n} histories are waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows them first",
+                n,
+                dev.label
+            );
+            cx.say(&text, false);
+            if let Some(app) = cx.app() {
+                toast::show(&app, &text);
             }
-            if auto && r.histories == 0 && r.already == 0 && r.skipped == 0 {
-                return Ok(String::new());
-            }
-            Ok(text)
-        },
-        move |cx, r| match (slot.lock().take(), r) {
-            // An automatic import waits for the go like a manual one: it only says that there is something to look at.
-            (Some(Planned::Review(plan)), _) if auto => {
-                let n = plan.items.iter().filter(|h| !h.already).count();
-                let text = tr_n!(
-                    "{}: {n} history is waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows it first",
-                    "{}: {n} histories are waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows them first",
-                    n,
-                    dev.label
-                );
-                cx.say(&text, false);
-                if let Some(app) = cx.app() {
-                    toast::show(&app, &text);
-                }
-            }
-            (Some(Planned::Review(plan)), _) => cx.open_history_review(&dev, plan),
-            (Some(Planned::Done(id)), Ok(text)) => cx.offer_undo(id, text),
-            _ => {}
-        },
-    );
+        }
+        (Some(Planned::Review(plan)), _) => cx.open_history_review(&dev, plan),
+        (Some(Planned::Done(id)), Ok(text)) => cx.offer_undo(id, text),
+        _ => {}
+    },);
 }
 
 fn delete_playlist(cx: &Rc<Ctx>, dev: &str, id: &str) {
@@ -258,7 +252,7 @@ fn delete_playlist(cx: &Rc<Ctx>, dev: &str, id: &str) {
     };
     cx.confirm(&text, tr!("DELETE"), move |c| {
         let config = device_settings::config(&c.store, &d.id);
-        c.start(Some(d.id.clone()), tr!("Deleting"), move |ctl| {
+        c.start(true, Some(d.id.clone()), tr!("Deleting"), move |ctl| {
             if log {
                 history::delete(&provider, &d.mount, &[name.clone()], &config, &ctl)?;
                 return Ok(tr!("Deleted the history {} from {}", name, d.label));
@@ -305,7 +299,7 @@ fn delete_track(cx: &Rc<Ctx>, dev: &str, file: &str) {
         tr!("DELETE"),
         move |c| {
             let config = device_settings::config(&c.store, &d.id);
-            c.start(Some(d.id.clone()), tr!("Deleting"), move |ctl| {
+            c.start(true, Some(d.id.clone()), tr!("Deleting"), move |ctl| {
                 let r = provider.remove(
                     &d.mount,
                     &RemoveTarget::Track { file },

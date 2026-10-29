@@ -56,7 +56,7 @@ export component TouchDeck inherits Rectangle {
             height: 190px; spacing: 8px;
             VerticalLayout {
                 width: 56px; horizontal-stretch: 0; alignment: center; spacing: 8px;
-                RingButton { width: 56px; height: 56px; text: @tr("CUE"); tone: Theme.cue; enabled: root.v.loaded; lit: root.v.at-cue; pressed => { DeckState.cue(root.index); } released => { DeckState.cue-released(root.index); } }
+                RingButton { width: 56px; height: 56px; text: @tr("CUE"); tone: Theme.cue; enabled: root.v.loaded; lit: root.v.at-cue; property <int> owner: -1; pressed => { self.owner = root.index; DeckState.cue(self.owner); } released => { let owner = self.owner; self.owner = -1; if (owner >= 0) { DeckState.cue-released(owner); } } }
                 RingButton { width: 56px; height: 56px; icon: root.v.playing ? Icon.pause : Icon.play; tone: Theme.play; enabled: root.v.loaded; lit: root.v.playing; clicked => { DeckState.play-pause(root.index); } }
             }
             LoopBlock { index: root.index; min-width: 96px; }
@@ -81,11 +81,12 @@ export component TouchDeck inherits Rectangle {
             chose(m) => { DeckState.pad-mode(root.index, !root.v.stems && m >= 11 ? m + 1 : m); }
         }
         if root.page == 1: PadGrid {
+            index: root.index;
             height: Theme.touch-target * 4 + Theme.gap * 3;
             pads: root.v.pads; mode: root.v.pad-mode; enabled: root.v.loaded;
             delete-mode: root.v.delete-mode; fx-color: DeckState.pad-fx-color;
-            pad(p) => { DeckState.pad(root.index, p); }
-            pad-released => { DeckState.pad-released(root.index); }
+            pad(d, p) => { DeckState.pad(d, p); }
+            pad-released(d, p, m) => { DeckState.pad-released-at(d, p, m); }
         }
         if root.page == 1: PadOptions { index: root.index; }
         if root.page == 1: HorizontalLayout {

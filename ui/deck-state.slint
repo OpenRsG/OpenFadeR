@@ -13,6 +13,7 @@ export struct DeckView {
     /// Track length "05:50.2" (the readout under the remaining time).
     total-text: string,
     title: string,
+    track-id: string,
     artist: string,
     /// Genre of the loaded track (the Stage deck headers show it).
     genre: string,
@@ -136,6 +137,15 @@ export struct DeckScroll {
 /// One entry of `decks` per deck; every callback carries the deck index (0 = A … 3 = D).
 export global DeckState {
     in property <[DeckView]> decks;
+    public pure function holds(d: int, identity: string) -> bool {
+        if (identity == "") { return false; }
+        let deck = root.decks[d];
+        return (deck.loaded || deck.loading) && deck.track-id == identity;
+    }
+    public pure function loaded-deck(identity: string) -> int {
+        if (identity == "") { return -1; }
+        return root.holds(0, identity) ? 0 : root.holds(1, identity) ? 1 : root.holds(2, identity) ? 2 : root.holds(3, identity) ? 3 : -1;
+    }
     in property <[DeckScroll]> scroll;
     in property <[DeckLive]> live;
     in property <bool> waveform-gpu;
@@ -209,8 +219,9 @@ export global DeckState {
     /// modes sit one place earlier in the list than their `pad-mode` index (STEMS keeps index 11).
     in property <[string]> pad-mode-names;
     in property <[string]> pad-mode-names-stems;
-    /// A pad was released (slip: back to the shadow playhead).
-    callback pad-released(int);
+    /// Beat-jump shortcuts return slip without releasing unrelated performance pads.
+    callback beat-jump-released(int);
+    callback pad-released-at(int, int, int);
     /// KEY − / KEY + (delta in semitones), KEY RESET, KEY SYNC to the other deck.
     callback key-step(int, int);
     callback key-reset(int);

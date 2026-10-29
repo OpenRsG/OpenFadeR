@@ -28,8 +28,9 @@ export struct PluginView {
     provides: string,
     folder: string,
     enabled: bool,
-    /// Compiled into the app: always on, no folder, cannot be uninstalled.
+    /// Compiled into the app: no folder, cannot be uninstalled.
     builtin: bool,
+    always-on: bool,
     /// Installed by the user (bundled plugins can only be switched off).
     removable: bool,
     /// A change of this plugin waits for a restart.
@@ -133,8 +134,8 @@ component Card inherits Rectangle {
         spacing: Theme.space-sm;
         HorizontalLayout {
             spacing: Theme.space-md;
-            if !root.v.builtin: Toggle { width: 20px; checked: root.v.enabled; toggled => { PluginState.toggle(root.index); } }
-            if root.v.builtin: Rectangle { width: 20px; }
+            if !root.v.always-on: Toggle { width: 20px; checked: root.v.enabled; toggled => { PluginState.toggle(root.index); } }
+            if root.v.always-on: Rectangle { width: 20px; }
             VerticalLayout {
                 // A short description must not shrink and centre the column (its children cap its width otherwise).
                 horizontal-stretch: 1;

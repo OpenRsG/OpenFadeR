@@ -546,16 +546,14 @@ impl Ctx {
             store: self.store.clone(),
         };
         let id = dev.id.clone();
-        self.start_then(
-            Some(dev.id.clone()),
-            tr!("Fixing the stick"),
-            move |ctl| job.run(&ctl),
-            move |cx, _| {
-                cx.check.facts.borrow_mut().remove(&id);
-                cx.recheck(&id);
-                cx.relink(&id);
-            },
-        );
+        self.start_then(true, Some(dev.id.clone()),
+        tr!("Fixing the stick"),
+        move |ctl| job.run(&ctl),
+        move |cx, _| {
+            cx.check.facts.borrow_mut().remove(&id);
+            cx.recheck(&id);
+            cx.relink(&id);
+        },);
     }
 
     /// The callbacks of the card and the booth picker.

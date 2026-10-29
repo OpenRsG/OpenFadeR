@@ -15,7 +15,7 @@ export component TouchTransport inherits Rectangle {
         width: root.width / root.columns - 8px; height: Theme.touch-target;
         spacing: 4px;
         Chip { text: ["A", "B", "C", "D"][d] + (DeckState.decks[d].playing ? @tr(" Pause") : @tr(" Play")); width: 64px; horizontal-stretch: 0; active: DeckState.decks[d].playing; active-color: Theme.play; enabled: DeckState.decks[d].loaded; clicked => { DeckState.play-pause(d); } }
-        Chip { text: @tr("CUE"); width: Theme.touch-target; horizontal-stretch: 0; active: DeckState.decks[d].at-cue; active-color: Theme.cue; enabled: DeckState.decks[d].loaded; pressed => { DeckState.cue(d); } released => { DeckState.cue-released(d); } }
+        Chip { text: @tr("CUE"); width: Theme.touch-target; horizontal-stretch: 0; active: DeckState.decks[d].at-cue; active-color: Theme.cue; enabled: DeckState.decks[d].loaded; property <int> owner: -1; pressed => { self.owner = d; DeckState.cue(self.owner); } released => { let owner = self.owner; self.owner = -1; if (owner >= 0) { DeckState.cue-released(owner); } } }
         Fader { value: MixerState.channels[d].fader; edited(v) => { MixerState.fader(d, v); } }
         IconButton { icon: Icon.headphones; tooltip: @tr("Headphone cue deck {}", ["A", "B", "C", "D"][d]); active: MixerState.channels[d].cue; clicked => { MixerState.cue-toggled(d); } }
     }

@@ -37,6 +37,10 @@ impl Port for Lights {
         match *m {
             [0xB0, 1, v] => host::set("crossfader", f64::from(v) / 127.0),
             [0xB0, 2, v] => host::set("eq-low/1", f64::from(v) / 127.0),
+            [0x90, 36, v] => host::set("cue/1", if v == 0 { 0.0 } else { 1.0 }),
+            [0x80, 36, _] => host::set("cue/1", 0.0),
+            [0x90, 37, v] => host::set("hw-sampler/1/2", if v == 0 { 0.0 } else { 1.0 }),
+            [0x80, 37, _] => host::set("hw-sampler/1/2", 0.0),
             _ => false,
         };
     }
@@ -174,4 +178,104 @@ fn a_claimed_port_works_our_controls_through_its_plugin_and_its_lights_follow() 
     );
     assert!(m.claimed.borrow().is_empty());
     set_for_test(|p| p.controller.soft_takeover = true);
+}
+
+#[test]
+fn plugin_sessions_do_not_share_synthetic_button_keys_and_close_releases_their_original_slots() {
+    use super::super::{Binding, Ev, actions::ACTIONS};
+    use crate::app::{DeckState, MidiState, SamplerState};
+    crate::app::headless::init();
+    let app = App::new().unwrap();
+    set_for_test(|p| {
+        p.decks = 4;
+        p.controller.soft_takeover = false;
+    });
+    let lib: Rc<dyn Library> = Rc::new(Own::new(Arc::new(Store::in_memory().unwrap())));
+    let decks = crate::app::deck::wire(&app, lib, Default::default());
+    let guard = super::super::wire(&app, decks);
+    let m = &guard.midi;
+    m.close(false);
+    let (tx1, rx1) = channel();
+    let (tx2, rx2) = channel();
+    let one = m
+        .start(&linked("pad", &PAD), "Pad 20:0", false, rx1, None, None)
+        .unwrap();
+    let two = m
+        .start(&linked("pad", &PAD), "Pad 21:0", false, rx2, None, None)
+        .unwrap();
+    m.claimed.borrow_mut().list.extend([one, two]);
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let seen = events.clone();
+    app.global::<DeckState>()
+        .on_cue(move |d| seen.borrow_mut().push(("cue", d)));
+    let (seen, midi) = (events.clone(), m.clone());
+    app.global::<DeckState>().on_cue_released(move |d| {
+        if d == 0 {
+            assert!(
+                midi.claimed.borrow().list.is_empty(),
+                "close dispatches without retaining the claims borrow"
+            );
+        }
+        seen.borrow_mut().push(("cue-up", d));
+    });
+    let seen = events.clone();
+    let sampler = app.global::<SamplerState>();
+    sampler.on_pad_pressed(move |slot| seen.borrow_mut().push(("pad", slot)));
+    let seen = events.clone();
+    sampler.on_pad_released(move |slot| seen.borrow_mut().push(("pad-up", slot)));
+    let raw = Binding {
+        status: 0x90,
+        d1: 0,
+        act: ACTIONS.iter().position(|a| a.name == "cue").unwrap(),
+        deck: 1,
+        arg: 0,
+        hires: false,
+    };
+    m.run(
+        &app,
+        Ev {
+            status: 0x90,
+            d1: 0,
+            d2: 127,
+        },
+        &raw,
+    );
+    tx1.send(vec![0x90, 36, 127]).unwrap();
+    tx1.send(vec![0x90, 37, 127]).unwrap();
+    m.read_claimed();
+    assert_eq!(
+        m.held.borrow().len(),
+        1,
+        "plugin synthetic notes never replace the raw hold"
+    );
+    sampler.set_bank(1);
+    tx2.send(vec![0x90, 37, 127]).unwrap();
+    m.read_claimed();
+    tx1.send(vec![0x80, 37, 0]).unwrap();
+    m.read_claimed();
+    assert_eq!(
+        m.claimed.borrow().list[1].st.held.borrow().len(),
+        1,
+        "the other plugin session retains its hold"
+    );
+    app.global::<MidiState>().set_visible(true);
+    m.handle(Ev {
+        status: 0x80,
+        d1: 0,
+        d2: 0,
+    });
+    m.close_claims();
+    assert_eq!(
+        *events.borrow(),
+        [
+            ("cue", 1),
+            ("cue", 0),
+            ("pad", 2),
+            ("pad", 10),
+            ("pad-up", 2),
+            ("cue-up", 1),
+            ("cue-up", 0),
+            ("pad-up", 10)
+        ]
+    );
 }

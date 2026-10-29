@@ -31,6 +31,7 @@ panes!(
     pane_tree = get_tree_d / set_tree_d,
     pane_info = get_info_d / set_info_d,
     pane_palette = get_palette_d / set_palette_d,
+    col_title = get_col_title_d / set_col_title_d,
     col_artist = get_col_artist_d / set_col_artist_d,
     col_genre = get_col_genre_d / set_col_genre_d,
     col_comment = get_col_comment_d / set_col_comment_d,
@@ -68,6 +69,7 @@ mod tests {
         s.set_tree_d(-30.0);
         s.set_info_d(-60.0);
         s.set_col_artist_d(44.0);
+        s.set_col_title_d(27.0);
         let mut p = Prefs::default();
         read(&app, &mut p.view);
         assert_eq!(
@@ -75,9 +77,10 @@ mod tests {
                 p.view.pane_stage,
                 p.view.pane_tree,
                 p.view.pane_info,
+                p.view.col_title,
                 p.view.col_artist
             ),
-            (120, -30, -60, 44)
+            (120, -30, -60, 27, 44)
         );
 
         let dir = std::env::temp_dir().join(format!("openfader-panes-{}", std::process::id()));
@@ -95,9 +98,10 @@ mod tests {
                 s.get_stage_d(),
                 s.get_tree_d(),
                 s.get_info_d(),
+                s.get_col_title_d(),
                 s.get_col_artist_d()
             ),
-            (120.0, -30.0, -60.0, 44.0)
+            (120.0, -30.0, -60.0, 27.0, 44.0)
         );
         assert_eq!(
             (s.get_palette_d(), s.get_col_key_d(), s.get_player_d()),
@@ -170,5 +174,230 @@ mod tests {
         assert_eq!(s.invoke_palette_h(500.0), 500.0 - s.invoke_browser_h(4));
         s.set_palette_d(-5000.0);
         assert_eq!(s.invoke_palette_h(500.0), 60.0);
+    }
+}
+
+#[cfg(test)]
+mod gestures {
+    use slint::platform::{PointerEventButton as Button, WindowEvent as Event};
+    use slint::{
+        ComponentHandle, LogicalPosition, Model, ModelRc, PhysicalSize, StandardListViewItem,
+        VecModel,
+    };
+    use std::{cell::Cell, rc::Rc};
+
+    slint::slint! {
+        import { TrackTable } from "../../../ui/browser-table.slint";
+        import { StudioTable } from "../../../ui/studio/table.slint";
+        import { StageTable } from "../../../ui/stage/table.slint";
+        import { Splitter } from "../../../ui/widgets.slint";
+        export { PaneState } from "../../../ui/panes.slint";
+        export { BrowserState } from "../../../ui/browser-state.slint";
+        export { Theme } from "../../../ui/theme.slint";
+        export component Tables inherits Window {
+            min-width: 0px;
+            min-height: 0px;
+            in property <int> variant;
+            callback sorted(int);
+            if root.variant == 0: TrackTable { width: root.width; height: root.height; sort-clicked(c) => { root.sorted(c); } }
+            if root.variant == 1: StudioTable { width: root.width; height: root.height; }
+            if root.variant == 2: StageTable { width: root.width; height: root.height; }
+        }
+        export component BoundedSplitter inherits Window {
+            min-width: 0px;
+            min-height: 0px;
+            in-out property <length> value: 30px;
+            Splitter { x: 50px; width: 8px; height: 80px; lo: 10px; hi: 100px; value <=> root.value; }
+        }
+    }
+
+    fn point(x: f32, y: f32) -> LogicalPosition {
+        LogicalPosition::new(x, y)
+    }
+    fn drag(window: &slint::Window, from: f32, to: f32, y: f32, button: Button) {
+        window.dispatch_event(Event::PointerPressed {
+            position: point(from, y),
+            button,
+        });
+        window.dispatch_event(Event::PointerMoved {
+            position: point(to, y),
+        });
+        window.dispatch_event(Event::PointerReleased {
+            position: point(to, y),
+            button,
+        });
+    }
+    fn rows() -> Rc<VecModel<ModelRc<StandardListViewItem>>> {
+        Rc::new(VecModel::from(
+            ["first", "second"]
+                .map(|id| {
+                    let mut cells = vec![StandardListViewItem::default(); 15];
+                    cells[0].text = id.into();
+                    cells[14].text = id.into();
+                    ModelRc::new(VecModel::from(cells))
+                })
+                .to_vec(),
+        ))
+    }
+
+    #[test]
+    fn narrow_tables_keep_the_rightmost_header_reachable_and_aligned() {
+        crate::app::headless::init();
+        for variant in 0..3 {
+            let ui = Tables::new().unwrap();
+            ui.set_variant(variant);
+            ui.show().unwrap();
+            crate::app::headless::last_window().set_size(PhysicalSize::new(480, 300));
+            ui.global::<BrowserState>().set_tracks(rows().into());
+            let sorted = Rc::new(Cell::new(-1));
+            let seen = sorted.clone();
+            ui.on_sorted(move |col| seen.set(col));
+            let seen = sorted.clone();
+            ui.global::<BrowserState>()
+                .on_sort(move |col, _| seen.set(col));
+            ui.window().dispatch_event(Event::PointerScrolled {
+                position: point(400.0, 80.0),
+                delta_x: -10000.0,
+                delta_y: 0.0,
+            });
+            let y = ui.global::<Theme>().get_h_header() / 2.0 + ui.global::<Theme>().get_space_sm();
+            drag(ui.window(), 430.0, 430.0, y, Button::Left);
+            assert_eq!(
+                sorted.get(),
+                if variant == 2 { 6 } else { 3 },
+                "variant {variant}"
+            );
+        }
+    }
+
+    #[test]
+    fn resizing_changes_only_the_grabbed_column_and_keeps_overflow_reachable() {
+        crate::app::headless::init();
+        let ui = Tables::new().unwrap();
+        ui.show().unwrap();
+        crate::app::headless::last_window().set_size(PhysicalSize::new(1100, 300));
+        ui.global::<BrowserState>().set_tracks(rows().into());
+        let state = ui.global::<PaneState>();
+        let y = ui.global::<Theme>().get_h_header() / 2.0;
+        drag(ui.window(), 626.0, 666.0, y, Button::Left);
+        assert_eq!(
+            (
+                state.get_col_artist_d(),
+                state.get_col_title_d(),
+                state.get_col_genre_d()
+            ),
+            (40.0, 0.0, 0.0)
+        );
+        drag(ui.window(), 756.0, 786.0, y, Button::Left);
+        assert_eq!(
+            (
+                state.get_col_genre_d(),
+                state.get_col_artist_d(),
+                state.get_col_title_d()
+            ),
+            (30.0, 40.0, 0.0)
+        );
+        drag(ui.window(), 496.0, 516.0, y, Button::Left);
+        assert_eq!(
+            (state.get_col_title_d(), state.get_col_artist_d()),
+            (20.0, 40.0)
+        );
+        ui.window().dispatch_event(Event::PointerPressed {
+            position: point(686.0, y),
+            button: Button::Left,
+        });
+        ui.window().dispatch_event(Event::PointerMoved {
+            position: point(696.0, y),
+        });
+        ui.window().dispatch_event(Event::PointerExited);
+        ui.window().dispatch_event(Event::PointerMoved {
+            position: point(726.0, y),
+        });
+        ui.window().dispatch_event(Event::PointerReleased {
+            position: point(726.0, y),
+            button: Button::Left,
+        });
+        assert_eq!(state.get_col_artist_d(), 50.0, "cancel ends the owned drag");
+        drag(ui.window(), 516.0, 536.0, y, Button::Right);
+        assert_eq!(state.get_col_title_d(), 20.0);
+        ui.window().dispatch_event(Event::PointerScrolled {
+            position: point(900.0, 80.0),
+            delta_x: -10000.0,
+            delta_y: 0.0,
+        });
+        drag(ui.window(), 1086.0, 1094.0, y, Button::Left);
+        assert_eq!(
+            state.get_col_key_d(),
+            8.0,
+            "the last column stays resizable after horizontal scrolling"
+        );
+        assert_eq!(state.get_col_genre_d(), 30.0);
+    }
+
+    #[test]
+    fn a_replaced_pressed_row_does_not_collapse_the_selection_onto_its_replacement() {
+        crate::app::headless::init();
+        for variant in 0..3 {
+            let ui = Tables::new().unwrap();
+            ui.set_variant(variant);
+            ui.show().unwrap();
+            crate::app::headless::last_window().set_size(PhysicalSize::new(1100, 300));
+            let state = ui.global::<BrowserState>();
+            let rows = rows();
+            state.set_tracks(rows.clone().into());
+            state.set_selected_rows(Rc::new(VecModel::from(vec![true, true])).into());
+            state.set_selected_count(2);
+            let selected = Rc::new(Cell::new(0));
+            let seen = selected.clone();
+            state.on_track_selected(move |_| seen.set(seen.get() + 1));
+            let position = point(
+                450.0,
+                ui.global::<Theme>().get_h_header() + ui.global::<Theme>().get_space_sm() + 5.0,
+            );
+            ui.window().dispatch_event(Event::PointerPressed {
+                position,
+                button: Button::Left,
+            });
+            rows.set_row_data(0, rows.row_data(1).unwrap());
+            ui.window().dispatch_event(Event::PointerReleased {
+                position,
+                button: Button::Left,
+            });
+            assert_eq!(
+                selected.get(),
+                0,
+                "variant {variant}: old gesture cannot select a new track"
+            );
+            ui.window().dispatch_event(Event::PointerPressed {
+                position,
+                button: Button::Left,
+            });
+            ui.window().dispatch_event(Event::PointerReleased {
+                position,
+                button: Button::Left,
+            });
+            assert_eq!(
+                selected.get(),
+                1,
+                "variant {variant}: a fresh click still collapses selection"
+            );
+        }
+    }
+
+    #[test]
+    fn splitter_reset_obeys_bounds_and_right_clicks_do_not_reset() {
+        crate::app::headless::init();
+        let ui = BoundedSplitter::new().unwrap();
+        ui.show().unwrap();
+        crate::app::headless::last_window().set_size(PhysicalSize::new(200, 80));
+        for _ in 0..2 {
+            drag(ui.window(), 54.0, 54.0, 20.0, Button::Left);
+        }
+        assert_eq!(ui.get_value(), 10.0);
+        ui.set_value(40.0);
+        for _ in 0..2 {
+            drag(ui.window(), 54.0, 54.0, 20.0, Button::Right);
+        }
+        assert_eq!(ui.get_value(), 40.0);
     }
 }

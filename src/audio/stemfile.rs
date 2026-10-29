@@ -183,7 +183,11 @@ pub fn decode_parts(
             .map_err(|e| format!("codec: {e}"))?;
         parts.push((*id, dec));
     }
-    let mut out: [Vec<i16>; STEM_COUNT] = std::array::from_fn(|_| Vec::with_capacity(2 * frames));
+    let capacity = frames
+        .checked_mul(2)
+        .ok_or("stem file: output size overflow")?;
+    let mut out: [Vec<i16>; STEM_COUNT] = std::array::from_fn(|_| Vec::with_capacity(capacity));
+    let mut seen = [false; STEM_COUNT];
     let mut bufs: [Option<SampleBuffer<f32>>; STEM_COUNT] = std::array::from_fn(|_| None);
     loop {
         if cancelled() {
@@ -207,17 +211,24 @@ pub fn decode_parts(
         let ch = spec.channels.count();
         let buf = bufs[k].get_or_insert_with(|| SampleBuffer::new(decoded.capacity() as u64, spec));
         buf.copy_interleaved_ref(decoded);
-        out[k].extend(stereo(buf.samples(), ch).flatten().map(to_i16));
+        seen[k] |= ch > 0 && buf.samples().len() >= ch;
+        let remaining = capacity - out[k].len();
+        out[k].extend(
+            stereo(buf.samples(), ch)
+                .flatten()
+                .take(remaining)
+                .map(to_i16),
+        );
         if k == 0 && frames > 0 {
             progress((out[0].len() / 2) as f32 / frames as f32);
         }
     }
-    if out.iter().any(Vec::is_empty) {
+    if seen.iter().any(|&seen| !seen) {
         return Err("stem file: a part holds no audio".into());
     }
     let mut by_stem: [Vec<i16>; STEM_COUNT] = std::array::from_fn(|_| Vec::new());
     for (k, mut part) in out.into_iter().enumerate() {
-        part.resize(2 * frames, 0);
+        part.resize(capacity, 0);
         by_stem[info.slot[k]] = part;
     }
     Ok(by_stem)
@@ -361,5 +372,32 @@ mod tests {
         let err = decode_parts(&wav, &info, 1000, &|| false, &|_| {}).unwrap_err();
         std::fs::remove_file(&wav).ok();
         assert!(err.contains("1 audio track"), "{err}");
+    }
+
+    #[test]
+    fn parts_are_bounded_to_the_mix_length_and_short_parts_are_zero_padded() {
+        let path = Path::new(FIXTURE);
+        let info = read_info(path).unwrap();
+        let (mix, _) = crate::audio::decode_track16_cancellable(path, &|| false).unwrap();
+        let whole = decode_parts(path, &info, mix.frames(), &|| false, &|_| {}).unwrap();
+        let frames = mix.frames() / 2;
+        let short = decode_parts(path, &info, frames, &|| false, &|_| {}).unwrap();
+        let padded = decode_parts(path, &info, mix.frames() + 100, &|| false, &|_| {}).unwrap();
+        for k in 0..STEM_COUNT {
+            assert_eq!(short[k], whole[k][..2 * frames]);
+            assert_eq!(
+                short[k].capacity(),
+                2 * frames,
+                "long parts must not grow beyond the reservation"
+            );
+            assert_eq!(&padded[k][..whole[k].len()], whole[k]);
+            assert!(padded[k][whole[k].len()..].iter().all(|&v| v == 0));
+        }
+        assert!(
+            decode_parts(path, &info, 0, &|| false, &|_| {})
+                .unwrap()
+                .iter()
+                .all(Vec::is_empty)
+        );
     }
 }

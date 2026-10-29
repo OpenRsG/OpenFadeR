@@ -70,6 +70,7 @@ export component StudioTable inherits Rectangle {
     property <length> x-bpm: root.x-time + root.w-time;
     property <length> x-key: root.x-bpm + root.w-bpm;
     property <length> x-genre: root.x-key + root.w-key;
+    property <length> columns-w: max(root.width, root.x-genre + root.w-genre + root.pad + root.w-scroll);
     property <length> menu-x;
     property <length> menu-y;
     property <int> cover-generation: BrowserState.cover-generation;
@@ -79,7 +80,7 @@ export component StudioTable inherits Rectangle {
     function reveal(i: int) {
         if (i < 0) { return; }
         if (i * root.row-h + list.content-y < 0) { list.content-y = -i * root.row-h; }
-        else if ((i + 1) * root.row-h + list.content-y > list.height) { list.content-y = list.height - (i + 1) * root.row-h; }
+        else if ((i + 1) * root.row-h + list.content-y > list.visible-height) { list.content-y = list.visible-height - (i + 1) * root.row-h; }
     }
     /// `mode`: 0 only this row is selected, 1 it joins / leaves the selection (Ctrl+click), 2 the range from the anchor (Shift+click / Shift+arrows).
     function choose(i: int, mode: int) {
@@ -91,6 +92,7 @@ export component StudioTable inherits Rectangle {
     }
     /// A press on one of several selected rows waits for the release: a drag from it carries the whole selection.
     property <int> collapse-row: -1;
+    property <string> collapse-id;
     property <bool> multi: BrowserState.selected-count > 1;
     // The menu keeps itself inside the table (its x / y bindings).
     function place-menu(x: length, y: length) {
@@ -119,21 +121,29 @@ export component StudioTable inherits Rectangle {
         VerticalLayout {
             Rectangle {
                 height: Theme.h-header + Theme.space-sm;
-                Head { x: root.x-rating; width: root.w-rating; height: Theme.h-header; y: Theme.space-sm; title: @tr("RATING"); sorted: BrowserState.sort-col == 6; clicked => { StudioState.sort-by(6); } }
-                Head { x: root.x-title; width: root.w-title; height: Theme.h-header; y: Theme.space-sm; title: @tr("TITLE"); sorted: BrowserState.sort-col == 0; clicked => { StudioState.sort-by(0); } }
-                Head { x: root.x-artist; width: root.w-artist; height: Theme.h-header; y: Theme.space-sm; title: @tr("ARTIST"); sorted: BrowserState.sort-col == 1; clicked => { StudioState.sort-by(1); } }
-                Head { x: root.x-time; width: root.w-time; height: Theme.h-header; y: Theme.space-sm; title: @tr("LENGTH"); right: true; sorted: BrowserState.sort-col == 5; clicked => { StudioState.sort-by(5); } }
-                Head { x: root.x-bpm; width: root.w-bpm; height: Theme.h-header; y: Theme.space-sm; title: "BPM"; right: true; sorted: BrowserState.sort-col == 4; clicked => { StudioState.sort-by(4); } }
-                Head { x: root.x-key; width: root.w-key; height: Theme.h-header; y: Theme.space-sm; title: @tr("KEY"); sorted: BrowserState.sort-col == 3; clicked => { StudioState.sort-by(3); } }
-                if root.w-genre > 0px: Head { x: root.x-genre; width: root.w-genre; height: Theme.h-header; y: Theme.space-sm; title: @tr("GENRE"); sorted: BrowserState.sort-col == 2; clicked => { StudioState.sort-by(2); } }
+                clip: true;
+                Rectangle {
+                    x: list.content-x;
+                    width: root.columns-w;
+                    height: parent.height;
+                    Head { x: root.x-rating; width: root.w-rating; height: Theme.h-header; y: Theme.space-sm; title: @tr("RATING"); sorted: BrowserState.sort-col == 6; clicked => { StudioState.sort-by(6); } }
+                    Head { x: root.x-title; width: root.w-title; height: Theme.h-header; y: Theme.space-sm; title: @tr("TITLE"); sorted: BrowserState.sort-col == 0; clicked => { StudioState.sort-by(0); } }
+                    Head { x: root.x-artist; width: root.w-artist; height: Theme.h-header; y: Theme.space-sm; title: @tr("ARTIST"); sorted: BrowserState.sort-col == 1; clicked => { StudioState.sort-by(1); } }
+                    Head { x: root.x-time; width: root.w-time; height: Theme.h-header; y: Theme.space-sm; title: @tr("LENGTH"); right: true; sorted: BrowserState.sort-col == 5; clicked => { StudioState.sort-by(5); } }
+                    Head { x: root.x-bpm; width: root.w-bpm; height: Theme.h-header; y: Theme.space-sm; title: "BPM"; right: true; sorted: BrowserState.sort-col == 4; clicked => { StudioState.sort-by(4); } }
+                    Head { x: root.x-key; width: root.w-key; height: Theme.h-header; y: Theme.space-sm; title: @tr("KEY"); sorted: BrowserState.sort-col == 3; clicked => { StudioState.sort-by(3); } }
+                    if root.w-genre > 0px: Head { x: root.x-genre; width: root.w-genre; height: Theme.h-header; y: Theme.space-sm; title: @tr("GENRE"); sorted: BrowserState.sort-col == 2; clicked => { StudioState.sort-by(2); } }
+                }
             }
             list := ListView {
+                content-width: root.columns-w;
                 for cells[i] in BrowserState.tracks: Rectangle {
                     height: root.row-h;
+                    width: root.columns-w;
                     property <bool> current: i == BrowserState.current-row;
                     property <bool> picked: BrowserState.selected-rows[i];
                     property <int> gen: root.cover-generation;
-                    property <bool> on-deck: cells[0].text != "" && (DeckState.decks[0].title == cells[0].text || DeckState.decks[1].title == cells[0].text);
+                    property <bool> on-deck: DeckState.loaded-deck(cells[14].text) >= 0;
                     changed gen => { BrowserState.cover-wanted(i); }
                     init => { BrowserState.cover-wanted(i); }
                     Rectangle {
@@ -174,7 +184,7 @@ export component StudioTable inherits Rectangle {
                             pointer-event(e) => {
                                 if (e.kind == PointerEventKind.cancel) { root.collapse-row = -1; return; }
                                 if (e.kind == PointerEventKind.up) {
-                                    if (e.button == PointerEventButton.left && root.collapse-row == i) { root.collapse-row = -1; root.choose(i, 0); }
+                                    if (e.button == PointerEventButton.left && root.collapse-row == i) { root.collapse-row = -1; if (root.collapse-id == cells[14].text) { root.choose(i, 0); } }
                                     return;
                                 }
                                 if (e.kind != PointerEventKind.down) { return; }
@@ -184,7 +194,7 @@ export component StudioTable inherits Rectangle {
                                 if (e.button == PointerEventButton.left) {
                                     if (e.modifiers.control || e.modifiers.meta) { root.choose(i, 1); }
                                     else if (e.modifiers.shift) { root.choose(i, 2); }
-                                    else if (picked) { root.collapse-row = i; }
+                                    else if (picked) { root.collapse-row = i; root.collapse-id = cells[14].text; }
                                     else { root.choose(i, 0); }
                                     if (!e.modifiers.control && !e.modifiers.meta && !e.modifiers.shift) { BrowserState.track-pressed(i); }
                                 } else if (e.button == PointerEventButton.right) {

@@ -203,6 +203,8 @@ pub struct Deck {
     key_st: Cell<i32>,
     /// PAD FX pad currently held (its effect is on), see [`pads`].
     pad_fx: Cell<Option<usize>>,
+    /// The latest non-sampler pad owns cleanup; sampler holds are independent per pad.
+    pad_owner: Cell<Option<usize>>,
     /// Page of the current pad mode (see `pads::page_range`); 0 after a mode change.
     pad_page: Cell<i32>,
     /// Logical size of the two waveform elements, reported by the layout.
@@ -336,6 +338,7 @@ impl Deck {
             key_st: Cell::new(0),
             pad_page: Cell::new(0),
             pad_fx: Cell::new(None),
+            pad_owner: Cell::new(None),
             detail_size: Cell::default(),
             overview_size: Cell::default(),
             tap: RefCell::default(),

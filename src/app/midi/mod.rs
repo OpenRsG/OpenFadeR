@@ -74,14 +74,7 @@ use jog::Jog;
 use led::Leds;
 use port::Sink;
 use slint::Timer;
-use std::{
-    cell::Cell,
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    fmt,
-    rc::Rc,
-    time::Instant,
-};
+use std::{cell::Cell, cell::RefCell, collections::HashMap, fmt, rc::Rc, time::Instant};
 
 /// A channel message without its value: status byte and data1.
 type Msg = (u8, u8);
@@ -106,6 +99,13 @@ struct Binding {
     arg: i32,
     /// 14-bit knob: `d1` is the MSB controller, `d1 + 0x20` the LSB.
     hires: bool,
+}
+
+/// A momentary press owns its original binding and physical deck recipients until release.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct HeldAction {
+    binding: Binding,
+    decks: u8,
 }
 
 /// What a controller light shows.
@@ -346,8 +346,8 @@ struct Midi {
     dump_due: RefCell<Option<Vec<u8>>>,
     /// The mapping file's state request, kept to ask again when the layout widens (empty = none).
     request: RefCell<Vec<u8>>,
-    /// Note-ons not yet released: on unplug they are released for the controller.
-    held: RefCell<HashSet<(u8, u8)>>,
+    /// Momentary controls still down, including CC buttons; unplug releases their saved recipients.
+    held: RefCell<HashMap<Msg, HeldAction>>,
     /// Toasts waiting for the next tick ([`Midi::notify`]).
     pending: RefCell<Vec<String>>,
     /// The light timer, restarted when a controller with another jog-ring period connects.

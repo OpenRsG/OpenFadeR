@@ -96,6 +96,8 @@ pub struct Stems {
     done: Box<[AtomicBool]>,
     /// Seam `s` (frames shared by segment `s-1` and `s`): one side has deposited its weighted share.
     seams: Box<[Mutex<bool>]>,
+    #[cfg(feature = "stems")]
+    memory: Option<crate::stems::output::Lease>,
 }
 
 impl Stems {
@@ -112,6 +114,8 @@ impl Stems {
             grid,
             done: (0..n).map(|_| AtomicBool::new(false)).collect(),
             seams: (0..n).map(|_| Mutex::new(false)).collect(),
+            #[cfg(feature = "stems")]
+            memory: None,
         }
     }
 
@@ -131,7 +135,15 @@ impl Stems {
             },
             done: Box::new([AtomicBool::new(true)]),
             seams: Box::new([Mutex::new(false)]),
+            #[cfg(feature = "stems")]
+            memory: None,
         }
+    }
+
+    #[cfg(feature = "stems")]
+    pub(crate) fn with_memory(mut self, lease: crate::stems::output::Lease) -> Self {
+        self.memory = Some(lease);
+        self
     }
 
     pub fn frames(&self) -> usize {
@@ -359,11 +371,18 @@ pub struct Rest<'a> {
     pub part: Part<'a>,
 }
 
-impl Source for Rest<'_> {
-    fn frame_at(&self, pos: f64) -> Option<[f32; 2]> {
+impl Rest<'_> {
+    /// Rest and selected part at one position; independent stretchers must read them separately.
+    pub(crate) fn frame_with_part(&self, pos: f64) -> Option<([f32; 2], [f32; 2])> {
         let m = self.mixed.frame_at(pos)?;
         let p = self.part.frame_at(pos)?;
-        Some([m[0] - p[0], m[1] - p[1]])
+        Some(([m[0] - p[0], m[1] - p[1]], p))
+    }
+}
+
+impl Source for Rest<'_> {
+    fn frame_at(&self, pos: f64) -> Option<[f32; 2]> {
+        self.frame_with_part(pos).map(|(rest, _)| rest)
     }
 }
 

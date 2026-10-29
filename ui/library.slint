@@ -146,9 +146,8 @@ export component LibraryOverlays inherits Rectangle {
     // The import report sits under the path dialog SAVE AS TEXT opens.
     ImportReportOverlay {}
 
-    // Path / name entry.
-    DialogFrame {
-        visible: LibraryState.path-open;
+    // Create the field on each opening so its init focus runs again.
+    if LibraryState.path-open: DialogFrame {
         title: LibraryState.path-title;
         card-width: 560px;
         closed => { LibraryState.path-done(false); }
@@ -167,7 +166,7 @@ export component LibraryOverlays inherits Rectangle {
             spacing: Theme.space-md;
             vertical-stretch: 0;
             alignment: end;
-            Chip { text: @tr("OK"); width: 80px; horizontal-stretch: 0; active: true; clicked => { LibraryState.path-done(true); } }
+            Chip { text: @tr("OK"); width: 80px; horizontal-stretch: 0; active: true; enabled: LibraryState.path-text != ""; clicked => { LibraryState.path-done(true); } }
             Chip { text: @tr("CANCEL"); width: 80px; horizontal-stretch: 0; clicked => { LibraryState.path-done(false); } }
         }
     }

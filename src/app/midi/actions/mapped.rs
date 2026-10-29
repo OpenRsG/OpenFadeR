@@ -60,7 +60,7 @@ pub(super) const TABLE: &[Action] = &[
     on_deck(
         "hw-pad",
         |d, a| d.pad_hw(a / 16, (a % 16) as usize),
-        Some(|d, a| d.pad_released_at((a % 16) as usize)),
+        Some(|d, a| d.pad_released_at(a / 16, (a % 16) as usize)),
     ),
     on_deck("hw-pad-delete", |d, a| d.pad_delete(a as usize), None),
     on_deck("hw-pad-stop", |d, a| d.pad_stop(a as usize), None),
@@ -72,11 +72,11 @@ pub(super) const TABLE: &[Action] = &[
     on_deck("hw-cue-call", |d, a| d.cue_call(a), None),
     on_deck("hw-master", |d, _| d.master_toggle(), None),
     on_deck("hw-track-start", |d, _| d.jump_to_start(), None),
-    // arg = slot in the visible bank
+    // The press snapshot resolves the visible bank once; both callbacks receive the absolute slot.
     arg(
         "hw-sampler",
-        sampler_pad!(invoke_pad_pressed),
-        Some(sampler_pad!(invoke_pad_released)),
+        |a, _, slot| a.global::<SamplerState>().invoke_pad_pressed(slot),
+        Some(|a, _, slot| a.global::<SamplerState>().invoke_pad_released(slot)),
     ),
     // The FX actions take the unit (0 FX1, 1 FX2) as their deck. arg = 0..3 CH1..CH4, 4 MASTER
     arg_cb!("hw-fx-assign", FxState::invoke_assign_selected),

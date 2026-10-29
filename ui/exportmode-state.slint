@@ -49,6 +49,7 @@ export struct ExportDeck {
 /// ui/app.slint flips `visible` with the mode selector and `layout` with the layout selector.
 export global ExportModeState {
     in-out property <bool> visible;
+    callback refresh();
     /// 0 1 PLAYER, 1 2 PLAYER, 2 DUAL PLAYER, 3 SIMPLE PLAYER, 4 FULL BROWSER.
     in-out property <int> layout;
     in property <[string]> layout-names: [@tr("1 PLAYER"), @tr("2 PLAYER"), @tr("DUAL PLAYER"), @tr("SIMPLE PLAYER"), @tr("FULL BROWSER")];

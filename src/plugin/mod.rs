@@ -219,7 +219,7 @@ pub struct Plugin {
     /// The plugin folder; empty for a built-in plugin.
     pub dir: PathBuf,
     pub manifest: Manifest,
-    /// Set for a plugin compiled into the app ([`builtin`]): no folder, always on, no uninstall.
+    /// Set for a plugin compiled into the app ([`builtin`]): no folder or uninstall.
     pub builtin: Option<&'static builtin::Builtin>,
 }
 
@@ -242,6 +242,35 @@ pub struct Registry {
 impl Registry {
     pub fn get(&self, name: &str) -> Option<&Plugin> {
         self.plugins.iter().find(|p| p.manifest.name == name)
+    }
+
+    fn with_builtins(mut self) -> Self {
+        // Keep optional adapters in companion order: ties choose the first device/library provider.
+        for p in builtin::plugins().iter().filter(|p| !p.always_on()) {
+            let at = self
+                .plugins
+                .iter()
+                .rposition(|found| found.manifest.name <= p.manifest.name)
+                .map_or(0, |i| i + 1);
+            self.plugins.insert(at, p.clone());
+        }
+        self.plugins.splice(
+            0..0,
+            builtin::plugins().iter().filter(|p| p.always_on()).cloned(),
+        );
+        self
+    }
+
+    fn configured(mut self, cfg: &config::Config) -> Self {
+        // A removed compiled-in adapter stays visible but off, so it can be explicitly re-enabled.
+        self.plugins
+            .retain(|p| p.builtin.is_some() || !cfg.removed.contains(&p.manifest.name));
+        (self.plugins, self.disabled) = self.plugins.into_iter().partition(|p| {
+            p.always_on()
+                || (cfg.enabled(&p.manifest.name)
+                    && (p.builtin.is_none() || !cfg.removed.contains(&p.manifest.name)))
+        });
+        self
     }
 
     /// [`Plugin::tr`] of the plugin called `name`; `text` as it is when there is none.
@@ -327,10 +356,11 @@ impl Registry {
 
 /// The plugin folders read, the uninstalled plugins left out and the switched-off ones set apart.
 fn read_all() -> Registry {
-    let mut r = discover(&crate::paths::search_path(
+    let r = discover(&crate::paths::search_path(
         "OPENFADER_PLUGINS",
         "extension/plugin",
-    ));
+    ))
+    .with_builtins();
     let found: Vec<&str> = r.plugins.iter().map(|p| p.manifest.name.as_str()).collect();
     config::seed(&found);
     let mut cfg = config::get();
@@ -339,15 +369,7 @@ fn read_all() -> Registry {
             eprintln!("plugin: {e}");
         }
     }
-    r.plugins
-        .retain(|p| !cfg.removed.contains(&p.manifest.name));
-    (r.plugins, r.disabled) = r
-        .plugins
-        .into_iter()
-        .partition(|p| cfg.enabled(&p.manifest.name));
-    // The built-in plugins come first and are on whatever the user decided.
-    r.plugins.splice(0..0, builtin::plugins().iter().cloned());
-    r
+    r.configured(&cfg)
 }
 
 /// The registry the app started with: its effects, sources, knob and pad modes are the app's for the rest of the process.
@@ -549,6 +571,11 @@ fn validate(m: &Manifest, file: &str, dir: Option<&Path>) -> Result<(), String> 
 }
 
 impl Plugin {
+    /// Whether this adapter must stay active regardless of saved plugin choices.
+    pub fn always_on(&self) -> bool {
+        self.builtin.is_some_and(|b| b.always_on)
+    }
+
     /// `text` given by this plugin (its manifest, a reply) in the language set, from its `locales/` ([`crate::locale`]).
     pub fn tr(&self, text: &str) -> String {
         match self.builtin {

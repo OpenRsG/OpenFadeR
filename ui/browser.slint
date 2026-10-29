@@ -417,7 +417,7 @@ export component Browser inherits Rectangle {
                     Image { source: BrowserState.previews[root.preview-row]; width: parent.width; height: parent.height; image-fit: fill; }
                     TouchArea { enabled: root.preview-row >= 0; clicked => { BrowserState.preview-seek(root.preview-row, self.mouse-x / self.width); } }
                 }
-                if BrowserState.palette-enabled: IconButton { icon: Icon.layout-4h; icon-size: 16px; tooltip: @tr("Playlist Palette"); active: BrowserState.palette-open; clicked => { BrowserState.palette-open = !BrowserState.palette-open; } }
+                if BrowserState.palette-enabled: IconButton { icon: Icon.layout-4h; icon-size: 16px; tooltip: @tr("Playlist Palette"); active: BrowserState.palette-open; clicked => { BrowserState.palette-toggled(!BrowserState.palette-open); } }
                 IconButton { icon: Icon.chevron-up; icon-size: 16px; tooltip: @tr("Move up"); enabled: root.list-edit; clicked => { BrowserState.list-move(-1); } }
                 IconButton { icon: Icon.chevron-down; icon-size: 16px; tooltip: @tr("Move down"); enabled: root.list-edit; clicked => { BrowserState.list-move(1); } }
                 IconButton { icon: Icon.trash; icon-size: 16px; tooltip: @tr("Remove from the list"); enabled: root.list-edit; clicked => { BrowserState.list-remove(); } }

@@ -1,8 +1,7 @@
 //! Library sources (base). Every source maps its rows to the shared [`Track`] / [`Playlist`] types (those of the library
 //! plugin SDK: one definition for the host and the plugins) and implements [`Library`]; [`open`] picks the source from
 //! the path: the library plugin that claims it ([`crate::plugin::library`]), else a plain folder is [`folder`]. The base
-//! also owns the "Histories" folder convention ([`is_history`]). [`markup`] is the mini XML tag reader and [`pathmap`] the
-//! `OPENFADER_PATH_MAP` remapping.
+//! also owns the "Histories" folder convention ([`is_history`]) and `OPENFADER_PATH_MAP` remapping ([`pathmap`]).
 //!
 //! Children: [`own`] (our own Collection, the library the app opens), [`folder`] (plain directory of audio), [`snapshot`]
 //! (the owned export input of a library), [`playlist_file`] (M3U / M3U8 / PLS files), [`relocate`] (finding moved files by
@@ -22,7 +21,6 @@ pub mod relocate;
 pub mod snapshot;
 pub mod translate;
 
-pub mod markup;
 mod pathmap;
 
 use openfader_plugin::library::{playlist_tree, PlaylistRow};

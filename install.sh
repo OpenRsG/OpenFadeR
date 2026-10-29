@@ -23,7 +23,7 @@ if [ "${1:-}" = --uninstall ]; then
 fi
 
 cd "$root"
-[ -e extension/plugin ] || git clone --quiet --branch "${PLUGINS_REF:-v0.2.8}" \
+[ -e extension/plugin ] || git clone --quiet --branch "${PLUGINS_REF:-v0.2.11}" \
 	https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
 for pair in extension/skin:OpenFadeR-Themes mappings:OpenFadeR-Map; do
 	[ -e "${pair%%:*}" ] || git clone --quiet "https://github.com/OpenRsG/${pair#*:}.git" "${pair%%:*}"
@@ -38,7 +38,11 @@ cargo build --release --quiet "${features[@]}"
 rm -rf "$lib.prev" "$lib.new" "$lib.swap" # a build installed here is newer than what an in-app update kept
 mkdir -p "$lib" "$bin" "$apps" "$icons"
 cp target/release/openfader "$lib/"
-cp -L target/release/*.so* "$lib/" 2>/dev/null || true # ONNX Runtime / WebGPU for STEMS, found next to the program
+# Plugins are bundled in their own folders, not beside the executable.
+for runtime in target/release/libonnxruntime*.so* target/release/libwebgpu_dawn.so*; do
+	[ -f "$runtime" ] || continue
+	cp -L "$runtime" "$lib/"
+done
 python3 .github/bundle.py "$lib"
 ln -sf "$lib/openfader" "$bin/openfader"
 cp assets/icon.png "$icons/openfader.png"

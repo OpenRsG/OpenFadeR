@@ -31,7 +31,7 @@
 //! Not supported (ceiling, add as map entries): albumArtist, originalArtist, producer, mixName,
 //! remixedBy, label, year, counter, dateReleased, myTag, grouping.
 
-use compat_rekordbox_common::{Edge, tags};
+use openfader_plugin::markup::{Edge, tags};
 use rusqlite::types::Value;
 use std::collections::HashMap;
 

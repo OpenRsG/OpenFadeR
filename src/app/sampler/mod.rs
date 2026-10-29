@@ -285,6 +285,7 @@ impl Sampler {
                 format!("{secs:.1}")
             )
         };
+        self.invalidate_load(i);
         let band = capture::band(&pcm);
         bus.sampler.load(i, pcm, bpm);
         {
@@ -294,6 +295,13 @@ impl Sampler {
         self.apply(i);
         self.say(info);
         Ok(())
+    }
+
+    fn invalidate_load(&self, slot: usize) {
+        let mut pending = self.pending.borrow_mut();
+        if pending.as_ref().is_some_and(|p| p.slot == slot) {
+            *pending = None;
+        }
     }
 
     /// Starts decoding `file` into slot `slot` (a TRK load or the next pack file); the timer takes the result.
@@ -370,6 +378,37 @@ pub fn controller_button(app: &App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clear_prevents_late_decode_errors_and_preserves_another_slots_pending_load() {
+        use openfader::{
+            library::{Library, own::Own},
+            store::Store,
+        };
+        super::super::headless::init();
+        let app = App::new().unwrap();
+        let lib: Rc<dyn Library> = Rc::new(Own::new(Arc::new(Store::in_memory().unwrap())));
+        let decks = super::super::deck::wire(&app, lib, Default::default());
+        wire(&app, &decks, Default::default());
+        let sampler = ME.with(|me| me.borrow().upgrade()).unwrap();
+        let state = app.global::<SamplerState>();
+        sampler.decode(0, PathBuf::new(), 120.0);
+        state.invoke_clear_clicked();
+        assert!(sampler.pending.borrow().is_none());
+        state.set_status("cleared".into());
+        sampler.tick();
+        assert_eq!(
+            state.get_status(),
+            "cleared",
+            "cancelled decode cannot publish a stale error"
+        );
+        sampler.decode(1, PathBuf::new(), 120.0);
+        state.invoke_clear_clicked();
+        assert_eq!(sampler.pending.borrow().as_ref().unwrap().slot, 1);
+        sampler.select(1);
+        state.invoke_clear_clicked();
+        assert!(sampler.pending.borrow().is_none());
+    }
 
     #[test]
     fn every_deck_is_a_source_and_trk_follows_them() {

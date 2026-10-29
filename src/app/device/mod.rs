@@ -49,7 +49,7 @@ mod verify;
 
 pub use import::import_tracks;
 pub use link::{track_edited, track_loading};
-pub(crate) use scan::mounted;
+pub(crate) use scan::{Snapshot as Discovery, mounted, with_snapshot};
 pub use transfer::{Dest, List, drop_playlist, drop_tracks};
 pub use verify::verify;
 
@@ -73,13 +73,14 @@ use std::{
     time::{Duration, Instant},
 };
 
-const BUSY: &str = n_!("Another job is running: wait for it or cancel it (X)");
+const BUSY: &str = n_!("Another job is running: wait for it to finish");
 
 /// What runs when a job ends, with the worker's result.
 type Then = Box<dyn FnOnce(&Rc<Ctx>, &Result<String, String>)>;
 
 struct Job {
     ctl: Arc<Control>,
+    cancellable: bool,
     rx: std::sync::mpsc::Receiver<Result<String, String>>,
     /// The device it writes to (eject and delete are refused meanwhile).
     device: Option<String>,
@@ -516,8 +517,12 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> Guard {
     });
     let c = cx.clone();
     s.on_cancel(move || {
-        if let Some(j) = c.job.borrow().as_ref() {
+        if let Some(j) = c.job.borrow().as_ref().filter(|j| j.cancellable) {
             j.ctl.cancel();
+            c.with_state(|s| {
+                s.set_can_cancel(false);
+                s.set_phase(tr!("Cancelling…").into());
+            });
             c.say(tr!("Cancelling…"), false);
         }
     });

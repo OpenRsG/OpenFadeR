@@ -18,33 +18,36 @@ export component WaveView inherits Image {
     changed height => { self.resized(self.width, self.height); }
 }
 
-/// The enlarged waveform of deck `index`: Rust's still picture (`DeckLive.detail`, `DeckScroll.strip-w` wide) slid by
-/// `strip-x` under the fixed playhead at the centre, with the slip ghost and the beat counter over it. Only `DeckScroll`
-/// changes while a deck plays (src/app/deck/frame.rs), so a frame moves one image and redraws nothing else. Reports its
-/// size like [`WaveView`]; Rust draws the picture at that height and three times that width.
+/// The enlarged waveform of deck `index`: a source-pixel crop of Rust's cached three-view picture (`DeckLive.detail`).
+/// `DeckScroll.strip-x` selects the crop under the fixed playhead; CPU and GPU use the same mapping at the raster's
+/// physical size. Only `DeckScroll` changes during playback (src/app/deck/frame.rs), without rebuilding the image.
+/// Reports its visible size like [`WaveView`]; Rust draws the picture at that height and three times that width.
 export component WaveStrip inherits Rectangle {
     in property <int> index;
     callback resized(length, length);
     property <DeckScroll> s: DeckState.scroll[root.index];
+    property <length> pixel-size: root.s.strip-w / max(1, strip.source.width);
+    property <length> playhead-x: root.s.strip-w > 0px ? floor(strip.source.width / 6) * root.pixel-size : root.width / 2;
     clip: true;
     init => { self.resized(self.width, self.height); }
     changed width => { self.resized(self.width, self.height); }
     changed height => { self.resized(self.width, self.height); }
     changed index => { self.resized(self.width, self.height); }
-    Image {
-        x: DeckState.waveform-gpu ? 0px : root.s.strip-x;
+    // A shared source-pixel crop avoids backend-dependent snapping of a translated image at fractional scales.
+    strip := Image {
+        x: 0;
         y: 0;
-        width: DeckState.waveform-gpu ? root.width : root.s.strip-w;
-        height: root.height;
+        width: root.s.strip-w / 3;
+        height: self.source.height * root.pixel-size;
         source: DeckState.live[root.index].detail;
-        source-clip-x: DeckState.waveform-gpu ? round(-root.s.strip-x / max(1px, root.s.strip-w) * self.source.width) : 0;
-        source-clip-width: DeckState.waveform-gpu ? round(root.width / max(1px, root.s.strip-w) * self.source.width) : self.source.width;
+        source-clip-x: round(-root.s.strip-x / max(1px, root.s.strip-w) * self.source.width);
+        source-clip-width: self.source.width / 3;
         image-fit: fill;
         image-rendering: pixelated;
     }
     if root.s.slip-x >= 0: Rectangle { x: root.s.slip-x; width: 1px; background: Theme.slip-ghost; }
-    // The playhead: 2 px, white, on the centre.
-    Rectangle { x: root.width / 2 - 1px; width: 2px; background: Theme.wave-playhead; }
+    // Snap the fixed playhead to the same physical column as the strip's centre.
+    Rectangle { x: root.playhead-x - 1px; width: 2px; background: Theme.wave-playhead; }
     if root.s.beat-text != "": Text {
         x: root.width / 2 + 6px;
         y: root.height - 12px;
@@ -186,36 +189,43 @@ export component DeckDetail inherits Rectangle {
     // Drag = scratch: press holds the platter, the waveform follows the hand, release lets go. With VIEW > Click on the
     // waveform for PLAY and CUE on, a left click without a drag is PLAY / PAUSE and the right button is the CUE button.
     TouchArea {
+        property <int> scratch-owner: -1;
+        property <int> cue-owner: -1;
         x: 24px;
         width: wave.width;
         mouse-cursor: crosshair;
         enabled: DeckState.decks[root.index].loaded;
         pointer-event(e) => {
-            if (e.button == PointerEventButton.left) {
-                if (e.kind == PointerEventKind.down) {
-                    root.last-x = self.mouse-x;
-                    root.down-x = self.mouse-x;
-                    root.scratching = true;
-                    DeckState.scratch-begin(root.index);
-                }
-                if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) {
-                    root.scratching = false;
-                    DeckState.scratch-end(root.index);
-                    if (e.kind == PointerEventKind.up && abs(self.mouse-x - root.down-x) < 4px) {
-                        // With the MIX POINT LINK panel open a click picks the deck and its MIX POINT instead of PLAY / PAUSE.
-                        if (MixPointState.active) { MixPointState.wave-click(root.index, self.mouse-x / self.width); }
-                        else if (DeckState.click-wave) { DeckState.play-pause(root.index); }
-                    }
+            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                self.scratch-owner = root.index;
+                root.last-x = self.mouse-x;
+                root.down-x = self.mouse-x;
+                root.scratching = true;
+                DeckState.scratch-begin(self.scratch-owner);
+            }
+            if (self.scratch-owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up))) {
+                let owner = self.scratch-owner;
+                self.scratch-owner = -1;
+                root.scratching = false;
+                DeckState.scratch-end(owner);
+                if (e.kind == PointerEventKind.up && abs(self.mouse-x - root.down-x) < 4px) {
+                    if (MixPointState.active) { MixPointState.wave-click(owner, self.mouse-x / self.width); }
+                    else if (DeckState.click-wave) { DeckState.play-pause(owner); }
                 }
             }
-            if (e.button == PointerEventButton.right && DeckState.click-wave) {
-                if (e.kind == PointerEventKind.down) { DeckState.cue(root.index); }
-                if (e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel) { DeckState.cue-released(root.index); }
+            if (e.button == PointerEventButton.right && DeckState.click-wave && e.kind == PointerEventKind.down) {
+                self.cue-owner = root.index;
+                DeckState.cue(self.cue-owner);
+            }
+            if (self.cue-owner >= 0 && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.right && e.kind == PointerEventKind.up))) {
+                let owner = self.cue-owner;
+                self.cue-owner = -1;
+                DeckState.cue-released(owner);
             }
         }
         moved => {
-            if (self.pressed && root.scratching) {
-                DeckState.scratch-move(root.index, self.mouse-x - root.last-x);
+            if (self.pressed && self.scratch-owner >= 0) {
+                DeckState.scratch-move(self.scratch-owner, self.mouse-x - root.last-x);
                 root.last-x = self.mouse-x;
             }
         }

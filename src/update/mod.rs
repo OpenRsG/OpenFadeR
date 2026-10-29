@@ -4,7 +4,7 @@
 //!
 //! Nothing here touches the window and everything may block: callers run it on a worker thread. The API base is
 //! `$OPENFADER_UPDATE_API` (tests and a mirror), else `https://api.github.com`. The release's archives are named by
-//! `.github/workflows/release.yml`: [`asset_for`] knows the four of them. A machine with no archive (macOS on Intel, Windows
+//! `.github/workflows/release.yml`: [`Release::asset_for`] keeps the installed build variant. A machine with no archive (macOS on Intel, Windows
 //! on ARM), a package-manager or read-only install ([`install::locate`]) is sent to the release page instead.
 
 pub mod install;
@@ -14,14 +14,14 @@ use serde::Deserialize;
 use std::path::Path;
 use std::time::Duration;
 
-/// The release asset's name suffix for `(std::env::consts::OS, ARCH)`; the part before it is the product and version.
-fn archive_suffix(os: &str, arch: &str) -> Option<&'static str> {
-    Some(match (os, arch) {
-        ("linux", "x86_64") => "-linux-x86_64.tar.gz",
-        // The Raspberry Pi archive is the aarch64 Linux build (Debian 13, docs/raspberry-pi.md).
-        ("linux", "aarch64") => "-linux-aarch64-pi.tar.gz",
-        ("windows", "x86_64") => "-windows-x86_64.zip",
-        ("macos", "aarch64") => "-macos-arm64.zip",
+/// The product/version-independent suffix. Pi4 updates must not silently switch to the generic Pi build.
+fn archive_suffix(os: &str, arch: &str, variant: &str) -> Option<&'static str> {
+    Some(match (os, arch, variant) {
+        ("linux", "x86_64", "") => "-linux-x86_64.tar.gz",
+        ("linux", "aarch64", "" | "pi") => "-linux-aarch64-pi.tar.gz",
+        ("linux", "aarch64", "pi4") => "-linux-aarch64-pi4.tar.gz",
+        ("windows", "x86_64", "") => "-windows-x86_64.zip",
+        ("macos", "aarch64", "") => "-macos-arm64.zip",
         _ => return None,
     })
 }
@@ -72,15 +72,19 @@ impl Release {
         }
     }
 
-    /// The archive for `os` / `arch` (`std::env::consts` names), if the release has one.
-    pub fn asset_for(&self, os: &str, arch: &str) -> Option<&Asset> {
-        let suffix = archive_suffix(os, arch)?;
+    /// The archive for `os` / `arch` and the compiled build variant, if the release has one.
+    pub fn asset_for(&self, os: &str, arch: &str, variant: &str) -> Option<&Asset> {
+        let suffix = archive_suffix(os, arch, variant)?;
         self.assets.iter().find(|a| a.name.ends_with(suffix))
     }
 
-    /// [`Release::asset_for`] this machine.
+    /// [`Release::asset_for`] this machine without changing its build variant.
     pub fn asset(&self) -> Option<&Asset> {
-        self.asset_for(std::env::consts::OS, std::env::consts::ARCH)
+        self.asset_for(
+            std::env::consts::OS,
+            std::env::consts::ARCH,
+            env!("OPENFADER_BUILD_VARIANT"),
+        )
     }
 }
 
@@ -454,7 +458,7 @@ pub(crate) mod tests {
                 "notes.txt",
             ],
         );
-        let pick = |os, arch| r.asset_for(os, arch).map(|a| a.name.as_str());
+        let pick = |os, arch| r.asset_for(os, arch, "").map(|a| a.name.as_str());
         assert_eq!(
             pick("linux", "x86_64"),
             Some("openfader-0.3.0-linux-x86_64.tar.gz")
@@ -473,7 +477,35 @@ pub(crate) mod tests {
         );
         assert_eq!(pick("macos", "x86_64"), None, "no Intel Mac build");
         assert_eq!(pick("windows", "aarch64"), None);
-        assert_eq!(release("v1", &["x.zip"]).asset_for("linux", "x86_64"), None);
+        assert_eq!(
+            release("v1", &["x.zip"]).asset_for("linux", "x86_64", ""),
+            None
+        );
+    }
+
+    #[test]
+    fn pi4_updates_keep_the_cpu_target_and_never_fall_back_to_generic() {
+        let r = release(
+            "v0.3.0",
+            &[
+                "openfader-0.3.0-linux-aarch64-pi.tar.gz",
+                "openfader-0.3.0-linux-aarch64-pi4.tar.gz",
+            ],
+        );
+        assert_eq!(
+            r.asset_for("linux", "aarch64", "pi4").unwrap().name,
+            "openfader-0.3.0-linux-aarch64-pi4.tar.gz"
+        );
+        assert_eq!(
+            r.asset_for("linux", "aarch64", "pi").unwrap().name,
+            "openfader-0.3.0-linux-aarch64-pi.tar.gz"
+        );
+        assert!(r.asset_for("linux", "aarch64", "unknown").is_none());
+        assert!(
+            release("v0.3.0", &["openfader-0.3.0-linux-aarch64-pi.tar.gz"])
+                .asset_for("linux", "aarch64", "pi4")
+                .is_none()
+        );
     }
 
     #[test]
@@ -491,8 +523,8 @@ pub(crate) mod tests {
 
 #[cfg(test)]
 mod serve_tests {
-    use super::tests::{asset_of, release, serve};
     use super::Channel;
+    use super::tests::{asset_of, release, serve};
 
     #[test]
     fn the_latest_release_is_read_from_the_api_base() {

@@ -32,7 +32,7 @@ impl Deck {
         st.invoke_pad_pressed(slot);
     }
 
-    /// Every held SAMPLER pad went up (a keyboard key, a mode change): the held slots are released (ends GATE slots).
+    /// Mode exit releases every held sampler slot; ordinary key-up releases only its own pad.
     pub(super) fn sampler_release(&self) {
         (0..8).for_each(|pad| self.sampler_release_pad(pad));
     }
@@ -44,11 +44,14 @@ impl Deck {
         }
     }
 
-    /// A controller pad went up (`pad` 0..16): in SAMPLER mode only its own slot is released, so other held pads go on playing.
-    pub fn pad_released_at(&self, pad: usize) {
+    /// Release one sampler slot, or the latest held performance pad. Older releases cannot stop its replacement.
+    pub fn pad_released_at(&self, mode: i32, pad: usize) {
+        if self.view.borrow().pad_mode != mode {
+            return;
+        }
         if self.pad_mode() == PadMode::Sampler {
             self.sampler_release_pad(pad);
-        } else {
+        } else if self.pad_owner.get() == Some(pad % 8) {
             self.pad_released();
         }
     }
@@ -137,8 +140,8 @@ mod tests {
         deck.pad_hw(sampler, 0);
         deck.pad_hw(sampler, 1); // pad 1 pressed while pad 0 is held
         assert_eq!(*log.borrow(), [('+', 0), ('+', 1)], "pad 0 stays held");
-        deck.pad_released_at(0);
-        deck.pad_released_at(1);
+        deck.pad_released_at(sampler, 0);
+        deck.pad_released_at(sampler, 1);
         assert_eq!(
             *log.borrow(),
             [('+', 0), ('+', 1), ('-', 0), ('-', 1)],

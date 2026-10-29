@@ -72,11 +72,13 @@ impl Deck {
         } else if let Some(call) = hot_call(&l.analysis, pad) {
             drop(l);
             let paused = !self.playing();
+            let gated = self.gate.take().is_some();
             if let Call::Hot(ms) = call {
-                if paused && prefs::with(|p| p.controller.hot_cue_gate) {
+                if (paused || gated) && prefs::with(|p| p.controller.hot_cue_gate) {
                     self.gate.set(Some(ms));
                 }
             }
+            self.pad_owner.set(Some(pad));
             self.call(call);
         } else {
             let ms = self.mark(&l);

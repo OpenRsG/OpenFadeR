@@ -146,6 +146,7 @@ export global BrowserState {
     /// when none) with its tracks as "title — artist · BPM" lines.
     in property <bool> palette-enabled;
     in-out property <bool> palette-open;
+    callback palette-toggled(bool);
     in property <[string]> palette-names;
     in property <[[string]]> palette-tracks;
     /// A palette Rust wants renamed (a blank palette just made "Untitled Playlist"); -1 when none. The palette resets it.

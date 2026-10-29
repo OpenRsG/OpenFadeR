@@ -28,7 +28,7 @@
 //! `light` one of [`Led`] written as in Rust.
 
 use super::{Binding, Led, LedRow, Msg, actions::ACTIONS};
-use openfader::library::markup::{Edge, tags};
+use openfader_plugin::markup::{Edge, tags};
 use openfader::paths::search_path;
 use std::collections::HashMap;
 #[cfg(test)]

@@ -82,6 +82,8 @@ impl Deck {
     /// A pad of a plugin mode went down: remembered for [`Deck::plugin_release`], then its `press` steps run.
     pub(super) fn plugin_pad(&self, pad: usize) {
         if let Some(m) = self.plugin_decl() {
+            self.plugin_release();
+            self.pad_owner.set(Some(pad));
             self.plugin_held.set(Some((m, pad)));
             run(&m.press, pad, self);
         }
@@ -90,6 +92,7 @@ impl Deck {
     /// The pad let go: the `release` steps of the mode it was pressed in (nothing for a pad of another mode).
     pub(in crate::app::deck) fn plugin_release(&self) {
         if let Some((m, pad)) = self.plugin_held.take() {
+            self.pad_owner.set(None);
             run(&m.release, pad, self);
         }
     }

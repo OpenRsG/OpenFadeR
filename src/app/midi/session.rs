@@ -95,13 +95,11 @@ impl Midi {
     pub(super) fn close(&self, controller_present: bool) {
         self.close_claims();
         (self.dump.set(None), *self.dump_due.borrow_mut() = None);
-        let held: Vec<_> = self.held.borrow_mut().drain().collect();
-        for (status, d1) in held {
-            self.handle(Ev {
-                status: status & 0x8F,
-                d1,
-                d2: 0,
-            });
+        let held = self.held.take();
+        if let Some(app) = self.app.upgrade() {
+            for (_, held) in held {
+                self.release_held(&app, held);
+            }
         }
         for d in 0..DECKS {
             self.touch(d, false);

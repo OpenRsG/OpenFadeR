@@ -183,12 +183,17 @@ export component StageButton inherits Rectangle {
         colorize: root.label;
     }
     ta := TouchArea {
+        property <bool> momentary-held;
         enabled: root.enabled;
         clicked => { root.clicked(); }
         pointer-event(e) => {
-            if e.button == PointerEventButton.left {
-                if e.kind == PointerEventKind.down { root.pressed(); }
-                if e.kind == PointerEventKind.up { root.released(); }
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                self.momentary-held = true;
+                root.pressed();
+            }
+            if self.momentary-held && (e.kind == PointerEventKind.cancel || (e.button == PointerEventButton.left && e.kind == PointerEventKind.up)) {
+                self.momentary-held = false;
+                root.released();
             }
         }
     }

@@ -191,12 +191,13 @@ section!(
         show_mixer: bool = true;
         /// Pane sizes dragged with the Splitters (ui/panes.slint `PaneState`), in px from the default size, 0 = the default: the
         /// enlarged-waveform area, the EXPORT player panel, the browser's tree column, track info and palette, and the track table's
-        /// column widths (the title takes the rest). Written by [`panes_read`], restored by [`panes_apply`].
+        /// independent column widths. Written by [`panes_read`], restored by [`panes_apply`].
         pane_stage: i32 = 0;
         pane_player: i32 = 0;
         pane_tree: i32 = 0;
         pane_info: i32 = 0;
         pane_palette: i32 = 0;
+        col_title: i32 = 0;
         col_artist: i32 = 0;
         col_genre: i32 = 0;
         col_comment: i32 = 0;

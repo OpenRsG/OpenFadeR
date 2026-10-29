@@ -31,7 +31,7 @@ use render::{Palette, Rgb};
 use slint::ComponentHandle;
 use std::{cell::OnceCell, cell::RefCell, path::PathBuf, rc::Rc};
 
-pub use page::{install_and_choose, refresh, wire};
+pub use page::{install_and_choose, refresh, remove_named, wire};
 
 /// The names of the two built-in skins (the dark and the light base), which skin files cannot take. The first is the default.
 pub const BUILTIN: [&str; 2] = ["Catppuccin Mocha", "Catppuccin Latte"];

@@ -25,6 +25,9 @@ cargo build --release   # 0 warnings expected
 cargo test --release --workspace   # includes compatibility/ adapters, SDK and UI; companion tests run separately
 ```
 
+On Linux, `python3 .github/test_install.py -v` checks the installer with small C runtime/plugin fixtures. It needs `cc` and
+uses temporary install/configuration directories; it does not build Rust or use the user's installation.
+
 ## Making a change
 
 1. Branch off `main`.

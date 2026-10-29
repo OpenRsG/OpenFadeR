@@ -1,7 +1,8 @@
 //! The mixer channel's public face: [`Player`] and the state it shares with the audio thread.
 //!
-//! `Player` (UI thread) sets atomics in [`Shared`]; the audio callback reads them. A FADER plugin curve ([`Player::fader`])
-//! replaces the channel's fader gain (see [`voice`]). Children: [`clock`]
+//! `Player` (UI thread) publishes whole seek commands; the audio callback only `try_lock`s them. Their targets remain visible until
+//! the matching position/clock epoch is published. A FADER plugin curve ([`Player::fader`]) replaces the channel's fader gain
+//! (see [`voice`]). Children: [`clock`]
 //! (latency-compensated position clock), [`voice`] (one channel's render: varispeed or WSOLA, EQ, filter,
 //! gain, key shift / reverse / brake / scratch / nudge), [`scratch`] (jog scratch filter), [`mix`] (the audio
 //! callback and the bus mix), [`engine`] (the one cpal stream all `Player`s share and its lifecycle) and [`output`]
@@ -36,7 +37,7 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::sync::atomic::{
     AtomicBool, AtomicI64, AtomicU32, AtomicU64,
-    Ordering::{Relaxed, Release},
+    Ordering::{Acquire, Relaxed, Release},
 };
 use std::time::Instant;
 use voice::{Done, Voice, render};
@@ -88,6 +89,16 @@ fn unpack_beat(v: u64) -> Option<(f64, f64)> {
     (v != NO_SEEK).then(|| (f((v >> 32) as u32), f(v as u32)))
 }
 
+#[derive(Clone, Copy)]
+struct Seek {
+    epoch: u64,
+    target: f64,
+    from: u64,
+    beat: u64,
+    wrap: f32,
+    pending: bool,
+}
+
 struct Shared {
     /// Shared (not copied) with the stems job and the stem waveform.
     pcm: Mutex<Arc<Track16>>,
@@ -97,13 +108,10 @@ struct Shared {
     groove: groove::Controls,
     stem: [AtomicU32; STEM_COUNT], // f32 bits, target gain 0..=1 of each stem (voice ramps toward it)
     pos: AtomicU64,                // f64 bits, source-frame position (written by the callback)
-    seek: AtomicU64,               // f64 bits or NO_SEEK, consumed by the callback
-    /// f64 bits or NO_SEEK: the heard position (source frames) `seek` was worked out at ([`Player::seek_in_phase`]).
-    seek_from: AtomicU64,
-    /// [`pack_beat`] or NO_SEEK: the beat grid a seek is kept on ([`Player::seek_on_beat`]), consumed with `seek`.
-    seek_beat: AtomicU64,
-    /// f32 bits: a loop's length in frames the landing of a seek on the beat wraps in (0 = none), consumed with `seek_beat`.
-    seek_wrap: AtomicU32,
+    /// Latest whole command; retained after consumption until its position and clock have been published.
+    seek: Mutex<Seek>,
+    /// Epoch of `pos`, published after the callback finishes rendering it.
+    pos_epoch: AtomicU64,
     playing: AtomicBool,
     rate: AtomicU64,         // f64 bits, varispeed
     nudge: AtomicU32,        // f32 bits, temporary offset added to the rate (jog bend)
@@ -123,7 +131,7 @@ struct Shared {
     cut: AtomicBool, // JOG CUTTER gate: channel cut (ramped per sample, see voice::CUT_S)
     t: Transport,    // key shift, reverse, slip, brake
     level: AtomicU32, // f32 bits, post-gain peak of the last buffer (callback only)
-    /// The callback only `try_lock`s it (a missed buffer costs one anchor, see `mix`); `position_ms` locks it.
+    /// The callback only `try_lock`s it (pending anchors stay in `mix`); `position_ms` locks it.
     clock: Mutex<Clock>,
     /// External mixer mode: the channel's output is the raw track (no EQ, filter, COLOR FX, fader or crossfader);
     /// set when the stream opens.
@@ -151,10 +159,15 @@ impl Shared {
             groove: groove::Controls::default(),
             stem: [0; STEM_COUNT].map(|_| AtomicU32::new(1f32.to_bits())),
             pos: AtomicU64::new(0),
-            seek: AtomicU64::new(NO_SEEK),
-            seek_from: AtomicU64::new(NO_SEEK),
-            seek_beat: AtomicU64::new(NO_SEEK),
-            seek_wrap: AtomicU32::new(0),
+            seek: Mutex::new(Seek {
+                epoch: 0,
+                target: 0.0,
+                from: NO_SEEK,
+                beat: NO_SEEK,
+                wrap: 0.0,
+                pending: false,
+            }),
+            pos_epoch: AtomicU64::new(0),
             steady: AtomicBool::new(true),
             playing: AtomicBool::new(false),
             rate: AtomicU64::new(1f64.to_bits()),
@@ -224,12 +237,20 @@ impl Shared {
         if self.playing.load(Relaxed) {
             self.t.diverge();
         }
-        if heard.is_none() || self.seek.load(Relaxed) == NO_SEEK {
-            self.seek_from
-                .store(heard.map_or(NO_SEEK, f64::to_bits), Relaxed);
-        }
-        self.seek_beat.store(NO_SEEK, Relaxed);
-        self.seek.store(f.to_bits(), Release);
+        let mut seek = self.seek.lock();
+        let from = if heard.is_some() && seek.pending {
+            seek.from
+        } else {
+            heard.map_or(NO_SEEK, f64::to_bits)
+        };
+        *seek = Seek {
+            epoch: seek.epoch.wrapping_add(1),
+            target: f,
+            from,
+            beat: NO_SEEK,
+            wrap: 0.0,
+            pending: true,
+        };
     }
 
     /// Seek to source frame `f` plus how far into its beat the written playhead is when the callback takes the seek: the grid has
@@ -240,10 +261,15 @@ impl Shared {
         if self.playing.load(Relaxed) {
             self.t.diverge();
         }
-        self.seek_from.store(NO_SEEK, Relaxed);
-        self.seek_wrap.store((wrap as f32).to_bits(), Relaxed);
-        self.seek_beat.store(pack_beat(start, len), Relaxed);
-        self.seek.store(f.to_bits(), Release);
+        let mut seek = self.seek.lock();
+        *seek = Seek {
+            epoch: seek.epoch.wrapping_add(1),
+            target: f,
+            from: NO_SEEK,
+            beat: pack_beat(start, len),
+            wrap: wrap as f32,
+            pending: true,
+        };
     }
 
     /// Platter touched: scratching starts at the current position, paused or playing. Made while playing under slip it diverges from the shadow.
@@ -372,8 +398,7 @@ impl Player {
         self.shared.src_rate.store(pcm.rate, Relaxed);
         drop(self.shared.beats.lock().take()); // the grid belongs to the old track
         self.frames = pcm.frames() as u64;
-        self.shared.seek_beat.store(NO_SEEK, Relaxed); // a seek of the old track's grid is not this one's
-        self.shared.seek.store(0f64.to_bits(), Relaxed);
+        self.shared.seek_to(0.0); // a seek of the old track's grid is not this one's
         self.shared.pos.store(0f64.to_bits(), Relaxed);
         let old_stems = self.shared.stems.lock().take();
         let old = std::mem::replace(&mut *self.shared.pcm.lock(), pcm);
@@ -447,10 +472,10 @@ impl Player {
         let (pos, frames) = (self.pos_frames(), self.frames as f64);
         if self.reverse() {
             if pos <= 0.0 || pos >= frames {
-                self.shared.seek.store((frames - 1.0).to_bits(), Relaxed); // reversed to the start: restart from the end
+                self.shared.seek_to(frames - 1.0); // reversed to the start: restart from the end
             }
         } else if pos >= frames {
-            self.shared.seek.store(0f64.to_bits(), Relaxed); // finished track: restart
+            self.shared.seek_to(0.0); // finished track: restart
         }
         self.shared.play(ramp);
     }
@@ -524,12 +549,12 @@ impl Player {
 
     /// Frames written (or the pending seek target): the resting position.
     fn pos_frames(&self) -> f64 {
-        let s = self.shared.seek.load(Relaxed);
-        f64::from_bits(if s != NO_SEEK {
-            s
+        let seek = self.shared.seek.lock();
+        if seek.epoch != self.shared.pos_epoch.load(Acquire) {
+            seek.target
         } else {
-            self.shared.pos.load(Relaxed)
-        })
+            f64::from_bits(self.shared.pos.load(Relaxed))
+        }
     }
 
     /// Isolator EQ in dB per band (low ~200 Hz shelf, mid ~1 kHz peak, high ~4 kHz shelf), each clamped
@@ -676,14 +701,19 @@ impl Player {
             return 0.0;
         }
         let frames = self.frames as f64;
-        // Paused, or a seek not yet consumed: no extrapolation, report the resting position. A scratch moves the paused playhead too.
-        let f = if (self.is_playing() || self.is_scratching())
-            && self.shared.seek.load(Relaxed) == NO_SEEK
-            && self.engine.available()
-        {
-            heard_frames(&self.shared.clock.lock(), Instant::now(), frames)
+        let seek = *self.shared.seek.lock();
+        // A consumed seek still owns the display until its matching clock epoch is published.
+        let f = if (self.is_playing() || self.is_scratching()) && self.engine.available() {
+            let clock = self.shared.clock.lock();
+            if seek.epoch == clock.epoch {
+                heard_frames(&clock, Instant::now(), frames)
+            } else {
+                seek.target.min(frames)
+            }
+        } else if seek.epoch != self.shared.pos_epoch.load(Acquire) {
+            seek.target.min(frames)
         } else {
-            self.pos_frames().min(frames)
+            f64::from_bits(self.shared.pos.load(Relaxed)).min(frames)
         };
         f * 1000.0 / self.src_rate as f64
     }
@@ -691,9 +721,9 @@ impl Player {
     /// [`Self::position_ms`] follows the audio being heard: no seek waits for the next buffer and, playing, the first buffer
     /// since the last seek or start is past its output latency (until then the position holds at the target).
     pub fn settled(&self) -> bool {
-        self.shared.seek.load(Relaxed) == NO_SEEK
-            && self.engine.available()
-            && audible(&self.shared.clock.lock(), Instant::now())
+        let seek = *self.shared.seek.lock();
+        let clock = self.shared.clock.lock();
+        seek.epoch == clock.epoch && self.engine.available() && audible(&clock, Instant::now())
     }
 
     /// No brake or spin-up ramp ran in the last buffer: the deck plays at its tempo, so its position is not changing speed.

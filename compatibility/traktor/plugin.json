@@ -1,0 +1,23 @@
+{
+  "name": "traktor",
+  "version": "0.1.0",
+  "description": "Traktor collection (collection.nml): read from Traktor's folder or a USB stick, and written on sticks next to the other libraries, sharing their audio, for Traktor's Import another Collection.",
+  "library": {
+    "formats": [
+      "dir",
+      "nml"
+    ],
+    "device": true,
+    "detect": {
+      "linux": [
+        "~/Documents/Native Instruments/Traktor */collection.nml"
+      ],
+      "macos": [
+        "~/Documents/Native Instruments/Traktor */collection.nml"
+      ],
+      "windows": [
+        "%USERPROFILE%/Documents/Native Instruments/Traktor */collection.nml"
+      ]
+    }
+  }
+}

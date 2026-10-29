@@ -168,7 +168,10 @@ impl Deck {
         let Some((s, e)) = Self::slicer_ms(&l, start, roll).filter(|(s, e)| e > s) else {
             return;
         };
-        if self.slicer.held.get().is_none() {
+        self.pad_owner.set(Some(pad));
+        if let Some(held) = self.slicer.held.get() {
+            self.slicer.held.set(Some(Held { pad, ..held }));
+        } else {
             self.slicer.held.set(Some(Held {
                 pad,
                 pos_ms: pos,
@@ -190,6 +193,7 @@ impl Deck {
         let Some(h) = self.slicer.held.take() else {
             return;
         };
+        self.pad_owner.set(None);
         let l = self.loaded.borrow_mut();
         let range = self
             .slicer

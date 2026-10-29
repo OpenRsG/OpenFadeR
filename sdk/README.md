@@ -89,6 +89,14 @@ with interpolated reads), `Lfo`, `sweep`, `fold`, `ramp`, `OnePole` (low / high 
 filter: low, band, high), `Shifter` (two-tap pitch shifter), `Allpass` and `Reverb` (Freeverb). All allocate in their
 constructors only.
 
+## XML tag scanner
+
+`openfader_plugin::markup::{tags, Tag, Edge}` is the shared scanner for controller maps and XML-based library formats.
+It uses only the standard library and is available without SDK features. `tags` returns tags in document order with
+decoded attributes and following text. It does not validate nesting or resolve DTD entities; consumers keep their
+format-specific validation.
+
+
 ## Bundled plugins
 
 The effects the built-ins lack live in `extension/plugin/` as JSON-only plugins (`beat-fx`, `mic-fx`, `send-fx`, `lever-fx`,

@@ -128,8 +128,9 @@ export component RingColumn inherits VerticalLayout {
         text: @tr("CUE");
         lit: root.v.at-cue;
         enabled: root.v.loaded;
-        pressed => { DeckState.cue(root.index); }
-        released => { DeckState.cue-released(root.index); }
+        property <int> owner: -1;
+        pressed => { self.owner = root.index; DeckState.cue(self.owner); }
+        released => { let owner = self.owner; self.owner = -1; if (owner >= 0) { DeckState.cue-released(owner); } }
     }
     RingButton {
         width: root.size;

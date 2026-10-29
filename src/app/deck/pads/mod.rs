@@ -23,10 +23,11 @@ mod plugin;
 
 use super::{Deck, Loaded, beats_between, tempo_at};
 use crate::app::{
+    PadView,
     fx::pad_fx_rgb,
     prefs,
     prefs::view::{PadFxColor, SamplerColor},
-    sampler, PadView,
+    sampler,
 };
 use openfader::analysis::{Analysis, Cue};
 use openfader::audio::{
@@ -222,6 +223,7 @@ impl Deck {
             c.set_on(true);
         });
         self.pad_fx.set(Some(pad));
+        self.pad_owner.set(Some(pad % 8));
         self.refresh_pads();
         self.say(tr!(
             "pad fx {} {}",
@@ -233,6 +235,7 @@ impl Deck {
     /// Releases the held PAD FX pad (whatever the mode now is); the effect fades out, echo / reverb tails ring out.
     pub(super) fn pad_fx_off(&self) {
         if self.pad_fx.take().is_some() {
+            self.pad_owner.set(None);
             self.with_player(|p| p.bus().pad_fx[self.index].set_on(false));
             self.refresh_pads();
         }
@@ -320,7 +323,10 @@ impl Deck {
 
     pub(in crate::app) fn refresh_pads(&self) {
         let pads = self.pad_views(&self.loaded.borrow());
-        self.show(|v| v.pads = ModelRc::new(VecModel::from(pads)));
+        let current = self.view.borrow().pads.clone();
+        if let Some(model) = crate::app::update_rows(&current, pads) {
+            self.show(|v| v.pads = model);
+        }
         self.refresh_options();
     }
 
@@ -330,19 +336,26 @@ impl Deck {
         self.enter_mode(mode, false);
     }
 
-    /// [`Deck::set_pad_mode`]; `keep_page`: when `mode` is the one already shown its page stays (a controller pad press).
-    fn enter_mode(&self, mode: i32, keep_page: bool) {
+    pub(in crate::app) fn pad_mode_index(mode: i32) -> i32 {
         let mut mode = mode.rem_euclid(PadMode::count());
         if mode == PadMode::Stems as i32 && !prefs::with(|p| p.stems) {
-            mode = (mode + 1).rem_euclid(PadMode::count()); // STEMS is off: the cycle goes on to the plugin modes or HOT CUE
+            mode = (mode + 1).rem_euclid(PadMode::count());
         }
+        mode
+    }
+
+    /// [`Deck::set_pad_mode`]; `keep_page`: when `mode` is the one already shown its page stays (a controller pad press).
+    fn enter_mode(&self, mode: i32, keep_page: bool) {
+        let mode = Self::pad_mode_index(mode);
         let same = self.view.borrow().pad_mode == mode;
         let keep = keep_page && same;
-        self.slicer_switch(self.pad_mode(), PadMode::from_index(mode));
+        let old = self.pad_mode();
         if !same {
-            self.sampler_release(); // a pad of the same mode pressed next to a held one leaves it held
+            self.pad_released();
+        } else {
+            self.pad_fx_off();
         }
-        self.pad_fx_off();
+        self.slicer_switch(old, PadMode::from_index(mode));
         if !keep {
             self.pad_page.set(0);
         }
@@ -388,7 +401,10 @@ impl Deck {
             PadMode::PadFx => self.pad_fx_on(pad + 8 * page as usize),
             PadMode::KeyShift => self.set_key_shift(page_shift(KEY_SHIFTS[pad], page)),
             PadMode::HotCue => self.hot_pad(pad),
-            PadMode::BeatJump => self.beat_jump(page_jump(pad, page)),
+            PadMode::BeatJump => {
+                self.pad_owner.set(Some(pad));
+                self.beat_jump(page_jump(pad, page));
+            }
             PadMode::Keyboard => self.set_key_shift(page_shift(keyboard_shift(pad), page)),
             PadMode::BeatLoop => self.beat_loop(LOOPS[pad].0),
             PadMode::SampleScratch | PadMode::Sampler | PadMode::SeqCall => {}
@@ -476,6 +492,127 @@ impl Deck {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn deck() -> (crate::app::App, std::rc::Rc<Deck>) {
+        use openfader::{
+            library::{Library, own::Own},
+            store::Store,
+        };
+        use std::{rc::Rc, sync::Arc};
+        crate::app::headless::init();
+        prefs::set_for_test(|p| p.controller.hot_cue_gate = true);
+        let app = crate::app::App::new().unwrap();
+        let lib: Rc<dyn Library> = Rc::new(Own::new(Arc::new(Store::in_memory().unwrap())));
+        let decks = crate::app::deck::wire(&app, lib, Default::default());
+        let deck = decks[0].clone();
+        let mut analysis = Analysis::default();
+        analysis.beats = (0..64)
+            .map(|i| openfader::analysis::Beat {
+                time_ms: i * 500,
+                bpm_x100: 12000,
+                bar_pos: (i % 4 + 1) as u16,
+            })
+            .collect();
+        analysis.cues = [500, 1500]
+            .into_iter()
+            .enumerate()
+            .map(|(i, ms)| Cue {
+                hot_cue: i as u16 + 1,
+                time_ms: ms,
+                loop_end_ms: None,
+                color: None,
+                comment: None,
+            })
+            .collect();
+        deck._timer.stop();
+        *deck.loaded.borrow_mut() = Loaded {
+            ready: true,
+            duration_ms: 32000,
+            analysis,
+            ..Default::default()
+        };
+        deck.show(|v| {
+            v.loaded = true;
+            v.has_grid = true;
+        });
+        deck.refresh_pads();
+        (app, deck)
+    }
+
+    #[test]
+    fn replacing_an_fx_pad_keeps_the_new_effect_until_its_own_release() {
+        let (_app, deck) = deck();
+        let mode = PadMode::PadFx as i32;
+        deck.pad_hw(mode, 0);
+        deck.pad_hw(mode, 9);
+        assert_eq!(deck.pad_fx_held(), Some(9));
+        deck.pad_released_at(mode, 0);
+        deck.beat_jump_released();
+        assert_eq!(deck.pad_fx_held(), Some(9));
+        deck.pad_released_at(mode, 1);
+        assert_eq!(deck.pad_fx_held(), None);
+    }
+
+    #[test]
+    fn gated_hot_cues_retarget_and_mode_exit_cleans_the_preview() {
+        let (_app, deck) = deck();
+        deck.pad(0);
+        deck.pad(1);
+        assert_eq!(deck.gate.get(), Some(1500));
+        deck.pad_released_at(PadMode::HotCue as i32, 0);
+        assert_eq!(deck.gate.get(), Some(1500));
+        deck.pending.set(Some((
+            2000.0,
+            1500.0,
+            crate::app::deck::quantize::Call::Hot(500),
+        )));
+        deck.set_pad_mode(PadMode::Sampler as i32);
+        assert_eq!(deck.gate.get(), None);
+        assert_eq!(deck.pad_owner.get(), None);
+        assert!(deck.pending.get().is_none());
+    }
+
+    #[test]
+    fn a_slicers_second_pad_owns_the_roll_and_its_lit_pad() {
+        let (_app, deck) = deck();
+        let mode = PadMode::Slicer as i32;
+        deck.set_pad_mode(mode);
+        deck.pad(0);
+        deck.pad(1);
+        assert_eq!(deck.slicer_lit(&deck.loaded.borrow()), Some(1));
+        deck.pad_released_at(mode, 0);
+        assert_eq!(deck.slicer_lit(&deck.loaded.borrow()), Some(1));
+        assert_eq!(deck.pad_owner.get(), Some(1));
+        deck.pad_released_at(mode, 1);
+        assert_eq!(deck.pad_owner.get(), None);
+    }
+
+    #[test]
+    fn sampler_holds_survive_track_replacement_but_old_modes_cannot_release_new_effects() {
+        use slint::ComponentHandle;
+        let (app, deck) = deck();
+        let sampler = PadMode::Sampler as i32;
+        let events = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let seen = events.clone();
+        app.global::<crate::app::SamplerState>()
+            .on_pad_pressed(move |p| seen.borrow_mut().push((true, p)));
+        let seen = events.clone();
+        app.global::<crate::app::SamplerState>()
+            .on_pad_released(move |p| seen.borrow_mut().push((false, p)));
+        deck.pad_hw(sampler, 0);
+        deck.pad_hw(sampler, 1);
+        deck.install_for_test(Analysis::default());
+        assert_eq!(*events.borrow(), [(true, 0), (true, 1)]);
+        deck.pad_released_at(sampler, 0);
+        assert_eq!(*events.borrow(), [(true, 0), (true, 1), (false, 0)]);
+        deck.set_pad_mode(PadMode::PadFx as i32);
+        assert_eq!(events.borrow().last(), Some(&(false, 1)));
+        deck.pad_fx_on(0);
+        deck.pad_released_at(sampler, 0);
+        assert_eq!(deck.pad_fx_held(), Some(0));
+        deck.pad_released_at(PadMode::PadFx as i32, 0);
+        assert_eq!(deck.pad_fx_held(), None);
+    }
 
     #[test]
     fn mode_index_round_trips_and_unknown_is_hot_cue() {

@@ -175,7 +175,7 @@ fn cue_path_ignores_the_fader_gain() {
         ] {
             a.0.store(a.1.to_bits(), Relaxed);
         }
-        sh.seek.store(0f64.to_bits(), Relaxed);
+        sh.seek_to(0.0);
         render(&sh, &mut v, 44100, 32, |_, m, c| last = (m, c));
         assert_eq!(last, ([g.0 * 0.5, g.0 * -0.5], [g.1 * 0.5, g.1 * -0.5]));
     }
@@ -275,7 +275,7 @@ fn cpu_two_decks_key_shift_one_second() {
     let (mut best, mut sink) = (f64::MAX, 0.0f32);
     for _ in 0..5 {
         for (sh, _) in &decks {
-            sh.seek.store(0f64.to_bits(), Relaxed);
+            sh.seek_to(0.0);
         }
         let t = Instant::now();
         for _ in 0..86 {
@@ -558,7 +558,7 @@ fn a_beat_loop_keeps_its_length_to_a_fraction_of_a_ms() {
 #[test]
 fn reverse_plays_the_source_backwards_and_pauses_at_the_start() {
     let (sh, mut v) = rig(1.0, false);
-    sh.seek.store(44100f64.to_bits(), Relaxed);
+    sh.seek_to(44100.0);
     sh.set_reverse(true);
     let out = run_buffers(&sh, &mut v, 10);
     let src = track(&sh);
@@ -576,7 +576,7 @@ fn reverse_plays_the_source_backwards_and_pauses_at_the_start() {
         assert!(p < last);
         last = p;
     }
-    sh.seek.store(1000f64.to_bits(), Relaxed);
+    sh.seek_to(1000.0);
     run_buffers(&sh, &mut v, 4);
     assert!(!sh.playing.load(Relaxed), "reached the start: paused");
     assert_eq!(f64::from_bits(sh.pos.load(Relaxed)), 0.0);
@@ -586,7 +586,7 @@ fn reverse_plays_the_source_backwards_and_pauses_at_the_start() {
 fn reverse_loop_wraps_and_key_locked_reverse_keeps_pitch() {
     let (sh, mut v) = rig(1.0, true);
     sh.set_loop(Some((100.0, 200.0))); // 4410..8820 frames
-    sh.seek.store(6000f64.to_bits(), Relaxed);
+    sh.seek_to(6000.0);
     sh.set_reverse(true);
     let mut seen = vec![];
     let mut out = vec![];
@@ -613,7 +613,7 @@ fn reverse_loop_wraps_and_key_locked_reverse_keeps_pitch() {
 fn a_loop_halved_behind_the_playhead_keeps_playing_inside_it() {
     let (sh, mut v) = rig(1.0, false);
     sh.set_loop(Some((100.0, 300.0))); // 4410..13230 frames
-    sh.seek.store(10_000f64.to_bits(), Relaxed); // second half
+    sh.seek_to(10_000.0); // second half
     run_buffers(&sh, &mut v, 1);
     sh.set_loop(Some((100.0, 200.0))); // halved: the playhead is past the new end
     for _ in 0..200 {
@@ -948,7 +948,7 @@ fn stems_share_the_read_position_with_key_lock_and_loops() {
     // A loop wraps the same way with stems: the playhead stays inside [1 s, 1.5 s).
     let (sh, mut v) = stem_rig(1.0, false);
     sh.set_loop(Some((1000.0, 1500.0)));
-    sh.seek.store((44100.0f64).to_bits(), Relaxed);
+    sh.seek_to(44100.0);
     set_stem(&sh, 0, 0.5);
     run_buffers(&sh, &mut v, 200);
     let pos = f64::from_bits(sh.pos.load(Relaxed)) / 44100.0;
@@ -1125,6 +1125,88 @@ fn stem_fx_with_key_lock_keeps_the_level_and_stays_finite() {
         rms(&fx),
         rms(&plain)
     );
+}
+
+#[test]
+fn stem_fx_pending_stems_preserve_both_channels_and_stop_at_the_track_end() {
+    let (sh, mut v) = rig(1.0, false);
+    set_track(
+        &sh,
+        Pcm {
+            rate: 44100,
+            samples: [0.5, -0.25].repeat(1024),
+        },
+    );
+    *sh.stems.lock() = Some(Arc::new(Stems::new(
+        1024,
+        super::super::Grid {
+            len: 512,
+            overlap: 0,
+        },
+    )));
+    v.part_fx.prepare(fx::Effect::Trans.index());
+    let mut out = Vec::new();
+    for _ in 0..4 {
+        v.set_part_fx(Some((DRUMS_BIT, trans_on(1.0))));
+        render(&sh, &mut v, 44100, 512, |_, m, _| out.push(m));
+    }
+    assert!(
+        out[128..1024].iter().all(|&m| m == [0.5, -0.25]),
+        "pending stems must not mute the original"
+    );
+    assert!(
+        out[1024..].iter().all(|&m| m == [0.0; 2]),
+        "the split must end with the track"
+    );
+    assert!(!sh.playing.load(Relaxed));
+}
+
+#[test]
+#[ignore = "matched stem-FX callback timing and output digest"]
+fn bench_stem_fx_split_callback() {
+    use std::{hint::black_box, time::Instant};
+    const BUFFERS: usize = 256;
+    for (rate, key_lock, mask) in [
+        (1.0f64, false, DRUMS_BIT),
+        (1.037, false, DRUMS_BIT),
+        (2.25, false, 15),
+        (1.037, true, DRUMS_BIT),
+    ] {
+        let mut times = Vec::new();
+        let mut digest = None;
+        for _ in 0..7 {
+            let (sh, mut v) = fx_rig(key_lock);
+            sh.rate.store(rate.to_bits(), Relaxed);
+            set_stem(&sh, 0, 0.65);
+            set_stem(&sh, 3, 0.85);
+            v.part_fx.prepare(fx::Effect::Trans.index());
+            let mut out = vec![([0.0; 2], [0.0; 2]); BUFFERS * 512];
+            let start = Instant::now();
+            for b in 0..BUFFERS {
+                sh.pos.store(1024.0f64.to_bits(), Relaxed);
+                v.set_part_fx(Some((mask, trans_on(1.0))));
+                render(&sh, &mut v, 44100, 512, |i, m, c| out[b * 512 + i] = (m, c));
+            }
+            times.push(start.elapsed().as_secs_f64() * 1e9 / out.len() as f64);
+            let hash = black_box(&out)
+                .iter()
+                .flat_map(|(m, c)| m.iter().chain(c))
+                .fold(0xcbf29ce484222325u64, |hash, v| {
+                    (hash ^ v.to_bits() as u64).wrapping_mul(0x100000001b3)
+                });
+            if let Some(was) = digest {
+                assert_eq!(hash, was);
+            }
+            digest = Some(hash);
+        }
+        times.sort_by(f64::total_cmp);
+        eprintln!(
+            "STEMFX rate={rate} key_lock={key_lock} mask={mask} frames={} trials=7 median_ns_per_frame={:.3} digest={:016x}",
+            BUFFERS * 512,
+            times[3],
+            digest.unwrap()
+        );
+    }
 }
 
 #[test]

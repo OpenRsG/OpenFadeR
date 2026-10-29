@@ -168,6 +168,7 @@ pub(super) fn refresh(app: &App) {
                 folder: p.dir.to_string_lossy().as_ref().into(),
                 enabled: *on,
                 builtin: p.builtin.is_some(),
+                always_on: p.always_on(),
                 removable: install::removable(p),
                 restart: restart.contains(&m.name),
                 open: open.iter().any(|n| n == m.name.as_str()),
@@ -280,12 +281,17 @@ pub(super) fn wire(app: &App) {
         let (Some(app), Some((p, on))) = (w.upgrade(), nth(i)) else {
             return;
         };
-        if p.builtin.is_some() {
-            return; // always on
+        if p.always_on() {
+            return;
         }
         changed(
             &app,
-            config::update(|c| c.set_enabled(&p.manifest.name, !on)),
+            config::update(|c| {
+                if !on {
+                    c.removed.retain(|n| n != &p.manifest.name);
+                }
+                c.set_enabled(&p.manifest.name, !on);
+            }),
         );
     });
     let w = app.as_weak();

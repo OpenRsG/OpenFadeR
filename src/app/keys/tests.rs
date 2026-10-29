@@ -202,15 +202,39 @@ fn only_pad_and_cue_keys_have_a_release_action() {
 fn shifted_key_released_after_shift_still_returns_deck_b() {
     let mut held = Held::new();
     for (down, up) in [("!", "1"), ("{", "["), ("*", "8"), ("}", "]")] {
-        let (r, _) = lookup(down, true, false).unwrap();
-        hold(&mut held, down, &r);
-        // Shift is already up: the plain lookup would hit deck A (or nothing)
-        let got = release(&mut held, up, false, false).expect(down);
-        assert_eq!((got.deck, got.act), (r.deck, r.act));
-        assert_eq!(got.deck, Some(1));
+        let (r, n) = lookup(down, true, false).unwrap();
+        hold(&mut held, down, &r, 1, n, 0);
+        let got = release(&mut held, up).expect(down);
+        assert_eq!((got.deck, got.act, got.pad), (1, r.act, n));
     }
     assert!(held.is_empty());
-    assert!(release(&mut held, "k", false, false).is_none());
+    assert!(release(&mut held, "k").is_none());
+}
+
+#[test]
+fn held_pad_keeps_original_physical_deck_and_offset_until_its_own_release() {
+    let mut held = Held::new();
+    let (first, n) = lookup("2", false, false).unwrap();
+    let (other, m) = lookup("3", false, false).unwrap();
+    hold(&mut held, "2", &first, 2, n, 9);
+    hold(&mut held, "3", &other, 0, m, 0);
+    hold(&mut held, "2", &first, 0, n, 4);
+    let first = release(&mut held, "2").unwrap();
+    assert_eq!((first.deck, first.pad, first.mode), (2, 1, 9));
+    assert!(release(&mut held, "2").is_none());
+    let other = release(&mut held, "3").unwrap();
+    assert_eq!((other.deck, other.pad), (0, 2));
+}
+
+#[test]
+fn control_letter_releases_match_after_control_is_already_up() {
+    let mut held = Held::new();
+    let (cue, n) = lookup("\u{18}", false, true).unwrap();
+    hold(&mut held, "\u{18}", &cue, 2, n, 0);
+    let action = release(&mut held, "x").unwrap();
+    assert_eq!((action.deck, action.act), (2, Act::Cue));
+    assert_eq!(physical("\r"), physical("\n"));
+    assert!(release(&mut held, "\u{18}").is_none());
 }
 
 #[test]

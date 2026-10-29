@@ -1,4 +1,4 @@
-//! The library plugins through the host: the built-in rekordbox xml reader and the folder plugins of the plugins checkout
+//! The library plugins through the host: the built-in Rekordbox XML and Traktor readers and the folder plugins of the plugins checkout
 //! (built by `extension/plugin/build.sh`; their part is skipped when they are not) are probed for a path, answer playlists,
 //! tracks and analysis through the JSON `call`, write the Collection back as a file that opens again, and list a library of
 //! their own setting in the Media Browser.
@@ -25,6 +25,23 @@ const ITUNES: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <key>Location</key><string>file://localhost/tmp/tune.mp3</string></dict></dict>
 <key>Playlists</key><array></array></dict></plist>"#;
 
+const TRAKTOR: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<NML VERSION="19">
+  <COLLECTION ENTRIES="1">
+    <ENTRY TITLE="Traktor tune" ARTIST="A">
+      <LOCATION DIR="/:tmp/:" FILE="traktor.mp3" VOLUME=""/>
+      <INFO PLAYTIME="10"/><TEMPO BPM="120"/>
+      <CUE_V2 NAME="Beat Marker" TYPE="4" START="0" LEN="0" HOTCUE="-1"/>
+      <CUE_V2 NAME="drop" TYPE="0" START="2000" LEN="0" HOTCUE="0"/>
+    </ENTRY>
+  </COLLECTION>
+  <PLAYLISTS><NODE TYPE="FOLDER" NAME="$ROOT"><SUBNODES COUNT="1">
+    <NODE TYPE="PLAYLIST" NAME="Set"><PLAYLIST ENTRIES="1" TYPE="LIST">
+      <ENTRY><PRIMARYKEY TYPE="TRACK" KEY="/:tmp/:traktor.mp3"/></ENTRY>
+    </PLAYLIST></NODE>
+  </SUBNODES></NODE></PLAYLISTS>
+</NML>"#;
+
 fn titles(l: &dyn Library, playlist: Option<&str>) -> Vec<String> {
     l.tracks(playlist)
         .unwrap()
@@ -36,8 +53,7 @@ fn titles(l: &dyn Library, playlist: Option<&str>) -> Vec<String> {
 #[test]
 fn builtin_and_folder_plugins_read_and_write_over_the_abi() {
     let plugins = Path::new(env!("CARGO_MANIFEST_DIR")).join("extension/plugin");
-    // The rekordbox xml reader is built into the app. iTunes is a folder plugin of the plugins checkout (start.sh fetches it,
-    // extension/plugin/build.sh builds it): its part of the test runs when the checkout is there and built.
+    // The built-in readers need no companion build. iTunes is tested only when its folder library is built.
     let manifests: Vec<serde_json::Value> = std::fs::read_dir(&plugins)
         .into_iter()
         .flatten()
@@ -65,7 +81,8 @@ fn builtin_and_folder_plugins_read_and_write_over_the_abi() {
     std::fs::write(
         dir.join("config/openfader/plugins.json"),
         serde_json::json!({
-            "enabled": manifests.iter().map(|m| &m["name"]).collect::<Vec<_>>(),
+            "enabled": manifests.iter().map(|m| m["name"].clone())
+                .chain(std::iter::once(serde_json::json!("traktor"))).collect::<Vec<_>>(),
             "settings": {"itunes": {"file": plist}}
         })
         .to_string(),
@@ -96,6 +113,19 @@ fn builtin_and_folder_plugins_read_and_write_over_the_abi() {
     let a = lib.analysis(&zed).expect("grid and cues");
     assert_eq!((a.beats.len(), a.cues.len()), (20, 1));
     assert_eq!(a.cues[0].color, Some([1, 2, 3]));
+
+    let nml = dir.join("collection.nml");
+    std::fs::write(&nml, TRAKTOR).unwrap();
+    let traktor = library::open(&nml).unwrap();
+    assert_eq!(titles(&*traktor, None), ["Traktor tune"]);
+    let playlists = traktor.playlists().unwrap();
+    assert_eq!(playlists.len(), 1);
+    assert_eq!(titles(&*traktor, Some(&playlists[0].id)), ["Traktor tune"]);
+    let track = traktor.tracks(None).unwrap().remove(0);
+    let analysis = traktor.analysis(&track).expect("Traktor grid and cue");
+    assert_eq!((analysis.beats.len(), analysis.cues.len()), (21, 1));
+    assert_eq!(analysis.cues[0].time_ms, 2000);
+    assert_eq!(analysis.cues[0].hot_cue, 1);
 
     // The Collection written by the plugin opens again with the same content, and is never overwritten.
     let writer = plugin::library::writers()
