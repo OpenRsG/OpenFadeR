@@ -28,7 +28,8 @@ jobs:
               target: aarch64-apple-darwin,
             }
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    # macOS builds two architectures serially under the single-job memory policy.
+    timeout-minutes: ${{ matrix.name == 'macos' && 240 || 120 }}
     defaults:
       run:
         shell: bash
