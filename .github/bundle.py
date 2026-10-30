@@ -3,6 +3,7 @@
 (extension/plugin: each plugin folder as the app reads it, with the library built for this OS, no sources), the themes
 (extension/skin) and the controller mappings (mappings). Usage: bundle.py <folder>  (run from the core checkout with the
 companion repositories in place and the plugins built by extension/plugin/build.sh)."""
+import json
 import pathlib
 import shutil
 import sys
@@ -11,9 +12,14 @@ dest = pathlib.Path(sys.argv[1])
 root = pathlib.Path(".")
 SKIP = {"src", "tests", "examples", "target", "dist", ".git", ".github", "Cargo.toml", "Cargo.lock"}
 
+# The adapters of compatibility/ are compiled into the app: an older companion checkout may still hold their folders
+# (and libraries), which the app ignores by name, so they are not shipped.
+builtin = {json.loads(f.read_text())["name"] for f in (root / "compatibility").glob("**/plugin.json")}
 plugins = 0
 for manifest in sorted((root / "extension/plugin").glob("*/plugin.json")):
     src = manifest.parent
+    if json.loads(manifest.read_text()).get("name") in builtin:
+        continue
     shutil.copytree(src, dest / "extension/plugin" / src.name, ignore=lambda _, names: [n for n in names if n in SKIP])
     plugins += 1
 

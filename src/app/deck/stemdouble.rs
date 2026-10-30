@@ -70,6 +70,7 @@ impl Deck {
         let Some((track, analysis)) = src else {
             return self.say(tr!("instant doubles: the other deck has no library track"));
         };
+        from.want_stems();
         let Some(stems) = from.completed_stems() else {
             return self.say(tr!(
                 "instant doubles: the other deck's stems are not finished yet"

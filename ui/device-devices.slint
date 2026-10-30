@@ -134,7 +134,7 @@ export component DevicesPage inherits HorizontalLayout {
                 x: Theme.space-xl;
                 width: parent.width - 2 * Theme.space-xl;
                 height: parent.height;
-                text: !DeviceState.has-plugin ? @tr("No device plugin is on. Switch one on in PREFERENCES > EXTENSIONS, then restart.") : @tr("No USB drive or SD card is mounted. Insert one: it shows up here, and as a USB icon on the left of the browser, as soon as it is mounted.");
+                text: !DeviceState.has-plugin ? @tr("No device format is enabled. Check Preferences > Library formats.") : @tr("No USB drive or SD card is mounted. Insert one: it shows up here, and as a USB icon on the left of the browser, as soon as it is mounted.");
                 wrap: word-wrap;
                 vertical-alignment: center;
                 color: Theme.text-faint;
@@ -244,7 +244,7 @@ export component DevicesPage inherits HorizontalLayout {
         ActionRow {
             label: @tr("KEEP IT SAFE");
             Chip { text: @tr("BACKUPS"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.can-backup; tooltip: @tr("Back up or restore this device's library"); clicked => { DeviceState.tab = 3; DeviceState.opened(); } }
-            Chip { text: @tr("SETTINGS"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.can-settings; tooltip: @tr("The player settings this device carries (Preferences > DJ SYSTEM)"); clicked => { DeviceState.edit-settings(); } }
+            Chip { text: @tr("SETTINGS"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.can-settings; tooltip: @tr("The player settings this device carries (Preferences > Player settings)"); clicked => { DeviceState.edit-settings(); } }
             Chip { text: @tr("FORMAT…"); min-width: Theme.layout-profile == 1 ? Theme.target-size(self.fit-width) : 28px; enabled: root.picked && !DeviceState.busy; tooltip: @tr("Erase the whole stick or card and format it again (FAT32 plays on every player)"); clicked => { DeviceState.format-ask(); } }
         }
         if DeviceState.actions.length > 0: ActionRow {

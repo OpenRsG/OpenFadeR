@@ -1,4 +1,4 @@
-//! EXTENSIONS category (Preferences > Extensions: STEMS, BEAT LAB, Video, Lighting). The STEMS switches that existed before are base fields of
+//! Native Creative tools category. The saved section remains `Extensions`. The STEMS switches that existed before are base fields of
 //! [`Prefs`] (`stems`, `stems_four`, `active_part_solo`, `stems_reset`, `stems_fast`, `stem_wave`); the rest is the typed
 //! section [`Extensions`]. BEAT LAB (the panel, needs STEMS), DRUM SWAP (Eject/Load Lock, track titles on the slots) and
 //! DRUM CAPTURE (DRUMS stem or original track, Location of Files) drive `app/groove` and `audio/groove`; `drum_pack` is ours (where the
@@ -22,6 +22,10 @@ choice!(
     /// DRUM CAPTURE: what a capture extracts from the track on the deck.
     DrumSource { #[default] Drums = "drums", Original = "original" }
 );
+choice!(
+    /// STEMS PROCESSING: Auto uses the GPU where that is safe, CPU never does.
+    StemsProcessor { #[default] Auto = "auto", Cpu = "cpu" }
+);
 
 section!(
     /// The EXTENSIONS settings that are not base fields of [`Prefs`].
@@ -35,6 +39,8 @@ section!(
         doubles_from: DoublesFrom = DoublesFrom::Neighbour;
         /// Multi-thread: the separation uses every core; off = one thread.
         stems_multithread: bool = true;
+        /// STEMS PROCESSING: the GPU where it is safe (Auto), or the CPU only.
+        stems_processor: StemsProcessor = StemsProcessor::Auto;
         /// STEM FILES: a loaded stem file (`.stem.mp4`) plays its own four parts as the STEMS, instead of separating the mix.
         stem_files: bool = true;
         /// BEAT LAB: the panel and its toggle in the global bar; the function also needs STEMS.
@@ -144,6 +150,12 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             "stems_multithread",
             tr!("Apply multi-thread to the analysis process"),
             e.stems_multithread,
+        )
+        .hint(tr!("next track")),
+        Row::of(
+            "stems_processor",
+            tr!("STEMS PROCESSING"),
+            e.stems_processor,
         )
         .hint(tr!("next track")),
         Row::header(tr!("BEAT LAB")),

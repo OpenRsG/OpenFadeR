@@ -4,7 +4,7 @@ import { BrowserState } from "../browser-state.slint";
 import { TreeView } from "../browser-tree.slint";
 import { DeckState } from "../deck-state.slint";
 import { DeviceState } from "../device-state.slint";
-import { StudioState } from "../studio-state.slint";
+import { StageState } from "state.slint";
 import { StageButton, StagePanel } from "controls.slint";
 import { StageTable } from "table.slint";
 
@@ -77,7 +77,7 @@ component StageSidebar inherits Rectangle {
     property <bool> horiz: !root.icons && root.height < 270px;
     public function focus-tree() { tree.focus(); }
     function show-list(r: int) {
-        StudioState.tree-focus = false;
+        StageState.tree-focus = false;
         if (BrowserState.related) { BrowserState.related-toggled(false); }
         if (BrowserState.suggest) { BrowserState.suggest-toggled(false); }
         if (BrowserState.playlists.length > 0) {
@@ -101,7 +101,7 @@ component StageSidebar inherits Rectangle {
             current-item <=> BrowserState.tree-row;
             border-radius: Theme.stage-radius-ctl;
             item-changed(i) => { BrowserState.playlist-selected(i); }
-            focused => { StudioState.tree-focus = true; }
+            focused => { StageState.tree-focus = true; }
         }
         if root.icons: Rectangle { vertical-stretch: 1; }
     }
@@ -119,24 +119,24 @@ component StageSidebar inherits Rectangle {
                 background: transparent;
                 current-item <=> BrowserState.tree-row;
                 item-changed(i) => { BrowserState.playlist-selected(i); }
-                focused => { StudioState.tree-focus = true; }
+                focused => { StageState.tree-focus = true; }
             }
         }
     }
 }
 
 /// The bottom of the workspace: the side bar, and beside it the search / filter / load bar over the track list. The search box, the
-/// tree and the list take the focus when `StudioState.focus-pulse` asks (Ctrl+F, the MIDI browse encoder).
+/// tree and the list take the focus when `StageState.focus-pulse` asks (Ctrl+F, the MIDI browse encoder).
 export component StageLibrary inherits Rectangle {
     property <length> g: Theme.stage-gap;
     property <length> side-w: Theme.stage-sidebar == 1 ? 46px : clamp(root.width * 0.16, 170px, 230px);
     property <length> bar-h: Theme.h-ctl + 2 * Theme.space-md;
     property <length> main-w: root.width - root.side-w - root.g;
-    property <int> pulse: StudioState.focus-pulse;
+    property <int> pulse: StageState.focus-pulse;
     changed pulse => {
-        if (StudioState.focus-target == 0) { search.focus-field(); }
-        else if (StudioState.focus-target == 1) { sidebar.focus-tree(); }
-        else { table.focus-list(); StudioState.tree-focus = false; }
+        if (StageState.focus-target == 0) { search.focus-field(); }
+        else if (StageState.focus-target == 1) { sidebar.focus-tree(); }
+        else { table.focus-list(); StageState.tree-focus = false; }
     }
     sidebar := StageSidebar { x: 0px; y: 0px; width: root.side-w; height: root.height; }
     StagePanel {
@@ -186,6 +186,6 @@ export component StageLibrary inherits Rectangle {
         width: root.main-w;
         height: root.height - root.bar-h - root.g;
         row-h: root.height > 330px ? Theme.stage-row : 28px;
-        focused => { StudioState.tree-focus = false; }
+        focused => { StageState.tree-focus = false; }
     }
 }

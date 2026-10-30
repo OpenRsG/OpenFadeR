@@ -146,29 +146,33 @@ fn flux(e: &[Vec<f32>; 3], fr: f64) -> Vec<f32> {
         ((LOOK_S * fr).round() as usize).max(1),
     );
     let lg = |v: f32| (1.0 + ENERGY_GAIN * v).ln();
-    let s: Vec<Vec<f32>> = e
-        .iter()
-        .map(|b| {
-            (0..b.len())
-                .map(|i| {
-                    lg(b[(i + 1).saturating_sub(smooth)..=i].iter().sum::<f32>() / smooth as f32)
-                })
-                .collect()
-        })
-        .collect();
-    (0..e[0].len())
-        .map(|i| {
-            s.iter()
-                .map(|b| {
-                    (b[i]
-                        - b[i.saturating_sub(look)..i]
-                            .iter()
-                            .fold(0.0, |m: f32, &v| m.max(v)))
-                    .max(0.0)
-                })
-                .sum()
-        })
-        .collect()
+    let n = e[0].len();
+    let mut out = vec![0f32; n];
+    // Per band: a running window sum for the smoothing, and the maximum of the smoothed log energy over the `look`
+    // hops before as a monotonic deque of (hop, value): O(n) instead of a window scan per hop.
+    let mut deque: std::collections::VecDeque<(usize, f32)> = std::collections::VecDeque::new();
+    for b in e {
+        deque.clear();
+        let mut sum = 0.0f32;
+        for i in 0..n {
+            sum += b[i];
+            if i >= smooth {
+                sum -= b[i - smooth];
+            }
+            let s = lg(sum.max(0.0) / smooth as f32);
+            let floor = i.saturating_sub(look);
+            while deque.front().is_some_and(|&(j, _)| j < floor) {
+                deque.pop_front();
+            }
+            let max = deque.front().map_or(0.0, |&(_, v)| v);
+            out[i] += (s - max).max(0.0);
+            while deque.back().is_some_and(|&(_, v)| v <= s) {
+                deque.pop_back();
+            }
+            deque.push_back((i, s));
+        }
+    }
+    out
 }
 
 /// `b` doubled or halved into `range` (BPM). The range is the user's promise of which reading they want ("Every range spans
@@ -215,7 +219,29 @@ fn octave(onsets: &[(f64, f64)], p: f64, fr: f64, range: (f64, f64)) -> f64 {
             }
         }
     }
+    fold(onsets, best.1, &mut bins);
+    let q = best.1 * 2.0 / 3.0;
+    if dotted(&bins) && (range.0..=range.1).contains(&(60.0 * fr / q)) {
+        return q;
+    }
     best.1
+}
+
+/// Whether a fold has its off-beats on the thirds of the period and none on its half: a kick every one and a half beats
+/// read as the beat (the dotted bass pattern of much tech house, issue 43). The hats and claps on the real beat's halves
+/// land on the thirds of that reading, where a straight track at this tempo has nothing, and its half is empty; [`score`]
+/// cannot tell, as it rewards the longer period that carries every kick. A shuffle keeps weight on the half.
+fn dotted(bins: &[f64]) -> bool {
+    let n = bins.len();
+    if n < 12 {
+        return false;
+    }
+    let top = (0..n)
+        .max_by(|&a, &b| win3(bins, a).total_cmp(&win3(bins, b)))
+        .unwrap();
+    let at = |f: f64| win3(bins, (top + (n as f64 * f).round() as usize) % n);
+    let (half, thirds) = (at(0.5), at(1.0 / 3.0) + at(2.0 / 3.0));
+    thirds > 0.25 * win3(bins, top) && half < 0.15 * thirds
 }
 
 /// Onsets folded modulo `p` frames into 1-frame `bins`.
@@ -338,6 +364,11 @@ fn tempo_search(
         opt.search(),
         (opt.bpm_range.0 as f64, opt.bpm_range.1 as f64),
     );
+    // The autocorrelation only proposes candidates (the fine fold below refines them by ±0.6 %), so it runs on the flux
+    // summed down to at most 500 Hz: 1000 Hz hops would cost 2.5× the lags over 2.5× the hops for the same candidates.
+    let d = ((fr / 500.0).ceil() as usize).max(1);
+    let (fr_full, n_full) = (fr, n);
+    let (fr, n) = (fr / d as f64, n / d);
     let (lag_lo, lag_hi) = (
         (60.0 * fr / search.1).ceil() as usize,
         (60.0 * fr / search.0) as usize,
@@ -345,8 +376,9 @@ fn tempo_search(
     if n < lag_hi * 4 {
         return None;
     }
-    let mean = f.iter().map(|&v| v as f64).sum::<f64>() / n as f64;
-    let fm: Vec<f64> = f.iter().map(|&v| v as f64 - mean).collect();
+    let sum_d = |i: usize| f[i * d..(i + 1) * d].iter().map(|&v| v as f64).sum::<f64>();
+    let mean = (0..n).map(sum_d).sum::<f64>() / n as f64;
+    let fm: Vec<f64> = (0..n).map(|i| sum_d(i) - mean).collect();
     let mut ac = Vec::with_capacity(lag_hi - lag_lo + 3);
     for l in lag_lo - 1..=lag_hi + 1 {
         if cancelled() {
@@ -369,7 +401,7 @@ fn tempo_search(
         .collect();
     peaks.sort_by(|&a, &b| ac[b].total_cmp(&ac[a]));
 
-    // Fine fold search ±0.6 % around each candidate (lag quantisation is ≤0.4 %; candidates that fold
+    // Fine fold search ±0.6 % around each candidate (lag quantisation is ≤0.6 % at 500 Hz; candidates that fold
     // to a tempo already searched are skipped). The step keeps the drift between neighbouring
     // candidates under 1.5 frames over the whole track.
     let (mut best, mut bins, mut tried) = ((0.0, 0.0), Vec::new(), Vec::<f64>::new());
@@ -379,13 +411,13 @@ fn tempo_search(
             continue;
         }
         tried.push(bpm0);
-        let step = 1.5 / n as f64;
+        let step = 1.5 / n_full as f64;
         let mut r = -0.006;
         while r <= 0.006 {
             if cancelled() {
                 return None;
             }
-            let p = 60.0 * fr / (bpm0 * (1.0 + r));
+            let p = 60.0 * fr_full / (bpm0 * (1.0 + r));
             if let Some(s) = evaluate(p, &mut bins, best.0) {
                 if s > best.0 {
                     best = (s, p);
@@ -570,17 +602,70 @@ fn fit(onsets: &[(f64, f64)], phase: f64, p: f64, fr: f64) -> (f64, f64) {
     (p, phase)
 }
 
-/// Beats at `times` (frames): bar positions from [`downbeat`] of the band amplitudes `amp`, tempo per beat from `bpm_x100`.
+/// The beat sits where the kick starts, not where it peaks: window around each beat in which its rise is looked for
+/// (seconds), the share of the window's rise (min to peak of the low band) that marks the start, and the share of the median
+/// beat's energy under which a leading beat is silence.
+const KICK_LEAD_S: f64 = 0.04;
+const KICK_RISE: f32 = 0.1;
+const SILENT: f64 = 0.02;
+
+/// How far (frames, usually negative) the start of the kick's rise sits from the beats: per beat, the low band's peak
+/// within [`KICK_LEAD_S`] walked back to where it first rose above [`KICK_RISE`] of the way from the window's minimum before
+/// the peak, median over the beats with a clear rise (peak at least 3× that minimum). 0 when fewer than 8 beats have one.
+/// The onset flux the phase is fitted to peaks where the energy rises fastest, 15-25 ms into a real kick (issue 43).
+fn kick_lead(low: &[f32], times: &[f64], fr: f64) -> f64 {
+    let w = (KICK_LEAD_S * fr).round() as i64;
+    let mut leads: Vec<f64> = times
+        .iter()
+        .filter_map(|&t| {
+            let t = t.round() as i64;
+            let lo = (t - w).max(0) as usize;
+            let hi = ((t + w).max(0) as usize).min(low.len());
+            let seg = low.get(lo..hi).filter(|s| s.len() > 1)?;
+            let peak = (0..seg.len()).max_by(|&a, &b| seg[a].total_cmp(&seg[b]))?;
+            let min = seg[..=peak].iter().copied().fold(f32::MAX, f32::min);
+            if seg[peak] <= 0.0 || seg[peak] < 3.0 * min {
+                return None;
+            }
+            let level = min + KICK_RISE * (seg[peak] - min);
+            let mut k = peak;
+            while k > 0 && seg[k - 1] >= level {
+                k -= 1;
+            }
+            Some((lo + k) as f64 - t as f64)
+        })
+        .collect();
+    if leads.len() < 8 {
+        return 0.0;
+    }
+    leads.sort_by(f64::total_cmp);
+    leads[leads.len() / 2]
+}
+
+/// Beats at `times` (frames), moved to the start of the kick ([`kick_lead`]) and starting at the first beat that carries
+/// sound (a beat whose energy is under [`SILENT`] of the median beat's is the silence before the music, not a beat);
+/// bar positions from [`downbeat`] of the band amplitudes `amp`, tempo per beat from `bpm_x100` (indexed as `times`).
 fn beats(
     times: &[f64],
     amp: &[Vec<f32>; 3],
     fr: f64,
     bpm_x100: impl Fn(usize) -> u16,
 ) -> Vec<Beat> {
+    let lead = kick_lead(&amp[0], times, fr);
+    let times: Vec<f64> = times.iter().map(|t| (t + lead).max(0.0)).collect();
+    let energy: Vec<f64> = beat_bands(amp, &times)
+        .iter()
+        .map(|b| b.iter().sum())
+        .collect();
+    let mut sorted = energy.clone();
+    sorted.sort_by(f64::total_cmp);
+    let silent = SILENT * sorted.get(sorted.len() / 2).copied().unwrap_or(0.0);
+    let first = energy.iter().position(|&e| e > silent).unwrap_or(0);
+    let times = &times[first..];
     let m = downbeat(amp, times, fr) as i64;
     let at = |k: usize| Beat {
         bar_pos: ((k as i64 - m).rem_euclid(4) + 1) as u16,
-        bpm_x100: bpm_x100(k),
+        bpm_x100: bpm_x100(k + first),
         time_ms: (times[k] / fr * 1000.0).round() as u32,
     };
     (0..times.len()).map(at).collect()

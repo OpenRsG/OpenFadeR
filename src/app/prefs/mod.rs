@@ -37,6 +37,8 @@ mod dialog;
 pub mod dj_system;
 pub mod extensions;
 mod file;
+mod filter;
+mod help;
 pub mod keyboard;
 pub mod libraries;
 mod live;

@@ -11,13 +11,13 @@ use openfader::{
     store::{self, Store},
 };
 use slint::{ComponentHandle, Timer, TimerMode, Weak};
-use watch::Watch;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
+use watch::Watch;
 
 mod watch;
 
@@ -467,7 +467,10 @@ pub fn wire(app: &App) {
     {
         toast::show(
             app,
-            &tr!("Found {}: connect it in Preferences > Libraries", f.label),
+            &tr!(
+                "Found {}: connect it in Preferences > Music libraries",
+                f.label
+            ),
         );
     }
     TIMER.with(|t| t.start(TimerMode::Repeated, POLL, tick));

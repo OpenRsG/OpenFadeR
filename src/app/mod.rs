@@ -90,8 +90,8 @@ mod resources;
 mod sampler;
 mod skin;
 mod split;
+mod stage;
 mod stems_model;
-mod studio;
 mod toast;
 mod trackinfo;
 mod update;
@@ -241,7 +241,7 @@ pub fn run(
     stems_model::wire(&app);
     update::wire(&app); // the update check (a setting, read after prefs::wire) and Help > Check for Updates
     let _skin = skin::wire(&app); // PREFS > THEMES and the skin folder watcher; the guard holds the watcher's timer
-    let _studio = studio::wire(&app); // the studio workspace's clock; the timer lives until the window closes
+    let _stage = stage::wire(&app); // the Stage workspace's clock; the timer lives until the window closes
     catalog::wire(&app); // GET PLUGINS / THEMES / MAPPINGS; before the controller session, which asks it about a controller with no mapping
                          // plugin effects join every FX unit, so they load before the engine makes its units; the "found" count (folders only) is what the smoke test reads
     let r = openfader::plugin::registry();

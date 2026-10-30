@@ -67,7 +67,7 @@ macro_rules! builtin {
 }
 
 #[cfg(feature = "compatibility")]
-static ALL: [Builtin; 4] = [
+static ALL: [Builtin; 8] = [
     builtin!(
         "rekordbox/device",
         compat_rekordbox_device::Device,
@@ -83,7 +83,16 @@ static ALL: [Builtin; 4] = [
         true
     ),
     builtin!("rekordbox/db", compat_rekordbox_db::MasterDb, None, true),
+    builtin!(
+        "engine-dj",
+        compat_engine_dj::Plugin,
+        Some(include_str!("../../compatibility/engine-dj/players.json")),
+        false
+    ),
+    builtin!("itunes", compat_itunes::ITunesPlugin, None, false),
+    builtin!("serato", compat_serato::Plugin, None, false),
     builtin!("traktor", compat_traktor::Plugin, None, false),
+    builtin!("virtualdj", compat_virtualdj::Plugin, None, false),
 ];
 
 /// A build without the `compatibility` feature (the mobile crate) has no built-in plugins, and so no SQLCipher.

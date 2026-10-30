@@ -431,7 +431,7 @@ mod tests {
         timer_test_pump(TICK + Duration::from_millis(50));
         assert_eq!(v.borrow().suggest.dispatches.get(), before);
         state.invoke_suggest_toggled(true);
-        v.borrow_mut().suggest_off(); // shared Related callback's handover, including Studio
+        v.borrow_mut().suggest_off(); // shared Related callback's handover, including Stage
         assert!(!v.borrow().suggest.timer.running());
         state.invoke_suggest_toggled(true);
         prefs::set_for_test(|p| p.view.media_track_suggestion = false);

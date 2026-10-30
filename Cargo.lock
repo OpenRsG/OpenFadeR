@@ -806,6 +806,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "compat-engine-dj"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "flate2",
+ "openfader-plugin",
+ "rusqlite",
+ "serde_json",
+]
+
+[[package]]
+name = "compat-itunes"
+version = "0.1.0"
+dependencies = [
+ "compat-rekordbox-common",
+ "openfader-plugin",
+ "serde_json",
+]
+
+[[package]]
 name = "compat-rekordbox-common"
 version = "0.1.0"
 dependencies = [
@@ -860,12 +880,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "compat-serato"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "openfader-plugin",
+ "serde_json",
+]
+
+[[package]]
 name = "compat-traktor"
 version = "0.1.0"
 dependencies = [
  "chrono",
  "openfader-plugin",
  "serde_json",
+]
+
+[[package]]
+name = "compat-virtualdj"
+version = "0.1.1"
+dependencies = [
+ "chrono",
+ "openfader-plugin",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -3754,14 +3793,18 @@ dependencies = [
 
 [[package]]
 name = "openfader"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "alsa 0.9.1",
  "chrono",
+ "compat-engine-dj",
+ "compat-itunes",
  "compat-rekordbox-db",
  "compat-rekordbox-device",
  "compat-rekordbox-xml",
+ "compat-serato",
  "compat-traktor",
+ "compat-virtualdj",
  "cpal",
  "embed-resource",
  "fatfs",

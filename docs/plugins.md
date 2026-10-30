@@ -8,11 +8,11 @@ A plugin adds to OpenFadeR without touching its code:
 | **Actions** | the same script | the **Plugins** menu of the menu bar |
 | **Event hooks** (features: logs, overlays, automations) | the same script | nothing, or whatever the reply's commands do: the plugin is told when a track loads, a deck plays or pauses, the master changes, a recording starts or stops, every few seconds … |
 | **Effects** for six places in the mixer: Beat FX, COLOR FX, MIC FX, SEND FX, LEVER FX, channel fader curves | a chain of the host's DSP blocks written in JSON (no code, no compiling), or a native library (`.so`) | each place's selector; see [Effects](#effects) and [`sdk/README.md`](../sdk/README.md) |
-| **COLOR FX knob modes** (e.g. Center Lock) | two lines of JSON, no code | PREFERENCES > CONTROLLER > Mixer > COLOR FX KNOB |
+| **COLOR FX knob modes** (e.g. Center Lock) | two lines of JSON, no code | Preferences > Decks & controllers > Mixer > COLOR FX KNOB |
 | **Pad modes** (e.g. Gate Cue) | a list of deck steps in JSON, no code | a mode button of the performance pads |
 | **Cover art** (online lookup: MusicBrainz, iTunes, …) | `"artwork": true` and a script answering `artwork` requests | Track > Find Artwork…, Fetch Missing Artwork, the track info; see [Artwork](#artwork) |
 | **Track library formats** (a collection file, a media player's library) | a native library (`.so`) built against the `library` interface of `sdk/` | File > Import / Export, the Media Browser, and whatever path the app opens; see [Library plugins](#library-plugins) |
-| **Controller drivers** (a controller's own mapping format: Mixxx `.midi.xml` + JS, a manufacturer SDK, …) | a native library (`.so`) built against the `controller` interface of `sdk/` | claims a MIDI port instead of our mapping files; PREFERENCES > CONTROLLER > CONTROLLER PLUGINS; see [Controller plugins](#controller-plugins) |
+| **Controller drivers** (a controller's own mapping format: Mixxx `.midi.xml` + JS, a manufacturer SDK, …) | a native library (`.so`) built against the `controller` interface of `sdk/` | claims a MIDI port instead of our mapping files; Preferences > Decks & controllers > CONTROLLER PLUGINS; see [Controller plugins](#controller-plugins) |
 | **Settings** of a plugin | a list in JSON | the plugin's card in PREFERENCES > EXTENSIONS; every request carries their values |
 | **Themes** (not a plugin: one JSON file) | see [`docs/skins.md`](skins.md) | PREFERENCES > THEMES |
 
@@ -44,29 +44,31 @@ The app reads plugins from
 
 An entry of that search path is either one plugin folder or a folder of plugin folders; the first plugin of a name wins.
 
-PREFERENCES > EXTENSIONS lists every plugin as a card. The built-in compatibility adapters come first, marked **BUILT IN**:
-they are compiled into the app ([Built-in adapters](#built-in-adapters)). The mandatory `rekordbox-device`, `rekordbox-xml`
-and `rekordbox-db` adapters are always on, with no switch. The optional `traktor` adapter has an on/off switch. Built-ins have
-no folder or uninstall; their settings work as any plugin's. A fresh profile with no `plugins.json` starts with `traktor`,
-the companion readers `engine-dj`, `serato`, `virtualdj` and the effect packs `beat-fx`, `send-fx`, `lever-fx`, `mic-fx`,
-`soft-mix` and `cross-pass` on. Existing choices are preserved, including disabled or removed Traktor; a removed Traktor
-remains visible but off so you can switch it on explicitly.
+Preferences > Extensions lists optional add-ons as cards. Built-in format support is managed separately in
+Preferences > Library formats. Rekordbox device, XML and desktop adapters are always available; Engine DJ, iTunes,
+Serato, Traktor and VirtualDJ can be enabled or disabled there. Native adapters have settings but no install folder
+or uninstall action.
 
-Folder plugin cards have a switch, what they run on (LUA, PYTHON, PROGRAM or JSON), what they bring, their settings
-(**SETTINGS**), **OPEN FOLDER**, **WEB PAGE** (`homepage`), then whatever went wrong while reading them. A folder plugin starts
-off; installing one switches it on. The card's **⋮** menu opens its folder or **uninstalls** it: an installed plugin's folder is
-deleted, and a bundled one is hidden (listed under `removed`) until you install it again, from GET PLUGINS or a drop.
-**RELOAD** reads the folders again (after you edit a plugin). Actions, events and settings apply at once; effects, sources,
+A fresh profile enables Engine DJ, Serato, Traktor, VirtualDJ and the standard effect packs; iTunes stays off until
+enabled. Existing activation choices and saved settings are preserved. A previously removed optional format appears
+disabled so it can be enabled explicitly. Both native compatibility and add-ons retain their configuration in
+`~/.config/openfader/plugins.json`; reorganizing the UI does not move or discard those values.
+
+Add-on cards show a tile (lit while the add-on is on), the name with its version and implementation type, the description,
+the author and what it provides; the switch is at the right of the card. Details expose the settings, folder and homepage.
+The menu uninstalls a user-installed add-on or hides a bundled one until it is installed again. Hiding or
+disabling an adapter does not delete tracks imported into the Collection.
+The folder button beside INSTALL FOLDER… opens your plugin folder; the reload button (**RELOAD**) reads the folders again (after you edit a plugin). Actions, events and settings apply at once; effects, sources,
 knob and pad modes are part of the mixer and the browser from start-up, so a change to those shows a **RESTART NOW** banner.
 The switches, the uninstalled plugins and the settings are kept in `~/.config/openfader/plugins.json`.
 
-A plugin folder named like a built-in extension (an old copy in the plugin folders, or one from GET PLUGINS) is not read: the card
-list shows the folder with a note to delete it, and installing a plugin of that name is refused. Built-ins are not offered or updated
-by GET PLUGINS either; they change with the app.
+A folder named like a built-in adapter is ignored, including former companion copies of `engine-dj`, `serato`,
+`virtualdj`, `itunes` and `traktor`. Discovery reports the ignored folder, installation of that reserved name is
+refused, and bundles exclude it. Built-in formats are not offered by Get Plugins; they update with the application.
 
-When a stick is plugged in whose library only an extension that is off can read (`Engine Library/`:
-`engine-dj`, `_Serato_/`: `serato`, `VirtualDJ/`: `virtualdj`, `Traktor/`: `traktor`), the welcome window opens with just that extension
-and SWITCH ON turns it on (its library loads at the next start: RESTART NOW). Each extension is offered once per device per run.
+If a plugged-in device contains a library whose optional format is disabled, the welcome window offers to enable
+that included format. Each format is offered once per device per run. Native compatibility is not downloaded as an
+extension.
 
 ### Install from a repository
 
@@ -148,7 +150,7 @@ that asset for the user's platform nothing is installed and the page says `no pr
 
 ### Languages
 
-The app shows a plugin's texts in its UI language (PREFERENCES > VIEW > LANGUAGE) when the plugin folder holds
+The app shows a plugin's texts in its UI language (Preferences > Appearance > LANGUAGE) when the plugin folder holds
 `locales/<lang>.json` for it (`fr`, `es`, `de`, `pt`, `it`, `nl`): one object, English text → translation.
 
 ```json
@@ -450,7 +452,7 @@ mix (load the next track when one ends, pause a deck, change tempo, …). A fail
 | `recording_started`, `recording_stopped` | REC started / stopped (the files it wrote, and the cue sheets, tracklists and control log written next to them) | `{}` / `{"files": ["/m/rec.wav"], "sidecars": ["/m/rec.cue", "/m/rec.tracklist.txt"]}` |
 | `recording_track` | During REC, another deck took over the mix (the master while it is on air, else the first deck on air); the moment is the recorder's clock, the same time the cue sheet gets | `{"deck": 2, "position_ms": 61234, "track": {…}}` |
 | `recording_started`, `recording_stopped` | REC started / stopped (the files it wrote) | `{}` / `{"files": ["/m/rec.wav"]}` |
-| `inbox_added` | New music from a watched folder joined INBOX (Preferences > Advanced > Database > Inbox): a plugin can tag it, convert it, tell a phone … | `{"files": ["/m/Downloads/a.mp3"]}` |
+| `inbox_added` | New music from a watched folder joined INBOX (Preferences > Music libraries > Inbox): a plugin can tag it, convert it, tell a phone … | `{"files": ["/m/Downloads/a.mp3"]}` |
 | `inbox_moved` | Tracks moved to another stage (INBOX → REVIEW → COLLECTION, by drag or MORE); `files` are where the files are now | `{"stage": "REVIEW", "files": ["/m/Review/a.mp3"]}` |
 | `timer` | Every `timer` seconds of the manifest | `{}` |
 
@@ -469,7 +471,7 @@ a **native library** (see [Native libraries](#native-libraries)). Every effect n
 | `mic` | FX panel, MIC tab | the microphone; LEVEL, PARAM, ON |
 | `send` | FX panel, SEND tab | the sum of each channel's SEND knob; gives the return, added to the master |
 | `lever` | FX panel, LEVER tab | the master; the lever, 0 at rest |
-| `fader` | PREFERENCES > CONTROLLER > Mixer > CHANNEL FADER CURVE | a channel before its fader; the fader position; it applies the fader gain |
+| `fader` | Preferences > Decks & controllers > Mixer > CHANNEL FADER CURVE | a channel before its fader; the fader position; it applies the fader gain |
 
 The exact contract (inputs, outputs, the `knob` and `level` of each slot, trails, the engage ramp) is the `Slot` documentation
 in [`sdk/src/lib.rs`](../sdk/src/lib.rs). A name is 1 to 16 characters of ASCII letters, digits, space, `-` and `_`, and unique
@@ -637,14 +639,19 @@ adapter's supported operations. Format-specific paths, table names and fields st
 | Rekordbox Device Library (`export.pdb`) and OneLibrary (`exportLibrary.db`) | Built in, `rekordbox-device` | Read USB/SD libraries and analysis; export, update Collection, back up/restore, convert, check/fix and edit device settings |
 | Rekordbox XML (`rekordbox.xml`) | Built in, `rekordbox-xml` | Read and write collection XML, including playlists, grids and cues |
 | Rekordbox desktop collection (`master.db`) | Built in, `rekordbox-db` | Read the SQLCipher collection with a supplied key |
-| Engine DJ (`Engine Library/Database2/m.db`) | Companion, `engine-dj` | Read desktop/device libraries; export tracks, cues, loops, grids, waveforms and playlists to devices |
-| Serato (`_Serato_`, database V2, crates and audio tags) | Companion, `serato` | Read desktop/device libraries; write device libraries and tagged cues/grids |
+| Engine DJ (`Engine Library/Database2/m.db`) | Built in, optional `engine-dj` | Read desktop/device libraries; export tracks, cues, loops, grids, waveforms and playlists to devices |
+| Serato (`_Serato_`, database V2, crates and audio tags) | Built in, optional `serato` | Read desktop/device libraries; write device libraries and tagged cues/grids |
 | Traktor (`collection.nml`) | Built in, optional `traktor` | Read desktop/device collections; write a device collection for Traktor's Import another Collection |
-| VirtualDJ (`database.xml`) | Companion, `virtualdj` | Read desktop libraries/lists; export device libraries with cues, loops, grids and playlists |
-| iTunes / Music (`Library.xml`) | Companion, `itunes` | Read tracks and playlists |
+| VirtualDJ (`database.xml`) | Built in, optional `virtualdj` | Read desktop libraries/lists; export device libraries with cues, loops, grids and playlists |
+| iTunes / Music (`Library.xml`) | Built in, optional `itunes` | Read tracks and playlists |
 | Sampler packs (`.spp`, `sampler_pack.xml`) | Companion, `sample-pack` | Extract audio to the plugin cache and read pack lists/BPM; populate the sampler on import |
 
-The companion plugins remain in [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins), checked out as
+The Engine DJ, Serato, Traktor and VirtualDJ device writers stage their library files beside their targets, read them
+back and switch them in one journalled `Commit`, so a pulled stick holds the old library or the new one; a cancel or an error
+leaves it byte-identical, a dry run writes nothing, and CHECK / FIX THE STICK reads without writing and cleans leftovers. The
+formats write side by side on one stick and share one copy of each audio file.
+
+The remaining companion plugins live in [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins), checked out as
 `extension/plugin/` and built separately. Its `mixxx` adapter runs Mixxx controller mappings and JavaScript through the
 [controller interface](#controller-plugins); it is not a collection reader. Physical-player compatibility is recorded separately
 in the built-in device adapter's [compatibility table](../compatibility/rekordbox/device/COMPATIBILITY.md).
@@ -679,7 +686,7 @@ that format. It is a native shared library (Rust or C) built against the library
 | `browser` | A Media Browser source: `label` is its name in the tree, `path_setting` the id of a `text` setting that holds the library file. Set the file in the plugin's settings and the source appears. |
 | `device` | `true`: the plugin also works with removable devices, see [Devices](#devices). `formats` must then list `dir`. |
 | `legacy_analysis_refs` | `true`: the plugin also answers `analysis_ref` for references that carry no plugin name (stored by older versions). |
-| `detect` | Where the app this format belongs to keeps its library by default: a list of path patterns, or one list per OS (`linux`, `windows`, `macos`). `~`, `$HOME`, `%USERPROFILE%`, `%APPDATA%` and `%LOCALAPPDATA%` expand and `*` matches within one path part. A match that is not connected yet is offered in PREFERENCES > LIBRARIES. |
+| `detect` | Where the app this format belongs to keeps its library by default: a list of path patterns, or one list per OS (`linux`, `windows`, `macos`). `~`, `$HOME`, `%USERPROFILE%`, `%APPDATA%` and `%LOCALAPPDATA%` expand and `*` matches within one path part. A match that is not connected yet is offered in Preferences > Music libraries. |
 | `samples` | `true`: the plugin's libraries are sample collections: after File > Import the first list's files fill the sampler's empty slots. |
 
 **How a path is opened.** `library::open` asks every enabled library plugin that may read the path (by `formats`) to `probe` it and
@@ -792,7 +799,7 @@ Serato embeds cues and grids in audio tags. When existing padding is insufficien
 and cue sync depend on its file name and size. Do not resize shared copies without preserving that identity contract.
 
 **Cue sync.** A track that is in the collection and on a device, same file name and size, has its cues, hot cues, loops, beat grid
-and phrases kept the same on both copies (PREFERENCES > DJ SYSTEM > DEVICE > CUE SYNC, on by default). This needs a device whose
+and phrases kept the same on both copies (Preferences > Player settings > DEVICE > CUE SYNC, on by default). This needs a device whose
 plugin offers `update`, so that it reads back. When a device is plugged in, each copy that lacks one of these parts is filled from the
 other. When a track is loaded on a deck, the copy loaded wins. Edits of a loaded track reach its device copies a few seconds after the
 last one. A device copy is written with an `export` of just those tracks, in the device's picked formats.
@@ -815,8 +822,8 @@ does not carry the previous target's switches over, and newly installed formats 
 playlist ticks when you change tabs. A playlist sent before the collection has loaded waits for its list to arrive.
 
 
-**Before a write.** EXPORT, SYNC NOW, the sync of a device that was just plugged in, and Transfer show a card first (Preferences > DJ
-SYSTEM > DEVICE, "Show what an export will write before it starts"): the tracks to copy and the ones refreshed, the analyses run
+**Before a write.** EXPORT, SYNC NOW, the sync of a device that was just plugged in, and Transfer show a card first (Preferences >
+Player settings > DEVICE, "Show what an export will write before it starts"): the tracks to copy and the ones refreshed, the analyses run
 first, the time, what is left out and why, then START or CANCEL. A format whose plugin lists the `plan` feature answers the same
 `export` request with `options.dry_run` set (nothing is written; the answer's `plan` is the card); for any other format the app
 estimates from the audio files. Shared audio counts once; required private copies for Serato tags count separately. The time
@@ -856,7 +863,7 @@ libraries, never a new one next to an old one. The app recovers a device when it
 **Players.** A device plugin may ship `players.json` next to its `plugin.json` (a built-in one embeds it): `{"version", "players": [{"model", "reads":
 [library names from device_check], "file_systems": ["vfat", "exfat", "hfsplus"], "partition_tables": ["dos", "gpt"], "status":
 "confirmed" | "to_measure", "firmware", "note"}…], "presets": [{"id", "label", "models"}…]}`. The stick checker judges a device for
-each player of the booth profile (PREFERENCES > DJ SYSTEM > DEVICE and the DEVICES tab). A model marked `to_measure` is never shown
+each player of the booth profile (Preferences > Player settings > DEVICE and the DEVICES tab). A model marked `to_measure` is never shown
 as working. A new model is a line in that file, shipped with the plugin, with no new app.
 
 **Settings pages.** `settings_schema` answers `{"tabs": [{"label", "scope", "groups": [{"label", "fields": […]}], "apply_label",
@@ -891,18 +898,21 @@ core/common scanner paths; native plugin entry points and ABI versions are uncha
 module need the matching core SDK checkout. Publish the core SDK change before a companion release that imports it.
 
 
-`compatibility/traktor/` holds `compat-traktor`, the optional compiled-in Traktor adapter. It keeps the runtime ID `traktor`,
-NML 19 collection format, desktop detection, analysis references, locales and device operations. It reads desktop or device
-collections and merges exports into `Traktor/collection.nml` for Traktor's Import another Collection. Its tests cover the native
-NML reader, read-back validation, dry run, journalled commit, rollback and check/fix behavior.
+`compatibility/engine-dj/`, `itunes/`, `serato/`, `traktor/` and `virtualdj/` hold the optional compiled-in adapters
+`compat-engine-dj`, `compat-itunes`, `compat-serato`, `compat-traktor` and `compat-virtualdj`. Each keeps its runtime ID, saved
+settings, desktop detection, analysis references, locales and operations (Engine DJ also its `players.json`). They read desktop or
+device libraries (iTunes: tracks and playlists) and the device writers stage, read back and commit their files with the SDK's
+journal. Traktor merges exports into `Traktor/collection.nml` for Traktor's Import another Collection. Their tests cover the native
+readers, read-back validation, dry run, journalled commit, rollback and check/fix behavior.
 
 These adapters implement `LibraryPlugin` without exporting `openfader_library_v2`. The host (`src/plugin/builtin.rs`) holds
 a table per extension: its `plugin.json` (without `lib`), its `locales/`, any `players.json`, and the static
 `openfader_plugin::library::api::<Plugin>()`. Requests go through that table's JSON `call` exactly as through a loaded library.
-The mandatory Rekordbox adapters are listed first and always on. Traktor keeps its place among the companion readers so
-equal-scoring formats retain their preference order on a multi-format device. It follows its saved activation choice and starts
-on only for a fresh profile. Settings stay under the runtime plugin names in `plugins.json`; a folder of the same name is
-skipped with a note in the plugin list. Built-ins are behind the `compatibility` feature of the `openfader` crate, which the
+The mandatory Rekordbox adapters are listed first and always on. The optional adapters follow in name order among the folder
+plugins, so equal-scoring formats retain their preference order on a multi-format device. Each follows its saved activation
+choice; `engine-dj`, `serato`, `traktor` and `virtualdj` start on only for a fresh profile, `itunes` stays off. Settings stay
+under the runtime plugin names in `plugins.json`; a folder of the same name is skipped with a note in the plugin list.
+Built-ins are behind the `compatibility` feature of the `openfader` crate, which the
 `app` feature turns on (so Pi builds with `--no-default-features --features app` have them). It also swaps the bundled SQLite
 for SQLCipher with its own OpenSSL; a build without it, like the mobile crate, has no built-in plugins, plain SQLite and no
 OpenSSL. Their tests run with the app's: `cargo test --release --workspace`.
@@ -936,20 +946,24 @@ pyrekordbox==0.5.0 && python .github/check_stick.py /tmp/fx`. rekordcrate 0.3.0 
 
 ### The bundled library plugins
 
-The companion repository's Cargo workspace (`extension/plugin/Cargo.toml` in a core checkout) builds `itunes`, `sample-pack`
-and the three device adapters `engine-dj`, `serato` and `virtualdj` listed [above](#compatibility-layer). Their
-desktop-library `detect` patterns let PREFERENCES > LIBRARIES offer to connect them. `extension/plugin/build.sh` builds the
-workspace in release mode and copies each library next to its `plugin.json`; `start.sh` runs it first. The workspace uses
-`sdk/` and `compatibility/rekordbox/common` from the core checkout. Their settings are on their cards in PREFERENCES >
-EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
+The companion workspace builds `sample-pack` and the `mixxx` controller driver. The other supported DJ library
+formats are built into the core ([compatibility layer](#compatibility-layer)). `extension/plugin/build.sh` builds
+the companion workspace and copies each library next to its `plugin.json`; `start.sh` runs it first.
 
-Core 0.2.8 builds use the matching OpenFadeR-Plugins tag `v0.2.11`: CI's `plugins_ref` input, Docker's `PLUGINS_REF` build arg
-and the `PLUGINS_REF` environment variable for `start.sh` / `install.sh` can select another compatible ref. Existing companion
-checkouts are used as they stand; switch an older checkout to that tag before building this core. The generic GET PLUGINS
-catalog still reads repositories' default branches and downloads their prebuilt native libraries.
+Add-on settings are in Preferences > Extensions. Native format options, including masked library keys, are in
+Preferences > Library formats. Both keep values in `plugins.json`. Preferences > Music libraries offers detected
+desktop libraries and connects sources to the Collection.
 
-The companion no longer contains external Traktor. Older companion checkouts may still have that folder; this core
-ignores the duplicate and shows a note to delete it. Traktor's implementation and tests live in the core workspace.
+Core 0.2.9 builds use the published OpenFadeR-Plugins tag `v0.2.12` by default: CI's `plugins_ref` input, Docker's
+`PLUGINS_REF` build arg and the `PLUGINS_REF` environment variable for `start.sh` / `install.sh` can select another compatible
+ref. Existing companion checkouts are used as they stand. An older companion checkout may still carry the former `engine-dj`,
+`serato`, `virtualdj`, `itunes` folders and build their libraries; the core ignores the duplicates by name (a note in the plugin
+list) and `.github/bundle.py` leaves every folder named like a built-in adapter out of a release or install bundle, so the result
+is the same as with the trimmed tag, only slower to build. The generic GET
+PLUGINS catalog still reads repositories' default branches and downloads their prebuilt native libraries.
+
+Older companion checkouts may also still have an external Traktor folder; it is ignored the same way. The implementations and
+tests of all five optional adapters live in the core workspace.
 
 ## Controller plugins
 
@@ -1136,12 +1150,12 @@ incoming EQ flat, its filter off and its fader multiplier at 1; the saved DJ val
 Without grids or enough room, the existing end-of-track cut rule takes priority; late grid analysis replans the same chosen
 style. RANDOM draws only from the checked styles and excludes the preceding pick; the panel keeps at least two enabled.
 
-## In the studio theme
+## In the stage theme
 
-A theme that selects the studio workspace (`layout-profile` 2, [docs/skins.md](skins.md); the bundled Studio theme) shows every one of these
-extension points without a line of theme code: the effects of plugins are in the effect drop-downs of the deck panels' three FX
-slots, the pad modes are in the MORE menu of the pad tabs, the COLOR FX effects and knob modes in the SETTINGS tab of the mixer, a
-plugin's source in the sidebar's tree, and its actions in the Plugins menu of the window's menu bar. The drop-downs read the same
+A theme that selects the stage workspace (`layout-profile` 2, [docs/skins.md](skins.md)) shows these extension points without a line of
+theme code: the effects of plugins are in the effect drop-downs of the FX slots (in the deck panels, the mixer and the effects strip),
+the pad modes are in the pad-mode drop-down of a deck panel, the COLOR FX effects and knob modes in the mixer's COLOR FX controls, a
+plugin's source in the library's tree, and its actions in the Plugins menu of the window's menu bar. The drop-downs read the same
 lists as the desktop panels (`FxState.effects`, `DeckState.pad-mode-names`, `MixerState.cfx-names`), so a plugin installed or
 removed changes all layouts alike.
 

@@ -31,8 +31,8 @@ pub const KEY_HUE: usize = 8;
 pub const HINTS: usize = 9;
 pub const PLAYED: usize = 10;
 pub const STEM_FILE: usize = 11;
-/// Album and the day the track was added (`YYYY-MM-DD`): columns of the Stage track list (ui/stage/table.slint); the desktop and
-/// studio lists do not show them.
+/// Album and the day the track was added (`YYYY-MM-DD`): columns of the Stage track list (ui/stage/table.slint); the desktop
+/// list does not show them.
 pub const ALBUM: usize = 12;
 pub const ADDED: usize = 13;
 pub const TRACK_ID: usize = 14;

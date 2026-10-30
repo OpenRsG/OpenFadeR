@@ -68,7 +68,7 @@ component DeviceWindow inherits DialogFrame {
     card-width: 900px;
     card-height: 780px;
     closed => { DeviceState.visible = false; }
-    if Theme.layout-profile == 0: SegmentedChips {
+    if Theme.layout-profile != 1: SegmentedChips {
         options: [@tr("DEVICES"), @tr("EXPORT"), @tr("SYNC MANAGER"), @tr("BACKUPS")];
         current: DeviceState.tab;
         vertical-stretch: 0;

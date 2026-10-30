@@ -1,10 +1,10 @@
-import { PrefRows } from "prefs-state.slint";
+import { PrefRows, PrefsState } from "prefs-state.slint";
 import { Theme } from "theme.slint";
 import { AudioCardList } from "prefs-audio-card.slint";
 
 /// AUDIO category: the output device cards (src/app/prefs/audio/cards.rs), then the rows from src/app/prefs/audio.rs.
 export component PrefsAudio inherits VerticalLayout {
     spacing: Theme.space-lg;
-    AudioCardList {}
+    if PrefsState.query == "" && PrefsState.section == 0: AudioCardList {}
     PrefRows {}
 }

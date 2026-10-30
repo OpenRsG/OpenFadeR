@@ -355,17 +355,26 @@ fn resample_at(
     let reach = (HALF as f64 * width).ceil() as i64;
     let limit = (HALF * RES) as f32;
     let (mut acc, mut norm) = ([0.0f32; 2], 0.0f32);
-    for n in i + 1 - reach..=i + reach {
+    let (lo, hi) = (i + 1 - reach, i + reach);
+    let mut tap = |n: i64, k: usize| {
         let u = ((n - i) as f32 - frac).abs() * scale;
-        if u >= limit {
-            continue;
+        if u < limit {
+            let e = u as usize;
+            let w = table[e] + (table[e + 1] - table[e]) * (u - e as f32);
+            acc[0] += w * sample(k, 0);
+            acc[1] += w * sample(k, 1);
+            norm += w;
         }
-        let e = u as usize;
-        let w = table[e] + (table[e + 1] - table[e]) * (u - e as f32);
-        let k = n.clamp(0, last) as usize;
-        acc[0] += w * sample(k, 0);
-        acc[1] += w * sample(k, 1);
-        norm += w;
+    };
+    if lo >= 0 && hi <= last {
+        // The usual case, away from both ends: no edge clamp per tap.
+        for n in lo..=hi {
+            tap(n, n as usize);
+        }
+    } else {
+        for n in lo..=hi {
+            tap(n, n.clamp(0, last) as usize);
+        }
     }
     Some(acc.map(|v| v / norm))
 }

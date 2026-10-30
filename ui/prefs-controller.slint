@@ -2,19 +2,29 @@ import { PrefRows } from "prefs-state.slint";
 import { Theme } from "theme.slint";
 import { MidiState } from "midi.slint";
 import { GetMappings } from "catalog.slint";
+import { Chip } from "widgets.slint";
 
-/// CONTROLLER category (skeleton by S1, S2PrefsCtl owns it): rows from src/app/prefs/controller.rs, the connected controller, then
-/// GET MAPPINGS (the repositories' mapping files, src/app/catalog).
 export component PrefsController inherits VerticalLayout {
-    spacing: Theme.space-lg;
-    PrefRows {}
-    Text {
-        text: MidiState.connected == "" ? @tr("Controller: none connected") : @tr("Controller: {} · {}", MidiState.connected, MidiState.link);
-        color: MidiState.connected == "" ? Theme.text-dim : Theme.play;
-        font-family: Theme.font;
-        font-size: Theme.font-size;
-        font-weight: Theme.weight-bold;
-        wrap: word-wrap;
+    property <bool> mappings-open;
+    spacing: Theme.space-md;
+    HorizontalLayout {
+        spacing: Theme.space-md;
+        Text {
+            text: MidiState.connected == "" ? @tr("Controller: none connected") : @tr("Controller: {} · {}", MidiState.connected, MidiState.link);
+            color: MidiState.connected == "" ? Theme.text-dim : Theme.play;
+            font-family: Theme.font;
+            font-size: Theme.font-size;
+            wrap: word-wrap;
+        }
+        Chip {
+            text: @tr("Get mappings");
+            horizontal-stretch: 0;
+            width: 130px;
+            active: root.mappings-open;
+            tooltip: @tr("Find and install a MIDI mapping for your controller");
+            clicked => { root.mappings-open = !root.mappings-open; }
+        }
     }
-    GetMappings { }
+    if root.mappings-open: GetMappings {}
+    PrefRows {}
 }

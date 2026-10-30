@@ -18,7 +18,7 @@ import { ResourceChip, ResourceState } from "resources.slint";
 import { ActionItem, BackupItem, CompareRow, DeviceChip, DeviceItem, DeviceOverlay, DeviceProgress, DeviceState, FormatItem, FormatOption, PickRow, ReviewRow } from "device.slint";
 import { CheckLib, CheckPlayer, CheckPreset, CheckProblem } from "device.slint";
 import { DupeRow, ImportReportState, ImportSkipRow, LibraryOverlays, LibraryState, MissingRow } from "library.slint";
-import { PrefsOverlay, PrefsState, PrefRowData } from "prefs.slint";
+import { PrefsOverlay, PrefsState, PrefRowData, PrefCategory } from "prefs.slint";
 import { KeymapState } from "prefs-keyboard.slint";
 import { DjEditor, DjItem, DjSystemState } from "prefs-djsystem.slint";
 import { Chip, Dropdown, Glyph, Icon, IconButton, Meter, Splitter, TipOverlay } from "widgets.slint";
@@ -40,12 +40,10 @@ import { Palette } from "std-widgets.slint";
 import { ThemeCard, ThemeState, TokenRow } from "themes.slint";
 import { CatalogState, GetMapping, GetPlugin, GetTheme, OfferBanner, RepoView } from "catalog.slint";
 import { TouchWorkspace } from "touch.slint";
-import { StudioState } from "studio-state.slint";
-import { StudioWorkspace } from "studio/workspace.slint";
-import { StageMetrics } from "stage/state.slint";
+import { StageMetrics, StageState } from "stage/state.slint";
 import { StageWorkspace } from "stage/stage.slint";
 // Re-exported so Rust can reach them via `app.global::<…>()` and by name.
-export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowView, DeckState, DeckView, DeviceItem, DeviceState, DjEditor, DjItem, DjSystemState, DragState, DupeRow, EditState, ExportDeck, ExportModeState, FixtureView, FxState, FxUnit, HelpLine, KeymapState, KeysState, LayoutState, LibraryState, LightingState, MidiState, MissingRow, MixDeckView, MixPointState, MixerState, PadOpt, PadView, PadsState, PaneState, PluginState, PrefRowData, PrefsState, SamplerState, SlotView, SplitWindow, Theme, ToastState, TrackInfoState, VideoDeckView, VideoItem, VideoState, VideoWindow }
+export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowView, DeckState, DeckView, DeviceItem, DeviceState, DjEditor, DjItem, DjSystemState, DragState, DupeRow, EditState, ExportDeck, ExportModeState, FixtureView, FxState, FxUnit, HelpLine, KeymapState, KeysState, LayoutState, LibraryState, LightingState, MidiState, MissingRow, MixDeckView, MixPointState, MixerState, PadOpt, PadView, PadsState, PaneState, PluginState, PrefCategory, PrefRowData, PrefsState, SamplerState, SlotView, SplitWindow, Theme, ToastState, TrackInfoState, VideoDeckView, VideoItem, VideoState, VideoWindow }
 export { DrumSlotView, GrooveDeckView, GrooveState, HotCue, PhraseSeg }
 export { FxRackState, RackView, FxSlot }
 export { ResourceState }
@@ -55,7 +53,7 @@ export { ArtCandidate, ArtworkState } // FIND ARTWORK (ui/artwork.slint, src/app
 export { Palette } // the std widgets' colour scheme follows the skin's base (src/app/skin)
 export { FileDropState } // files dragged in from the desktop (src/app/drop)
 export { ThemeCard, ThemeState, TokenRow } // PREFS > THEMES (ui/themes.slint, src/app/skin/page.rs)
-export { StudioState } // the studio workspace's clock (ui/studio/, src/app/studio.rs)
+export { StageState } // the Stage workspace's clock and library focus (ui/stage/state.slint, src/app/stage.rs)
 export { CatalogState, GetMapping, GetPlugin, GetTheme, RepoView } // GET PLUGINS / THEMES / MAPPINGS (ui/catalog.slint, src/app/catalog)
 export { AboutState } // Help > About (ui/about.slint, src/app/about.rs)
 export { UpdateState, AnalysisNoticeState } // the update check and one-click update, the notice of an update changing the analysis (ui/update.slint, src/app/update.rs, src/app/analyze/stale.rs)
@@ -76,20 +74,19 @@ export component App inherits Window {
     icon: @image-url("../assets/icon.png");
     preferred-width: 1100px;
     preferred-height: 960px;
-    min-width: root.touch ? 320px + root.safe-area-insets.left + root.safe-area-insets.right : root.stage-ws ? StageMetrics.min-w : root.studio ? 1100px : root.vert ? 1100px : 1000px;
-    min-height: root.touch ? max(320px, touch-workspace.required-height + root.safe-area-insets.top + root.safe-area-insets.bottom) : root.stage-ws ? StageMetrics.min-h : root.studio ? 720px : root.y-browser + root.browser-min + Theme.h-status;
+    min-width: root.touch ? 320px + root.safe-area-insets.left + root.safe-area-insets.right : root.stage-ws ? StageMetrics.min-w : root.vert ? 1100px : 1000px;
+    min-height: root.touch ? max(320px, touch-workspace.required-height + root.safe-area-insets.top + root.safe-area-insets.bottom) : root.stage-ws ? StageMetrics.min-h : root.y-browser + root.browser-min + Theme.h-status;
     background: Theme.bg;
     default-font-family: Theme.font;
     default-font-size: Theme.font-size;
 
     property <bool> touch: Theme.layout-profile == 1;
-    /// The studio workspace (ui/studio/, `layout-profile` 2) and the stage workspace (ui/stage/, 3) take the PERFORMANCE mode with two
-    /// decks; every other mode and the 4-deck layouts keep the desktop workspace, with its own global bar to come back by. Both share
-    /// the window plumbing below (no desktop layout, the keyboard / MIDI entry points, the track-list rows); `stage-ws` picks the stage.
-    property <bool> studio: (Theme.layout-profile == 2 || Theme.layout-profile == 3) && root.mode == 1 && DeckState.count == 2;
-    property <bool> stage-ws: Theme.layout-profile == 3 && root.studio;
-    /// Touch or studio: the desktop layout below builds none of its decks, waveforms or panels.
-    property <bool> flat: root.touch || root.studio;
+    /// The Stage workspace (ui/stage/, `layout-profile` 2) takes the PERFORMANCE mode with two decks; every other mode and the 4-deck
+    /// layouts keep the desktop workspace, with its own global bar to come back by. It replaces the desktop layout below and brings its own
+    /// keyboard / MIDI entry points and track-list rows.
+    property <bool> stage-ws: Theme.layout-profile == 2 && root.mode == 1 && DeckState.count == 2;
+    /// Touch or Stage: the desktop layout below builds none of its decks, waveforms or panels.
+    property <bool> flat: root.touch || root.stage-ws;
     property <length> browser-min: Theme.h-tab + Theme.h-toolbar + Theme.h-header + 6 * Theme.h-row;
     property <bool> four: DeckState.count == 4;
     property <bool> browse-on: BrowserState.browse-max;
@@ -136,7 +133,7 @@ export component App inherits Window {
     // The vertical stack, top to bottom.
     property <length> y-fx: Theme.h-bar + Theme.gap;
     /// The MIX POINT LINK panel (global-bar button, PREFS > Controller > MIX POINT LINK > Enable); it needs a deck layout, not Browse.
-    property <bool> show-mix: root.touch ? touch-workspace.mix-active : root.studio ? StudioState.linked-open && MixPointState.enabled && !root.stage-ws : MixPointState.enabled && MixPointState.open && !root.browse-on && root.stage;
+    property <bool> show-mix: root.touch ? touch-workspace.mix-active : MixPointState.enabled && MixPointState.open && !root.browse-on && root.stage && !root.stage-ws;
     changed show-mix => { MixPointState.active = root.show-mix; }
     /// EXPORT layout (1 PLAYER … FULL BROWSER, `PrefsState.export-layout`): exportmode.slint draws the players for it.
     property <int> export-layout: PrefsState.export-layout;
@@ -166,26 +163,26 @@ export component App inherits Window {
     /// The border is draggable in PERFORMANCE and EXPORT (the other modes cover the window with their own view) when something can move.
     property <bool> split-on: (root.mode == 1 || root.mode == 0) && (root.stage || ExportModeState.panel-h > 100px);
     /// Track rows the browser has room for (0.5 px of slack for the rounding): at least `PaneState.min-rows`, however far the border is dragged.
-    out property <int> browser-rows: root.touch ? touch-workspace.browser-rows : root.studio ? StudioState.rows : Math.floor((root.height - root.y-browser - root.bx - Theme.h-status - PaneState.browser-h(0) + 0.5px) / Theme.h-row);
+    out property <int> browser-rows: root.touch ? touch-workspace.browser-rows : root.stage-ws ? StageState.rows : Math.floor((root.height - root.y-browser - root.bx - Theme.h-status - PaneState.browser-h(0) + 0.5px) / Theme.h-row);
 
     /// Ctrl+F (src/app/keys.rs).
-    public function focus-search() { if root.touch { touch-workspace.focus-search(); } else if root.studio { StudioState.focus(0); } else { browser.focus-search(); } }
+    public function focus-search() { if root.touch { touch-workspace.focus-search(); } else if root.stage-ws { StageState.focus(0); } else { browser.focus-search(); } }
     /// MIDI browse encoder (src/app/midi): move the track selection by `d` rows (the tree's row when it has the focus, the
     /// item of the track menu while it is open).
     public function browse(d: int) {
         if TrackMenuState.open { TrackMenuState.move(d); }
-        else if root.touch { touch-workspace.browse(d); } else if root.studio { StudioState.browse(d); } else { browser.select-delta(d); }
+        else if root.touch { touch-workspace.browse(d); } else if root.stage-ws { StageState.browse(d); } else { browser.select-delta(d); }
     }
     /// MIDI BACK / browse push / sort buttons (see Browser). BACK closes an open track menu; in the tree it folds the section
     /// the chosen row is in and goes to its heading.
     public function browse-back() {
         if TrackMenuState.open { TrackMenuState.toggle += 1; }
         else if root.touch { touch-workspace.browse-back(); }
-        else if root.studio {
-            if StudioState.tree-focus {
+        else if root.stage-ws {
+            if StageState.tree-focus {
                 BrowserState.tree-row = BrowserState.tree-back(BrowserState.tree-row);
                 BrowserState.playlist-selected(BrowserState.tree-row);
-            } else { StudioState.focus(1); }
+            } else { StageState.focus(1); }
         } else { browser.browse-back(); }
     }
     /// Push: runs the item of an open track menu; on a tree heading it folds or unfolds the section; on a list it goes to the
@@ -193,9 +190,9 @@ export component App inherits Window {
     public function browse-push() -> bool {
         if TrackMenuState.open { TrackMenuState.fire += 1; return false; }
         if root.touch { return touch-workspace.browse-push(); }
-        if root.studio {
-            if StudioState.tree-focus {
-                if BrowserState.playlists[BrowserState.tree-row].head { BrowserState.tree-toggle(BrowserState.tree-row); } else { StudioState.focus(2); }
+        if root.stage-ws {
+            if StageState.tree-focus {
+                if BrowserState.playlists[BrowserState.tree-row].head { BrowserState.tree-toggle(BrowserState.tree-row); } else { StageState.focus(2); }
                 return false;
             }
             return true;
@@ -204,11 +201,11 @@ export component App inherits Window {
     }
     /// MIDI menu button (DDJ-FLX6: SHIFT + browse push) / Menu key: opens the track menu of the chosen track, or closes it.
     public function browse-menu() { TrackMenuState.toggle += 1; }
-    public function sort-by(col: int) { if root.touch { touch-workspace.sort-by(col); } else if root.studio { StudioState.sort-by(col); } else { browser.sort-by(col); } }
+    public function sort-by(col: int) { if root.touch { touch-workspace.sort-by(col); } else if root.stage-ws { StageState.sort-by(col); } else { browser.sort-by(col); } }
     /// MIDI VIEW (SwitchActiveWindow) / W: browse view on / off.
     public function browse-view() { if root.touch { touch-workspace.browse-view(); } else { BrowserState.browse-max = !BrowserState.browse-max; } }
     /// MIDI Area (Back+Shift) / Shift+W: the browser focus moves on, tree → Tag List → track list → related → tree.
-    public function browse-area() { if root.touch { touch-workspace.browse-area(); } else if root.studio { StudioState.focus(StudioState.tree-focus ? 2 : 1); } else { browser.cycle-area(); } }
+    public function browse-area() { if root.touch { touch-workspace.browse-area(); } else if root.stage-ws { StageState.focus(StageState.tree-focus ? 2 : 1); } else { browser.cycle-area(); } }
     /// Mode selector: 0 EXPORT, 1 PERFORMANCE, 2 EDIT, 3 LIGHTING, 4 VIDEO. Each mode shows while its state is `visible` (PERFORMANCE
     /// while none is); one at a time.
     function set-mode(n: int) {
@@ -349,32 +346,66 @@ export component App inherits Window {
             MenuItem { title: @tr("About OpenFadeR"); activated => { AboutState.visible = true; } }
         }
     }
+    /// One zoom step on all four decks' waveforms (`dir` 0 = default).
+    function zoom-all(dir: int) {
+        DeckState.zoom(0, dir);
+        DeckState.zoom(1, dir);
+        DeckState.zoom(2, dir);
+        DeckState.zoom(3, dir);
+    }
+    function focus-workspace() {
+        if root.touch { touch-workspace.focus-keys(); }
+        else if root.stage-ws { StageState.focus(StageState.tree-focus ? 1 : 2); }
+        else { desk-keys.focus(); }
+    }
 
     /// What the stage draws: the deck panels and the mixer (not in Browse or EXPORT), the vertical waveform columns.
     property <bool> decks-on: !root.flat && root.stage && !root.browse-on;
     property <int> vwaves-n: !root.flat && root.vert ? root.decks-n : 0;
+    property <bool> prefs-open: PrefsState.visible;
+    changed prefs-open => {
+        if root.prefs-open { overlay-keys.focus(); }
+        else { root.focus-workspace(); }
+    }
+    property <bool> theme-editing: ThemeState.editing;
+    changed theme-editing => {
+        // Closing the editor destroys its focused name or token field.
+        if !root.theme-editing && root.prefs-open { overlay-keys.focus(); }
+    }
+    // Dialog keys stay isolated; releases still finish cues pressed in the workspace.
+    FocusScope {
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    width: root.width; height: root.height;
+    key-released(e) => {
+        if KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control) { accept } else { reject }
+    }
+    FocusScope {
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    width: root.width; height: root.height;
+    init => { root.focus-workspace(); }
+    key-pressed(e) => {
+        if PrefsState.visible { return reject; }
+        if !e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control) { accept } else { reject }
+    }
     // Reports the cursor of a drag where no drop target takes it (dnd.slint); under everything.
     Rectangle {
     visible: !root.flat;
     width: root.width; height: root.height;
     DragTracker { x: 0; y: 0; width: root.width; height: root.height; }
-    FocusScope {
-        init => { self.focus(); }
+    desk-keys := FocusScope {
+        init => { if !PrefsState.visible { self.focus(); } }
         key-pressed(e) => {
-            // Arrows reach here only when neither the search box nor the table has focus.
-            if (e.text == Key.UpArrow || e.text == Key.DownArrow) {
+            if !PrefsState.visible && (e.text == Key.UpArrow || e.text == Key.DownArrow) {
                 browser.select-delta(e.text == Key.DownArrow ? 1 : -1);
                 return accept;
             }
-            // Held keys repeat; a shortcut fires once per press.
-            if (!e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
-        }
-        key-released(e) => {
-            if (KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+            return reject;
         }
 
         if root.show-fx: FxPanel { x: 0; y: root.y-fx; width: root.width; height: root.h-fx; }
-        if root.show-mix && !root.studio: MixPointPanel { x: 0; y: root.y-mix; width: root.width; height: Theme.h-mixpoint; }
+        if root.show-mix: MixPointPanel { x: 0; y: root.y-mix; width: root.width; height: Theme.h-mixpoint; }
         for i in root.flat ? 0 : root.waves-n: DeckDetail {
             index: DeckState.slots[PrefsState.wave-order[i]];
             x: 0;
@@ -403,7 +434,7 @@ export component App inherits Window {
         // EXPORT mode: the player panels over the browser, whose tree column carries the device dock.
         if !root.touch && ExportModeState.visible && ExportModeState.panel-h > 0px: ExportPlayers { x: 0; y: Theme.h-bar; width: root.width; height: ExportModeState.panel-h + root.bx; }
         browser := Browser {
-            live: !root.touch && !root.studio;
+            live: !root.touch && !root.stage-ws;
             x: 0;
             y: root.y-browser + root.bx;
             width: root.width;
@@ -568,8 +599,7 @@ export component App inherits Window {
         }
     }
     }
-    // The studio and stage presentations (layout-profile 2, 3): their panels are built while they show.
-    if root.studio && !root.stage-ws: StudioWorkspace { x: 0px; y: 0px; width: root.width; height: root.height; }
+    // The Stage presentation (layout-profile 2): its panels are built while it shows.
     if root.stage-ws: StageWorkspace { x: 0px; y: 0px; width: root.width; height: root.height; }
     touch-workspace := TouchWorkspace {
         visible: root.touch;
@@ -579,14 +609,19 @@ export component App inherits Window {
         fullscreen-toggled => { root.full-screen = !root.full-screen; }
         zoom-all(dir) => { root.zoom-all(dir); }
     }
-    /// One zoom step on all four decks' waveforms (`dir` 0 = default).
-    function zoom-all(dir: int) {
-        DeckState.zoom(0, dir);
-        DeckState.zoom(1, dir);
-        DeckState.zoom(2, dir);
-        DeckState.zoom(3, dir);
-    }
 
+    }
+    overlay-keys := FocusScope {
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    width: root.width; height: root.height;
+    key-pressed(e) => {
+        if PrefsState.visible && (e.text == Key.Escape || (root.touch && e.text == Key.Back)) {
+            PrefsState.visible = false;
+            return accept;
+        }
+        return reject;
+    }
     // Separate persistent item trees keep nested overlay constructors within a 1 MiB startup stack.
     if true: Rectangle {
     width: root.width; height: root.height;
@@ -613,5 +648,7 @@ export component App inherits Window {
     // The label that follows the cursor while a track row is dragged (dnd.slint); above everything.
     DragGhost { x: 0; y: 0; width: root.width; height: root.height; }
     FileDropOverlay { x: 0; y: 0; width: root.width; height: root.height; }
+    }
+    }
     }
 }

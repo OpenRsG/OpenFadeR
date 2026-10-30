@@ -43,9 +43,9 @@ use logic::{
 };
 pub(super) use logic::{pad_fx_rgb, tempo};
 use openfader::audio::{
-    fx::{Assign, Effect, BEAT_TEXT, FALLBACK_BPM},
-    merge::{DEFAULT_VOLUME, PRESETS},
     Bus, FX_SLOTS, FX_UNITS,
+    fx::{Assign, BEAT_TEXT, Effect, FALLBACK_BPM},
+    merge::{DEFAULT_VOLUME, PRESETS},
 };
 use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use std::{
@@ -158,6 +158,9 @@ impl Fx {
         } else {
             0
         };
+        if part != 0 && u.slots.iter().any(|s| s.on) {
+            self.decks[assign as usize].want_stems();
+        }
         for (c, s) in bus.fx[unit].iter().zip(u.slots.iter()) {
             c.set_effect(Effect::from_index(s.effect.max(0) as usize));
             c.set_beat(s.beat.max(0) as usize);

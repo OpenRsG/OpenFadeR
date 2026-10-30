@@ -17,7 +17,6 @@ import { VideoView, VideoState } from "video.slint";
 import { PrefsState } from "prefs.slint";
 import { MidiState } from "midi.slint";
 import { DeviceState } from "device.slint";
-import { KeysState } from "help.slint";
 import { TouchActions } from "touch-actions.slint";
 import { TrackInfoEditor, TrackInfoState } from "trackinfo.slint";
 import { ArtworkPicker, ArtworkState } from "artwork.slint";
@@ -44,7 +43,7 @@ export component TouchWorkspace inherits Rectangle {
     property <length> panel-width: root.section == 3 || root.section == 4 || root.section == 5 || root.section == 6 ? max(root.width, 1000px) : root.section == 0 && root.mode != 1 ? max(root.width, 1000px) : root.width;
     out property <int> browser-rows: max(6, floor((viewport.height - browser.required-height + 4 * Theme.h-row) / Theme.h-row));
     out property <bool> mix-active: root.visible && root.section == 5 && MixPointState.enabled;
-    changed visible => { if root.visible { keys.focus(); } }
+    changed visible => { if root.visible && !PrefsState.visible { keys.focus(); } }
     changed section => {
         viewport.content-x = 0px; viewport.content-y = 0px;
         if root.visible {
@@ -52,11 +51,12 @@ export component TouchWorkspace inherits Rectangle {
             SamplerState.open = root.section == 4;
             MixPointState.open = root.section == 5;
             GrooveState.open = root.section == 6;
-            keys.focus();
+            if !PrefsState.visible { keys.focus(); }
         }
     }
     changed mode => { root.section = root.mode == 0 && root.export-layout == 4 ? 1 : 0; viewport.content-x = 0px; viewport.content-y = 0px; }
     function set-mode(n: int) { ExportModeState.visible = n == 0; EditState.visible = n == 2; LightingState.visible = n == 3; VideoState.visible = n == 4; }
+    public function focus-keys() { keys.focus(); }
     public function focus-search() { root.section = 1; browser.focus-search(); }
     public function browse(d: int) { browser.select-delta(d); }
     public function browse-back() { root.section = 1; browser.browse-back(); }
@@ -68,11 +68,12 @@ export component TouchWorkspace inherits Rectangle {
     keys := FocusScope {
         width: root.width; height: root.height;
         key-pressed(e) => {
-            if (e.text == Key.Escape || e.text == Key.Back) && root.section != 0 { root.section = 0; return accept; }
-            if !e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control) { return accept; }
+            if !PrefsState.visible && (e.text == Key.Escape || e.text == Key.Back) && root.section != 0 {
+                root.section = 0;
+                return accept;
+            }
             return reject;
         }
-        key-released(e) => { if KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control) { return accept; } return reject; }
         VerticalLayout {
             x: 4px; y: 4px; width: root.width - 8px; height: root.header-h - 4px; spacing: 4px;
             HorizontalLayout {
@@ -89,7 +90,7 @@ export component TouchWorkspace inherits Rectangle {
                     options: DeckState.count == 4 ? [@tr("Deck A"), @tr("Deck B"), @tr("Deck C"), @tr("Deck D")] : [[@tr("Deck A"), @tr("Deck B"), @tr("Deck C"), @tr("Deck D")][DeckState.slots[0]], [@tr("Deck A"), @tr("Deck B"), @tr("Deck C"), @tr("Deck D")][DeckState.slots[1]]];
                     current: root.deck; chose(n) => { root.deck = n; }
                 }
-                if root.compact-header && root.mode == 1: Dropdown { width: 2 * Theme.touch-target; horizontal-stretch: 0; options: [@tr("2 decks"), @tr("4 decks")]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose(@tr("decks"), n); } }
+                if root.compact-header && root.mode == 1: Dropdown { width: 2 * Theme.touch-target; horizontal-stretch: 0; options: [@tr("2 decks"), @tr("4 decks")]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose("decks", n); } }
                 if root.compact-header && root.mode == 0: Dropdown { width: 3 * Theme.touch-target; horizontal-stretch: 0; options: ExportModeState.layout-names; current: ExportModeState.layout; chose(n) => { PrefsState.chose("export_layout", n); } }
                 IconButton { icon: Icon.usb; tooltip: @tr("Devices"); clicked => { DeviceState.visible = true; DeviceState.opened(); } }
                 IconButton { icon: Icon.gear; tooltip: @tr("Preferences, themes and extensions"); clicked => { PrefsState.visible = true; } }
@@ -98,7 +99,7 @@ export component TouchWorkspace inherits Rectangle {
             if !root.compact-header: HorizontalLayout {
                 height: Theme.touch-target; spacing: 4px;
                 Dropdown { options: [root.mode == 1 ? @tr("Decks") : root.mode == 0 ? @tr("Export players") : root.mode == 2 ? @tr("Edit") : root.mode == 3 ? @tr("Lighting") : @tr("Video"), @tr("Library"), @tr("Mixer & output"), @tr("Effects"), @tr("Sampler"), @tr("Mix point link"), @tr("Beat Lab"), @tr("All commands")]; current: root.section; chose(n) => { root.section = n; } }
-                if root.mode == 1: Dropdown { width: 100px; horizontal-stretch: 0; options: [@tr("2 decks"), @tr("4 decks")]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose(@tr("decks"), n); } }
+                if root.mode == 1: Dropdown { width: 100px; horizontal-stretch: 0; options: [@tr("2 decks"), @tr("4 decks")]; current: DeckState.count == 4 ? 1 : 0; chose(n) => { PrefsState.chose("decks", n); } }
                 if root.mode == 0: Dropdown { width: 130px; horizontal-stretch: 0; options: ExportModeState.layout-names; current: ExportModeState.layout; chose(n) => { PrefsState.chose("export_layout", n); } }
             }
             if root.deck-page && !root.inline-deck: HorizontalLayout {

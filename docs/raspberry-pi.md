@@ -25,8 +25,8 @@ docker buildx build -f Dockerfile.pi --build-arg PI_VARIANT=pi4 --build-arg TARG
 Fat LTO can exceed 12 GiB during final compilation. The release job uses a hosted runner with additional swap; local memory
 limits are not raised and the shipping optimization profile is not weakened to fit them.
 
-The archive holds the same plugins, themes and controller mappings as a release archive. Core 0.2.8 builds the companion
-OpenFadeR-Plugins tag `v0.2.11`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
+The archive holds the same plugins, themes and controller mappings as a release archive. Core 0.2.9 builds the companion
+OpenFadeR-Plugins tag `v0.2.12`; `--build-arg PLUGINS_REF=…` selects another compatible ref (`THEMES_REF` and `MAPPINGS_REF`
 pick the other companions' branch or tag). Checkouts already present in `extension/plugin`, `extension/skin` or `mappings`
 are used as they are, so switch an older plugin checkout to the matching tag first. The cargo registry and target folders stay
 in BuildKit cache mounts, so the next build only recompiles what changed.
@@ -72,7 +72,7 @@ as soon as the last active batch ends; loaded 16-bit tracks and completed stems 
 
 ## Speed
 
-PREFS > VIEW > WAVEFORM > RENDERER selects AUTO (default), GPU or CPU without restarting playback.
+Preferences > Appearance > WAVEFORM > RENDERER selects AUTO (default), GPU or CPU without restarting playback.
 AUTO uses hardware image composition when the window exposes an accelerated graphics API. The startup log reports
 the API and OpenGL `GL_RENDERER`: V3D is hardware, while `llvmpipe` / `softpipe` are CPU emulation and AUTO keeps
 the CPU waveform fallback. GPU explicitly permits emulated GL for diagnosis; it still falls back to CPU when
@@ -132,5 +132,5 @@ An earlier software-renderer measurement with two decks playing drew 62 frames p
 build, run under qemu-user emulation in a container limited to 4 cores and 1 GB, loaded, analysed and played the same two
 tracks at 31 to 34 frames per second; the tracks added 135 MB over idle, as on x86_64 (qemu's own translator adds about
 130 MB, so its totals are not the Pi's). A Pi core is several times slower than an x86_64 one: on a Pi 3, or at 1920×1080,
-set PREFS > VIEW > WAVEFORM > DRAWING RATE to 30, which halves the drawing work. A track plays as soon as it is decoded; its
+set Preferences > Appearance > WAVEFORM > DRAWING RATE to 30, which halves the drawing work. A track plays as soon as it is decoded; its
 analysis finishes afterwards without holding up the window.

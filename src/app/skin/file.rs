@@ -9,7 +9,9 @@
 //! settings the theme sets when it is chosen ([`LAYOUT_KEYS`]). A token that is unknown, of the wrong type or has a bad value is
 //! reported and left at the base's value; the rest of the skin still applies. Token values by type: colour `"#rrggbb"` /
 //! `"#rrggbbaa"`; length a number or `"12px"`; string text; int a whole number; float a number; duration a number of ms,
-//! `"80ms"` or `"0.2s"`. [`serialize`] writes the same format back (the theme editor and installer use it).
+//! `"80ms"` or `"0.2s"`; an int that picks one of a few options (`// @values` in ui/theme.slint) may be written as the option's name
+//! (`"stage-deck": "turntable"`) or its number. [`serialize`] writes the same format back (the theme editor and installer use it).
+//! Themes from before the Studio workspace went ([`RENAMED`], `layout-profile` 3) are migrated while they are read.
 
 use super::{Base, Skin, Ty, Value, TOKENS, TOKEN_RULES};
 use openfader_ui::skin::Rule;
@@ -31,6 +33,17 @@ pub const LAYOUT_KEYS: [&str; 11] = [
     "browse_bold",
     "overview",
     "show_mixer",
+];
+
+/// Tokens renamed when the Stage workspace took over the Studio workspace's sizes: (old name, new name), same meaning. A theme that sets
+/// both keeps the new one.
+const RENAMED: [(&str, &str); 6] = [
+    ("studio-radius", "stage-radius"),
+    ("studio-radius-ctl", "stage-radius-ctl"),
+    ("studio-button", "stage-button"),
+    ("studio-gap", "stage-gap"),
+    ("studio-cover", "stage-cover"),
+    ("studio-row", "stage-row"),
 ];
 
 /// The skins under `dirs` (earlier folders win a name clash), with one note per problem found.
@@ -173,11 +186,37 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
         None => {}
         Some(Json::Object(map)) => {
             for (key, v) in map {
-                let Some(i) = TOKENS.iter().position(|(n, _)| n == key) else {
+                let key = match RENAMED.iter().find(|(old, _)| *old == key.as_str()) {
+                    Some((_, new)) if map.contains_key(*new) => continue,
+                    Some((_, new)) => *new,
+                    None => key.as_str(),
+                };
+                let Some(i) = TOKENS.iter().position(|(n, _)| *n == key) else {
                     notes.push(tr!("unknown token {} (the names are the in-out properties of ui/theme.slint, docs/skins.md)", format!("{key:?}")));
                     continue;
                 };
-                match value(TOKENS[i].1, v).and_then(|v| check(i, &v).map(|()| v)) {
+                let v = match (TOKEN_RULES[i], v) {
+                    (Rule::Choice(names), Json::String(s)) => {
+                        match names.iter().position(|n| n.eq_ignore_ascii_case(s.trim())) {
+                            Some(k) => Json::from(k),
+                            None => {
+                                let e = tr!(
+                                    "{} is not allowed, use {}",
+                                    format!("{s:?}"),
+                                    allowed(names)
+                                );
+                                notes.push(tr!("token {}: {}", format!("{key:?}"), e));
+                                continue;
+                            }
+                        }
+                    }
+                    // Stage was 3 while the Studio workspace was 2; both are the stage workspace (2) now.
+                    (_, Json::Number(n)) if key == "layout-profile" && n.as_i64() == Some(3) => {
+                        Json::from(2)
+                    }
+                    _ => v.clone(),
+                };
+                match value(TOKENS[i].1, &v).and_then(|v| check(i, &v).map(|()| v)) {
                     Ok(v) => tokens.push((TOKENS[i].0, v)),
                     Err(e) => notes.push(tr!("token {}: {}", format!("{key:?}"), e)),
                 }
@@ -207,12 +246,7 @@ pub fn check(i: usize, v: &Value) -> Result<(), String> {
         (Rule::Choice(names), Value::Int(n))
             if usize::try_from(*n).map_or(true, |n| n >= names.len()) =>
         {
-            let all = names
-                .iter()
-                .enumerate()
-                .map(|(k, name)| format!("{k} ({name})"))
-                .collect::<Vec<_>>();
-            Err(tr!("{} is not allowed, use {}", n, all.join(", ")))
+            Err(tr!("{} is not allowed, use {}", n, allowed(names)))
         }
         (Rule::Range(lo, hi), Value::Float(x)) if !(lo..=hi).contains(x) => {
             Err(tr!("{} is out of range, use {} to {}", x, lo, hi))
@@ -220,6 +254,17 @@ pub fn check(i: usize, v: &Value) -> Result<(), String> {
         _ => Ok(()),
     }
 }
+
+/// `0 (desktop), 1 (touch), …`: what a choice token takes.
+fn allowed(names: &[&str]) -> String {
+    let all: Vec<_> = names
+        .iter()
+        .enumerate()
+        .map(|(k, name)| format!("{k} ({name})"))
+        .collect();
+    all.join(", ")
+}
+
 /// `j` as a value of type `ty`.
 fn value(ty: Ty, j: &Json) -> Result<Value, String> {
     let bad = |want: &str| tr!("expected {}, got {}", want, j);
@@ -334,6 +379,18 @@ fn to_json(v: &Value) -> Json {
     }
 }
 
+/// What [`serialize`] writes for `v`: a choice token as its option's name, anything else as [`to_json`].
+fn file_json(token: &str, v: &Value) -> Json {
+    if let (Value::Int(n), Some(i)) = (v, TOKENS.iter().position(|t| t.0 == token)) {
+        if let (Rule::Choice(names), Ok(n)) = (TOKEN_RULES[i], usize::try_from(*n)) {
+            if let Some(name) = names.get(n) {
+                return Json::String((*name).to_owned());
+            }
+        }
+    }
+    to_json(v)
+}
+
 /// `v` as the editor's field shows it: `#rrggbb`, a number, `80ms`, a font name.
 pub fn show(v: &Value) -> String {
     match v {
@@ -375,7 +432,7 @@ pub fn serialize(skin: &Skin) -> String {
     let lines: Vec<String> = skin
         .tokens
         .iter()
-        .map(|(k, v)| format!("    {}: {}", q(k), to_json(v)))
+        .map(|(k, v)| format!("    {}: {}", q(k), file_json(k, v)))
         .collect();
     out + &format!("  \"tokens\": {{\n{}\n  }}\n}}\n", lines.join(",\n"))
 }
@@ -465,7 +522,7 @@ mod tests {
                 .as_str()
         };
         assert!(note("layout-profile")
-            .contains("4 is not allowed, use 0 (desktop), 1 (touch), 2 (studio), 3 (stage)"));
+            .contains("4 is not allowed, use 0 (desktop), 1 (touch), 2 (stage)"));
         assert!(note("stage-deck").contains("-1 is not allowed"));
         assert!(note("stage-tabs").contains(
             "3 is not allowed, use 0 (none), 1 (MIXER FX REC), 2 (MIXER VIDEO LIGHTING)"
@@ -478,6 +535,52 @@ mod tests {
         assert!(note("bevel").contains("-0.1 is out of range"));
         assert!(note("wave-fade").contains("2 is out of range"));
         assert_eq!(notes.len(), 7, "{notes:?}");
+    }
+
+    #[test]
+    fn a_choice_token_takes_its_name_or_its_number_and_is_written_as_its_name() {
+        let (skin, notes) = parse(
+            r##"{"tokens":{"layout-profile":"Stage","stage-deck":"turntable","stage-pads":1,"stage-tabs":"MIXER FX REC","pad-style":"round"}}"##,
+            "x",
+        )
+        .unwrap();
+        let got = |n: &str| skin.tokens.iter().find(|t| t.0 == n).map(|t| t.1.clone());
+        assert_eq!(got("layout-profile"), Some(Value::Int(2)));
+        assert_eq!(got("stage-deck"), Some(Value::Int(1)));
+        assert_eq!(got("stage-pads"), Some(Value::Int(1)));
+        assert_eq!(got("stage-tabs"), Some(Value::Int(1)));
+        assert_eq!(got("pad-style"), None);
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert!(
+            notes[0].contains("\"round\" is not allowed, use 0 (list), 1 (grid)"),
+            "{notes:?}"
+        );
+        let text = serialize(&skin);
+        assert!(text.contains("\"layout-profile\": \"stage\""), "{text}");
+        assert!(text.contains("\"stage-deck\": \"turntable\""), "{text}");
+        assert_eq!(parse(&text, "x").unwrap().0, skin, "{text}");
+    }
+
+    #[test]
+    fn themes_from_the_studio_days_load_as_stage_themes_without_a_note() {
+        let (skin, notes) = parse(
+            r##"{"tokens":{"layout-profile":3,"studio-gap":6,"studio-row":40,"stage-row":30,"studio-radius":14}}"##,
+            "old",
+        )
+        .unwrap();
+        assert!(notes.is_empty(), "{notes:?}");
+        assert_eq!(
+            skin.tokens,
+            [
+                ("layout-profile", Value::Int(2)),
+                ("stage-gap", Value::Length(6.0)),
+                ("stage-radius", Value::Length(14.0)),
+                ("stage-row", Value::Length(30.0)),
+            ],
+            "the newer name wins over studio-row"
+        );
+        let (skin, _) = parse(r#"{"tokens":{"layout-profile":2}}"#, "studio").unwrap();
+        assert_eq!(skin.tokens, [("layout-profile", Value::Int(2))]);
     }
 
     #[test]

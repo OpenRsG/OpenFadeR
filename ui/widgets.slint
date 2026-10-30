@@ -23,6 +23,12 @@ export component Tooltip inherits Rectangle {
         root.armed = root.hovered && root.text != "" && Theme.tooltips;
         if !root.hovered { TipState.text = ""; }
     }
+    changed text => {
+        if root.hovered {
+            TipState.text = "";
+            root.armed = root.text != "" && Theme.tooltips;
+        }
+    }
     Timer {
         interval: Theme.tooltip-delay;
         running: root.armed;
@@ -40,15 +46,19 @@ export component TipOverlay inherits Rectangle {
     in property <length> window-w;
     in property <length> window-h;
     visible: TipState.text != "";
-    x: max(0px, min(TipState.x, root.window-w - self.width));
-    y: min(TipState.y, root.window-h - self.height);
-    width: label.preferred-width + 2 * Theme.space-lg;
+    x: max(8px, min(TipState.x, root.window-w - self.width - 8px));
+    y: max(8px, min(TipState.y, root.window-h - self.height - 8px));
+    width: min(max(32px, root.window-w - 16px), min(420px, label.preferred-width + 2 * Theme.space-lg));
     height: label.preferred-height + 2 * Theme.space-sm;
     background: Theme.panel-raised;
     border-width: 1px;
     border-color: Theme.line-strong;
     border-radius: Theme.radius;
     label := Text {
+        x: Theme.space-lg;
+        y: Theme.space-sm;
+        width: max(0px, parent.width - 2 * Theme.space-lg);
+        wrap: word-wrap;
         text: TipState.text;
         color: Theme.text;
         font-family: Theme.font;
@@ -146,7 +156,7 @@ export component IconButton inherits Rectangle {
     height: Theme.h-ctl;
     accessible-role: button;
     accessible-label: root.tooltip;
-    accessible-action-default => { if root.enabled { root.pressed(); root.released(); root.clicked(); } }
+    accessible-action-default => { if root.enabled { TipState.text = ""; root.pressed(); root.released(); root.clicked(); } }
     face := Rectangle {
         border-radius: Theme.radius;
         background: !root.enabled ? (root.solid ? Theme.panel : transparent)
@@ -164,7 +174,7 @@ export component IconButton inherits Rectangle {
     }
     ta := TouchArea {
         enabled: root.enabled;
-        clicked => { root.clicked(); }
+        clicked => { TipState.text = ""; root.clicked(); }
         pointer-event(e) => {
             if e.button == PointerEventButton.left {
                 if e.kind == PointerEventKind.down { root.pressed(); }
@@ -269,6 +279,10 @@ export component Toggle inherits Rectangle {
     in property <string> text;
     in property <bool> enabled: true;
     callback toggled(bool);
+    accessible-role: checkbox;
+    accessible-label: root.text;
+    accessible-checked: root.checked;
+    accessible-action-default => { if root.enabled { root.toggled(!root.checked); } }
     height: Theme.h-ctl;
     min-width: self.preferred-width;
     opacity: root.enabled ? 1 : 0.4;

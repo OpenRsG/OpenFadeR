@@ -45,7 +45,7 @@ fn choices(c: &Ctx, tab: &Tab, f: &Field) -> Vec<Choice> {
 pub fn row(c: &Ctx, tab: &Tab, f: &Field) -> Row {
     let key = format!("djs.f.{}", f.key);
     let v = c.value(f);
-    match &f.kind {
+    let row = match &f.kind {
         FieldKind::Choice { from_list, .. } => {
             let options = choices(c, tab, f);
             let names: Vec<&str> = options.iter().map(|o| o.label.as_str()).collect();
@@ -67,7 +67,8 @@ pub fn row(c: &Ctx, tab: &Tab, f: &Field) -> Row {
         FieldKind::Text => Row::text(&key, &f.label, &v),
         FieldKind::Info => Row::info(&f.label, &f.hint),
         FieldKind::List { .. } | FieldKind::File { .. } => Row::info(&f.label, &v),
-    }
+    };
+    row.help(&f.hint)
 }
 
 /// The click on option `i` of a Choice or Bool row.

@@ -128,7 +128,7 @@ unsafe extern "C" fn settings(c: *mut c_void) -> Str {
         let cx = ctx(c);
         let mut buf = cx.settings.borrow_mut();
         // The new text replaces the last answer, which the SDK documents.
-        *buf = serde_json::to_string(&config::get().values(&cx.lib.plugin.manifest))
+        *buf = serde_json::to_string(&config::values(&cx.lib.plugin.manifest))
             .unwrap_or_else(|_| "{}".to_owned());
         Str::new(&buf)
     })

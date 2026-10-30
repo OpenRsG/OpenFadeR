@@ -62,8 +62,8 @@ pub fn visible(app: &App) -> bool {
 /// Opens the window with just `plugins`, the extensions that read what the device `device` holds; ACCEPT switches them on.
 pub fn offer(app: &App, device: &str, plugins: &[Plugin]) {
     let intro = tr_n!(
-        "{} holds a library written by other DJ software. This extension reads it; it stays off until you switch it on.",
-        "{} holds libraries written by other DJ software. These extensions read them; they stay off until you switch them on.",
+        "{} holds a library from other DJ software. This format is included but stays off until you enable it.",
+        "{} holds libraries from other DJ software. These formats are included but stay off until you enable them.",
         plugins.len(),
         device
     );
@@ -89,10 +89,10 @@ pub fn show(app: &App) {
         });
     }
     let intro = if targets.is_empty() {
-        tr!("Switch these on to get the most out of OpenFadeR.").to_owned()
+        tr!("Enable the optional features you want to use.").to_owned()
     } else {
         tr!(
-            "These make OpenFadeR fully compatible with {}: its libraries, devices, effects and pad modes.",
+            "These options add support for {} and its available library or controller features.",
             targets.join(&tr!(" and "))
         )
     };
@@ -126,7 +126,7 @@ fn accept(app: &App) {
         }) {
             Ok(()) => {
                 plugins::installed(app, &names);
-                done.push(tr!("{} extensions switched on", names.len()));
+                done.push(tr!("{} options enabled", names.len()));
             }
             Err(e) => done.push(e),
         }

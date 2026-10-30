@@ -2,10 +2,9 @@
 //! session history, the stored play history, and the 200 ms timer that watches the decks.
 
 use super::{
-    history,
+    Home, View, history,
     sidebar::{HISTORY_ROW, TAG_ROW},
     table::reference,
-    Home, View,
 };
 use crate::app::{
     App, BrowserState, DeckState, analyze::detected, deck::Decks, library::settings, prefs,
@@ -16,7 +15,7 @@ use openfader::{
     store,
 };
 use serde_json::json;
-use slint::{ComponentHandle, Model, TimerMode};
+use slint::{ComponentHandle, Model, SharedString, TimerMode};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -84,7 +83,7 @@ impl View {
     }
 
     /// Preferences > Advanced > Browse: tracks of the Tag List that a deck just loaded leave it.
-    fn drop_loaded_from_tag_list(&mut self, app: &App, fresh: &[&(String, String)]) {
+    fn drop_loaded_from_tag_list(&mut self, app: &App, fresh: &[(String, String)]) {
         let before = self.tags.len();
         self.tags.retain(|t| {
             !fresh
@@ -97,15 +96,25 @@ impl View {
     }
 }
 
-/// (title, artist) of every deck that has a track loaded, in deck order.
-fn loaded(app: &App) -> Vec<(String, String)> {
-    let s = app.global::<DeckState>();
-    s.get_decks()
+type Titles = (SharedString, SharedString);
+
+/// Compares the loaded decks' (title, artist), in deck order, with `seen` without allocating; only when they differ
+/// `seen` is replaced and the entries it lacked are returned.
+fn fresh_loaded<I: Iterator<Item = Titles>>(
+    seen: &mut Vec<Titles>,
+    live: impl Fn() -> I,
+) -> Vec<(String, String)> {
+    if live().eq(seen.iter().cloned()) {
+        return Vec::new();
+    }
+    let now: Vec<Titles> = live().collect();
+    let fresh = now
         .iter()
-        .take(s.get_count() as usize)
-        .filter(|d| d.loaded)
-        .map(|d| (d.title.to_string(), d.artist.to_string()))
-        .collect()
+        .filter(|n| !seen.contains(n))
+        .map(|(t, a)| (t.to_string(), a.to_string()))
+        .collect();
+    *seen = now;
+    fresh
 }
 
 /// Polls the decks (a few property reads): logs what played on air, re-marks the rows (or re-filters) when the reference
@@ -119,7 +128,7 @@ pub(super) fn start_poll(app: &App, view: &Rc<RefCell<View>>, decks: Decks) {
         history::Watcher::new(history::MIN_PLAYED),
     );
     let (weak_view, weak) = (Rc::downgrade(view), app.as_weak());
-    let (mut ticks, mut seen) = (0u32, Vec::<(String, String)>::new());
+    let (mut ticks, mut seen, mut merged) = (0u32, Vec::<Titles>::new(), None);
     view.borrow()
         ._timer
         .start(TimerMode::Repeated, Duration::from_millis(200), move || {
@@ -133,15 +142,27 @@ pub(super) fn start_poll(app: &App, view: &Rc<RefCell<View>>, decks: Decks) {
             );
             let stored = stored.poll(&app, &decks);
             let mut v = v.borrow_mut();
-            let now = loaded(&app);
-            let fresh: Vec<&(String, String)> = now.iter().filter(|n| !seen.contains(n)).collect();
+            let state = app.global::<DeckState>();
+            let (n, models) = (state.get_count() as usize, state.get_decks());
+            let fresh = fresh_loaded(&mut seen, || {
+                models
+                    .iter()
+                    .take(n)
+                    .filter(|d| d.loaded)
+                    .map(|d| (d.title, d.artist))
+            });
             if taglist_load.get() && !fresh.is_empty() {
                 v.drop_loaded_from_tag_list(&app, &fresh);
             }
-            seen = now;
             ticks = ticks.wrapping_add(1);
-            if ticks % 5 == 0 {
-                v.refresh_sources(&app); // devices plugged / unplugged, Media Browser settings
+            // devices plugged / unplugged, Media Browser settings: merge only when either changed since the last merge
+            let sources = (
+                crate::app::device::generation(),
+                prefs::with(|p| p.view.media_explorer),
+            );
+            if ticks % 5 == 0 && merged != Some(sources) {
+                merged = Some(sources);
+                v.refresh_sources(&app);
             }
             v.health_tick(&app);
             for t in played {
@@ -169,4 +190,31 @@ pub(super) fn start_poll(app: &App, view: &Rc<RefCell<View>>, decks: Decks) {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn deck(t: &str, a: &str) -> Titles {
+        (t.into(), a.into())
+    }
+
+    #[test]
+    fn only_a_changed_deck_set_reports_fresh_tracks() {
+        let mut seen = Vec::new();
+        let one = vec![deck("A", "x")];
+        assert_eq!(
+            fresh_loaded(&mut seen, || one.iter().cloned()),
+            [("A".to_owned(), "x".to_owned())]
+        );
+        assert!(fresh_loaded(&mut seen, || one.iter().cloned()).is_empty());
+        let two = vec![deck("A", "x"), deck("B", "y")];
+        assert_eq!(
+            fresh_loaded(&mut seen, || two.iter().cloned()),
+            [("B".to_owned(), "y".to_owned())]
+        );
+        assert!(fresh_loaded(&mut seen, std::iter::empty).is_empty());
+        assert!(seen.is_empty());
+    }
 }

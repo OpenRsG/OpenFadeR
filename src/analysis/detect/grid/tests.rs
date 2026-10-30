@@ -98,6 +98,36 @@ fn with_pad(mut s: Vec<f32>, amp: f32) -> Vec<f32> {
 }
 
 #[test]
+fn rolling_flux_matches_the_direct_window_definition() {
+    let fr = 400.0;
+    let (smooth, look) = (4usize, 10usize);
+    let e: [Vec<f32>; 3] = std::array::from_fn(|b| {
+        (0..600)
+            .map(|i| ((i * (b + 3)) % 17) as f32 * 0.01 + if i % 50 == 0 { 2.0 } else { 0.0 })
+            .collect()
+    });
+    let lg = |v: f32| (1.0 + ENERGY_GAIN * v).ln();
+    let direct: Vec<f32> = (0..600)
+        .map(|i: usize| {
+            e.iter()
+                .map(|b| {
+                    let s = |i: usize| {
+                        lg(b[(i + 1).saturating_sub(smooth)..=i].iter().sum::<f32>()
+                            / smooth as f32)
+                    };
+                    let m = (i.saturating_sub(look)..i).map(s).fold(0.0f32, f32::max);
+                    (s(i) - m).max(0.0)
+                })
+                .sum()
+        })
+        .collect();
+    let fast = flux(&e, fr);
+    for (i, (a, b)) in direct.iter().zip(&fast).enumerate() {
+        assert!((a - b).abs() < 1e-4, "hop {i}: {a} vs {b}");
+    }
+}
+
+#[test]
 fn chord_pad_under_clicks_keeps_the_click_tempo() {
     for amp in [0.05, 0.1, 0.2] {
         let beats = beat_grid(
@@ -281,6 +311,90 @@ fn bpm_range_folds_octaves() {
         (at(70, 140) - 87.0).abs() <= 0.1,
         "a 70-140 range reads drum & bass in half time"
     );
+}
+
+/// A house groove at `bpm` from `first` seconds: a kick (60 Hz) every `kick_beats` beats, hats (6 kHz) on every eighth and a clap
+/// (1.5 kHz) on beats 2 and 4. `kick_beats` 1.5 is the dotted (3-against-4) bass pattern of much tech house.
+fn groove(bpm: f64, kick_beats: f64, first: f64, secs: f64) -> Vec<f32> {
+    let mut s = vec![0f32; (secs * RATE as f64) as usize * 2];
+    let beat = 60.0 / bpm;
+    let mut t = first;
+    while t < secs - 0.2 {
+        burst(&mut s, t, 60.0, 0.9, 6000);
+        t += kick_beats * beat;
+    }
+    let mut k = 0;
+    let mut t = first;
+    while t < secs - 0.2 {
+        burst(&mut s, t, 6000.0, 0.25, 300);
+        if k % 4 == 2 {
+            burst(&mut s, t, 1500.0, 0.5, 1500);
+        }
+        k += 1;
+        t += beat / 2.0;
+    }
+    s
+}
+
+#[test]
+fn dotted_kick_pattern_reads_the_beat_not_the_kick_period() {
+    // Kicks every 1.5 beats of 128 BPM are 85.33 BPM on their own; the hats and claps say 128, and 85 is inside the default
+    // range, so the fold of octaves alone cannot save it (issue 43, "Overflow").
+    for first in [0.0, 0.173] {
+        let audio = groove(128.0, 1.5, first, 40.0);
+        for opt in [GridOptions::default(), opts(Mode::Normal, true)] {
+            let beats = beat_grid_with(&audio, RATE, &opt);
+            let got = beats.first().map_or(0.0, |b| b.bpm_x100 as f64 / 100.0);
+            assert!(
+                (got - 128.0).abs() <= 0.15,
+                "{opt:?} first {first}: detected {got}"
+            );
+        }
+    }
+    // The plain four-on-the-floor groove still reads straight.
+    let beats = beat_grid(&groove(124.0, 1.0, 0.173, 40.0), RATE);
+    let got = beats.first().map_or(0.0, |b| b.bpm_x100 as f64 / 100.0);
+    assert!((got - 124.0).abs() <= 0.15, "detected {got}");
+}
+
+#[test]
+fn a_fold_with_thirds_and_an_empty_half_is_the_dotted_reading() {
+    // 60 bins: the kick on 0, hats/claps on the thirds (20, 40), nothing on the half (30).
+    let mut dotted_fold = vec![0.0; 60];
+    dotted_fold[0] = 10.0;
+    dotted_fold[20] = 2.0;
+    dotted_fold[40] = 2.0;
+    assert!(dotted(&dotted_fold));
+    // The straight reading: the half carries the hats.
+    let mut straight = vec![0.0; 60];
+    straight[0] = 10.0;
+    straight[30] = 4.0;
+    assert!(!dotted(&straight));
+    // A shuffle: thirds and a half both carry weight.
+    straight[40] = 3.0;
+    assert!(!dotted(&straight));
+    assert!(!dotted(&[1.0; 6]), "too short to split");
+}
+
+#[test]
+fn no_beats_in_the_silence_before_the_music_and_the_first_lands_on_the_kick() {
+    // 1.3 s of silence, then the groove: the grid starts at the first kick, not on extrapolated beats in the silence,
+    // and the first beat is within 3 ms of the kick's onset (issue 43).
+    for first in [1.3, 2.05] {
+        let audio = groove(126.0, 1.0, first, 40.0);
+        for opt in [
+            opts(Mode::Normal, false),
+            opts(Mode::Normal, true),
+            GridOptions::default(),
+        ] {
+            let beats = beat_grid_with(&audio, RATE, &opt);
+            let t0 = beats.first().map_or(0, |b| b.time_ms) as f64;
+            assert!(
+                (t0 - first * 1000.0).abs() <= 3.0,
+                "{opt:?} first {first}: first beat at {t0} ms"
+            );
+        }
+    }
 }
 
 /// Onsets (400 Hz frames) every `step` frames for 60 s, `weight(k)` for the k-th.

@@ -16,10 +16,18 @@ pub use picker::{find, wire};
 use super::{library::Ctx, toast, App, BrowserState};
 use openfader::{artwork, library::Track, plugin, store::Store};
 use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer};
-use std::{path::Path, rc::Rc};
+use std::{
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
-/// The file at `path` as a picture at most `max` pixels on its longer side; `None` when it cannot be read as one.
+/// The file at `path` as a picture at most `max` pixels on its longer side; `None` when it cannot be read as one. A shrunk
+/// picture is kept under `<cache>/thumbs` so the next start does not decode the full cover again.
 pub fn image(path: &Path, max: u32) -> Option<Image> {
+    let thumb = thumb_file(path, max);
+    if let Some(img) = thumb.as_deref().and_then(read_thumb) {
+        return Some(img);
+    }
     let img = Image::load_from_path(path).ok()?;
     let size = img.size();
     if size.width.max(size.height) <= max {
@@ -34,9 +42,48 @@ pub fn image(path: &Path, max: u32) -> Option<Image> {
         size.height as usize,
         max as usize,
     );
-    let mut buf = SharedPixelBuffer::<Rgba8Pixel>::new(w as u32, h as u32);
-    buf.make_mut_bytes().copy_from_slice(&out);
-    Some(Image::from_rgba8(buf))
+    if let Some(f) = &thumb {
+        write_thumb(f, w as u32, h as u32, &out);
+    }
+    Some(rgba_image(w as u32, h as u32, &out))
+}
+
+fn rgba_image(w: u32, h: u32, rgba: &[u8]) -> Image {
+    let mut buf = SharedPixelBuffer::<Rgba8Pixel>::new(w, h);
+    buf.make_mut_bytes().copy_from_slice(rgba);
+    Image::from_rgba8(buf)
+}
+
+/// Where the thumbnail of `path` at `max` lives: the analysis cache's key (path, size, mtime, so an edited cover never hits
+/// an old thumbnail) plus `max`. `None` without a cache folder or a readable file.
+fn thumb_file(path: &Path, max: u32) -> Option<PathBuf> {
+    let key = openfader::analysis::cache::key(path).ok()?;
+    Some(
+        openfader::paths::cache_dir()?
+            .join("thumbs")
+            .join(format!("{key}-{max}.rgba")),
+    )
+}
+
+/// A thumbnail file: `w u32`, `h u32` (little-endian), then `w × h` RGBA pixels. `None` for anything else, so a damaged file
+/// is simply decoded again.
+fn read_thumb(file: &Path) -> Option<Image> {
+    let b = std::fs::read(file).ok()?;
+    let w = u32::from_le_bytes(b.get(..4)?.try_into().ok()?);
+    let h = u32::from_le_bytes(b.get(4..8)?.try_into().ok()?);
+    let px = b.get(8..)?;
+    (w > 0 && h > 0 && px.len() as u64 == w as u64 * h as u64 * 4).then(|| rgba_image(w, h, px))
+}
+
+/// Best effort (the picture is shown either way); written beside and renamed so a half-written file is never read.
+fn write_thumb(file: &Path, w: u32, h: u32, rgba: &[u8]) {
+    let mut data = [w.to_le_bytes(), h.to_le_bytes()].concat();
+    data.extend_from_slice(rgba);
+    let tmp = file.with_extension("tmp");
+    let _ = file.parent().map(std::fs::create_dir_all);
+    if std::fs::write(&tmp, data).is_ok() && std::fs::rename(&tmp, file).is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
 }
 
 /// `rgba` (`w` × `h`, 4 bytes a pixel) averaged down by a whole factor so that neither side is over `max`: width, height and
@@ -110,5 +157,22 @@ mod tests {
         let big = vec![9u8; 601 * 300 * 4];
         let (nw, nh, _) = shrink(&big, 601, 300, 40);
         assert!(nw <= 40 && nh <= 40, "{nw}×{nh}");
+    }
+
+    #[test]
+    fn a_stored_thumbnail_answers_without_decoding_the_cover() {
+        // Not a picture: only the cache can make `image` answer.
+        let f = std::env::temp_dir().join(format!("openfader-thumb-{}.jpg", std::process::id()));
+        std::fs::write(&f, b"not a picture").unwrap();
+        assert!(image(&f, 2).is_none());
+        let t = thumb_file(&f, 2).unwrap();
+        write_thumb(&t, 2, 1, &[0, 0, 0, 255, 200, 0, 0, 255]);
+        let img = image(&f, 2).unwrap();
+        assert_eq!((img.size().width, img.size().height), (2, 1));
+        // A damaged entry is ignored.
+        std::fs::write(&t, [2, 0, 0, 0, 1, 0, 0, 0, 9]).unwrap();
+        assert!(image(&f, 2).is_none());
+        let _ = std::fs::remove_file(&f);
+        let _ = std::fs::remove_file(&t);
     }
 }

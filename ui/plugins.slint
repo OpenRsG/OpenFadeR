@@ -1,5 +1,5 @@
 import { ListView } from "std-widgets.slint";
-import { Chip, Dropdown, Icon, IconButton, MenuItem, TextField, Toggle } from "widgets.slint";
+import { Chip, Dropdown, Glyph, Icon, IconButton, MenuItem, TextField, Toggle } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { CatalogState, GetPlugin, RepoBar } from "catalog.slint";
 import { DialogFrame, Note } from "dialog.slint";
@@ -18,6 +18,9 @@ export struct PluginSettingView {
 /// One card of the plugin manager.
 export struct PluginView {
     name: string,
+    title: string,
+    search: string,
+    index: int,
     version: string,
     author: string,
     description: string,
@@ -61,6 +64,11 @@ export global PluginState {
     in property <string> restart-text;
     in property <string> folder;
     in property <string> message;
+    in property <[PluginView]> formats;
+    in property <[PluginView]> extensions;
+    in-out property <string> help-plugin;
+    in-out property <int> help-setting: -1;
+    callback filter(string);
     callback toggle(int);
     callback remove(int);
     callback expand(int);
@@ -100,6 +108,7 @@ component Badge inherits Rectangle {
 /// The ⋮ of a plugin card: open its folder, uninstall it (a bundled plugin stays hidden until it is installed again).
 component CardMenu inherits IconButton {
     in property <int> index;
+    in property <bool> removable;
     icon: Icon.more;
     tooltip: @tr("More");
     clicked => { pop.show(); }
@@ -116,92 +125,157 @@ component CardMenu inherits IconButton {
             VerticalLayout {
                 padding: 1px;
                 MenuItem { text: @tr("Open folder"); activated => { PluginState.open-folder(root.index); pop.close(); } }
-                MenuItem { text: @tr("Uninstall"); activated => { PluginState.remove(root.index); pop.close(); } }
+                MenuItem { text: root.removable ? @tr("Uninstall") : @tr("Hide bundled extension"); activated => { PluginState.remove(root.index); pop.close(); } }
             }
         }
+    }
+}
+
+/// The square glyph tile of a card or a catalogue row: lit in the accent while the plugin is on.
+component Tile inherits Rectangle {
+    in property <Icon> icon: Icon.puzzle;
+    in property <bool> lit: true;
+    width: 36px;
+    height: 36px;
+    border-radius: Theme.radius-lg;
+    background: root.lit ? Theme.accent.with-alpha(0.16) : Theme.panel-high;
+    Glyph {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: parent.width / 2;
+        height: parent.width / 2;
+        icon: root.icon;
+        tint: root.lit ? Theme.accent-hi : Theme.text-dim;
     }
 }
 
 component Card inherits Rectangle {
     in property <PluginView> v;
     in property <int> index;
-    background: root.v.enabled ? Theme.panel : Theme.bg;
+    in property <bool> compatibility;
+    background: Theme.panel;
     border-radius: Theme.radius-lg;
     border-width: 1px;
     border-color: root.v.restart ? Theme.cue : Theme.line;
     VerticalLayout {
-        padding: Theme.space-lg;
-        spacing: Theme.space-sm;
+        padding: Theme.space-xl;
+        spacing: Theme.space-md;
         HorizontalLayout {
-            spacing: Theme.space-md;
-            if !root.v.always-on: Toggle { width: 20px; checked: root.v.enabled; toggled => { PluginState.toggle(root.index); } }
-            if root.v.always-on: Rectangle { width: 20px; }
+            spacing: Theme.space-lg;
+            Tile { y: 0px; icon: root.compatibility ? Icon.stack : Icon.puzzle; lit: root.v.enabled; }
             VerticalLayout {
-                // A short description must not shrink and centre the column (its children cap its width otherwise).
                 horizontal-stretch: 1;
                 min-width: 0px;
                 max-width: 100000px;
-                spacing: 2px;
+                spacing: Theme.space-xs;
                 HorizontalLayout {
                     spacing: Theme.space-md;
                     alignment: start;
                     Text {
-                        text: root.v.name;
+                        text: root.v.title;
                         color: root.v.enabled ? Theme.text-bright : Theme.text-dim;
                         font-family: Theme.font;
                         font-size: Theme.font-md;
                         font-weight: Theme.weight-bold;
                         vertical-alignment: center;
                     }
-                    if root.v.version != "": Text { text: root.v.version; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
-                    Badge { text: root.v.kind; tone: root.v.kind == "LUA" ? Theme.accent-hi : root.v.kind == "PYTHON" ? Theme.cue : root.v.kind == "JSON" ? Theme.play : Theme.text-dim; y: 2px; }
-                    if root.v.builtin: Badge { text: @tr("BUILT IN"); tone: Theme.text-dim; y: 2px; }
-                    if !root.v.removable && !root.v.builtin: Badge { text: @tr("BUNDLED"); tone: Theme.text-dim; y: 2px; }
-                    if root.v.restart: Badge { text: @tr("RESTART"); tone: Theme.cue; y: 2px; }
+                    if root.v.version != "": Text { text: root.v.version; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; vertical-alignment: center; }
+                    if !root.v.builtin: Badge { y: (parent.height - self.height) / 2; text: root.v.kind; tone: Theme.text-dim; }
+                    if !root.v.builtin && !root.v.removable: Badge { y: (parent.height - self.height) / 2; text: @tr("BUNDLED"); tone: Theme.text-dim; }
                 }
                 Text {
                     text: root.v.description;
                     color: Theme.text-dim;
                     font-family: Theme.font;
+                    font-size: Theme.font-size;
+                    wrap: word-wrap;
+                }
+                Text {
+                    text: root.v.builtin
+                        ? (root.v.always-on ? @tr("Always available") : root.v.enabled ? @tr("Enabled") : @tr("Disabled"))
+                        : (root.v.author != "" ? @tr("by {}", root.v.author) + "  ·  " + root.v.provides : root.v.provides);
+                    color: root.v.builtin && root.v.enabled ? Theme.play : Theme.text-faint;
+                    font-family: Theme.font;
                     font-size: Theme.font-sm;
                     wrap: word-wrap;
                 }
-                Text { text: root.v.provides; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; }
             }
-            Chip {
-                text: root.v.open ? @tr("LESS") : root.v.settings.length > 0 ? @tr("SETTINGS") : @tr("MORE");
-                width: 72px;
-                horizontal-stretch: 0;
-                font-size: Theme.font-xs;
-                clicked => { PluginState.expand(root.index); }
+            HorizontalLayout {
+                height: Theme.h-ctl;
+                spacing: Theme.space-md;
+                alignment: end;
+                if !root.v.builtin || root.v.settings.length > 0: Chip {
+                    text: root.v.open ? @tr("Close details") : root.v.settings.length > 0 ? @tr("Settings") : @tr("Details");
+                    width: max(88px, self.fit-width);
+                    horizontal-stretch: 0;
+                    active: root.v.open;
+                    clicked => { PluginState.expand(root.index); }
+                }
+                if !root.v.builtin: CardMenu { index: root.index; removable: root.v.removable; horizontal-stretch: 0; }
+                if !root.v.always-on: Toggle {
+                    width: Theme.target-size(24px);
+                    checked: root.v.enabled;
+                    accessible-label: root.v.title;
+                    toggled => { PluginState.toggle(root.index); }
+                }
             }
-            if !root.v.builtin: CardMenu { index: root.index; horizontal-stretch: 0; }
         }
         if root.v.open: VerticalLayout {
-            spacing: Theme.space-sm;
-            padding-left: 26px;
-            if root.v.author != "": Text { text: @tr("by {}", root.v.author); color: Theme.text-dim; font-size: Theme.font-sm; }
-            if !root.v.builtin: Text { text: root.v.folder; color: Theme.text-faint; font-size: Theme.font-xs; overflow: elide; }
+            spacing: Theme.space-md;
+            Rectangle { height: 1px; background: Theme.line; }
             for s[k] in root.v.settings: VerticalLayout {
-                spacing: 2px;
+                spacing: Theme.space-xs;
+                if s.kind != 0: Text {
+                    text: s.label;
+                    color: Theme.text;
+                    font-family: Theme.font;
+                    font-size: Theme.font-size;
+                    wrap: word-wrap;
+                }
                 HorizontalLayout {
                     spacing: Theme.space-md;
-                    if s.kind == 0: Toggle { text: s.label; checked: s.on; toggled(on) => { PluginState.setting-bool(root.index, k, on); } }
-                    if s.kind != 0: Text { text: s.label; width: 160px; color: Theme.text; font-size: Theme.font-sm; vertical-alignment: center; }
+                    if s.kind == 0: Toggle {
+                        text: s.label;
+                        checked: s.on;
+                        toggled(on) => { PluginState.setting-bool(root.index, k, on); }
+                    }
                     if s.kind == 1 || s.kind == 2 || s.kind == 4: TextField {
                         text: s.text;
                         input-type: s.kind == 2 ? InputType.decimal : s.kind == 4 ? InputType.password : InputType.text;
                         accepted(t) => { PluginState.setting-text(root.index, k, t); }
                     }
-                    if s.kind == 3: Dropdown { options: s.choices; current: s.choice; chose(c) => { PluginState.setting-choice(root.index, k, c); } }
+                    if s.kind == 3: Dropdown {
+                        horizontal-stretch: 1;
+                        options: s.choices;
+                        current: s.choice;
+                        chose(c) => { PluginState.setting-choice(root.index, k, c); }
+                    }
+                    if s.help != "": IconButton {
+                        width: Theme.target-size(26px);
+                        height: Theme.target-size(26px);
+                        horizontal-stretch: 0;
+                        icon: Icon.info;
+                        tooltip: self.active ? "" : s.help;
+                        accessible-label: @tr("Help: {}", s.label);
+                        active: PluginState.help-plugin == root.v.name && PluginState.help-setting == k;
+                        clicked => {
+                            if self.active { PluginState.help-plugin = ""; PluginState.help-setting = -1; }
+                            else { PluginState.help-plugin = root.v.name; PluginState.help-setting = k; }
+                        }
+                    }
                 }
-                if s.help != "": Text { text: s.help; color: Theme.text-faint; font-size: Theme.font-xs; wrap: word-wrap; }
+                if s.help != "" && PluginState.help-plugin == root.v.name && PluginState.help-setting == k: Note {
+                    text: s.help;
+                    color: Theme.text-dim;
+                    font-size: Theme.font-size;
+                }
             }
-            HorizontalLayout {
+            if !root.v.builtin: Text { text: root.v.folder; color: Theme.text-dim; font-size: Theme.font-sm; overflow: elide; }
+            if !root.v.builtin: HorizontalLayout {
                 spacing: Theme.space-md;
                 alignment: start;
-                if !root.v.builtin: Chip { text: @tr("OPEN FOLDER"); width: 100px; font-size: Theme.font-xs; clicked => { PluginState.open-folder(root.index); } }
-                if root.v.homepage != "": Chip { text: @tr("WEB PAGE"); width: 90px; font-size: Theme.font-xs; clicked => { PluginState.homepage(root.index); } }
+                Chip { text: @tr("OPEN FOLDER"); width: 120px; clicked => { PluginState.open-folder(root.index); } }
+                if root.v.homepage != "": Chip { text: @tr("WEB PAGE"); width: 100px; clicked => { PluginState.homepage(root.index); } }
             }
         }
     }
@@ -210,30 +284,25 @@ component Card inherits Rectangle {
 /// The plugin manager (PREFS > EXTENSIONS): install buttons and the drop hint, the restart banner, one card per plugin
 /// (switch, details, settings, remove), then the load errors.
 export component PluginManager inherits VerticalLayout {
+    in property <bool> compatibility;
     spacing: Theme.space-md;
-    HorizontalLayout {
+    if !root.compatibility: HorizontalLayout {
         spacing: Theme.space-md;
-        Text { text: @tr("PLUGINS"); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; }
+        Text { text: @tr("Installed extensions"); color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; }
         Rectangle { horizontal-stretch: 1; }
-        Chip { text: @tr("INSTALL FILE…"); width: 110px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: @tr("A plugin .zip or its plugin.json"); clicked => { PluginState.install(false); } }
-        Chip { text: @tr("INSTALL FOLDER…"); width: 120px; horizontal-stretch: 0; font-size: Theme.font-xs; clicked => { PluginState.install(true); } }
-        Chip { text: @tr("OPEN PLUGINS FOLDER"); width: 150px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: PluginState.folder; clicked => { PluginState.open-folder(-1); } }
-        Chip { text: @tr("RELOAD"); width: 70px; horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: @tr("Read the plugin folders again"); clicked => { PluginState.reload(); } }
+        Chip { text: @tr("INSTALL FILE…"); width: max(110px, self.fit-width); horizontal-stretch: 0; font-size: Theme.font-xs; tooltip: @tr("A plugin .zip or its plugin.json"); clicked => { PluginState.install(false); } }
+        Chip { text: @tr("INSTALL FOLDER…"); width: max(120px, self.fit-width); horizontal-stretch: 0; font-size: Theme.font-xs; clicked => { PluginState.install(true); } }
+        IconButton { solid: true; icon: Icon.folder; tooltip: @tr("OPEN PLUGINS FOLDER"); clicked => { PluginState.open-folder(-1); } }
+        IconButton { solid: true; icon: Icon.loop; tooltip: @tr("Read the plugin folders again"); clicked => { PluginState.reload(); } }
     }
-    Rectangle {
-        height: 34px;
-        border-radius: Theme.radius-lg;
-        border-width: 1px;
-        border-color: Theme.line-strong;
-        background: Theme.bg;
-        Text {
-            text: PluginState.message != "" ? PluginState.message : @tr("Drop a plugin folder, .zip or plugin.json (or a theme .json, or audio files) anywhere on the window to install it.");
-            color: PluginState.message != "" ? Theme.text : Theme.text-dim;
-            font-family: Theme.font;
-            font-size: Theme.font-sm;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
+    if !root.compatibility: Note {
+        text: PluginState.message != "" ? PluginState.message : @tr("Install optional extensions from a file, folder or repository. Library format adapters are included in the app.");
+        color: PluginState.message != "" ? Theme.text : Theme.text-dim;
+    }
+    if root.compatibility: Note {
+        text: @tr("Enable the formats you use, then connect a source in Music libraries. Disabling a format does not delete tracks already imported into the Collection.");
+        color: Theme.text-dim;
+        font-size: Theme.font-size;
     }
     if PluginState.restart-text != "": Rectangle {
         height: 32px;
@@ -249,39 +318,45 @@ export component PluginManager inherits VerticalLayout {
             Chip { text: @tr("RESTART NOW"); width: 110px; horizontal-stretch: 0; y: 4px; height: 24px; active: true; active-color: Theme.cue; clicked => { PluginState.restart(); } }
         }
     }
-    for v[i] in PluginState.plugins: Card { v: v; index: i; }
-    if PluginState.plugins.length == 0: Note { text: @tr("No plugin found. Install one, or put plugin folders in {}.", PluginState.folder); }
-    for e in PluginState.errors: Text { text: "⚠ " + e; color: Theme.danger; font-family: Theme.font; font-size: Theme.font-sm; wrap: word-wrap; }
+    for v in (root.compatibility ? PluginState.formats : PluginState.extensions): Card { v: v; index: v.index; compatibility: root.compatibility; }
+    if (root.compatibility ? PluginState.formats.length : PluginState.extensions.length) == 0: Note {
+        text: root.compatibility ? @tr("No formats match this search.") : @tr("No extensions to show. Clear the search or install one.");
+        color: Theme.text-dim;
+    }
+    if !root.compatibility: VerticalLayout {
+        for e in PluginState.errors: Text { text: e; color: Theme.danger; font-family: Theme.font; font-size: Theme.font-sm; wrap: word-wrap; }
+    }
 }
 
-/// One row of GET PLUGINS: name, version, NATIVE, repository and a one-line description, and the one button (INSTALL, UPDATE when
+/// One row of GET PLUGINS: tile, name, version, NATIVE, repository and a one-line description, and the one button (INSTALL, UPDATE when
 /// the repository has another version than the installed one, INSTALLED). Fixed height, so the list only builds the rows on screen.
 component GetRow inherits Rectangle {
     in property <GetPlugin> v;
     in property <int> index;
-    height: 44px;
-    background: Math.mod(root.index, 2) == 0 ? Theme.bg-deep : Theme.row-alt;
+    height: 56px;
+    Rectangle { y: parent.height - 1px; height: 1px; background: Theme.line.with-alpha(0.55); }
     HorizontalLayout {
         padding-left: Theme.space-lg;
-        padding-right: Theme.space-md;
+        padding-right: Theme.space-lg;
         spacing: Theme.space-lg;
+        Tile { y: (parent.height - self.height) / 2; width: 32px; height: 32px; lit: root.v.action == 2; }
         VerticalLayout {
             horizontal-stretch: 1;
             min-width: 0px;
             alignment: center;
-            spacing: 1px;
+            spacing: 2px;
             HorizontalLayout {
                 spacing: Theme.space-md;
                 alignment: start;
-                Text { text: root.v.name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
-                if root.v.version != "": Text { text: root.v.action == 1 ? @tr("{} → {}", root.v.installed, root.v.version) : root.v.version; color: Theme.text-faint; font-size: Theme.font-xs; vertical-alignment: center; }
-                if root.v.native: Badge { text: @tr("NATIVE"); tone: Theme.text-dim; }
+                Text { text: root.v.name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-size; font-weight: Theme.weight-bold; vertical-alignment: center; }
+                if root.v.version != "": Text { text: root.v.action == 1 ? @tr("{} → {}", root.v.installed, root.v.version) : root.v.version; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; vertical-alignment: center; }
+                if root.v.native: Badge { y: (parent.height - self.height) / 2; text: @tr("NATIVE"); tone: Theme.text-dim; }
                 Text { text: root.v.repo; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; vertical-alignment: center; }
             }
-            Text { text: root.v.description; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-xs; overflow: elide; }
+            Text { text: root.v.description; color: Theme.text-dim; font-family: Theme.font; font-size: Theme.font-sm; overflow: elide; }
         }
         VerticalLayout {
-            width: 96px;
+            width: 100px;
             horizontal-stretch: 0;
             alignment: center;
             Chip {
@@ -296,20 +371,19 @@ component GetRow inherits Rectangle {
     }
 }
 
-/// PREFS > EXTENSIONS > GET PLUGINS: the repositories, every plugin they hold with its install button, INSTALL ALL.
+/// PREFS > EXTENSIONS > GET PLUGINS: every plugin the repositories hold with its install button and INSTALL ALL, then the repositories.
 export component GetPlugins inherits VerticalLayout {
     spacing: Theme.space-md;
     init => { CatalogState.opened(); }
-    Text { text: @tr("GET PLUGINS"); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
-    Note { text: @tr("Plugins and themes come from GitHub repositories. Add a repository (owner/repo), then install what it holds with one click."); }
-    RepoBar { }
+    Rectangle { height: Theme.space-md; }
     HorizontalLayout {
         spacing: Theme.space-md;
         height: Theme.h-ctl;
+        Text { text: @tr("GET PLUGINS"); color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; vertical-alignment: center; }
         Text {
             text: CatalogState.plugins.length == 1 ? @tr("1 plugin in your repositories") : @tr("{} plugins in your repositories", CatalogState.plugins.length);
             vertical-alignment: center;
-            color: Theme.text-dim;
+            color: Theme.text-faint;
             font-family: Theme.font;
             font-size: Theme.font-sm;
         }
@@ -324,9 +398,11 @@ export component GetPlugins inherits VerticalLayout {
             clicked => { CatalogState.install-all-plugins(); }
         }
     }
-    // At most 7 rows high, then it scrolls; a ListView makes only the visible rows, so a long list stays light.
+    Note { text: @tr("Plugins and themes come from GitHub repositories. Add a repository (owner/repo), then install what it holds with one click."); }
+    // At most 6 rows high, then it scrolls; a ListView makes only the visible rows, so a long list stays light.
     if CatalogState.plugins.length > 0: Rectangle {
-        height: Math.min(CatalogState.plugins.length, 7) * 44px + 2px;
+        height: Math.min(CatalogState.plugins.length, 6) * 56px + 2px;
+        background: Theme.bg;
         border-radius: Theme.radius-lg;
         border-width: 1px;
         border-color: Theme.line;
@@ -339,6 +415,9 @@ export component GetPlugins inherits VerticalLayout {
             for v[i] in CatalogState.plugins: GetRow { v: v; index: i; }
         }
     }
+    Rectangle { height: Theme.space-md; }
+    Text { text: @tr("Repositories"); color: Theme.text; font-family: Theme.font; font-size: Theme.font-size; font-weight: Theme.weight-bold; }
+    RepoBar { }
 }
 
 /// The prompt dialog; instantiate once in the window. The dialog exists only while open, so its field takes the focus each time.

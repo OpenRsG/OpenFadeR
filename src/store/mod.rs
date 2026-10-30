@@ -227,6 +227,9 @@ const MIGRATIONS: &[&str] = &[
      CREATE INDEX IF NOT EXISTS file_print_by_print ON file_print(print);
      CREATE TABLE IF NOT EXISTS import_undo (
         id INTEGER PRIMARY KEY, at INTEGER NOT NULL, label TEXT NOT NULL, device TEXT NOT NULL, data TEXT NOT NULL);",
+    // v24: `entry(key)`: forgetting a track's playlist entries and the "is this track in a playlist" checks look up by key, which
+    // the (node, pos) primary key cannot serve. (`track_mytag` is `(key, tag)` already: its primary key serves `key`.)
+    "CREATE INDEX IF NOT EXISTS entry_by_key ON entry(key);",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as
@@ -594,6 +597,22 @@ mod tests {
             .unwrap();
         drop(c);
         assert!(Store::open_at(&path).err().unwrap().contains("newer"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn entries_are_looked_up_by_key_through_an_index() {
+        let dir = std::env::temp_dir().join(format!("openfader-store-idx-{}", std::process::id()));
+        let s = Store::open_at(&dir.join("s.db")).unwrap();
+        let plan = |sql: &str| -> String {
+            let db = s.db();
+            let mut st = db.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
+            let rows = st.query_map(["k"], |r| r.get::<_, String>(3)).unwrap();
+            rows.map(Result::unwrap).collect::<Vec<_>>().join(" ")
+        };
+        assert!(plan("SELECT node FROM entry WHERE key = ?1").contains("entry_by_key"));
+        assert!(plan("SELECT tag FROM track_mytag WHERE key = ?1").contains("USING"));
+        drop(s);
         std::fs::remove_dir_all(dir).unwrap();
     }
 

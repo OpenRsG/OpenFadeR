@@ -49,7 +49,7 @@ mod verify;
 
 pub use import::import_tracks;
 pub use link::{track_edited, track_loading};
-pub(crate) use scan::{Snapshot as Discovery, mounted, with_snapshot};
+pub(crate) use scan::{Snapshot as Discovery, generation, mounted, with_snapshot};
 pub use transfer::{Dest, List, drop_playlist, drop_tracks};
 pub use verify::verify;
 
@@ -368,7 +368,7 @@ impl Ctx {
     fn provider_for(&self, d: &Device, f: Feature) -> Option<Provider> {
         let p = d.provider().filter(|_| d.can(f));
         if p.is_none() {
-            self.say(&tr!("{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports.", d.label), true);
+            self.say(&tr!("{}: this format cannot perform that operation. Check Preferences > Library formats or use a supported device.", d.label), true);
         }
         p
     }

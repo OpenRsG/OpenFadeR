@@ -188,7 +188,6 @@ mod gestures {
 
     slint::slint! {
         import { TrackTable } from "../../../ui/browser-table.slint";
-        import { StudioTable } from "../../../ui/studio/table.slint";
         import { StageTable } from "../../../ui/stage/table.slint";
         import { Splitter } from "../../../ui/widgets.slint";
         export { PaneState } from "../../../ui/panes.slint";
@@ -200,8 +199,7 @@ mod gestures {
             in property <int> variant;
             callback sorted(int);
             if root.variant == 0: TrackTable { width: root.width; height: root.height; sort-clicked(c) => { root.sorted(c); } }
-            if root.variant == 1: StudioTable { width: root.width; height: root.height; }
-            if root.variant == 2: StageTable { width: root.width; height: root.height; }
+            if root.variant == 1: StageTable { width: root.width; height: root.height; }
         }
         export component BoundedSplitter inherits Window {
             min-width: 0px;
@@ -243,7 +241,7 @@ mod gestures {
     #[test]
     fn narrow_tables_keep_the_rightmost_header_reachable_and_aligned() {
         crate::app::headless::init();
-        for variant in 0..3 {
+        for variant in 0..2 {
             let ui = Tables::new().unwrap();
             ui.set_variant(variant);
             ui.show().unwrap();
@@ -264,7 +262,7 @@ mod gestures {
             drag(ui.window(), 430.0, 430.0, y, Button::Left);
             assert_eq!(
                 sorted.get(),
-                if variant == 2 { 6 } else { 3 },
+                if variant == 1 { 6 } else { 3 },
                 "variant {variant}"
             );
         }
@@ -337,7 +335,7 @@ mod gestures {
     #[test]
     fn a_replaced_pressed_row_does_not_collapse_the_selection_onto_its_replacement() {
         crate::app::headless::init();
-        for variant in 0..3 {
+        for variant in 0..2 {
             let ui = Tables::new().unwrap();
             ui.set_variant(variant);
             ui.show().unwrap();

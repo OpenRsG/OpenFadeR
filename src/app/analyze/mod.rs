@@ -561,14 +561,13 @@ fn settings(p: &prefs::Prefs) -> Settings {
 }
 
 /// `t` as the Collection lists it when it names a file the Collection has (a file just imported is handed over bare): the row
-/// carries the id that records the audio fingerprint, and the tags the job decides by.
-fn listed(store: &Store, t: &Track) -> Track {
+/// carries the id that records the audio fingerprint, and the tags the job decides by. `None`: use `t` as given.
+fn listed(store: &Store, t: &Track) -> Option<Track> {
     let row = match (t.id, t.file.as_deref()) {
         (None, Some(f)) => store.id_of_path(f).ok().flatten(),
         _ => None,
     };
     row.and_then(|id| store.collection_track(id).ok().flatten())
-        .unwrap_or_else(|| t.clone())
 }
 
 /// Lightweight submissions only: source analysis, Collection metadata and locks are read by the shared workers.
@@ -948,16 +947,15 @@ mod tests {
             file: Some(file),
             ..Track::default()
         };
-        let t = listed(&store, &bare);
+        let t = listed(&store, &bare).unwrap();
         assert!(t.id.is_some(), "the fingerprint is stored by row id");
         assert_eq!(t.key, "8A");
         let other = Track {
             file: Some(dir.join("gone.wav")),
             ..Track::default()
         };
-        assert_eq!(
-            listed(&store, &other),
-            other,
+        assert!(
+            listed(&store, &other).is_none(),
             "not in the Collection: as given"
         );
         std::fs::remove_dir_all(&dir).ok();

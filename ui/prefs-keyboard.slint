@@ -117,16 +117,12 @@ export component KeyboardPage inherits Rectangle {
         }
     }
 
-    // Takes the keyboard focus when a row is clicked (it leaves the search box or the track table) and passes every key on
-    // to the shortcut table, like the root scope does, so shortcuts keep working while it is focused.
+    // Only an active assignment receives keys; idle key presses must not control decks behind settings.
     fs := FocusScope {
         width: 1px;
         height: 1px;
         key-pressed(e) => {
-            if (!e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
-        }
-        key-released(e) => {
-            if (KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+            if (KeymapState.selected >= 0 && !e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
         }
     }
 }

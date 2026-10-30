@@ -1,4 +1,4 @@
-import { Chip, Dropdown, TextField, Toggle } from "widgets.slint";
+import { Chip, Dropdown, Icon, IconButton, TextField, Toggle } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { FormRow } from "dialog.slint";
 
@@ -8,10 +8,19 @@ export struct PrefRowData {
     key: string,
     label: string,
     hint: string,
+    help: string,
     kind: int,
     options: [string],
     current: int,
     enabled: bool,
+}
+
+export struct PrefCategory {
+    id: int,
+    group: string,
+    title: string,
+    description: string,
+    icon: Icon,
 }
 
 /// One output device card of the AUDIO page (src/app/prefs/audio/cards.rs). `key` goes back in `PrefsState.chose` and the
@@ -43,8 +52,30 @@ export global PrefsState {
     /// Settings file shown at the bottom.
     in property <string> path;
     in property <[PrefRowData]> rows;
-    /// Open category: 0 VIEW, 1 AUDIO, 2 ANALYSIS, 3 CONTROLLER, 4 KEYBOARD, 5 EXTENSIONS, 6 DJ SYSTEM, 7 ADVANCED, 8 THEMES (ui/themes.slint, no rows).
+    /// Stable category IDs: 0 appearance, 1 audio, 2 analysis, 3 decks/controllers, 4 keyboard, 5 extensions, 6 player settings, 7 advanced, 8 themes, 9 sources, 10 formats, 11 creative tools.
     in-out property <int> category;
+    in property <[PrefCategory]> categories: [
+        { id: 1, group: @tr("Setup"), title: @tr("Audio"), icon: Icon.headphones, description: @tr("Choose where you hear the master mix, headphones and inputs. Start here if there is no sound.") },
+        { id: 9, group: @tr("Setup"), title: @tr("Music libraries"), icon: Icon.folder, description: @tr("Connect music folders or another DJ application's library. Imported tracks stay in your Collection when a source is disconnected.") },
+        { id: 10, group: @tr("Setup"), title: @tr("Library formats"), icon: Icon.stack, description: @tr("Built-in compatibility with other DJ software and USB libraries. These adapters are included in OpenFadeR, not downloadable extensions.") },
+        { id: 3, group: @tr("Mixing"), title: @tr("Decks & controllers"), icon: Icon.mixer, description: @tr("Playback, cueing, mixer, effects, sampler and MIDI behavior. Choose a settings group or search this page to narrow the list.") },
+        { id: 2, group: @tr("Mixing"), title: @tr("Track analysis"), icon: Icon.pulse, description: @tr("Choose how OpenFadeR finds tempo, beat grids, keys and cue points. Review cue protection and grid-source options before reanalysis.") },
+        { id: 11, group: @tr("Mixing"), title: @tr("Creative tools"), icon: Icon.stems, description: @tr("Enable the native STEMS, Beat Lab, video and lighting workspaces. Optional tools can use extra CPU, GPU memory or disk space.") },
+        { id: 4, group: @tr("Mixing"), title: @tr("Keyboard shortcuts"), icon: Icon.keyboard, description: @tr("Find an action, select its shortcut and press the keys you want to use. Conflicts are shown before a binding is replaced.") },
+        { id: 0, group: @tr("Personalize"), title: @tr("Appearance"), icon: Icon.monitor, description: @tr("Adjust language, text, waveforms and visible panels. Choose Themes for colors and layout customization.") },
+        { id: 8, group: @tr("Personalize"), title: @tr("Themes"), icon: Icon.palette, description: @tr("Choose a theme or customize its shared colors and layout tokens. Your library and playback state stay the same when the appearance changes.") },
+        { id: 6, group: @tr("Devices & extras"), title: @tr("Player settings"), icon: Icon.usb, description: @tr("Preferences carried by supported DJ players and USB libraries. These are separate from this computer's audio settings.") },
+        { id: 5, group: @tr("Devices & extras"), title: @tr("Extensions"), icon: Icon.puzzle, description: @tr("Manage optional effects, controller drivers and external tools. Native library compatibility is managed under Library formats.") },
+        { id: 7, group: @tr("Devices & extras"), title: @tr("Advanced"), icon: Icon.gear, description: @tr("Collection management, recordings, updates and resource limits. Read the help beside a setting before changing an unfamiliar option.") },
+    ];
+    in property <[string]> category-titles;
+    in property <[Icon]> category-icons;
+    in property <int> category-index;
+    in-out property <string> query;
+    in property <[string]> sections;
+    in-out property <int> section;
+    in-out property <string> help-key;
+    callback filter-changed(string);
     /// Deck shown in each enlarged-waveform slot, top to bottom (VIEW > Enlarged Waveform order, 0-based, only the decks in use).
     in property <[int]> wave-order: [0, 1, 2, 3];
     /// VIEW > DECK LAYOUT: the 2Deck / 4Deck Vertical layouts (enlarged waveforms side by side between the decks) are on.
@@ -71,82 +102,134 @@ export global PrefsState {
 export component PrefRowView inherits Rectangle {
     in property <PrefRowData> r;
     callback chose(int);
-    height: root.r.kind == 3 ? 30px : Theme.h-ctl + Theme.space-xs + (Theme.layout-profile == 1 && root.r.kind != 2 ? 24px : 0px);
-    opacity: root.r.enabled ? 1 : 0.45;
-    if root.r.kind == 3: Text {
-        y: 8px;
+    property <length> control-h: root.r.kind == 3 ? 44px : max(32px, Theme.target-size(Theme.h-ctl + Theme.space-xs + (Theme.layout-profile == 1 && root.r.kind != 2 ? 24px : 0px)));
+    property <bool> has-help: root.r.help != "" && root.r.key != "";
+    property <bool> help-open: root.has-help && PrefsState.help-key == root.r.key;
+    height: root.control-h + (root.help-open ? explanation.preferred-height + Theme.space-lg : 0px);
+    controls := Rectangle {
         x: 0px;
-        text: root.r.label;
-        color: Theme.accent-hi;
-        font-family: Theme.font;
-        font-size: Theme.font-md;
-        font-weight: Theme.weight-bold;
-    }
-    if root.r.kind == 0: FormRow {
-        label: root.r.label;
-        hint: root.r.hint;
-        for name[i] in root.r.options: Chip {
-            text: name;
-            width: max(70px, name.character-count * 7px + 18px);
-            horizontal-stretch: 0;
-            enabled: root.r.enabled;
-            active: root.r.current == i;
-            clicked => { root.chose(i); }
-        }
-    }
-    if root.r.kind == 1: FormRow {
-        label: root.r.label;
-        hint: root.r.hint;
-        Dropdown {
-            width: Theme.layout-profile == 1 ? min(220px, root.width) : 220px;
-            horizontal-stretch: 0;
-            enabled: root.r.enabled;
-            options: root.r.options;
-            current: root.r.current;
-            chose(n) => { root.chose(n); }
-        }
-    }
-    if root.r.kind == 2: HorizontalLayout {
-        padding-left: 0px;
-        spacing: Theme.space-md;
-        Toggle {
+        y: 0px;
+        width: root.width - (root.has-help ? Theme.target-size(26px) + Theme.space-sm : 0px);
+        height: root.control-h;
+        opacity: root.r.enabled ? 1 : 0.45;
+        // A section heading: left on its own line, a hairline running on from it.
+        if root.r.kind == 3: Text {
+            x: 0px;
+            y: root.control-h - 24px;
+            height: 20px;
             text: root.r.label;
-            horizontal-stretch: 0;
-            checked: root.r.current == 1;
-            enabled: root.r.enabled;
-            toggled(on) => { root.chose(on ? 1 : 0); }
-        }
-        Text {
-            text: root.r.hint;
-            min-width: 0px;
-            horizontal-stretch: 1;
             vertical-alignment: center;
-            color: Theme.text-faint;
+            color: Theme.accent-hi;
             font-family: Theme.font;
             font-size: Theme.font-sm;
-            overflow: elide;
+            font-weight: Theme.weight-bold;
+            letter-spacing: 0.6px;
+        }
+        if root.r.kind == 3: Rectangle {
+            x: heading-w.preferred-width + Theme.space-lg;
+            y: root.control-h - 14px;
+            width: max(0px, root.width - self.x);
+            height: 1px;
+            background: Theme.line;
+        }
+        heading-w := Text { visible: false; text: root.r.kind == 3 ? root.r.label : ""; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; letter-spacing: 0.6px; }
+        if root.r.kind == 0: FormRow {
+            y: (parent.height - self.height) / 2;
+            label: root.r.label;
+            hint: root.r.hint;
+            for name[i] in root.r.options: Chip {
+                text: name;
+                width: max(70px, name.character-count * 7px + 18px);
+                horizontal-stretch: 0;
+                enabled: root.r.enabled;
+                active: root.r.current == i;
+                clicked => { root.chose(i); }
+            }
+        }
+        if root.r.kind == 1: FormRow {
+            y: (parent.height - self.height) / 2;
+            label: root.r.label;
+            hint: root.r.hint;
+            Dropdown {
+                width: min(220px, parent.width);
+                horizontal-stretch: 0;
+                enabled: root.r.enabled;
+                options: root.r.options;
+                current: root.r.current;
+                chose(n) => { root.chose(n); }
+            }
+        }
+        if root.r.kind == 2: HorizontalLayout {
+            spacing: Theme.space-md;
+            Toggle {
+                text: root.r.label;
+                max-width: parent.width;
+                horizontal-stretch: 0;
+                checked: root.r.current == 1;
+                enabled: root.r.enabled;
+                toggled(on) => { root.chose(on ? 1 : 0); }
+            }
+            Text {
+                text: root.r.hint;
+                min-width: 0px;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-sm;
+                overflow: elide;
+            }
+        }
+        if root.r.kind == 5: FormRow {
+            y: (parent.height - self.height) / 2;
+            label: root.r.label;
+            TextField {
+                width: min(340px, parent.width);
+                horizontal-stretch: 0;
+                text: root.r.hint;
+                placeholder-text: root.r.options.length > 0 ? root.r.options[0] : "";
+                accepted(t) => { PrefsState.text-edited(root.r.key, t); }
+            }
+        }
+        if root.r.kind == 4: FormRow {
+            y: (parent.height - self.height) / 2;
+            label: root.r.label;
+            Text {
+                text: root.r.hint;
+                vertical-alignment: center;
+                color: Theme.text;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+                overflow: elide;
+            }
         }
     }
-    if root.r.kind == 5: FormRow {
-        label: root.r.label;
-        TextField {
-            width: Theme.layout-profile == 1 ? root.width : 340px;
-            horizontal-stretch: 0;
-            text: root.r.hint;
-            placeholder-text: root.r.options.length > 0 ? root.r.options[0] : "";
-            accepted(t) => { PrefsState.text-edited(root.r.key, t); }
-        }
+    if root.has-help: IconButton {
+        x: root.width - self.width;
+        y: 0px;
+        width: Theme.target-size(26px);
+        height: root.control-h;
+        icon: Icon.info;
+        active: root.help-open;
+        tooltip: root.help-open ? "" : root.r.help;
+        accessible-label: @tr("Help: {}", root.r.label);
+        clicked => { PrefsState.help-key = root.help-open ? "" : root.r.key; }
     }
-    if root.r.kind == 4: FormRow {
-        label: root.r.label;
-        Text {
-            text: root.r.hint;
-            vertical-alignment: center;
-            color: Theme.text;
-            font-family: Theme.font;
-            font-size: Theme.font-size;
-            overflow: elide;
-        }
+    if root.r.kind != 3: Rectangle {
+        y: root.height - 1px;
+        width: root.width;
+        height: 1px;
+        background: Theme.line.with-alpha(0.55);
+    }
+    explanation := Text {
+        visible: root.help-open;
+        y: root.control-h + Theme.space-sm;
+        width: root.width;
+        text: root.r.help;
+        color: Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+        wrap: word-wrap;
     }
 }
 
@@ -157,6 +240,13 @@ export component PrefRows inherits VerticalLayout {
     for r[i] in PrefsState.rows: PrefRowView {
         r: r;
         chose(n) => { PrefsState.chose(r.key, n); }
+    }
+    if PrefsState.rows.length == 0 && PrefsState.query != "": Text {
+        text: @tr("No settings match. Try another word or choose All groups.");
+        color: Theme.text-dim;
+        font-family: Theme.font;
+        font-size: Theme.font-size;
+        wrap: word-wrap;
     }
 }
 

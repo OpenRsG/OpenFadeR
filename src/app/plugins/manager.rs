@@ -17,7 +17,7 @@ fn kind(p: &Plugin) -> &'static str {
     match (m.command.is_empty(), m.script.as_deref()) {
         (true, Some(s)) if s.ends_with(".lua") => "LUA",
         (true, Some(s)) if s.ends_with(".py") => "PYTHON",
-        (true, None) if m.library.is_some() || m.controller.is_some() => tr!("NATIVE"),
+        (true, None) if m.library.is_some() || m.controller.is_some() => tr!("COMPILED"),
         (true, None) => "JSON",
         _ => tr!("PROGRAM"),
     }
@@ -87,7 +87,7 @@ fn provides(p: &Plugin) -> String {
 }
 
 fn setting_views(p: &Plugin) -> Vec<PluginSettingView> {
-    let values = config::get().values(&p.manifest);
+    let values = config::values(&p.manifest);
     p.manifest
         .settings
         .iter()
@@ -143,6 +143,99 @@ fn listed() -> Vec<(Plugin, bool)> {
     all
 }
 
+fn presentation(p: &Plugin) -> (&str, SharedString) {
+    if p.builtin.is_none() {
+        return (&p.manifest.name, p.tr(&p.manifest.description).into());
+    }
+    let (title, description) = match p.manifest.name.as_str() {
+        "rekordbox-db" => (
+            tr!("Rekordbox desktop library"),
+            tr!(
+                "Read the desktop collection, playlists and preparation data. An encrypted collection needs its library key."
+            ),
+        ),
+        "rekordbox-device" => (
+            tr!("Rekordbox USB / SD libraries"),
+            tr!(
+                "Read and prepare supported USB or SD libraries, including cue points, beat grids and playlists."
+            ),
+        ),
+        "rekordbox-xml" => (
+            tr!("Rekordbox XML"),
+            tr!("Exchange tracks, playlists, beat grids and cues through a Rekordbox XML file."),
+        ),
+        "engine-dj" => (
+            tr!("Engine DJ"),
+            tr!(
+                "Read Engine DJ libraries and prepare supported device libraries with tracks, cues and playlists."
+            ),
+        ),
+        "serato" => (
+            tr!("Serato"),
+            tr!(
+                "Read Serato libraries and crates, and exchange supported device and audio-tag preparation data."
+            ),
+        ),
+        "traktor" => (
+            tr!("Traktor"),
+            tr!("Read Traktor collections and write device collections that Traktor can import."),
+        ),
+        "virtualdj" => (
+            tr!("VirtualDJ"),
+            tr!(
+                "Read VirtualDJ libraries and lists, and export supported device libraries with cues and playlists."
+            ),
+        ),
+        "itunes" => (
+            tr!("iTunes / Music"),
+            tr!("Read tracks and playlists from an exported Library.xml file."),
+        ),
+        _ => return (&p.manifest.name, p.tr(&p.manifest.description).into()),
+    };
+    (title, description.into())
+}
+
+fn search_text(
+    p: &Plugin,
+    title: &str,
+    description: &str,
+    settings: &[PluginSettingView],
+) -> String {
+    let texts = std::iter::once(p.manifest.name.as_str())
+        .chain([title, description])
+        .chain(
+            settings
+                .iter()
+                .flat_map(|s| [s.label.as_str(), s.help.as_str()]),
+        );
+    let mut out = String::with_capacity(texts.clone().map(|s| s.len() + 1).sum());
+    for text in texts {
+        out.extend(text.chars().flat_map(char::to_lowercase));
+        out.push(' ');
+    }
+    out
+}
+
+fn filter(app: &App, query: &str) {
+    let query = query.trim().to_lowercase();
+    let s = app.global::<PluginState>();
+    let (mut formats, mut extensions) = (Vec::new(), Vec::new());
+    for view in s.get_plugins().iter() {
+        if query
+            .split_whitespace()
+            .all(|word| view.search.contains(word))
+        {
+            if view.builtin {
+                formats.push(view);
+            } else {
+                extensions.push(view);
+            }
+        }
+    }
+    s.set_formats(ModelRc::new(VecModel::from(formats)));
+    s.set_extensions(ModelRc::new(VecModel::from(extensions)));
+}
+
 /// Fills `PluginState` from [`current`] (keeps the open cards open).
 pub(super) fn refresh(app: &App) {
     let s = app.global::<PluginState>();
@@ -155,13 +248,20 @@ pub(super) fn refresh(app: &App) {
     let restart = current().restart_needed();
     let views: Vec<PluginView> = listed()
         .iter()
-        .map(|(p, on)| {
+        .enumerate()
+        .map(|(index, (p, on))| {
             let m = &p.manifest;
+            let (title, description) = presentation(p);
+            let settings = setting_views(p);
+            let search = search_text(p, title, description.as_str(), &settings);
             PluginView {
                 name: m.name.as_str().into(),
+                title: title.into(),
+                search: search.into(),
+                index: index as i32,
                 version: m.version.as_str().into(),
                 author: m.author.as_str().into(),
-                description: p.tr(&m.description).into(),
+                description,
                 homepage: m.homepage.as_str().into(),
                 kind: kind(p).into(),
                 provides: provides(p).into(),
@@ -172,7 +272,7 @@ pub(super) fn refresh(app: &App) {
                 removable: install::removable(p),
                 restart: restart.contains(&m.name),
                 open: open.iter().any(|n| n == m.name.as_str()),
-                settings: ModelRc::new(VecModel::from(setting_views(p))),
+                settings: ModelRc::new(VecModel::from(settings)),
             }
         })
         .collect();
@@ -190,6 +290,7 @@ pub(super) fn refresh(app: &App) {
             .unwrap_or_default()
             .into(),
     );
+    filter(app, &app.global::<crate::app::PrefsState>().get_query());
 }
 
 /// Reads the plugin folders again and shows the result everywhere.
@@ -277,6 +378,12 @@ fn set(app: &App, i: i32, k: i32, value: impl FnOnce(&plugin::SettingDecl) -> Op
 pub(super) fn wire(app: &App) {
     let s = app.global::<PluginState>();
     let w = app.as_weak();
+    s.on_filter(move |query| {
+        if let Some(app) = w.upgrade() {
+            filter(&app, &query);
+        }
+    });
+    let w = app.as_weak();
     s.on_toggle(move |i| {
         let (Some(app), Some((p, on))) = (w.upgrade(), nth(i)) else {
             return;
@@ -317,6 +424,7 @@ pub(super) fn wire(app: &App) {
             v.open = !v.open;
             model.set_row_data(i as usize, v);
         }
+        filter(&app, &app.global::<crate::app::PrefsState>().get_query());
     });
     let w = app.as_weak();
     s.on_setting_bool(move |i, k, on| {

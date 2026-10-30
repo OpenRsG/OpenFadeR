@@ -29,13 +29,10 @@ msgid "SOURCE"
 msgstr "SORGENTE"
 
 #: ui/about.slint:53
-#: ui/plugins.slint:216
 msgid "PLUGINS"
 msgstr "PLUGINS"
 
 #: ui/about.slint:54
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
 msgid "THEMES"
 msgstr "TEMI"
 
@@ -59,472 +56,470 @@ msgstr "LICENZA"
 msgid "Free software: you may use, share and change it under the AGPL. Built with Rust and Slint."
 msgstr "Software libero: puoi usarlo, condividerlo e modificarlo secondo la AGPL. Realizzato con Rust e Slint."
 
-#: ui/app.slint:233
+#: ui/app.slint:230
 msgid "File"
 msgstr "File"
 
-#: ui/app.slint:235
+#: ui/app.slint:232
 msgid "Import"
 msgstr "Importa"
 
-#: ui/app.slint:236
+#: ui/app.slint:233
 msgid "Import Track…"
 msgstr "Importa traccia…"
 
-#: ui/app.slint:237
+#: ui/app.slint:234
 msgid "Import Folder…"
 msgstr "Importa cartella…"
 
-#: ui/app.slint:238
-#: ui/app.slint:311
+#: ui/app.slint:235
+#: ui/app.slint:308
 msgid "Import Playlist…"
 msgstr "Importa playlist…"
 
-#: ui/app.slint:242
+#: ui/app.slint:239
 msgid "Display All Missing Files"
 msgstr "Mostra tutti i file mancanti"
 
-#: ui/app.slint:243
+#: ui/app.slint:240
 msgid "Display All Duplicated Files"
 msgstr "Mostra tutti i file duplicati"
 
-#: ui/app.slint:245
-#: ui/touch.slint:86
-#: ui/touch.slint:100
+#: ui/app.slint:242
+#: ui/touch.slint:87
+#: ui/touch.slint:101
 msgid "Library"
 msgstr "Libreria"
 
-#: ui/app.slint:246
+#: ui/app.slint:243
 msgid "Backup Library…"
 msgstr "Backup della libreria…"
 
-#: ui/app.slint:247
+#: ui/app.slint:244
 msgid "Restore Library…"
 msgstr "Ripristina libreria…"
 
-#: ui/app.slint:248
+#: ui/app.slint:245
 msgid "Backed up device library management…"
 msgstr "Gestione delle librerie dei dispositivi salvate…"
 
-#: ui/app.slint:249
+#: ui/app.slint:246
 msgid "Last Import Report…"
 msgstr "Ultimo rapporto di importazione…"
 
-#: ui/app.slint:249
+#: ui/app.slint:246
 msgid "Last Import Report: no import yet"
 msgstr "Ultimo rapporto di importazione: nessuna importazione"
 
-#: ui/app.slint:252
+#: ui/app.slint:249
 msgid "Export Collection"
 msgstr "Esporta collezione"
 
-#: ui/app.slint:256
+#: ui/app.slint:253
 msgid "Preferences…"
 msgstr "Preferenze…"
 
-#: ui/app.slint:257
+#: ui/app.slint:254
 msgid "Exit"
 msgstr "Esci"
 
-#: ui/app.slint:260
-#: ui/touch.slint:82
-#: ui/touch.slint:82
+#: ui/app.slint:257
+#: ui/touch.slint:83
+#: ui/touch.slint:83
 msgid "Edit"
 msgstr "Modifica"
 
-#: ui/app.slint:261
+#: ui/app.slint:258
 msgid "Undo (Ctrl+Z)"
 msgstr "Annulla (Ctrl+Z)"
 
-#: ui/app.slint:261
+#: ui/app.slint:258
 msgid "Undo {} (Ctrl+Z)"
 msgstr "Annulla {} (Ctrl+Z)"
 
-#: ui/app.slint:262
+#: ui/app.slint:259
 msgid "Redo (Ctrl+Shift+Z)"
 msgstr "Ripeti (Ctrl+Shift+Z)"
 
-#: ui/app.slint:262
+#: ui/app.slint:259
 msgid "Redo {} (Ctrl+Shift+Z)"
 msgstr "Ripeti {} (Ctrl+Shift+Z)"
 
-#: ui/app.slint:265
+#: ui/app.slint:262
 msgid "Track"
 msgstr "Traccia"
 
-#: ui/app.slint:266
+#: ui/app.slint:263
 msgid "Edit Track Details…"
 msgstr "Modifica dettagli traccia…"
 
-#: ui/app.slint:267
+#: ui/app.slint:264
 msgid "Import To Collection"
 msgstr "Importa nella collezione"
 
-#: ui/app.slint:268
+#: ui/app.slint:265
 msgid "Analyze Track"
 msgstr "Analizza traccia"
 
-#: ui/app.slint:269
+#: ui/app.slint:266
 msgid "Analysis Lock"
 msgstr "Blocco analisi"
 
-#: ui/app.slint:270
+#: ui/app.slint:267
 #: src/app/library/track.rs:177
 msgid "Reload Tag"
 msgstr "Ricarica tag"
 
-#: ui/app.slint:271
+#: ui/app.slint:268
 #: src/app/library/track.rs:179
 msgid "Reload Tag (discard edits)"
 msgstr "Ricarica tag (scarta modifiche)"
 
-#: ui/app.slint:272
+#: ui/app.slint:269
 msgid "Find Artwork…"
 msgstr "Trova copertina…"
 
-#: ui/app.slint:273
+#: ui/app.slint:270
 msgid "Fetch Missing Artwork"
 msgstr "Scarica copertine mancanti"
 
-#: ui/app.slint:274
+#: ui/app.slint:271
 msgid "Show in File Manager"
 msgstr "Mostra nel gestore file"
 
-#: ui/app.slint:276
+#: ui/app.slint:273
 #: ui/track-menu.slint:111
 msgid "Relocate…"
 msgstr "Ricollega…"
 
-#: ui/app.slint:277
+#: ui/app.slint:274
 msgid "Auto Relocate"
 msgstr "Ricollega automaticamente"
 
-#: ui/app.slint:278
+#: ui/app.slint:275
 #: ui/track-menu.slint:113
 #: src/app/library/mod.rs:124
 msgid "Remove from Collection"
 msgstr "Rimuovi dalla collezione"
 
-#: ui/app.slint:280
+#: ui/app.slint:277
 msgid "Add to Tag List"
 msgstr "Aggiungi alla Tag List"
 
-#: ui/app.slint:281
+#: ui/app.slint:278
 msgid "Add to Playlist…"
 msgstr "Aggiungi a playlist…"
 
-#: ui/app.slint:282
+#: ui/app.slint:279
 #: ui/track-menu.slint:104
 msgid "Tags…"
 msgstr "Tag…"
 
-#: ui/app.slint:285
+#: ui/app.slint:282
 msgid "Playlist"
 msgstr "Playlist"
 
-#: ui/app.slint:286
+#: ui/app.slint:283
 msgid "Create New Playlist"
 msgstr "Crea nuova playlist"
 
-#: ui/app.slint:287
+#: ui/app.slint:284
 msgid "Create New Intelligent Playlist"
 msgstr "Crea nuova playlist intelligente"
 
-#: ui/app.slint:288
+#: ui/app.slint:285
 msgid "Create New Folder"
 msgstr "Crea nuova cartella"
 
-#: ui/app.slint:289
+#: ui/app.slint:286
 msgid "Delete Playlist"
 msgstr "Elimina playlist"
 
-#: ui/app.slint:292
+#: ui/app.slint:289
 msgid "Sort Items"
 msgstr "Ordina elementi"
 
-#: ui/app.slint:293
+#: ui/app.slint:290
 msgid "Track Title"
 msgstr "Titolo traccia"
 
-#: ui/app.slint:294
+#: ui/app.slint:291
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:198
 msgid "Artist"
 msgstr "Artista"
 
-#: ui/app.slint:295
+#: ui/app.slint:292
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:202
 msgid "Genre"
 msgstr "Genere"
 
-#: ui/app.slint:297
+#: ui/app.slint:294
 #: ui/browser-tree.slint:169
 #: ui/touch-actions.slint:74
 msgid "Key"
 msgstr "Key"
 
-#: ui/app.slint:298
+#: ui/app.slint:295
 #: ui/touch-actions.slint:74
 msgid "Time"
 msgstr "Durata"
 
-#: ui/app.slint:299
+#: ui/app.slint:296
 #: ui/touch-actions.slint:74
 msgid "Rating"
 msgstr "Valutazione"
 
-#: ui/app.slint:300
+#: ui/app.slint:297
 #: ui/touch-actions.slint:74
 msgid "Comments"
 msgstr "Commenti"
 
-#: ui/app.slint:302
+#: ui/app.slint:299
 msgid "Renumber Track Order"
 msgstr "Rinumera ordine tracce"
 
-#: ui/app.slint:305
+#: ui/app.slint:302
 msgid "Export a playlist to a file"
 msgstr "Esporta una playlist in un file"
 
-#: ui/app.slint:308
+#: ui/app.slint:305
 #: ui/touch-actions.slint:76
 msgid "Text"
 msgstr "Testo"
 
-#: ui/app.slint:310
+#: ui/app.slint:307
 msgid "Export Playlist (to a device)…"
 msgstr "Esporta playlist (su un dispositivo)…"
 
-#: ui/app.slint:314
+#: ui/app.slint:311
 msgid "View"
 msgstr "Visualizza"
 
-#: ui/app.slint:315
+#: ui/app.slint:312
 msgid "Full Screen"
 msgstr "Schermo intero"
 
-#: ui/app.slint:317
-#: ui/app.slint:511
+#: ui/app.slint:314
+#: ui/app.slint:542
 msgid "2Deck Horizontal"
 msgstr "2 deck orizzontale"
 
-#: ui/app.slint:318
-#: ui/app.slint:511
+#: ui/app.slint:315
+#: ui/app.slint:542
 msgid "2Deck Vertical"
 msgstr "2 deck verticale"
 
-#: ui/app.slint:319
-#: ui/app.slint:511
+#: ui/app.slint:316
+#: ui/app.slint:542
 msgid "4Deck Horizontal"
 msgstr "4 deck orizzontale"
 
-#: ui/app.slint:320
-#: ui/app.slint:511
+#: ui/app.slint:317
+#: ui/app.slint:542
 msgid "4Deck Vertical"
 msgstr "4 deck verticale"
 
-#: ui/app.slint:321
-#: ui/app.slint:511
+#: ui/app.slint:318
+#: ui/app.slint:542
 msgid "Browse"
 msgstr "Sfoglia"
 
-#: ui/app.slint:322
+#: ui/app.slint:319
 #: ui/exportmode-state.slint:55
 msgid "1 PLAYER"
 msgstr "1 PLAYER"
 
-#: ui/app.slint:323
+#: ui/app.slint:320
 #: ui/exportmode-state.slint:55
 msgid "2 PLAYER"
 msgstr "2 PLAYER"
 
-#: ui/app.slint:324
+#: ui/app.slint:321
 #: ui/exportmode-state.slint:55
 msgid "DUAL PLAYER"
 msgstr "DUAL PLAYER"
 
-#: ui/app.slint:325
+#: ui/app.slint:322
 #: ui/exportmode-state.slint:55
 msgid "SIMPLE PLAYER"
 msgstr "SIMPLE PLAYER"
 
-#: ui/app.slint:326
+#: ui/app.slint:323
 #: ui/exportmode-state.slint:55
 msgid "FULL BROWSER"
 msgstr "BROWSER COMPLETO"
 
-#: ui/app.slint:327
+#: ui/app.slint:324
 msgid "Close Split Screen"
 msgstr "Chiudi schermo diviso"
 
-#: ui/app.slint:327
+#: ui/app.slint:324
 msgid "Split Screen"
 msgstr "Schermo diviso"
 
-#: ui/app.slint:329
+#: ui/app.slint:326
 #: src/app/prefs/view.rs:418
 msgid "Mixer"
 msgstr "Mixer"
 
-#: ui/app.slint:330
+#: ui/app.slint:327
 msgid "Effect Panel"
 msgstr "Pannello effetti"
 
-#: ui/app.slint:331
-#: ui/touch.slint:86
-#: ui/touch.slint:100
+#: ui/app.slint:328
+#: ui/touch.slint:87
+#: ui/touch.slint:101
 msgid "Sampler"
 msgstr "Sampler"
 
-#: ui/app.slint:332
-#: ui/app.slint:530
+#: ui/app.slint:329
+#: ui/app.slint:561
 #: ui/groove.slint:250
 msgid "BEAT LAB"
 msgstr "BEAT LAB"
 
-#: ui/app.slint:334
+#: ui/app.slint:331
 #: ui/stage/library.slint:53
 #: src/app/prefs/view.rs:349
 msgid "Related Tracks"
 msgstr "Tracce correlate"
 
-#: ui/app.slint:335
+#: ui/app.slint:332
 #: ui/browser-tree.slint:169
 msgid "Tags"
 msgstr "Tag"
 
-#: ui/app.slint:336
-#: ui/studio/automix.slint:181
+#: ui/app.slint:333
 #: ui/touch-actions.slint:79
 msgid "Automix"
 msgstr "Automix"
 
-#: ui/app.slint:339
+#: ui/app.slint:336
 msgid "Plugins"
 msgstr "Plugins"
 
-#: ui/app.slint:343
+#: ui/app.slint:340
 msgid "Help"
 msgstr "Aiuto"
 
-#: ui/app.slint:344
+#: ui/app.slint:341
 msgid "Keyboard Shortcuts"
 msgstr "Scorciatoie da tastiera"
 
-#: ui/app.slint:345
+#: ui/app.slint:342
 #: ui/welcome.slint:69
 msgid "Welcome"
 msgstr "Benvenuto"
 
-#: ui/app.slint:346
+#: ui/app.slint:343
 msgid "Update to {}…"
 msgstr "Aggiorna a {}…"
 
-#: ui/app.slint:346
+#: ui/app.slint:343
 #: ui/touch-actions.slint:85
 msgid "Check for Updates"
 msgstr "Controlla aggiornamenti"
 
-#: ui/app.slint:347
+#: ui/app.slint:344
 msgid "Roll Back to {}…"
 msgstr "Torna a {}…"
 
-#: ui/app.slint:348
+#: ui/app.slint:345
 msgid "Report a Problem…"
 msgstr "Segnala un problema…"
 
-#: ui/app.slint:349
+#: ui/app.slint:346
 msgid "About OpenFadeR"
 msgstr "Info su OpenFadeR"
 
-#: ui/app.slint:470
+#: ui/app.slint:501
 msgid "Split screen: the browser in a window of its own"
 msgstr "Schermo diviso: il browser in una finestra separata"
 
-#: ui/app.slint:471
+#: ui/app.slint:502
 msgid "Switch the active window"
 msgstr "Cambia finestra attiva"
 
-#: ui/app.slint:499
-#: ui/app.slint:500
-#: ui/app.slint:501
+#: ui/app.slint:530
+#: ui/app.slint:531
+#: ui/app.slint:532
 msgid "EXPORT"
 msgstr "ESPORTA"
 
-#: ui/app.slint:499
-#: ui/app.slint:500
-#: ui/app.slint:501
+#: ui/app.slint:530
+#: ui/app.slint:531
+#: ui/app.slint:532
 msgid "PERFORMANCE"
 msgstr "PERFORMANCE"
 
-#: ui/app.slint:499
-#: ui/app.slint:500
-#: ui/app.slint:501
+#: ui/app.slint:530
+#: ui/app.slint:531
+#: ui/app.slint:532
 msgid "EDIT"
 msgstr "MODIFICA"
 
-#: ui/app.slint:499
-#: ui/app.slint:500
-#: ui/app.slint:542
+#: ui/app.slint:530
+#: ui/app.slint:531
+#: ui/app.slint:573
 msgid "LIGHTING (BETA)"
 msgstr "LUCI (BETA)"
 
-#: ui/app.slint:499
-#: ui/app.slint:501
-#: ui/app.slint:541
+#: ui/app.slint:530
+#: ui/app.slint:532
+#: ui/app.slint:572
 msgid "VIDEO (BETA)"
 msgstr "VIDEO (BETA)"
 
-#: ui/app.slint:529
+#: ui/app.slint:560
 #: ui/stage/mixer.slint:225
 msgid "FX"
 msgstr "FX"
 
-#: ui/app.slint:531
+#: ui/app.slint:562
 #: src/app/prefs/controller/mixpoint.rs:8
 msgid "MIX POINT LINK"
 msgstr "MIX POINT LINK"
 
-#: ui/app.slint:532
+#: ui/app.slint:563
 #: ui/stage/deck-parts.slint:508
 #: ui/stage/strip.slint:170
 msgid "SAMPLER"
 msgstr "SAMPLER"
 
-#: ui/app.slint:533
+#: ui/app.slint:564
 #: ui/stage/mixer.slint:225
 #: ui/stage/mixer.slint:227
 msgid "MIXER"
 msgstr "MIXER"
 
-#: ui/app.slint:538
+#: ui/app.slint:569
 msgid "REC panel"
 msgstr "Pannello REC"
 
-#: ui/app.slint:538
-#: ui/stage/bar.slint:80
-#: ui/studio/bar.slint:70
+#: ui/app.slint:569
+#: ui/stage/bar.slint:79
 msgid "REC (master out)"
 msgstr "REC (uscita MASTER)"
 
-#: ui/app.slint:553
+#: ui/app.slint:584
 msgid "Zoom out the waveforms"
 msgstr "Riduci lo zoom delle forme d'onda"
 
-#: ui/app.slint:554
+#: ui/app.slint:585
 msgid "Default waveform zoom"
 msgstr "Zoom predefinito della forma d'onda"
 
-#: ui/app.slint:555
+#: ui/app.slint:586
 msgid "Zoom in the waveforms"
 msgstr "Aumenta lo zoom delle forme d'onda"
 
-#: ui/app.slint:560
+#: ui/app.slint:591
 msgid "SHORTCUTS (?)"
 msgstr "SCORCIATOIE (?)"
 
-#: ui/app.slint:561
+#: ui/app.slint:592
 msgid "PREFS"
 msgstr "PREF."
 
@@ -541,24 +536,20 @@ msgstr "Chiudi"
 
 #: ui/automix-panel.slint:28
 #: ui/browser.slint:231
-#: ui/studio/automix.slint:49
 msgid "AUTOMIX"
 msgstr "AUTOMIX"
 
 #: ui/automix-panel.slint:34
-#: ui/stage/table.slint:153
-#: ui/studio/automix.slint:61
+#: ui/stage/table.slint:152
+#: src/app/prefs/controller/sampler.rs:50
 msgid "LENGTH"
 msgstr "DURATA"
 
 #: ui/automix-panel.slint:35
-#: ui/studio/automix.slint:63
-#: ui/studio/automix.slint:63
 msgid "{} BARS"
 msgstr "{} BATT."
 
 #: ui/automix-panel.slint:40
-#: ui/studio/automix.slint:70
 msgid "STYLE"
 msgstr "STILE"
 
@@ -679,14 +670,12 @@ msgid "TRACK TITLE"
 msgstr "TITOLO TRACCIA"
 
 #: ui/browser-table.slint:170
-#: ui/stage/table.slint:148
-#: ui/studio/table.slint:131
+#: ui/stage/table.slint:147
 msgid "ARTIST"
 msgstr "ARTISTA"
 
 #: ui/browser-table.slint:171
-#: ui/stage/table.slint:152
-#: ui/studio/table.slint:135
+#: ui/stage/table.slint:151
 msgid "GENRE"
 msgstr "GENERE"
 
@@ -695,8 +684,7 @@ msgid "COMMENT"
 msgstr "COMMENTO"
 
 #: ui/browser-table.slint:174
-#: ui/stage/table.slint:154
-#: ui/studio/table.slint:129
+#: ui/stage/table.slint:153
 msgid "RATING"
 msgstr "VALUTAZ."
 
@@ -706,25 +694,23 @@ msgstr "DURATA"
 
 #: ui/browser-table.slint:176
 #: ui/deck-header.slint:73
-#: ui/stage/table.slint:151
+#: ui/stage/table.slint:150
 msgid "KEY"
 msgstr "KEY"
 
 #: ui/browser-table.slint:217
 #: src/app/deck/pads/mod.rs:94
-#: src/app/prefs/extensions.rs:87
+#: src/app/prefs/extensions.rs:93
 msgid "STEMS"
 msgstr "STEMS"
 
 #: ui/browser-table.slint:223
-#: ui/stage/table.slint:216
-#: ui/studio/table.slint:171
+#: ui/stage/table.slint:215
 msgid "★★★★★"
 msgstr "★★★★★"
 
 #: ui/browser-table.slint:278
-#: ui/stage/table.slint:262
-#: ui/studio/table.slint:215
+#: ui/stage/table.slint:261
 msgid "No tracks"
 msgstr "Nessuna traccia"
 
@@ -822,19 +808,18 @@ msgstr "Cronologia sessioni"
 
 #: ui/browser.slint:162
 #: ui/stage/library.slint:52
-#: ui/studio/library.slint:33
+#: src/app/browser/sidebar.rs:118
 msgid "Duplicate tracks"
 msgstr "Tracce duplicate"
 
 #: ui/browser.slint:163
 #: ui/stage/library.slint:53
-#: ui/studio/library.slint:34
+#: ui/touch-actions.slint:80
 msgid "Related tracks"
 msgstr "Tracce correlate"
 
 #: ui/browser.slint:168
 #: ui/stage/library.slint:62
-#: ui/studio/library.slint:39
 msgid "{} ({}): open its device window"
 msgstr "{} ({}): apri la finestra del dispositivo"
 
@@ -849,7 +834,7 @@ msgstr "Nuova playlist / cartella / playlist intelligente / Tag / Cue Bank / fas
 
 #: ui/browser.slint:203
 #: ui/device-devices.slint:251
-#: ui/plugins.slint:172
+#: src/app/browser/playlists/manage.rs:117
 msgid "MORE"
 msgstr "ALTRO"
 
@@ -882,7 +867,6 @@ msgid "Transition style and length"
 msgstr "Stile e durata della transizione"
 
 #: ui/browser.slint:237
-#: ui/studio/automix.slint:57
 #: ui/welcome.slint:107
 msgid "SKIP"
 msgstr "SALTA"
@@ -903,13 +887,11 @@ msgstr "Ricerche salvate: salva la ricerca e i filtri con un nome"
 
 #: ui/browser.slint:266
 #: ui/stage/library.slint:155
-#: ui/studio/library.slint:86
 msgid "Search online (Enter)"
 msgstr "Cerca online (Invio)"
 
 #: ui/browser.slint:266
 #: ui/stage/library.slint:155
-#: ui/studio/library.slint:86
 msgid "Search tracks (Ctrl+F)"
 msgstr "Cerca tracce (Ctrl+F)"
 
@@ -1128,7 +1110,6 @@ msgid "Move down"
 msgstr "Sposta giù"
 
 #: ui/browser.slint:423
-#: ui/studio/automix.slint:96
 msgid "Remove from the list"
 msgstr "Rimuovi dalla lista"
 
@@ -1235,18 +1216,18 @@ msgstr "Cerca per nome del controller o della porta"
 
 #: ui/catalog.slint:166
 #: ui/catalog.slint:194
-#: ui/plugins.slint:288
+#: ui/plugins.slint:363
 msgid "INSTALL"
 msgstr "INSTALLA"
 
 #: ui/catalog.slint:166
 #: ui/exportmode-dock.slint:68
-#: ui/plugins.slint:288
+#: ui/plugins.slint:363
 msgid "UPDATE"
 msgstr "AGGIORNA"
 
 #: ui/catalog.slint:166
-#: ui/plugins.slint:288
+#: ui/plugins.slint:363
 #: ui/themes.slint:485
 msgid "INSTALLED"
 msgstr "INSTALLATO"
@@ -1351,13 +1332,11 @@ msgstr "MA"
 
 #: ui/deck-header.slint:32
 #: ui/stage/deck-parts.slint:66
-#: ui/studio/deck-head.slint:41
 msgid "loading…"
 msgstr "caricamento…"
 
 #: ui/deck-header.slint:32
 #: ui/stage/deck-parts.slint:66
-#: ui/studio/deck-head.slint:41
 msgid "LOAD A TRACK"
 msgstr "CARICA UNA TRACCIA"
 
@@ -1387,13 +1366,11 @@ msgstr "Tempo MASTER"
 
 #: ui/deck-header.slint:70
 #: ui/exportmode-parts.slint:150
-#: ui/studio/deck-head.slint:70
 msgid "Key down"
 msgstr "Key giù"
 
 #: ui/deck-header.slint:76
 #: ui/exportmode-parts.slint:152
-#: ui/studio/deck-head.slint:81
 msgid "Key up"
 msgstr "Key su"
 
@@ -1487,7 +1464,6 @@ msgstr "Rimuovi la sezione di tempo al cursore"
 
 #: ui/deck-panel.slint:117
 #: ui/stage/deck-parts.slint:516
-#: ui/studio/deck-controls.slint:302
 msgid "Delete a hot cue: press its pad"
 msgstr "Elimina un HOT CUE: premi il suo PAD"
 
@@ -1556,7 +1532,7 @@ msgid "Key +"
 msgstr "Key +"
 
 #: ui/deck-touch.slint:47
-#: ui/widgets.slint:218
+#: ui/widgets.slint:228
 msgid "Transport"
 msgstr "Trasporto"
 
@@ -1765,8 +1741,8 @@ msgid "CONNECTED"
 msgstr "COLLEGATO"
 
 #: ui/device-devices.slint:137
-msgid "No device plugin is on. Switch one on in PREFERENCES > EXTENSIONS, then restart."
-msgstr "Nessun plugin di dispositivo è attivo. Attivane uno in PREFERENZE > ESTENSIONI, poi riavvia."
+msgid "No device format is enabled. Check Preferences > Library formats."
+msgstr "Nessun formato dispositivo è attivo. Controlla Preferenze > Formati libreria."
 
 #: ui/device-devices.slint:137
 msgid "No USB drive or SD card is mounted. Insert one: it shows up here, and as a USB icon on the left of the browser, as soon as it is mounted."
@@ -1889,13 +1865,12 @@ msgstr "Esegui il backup o il ripristino della libreria di questo dispositivo"
 
 #: ui/device-devices.slint:247
 #: ui/exportmode-dock.slint:69
-#: ui/plugins.slint:172
 msgid "SETTINGS"
 msgstr "PREFERENZE"
 
 #: ui/device-devices.slint:247
-msgid "The player settings this device carries (Preferences > DJ SYSTEM)"
-msgstr "Le impostazioni del player contenute in questo dispositivo (Preferenze > DJ SYSTEM)"
+msgid "The player settings this device carries (Preferences > Player settings)"
+msgstr "Le impostazioni del player che questo dispositivo contiene (Preferenze > Impostazioni player)"
 
 #: ui/device-devices.slint:248
 msgid "FORMAT…"
@@ -2128,7 +2103,7 @@ msgstr "STOP"
 
 #: ui/edit.slint:120
 #: ui/sampler.slint:159
-#: ui/studio/deck-controls.slint:243
+#: ui/track-menu.slint:67
 msgid "PLAY"
 msgstr "PLAY"
 
@@ -2215,7 +2190,7 @@ msgid "+ SILENCE"
 msgstr "+ SILENZIO"
 
 #: ui/edit.slint:158
-#: ui/themes.slint:545
+#: ui/themes.slint:539
 msgid "DUPLICATE"
 msgstr "DUPLICA"
 
@@ -2593,7 +2568,6 @@ msgstr "Avvia / ferma la registrazione"
 
 #: ui/fx.slint:104
 #: ui/stage/deck-parts.slint:737
-#: ui/studio/deck-controls.slint:34
 msgid "FX{}-{} ON"
 msgstr "FX{}-{} ON"
 
@@ -2603,12 +2577,10 @@ msgstr "Beat (acceso: BEAT ◀ ▶ regola questo slot)"
 
 #: ui/fx.slint:125
 #: ui/fx.slint:226
-#: ui/studio/deck-controls.slint:63
 msgid "MST"
 msgstr "MST"
 
 #: ui/fx.slint:125
-#: ui/studio/deck-controls.slint:63
 msgid "CH{}"
 msgstr "CH{}"
 
@@ -2673,12 +2645,10 @@ msgid "SAMPLE"
 msgstr "SAMPLE"
 
 #: ui/fx.slint:216
-#: ui/studio/deck-controls.slint:73
 msgid "BEAT down (the lit slot)"
 msgstr "BEAT giù (lo slot acceso)"
 
 #: ui/fx.slint:217
-#: ui/studio/deck-controls.slint:83
 msgid "BEAT up (the lit slot)"
 msgstr "BEAT su (lo slot acceso)"
 
@@ -2946,8 +2916,8 @@ msgid "No duplicate track found"
 msgstr "Nessuna traccia duplicata trovata"
 
 #: ui/lighting.slint:127
+#: ui/stage/bar.slint:21
 #: ui/stage/bar.slint:22
-#: ui/stage/bar.slint:23
 msgid "LIGHTING"
 msgstr "LUCI"
 
@@ -3129,7 +3099,7 @@ msgstr "AUX"
 
 #: ui/mixer-touch.slint:42
 #: ui/mixer-touch.slint:77
-#: ui/touch.slint:155
+#: ui/touch.slint:156
 msgid "Deck {}"
 msgstr "Deck {}"
 
@@ -3168,7 +3138,6 @@ msgid "Drums"
 msgstr "Drums"
 
 #: ui/mixer-touch.slint:56
-#: ui/studio/mixer.slint:202
 msgid "STEM ISO"
 msgstr "STEM ISO"
 
@@ -3275,35 +3244,31 @@ msgid "SPLIT"
 msgstr "SPLIT"
 
 #: ui/mixer.slint:245
-#: ui/studio/mixer.slint:169
 msgid "Mono HP left / master right"
 msgstr "Cuffie mono a sinistra / master a destra"
 
 #: ui/mixer.slint:266
-#: ui/studio/mixer.slint:174
 msgid "Waiting for audio, click to cancel"
 msgstr "In attesa dell'audio, clic per annullare"
 
 #: ui/mixer.slint:266
-#: ui/studio/mixer.slint:174
 msgid "Record master"
 msgstr "Registra il master"
 
 #: ui/mixer.slint:291
 #: ui/stage/mixer.slint:135
-#: ui/studio/mixer.slint:148
+#: src/app/prefs/mod.rs:70
 msgid "SMOOTH"
 msgstr "MORBIDA"
 
 #: ui/mixer.slint:291
 #: ui/stage/mixer.slint:135
-#: ui/studio/mixer.slint:148
+#: src/app/prefs/mod.rs:70
 msgid "SHARP"
 msgstr "NETTA"
 
 #: ui/mixer.slint:291
 #: ui/stage/mixer.slint:135
-#: ui/studio/mixer.slint:148
 msgid "CONST"
 msgstr "COST"
 
@@ -3312,39 +3277,34 @@ msgid "Crossfader curve"
 msgstr "Curva del crossfader"
 
 #: ui/mixpoint.slint:52
-#: ui/studio/automix.slint:164
 msgid "not set"
 msgstr "non impostato"
 
 #: ui/mixpoint.slint:110
 #: ui/mixpoint.slint:144
-#: ui/studio/automix.slint:134
+#: src/app/prefs/controller/mixpoint.rs:17
 msgid "MIX IN"
 msgstr "MIX IN"
 
 #: ui/mixpoint.slint:110
 #: ui/mixpoint.slint:143
-#: ui/studio/automix.slint:134
+#: src/app/prefs/controller/mixpoint.rs:17
 msgid "MIX OUT"
 msgstr "MIX OUT"
 
 #: ui/mixpoint.slint:118
-#: ui/studio/automix.slint:135
 msgid "SELECT"
 msgstr "SELECT"
 
 #: ui/mixpoint.slint:118
-#: ui/studio/automix.slint:135
 msgid "MIX POINT SELECT: the next Hot Cue / memory cue (the current cue without any)"
 msgstr "MIX POINT SELECT: il prossimo Hot Cue / memory cue (il cue attuale se non ce ne sono)"
 
 #: ui/mixpoint.slint:120
-#: ui/studio/automix.slint:148
 msgid "LINKED"
 msgstr "LINKED"
 
 #: ui/mixpoint.slint:120
-#: ui/studio/automix.slint:148
 msgid "LINK"
 msgstr "LINK"
 
@@ -3353,17 +3313,14 @@ msgid "MIX POINT LINK is set: click again to put a running MIX IN deck back in s
 msgstr "MIX POINT LINK è attivo: clicca di nuovo per riallineare un deck MIX IN in riproduzione"
 
 #: ui/mixpoint.slint:126
-#: ui/studio/automix.slint:151
 msgid "MIX POINT LINK: the MIX IN deck starts by itself at the MIX POINT"
 msgstr "MIX POINT LINK: il deck MIX IN parte da solo al MIX POINT"
 
 #: ui/mixpoint.slint:132
-#: ui/studio/automix.slint:157
 msgid "SILENT: mute the MIX IN deck from the start of its track to the silent end"
 msgstr "SILENT: silenzia il deck MIX IN dall'inizio della traccia fino alla fine del silenzio"
 
 #: ui/mixpoint.slint:133
-#: ui/studio/automix.slint:158
 msgid "SILENT EDIT: click the MIX IN waveform to move the silent end"
 msgstr "SILENT EDIT: clicca sulla forma d'onda MIX IN per spostare la fine del silenzio"
 
@@ -3379,121 +3336,153 @@ msgstr "SAL. LOOP"
 msgid "Cue color and comment"
 msgstr "Colore e commento del cue"
 
-#: ui/plugins.slint:104
+#: ui/plugins.slint:113
 msgid "More"
 msgstr "Altro"
 
-#: ui/plugins.slint:118
+#: ui/plugins.slint:127
 msgid "Open folder"
 msgstr "Apri cartella"
 
-#: ui/plugins.slint:119
+#: ui/plugins.slint:128
 msgid "Uninstall"
 msgstr "Disinstalla"
 
-#: ui/plugins.slint:158
-msgid "BUILT IN"
-msgstr "INTEGRATO"
+#: ui/plugins.slint:128
+msgid "Hide bundled extension"
+msgstr "Nascondi estensione inclusa"
 
-#: ui/plugins.slint:159
+#: ui/plugins.slint:184
 msgid "BUNDLED"
 msgstr "INCLUSO"
 
-#: ui/plugins.slint:160
-msgid "RESTART"
-msgstr "RIAVVIA"
+#: ui/plugins.slint:195
+msgid "Always available"
+msgstr "Sempre disponibile"
 
-#: ui/plugins.slint:172
-msgid "LESS"
-msgstr "MENO"
+#: ui/plugins.slint:195
+msgid "Enabled"
+msgstr "Attivata"
 
-#: ui/plugins.slint:183
+#: ui/plugins.slint:195
+msgid "Disabled"
+msgstr "Disattivata"
+
+#: ui/plugins.slint:196
 #: ui/themes.slint:168
 msgid "by {}"
 msgstr "di {}"
 
-#: ui/plugins.slint:203
-#: ui/themes.slint:548
+#: ui/plugins.slint:208
+msgid "Close details"
+msgstr "Chiudi dettagli"
+
+#: ui/plugins.slint:208
+msgid "Settings"
+msgstr "Impostazioni"
+
+#: ui/plugins.slint:208
+msgid "Details"
+msgstr "Dettagli"
+
+#: ui/plugins.slint:259
+#: ui/prefs-state.slint:215
+msgid "Help: {}"
+msgstr "Aiuto: {}"
+
+#: ui/plugins.slint:277
+#: ui/themes.slint:542
 msgid "OPEN FOLDER"
 msgstr "APRI CARTELLA"
 
-#: ui/plugins.slint:204
+#: ui/plugins.slint:278
 msgid "WEB PAGE"
 msgstr "PAGINA WEB"
 
-#: ui/plugins.slint:218
+#: ui/plugins.slint:291
+msgid "Installed extensions"
+msgstr "Estensioni installate"
+
+#: ui/plugins.slint:293
 msgid "INSTALL FILE…"
 msgstr "INSTALLA FILE…"
 
-#: ui/plugins.slint:218
+#: ui/plugins.slint:293
 msgid "A plugin .zip or its plugin.json"
 msgstr "Uno .zip di plugin o il suo plugin.json"
 
-#: ui/plugins.slint:219
+#: ui/plugins.slint:294
 msgid "INSTALL FOLDER…"
 msgstr "INSTALLA CARTELLA…"
 
-#: ui/plugins.slint:220
+#: ui/plugins.slint:295
 msgid "OPEN PLUGINS FOLDER"
 msgstr "APRI CARTELLA PLUGIN"
 
-#: ui/plugins.slint:221
-msgid "RELOAD"
-msgstr "RICARICA"
-
-#: ui/plugins.slint:221
+#: ui/plugins.slint:296
 msgid "Read the plugin folders again"
 msgstr "Rilegge le cartelle dei plugin"
 
-#: ui/plugins.slint:230
-msgid "Drop a plugin folder, .zip or plugin.json (or a theme .json, or audio files) anywhere on the window to install it."
-msgstr "Trascina una cartella di plugin, uno .zip o un plugin.json (o un .json di tema, o file audio) in un punto qualsiasi della finestra per installarlo."
+#: ui/plugins.slint:299
+msgid "Install optional extensions from a file, folder or repository. Library format adapters are included in the app."
+msgstr "Installa estensioni opzionali da un file, una cartella o un repository. Gli adattatori dei formati libreria sono inclusi nell'app."
 
-#: ui/plugins.slint:249
+#: ui/plugins.slint:303
+msgid "Enable the formats you use, then connect a source in Music libraries. Disabling a format does not delete tracks already imported into the Collection."
+msgstr "Attiva i formati che usi, poi collega una sorgente in Librerie musicali. Disattivare un formato non elimina le tracce già importate nella Collezione."
+
+#: ui/plugins.slint:318
 #: ui/welcome.slint:110
 msgid "RESTART NOW"
 msgstr "RIAVVIA ORA"
 
-#: ui/plugins.slint:253
-msgid "No plugin found. Install one, or put plugin folders in {}."
-msgstr "Nessun plugin trovato. Installane uno, o metti le cartelle dei plugin in {}."
+#: ui/plugins.slint:323
+msgid "No formats match this search."
+msgstr "Nessun formato corrisponde a questa ricerca."
 
-#: ui/plugins.slint:277
+#: ui/plugins.slint:323
+msgid "No extensions to show. Clear the search or install one."
+msgstr "Nessuna estensione da mostrare. Cancella la ricerca o installane una."
+
+#: ui/plugins.slint:352
 msgid "{} → {}"
 msgstr "{} → {}"
 
-#: ui/plugins.slint:278
-#: src/app/plugins/manager.rs:20
+#: ui/plugins.slint:353
 msgid "NATIVE"
 msgstr "NATIVO"
 
-#: ui/plugins.slint:292
+#: ui/plugins.slint:367
 msgid "Downloads the prebuilt library for this computer when the repository has one"
 msgstr "Scarica la libreria precompilata per questo computer, se il repository ne ha una"
 
-#: ui/plugins.slint:303
+#: ui/plugins.slint:382
 msgid "GET PLUGINS"
 msgstr "OTTIENI PLUGIN"
 
-#: ui/plugins.slint:304
-msgid "Plugins and themes come from GitHub repositories. Add a repository (owner/repo), then install what it holds with one click."
-msgstr "Plugin e temi provengono da repository GitHub. Aggiungi un repository (owner/repo), poi installa ciò che contiene con un clic."
-
-#: ui/plugins.slint:310
+#: ui/plugins.slint:384
 msgid "1 plugin in your repositories"
 msgstr "1 plugin nei tuoi repository"
 
-#: ui/plugins.slint:310
+#: ui/plugins.slint:384
 msgid "{} plugins in your repositories"
 msgstr "{} plugin nei tuoi repository"
 
-#: ui/plugins.slint:318
+#: ui/plugins.slint:392
 msgid "INSTALL ALL"
 msgstr "INSTALLA TUTTO"
 
-#: ui/plugins.slint:323
+#: ui/plugins.slint:397
 msgid "Install or update every plugin below"
 msgstr "Installa o aggiorna tutti i plugin qui sotto"
+
+#: ui/plugins.slint:401
+msgid "Plugins and themes come from GitHub repositories. Add a repository (owner/repo), then install what it holds with one click."
+msgstr "Plugin e temi provengono da repository GitHub. Aggiungi un repository (owner/repo), poi installa ciò che contiene con un clic."
+
+#: ui/plugins.slint:419
+msgid "Repositories"
+msgstr "Repository"
 
 #: ui/prefs-audio-card.slint:84
 msgid "This device has no mute switch"
@@ -3524,6 +3513,7 @@ msgid "Silence"
 msgstr "Silenzio"
 
 #: ui/prefs-audio-card.slint:318
+#: ui/prefs-state.slint:69
 msgid "Advanced"
 msgstr "Avanzate"
 
@@ -3539,13 +3529,21 @@ msgstr "Il segno di spunta verde indica dove suona OpenFadeR. Scegliendo una sch
 msgid "Show all ALSA devices (plugins, converters and raw names)"
 msgstr "Mostra tutti i dispositivi ALSA (plugin, convertitori e nomi grezzi)"
 
-#: ui/prefs-controller.slint:12
+#: ui/prefs-controller.slint:13
 msgid "Controller: none connected"
 msgstr "Controller: nessuno collegato"
 
-#: ui/prefs-controller.slint:12
+#: ui/prefs-controller.slint:13
 msgid "Controller: {} · {}"
 msgstr "Controller: {} · {}"
+
+#: ui/prefs-controller.slint:20
+msgid "Get mappings"
+msgstr "Ottieni mapping"
+
+#: ui/prefs-controller.slint:24
+msgid "Find and install a MIDI mapping for your controller"
+msgstr "Trova e installa un mapping MIDI per il tuo controller"
 
 #: ui/prefs-djsystem.slint:102
 msgid "Add to Active"
@@ -3585,64 +3583,146 @@ msgstr "RIPRISTINA PREDEFINITI"
 msgid "REPLACE"
 msgstr "SOSTITUISCI"
 
-#: ui/prefs.slint:39
-#: ui/stage/bar.slint:97
-#: ui/studio/bar.slint:87
+#: ui/prefs-state.slint:58
+#: ui/prefs-state.slint:59
+#: ui/prefs-state.slint:60
+msgid "Setup"
+msgstr "Configurazione"
+
+#: ui/prefs-state.slint:58
+msgid "Audio"
+msgstr "Audio"
+
+#: ui/prefs-state.slint:58
+msgid "Choose where you hear the master mix, headphones and inputs. Start here if there is no sound."
+msgstr "Scegli dove ascoltare il master mix, le cuffie e gli ingressi. Inizia da qui se non senti alcun suono."
+
+#: ui/prefs-state.slint:59
+msgid "Music libraries"
+msgstr "Librerie musicali"
+
+#: ui/prefs-state.slint:59
+msgid "Connect music folders or another DJ application's library. Imported tracks stay in your Collection when a source is disconnected."
+msgstr "Collega cartelle di musica o la libreria di un'altra applicazione DJ. Le tracce importate restano nella tua Collezione quando una sorgente viene scollegata."
+
+#: ui/prefs-state.slint:60
+msgid "Library formats"
+msgstr "Formati libreria"
+
+#: ui/prefs-state.slint:60
+msgid "Built-in compatibility with other DJ software and USB libraries. These adapters are included in OpenFadeR, not downloadable extensions."
+msgstr "Compatibilità integrata con altro software DJ e librerie USB. Questi adattatori sono inclusi in OpenFadeR e non sono estensioni scaricabili."
+
+#: ui/prefs-state.slint:61
+#: ui/prefs-state.slint:62
+#: ui/prefs-state.slint:63
+msgid "Mixing"
+msgstr "Mix"
+
+#: ui/prefs-state.slint:61
+msgid "Decks & controllers"
+msgstr "Deck e controller"
+
+#: ui/prefs-state.slint:61
+msgid "Playback, cueing, mixer, effects, sampler and MIDI behavior. Choose a settings group or search this page to narrow the list."
+msgstr "Riproduzione, cueing, mixer, effetti, sampler e comportamento MIDI. Scegli un gruppo di impostazioni o cerca in questa pagina per restringere l'elenco."
+
+#: ui/prefs-state.slint:62
+msgid "Track analysis"
+msgstr "Analisi tracce"
+
+#: ui/prefs-state.slint:62
+msgid "Choose how OpenFadeR finds tempo, beat grids, keys and cue points. Review cue protection and grid-source options before reanalysis."
+msgstr "Scegli come OpenFadeR trova tempo, griglie dei beat, tonalità e punti CUE. Controlla la protezione dei cue e le opzioni della sorgente delle griglie prima di rianalizzare."
+
+#: ui/prefs-state.slint:63
+msgid "Creative tools"
+msgstr "Strumenti creativi"
+
+#: ui/prefs-state.slint:63
+msgid "Enable the native STEMS, Beat Lab, video and lighting workspaces. Optional tools can use extra CPU, GPU memory or disk space."
+msgstr "Attiva gli spazi di lavoro nativi STEMS, Beat Lab, video e luci. Gli strumenti opzionali possono usare più CPU, memoria GPU o spazio su disco."
+
+#: ui/prefs-state.slint:64
+#: ui/touch-actions.slint:82
+msgid "Keyboard shortcuts"
+msgstr "Scorciatoie da tastiera"
+
+#: ui/prefs-state.slint:64
+msgid "Find an action, select its shortcut and press the keys you want to use. Conflicts are shown before a binding is replaced."
+msgstr "Trova un'azione, seleziona la sua scorciatoia e premi i tasti che vuoi usare. I conflitti vengono mostrati prima di sostituire un'assegnazione."
+
+#: ui/prefs-state.slint:65
+#: ui/prefs-state.slint:66
+msgid "Personalize"
+msgstr "Personalizza"
+
+#: ui/prefs-state.slint:65
+msgid "Appearance"
+msgstr "Aspetto"
+
+#: ui/prefs-state.slint:65
+msgid "Adjust language, text, waveforms and visible panels. Choose Themes for colors and layout customization."
+msgstr "Regola lingua, testo, forme d'onda e pannelli visibili. Scegli Temi per colori e layout personalizzati."
+
+#: ui/prefs-state.slint:66
+msgid "Themes"
+msgstr "Temi"
+
+#: ui/prefs-state.slint:66
+msgid "Choose a theme or customize its shared colors and layout tokens. Your library and playback state stay the same when the appearance changes."
+msgstr "Scegli un tema o personalizza i suoi colori condivisi e i token del layout. La libreria e lo stato di riproduzione restano invariati quando cambi l'aspetto."
+
+#: ui/prefs-state.slint:67
+#: ui/prefs-state.slint:68
+#: ui/prefs-state.slint:69
+msgid "Devices & extras"
+msgstr "Dispositivi ed extra"
+
+#: ui/prefs-state.slint:67
+msgid "Player settings"
+msgstr "Impostazioni player"
+
+#: ui/prefs-state.slint:67
+msgid "Preferences carried by supported DJ players and USB libraries. These are separate from this computer's audio settings."
+msgstr "Preferenze contenute nei player DJ e nelle librerie USB supportati. Sono separate dalle impostazioni audio di questo computer."
+
+#: ui/prefs-state.slint:68
+msgid "Extensions"
+msgstr "Estensioni"
+
+#: ui/prefs-state.slint:68
+msgid "Manage optional effects, controller drivers and external tools. Native library compatibility is managed under Library formats."
+msgstr "Gestisci effetti opzionali, driver per controller e strumenti esterni. La compatibilità nativa delle librerie si gestisce in Formati libreria."
+
+#: ui/prefs-state.slint:69
+msgid "Collection management, recordings, updates and resource limits. Read the help beside a setting before changing an unfamiliar option."
+msgstr "Gestione della Collezione, registrazioni, aggiornamenti e limiti delle risorse. Leggi l'aiuto accanto a un'impostazione prima di modificare un'opzione che non conosci."
+
+#: ui/prefs-state.slint:245
+msgid "No settings match. Try another word or choose All groups."
+msgstr "Nessuna impostazione corrisponde. Prova un'altra parola o scegli Tutti i gruppi."
+
+#: ui/prefs.slint:84
+#: ui/stage/bar.slint:96
 msgid "PREFERENCES"
 msgstr "PREFERENZE"
 
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
-msgid "VIEW"
-msgstr "VISTA"
+#: ui/prefs.slint:168
+msgid "Find a setting on this page"
+msgstr "Trova un'impostazione in questa pagina"
 
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
-msgid "AUDIO"
-msgstr "AUDIO"
+#: ui/prefs.slint:203
+msgid "Manage library sources"
+msgstr "Gestisci sorgenti libreria"
 
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
-#: ui/track-menu.slint:98
-msgid "ANALYSIS"
-msgstr "ANALISI"
+#: ui/prefs.slint:217
+msgid "Changes save automatically."
+msgstr "Le modifiche vengono salvate automaticamente."
 
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
-#: src/app/prefs/audio/cards/mod.rs:73
-msgid "CONTROLLER"
-msgstr "CONTROLLER"
-
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
-#: src/app/deck/pads/mod.rs:85
-msgid "KEYBOARD"
-msgstr "TASTIERA"
-
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
-msgid "EXTENSIONS"
-msgstr "ESTENSIONI"
-
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
-msgid "DJ SYSTEM"
-msgstr "DJ SYSTEM"
-
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
-#: src/app/prefs/audio/mod.rs:53
-msgid "ADVANCED"
-msgstr "AVANZATE"
-
-#: ui/prefs.slint:49
-#: ui/prefs.slint:68
-msgid "LIBRARIES"
-msgstr "LIBRERIE"
-
-#: ui/prefs.slint:102
-msgid "Saved on every change to {}."
-msgstr "Salvato in {} a ogni modifica."
+#: ui/prefs.slint:223
+msgid "Settings file location"
+msgstr "Posizione del file delle impostazioni"
 
 #: ui/report.slint:24
 msgid "OpenFadeR closed unexpectedly. Report it?"
@@ -3798,23 +3878,23 @@ msgstr "trascina qui una traccia"
 msgid "Load the chosen track onto deck {}"
 msgstr "Carica la traccia scelta sul deck {}"
 
-#: ui/stage/bar.slint:22
-#: ui/stage/bar.slint:24
+#: ui/stage/bar.slint:21
+#: ui/stage/bar.slint:23
 #: ui/stage/mixer.slint:227
 msgid "VIDEO"
 msgstr "VIDEO"
 
-#: ui/stage/bar.slint:50
+#: ui/stage/bar.slint:49
 #: src/app/prefs/view.rs:424
 msgid "2 DECKS"
 msgstr "2 DECK"
 
-#: ui/stage/bar.slint:50
+#: ui/stage/bar.slint:49
 #: src/app/prefs/view.rs:424
 msgid "4 DECKS"
 msgstr "4 DECK"
 
-#: ui/stage/bar.slint:84
+#: ui/stage/bar.slint:83
 msgid "Controller mapping and MIDI learn"
 msgstr "Mappatura del controller e apprendimento MIDI"
 
@@ -3841,17 +3921,14 @@ msgid "SLICER"
 msgstr "SLICER"
 
 #: ui/stage/deck-parts.slint:664
-#: ui/studio/deck-controls.slint:142
 msgid "Loop in at the playhead"
 msgstr "Loop in al cursore"
 
 #: ui/stage/deck-parts.slint:665
-#: ui/studio/deck-controls.slint:143
 msgid "Loop out at the playhead: the loop starts"
 msgstr "Loop out al cursore: il loop parte"
 
 #: ui/stage/deck-parts.slint:699
-#: ui/studio/deck-controls.slint:145
 msgid "Leave the loop, or go back into the last one"
 msgstr "Esci dal loop, o rientra nell'ultimo"
 
@@ -3861,13 +3938,11 @@ msgstr "PROFONDITÀ"
 
 #: ui/stage/deck-parts.slint:788
 #: ui/stage/deck-parts.slint:811
-#: ui/studio/deck-controls.slint:222
 msgid "Slower"
 msgstr "Più lento"
 
 #: ui/stage/deck-parts.slint:788
 #: ui/stage/deck-parts.slint:811
-#: ui/studio/deck-controls.slint:222
 msgid "Faster"
 msgstr "Più veloce"
 
@@ -3886,12 +3961,10 @@ msgid "Collection"
 msgstr "Collezione"
 
 #: ui/stage/library.slint:49
-#: ui/studio/library.slint:30
 msgid "Folders: all tracks"
 msgstr "Cartelle: tutte le tracce"
 
 #: ui/stage/library.slint:50
-#: ui/studio/library.slint:31
 msgid "Favourites: the Tag List"
 msgstr "Preferiti: la Tag List"
 
@@ -3900,7 +3973,6 @@ msgid "History"
 msgstr "Cronologia"
 
 #: ui/stage/library.slint:51
-#: ui/studio/library.slint:32
 msgid "History of this session"
 msgstr "Cronologia di questa sessione"
 
@@ -3916,27 +3988,22 @@ msgstr "Playlist"
 
 #: ui/stage/library.slint:178
 #: ui/stage/library.slint:179
-#: ui/studio/library.slint:98
 msgid "LOAD {}"
 msgstr "CARICA {}"
 
 #: ui/stage/mixer.slint:60
-#: ui/studio/mixer.slint:161
 msgid "A"
 msgstr "A"
 
 #: ui/stage/mixer.slint:60
-#: ui/studio/mixer.slint:161
 msgid "B"
 msgstr "B"
 
 #: ui/stage/mixer.slint:125
-#: ui/studio/mixer.slint:121
 msgid "MIX"
 msgstr "MIX"
 
 #: ui/stage/mixer.slint:125
-#: ui/studio/mixer.slint:120
 msgid "PHONES"
 msgstr "CUFFIE"
 
@@ -3949,21 +4016,20 @@ msgstr "EFFETTI"
 msgid "SOUND COLOR FX"
 msgstr "EFFETTI COLORE"
 
-#: ui/stage/table.slint:146
+#: ui/stage/table.slint:145
 #: src/app/prefs/view.rs:316
 msgid "WAVEFORM"
 msgstr "FORMA D'ONDA"
 
-#: ui/stage/table.slint:147
-#: ui/studio/table.slint:130
+#: ui/stage/table.slint:146
 msgid "TITLE"
 msgstr "TITOLO"
 
-#: ui/stage/table.slint:149
+#: ui/stage/table.slint:148
 msgid "ALBUM"
 msgstr "ALBUM"
 
-#: ui/stage/table.slint:155
+#: ui/stage/table.slint:154
 msgid "DATE ADDED"
 msgstr "AGGIUNTO"
 
@@ -3982,148 +4048,6 @@ msgstr "Necessario una sola volta per separare le tracce in voce, strumenti e ba
 #: ui/stems-model.slint:64
 msgid "RETRY"
 msgstr "RIPROVA"
-
-#: ui/studio/automix.slint:39
-msgid "The list is empty"
-msgstr "La lista è vuota"
-
-#: ui/studio/automix.slint:49
-msgid "AUTOMIX ON"
-msgstr "AUTOMIX ON"
-
-#: ui/studio/automix.slint:54
-msgid "Play the list from the chosen track on, mixing from one track into the next"
-msgstr "Riproduci la lista dalla traccia scelta in poi, mixando da una traccia alla successiva"
-
-#: ui/studio/automix.slint:57
-msgid "Mix the next track in at the next bar line"
-msgstr "Mixa la traccia successiva alla prossima battuta"
-
-#: ui/studio/automix.slint:81
-msgid "ADD CHOSEN TRACK"
-msgstr "AGGIUNGI TRACCIA SCELTA"
-
-#: ui/studio/automix.slint:81
-msgid "Add the chosen track to the Tag List (T)"
-msgstr "Aggiungi la traccia scelta alla Tag List (T)"
-
-#: ui/studio/automix.slint:100
-msgid "The Tag List is empty"
-msgstr "La Tag List è vuota"
-
-#: ui/studio/automix.slint:115
-msgid "RELATED TRACKS ON"
-msgstr "TRACCE CORRELATE ON"
-
-#: ui/studio/automix.slint:115
-msgid "RELATED TRACKS"
-msgstr "TRACCE CORRELATE"
-
-#: ui/studio/automix.slint:119
-msgid "The track list shows the tracks that mix with the chosen one: compatible key, BPM within 6%"
-msgstr "L'elenco tracce mostra le tracce che si mixano con quella scelta: KEY compatibile, BPM entro il 6%"
-
-#: ui/studio/automix.slint:126
-msgid "MIX POINT LINK starts the MIX IN deck by itself at the MIX POINT of the MIX OUT deck."
-msgstr "MIX POINT LINK avvia da solo il deck MIX IN al MIX POINT del deck MIX OUT."
-
-#: ui/studio/automix.slint:127
-msgid "SWITCH ON MIX POINT LINK"
-msgstr "ATTIVA MIX POINT LINK"
-
-#: ui/studio/automix.slint:144
-msgid "Choose this deck for the mode, or clear its MIX POINT"
-msgstr "Scegli questo deck per la modalità, o cancella il suo MIX POINT"
-
-#: ui/studio/automix.slint:165
-msgid "Clear this MIX POINT"
-msgstr "Cancella questo MIX POINT"
-
-#: ui/studio/automix.slint:181
-msgid "Sidelist"
-msgstr "Lista laterale"
-
-#: ui/studio/automix.slint:181
-msgid "Linked"
-msgstr "Collegato"
-
-#: ui/studio/bar.slint:35
-msgid "PERFORM"
-msgstr "PERFORM"
-
-#: ui/studio/bar.slint:40
-msgid "The performance workspace: decks, mixer, effects and library"
-msgstr "L'area di lavoro per l'esibizione: deck, mixer, effetti e libreria"
-
-#: ui/studio/bar.slint:40
-#: ui/studio/bar.slint:43
-#: ui/studio/bar.slint:44
-msgid "Open this mode"
-msgstr "Apri questa modalità"
-
-#: ui/studio/deck-controls.slint:67
-msgid "The unit's channel: this deck, or the master (click to switch)"
-msgstr "Il canale dell'unità: questo deck, o il master (clicca per cambiare)"
-
-#: ui/studio/deck-controls.slint:243
-#: ui/video.slint:153
-msgid "PAUSE"
-msgstr "PAUSA"
-
-#: ui/studio/deck-controls.slint:289
-#: src/app/prefs/analysis.rs:220
-msgid "HOT CUES"
-msgstr "HOT CUE"
-
-#: ui/studio/deck-controls.slint:289
-#: src/app/deck/pads/mod.rs:87
-msgid "PAD FX"
-msgstr "PAD FX"
-
-#: ui/studio/deck-controls.slint:289
-msgid "BEAT JUMP"
-msgstr "BEAT JUMP"
-
-#: ui/studio/deck-head.slint:76
-msgid "Key: a click returns to the track's key"
-msgstr "Key: un clic torna alla KEY della traccia"
-
-#: ui/studio/deck-head.slint:109
-msgid "TOTAL {}"
-msgstr "TOTALE {}"
-
-#: ui/studio/library.slint:98
-#: ui/studio/library.slint:99
-msgid "Load the chosen track on deck {}"
-msgstr "Carica la traccia scelta sul deck {}"
-
-#: ui/studio/mixer.slint:114
-#: ui/studio/mixer.slint:115
-msgid "Headphone CUE, deck {}"
-msgstr "CUE cuffie, deck {}"
-
-#: ui/studio/mixer.slint:144
-msgid "FILTER KNOB (COLOR FX)"
-msgstr "MANOPOLA FILTER (COLOR FX)"
-
-#: ui/studio/mixer.slint:146
-#: src/app/prefs/controller/mixer.rs:66
-msgid "CROSSFADER CURVE"
-msgstr "CURVA DEL CROSSFADER"
-
-#: ui/studio/mixer.slint:159
-msgid "DECK {} ON THE CROSSFADER"
-msgstr "DECK {} SUL CROSSFADER"
-
-#: ui/studio/mixer.slint:161
-msgid "THRU"
-msgstr "THRU"
-
-#: ui/studio/mixer.slint:202
-#: src/app/prefs/controller/mixer.rs:46
-#: src/app/prefs/controller/mod.rs:34
-msgid "EQ"
-msgstr "EQ"
 
 #: ui/themes.slint:168
 msgid "yours"
@@ -4154,7 +4078,7 @@ msgid "FONTS"
 msgstr "FONT"
 
 #: ui/themes.slint:421
-#: ui/themes.slint:544
+#: ui/themes.slint:538
 msgid "CUSTOMIZE"
 msgstr "PERSONALIZZA"
 
@@ -4223,35 +4147,35 @@ msgstr "Temi dai tuoi repository GitHub (la stessa lista di GET PLUGINS): INSTAL
 msgid "No theme in your repositories yet."
 msgstr "Nessun tema nei tuoi repository per ora."
 
-#: ui/themes.slint:539
+#: ui/themes.slint:533
 msgid "Click a theme to apply it: colours, fonts, sizes and the layout it asks for change at once. Drop a theme file on the window, or IMPORT one; folders are re-read while the app runs."
 msgstr "Clicca su un tema per applicarlo: colori, font, dimensioni e layout richiesto cambiano subito. Trascina un file di tema sulla finestra oppure usa IMPORTA; le cartelle vengono rilette mentre l'app è in esecuzione."
 
-#: ui/themes.slint:544
+#: ui/themes.slint:538
 msgid "Edit every colour, font and size of the applied theme, live"
 msgstr "Modifica ogni colore, font e dimensione del tema applicato, in tempo reale"
 
-#: ui/themes.slint:545
+#: ui/themes.slint:539
 msgid "A copy of the applied theme in your themes folder"
 msgstr "Una copia del tema applicato nella tua cartella dei temi"
 
-#: ui/themes.slint:546
+#: ui/themes.slint:540
 msgid "Delete the applied theme (only your own can be)"
 msgstr "Elimina il tema applicato (solo i tuoi possono essere eliminati)"
 
-#: ui/themes.slint:547
+#: ui/themes.slint:541
 msgid "IMPORT…"
 msgstr "IMPORTA…"
 
-#: ui/themes.slint:547
+#: ui/themes.slint:541
 msgid "Choose a theme file to add"
 msgstr "Scegli un file di tema da aggiungere"
 
-#: ui/themes.slint:548
+#: ui/themes.slint:542
 msgid "Your themes folder"
 msgstr "La tua cartella dei temi"
 
-#: ui/themes.slint:549
+#: ui/themes.slint:543
 msgid "Read the theme folders again"
 msgstr "Rileggi le cartelle dei temi"
 
@@ -4471,10 +4395,6 @@ msgstr "Esporta playlist come {}"
 msgid "Export playlist to device"
 msgstr "Esporta playlist su dispositivo"
 
-#: ui/touch-actions.slint:82
-msgid "Keyboard shortcuts"
-msgstr "Scorciatoie da tastiera"
-
 #: ui/touch-actions.slint:83
 msgid "Welcome / suggested extensions"
 msgstr "Benvenuto / estensioni consigliate"
@@ -4491,150 +4411,145 @@ msgstr "Segnala un problema"
 msgid "Exit OpenFadeR"
 msgstr "Esci da OpenFadeR"
 
-#: ui/touch.slint:82
-#: ui/touch.slint:82
-#: ui/touch.slint:82
+#: ui/touch.slint:83
+#: ui/touch.slint:83
+#: ui/touch.slint:83
 msgid "Export"
 msgstr "Esporta"
 
-#: ui/touch.slint:82
-#: ui/touch.slint:82
-#: ui/touch.slint:82
+#: ui/touch.slint:83
+#: ui/touch.slint:83
+#: ui/touch.slint:83
 msgid "Performance"
 msgstr "Performance"
 
-#: ui/touch.slint:82
-#: ui/touch.slint:82
-#: ui/touch.slint:86
+#: ui/touch.slint:83
+#: ui/touch.slint:83
+#: ui/touch.slint:87
 msgid "Lighting"
 msgstr "Luci"
 
-#: ui/touch.slint:82
-#: ui/touch.slint:82
-#: ui/touch.slint:86
+#: ui/touch.slint:83
+#: ui/touch.slint:83
+#: ui/touch.slint:87
 msgid "Video"
 msgstr "Video"
 
-#: ui/touch.slint:86
-#: ui/touch.slint:100
+#: ui/touch.slint:87
+#: ui/touch.slint:101
 msgid "Decks"
 msgstr "Deck"
 
-#: ui/touch.slint:86
-#: ui/touch.slint:100
+#: ui/touch.slint:87
+#: ui/touch.slint:101
 msgid "Export players"
 msgstr "Player di esportazione"
 
-#: ui/touch.slint:86
-#: ui/touch.slint:100
+#: ui/touch.slint:87
+#: ui/touch.slint:101
 msgid "Mixer & output"
 msgstr "Mixer e uscita"
 
-#: ui/touch.slint:86
-#: ui/touch.slint:100
+#: ui/touch.slint:87
+#: ui/touch.slint:101
 msgid "Effects"
 msgstr "Effetti"
 
-#: ui/touch.slint:86
-#: ui/touch.slint:100
+#: ui/touch.slint:87
+#: ui/touch.slint:101
 msgid "Mix point link"
 msgstr "Collegamento MIX POINT"
 
-#: ui/touch.slint:86
-#: ui/touch.slint:100
+#: ui/touch.slint:87
+#: ui/touch.slint:101
 msgid "Beat Lab"
 msgstr "Beat Lab"
 
-#: ui/touch.slint:86
-#: ui/touch.slint:96
-#: ui/touch.slint:100
+#: ui/touch.slint:87
+#: ui/touch.slint:97
+#: ui/touch.slint:101
 msgid "All commands"
 msgstr "Tutti i comandi"
 
-#: ui/touch.slint:89
-#: ui/touch.slint:89
-#: ui/touch.slint:89
+#: ui/touch.slint:90
+#: ui/touch.slint:90
+#: ui/touch.slint:90
 msgid "Deck A"
 msgstr "Deck A"
 
-#: ui/touch.slint:89
-#: ui/touch.slint:89
-#: ui/touch.slint:89
+#: ui/touch.slint:90
+#: ui/touch.slint:90
+#: ui/touch.slint:90
 msgid "Deck B"
 msgstr "Deck B"
 
-#: ui/touch.slint:89
-#: ui/touch.slint:89
-#: ui/touch.slint:89
+#: ui/touch.slint:90
+#: ui/touch.slint:90
+#: ui/touch.slint:90
 msgid "Deck C"
 msgstr "Deck C"
 
-#: ui/touch.slint:89
-#: ui/touch.slint:89
-#: ui/touch.slint:89
+#: ui/touch.slint:90
+#: ui/touch.slint:90
+#: ui/touch.slint:90
 msgid "Deck D"
 msgstr "Deck D"
 
-#: ui/touch.slint:92
-#: ui/touch.slint:101
+#: ui/touch.slint:93
+#: ui/touch.slint:102
 msgid "2 decks"
 msgstr "2 deck"
 
-#: ui/touch.slint:92
-#: ui/touch.slint:101
+#: ui/touch.slint:93
+#: ui/touch.slint:102
 msgid "4 decks"
 msgstr "4 deck"
 
-#: ui/touch.slint:92
-#: ui/touch.slint:101
-msgid "decks"
-msgstr "deck"
-
-#: ui/touch.slint:94
+#: ui/touch.slint:95
 msgid "Devices"
 msgstr "Dispositivi"
 
-#: ui/touch.slint:95
+#: ui/touch.slint:96
 msgid "Preferences, themes and extensions"
 msgstr "Preferenze, temi ed estensioni"
 
-#: ui/touch.slint:106
+#: ui/touch.slint:107
 msgid "Deck"
 msgstr "Deck"
 
-#: ui/touch.slint:106
+#: ui/touch.slint:107
 msgid "Select deck {}"
 msgstr "Seleziona deck {}"
 
-#: ui/touch.slint:108
+#: ui/touch.slint:109
 msgid "Reset waveform zoom"
 msgstr "Reimposta zoom forma d'onda"
 
-#: ui/touch.slint:156
+#: ui/touch.slint:157
 msgid "Select deck waveform for MIX POINT / SILENT editing"
 msgstr "Seleziona la forma d'onda del deck per modificare MIX POINT / SILENT"
 
-#: ui/touch.slint:159
+#: ui/touch.slint:160
 msgid "Deck waveform zoom out"
 msgstr "Riduci zoom forma d'onda del deck"
 
-#: ui/touch.slint:160
+#: ui/touch.slint:161
 msgid "Reset deck waveform zoom"
 msgstr "Reimposta zoom forma d'onda del deck"
 
-#: ui/touch.slint:161
+#: ui/touch.slint:162
 msgid "Deck waveform zoom in"
 msgstr "Aumenta zoom forma d'onda del deck"
 
-#: ui/touch.slint:162
+#: ui/touch.slint:163
 msgid "Mix point lane zoom"
 msgstr "Zoom corsia MIX POINT"
 
-#: ui/touch.slint:163
+#: ui/touch.slint:164
 msgid "Mix point lanes zoom out"
 msgstr "Riduci zoom corsie MIX POINT"
 
-#: ui/touch.slint:164
+#: ui/touch.slint:165
 msgid "Mix point lanes zoom in"
 msgstr "Aumenta zoom corsie MIX POINT"
 
@@ -4682,6 +4597,10 @@ msgstr "Trasferisci su {}"
 #: ui/track-menu.slint:86
 msgid "Plug one in to send tracks to it"
 msgstr "Collegane una per inviarle tracce"
+
+#: ui/track-menu.slint:98
+msgid "ANALYSIS"
+msgstr "ANALISI"
 
 #: ui/track-menu.slint:100
 #: src/app/library/autocue.rs:129
@@ -4852,6 +4771,10 @@ msgstr "OpenFadeR — uscita video"
 msgid "NO PICTURE"
 msgstr "NESSUNA IMMAGINE"
 
+#: ui/video.slint:153
+msgid "PAUSE"
+msgstr "PAUSA"
+
 #: ui/video.slint:201
 msgid "OUTPUT WINDOW"
 msgstr "FINESTRA DI USCITA"
@@ -4909,39 +4832,39 @@ msgid "Open-source DJ software for two or four decks. Load a track, press play, 
 msgstr "Software DJ open source per due o quattro deck. Carica una traccia, premi play e mixa."
 
 #: ui/welcome.slint:84
-msgid "SUGGESTED EXTENSIONS ({})"
-msgstr "ESTENSIONI CONSIGLIATE ({})"
+msgid "SUGGESTED OPTIONS ({})"
+msgstr "OPZIONI CONSIGLIATE ({})"
 
 #: ui/welcome.slint:92
-msgid "Every suggested extension is already on. More are in PREFERENCES > EXTENSIONS > GET PLUGINS."
-msgstr "Tutte le estensioni consigliate sono già attive. Altre si trovano in PREFERENZE > ESTENSIONI > OTTIENI PLUGIN."
+msgid "Suggested options are already enabled. Manage native compatibility in Library formats and add-ons in Extensions."
+msgstr "Le opzioni consigliate sono già attive. Gestisci la compatibilità nativa in Formati libreria e i componenti aggiuntivi in Estensioni."
 
 #: ui/welcome.slint:103
-msgid "You can change this later in PREFERENCES > EXTENSIONS, and open this window again from Help > Welcome."
-msgstr "Puoi cambiarlo in seguito in PREFERENZE > ESTENSIONI e riaprire questa finestra da Aiuto > Benvenuto."
+msgid "Change compatibility in Library formats, native features in Creative tools, and add-ons in Extensions. Reopen this window from Help > Welcome."
+msgstr "Cambia la compatibilità in Formati libreria, le funzioni native in Strumenti creativi e i componenti aggiuntivi in Estensioni. Riapri questa finestra da Aiuto > Benvenuto."
 
 #: ui/welcome.slint:108
 msgid "SWITCH ON {}"
 msgstr "ATTIVA {}"
 
-#: ui/widgets.slint:218
+#: ui/widgets.slint:228
 msgid "Play"
 msgstr "Play"
 
-#: ui/widgets.slint:218
+#: ui/widgets.slint:228
 msgid "Pause"
 msgstr "Pausa"
 
-#: src/app/analyze/job.rs:313
+#: src/app/analyze/job.rs:337
 msgid "Analysis is busy: wait for an existing analysis run to finish or cancel it."
 msgstr "Analisi occupata: attendi il completamento di un'analisi in corso oppure annullala."
 
-#: src/app/analyze/job.rs:447
+#: src/app/analyze/job.rs:473
 #: src/app/exportmode/mod.rs:180
 msgid "this track has an Analysis Lock: unlock it first"
 msgstr "questa traccia ha un Blocco analisi: sbloccala prima"
 
-#: src/app/analyze/job.rs:480
+#: src/app/analyze/job.rs:506
 msgid "analysing “{}”…{}"
 msgstr "analisi di “{}”…{}"
 
@@ -5637,15 +5560,15 @@ msgstr "seleziona una traccia con un file da ascoltare in anteprima"
 msgid "this track has no file to preview"
 msgstr "questa traccia non ha un file da ascoltare in anteprima"
 
-#: src/app/browser/preview.rs:79
+#: src/app/browser/preview.rs:80
 msgid "previewing on the headphones"
 msgstr "anteprima in cuffia"
 
-#: src/app/browser/preview.rs:81
+#: src/app/browser/preview.rs:82
 msgid "preview: no audio output"
 msgstr "anteprima: nessuna uscita audio"
 
-#: src/app/browser/preview.rs:83
+#: src/app/browser/preview.rs:84
 msgid "preview: {}"
 msgstr "anteprima: {}"
 
@@ -5685,17 +5608,17 @@ msgstr "la ricerca salvata «{}» non è leggibile"
 msgid "deleted the saved search “{}”"
 msgstr "ricerca salvata «{}» eliminata"
 
-#: src/app/browser/session.rs:37
+#: src/app/browser/session.rs:36
 #: src/app/browser/sidebar.rs:116
 msgid "Tag List ({})"
 msgstr "Tag List ({})"
 
-#: src/app/browser/session.rs:65
+#: src/app/browser/session.rs:64
 #: src/app/browser/sidebar.rs:117
 msgid "Session history ({})"
 msgstr "Cronologia della sessione ({})"
 
-#: src/app/browser/session.rs:78
+#: src/app/browser/session.rs:77
 msgid "history: {}"
 msgstr "cronologia: {}"
 
@@ -6272,8 +6195,8 @@ msgid "{}: not written: {}"
 msgstr "{}: non scritto: {}"
 
 #: src/app/connect.rs:470
-msgid "Found {}: connect it in Preferences > Libraries"
-msgstr "Trovato {}: collegalo in Preferenze > Librerie"
+msgid "Found {}: connect it in Preferences > Music libraries"
+msgstr "Trovato {}: collegalo in Preferenze > Librerie musicali"
 
 #: src/app/deck/bank.rs:40
 msgid "Cue Bank “{}” on the pads ({} banks)"
@@ -6675,6 +6598,14 @@ msgstr ""
 msgid "JUMP"
 msgstr "JUMP"
 
+#: src/app/deck/pads/mod.rs:85
+msgid "KEYBOARD"
+msgstr "TASTIERA"
+
+#: src/app/deck/pads/mod.rs:87
+msgid "PAD FX"
+msgstr "PAD FX"
+
 #: src/app/deck/pads/mod.rs:88
 msgid "KEY SHIFT"
 msgstr "KEY SHIFT"
@@ -6839,61 +6770,61 @@ msgstr "instant doubles: nessun altro deck in questo layout"
 msgid "instant doubles: the other deck has no library track"
 msgstr "instant doubles: l'altro deck non ha una traccia della libreria"
 
-#: src/app/deck/stemdouble.rs:74
+#: src/app/deck/stemdouble.rs:75
 msgid "instant doubles: the other deck's stems are not finished yet"
 msgstr "instant doubles: gli stem dell'altro deck non sono ancora pronti"
 
-#: src/app/deck/stemdouble.rs:85
+#: src/app/deck/stemdouble.rs:86
 msgid "instant double {}"
 msgstr "instant double {}"
 
-#: src/app/deck/stemdouble.rs:115
+#: src/app/deck/stemdouble.rs:116
 msgid "instant doubles: the other deck changed track"
 msgstr "instant doubles: l'altro deck ha cambiato traccia"
 
-#: src/app/deck/stemdouble.rs:137
+#: src/app/deck/stemdouble.rs:138
 msgid "instant double {}: {} here, muted on {}"
 msgstr "instant double {}: {} qui, muto su {}"
 
-#: src/app/deck/stems/job.rs:158
+#: src/app/deck/stems/job.rs:165
 msgid "STEMS 0%"
 msgstr "STEMS 0%"
 
-#: src/app/deck/stems/job.rs:159
+#: src/app/deck/stems/job.rs:166
 msgid "RAM WAIT"
 msgstr "ATT. RAM"
 
-#: src/app/deck/stems/job.rs:160
+#: src/app/deck/stems/job.rs:167
 msgid "MODEL {}%"
 msgstr "MODELLO {}%"
 
-#: src/app/deck/stems/job.rs:161
+#: src/app/deck/stems/job.rs:168
 msgid "STEMS {}%"
 msgstr "STEMS {}%"
 
-#: src/app/deck/stems/job.rs:267
-#: src/app/deck/stems/job.rs:479
+#: src/app/deck/stems/job.rs:279
+#: src/app/deck/stems/job.rs:504
 msgid "NO STEMS"
 msgstr "NESSUN STEM"
 
-#: src/app/deck/stems/job.rs:351
-#: src/app/deck/stems/job.rs:461
+#: src/app/deck/stems/job.rs:376
+#: src/app/deck/stems/job.rs:486
 msgid "100% READY"
 msgstr "100% PRONTO"
 
-#: src/app/deck/stems/job.rs:368
+#: src/app/deck/stems/job.rs:393
 msgid "stems: {}"
 msgstr "stem: {}"
 
-#: src/app/deck/stems/job.rs:372
+#: src/app/deck/stems/job.rs:397
 msgid "no audio"
 msgstr "nessun audio"
 
-#: src/app/deck/stems/job.rs:459
+#: src/app/deck/stems/job.rs:484
 msgid "STEM FILE"
 msgstr "FILE STEM"
 
-#: src/app/deck/stems/job.rs:477
+#: src/app/deck/stems/job.rs:502
 msgid "NO MODEL"
 msgstr "NESSUN MODELLO"
 
@@ -6964,98 +6895,98 @@ msgstr "il beat jump richiede una griglia dei beat"
 msgid "select a track in the library first"
 msgstr "seleziona prima una traccia nella libreria"
 
-#: src/app/device/actions.rs:61
+#: src/app/device/actions.rs:62
 msgid "{}: its extension no longer offers that action. Open DEVICES and press CHECK AGAIN."
 msgstr "{}: la sua estensione non offre più quell'azione. Apri DISPOSITIVI e premi CONTROLLA DI NUOVO."
 
-#: src/app/device/actions.rs:69
-msgid "{}: its extension is switched off. Switch it on in PREFERENCES > EXTENSIONS, then restart."
-msgstr "{}: la sua estensione è disattivata. Attivala in PREFERENZE > ESTENSIONI, poi riavvia."
+#: src/app/device/actions.rs:70
+msgid "{}: its library format is switched off. Enable it in Preferences > Library formats."
+msgstr "{}: il suo formato libreria è disattivato. Attivalo in Preferenze > Formati libreria."
 
-#: src/app/device/actions.rs:99
+#: src/app/device/actions.rs:100
 msgid "{} has no library to read from. Export to it first."
 msgstr "{} non ha una libreria da leggere. Esporta prima su di esso."
 
-#: src/app/device/actions.rs:115
+#: src/app/device/actions.rs:116
 #: src/app/device/review.rs:548
 msgid "Updating the collection"
 msgstr "Aggiornamento della collezione"
 
-#: src/app/device/actions.rs:123
+#: src/app/device/actions.rs:124
 #: src/app/device/review.rs:553
 msgid "Update Collection of {}"
 msgstr "Aggiorna collezione da {}"
 
-#: src/app/device/actions.rs:162
+#: src/app/device/actions.rs:163
 #: src/app/device/review.rs:578
 msgid "Importing histories"
 msgstr "Importazione delle cronologie"
 
-#: src/app/device/actions.rs:173
+#: src/app/device/actions.rs:174
 #: src/app/device/review.rs:580
 msgid "Histories of {}"
 msgstr "Cronologie di {}"
 
-#: src/app/device/actions.rs:178
+#: src/app/device/actions.rs:179
 #: src/app/device/review.rs:586
 msgid "its plugin is not available"
 msgstr "il suo plugin non è disponibile"
 
-#: src/app/device/actions.rs:179
+#: src/app/device/actions.rs:180
 #: src/app/device/review.rs:591
 msgid "; deleted {} from the device"
 msgstr "; eliminati {} dal dispositivo"
 
-#: src/app/device/actions.rs:180
+#: src/app/device/actions.rs:181
 #: src/app/device/review.rs:593
 msgid "; not deleted from the device: {}"
 msgstr "; non eliminati dal dispositivo: {}"
 
-#: src/app/device/actions.rs:192
+#: src/app/device/actions.rs:193
 msgid "{}: {n} history is waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows it first"
 msgid_plural "{}: {n} histories are waiting to be imported. Nothing was imported yet: IMPORT HISTORIES in the DEVICES window shows them first"
 msgstr[0] "{}: {n} cronologia attende di essere importata. Non è stato ancora importato nulla: IMPORTA CRONOLOGIE nella finestra DISPOSITIVI la mostra prima"
 msgstr[1] "{}: {n} cronologie attendono di essere importate. Non è stato ancora importato nulla: IMPORTA CRONOLOGIE nella finestra DISPOSITIVI le mostra prima"
 
-#: src/app/device/actions.rs:235
+#: src/app/device/actions.rs:236
 #: src/app/device/transfer.rs:355
 msgid "That playlist is not on the device any more"
 msgstr "Quella playlist non è più sul dispositivo"
 
-#: src/app/device/actions.rs:239
+#: src/app/device/actions.rs:240
 msgid "Delete the history {} from {}?"
 msgstr "Eliminare la cronologia {} da {}?"
 
-#: src/app/device/actions.rs:241
+#: src/app/device/actions.rs:242
 msgid "Delete {} from {}? Tracks that no other playlist lists are deleted too."
 msgstr "Eliminare {} da {}? Vengono eliminate anche le tracce che nessun'altra playlist elenca."
 
-#: src/app/device/actions.rs:247
+#: src/app/device/actions.rs:248
 msgid "Delete {} from {}? Its tracks stay on the device."
 msgstr "Eliminare {} da {}? Le sue tracce restano sul dispositivo."
 
-#: src/app/device/actions.rs:255
-#: src/app/device/actions.rs:302
+#: src/app/device/actions.rs:256
+#: src/app/device/actions.rs:303
 msgid "Deleting"
 msgstr "Eliminazione"
 
-#: src/app/device/actions.rs:258
+#: src/app/device/actions.rs:259
 msgid "Deleted the history {} from {}"
 msgstr "Cronologia {} eliminata da {}"
 
-#: src/app/device/actions.rs:262
+#: src/app/device/actions.rs:263
 msgid "Deleted {} ({} list(s), {} track(s)) from {}{}"
 msgstr "Eliminata {} ({} liste, {} tracce) da {}{}"
 
-#: src/app/device/actions.rs:268
+#: src/app/device/actions.rs:269
 msgid " — {} file(s) could not be deleted, first: {}"
 msgstr " — {} file non eliminati, il primo: {}"
 
-#: src/app/device/actions.rs:294
+#: src/app/device/actions.rs:295
 msgid "Delete {} from {}? The file and its analysis are removed."
 msgstr "Eliminare {} da {}? Il file e la sua analisi vengono rimossi."
 
-#: src/app/device/actions.rs:310
+#: src/app/device/actions.rs:311
 msgid "Deleted {} track(s) from {}"
 msgstr "Eliminate {} tracce da {}"
 
@@ -7365,40 +7296,40 @@ msgid "{}: the cut-off export could not be put right ({})."
 msgstr "{}: non è stato possibile rimediare all'esportazione interrotta ({})."
 
 #: src/app/device/check.rs:667
-msgid "{}: the extension {} is switched off. Switch it on in PREFERENCES > EXTENSIONS."
-msgstr "{}: l'estensione {} è disattivata. Attivala in PREFERENZE > ESTENSIONI."
+msgid "{}: format {} is switched off. Enable it in Preferences > Library formats."
+msgstr "{}: il formato {} è disattivato. Attivalo in Preferenze > Formati libreria."
 
-#: src/app/device/check.rs:668
+#: src/app/device/check.rs:673
 msgid "Repairing ({})"
 msgstr "Riparazione ({})"
 
-#: src/app/device/check.rs:683
+#: src/app/device/check.rs:688
 msgid "{} is ready."
 msgstr "{} è pronta."
 
-#: src/app/device/check.rs:687
+#: src/app/device/check.rs:692
 msgid "{} still needs attention: {}"
 msgstr "{} richiede ancora attenzione: {}"
 
-#: src/app/device/check.rs:699
+#: src/app/device/check.rs:704
 msgid "Writing the library again"
 msgstr "Riscrittura della libreria"
 
-#: src/app/device/check.rs:731
+#: src/app/device/check.rs:736
 msgid "Copying missing music"
 msgstr "Copia della musica mancante"
 
-#: src/app/device/check.rs:743
+#: src/app/device/check.rs:748
 msgid "Copied {n} missing audio file again from your collection."
 msgid_plural "Copied {n} missing audio files again from your collection."
 msgstr[0] "{n} file audio mancante è stato copiato di nuovo dalla tua collezione."
 msgstr[1] "{n} file audio mancanti sono stati copiati di nuovo dalla tua collezione."
 
-#: src/app/device/check.rs:745
+#: src/app/device/check.rs:750
 msgid "Copied {} of {} missing audio files again. {} are not in your collection: copy them to the stick by hand or take them off its playlists."
 msgstr "{} di {} file audio mancanti sono stati copiati di nuovo. {} non sono nella tua collezione: copiali a mano sulla chiavetta o toglili dalle sue playlist."
 
-#: src/app/device/check.rs:790
+#: src/app/device/check.rs:795
 msgid "{}: the copy is shorter than the original"
 msgstr "{}: la copia è più corta dell'originale"
 
@@ -7587,7 +7518,7 @@ msgstr "Cartella inesistente: {}"
 
 #: src/app/device/formats.rs:88
 #: src/app/device/job.rs:205
-#: src/app/device/scan.rs:180
+#: src/app/device/scan.rs:188
 msgid "the worker stopped"
 msgstr "il worker si è fermato"
 
@@ -7722,8 +7653,8 @@ msgid "cannot read the collection: {}"
 msgstr "impossibile leggere la collezione: {}"
 
 #: src/app/device/mod.rs:371
-msgid "{}: its extension cannot do that with this device. Switch the extension on in PREFERENCES > EXTENSIONS, or use a device it supports."
-msgstr "{}: la sua estensione non può farlo con questo dispositivo. Attiva l'estensione in PREFERENZE > ESTENSIONI o usa un dispositivo supportato."
+msgid "{}: this format cannot perform that operation. Check Preferences > Library formats or use a supported device."
+msgstr "{}: questo formato non può eseguire l'operazione. Controlla Preferenze > Formati libreria o usa un dispositivo supportato."
 
 #: src/app/device/pace.rs:140
 msgid "{} left"
@@ -8044,31 +7975,31 @@ msgstr "Nulla è stato scritto: il backup della libreria di {} non è riuscito (
 msgid "The library of {} was backed up first, to {}"
 msgstr "La libreria di {} è stata prima salvata in un backup, in {}"
 
-#: src/app/device/scan.rs:104
+#: src/app/device/scan.rs:112
 msgid "no library yet"
 msgstr "ancora nessuna libreria"
 
-#: src/app/device/scan.rs:113
+#: src/app/device/scan.rs:121
 msgid "mounted read-only: nothing can be written"
 msgstr "montato in sola lettura: non si può scrivere nulla"
 
-#: src/app/device/scan.rs:221
+#: src/app/device/scan.rs:229
 msgid "{}: plugged in, mounting /dev/{}…"
 msgstr "{}: collegato, montaggio di /dev/{}…"
 
-#: src/app/device/scan.rs:232
+#: src/app/device/scan.rs:240
 msgid "{}: cannot mount /dev/{}: {}. Mount it from your file manager, then it shows up here."
 msgstr "{}: impossibile montare /dev/{}: {}. Montala dal gestore file e comparirà qui."
 
-#: src/app/device/scan.rs:261
+#: src/app/device/scan.rs:269
 msgid "{}: {} setting(s) changed on the player were taken over"
 msgstr "{}: {} impostazioni modificate sul player sono state recepite"
 
-#: src/app/device/scan.rs:308
+#: src/app/device/scan.rs:316
 msgid "{} connected ({})"
 msgstr "{} collegato ({})"
 
-#: src/app/device/scan.rs:344
+#: src/app/device/scan.rs:352
 msgid "{} removed"
 msgstr "{} rimosso"
 
@@ -8319,8 +8250,8 @@ msgid "no audio on this deck"
 msgstr "nessun audio su questo deck"
 
 #: src/app/groove/capture.rs:32
-msgid "DRUM CAPTURE needs the STEMS of this track (PREFS > Extensions)"
-msgstr "DRUM CAPTURE richiede gli STEMS di questa traccia (PREF. > Estensioni)"
+msgid "DRUM CAPTURE needs this track's STEMS (Preferences > Creative tools)"
+msgstr "DRUM CAPTURE richiede gli STEMS di questa traccia (Preferenze > Strumenti creativi)"
 
 #: src/app/groove/capture.rs:46
 #: src/app/sampler/capture.rs:31
@@ -8332,8 +8263,8 @@ msgid "Save as New Preset…"
 msgstr "Salva come nuovo preset…"
 
 #: src/app/groove/mod.rs:169
-msgid "slot {} is playing: loading is locked (PREFS > Extensions > DRUM SWAP)"
-msgstr "lo slot {} è in riproduzione: il caricamento è bloccato (PREF. > Estensioni > DRUM SWAP)"
+msgid "slot {} is playing: loading is locked (Preferences > Creative tools > DRUM SWAP)"
+msgstr "lo slot {} è in riproduzione: il caricamento è bloccato (Preferenze > Strumenti creativi > DRUM SWAP)"
 
 #: src/app/groove/preset.rs:192
 msgid "no settings folder: set HOME or XDG_CONFIG_HOME"
@@ -9727,6 +9658,10 @@ msgstr "REC interrotta a {}, {} potrebbe essere incompleto: {}"
 msgid "the file"
 msgstr "il file"
 
+#: src/app/plugins/manager.rs:20
+msgid "COMPILED"
+msgstr "COMPILATO"
+
 #: src/app/plugins/manager.rs:22
 msgid "PROGRAM"
 msgstr "PROGRAMMA"
@@ -9795,29 +9730,93 @@ msgstr[1] "{n} effetti {0}"
 msgid "nothing yet"
 msgstr "ancora niente"
 
+#: src/app/plugins/manager.rs:152
+msgid "Rekordbox desktop library"
+msgstr "Libreria desktop Rekordbox"
+
+#: src/app/plugins/manager.rs:153
+msgid "Read the desktop collection, playlists and preparation data. An encrypted collection needs its library key."
+msgstr "Legge la collezione desktop, le playlist e i dati di preparazione. Una collezione cifrata richiede la sua chiave di libreria."
+
+#: src/app/plugins/manager.rs:158
+msgid "Rekordbox USB / SD libraries"
+msgstr "Librerie USB / SD Rekordbox"
+
+#: src/app/plugins/manager.rs:159
+msgid "Read and prepare supported USB or SD libraries, including cue points, beat grids and playlists."
+msgstr "Legge e prepara le librerie USB o SD supportate, inclusi punti CUE, griglie dei beat e playlist."
+
+#: src/app/plugins/manager.rs:164
+msgid "Rekordbox XML"
+msgstr "Rekordbox XML"
+
+#: src/app/plugins/manager.rs:165
+msgid "Exchange tracks, playlists, beat grids and cues through a Rekordbox XML file."
+msgstr "Scambia tracce, playlist, griglie dei beat e cue tramite un file XML Rekordbox."
+
+#: src/app/plugins/manager.rs:168
+msgid "Engine DJ"
+msgstr "Engine DJ"
+
+#: src/app/plugins/manager.rs:169
+msgid "Read Engine DJ libraries and prepare supported device libraries with tracks, cues and playlists."
+msgstr "Legge le librerie Engine DJ e prepara le librerie dei dispositivi supportati con tracce, cue e playlist."
+
+#: src/app/plugins/manager.rs:174
+msgid "Serato"
+msgstr "Serato"
+
+#: src/app/plugins/manager.rs:175
+msgid "Read Serato libraries and crates, and exchange supported device and audio-tag preparation data."
+msgstr "Legge le librerie e i crate Serato e scambia i dati di preparazione supportati per dispositivi e tag audio."
+
+#: src/app/plugins/manager.rs:180
+msgid "Traktor"
+msgstr "Traktor"
+
+#: src/app/plugins/manager.rs:181
+msgid "Read Traktor collections and write device collections that Traktor can import."
+msgstr "Legge le collezioni Traktor e scrive collezioni per dispositivi che Traktor può importare."
+
+#: src/app/plugins/manager.rs:184
+msgid "VirtualDJ"
+msgstr "VirtualDJ"
+
 #: src/app/plugins/manager.rs:185
+msgid "Read VirtualDJ libraries and lists, and export supported device libraries with cues and playlists."
+msgstr "Legge le librerie e le liste VirtualDJ ed esporta le librerie dei dispositivi supportati con cue e playlist."
+
+#: src/app/plugins/manager.rs:190
+msgid "iTunes / Music"
+msgstr "iTunes / Music"
+
+#: src/app/plugins/manager.rs:191
+msgid "Read tracks and playlists from an exported Library.xml file."
+msgstr "Legge tracce e playlist da un file Library.xml esportato."
+
+#: src/app/plugins/manager.rs:285
 msgid "Restart to finish: {}"
 msgstr "Riavvia per completare: {}"
 
-#: src/app/plugins/manager.rs:213
+#: src/app/plugins/manager.rs:314
 msgid "plugin {} installed{}"
 msgid_plural "plugins {} installed{}"
 msgstr[0] "plugin {} installato{}"
 msgstr[1] "plugin {} installati{}"
 
-#: src/app/plugins/manager.rs:219
+#: src/app/plugins/manager.rs:320
 msgid "; restart to load its effects or sources"
 msgstr "; riavvia per caricare i suoi effetti o sorgenti"
 
-#: src/app/plugins/manager.rs:273
+#: src/app/plugins/manager.rs:374
 msgid "{}: not a number"
 msgstr "{}: non è un numero"
 
-#: src/app/plugins/manager.rs:304
+#: src/app/plugins/manager.rs:411
 msgid "plugin {} uninstalled"
 msgstr "plugin {} disinstallato"
 
-#: src/app/plugins/manager.rs:379
+#: src/app/plugins/manager.rs:487
 msgid "plugin folders read again"
 msgstr "cartelle dei plugin rilette"
 
@@ -9834,7 +9833,7 @@ msgid "nothing was typed"
 msgstr "non è stato digitato nulla"
 
 #: src/app/prefs/advanced.rs:143
-#: src/app/prefs/extensions.rs:175
+#: src/app/prefs/extensions.rs:187
 msgid "LOCATION OF FILES"
 msgstr "POSIZIONE DEI FILE"
 
@@ -10157,6 +10156,10 @@ msgstr "ogni {} battute"
 msgid "needs {} tracks with cues ({} found): MANUAL settings apply"
 msgstr "servono {} tracce con cue ({} trovate): si applicano le impostazioni MANUALE"
 
+#: src/app/prefs/analysis.rs:220
+msgid "HOT CUES"
+msgstr "HOT CUE"
+
 #: src/app/prefs/analysis.rs:226
 msgid "MEMORY CUES"
 msgstr "MEMORY CUE"
@@ -10240,6 +10243,11 @@ msgstr "NON CONNESSO · RIPRODUCE L'IMPOSTAZIONE PREDEFINITA DI SISTEMA"
 #: src/app/prefs/audio/cards/mod.rs:71
 msgid "OVERRIDDEN BY {}"
 msgstr "SOSTITUITO DA {}"
+
+#: src/app/prefs/audio/cards/mod.rs:73
+#: src/app/welcome.rs:31
+msgid "CONTROLLER"
+msgstr "CONTROLLER"
 
 #: src/app/prefs/audio/cards/mod.rs:78
 msgid "OVERRIDDEN BY OPENFADER_OUTPUT_DEVICE"
@@ -10348,6 +10356,10 @@ msgstr "INTERNO"
 #: src/app/prefs/audio/page.rs:201
 msgid "EXTERNAL"
 msgstr "ESTERNO"
+
+#: src/app/prefs/audio/mod.rs:53
+msgid "ADVANCED"
+msgstr "AVANZATE"
 
 #: src/app/prefs/audio/mod.rs:53
 #: src/app/prefs/controller/mod.rs:30
@@ -10738,6 +10750,11 @@ msgid "Auto Gain: even out the loudness of loaded tracks"
 msgstr "Auto Gain: uniforma il volume delle tracce caricate"
 
 #: src/app/prefs/controller/mixer.rs:46
+#: src/app/prefs/controller/mod.rs:34
+msgid "EQ"
+msgstr "EQ"
+
+#: src/app/prefs/controller/mixer.rs:46
 msgid "kill at the bottom"
 msgstr "kill in fondo"
 
@@ -10760,6 +10777,10 @@ msgstr "Abilita crossfader"
 #: src/app/prefs/controller/mixer.rs:65
 msgid "Automix transitions remain active"
 msgstr "Le transizioni di Automix restano attive"
+
+#: src/app/prefs/controller/mixer.rs:66
+msgid "CROSSFADER CURVE"
+msgstr "CURVA DEL CROSSFADER"
 
 #: src/app/prefs/controller/mixer.rs:67
 msgid "OUTPUT LEVEL"
@@ -11109,7 +11130,7 @@ msgstr "il dispositivo non è collegato"
 msgid "{} setting(s) changed on the player"
 msgstr "{} impostazione/i modificata/e sul player"
 
-#: src/app/prefs/dj_system/fields.rs:80
+#: src/app/prefs/dj_system/fields.rs:81
 msgid "no such choice"
 msgstr "scelta inesistente"
 
@@ -11170,12 +11191,12 @@ msgid "READ"
 msgstr "LEGGI"
 
 #: src/app/prefs/dj_system/mod.rs:303
-msgid "No device plugin"
-msgstr "Nessun plugin per dispositivi"
+msgid "No player-settings format available"
+msgstr "Nessun formato per le impostazioni del player disponibile"
 
 #: src/app/prefs/dj_system/mod.rs:304
-msgid "install or enable one in EXTENSIONS"
-msgstr "installane o abilitane uno in ESTENSIONI"
+msgid "Enable a supported format in Library formats."
+msgstr "Attiva un formato supportato in Formati libreria."
 
 #: src/app/prefs/dj_system/mod.rs:312
 msgid "STATUS"
@@ -11193,161 +11214,166 @@ msgstr "PREDEFINITI PER TUTTI I DISPOSITIVI"
 msgid "DEVICE {}"
 msgstr "DISPOSITIVO {}"
 
-#: src/app/prefs/extensions.rs:90
+#: src/app/prefs/extensions.rs:96
 msgid "ENABLE THE STEMS FUNCTION"
 msgstr "ABILITA LA FUNZIONE STEMS"
 
-#: src/app/prefs/extensions.rs:94
+#: src/app/prefs/extensions.rs:100
 msgid "ON downloads a 316 MB model once"
 msgstr "ON scarica una sola volta un modello da 316 MB"
 
-#: src/app/prefs/extensions.rs:97
+#: src/app/prefs/extensions.rs:103
 msgid "STEMS MODE"
 msgstr "MODALITÀ STEMS"
 
-#: src/app/prefs/extensions.rs:98
+#: src/app/prefs/extensions.rs:104
 msgid "3 STEMS"
 msgstr "3 STEMS"
 
-#: src/app/prefs/extensions.rs:98
+#: src/app/prefs/extensions.rs:104
 msgid "4 STEMS"
 msgstr "4 STEMS"
 
-#: src/app/prefs/extensions.rs:103
+#: src/app/prefs/extensions.rs:109
 msgid "STEMS ANALYSIS PROCESS"
 msgstr "PROCESSO DI ANALISI STEMS"
 
-#: src/app/prefs/extensions.rs:104
+#: src/app/prefs/extensions.rs:110
 msgid "QUALITY"
 msgstr "QUALITÀ"
 
-#: src/app/prefs/extensions.rs:104
+#: src/app/prefs/extensions.rs:110
 msgid "SPEED"
 msgstr "VELOCITÀ"
 
-#: src/app/prefs/extensions.rs:107
-#: src/app/prefs/extensions.rs:148
+#: src/app/prefs/extensions.rs:113
+#: src/app/prefs/extensions.rs:154
+#: src/app/prefs/extensions.rs:160
 msgid "next track"
 msgstr "traccia successiva"
 
-#: src/app/prefs/extensions.rs:108
+#: src/app/prefs/extensions.rs:114
 msgid "STEMS LAYOUT"
 msgstr "LAYOUT STEMS"
 
-#: src/app/prefs/extensions.rs:111
+#: src/app/prefs/extensions.rs:117
 msgid "Use the parts of stem files"
 msgstr "Usa le parti dei file stem"
 
-#: src/app/prefs/extensions.rs:114
+#: src/app/prefs/extensions.rs:120
 msgid "no separation for them"
 msgstr "nessuna separazione per questi"
 
-#: src/app/prefs/extensions.rs:117
+#: src/app/prefs/extensions.rs:123
 msgid "Custom layout: ACTIVE STEM buttons"
 msgstr "Layout personalizzato: pulsanti ACTIVE STEM"
 
-#: src/app/prefs/extensions.rs:121
+#: src/app/prefs/extensions.rs:127
 msgid "Custom layout: STEM ISO knobs"
 msgstr "Layout personalizzato: manopole STEM ISO"
 
-#: src/app/prefs/extensions.rs:122
+#: src/app/prefs/extensions.rs:128
 msgid "Custom layout: STEM FX"
 msgstr "Layout personalizzato: STEM FX"
 
-#: src/app/prefs/extensions.rs:125
+#: src/app/prefs/extensions.rs:131
 msgid "STEM WAVEFORM DISPLAY"
 msgstr "VISUALIZZAZIONE FORMA D'ONDA STEM"
 
-#: src/app/prefs/extensions.rs:126
+#: src/app/prefs/extensions.rs:132
 #: src/app/prefs/extensions.rs:23
 msgid "ORIGINAL"
 msgstr "ORIGINALE"
 
-#: src/app/prefs/extensions.rs:131
+#: src/app/prefs/extensions.rs:137
 msgid "ACTIVE STEM SETTING"
 msgstr "IMPOSTAZIONE ACTIVE STEM"
 
-#: src/app/prefs/extensions.rs:132
+#: src/app/prefs/extensions.rs:138
 msgid "SOLO"
 msgstr "SOLO"
 
-#: src/app/prefs/extensions.rs:135
+#: src/app/prefs/extensions.rs:141
 msgid "pads and controller"
 msgstr "pad e controller"
 
-#: src/app/prefs/extensions.rs:138
+#: src/app/prefs/extensions.rs:144
 msgid "MUTE/SOLO ON LOAD"
 msgstr "MUTE/SOLO AL CARICAMENTO"
 
-#: src/app/prefs/extensions.rs:139
+#: src/app/prefs/extensions.rs:145
 msgid "KEEP"
 msgstr "MANTIENI"
 
-#: src/app/prefs/extensions.rs:142
+#: src/app/prefs/extensions.rs:148
 msgid "STEM INSTANT DOUBLES"
 msgstr "STEM INSTANT DOUBLES"
 
-#: src/app/prefs/extensions.rs:142
+#: src/app/prefs/extensions.rs:148
 msgid "source deck"
 msgstr "deck di origine"
 
-#: src/app/prefs/extensions.rs:145
+#: src/app/prefs/extensions.rs:151
 msgid "Apply multi-thread to the analysis process"
 msgstr "Applica il multi-thread al processo di analisi"
 
-#: src/app/prefs/extensions.rs:150
+#: src/app/prefs/extensions.rs:157
+msgid "STEMS PROCESSING"
+msgstr "ELABORAZIONE STEMS"
+
+#: src/app/prefs/extensions.rs:162
 msgid "Enable the BEAT LAB Function"
 msgstr "Abilita la funzione BEAT LAB"
 
-#: src/app/prefs/extensions.rs:153
+#: src/app/prefs/extensions.rs:165
 msgid "needs STEMS"
 msgstr "richiede STEMS"
 
-#: src/app/prefs/extensions.rs:157
+#: src/app/prefs/extensions.rs:169
 msgid "FACTORY SAMPLES PACK (sample pack)"
 msgstr "PACCHETTO CAMPIONI DI FABBRICA (sample pack)"
 
-#: src/app/prefs/extensions.rs:160
+#: src/app/prefs/extensions.rs:172
 msgid "DRUM SWAP"
 msgstr "DRUM SWAP"
 
-#: src/app/prefs/extensions.rs:163
+#: src/app/prefs/extensions.rs:175
 msgid "EJECT/LOAD LOCK"
 msgstr "BLOCCO EJECT/LOAD"
 
-#: src/app/prefs/extensions.rs:164
+#: src/app/prefs/extensions.rs:176
 msgid "UNLOCK"
 msgstr "SBLOCCA"
 
-#: src/app/prefs/extensions.rs:164
+#: src/app/prefs/extensions.rs:176
 msgid "LOCK"
 msgstr "BLOCCA"
 
-#: src/app/prefs/extensions.rs:167
+#: src/app/prefs/extensions.rs:179
 msgid "no load into a playing slot"
 msgstr "nessun caricamento in uno slot in riproduzione"
 
-#: src/app/prefs/extensions.rs:170
+#: src/app/prefs/extensions.rs:182
 msgid "Display track titles on DRUM SWAP SLOT"
 msgstr "Mostra i titoli delle tracce sullo SLOT DRUM SWAP"
 
-#: src/app/prefs/extensions.rs:173
+#: src/app/prefs/extensions.rs:185
 msgid "DRUM CAPTURE"
 msgstr "DRUM CAPTURE"
 
-#: src/app/prefs/extensions.rs:174
+#: src/app/prefs/extensions.rs:186
 msgid "EXTRACT"
 msgstr "ESTRAI"
 
-#: src/app/prefs/extensions.rs:176
+#: src/app/prefs/extensions.rs:188
 msgid "empty = ~/Music/OpenFadeR/Drums"
 msgstr "vuoto = ~/Music/OpenFadeR/Drums"
 
-#: src/app/prefs/extensions.rs:178
+#: src/app/prefs/extensions.rs:190
 msgid "Enable Video Function"
 msgstr "Abilita la funzione Video"
 
-#: src/app/prefs/extensions.rs:180
+#: src/app/prefs/extensions.rs:192
 msgid "Enable Lighting Function"
 msgstr "Abilita la funzione Luci"
 
@@ -11378,6 +11404,700 @@ msgstr "DECK3"
 #: src/app/prefs/extensions.rs:19
 msgid "DECK4"
 msgstr "DECK4"
+
+#: src/app/prefs/extensions.rs:27
+#: src/app/prefs/view.rs:320
+#: src/app/prefs/view.rs:61
+msgid "CPU"
+msgstr "CPU"
+
+#: src/app/prefs/filter.rs:24
+msgid "All groups"
+msgstr "Tutti i gruppi"
+
+#: src/app/prefs/help.rs:6
+msgid "Choose the interface language. System follows your operating system's language."
+msgstr "Scegli la lingua dell'interfaccia. «Sistema» segue la lingua del tuo sistema operativo."
+
+#: src/app/prefs/help.rs:8
+msgid "Show explanations when you hold the pointer over a control. Clickable settings help remains available when tooltips are off."
+msgstr "Mostra spiegazioni quando passi il puntatore su un controllo. L'aiuto cliccabile delle impostazioni resta disponibile quando i tooltip sono disattivati."
+
+#: src/app/prefs/help.rs:11
+msgid "Choose how precisely tempo is displayed. This changes the readout, not the audio or beat grid."
+msgstr "Scegli con quale precisione viene mostrato il tempo. Cambia solo la lettura, non l'audio né la griglia dei beat."
+
+#: src/app/prefs/help.rs:14
+msgid "Reverse the on-screen vertical tempo fader. Use Invert hardware tempo fader separately for a controller that moves the wrong way."
+msgstr "Inverte il fader del tempo verticale sullo schermo. Usa separatamente «Inverti fader tempo hardware» per un controller che si muove nel verso sbagliato."
+
+#: src/app/prefs/help.rs:17
+msgid "Adjust the track list's text size, weight or row spacing for comfortable reading. Track data is unchanged."
+msgstr "Regola dimensione, spessore o spaziatura delle righe dell'elenco tracce per una lettura più comoda. I dati delle tracce non cambiano."
+
+#: src/app/prefs/help.rs:20
+msgid "Keep the selected track near the center of the visible browser list while navigating."
+msgstr "Mantiene la traccia selezionata vicino al centro dell'elenco visibile del browser durante la navigazione."
+
+#: src/app/prefs/help.rs:23
+msgid "Mark tracks played in this session. Reset clears the played color, not the track or its library history."
+msgstr "Segna le tracce riprodotte in questa sessione. «Reimposta» cancella il colore di riprodotto, non la traccia né la sua cronologia nella libreria."
+
+#: src/app/prefs/help.rs:26
+msgid "Choose musical-key notation: note names, Camelot-style codes, Open Key, or the library's stored text."
+msgstr "Scegli la notazione della tonalità: nomi delle note, codici in stile Camelot, Open Key o il testo memorizzato nella libreria."
+
+#: src/app/prefs/help.rs:29
+msgid "Auto chooses a supported waveform renderer. CPU is useful when a GPU driver causes display problems; this does not change the audio engine."
+msgstr "«Auto» sceglie un renderer di forme d'onda supportato. CPU è utile quando un driver GPU causa problemi di visualizzazione; non cambia il motore audio."
+
+#: src/app/prefs/help.rs:32
+msgid "Higher drawing rates make waveforms smoother but require more rendering work. Lower rates can save power."
+msgstr "Frequenze di disegno più alte rendono le forme d'onda più fluide ma richiedono più elaborazione. Frequenze più basse possono risparmiare energia."
+
+#: src/app/prefs/help.rs:36
+msgid "Choose how much waveform detail is drawn in track overviews and browser previews."
+msgstr "Scegli quanto dettaglio delle forme d'onda viene disegnato nelle panoramiche delle tracce e nelle anteprime del browser."
+
+#: src/app/prefs/help.rs:38
+msgid "Choose whether the waveform readout describes the current bar position or counts toward upcoming beats and bars."
+msgstr "Scegli se la lettura della forma d'onda indica la posizione nella battuta corrente o conta alla rovescia i prossimi beat e le prossime battute."
+
+#: src/app/prefs/help.rs:42
+msgid "Change the appearance of beat-grid lines. This does not move the actual beats."
+msgstr "Cambia l'aspetto delle linee della griglia dei beat. Non sposta i beat reali."
+
+#: src/app/prefs/help.rs:44
+msgid "Choose the size of hot-cue flags and letters on waveforms."
+msgstr "Scegli la dimensione dei flag e delle lettere degli hot cue sulle forme d'onda."
+
+#: src/app/prefs/help.rs:45
+msgid "Place the deck number beside or within the waveform to make decks easier to identify."
+msgstr "Posiziona il numero del deck accanto o dentro la forma d'onda per riconoscere i deck più facilmente."
+
+#: src/app/prefs/help.rs:48
+msgid "Allow waveform pointer gestures to control playback and cueing. Turn it off if you only want to inspect the waveform."
+msgstr "Consente ai gesti del puntatore sulla forma d'onda di controllare riproduzione e cueing. Disattivalo se vuoi solo ispezionare la forma d'onda."
+
+#: src/app/prefs/help.rs:52
+msgid "Choose which position or cue countdown the center of the jog display shows."
+msgstr "Scegli quale posizione o conto alla rovescia dei cue mostra il centro del display jog."
+
+#: src/app/prefs/help.rs:55
+msgid "Choose how harmonic-key compatibility is indicated when comparing tracks."
+msgstr "Scegli come viene indicata la compatibilità armonica delle tonalità quando confronti le tracce."
+
+#: src/app/prefs/help.rs:58
+msgid "Show related tracks in the media browser to help choose another track."
+msgstr "Mostra le tracce correlate nel browser multimediale per aiutarti a scegliere un'altra traccia."
+
+#: src/app/prefs/help.rs:61
+msgid "Show cue banks in the media browser for collecting and reusing hot cues."
+msgstr "Mostra i banchi di cue nel browser multimediale per raccogliere e riutilizzare gli hot cue."
+
+#: src/app/prefs/help.rs:64
+msgid "Show the track-suggestion browser alongside your other music sources."
+msgstr "Mostra il browser dei suggerimenti di tracce accanto alle altre sorgenti musicali."
+
+#: src/app/prefs/help.rs:67
+msgid "Show the folder explorer in the media browser. Hiding it does not remove music."
+msgstr "Mostra l'esplora cartelle nel browser multimediale. Nasconderlo non rimuove la musica."
+
+#: src/app/prefs/help.rs:70
+msgid "Show the playlist used to review tracks prepared by CUE Analysis."
+msgstr "Mostra la playlist usata per rivedere le tracce preparate da CUE Analysis."
+
+#: src/app/prefs/help.rs:73
+msgid "Show the playlist palette for quick access to playlists while browsing."
+msgstr "Mostra la palette delle playlist per accedere rapidamente alle playlist durante la navigazione."
+
+#: src/app/prefs/help.rs:75
+msgid "Draw cue positions on browser waveform previews."
+msgstr "Disegna le posizioni dei cue sulle anteprime delle forme d'onda del browser."
+
+#: src/app/prefs/help.rs:76
+msgid "Include the All Tracks entry in the playlist browser."
+msgstr "Include la voce Tutte le tracce nel browser delle playlist."
+
+#: src/app/prefs/help.rs:77
+msgid "Show the tempo relationship used by synchronized decks."
+msgstr "Mostra la relazione di tempo usata dai deck sincronizzati."
+
+#: src/app/prefs/help.rs:78
+msgid "Show analyzed musical phrases and their labels on detailed or overview waveforms. Phrase analysis must be available for the track."
+msgstr "Mostra le frasi musicali analizzate e le loro etichette sulle forme d'onda dettagliate o panoramiche. Per la traccia deve essere disponibile l'analisi delle frasi."
+
+#: src/app/prefs/help.rs:81
+msgid "Show estimated vocal regions on detailed or overview waveforms. This display depends on the track's vocal analysis."
+msgstr "Mostra le regioni vocali stimate sulle forme d'onda dettagliate o panoramiche. Questa visualizzazione dipende dall'analisi vocale della traccia."
+
+#: src/app/prefs/help.rs:85
+msgid "Choose the arrangement of effect controls in the performance workspace."
+msgstr "Scegli la disposizione dei controlli degli effetti nello spazio di lavoro performance."
+
+#: src/app/prefs/help.rs:88
+msgid "Choose which deck appears in each enlarged waveform lane in four-deck layouts."
+msgstr "Scegli quale deck appare in ogni corsia ingrandita della forma d'onda nei layout a quattro deck."
+
+#: src/app/prefs/help.rs:90
+msgid "Choose whether pad-mode display follows the active controls automatically or is selected manually."
+msgstr "Scegli se la visualizzazione della modalità pad segue automaticamente i controlli attivi o viene selezionata manualmente."
+
+#: src/app/prefs/help.rs:93
+msgid "Choose the overall theme. Open Themes to preview, customize or save a personal copy."
+msgstr "Scegli il tema generale. Apri Temi per vedere l'anteprima, personalizzare o salvare una copia personale."
+
+#: src/app/prefs/help.rs:96
+msgid "Choose the waveform color scheme used to distinguish frequency bands."
+msgstr "Scegli lo schema di colori della forma d'onda usato per distinguere le bande di frequenza."
+
+#: src/app/prefs/help.rs:97
+msgid "Choose how cue, effect-pad or sampler colors are displayed. This does not change their sound or assignments."
+msgstr "Scegli come vengono mostrati i colori di cue, pad effetti o sampler. Non cambia il suono né le assegnazioni."
+
+#: src/app/prefs/help.rs:100
+msgid "Arrange the visible players, waveform lanes and mixer. Switching layouts keeps loaded tracks and playback state."
+msgstr "Disponi i player, le corsie delle forme d'onda e il mixer visibili. Cambiando layout restano caricate le tracce e lo stato di riproduzione."
+
+#: src/app/prefs/help.rs:103
+msgid "Set the output sample rate. Auto uses the driver's supported default; choosing a rate may reopen the audio stream."
+msgstr "Imposta la frequenza di campionamento in uscita. «Auto» usa il valore predefinito supportato dal driver; scegliere una frequenza può riaprire lo stream audio."
+
+#: src/app/prefs/help.rs:106
+msgid "Smaller audio buffers reduce control-to-sound latency but need more reliable real-time processing. Increase the buffer if you hear dropouts; Auto uses the driver default."
+msgstr "Buffer audio più piccoli riducono la latenza tra comando e suono ma richiedono un'elaborazione in tempo reale più affidabile. Aumenta il buffer se senti interruzioni; «Auto» usa il valore predefinito del driver."
+
+#: src/app/prefs/help.rs:109
+msgid "Internal mixes decks in OpenFadeR. External sends decks to separate hardware output pairs and requires an audio device with enough channels."
+msgstr "«Interno» mixa i deck in OpenFadeR. «Esterno» invia i deck a coppie di uscite hardware separate e richiede un dispositivo audio con canali sufficienti."
+
+#: src/app/prefs/help.rs:112
+msgid "Choose the hardware channel pair that carries the master mix."
+msgstr "Scegli la coppia di canali hardware che trasporta il master mix."
+
+#: src/app/prefs/help.rs:113
+msgid "Choose a headphone cue output pair. A separate cue mix needs independent output channels or a configured cue device."
+msgstr "Scegli una coppia di uscite per il cue in cuffia. Un mix cue separato richiede canali di uscita indipendenti o un dispositivo cue configurato."
+
+#: src/app/prefs/help.rs:117
+msgid "Route and adjust a separate booth-monitor output. Off leaves that output unused."
+msgstr "Instrada e regola un'uscita separata per il monitor di cabina. «Off» lascia inutilizzata quell'uscita."
+
+#: src/app/prefs/help.rs:119
+msgid "Choose the sound and level of the beat-grid metronome. Use it while checking beat alignment."
+msgstr "Scegli suono e livello del metronomo della griglia dei beat. Usalo per controllare l'allineamento dei beat."
+
+#: src/app/prefs/help.rs:123
+msgid "Set the level of browser preview playback without changing deck channel faders."
+msgstr "Imposta il livello dell'anteprima del browser senza cambiare i fader dei canali dei deck."
+
+#: src/app/prefs/help.rs:125
+msgid "Choose the audio input device and channel pair for input recording. Microphone and AUX controls can also use this input device."
+msgstr "Scegli il dispositivo di ingresso audio e la coppia di canali per la registrazione dell'ingresso. Anche i controlli microfono e AUX possono usare questo dispositivo di ingresso."
+
+#: src/app/prefs/help.rs:128
+msgid "Record the master mix or a selected external audio input. Choosing Input does not record the deck mix."
+msgstr "Registra il master mix o un ingresso audio esterno selezionato. Scegliere «Ingresso» non registra il mix dei deck."
+
+#: src/app/prefs/help.rs:131
+msgid "Enable a microphone, choose its input channels and set its level. Check the input device before raising the microphone level."
+msgstr "Attiva un microfono, scegli i suoi canali di ingresso e imposta il livello. Controlla il dispositivo di ingresso prima di alzare il livello del microfono."
+
+#: src/app/prefs/help.rs:134
+msgid "Lower the music while microphone talkover is active. Advanced mode reduces the mid range instead of the entire signal."
+msgstr "Abbassa la musica mentre il talkover del microfono è attivo. La modalità avanzata riduce le frequenze medie invece dell'intero segnale."
+
+#: src/app/prefs/help.rs:137
+msgid "Bring an external line source into the mixer through the AUX strip. Choose its device and input channel pair."
+msgstr "Porta una sorgente line esterna nel mixer tramite la sezione AUX. Scegli il dispositivo e la coppia di canali di ingresso."
+
+#: src/app/prefs/help.rs:140
+msgid "Choose how far the music is lowered by AUX ducking and how quickly its level returns afterward."
+msgstr "Scegli di quanto la musica viene abbassata dal ducking AUX e con quale rapidità il livello ritorna."
+
+#: src/app/prefs/help.rs:143
+msgid "Prevent loading another track into a deck while it is playing. Pause the deck before replacing its track."
+msgstr "Impedisce di caricare un'altra traccia in un deck mentre è in riproduzione. Metti in pausa il deck prima di sostituire la traccia."
+
+#: src/app/prefs/help.rs:146
+msgid "Prevent overview-waveform needle searches while a deck is playing, to avoid an accidental jump."
+msgstr "Impedisce le ricerche con l'ago nella forma d'onda panoramica mentre un deck è in riproduzione, per evitare salti accidentali."
+
+#: src/app/prefs/help.rs:149
+msgid "Prevent recalling a memory cue while the deck is playing."
+msgstr "Impedisce di richiamare un memory cue mentre il deck è in riproduzione."
+
+#: src/app/prefs/help.rs:150
+msgid "Reverse incoming hardware tempo-fader values when moving your controller's fader changes tempo in the wrong direction."
+msgstr "Inverte i valori in ingresso del fader del tempo hardware quando muovendo il fader del controller il tempo cambia nel verso sbagliato."
+
+#: src/app/prefs/help.rs:153
+msgid "When a track loads, use the memory or hot cue closest to its beginning as the starting position."
+msgstr "Quando una traccia viene caricata, usa come posizione di partenza il memory cue o l'hot cue più vicino all'inizio."
+
+#: src/app/prefs/help.rs:156
+msgid "Place the transport cue at the first sound above the chosen threshold. A lower threshold includes quieter introductions."
+msgstr "Posiziona il cue di trasporto sul primo suono sopra la soglia scelta. Una soglia più bassa include introduzioni più silenziose."
+
+#: src/app/prefs/help.rs:159
+msgid "Set how long a deck takes to stop or reach full speed when vinyl-style braking or starting is used."
+msgstr "Imposta quanto tempo impiega un deck per fermarsi o raggiungere la piena velocità quando si usa la frenata o la partenza in stile vinile."
+
+#: src/app/prefs/help.rs:163
+msgid "Adjust how far the track moves for a turn of the controller's jog wheel."
+msgstr "Regola di quanto si sposta la traccia per un giro della jog wheel del controller."
+
+#: src/app/prefs/help.rs:165
+msgid "After a jog audition from CUE, return to the cue point and pause when the gesture ends."
+msgstr "Dopo un ascolto jog da CUE, alla fine del gesto torna al punto cue e va in pausa."
+
+#: src/app/prefs/help.rs:169
+msgid "Automatically load the next track in the list when the current track ends."
+msgstr "Carica automaticamente la traccia successiva dell'elenco quando quella corrente finisce."
+
+#: src/app/prefs/help.rs:172
+msgid "BPM sync matches tempo. Beat sync also aligns the decks' beat positions."
+msgstr "BPM sync allinea il tempo. Beat sync allinea anche le posizioni dei beat dei deck."
+
+#: src/app/prefs/help.rs:174
+msgid "Allow synchronization between related half-time or double-time tempo values, such as 70 and 140 BPM."
+msgstr "Consente la sincronizzazione tra valori di tempo correlati a metà o doppia velocità, come 70 e 140 BPM."
+
+#: src/app/prefs/help.rs:177
+msgid "While paused, play a hot cue only while its button is held, then return to the cue on release."
+msgstr "In pausa, riproduce un hot cue solo finché il suo pulsante è premuto, poi torna al cue al rilascio."
+
+#: src/app/prefs/help.rs:181
+msgid "Choose the initial beat length used when starting an automatic beat loop."
+msgstr "Scegli la lunghezza iniziale in beat usata quando si avvia un loop automatico."
+
+#: src/app/prefs/help.rs:183
+msgid "Choose the tempo-fader range applied to decks at startup. Wider ranges allow larger tempo changes."
+msgstr "Scegli l'intervallo del fader del tempo applicato ai deck all'avvio. Intervalli più ampi permettono variazioni di tempo maggiori."
+
+#: src/app/prefs/help.rs:186
+msgid "Choose whether decks start with Quantize enabled. Quantize aligns enabled actions to the beat grid."
+msgstr "Scegli se i deck partono con Quantize attivo. Quantize allinea le azioni abilitate alla griglia dei beat."
+
+#: src/app/prefs/help.rs:189
+msgid "Choose whether decks start with key lock enabled. Key lock preserves musical pitch when changing tempo."
+msgstr "Scegli se i deck partono con key lock attivo. Il key lock mantiene l'intonazione musicale quando cambia il tempo."
+
+#: src/app/prefs/help.rs:192
+msgid "Use analyzed track loudness to reduce level differences between loaded tracks. Channel faders and trim still work."
+msgstr "Usa la loudness analizzata delle tracce per ridurre le differenze di livello tra le tracce caricate. I fader dei canali e il trim continuano a funzionare."
+
+#: src/app/prefs/help.rs:195
+msgid "Choose ordinary EQ or isolator-style frequency controls, including how fully a band is removed at its minimum."
+msgstr "Scegli tra EQ ordinario o controlli di frequenza in stile isolator, incluso quanto completamente una banda viene rimossa al minimo."
+
+#: src/app/prefs/help.rs:198
+msgid "Choose how channel-fader position changes loudness. This is separate from the crossfader's curve."
+msgstr "Scegli come la posizione del fader del canale cambia il volume. È indipendente dalla curva del crossfader."
+
+#: src/app/prefs/help.rs:201
+msgid "Choose the mode available to the channel Sound Color FX knobs."
+msgstr "Scegli la modalità disponibile per le manopole Sound Color FX dei canali."
+
+#: src/app/prefs/help.rs:202
+msgid "Turn off manual crossfader control to avoid accidental bumps. Both sides stay open and channel faders still work; Automix keeps its automatic transitions."
+msgstr "Disattiva il controllo manuale del crossfader per evitare urti accidentali. Entrambi i lati restano aperti e i fader dei canali funzionano ancora; Automix mantiene le sue transizioni automatiche."
+
+#: src/app/prefs/help.rs:205
+msgid "Choose a smooth fade, sharp cut or constant-power curve for the manual crossfader."
+msgstr "Scegli una dissolvenza morbida, un taglio netto o una curva a potenza costante per il crossfader manuale."
+
+#: src/app/prefs/help.rs:208
+msgid "Adjust the overall deck output level before the master output. Lower it if your mix is too hot."
+msgstr "Regola il livello generale di uscita dei deck prima dell'uscita master. Abbassalo se il mix va in saturazione."
+
+#: src/app/prefs/help.rs:211
+msgid "Allow a recognized controller to select its matching audio interface when connected. If no matching interface is found, the current output stays selected."
+msgstr "Consente a un controller riconosciuto di selezionare la sua interfaccia audio corrispondente quando è collegato. Se non viene trovata un'interfaccia corrispondente, resta selezionata l'uscita attuale."
+
+#: src/app/prefs/help.rs:214
+msgid "Choose whether Release FX affect the master or individual effect units, and whether holding them temporarily disables Color FX."
+msgstr "Scegli se i Release FX agiscono sul master o sulle singole unità effetti e se tenerli premuti disattiva temporaneamente i Color FX."
+
+#: src/app/prefs/help.rs:217
+msgid "Enable MERGE FX transitions and choose whether the operating deck stops when the transition finishes."
+msgstr "Attiva le transizioni MERGE FX e scegli se il deck in uso si ferma al termine della transizione."
+
+#: src/app/prefs/help.rs:220
+msgid "Choose how many sampler pads are available. Low-power mode can limit sample duration to reduce memory use."
+msgstr "Scegli quanti pad del sampler sono disponibili. La modalità a basso consumo può limitare la durata dei campioni per ridurre l'uso di memoria."
+
+#: src/app/prefs/help.rs:224
+msgid "Keep a loaded sample when importing or loading another sample into its slot."
+msgstr "Mantiene un campione caricato quando ne importi o ne carichi un altro nel suo slot."
+
+#: src/app/prefs/help.rs:226
+msgid "Choose where captured sampler audio is saved. Empty uses the default OpenFadeR Sampler folder."
+msgstr "Scegli dove viene salvato l'audio catturato dal sampler. Se vuoto, usa la cartella predefinita «OpenFadeR Sampler»."
+
+#: src/app/prefs/help.rs:229
+msgid "During loop playback, press an empty sampler pad to capture the loop into that slot."
+msgstr "Durante la riproduzione di un loop, premi un pad del sampler vuoto per catturare il loop in quello slot."
+
+#: src/app/prefs/help.rs:233
+msgid "Open the sampler panel when a controller's SAMPLER button is used."
+msgstr "Apre il pannello sampler quando si usa il pulsante SAMPLER di un controller."
+
+#: src/app/prefs/help.rs:236
+msgid "When loading a sequence into a slot, loop its full length and start playback."
+msgstr "Quando carichi una sequenza in uno slot, ne esegue il loop per l'intera lunghezza e avvia la riproduzione."
+
+#: src/app/prefs/help.rs:238
+msgid "Choose the musical range divided into eight Slicer pads and the repeated-note length used by Slicer Roll."
+msgstr "Scegli l'intervallo musicale diviso in otto pad Slicer e la durata delle note ripetute usata da Slicer Roll."
+
+#: src/app/prefs/help.rs:241
+msgid "Choose whether a quantized hot cue or loop jumps immediately to an aligned position or waits for the next beat."
+msgstr "Scegli se un hot cue o loop quantizzato salta subito a una posizione allineata o aspetta il beat successivo."
+
+#: src/app/prefs/help.rs:245
+msgid "Choose the beat spacing used when placing beat-grid-aligned positions."
+msgstr "Scegli la spaziatura dei beat usata per posizionare i punti allineati alla griglia dei beat."
+
+#: src/app/prefs/help.rs:247
+msgid "Choose the beat subdivision used to align quantized actions. The deck's Q control must be on."
+msgstr "Scegli la suddivisione del beat usata per allineare le azioni quantizzate. Il controllo Q del deck deve essere attivo."
+
+#: src/app/prefs/help.rs:251
+msgid "Apply beat-grid timing to this action when the deck's Q control is enabled."
+msgstr "Applica la temporizzazione della griglia dei beat a questa azione quando il controllo Q del deck è attivo."
+
+#: src/app/prefs/help.rs:253
+msgid "Make one Q button change Quantize on every deck together instead of only its own deck."
+msgstr "Fa sì che un pulsante Q cambi Quantize su tutti i deck insieme anziché solo sul proprio deck."
+
+#: src/app/prefs/help.rs:256
+msgid "Send MIDI clock at the playing master deck's tempo. Enter part of the output port's name; leave empty to turn clock output off."
+msgstr "Invia il clock MIDI al tempo del deck master in riproduzione. Inserisci parte del nome della porta di uscita; lascia vuoto per disattivare l'uscita clock."
+
+#: src/app/prefs/help.rs:259
+msgid "Prevent hardware knobs and faders from jumping values. A control takes over only after it reaches or crosses the value shown on screen."
+msgstr "Impedisce che manopole e fader hardware facciano saltare i valori. Un controllo subentra solo dopo aver raggiunto o superato il valore mostrato sullo schermo."
+
+#: src/app/prefs/help.rs:262
+msgid "Use finer timing when analyzing beat grids. This increases analysis work but does not change the audio buffer."
+msgstr "Usa una temporizzazione più fine nell'analisi delle griglie dei beat. Aumenta il carico di analisi ma non cambia il buffer audio."
+
+#: src/app/prefs/help.rs:265
+msgid "Look for tempo changes within a track and create grid sections when needed. Steady-tempo tracks keep one section."
+msgstr "Cerca variazioni di tempo all'interno di una traccia e crea sezioni di griglia quando serve. Le tracce a tempo costante mantengono una sola sezione."
+
+#: src/app/prefs/help.rs:268
+msgid "Limit the tempo search range used during analysis. Choose a range appropriate for your music if half-time or double-time results are common."
+msgstr "Limita l'intervallo di ricerca del tempo usato durante l'analisi. Scegli un intervallo adatto alla tua musica se risultati a metà o doppia velocità sono frequenti."
+
+#: src/app/prefs/help.rs:271
+msgid "Analyze tempo and beat-grid positions for tracks."
+msgstr "Analizza il tempo e le posizioni della griglia dei beat delle tracce."
+
+#: src/app/prefs/help.rs:272
+msgid "Analyze musical key so tracks can be compared for harmonic mixing."
+msgstr "Analizza la tonalità musicale per poter confrontare le tracce nel mix armonico."
+
+#: src/app/prefs/help.rs:273
+msgid "Estimate musical phrases from the analyzed grid. Phrase analysis needs BPM/Grid analysis."
+msgstr "Stima le frasi musicali dalla griglia analizzata. L'analisi delle frasi richiede l'analisi BPM/griglia."
+
+#: src/app/prefs/help.rs:276
+msgid "Estimate vocal regions for the waveform display. This heuristic is separate from full STEMS separation."
+msgstr "Stima le regioni vocali per la visualizzazione della forma d'onda. Questa euristica è separata dalla separazione completa STEMS."
+
+#: src/app/prefs/help.rs:279
+msgid "Choose whether connected-library grids and cues or OpenFadeR's analysis are used for preparation. Analysis locks and cue protection still apply."
+msgstr "Scegli se per la preparazione si usano le griglie e i cue delle librerie collegate o l'analisi di OpenFadeR. I blocchi dell'analisi e la protezione dei cue restano validi."
+
+#: src/app/prefs/help.rs:283
+msgid "Analyze tracks that are missing tempo or key information automatically."
+msgstr "Analizza automaticamente le tracce prive di informazioni su tempo o tonalità."
+
+#: src/app/prefs/help.rs:285
+msgid "Analyze the library using the selected analysis options. This can take CPU time; locked preparation data is protected."
+msgstr "Analizza la libreria con le opzioni di analisi selezionate. Può richiedere tempo di CPU; i dati di preparazione bloccati sono protetti."
+
+#: src/app/prefs/help.rs:288
+msgid "Choose what happens when an application update changes analysis results. Ask lets you decide before reanalysis starts."
+msgstr "Scegli cosa succede quando un aggiornamento dell'applicazione cambia i risultati dell'analisi. «Chiedi» ti lascia decidere prima che inizi la rianalisi."
+
+#: src/app/prefs/help.rs:291
+msgid "Classic uses the standard key detector. Neural uses an additional model and needs the supported analysis feature; see its status beside this setting."
+msgstr "«Classic» usa il rilevatore di tonalità standard. «Neural» usa un modello aggiuntivo e richiede la funzione di analisi supportata; vedi lo stato accanto a questa impostazione."
+
+#: src/app/prefs/help.rs:294
+msgid "Write the detected musical key into the audio file's tag. This changes file metadata, so keep backups of files you edit."
+msgstr "Scrive la tonalità musicale rilevata nel tag del file audio. Modifica i metadati del file, quindi conserva un backup dei file che modifichi."
+
+#: src/app/prefs/help.rs:297
+msgid "Choose how many resources track analysis may use. More workers finish a batch faster but compete with playback and other applications."
+msgstr "Scegli quante risorse può usare l'analisi delle tracce. Più worker completano un lotto più velocemente ma competono con la riproduzione e le altre applicazioni."
+
+#: src/app/prefs/help.rs:300
+msgid "Auto places preparation cues from the analysis. Manual uses the cue-count and bar-position options below."
+msgstr "«Auto» posiziona i cue di preparazione in base all'analisi. «Manuale» usa le opzioni di numero di cue e posizione in battute qui sotto."
+
+#: src/app/prefs/help.rs:304
+msgid "Choose how many hot cues or memory cues manual CUE Analysis creates."
+msgstr "Scegli quanti hot cue o memory cue crea la CUE Analysis manuale."
+
+#: src/app/prefs/help.rs:306
+msgid "Place manual analysis cues from the first bar and optionally repeat them at the chosen bar interval. These controls are unavailable in automatic cue mode."
+msgstr "Posiziona i cue di analisi manuale dalla prima battuta e, se vuoi, li ripete all'intervallo di battute scelto. Questi controlli non sono disponibili in modalità cue automatica."
+
+#: src/app/prefs/help.rs:310
+msgid "Preserve existing cue points instead of replacing them during CUE Analysis."
+msgstr "Mantiene i punti cue esistenti invece di sostituirli durante la CUE Analysis."
+
+#: src/app/prefs/help.rs:312
+msgid "Label generated cues with their phrase or bar information."
+msgstr "Etichetta i cue generati con le informazioni sulla frase o sulla battuta."
+
+#: src/app/prefs/help.rs:313
+msgid "Separate tracks into parts that can be muted or mixed independently. First use downloads a 316 MB model and separation needs extra memory and processing time."
+msgstr "Separa le tracce in parti che possono essere silenziate o mixate indipendentemente. Al primo utilizzo viene scaricato un modello da 316 MB e la separazione richiede memoria e tempo di elaborazione aggiuntivi."
+
+#: src/app/prefs/help.rs:316
+msgid "Choose whether the STEMS controls expose three grouped parts or four separate parts."
+msgstr "Scegli se i controlli STEMS mostrano tre parti raggruppate o quattro parti separate."
+
+#: src/app/prefs/help.rs:319
+msgid "Choose separation quality or faster processing for the next track. This does not change a track that has already been separated."
+msgstr "Scegli la qualità di separazione o un'elaborazione più veloce per la traccia successiva. Non cambia una traccia già separata."
+
+#: src/app/prefs/help.rs:322
+msgid "Auto shows the standard STEMS controls. Custom lets you choose Active Stem buttons, Stem Isolator knobs and Stem FX; Hidden removes those controls."
+msgstr "«Auto» mostra i controlli STEMS standard. «Personalizzato» ti permette di scegliere i pulsanti Active Stem, le manopole Stem Isolator e gli Stem FX; «Nascosto» rimuove questi controlli."
+
+#: src/app/prefs/help.rs:325
+msgid "Use the separate parts already stored in a .stem.mp4 file instead of running separation again."
+msgstr "Usa le parti separate già memorizzate in un file .stem.mp4 invece di eseguire di nuovo la separazione."
+
+#: src/app/prefs/help.rs:328
+msgid "Display the original mix waveform or the separated stem waveform."
+msgstr "Mostra la forma d'onda del mix originale o quella dello stem separato."
+
+#: src/app/prefs/help.rs:329
+msgid "Choose whether an Active Stem pad mutes its part or solos it while the other parts are muted."
+msgstr "Scegli se un pad Active Stem silenzia la sua parte o la mette in solo mentre le altre parti sono silenziate."
+
+#: src/app/prefs/help.rs:332
+msgid "Choose whether loading another track resets the STEMS mute/solo choices or keeps them."
+msgstr "Scegli se caricare un'altra traccia reimposta le scelte di mute/solo degli STEMS o le mantiene."
+
+#: src/app/prefs/help.rs:335
+msgid "Choose the source deck used by STEM Instant Doubles. Neighbour uses the adjacent mixer deck."
+msgstr "Scegli il deck sorgente usato da STEM Instant Doubles. «Adiacente» usa il deck vicino del mixer."
+
+#: src/app/prefs/help.rs:338
+msgid "Allow multiple CPU threads during separation. Turning this off reduces CPU concurrency, but separation may take longer."
+msgstr "Consente più thread CPU durante la separazione. Disattivandolo si riduce la concorrenza della CPU, ma la separazione può richiedere più tempo."
+
+#: src/app/prefs/help.rs:341
+msgid "AUTO separates on the graphics card where that is safe, and on the CPU where the only graphics card also draws the desktop (it would freeze while a segment runs). CPU never uses the graphics card. Takes effect from the next track."
+msgstr "AUTO separa sulla scheda grafica dove è sicuro, e sulla CPU dove l'unica scheda grafica disegna anche il desktop (si bloccherebbe durante un segmento). CPU non usa mai la scheda grafica. Vale dalla traccia successiva."
+
+#: src/app/prefs/help.rs:344
+msgid "Enable Beat Lab's drum tools. STEMS must also be enabled for its separated-drum workflow."
+msgstr "Attiva gli strumenti per la batteria di Beat Lab. Per il flusso di lavoro con la batteria separata deve essere attivo anche STEMS."
+
+#: src/app/prefs/help.rs:348
+msgid "Choose the downloaded factory sample pack used by Beat Lab's factory presets."
+msgstr "Scegli il pacchetto di campioni di fabbrica scaricato usato dai preset di fabbrica di Beat Lab."
+
+#: src/app/prefs/help.rs:350
+msgid "Prevent replacing a Drum Swap slot while that slot is playing."
+msgstr "Impedisce di sostituire uno slot Drum Swap mentre quello slot è in riproduzione."
+
+#: src/app/prefs/help.rs:351
+msgid "Show the source track title on Drum Swap slots."
+msgstr "Mostra il titolo della traccia sorgente negli slot Drum Swap."
+
+#: src/app/prefs/help.rs:352
+msgid "Capture either the separated drums or the original track audio."
+msgstr "Cattura la batteria separata oppure l'audio originale della traccia."
+
+#: src/app/prefs/help.rs:353
+msgid "Choose where drum captures are saved. Empty uses the default OpenFadeR Drums folder."
+msgstr "Scegli dove vengono salvate le catture della batteria. Se vuoto, usa la cartella predefinita «OpenFadeR Drums»."
+
+#: src/app/prefs/help.rs:356
+msgid "Show the VIDEO workspace for video-track playback and mixing. It requires a working ffmpeg installation."
+msgstr "Mostra lo spazio di lavoro VIDEO per la riproduzione e il mix di tracce video. Richiede un'installazione funzionante di ffmpeg."
+
+#: src/app/prefs/help.rs:359
+msgid "Show the LIGHTING workspace for fixtures and DMX scenes. Lighting is beta; check your fixture and network configuration before use."
+msgstr "Mostra lo spazio di lavoro LIGHTING per fixture e scene DMX. Lighting è in beta; controlla la configurazione di fixture e rete prima dell'uso."
+
+#: src/app/prefs/help.rs:362
+msgid "Choose the folder for recorded mixes. Empty uses the default OpenFadeR music folder."
+msgstr "Scegli la cartella per i mix registrati. Se vuoto, usa la cartella musicale predefinita di OpenFadeR."
+
+#: src/app/prefs/help.rs:365
+msgid "Set the level treated as silence for recording start, stop and splitting. Very quiet music may fall below this threshold."
+msgstr "Imposta il livello considerato silenzio per l'avvio, l'arresto e la divisione della registrazione. La musica molto silenziosa può scendere sotto questa soglia."
+
+#: src/app/prefs/help.rs:368
+msgid "Start recording when REC is pressed, or wait for incoming audio above the silence threshold."
+msgstr "Avvia la registrazione quando si preme REC, oppure attende audio in ingresso sopra la soglia di silenzio."
+
+#: src/app/prefs/help.rs:372
+msgid "Stop recording manually or after twenty seconds below the silence threshold."
+msgstr "Ferma la registrazione manualmente o dopo venti secondi sotto la soglia di silenzio."
+
+#: src/app/prefs/help.rs:374
+msgid "Split a recording into separate files when silence lasts long enough. Set the silence threshold and duration carefully for quiet tracks."
+msgstr "Divide una registrazione in file separati quando il silenzio dura abbastanza. Imposta con attenzione soglia e durata del silenzio per le tracce silenziose."
+
+#: src/app/prefs/help.rs:377
+msgid "Adjust the recorded file's audio level after recording finishes. This is file processing, not a live mixer gain control."
+msgstr "Regola il livello audio del file registrato al termine della registrazione. È un'elaborazione del file, non un controllo di guadagno del mixer dal vivo."
+
+#: src/app/prefs/help.rs:380
+msgid "Import a finished recording into the Collection and optionally open its tag information."
+msgstr "Importa una registrazione terminata nella Collezione e, se vuoi, apre le sue informazioni sui tag."
+
+#: src/app/prefs/help.rs:383
+msgid "Save a cue sheet, track list or control log beside the recorded audio for later review."
+msgstr "Salva una cue sheet, un elenco tracce o un log dei controlli accanto all'audio registrato per consultarli in seguito."
+
+#: src/app/prefs/help.rs:387
+msgid "Ignore very short deck appearances when building a recording's track list."
+msgstr "Ignora le apparizioni molto brevi dei deck quando si costruisce l'elenco tracce di una registrazione."
+
+#: src/app/prefs/help.rs:389
+msgid "Choose the sample rate when exporting a loop as a WAV file."
+msgstr "Scegli la frequenza di campionamento per esportare un loop come file WAV."
+
+#: src/app/prefs/help.rs:390
+msgid "Check for updates automatically and choose stable releases or beta pre-releases. Beta versions may change more often."
+msgstr "Controlla automaticamente gli aggiornamenti e scegli le versioni stabili o le pre-release beta. Le versioni beta possono cambiare più spesso."
+
+#: src/app/prefs/help.rs:393
+msgid "Back up the Collection before an application update. Library backups do not include your music files."
+msgstr "Esegue il backup della Collezione prima di un aggiornamento dell'applicazione. I backup della libreria non includono i tuoi file musicali."
+
+#: src/app/prefs/help.rs:396
+msgid "Reduce analysis concurrency and sampler memory on smaller machines. Auto follows the device profile; On applies the limits explicitly."
+msgstr "Riduce la concorrenza dell'analisi e la memoria del sampler su computer più piccoli. «Auto» segue il profilo del dispositivo; «On» applica i limiti in modo esplicito."
+
+#: src/app/prefs/help.rs:399
+msgid "Connect a library file or music folder to the Collection. Library formats controls which external formats are available."
+msgstr "Collega un file di libreria o una cartella di musica alla Collezione. Formati libreria controlla quali formati esterni sono disponibili."
+
+#: src/app/prefs/help.rs:402
+msgid "Restore the selected player-settings scope to its defaults. Review the scope before resetting."
+msgstr "Ripristina i valori predefiniti dell'ambito di impostazioni del player selezionato. Controlla l'ambito prima di reimpostare."
+
+#: src/app/prefs/help.rs:405
+msgid "Also remove a playlist's tracks from the device when deleting that playlist. Leave off if other playlists still need the files."
+msgstr "Quando elimini una playlist, rimuove dal dispositivo anche le sue tracce. Lascia disattivato se altre playlist hanno ancora bisogno dei file."
+
+#: src/app/prefs/help.rs:408
+msgid "Import player history into the Collection and optionally remove the device's history after a successful import."
+msgstr "Importa la cronologia del player nella Collezione e, se vuoi, rimuove la cronologia del dispositivo dopo un'importazione riuscita."
+
+#: src/app/prefs/help.rs:411
+msgid "Keep preparation data synchronized between a Collection track and its linked device copy. Resolve conflicts before overwriting either copy."
+msgstr "Mantiene sincronizzati i dati di preparazione tra una traccia della Collezione e la sua copia collegata sul dispositivo. Risolvi i conflitti prima di sovrascrivere una delle due copie."
+
+#: src/app/prefs/help.rs:414
+msgid "Review planned device writes, playlist synchronization or Collection changes before they are applied."
+msgstr "Rivedi le scritture pianificate sul dispositivo, la sincronizzazione delle playlist o le modifiche alla Collezione prima che vengano applicate."
+
+#: src/app/prefs/help.rs:417
+msgid "Keep a backup of a device library before rewriting or removing it. This is separate from backing up the audio files."
+msgstr "Conserva un backup della libreria di un dispositivo prima di riscriverla o rimuoverla. È separato dal backup dei file audio."
+
+#: src/app/prefs/help.rs:421
+msgid "Check the device library before ejecting and warn if it needs attention."
+msgstr "Controlla la libreria del dispositivo prima dell'espulsione e avvisa se richiede attenzione."
+
+#: src/app/prefs/help.rs:424
+msgid "Set the computer name stored with player-related library information."
+msgstr "Imposta il nome del computer memorizzato con le informazioni della libreria relative al player."
+
+#: src/app/prefs/help.rs:426
+msgid "Choose folders searched when relocating missing music. Separate multiple paths with semicolons; this does not move the files."
+msgstr "Scegli le cartelle in cui cercare quando si ricollocano brani mancanti. Separa più percorsi con punto e virgola; i file non vengono spostati."
+
+#: src/app/prefs/help.rs:429
+msgid "Choose the library path opened at startup when no path is supplied. Changing this path does not move existing music."
+msgstr "Scegli il percorso della libreria aperto all'avvio quando non ne viene fornito uno. Cambiare questo percorso non sposta la musica esistente."
+
+#: src/app/prefs/help.rs:432
+msgid "Include your custom Tags in track comments. This changes comment metadata, not the audio."
+msgstr "Include i tuoi Tag personalizzati nei commenti delle tracce. Modifica i metadati dei commenti, non l'audio."
+
+#: src/app/prefs/help.rs:435
+msgid "Open the track's context menu by holding it for one second."
+msgstr "Apre il menu contestuale della traccia tenendola premuta per un secondo."
+
+#: src/app/prefs/help.rs:436
+msgid "Remove entries from the temporary Tag List after loading or quitting. The tracks remain in the Collection and on disk."
+msgstr "Rimuove le voci dalla Tag List temporanea dopo il caricamento o l'uscita. Le tracce restano nella Collezione e sul disco."
+
+#: src/app/prefs/help.rs:439
+msgid "Write downloaded artwork into supported audio-file tags. Keep a backup of files whose metadata you edit."
+msgstr "Scrive la copertina scaricata nei tag dei file audio supportati. Conserva un backup dei file di cui modifichi i metadati."
+
+#: src/app/prefs/help.rs:442
+msgid "Block accidental library edits and deletions. Turn protection off deliberately when you need to change protected data."
+msgstr "Blocca modifiche ed eliminazioni accidentali della libreria. Disattiva la protezione consapevolmente quando devi modificare dati protetti."
+
+#: src/app/prefs/help.rs:445
+msgid "Allow library names to be edited by double-clicking them."
+msgstr "Consente di modificare i nomi della libreria con un doppio clic."
+
+#: src/app/prefs/help.rs:446
+msgid "Set the library-health thresholds for very long tracks or low bitrate. Zero disables that check."
+msgstr "Imposta le soglie di salute della libreria per tracce molto lunghe o bitrate basso. Zero disattiva quel controllo."
+
+#: src/app/prefs/help.rs:449
+msgid "Watch these folders for new music and ZIP files to add to INBOX. Separate multiple folders with semicolons."
+msgstr "Controlla queste cartelle per nuova musica e file ZIP da aggiungere a INBOX. Separa più cartelle con punto e virgola."
+
+#: src/app/prefs/help.rs:452
+msgid "Physically move audio files as tracks change workflow stages. Leave off to keep original paths; review the root folder and path pattern before enabling."
+msgstr "Sposta fisicamente i file audio quando le tracce cambiano fase del flusso di lavoro. Lascia disattivato per mantenere i percorsi originali; controlla la cartella radice e il modello del percorso prima di attivare."
+
+#: src/app/prefs/help.rs:455
+msgid "Choose where moved INBOX audio is stored and how its path is named. These values are used only when Move the file with the track is enabled."
+msgstr "Scegli dove viene memorizzato l'audio INBOX spostato e come viene denominato il suo percorso. Questi valori sono usati solo quando «Sposta il file insieme alla traccia» è attivo."
+
+#: src/app/prefs/help.rs:458
+msgid "Write the selected player-setting defaults using this format's supported operation."
+msgstr "Scrive i valori predefiniti delle impostazioni del player selezionate usando l'operazione supportata da questo formato."
+
+#: src/app/prefs/help.rs:461
+msgid "Read the supported player settings from the selected device."
+msgstr "Legge dal dispositivo selezionato le impostazioni del player supportate."
+
+#: src/app/prefs/help.rs:463
+msgid "Choose the hardware output pair for this deck when using an external mixer."
+msgstr "Scegli la coppia di uscite hardware per questo deck quando usi un mixer esterno."
+
+#: src/app/prefs/help.rs:465
+msgid "Auto lets a recognizing controller driver claim the MIDI port, otherwise it uses a mapping. Choose an explicit driver only when automatic selection is unsuitable."
+msgstr "«Auto» lascia che un driver di controller che lo riconosce prenda la porta MIDI, altrimenti usa un mapping. Scegli un driver esplicito solo se la selezione automatica non è adatta."
+
+#: src/app/prefs/help.rs:468
+msgid "Import reads the source into the Collection. Two-way also writes supported edits back to that source; keep a backup before enabling writeback."
+msgstr "«Importa» legge la sorgente nella Collezione. «Bidirezionale» riscrive anche le modifiche supportate nella sorgente; fai un backup prima di attivare la riscrittura."
+
+#: src/app/prefs/help.rs:471
+msgid "Choose which copy wins when source and Collection metadata differ. Newest uses the recorded modification times."
+msgstr "Scegli quale copia prevale quando i metadati di sorgente e Collezione differiscono. «Più recente» usa gli orari di modifica registrati."
+
+#: src/app/prefs/help.rs:474
+msgid "Sync now reads the connected source again. Disconnect stops synchronization but keeps imported tracks in the Collection."
+msgstr "«Sincronizza ora» rilegge la sorgente collegata. «Scollega» interrompe la sincronizzazione ma mantiene le tracce importate nella Collezione."
+
+#: src/app/prefs/help.rs:477
+msgid "Connect this detected library so its supported tracks and playlists can be synchronized into the Collection."
+msgstr "Collega questa libreria rilevata per sincronizzare nella Collezione le sue tracce e playlist supportate."
 
 #: src/app/prefs/keyboard/mod.rs:125
 msgid "{} is already used by {}. REPLACE (Enter) takes it from there, CANCEL (Esc) keeps things as they are."
@@ -11455,7 +12175,7 @@ msgstr "FILE…"
 msgid "FOLDER…"
 msgstr "CARTELLA…"
 
-#: src/app/prefs/mod.rs:68
+#: src/app/prefs/mod.rs:70
 msgid "CONSTANT"
 msgstr "COSTANTE"
 
@@ -11549,11 +12269,6 @@ msgstr "RENDERER"
 #: src/app/prefs/view.rs:61
 msgid "GPU"
 msgstr "GPU"
-
-#: src/app/prefs/view.rs:320
-#: src/app/prefs/view.rs:61
-msgid "CPU"
-msgstr "CPU"
 
 #: src/app/prefs/view.rs:323
 msgid "DRAWING RATE"
@@ -12131,95 +12846,97 @@ msgstr "nessuna sequenza salvata nello slot {}"
 msgid "no such token"
 msgstr "token inesistente"
 
-#: src/app/skin/file.rs:90
+#: src/app/skin/file.rs:103
 msgid "not valid JSON: {}"
 msgstr "JSON non valido: {}"
 
-#: src/app/skin/file.rs:93
+#: src/app/skin/file.rs:106
 msgid "the file must hold one JSON object"
 msgstr "il file deve contenere un solo oggetto JSON"
 
-#: src/app/skin/file.rs:98
+#: src/app/skin/file.rs:111
 msgid "\"name\" must be a non-empty string"
 msgstr "\"name\" deve essere una stringa non vuota"
 
-#: src/app/skin/file.rs:105
+#: src/app/skin/file.rs:118
 msgid "\"base\" must be \"dark\" or \"light\", using \"dark\""
 msgstr "\"base\" deve essere \"dark\" o \"light\", uso \"dark\""
 
-#: src/app/skin/file.rs:123
+#: src/app/skin/file.rs:136
 msgid "unknown key {} ignored"
 msgstr "chiave sconosciuta {} ignorata"
 
-#: src/app/skin/file.rs:129
+#: src/app/skin/file.rs:142
 msgid "{} must be a string, ignored"
 msgstr "{} deve essere una stringa, ignorato"
 
-#: src/app/skin/file.rs:138
+#: src/app/skin/file.rs:151
 msgid "\"locales\" must be an object, ignored"
 msgstr "\"locales\" deve essere un oggetto, ignorato"
 
-#: src/app/skin/file.rs:151
+#: src/app/skin/file.rs:164
 msgid "layout {}: expected a text, number or true / false, got {}"
 msgstr "layout {}: atteso un testo, un numero o true / false, trovato {}"
 
-#: src/app/skin/file.rs:161
+#: src/app/skin/file.rs:174
 msgid "unknown layout setting {} (one of {})"
 msgstr "impostazione di layout sconosciuta {} (una tra {})"
 
-#: src/app/skin/file.rs:169
+#: src/app/skin/file.rs:182
 msgid "\"layout\" must be an object, none applied"
 msgstr "\"layout\" deve essere un oggetto, nessuno applicato"
 
-#: src/app/skin/file.rs:177
+#: src/app/skin/file.rs:195
 msgid "unknown token {} (the names are the in-out properties of ui/theme.slint, docs/skins.md)"
 msgstr "token sconosciuto {} (i nomi sono le proprietà in-out di ui/theme.slint, docs/skins.md)"
 
-#: src/app/skin/file.rs:182
-msgid "token {}: {}"
-msgstr "token {}: {}"
-
-#: src/app/skin/file.rs:186
-msgid "\"tokens\" must be an object, no token applied"
-msgstr "\"tokens\" deve essere un oggetto, nessun token applicato"
-
-#: src/app/skin/file.rs:215
+#: src/app/skin/file.rs:203
+#: src/app/skin/file.rs:249
 msgid "{} is not allowed, use {}"
 msgstr "{} non è consentito, usa {}"
 
-#: src/app/skin/file.rs:218
+#: src/app/skin/file.rs:208
+#: src/app/skin/file.rs:221
+msgid "token {}: {}"
+msgstr "token {}: {}"
+
+#: src/app/skin/file.rs:225
+msgid "\"tokens\" must be an object, no token applied"
+msgstr "\"tokens\" deve essere un oggetto, nessun token applicato"
+
+#: src/app/skin/file.rs:252
 msgid "{} is out of range, use {} to {}"
 msgstr "{} è fuori intervallo, usa da {} a {}"
 
-#: src/app/skin/file.rs:225
+#: src/app/skin/file.rs:270
 msgid "expected {}, got {}"
 msgstr "atteso {}, trovato {}"
 
-#: src/app/skin/file.rs:229
+#: src/app/skin/file.rs:274
 msgid "a colour like \"#1473eb\""
 msgstr "un colore come \"#1473eb\""
 
-#: src/app/skin/file.rs:232
+#: src/app/skin/file.rs:277
 msgid "a length like 12 or \"12px\""
 msgstr "una lunghezza come 12 o \"12px\""
 
-#: src/app/skin/file.rs:234
+#: src/app/skin/file.rs:279
 msgid "a string"
 msgstr "una stringa"
 
-#: src/app/skin/file.rs:238
+#: src/app/skin/file.rs:283
 msgid "a whole number"
 msgstr "un numero intero"
 
-#: src/app/skin/file.rs:240
+#: src/app/skin/file.rs:285
 msgid "a number"
 msgstr "un numero"
 
-#: src/app/skin/file.rs:256
+#: src/app/skin/file.rs:301
 msgid "a duration like 80, \"80ms\" or \"0.2s\""
 msgstr "una durata come 80, \"80ms\" o \"0.2s\""
 
-#: src/app/skin/file.rs:276
+#: src/app/skin/file.rs:321
 msgid "bad colour {}, use #rrggbb or #rrggbbaa"
 msgstr "colore non valido {}, usa #rrggbb o #rrggbbaa"
 
@@ -12451,10 +13168,10 @@ msgid "PLUGIN"
 msgstr "PLUGIN"
 
 #: src/app/welcome.rs:64
-msgid "{} holds a library written by other DJ software. This extension reads it; it stays off until you switch it on."
-msgid_plural "{} holds libraries written by other DJ software. These extensions read them; they stay off until you switch them on."
-msgstr[0] "{} contiene una libreria scritta da un altro software DJ. Questa estensione la legge; resta disattivata finché non la attivi."
-msgstr[1] "{} contiene librerie scritte da altri software DJ. Queste estensioni le leggono; restano disattivate finché non le attivi."
+msgid "{} holds a library from other DJ software. This format is included but stays off until you enable it."
+msgid_plural "{} holds libraries from other DJ software. These formats are included but stay off until you enable them."
+msgstr[0] "{} contiene una libreria di altro software DJ. Questo formato è incluso ma resta disattivato finché non lo attivi."
+msgstr[1] "{} contiene librerie di altro software DJ. Questi formati sono inclusi ma restano disattivati finché non li attivi."
 
 #: src/app/welcome.rs:83
 msgid "FEATURE"
@@ -12465,12 +13182,12 @@ msgid "Splits a track into vocals, instruments and drums. Switching it on downlo
 msgstr "Divide una traccia in voce, strumenti e batteria. Attivandola si scarica una sola volta un modello da {} MB."
 
 #: src/app/welcome.rs:92
-msgid "Switch these on to get the most out of OpenFadeR."
-msgstr "Attivali per sfruttare al meglio OpenFadeR."
+msgid "Enable the optional features you want to use."
+msgstr "Attiva le funzioni opzionali che vuoi usare."
 
 #: src/app/welcome.rs:94
-msgid "These make OpenFadeR fully compatible with {}: its libraries, devices, effects and pad modes."
-msgstr "Rendono OpenFadeR pienamente compatibile con {}: le sue librerie, i dispositivi, gli effetti e le pad mode."
+msgid "These options add support for {} and its available library or controller features."
+msgstr "Queste opzioni aggiungono il supporto per {} e le sue funzioni di libreria o controller disponibili."
 
 #: src/app/welcome.rs:96
 msgid " and "
@@ -12481,8 +13198,8 @@ msgid "{} They stay off until you switch them on."
 msgstr "{} Restano disattivati finché non li attivi."
 
 #: src/app/welcome.rs:129
-msgid "{} extensions switched on"
-msgstr "{} estensioni attivate"
+msgid "{} options enabled"
+msgstr "{} opzioni attive"
 
 #: src/app/welcome.rs:136
 msgid "STEMS on: its model is downloading"

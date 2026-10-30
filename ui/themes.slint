@@ -529,13 +529,7 @@ export component ThemesPage inherits VerticalLayout {
     spacing: Theme.space-md;
     alignment: start;
     init => { ThemeState.opened(); }
-    Text {
-        text: @tr("THEMES");
-        color: Theme.accent-hi;
-        font-family: Theme.font;
-        font-size: Theme.font-md;
-        font-weight: Theme.weight-bold;
-    }
+    if ThemeState.editing: Editor { }
     Note { text: @tr("Click a theme to apply it: colours, fonts, sizes and the layout it asks for change at once. Drop a theme file on the window, or IMPORT one; folders are re-read while the app runs."); }
     Gallery { }
     HorizontalLayout {
@@ -558,5 +552,4 @@ export component ThemesPage inherits VerticalLayout {
         font-size: Theme.font-size;
     }
     GetThemes { }
-    if ThemeState.editing: Editor { }
 }

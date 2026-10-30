@@ -663,8 +663,13 @@ impl Fix {
             let Step::Plugin { plugin, fix } = s else {
                 continue;
             };
-            let p = plugins::provider(plugin)
-                .ok_or_else(|| tr!("{}: the extension {} is switched off. Switch it on in PREFERENCES > EXTENSIONS.", dev.label, plugin))?;
+            let p = plugins::provider(plugin).ok_or_else(|| {
+                tr!(
+                    "{}: format {} is switched off. Enable it in Preferences > Library formats.",
+                    dev.label,
+                    plugin
+                )
+            })?;
             ctl.set_phase(&tr!("Repairing ({})", plugin));
             let a = p.fix(&dev.mount, fix, &self.config, ctl)?;
             said.extend(Some(a.message).filter(|m| !m.is_empty()));

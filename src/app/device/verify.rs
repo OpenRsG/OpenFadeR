@@ -8,9 +8,8 @@
 
 use super::check::{first_cause, line, reason, title, words};
 use openfader::device::{
-    self,
+    self, Device,
     check::{self, Fit, Overall, Verdict},
-    Device,
 };
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, ffi::OsString};
@@ -88,7 +87,7 @@ fn stick(mount: &OsString) -> Result<Device, String> {
         return Err(format!("{}: not a folder", want.display()));
     }
     if openfader::plugin::device::providers().is_empty() {
-        return Err("no device extension is on: switch one on in PREFERENCES > EXTENSIONS".into());
+        return Err("no device format is enabled: check Preferences > Library formats".into());
     }
     let dev = device::scan()
         .into_iter()

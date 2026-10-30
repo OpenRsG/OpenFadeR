@@ -161,13 +161,13 @@ impl Groove {
             .find_map(|(d, c)| Some((d, c.cap?)))
     }
 
-    /// Refuses a load into a playing slot while PREFS > Extensions > DRUM SWAP is on Lock.
+    /// Refuses a load into a playing slot while Creative tools > DRUM SWAP is locked.
     fn locked(&self, d: usize, i: usize) -> bool {
         let locked = prefs::with(|p| p.extensions.drum_lock)
             && self.with(d, |c| c.state(i) != State::Idle).unwrap_or(false);
         if locked {
             self.say(tr!(
-                "slot {} is playing: loading is locked (PREFS > Extensions > DRUM SWAP)",
+                "slot {} is playing: loading is locked (Preferences > Creative tools > DRUM SWAP)",
                 slot_name(i)
             ));
         }

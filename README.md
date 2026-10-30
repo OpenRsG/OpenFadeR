@@ -33,19 +33,17 @@ Use Help > Check for updates to check for a newer release. Release notes describ
 ## Quick start
 
 1. Open Preferences > Audio and select your audio output.
-2. Open a folder of music, or add a library source in Preferences > Libraries.
+2. Open a folder of music, or add a library source in Preferences > Music libraries.
 3. Select a track in the browser. Enter loads deck A; Shift+Enter loads deck B.
 4. Space starts or pauses deck A; Shift+Space controls deck B. Use the channel faders to set their levels.
 
-Press `?` for the shortcut list. Change bindings in Preferences > Keyboard.
+Press `?` for the shortcut list. Change bindings in Preferences > Keyboard shortcuts.
 
-For a MIDI controller, OpenFadeR loads a matching installed mapping when it connects. Preferences > Controller > Get mappings installs additional mappings. See the [controller guide](docs/mappings.md) for setup and soft takeover.
+For a MIDI controller, OpenFadeR loads a matching installed mapping when it connects. Preferences > Decks & controllers > Get mappings installs additional mappings. See the [controller guide](docs/mappings.md) for setup and soft takeover.
 
 ### Crossfader control
 
-Source builds include Preferences > Controller > Mixer > Enable crossfader. Clear it to ignore manual crossfader input and leave both mix sides open. Channel faders still work, and Automix keeps its automatic transitions. Re-enabling applies the crossfader position again.
-
-The crossfader-disable setting is unreleased; the 0.2.8 downloads do not include it.
+Preferences > Decks & controllers > Mixer > Enable crossfader. Clear it to ignore manual crossfader input and leave both mix sides open. Channel faders still work, and Automix keeps its automatic transitions. Re-enabling applies the crossfader position again.
 
 ## Feature tour
 
@@ -65,7 +63,7 @@ Channel EQ, Color FX and Beat FX sit alongside the decks. The sampler and sequen
 
 ### STEMS
 
-Separate a track into parts for mixing. The first use downloads a model, and separation needs additional CPU or GPU memory. ARM Linux builds use the CPU provider; see the [Pi guide](docs/raspberry-pi.md) before enabling it on a small board.
+Separate a track into parts for mixing. The first use downloads a model, and separation needs additional CPU or GPU memory; it starts when you first use a stem control on that deck (a part button, pad, isolator knob, FX part or instant doubles), so tracks played as the mix cost nothing, and cached stems load at once. Preferences > Creative tools > STEMS PROCESSING chooses where it runs: AUTO uses the graphics card except on a Windows machine whose only graphics adapter is an integrated one (there the desktop would freeze while a segment runs; `OPENFADER_STEMS_GPU=1` overrides that check), CPU never uses it. ARM Linux builds use the CPU provider; see the [Pi guide](docs/raspberry-pi.md) before enabling it on a small board.
 
 ![STEMS controls and separated waveform parts on two decks](docs/media/stems.png)
 
@@ -91,7 +89,7 @@ Back up a USB device before exporting to it, and test the exported library on yo
 
 ### Themes and layouts
 
-Choose a theme in Preferences or install one from a repository. Desktop, Studio, Stage and Pocket layouts share the same library and playback state. The [skin guide](docs/skins.md) covers customization.
+Choose a theme in Preferences or install one from a repository. Desktop, Stage and Pocket layouts share the same library and playback state. The [skin guide](docs/skins.md) covers the shared token schema, named choices and minimal theme files. The Studio theme has been removed.
 
 ![A selection of OpenFadeR themes with different colors and deck layouts](docs/media/themes-grid.jpg)
 
@@ -134,13 +132,15 @@ OpenFadeR keeps its Collection in its own database. Adapters read external libra
 | --- | --- |
 | Rekordbox device libraries, XML and desktop collection | Built-in adapters |
 | Traktor collections | Optional built-in adapter |
-| Engine DJ, Serato, VirtualDJ and iTunes / Music | Companion library plugins |
+| Engine DJ, Serato, VirtualDJ and iTunes / Music | Optional built-in compatibility adapters |
 | Sampler packs | Companion `sample-pack` plugin |
 | Mixxx controller mappings and scripts | Companion controller plugin, not a library reader |
 
 The [compatibility-layer guide](docs/plugins.md#compatibility-layer) lists formats and supported read/write operations. [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins) contains the companion integrations.
 
 MIDI support does not mean that every controller's audio interface is configured automatically. Select the audio output separately in Preferences > Audio when needed.
+
+Preferences separates native compatibility in Library formats, STEMS/Beat Lab/video/lighting in Creative tools, and optional add-ons in Extensions. Pages have scoped setting search, group selection and clickable help. Turning off a format does not remove imported tracks from the Collection.
 
 ## Build from source
 
@@ -152,7 +152,7 @@ cd OpenFadeR
 ./start.sh ~/Music
 ```
 
-`start.sh` fetches the companion repositories on the first run, builds native plugins and starts a release build. It uses plugin tag `v0.2.11` by default. Existing companion checkouts are left as they are; update them deliberately when changing core versions.
+`start.sh` fetches the companion repositories on the first run, builds native plugins and starts a release build. It uses plugin tag `v0.2.12` by default. Existing companion checkouts are left as they are; update them deliberately when changing core versions.
 
 On machines with little RAM, set `CARGO_BUILD_JOBS=1` to limit compiler parallelism. The [Pi guide](docs/raspberry-pi.md) also covers cross-compilation. Android has a separate [build guide](docs/android.md).
 

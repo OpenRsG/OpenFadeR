@@ -300,8 +300,8 @@ pub fn rows(_: &Prefs) -> Vec<Row> {
     let (mut rows, lists) = match pages.get(i).map(|e| &e.page) {
         None => (
             vec![Row::info(
-                tr!("No device plugin"),
-                tr!("install or enable one in EXTENSIONS"),
+                tr!("No player-settings format available"),
+                tr!("Enable a supported format in Library formats."),
             )],
             Vec::new(),
         ),

@@ -4,12 +4,13 @@ use super::{
     advanced, analysis, audio, controller, dj_system, extensions, keyboard, libraries, live, look,
     panes, view, Prefs, Row,
 };
-use crate::app::{App, PrefRowData, PrefsState};
-use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
+use crate::app::{App, PluginState, PrefsState};
+use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use std::{cell::RefCell, time::Duration};
 
 thread_local! {
     static APP: RefCell<Option<slint::Weak<App>>> = const { RefCell::new(None) };
+    static ROWS: RefCell<super::filter::Index> = RefCell::new(super::filter::Index::default());
 }
 
 /// The window [`wire`] connected, while it is alive.
@@ -19,32 +20,105 @@ pub(super) fn app() -> Option<App> {
 
 /// The dialog pages in category order: rows and click handler of each (see the module doc).
 type Page = (fn(&Prefs) -> Vec<Row>, fn(&mut Prefs, &str, usize) -> bool);
-pub(super) const PAGES: [Page; 10] = [
+pub(super) const PAGES: [Page; 12] = [
     (view::rows, view::choose),
     (audio::rows, audio::choose),
     (analysis::rows, analysis::choose),
     (controller::rows, controller::choose),
     (keyboard::rows, keyboard::choose),
-    (extensions::rows, extensions::choose),
+    (|_| Vec::new(), |_, _, _| false), // optional extensions have their own manager
     (dj_system::rows, dj_system::choose),
     (advanced::rows, advanced::choose),
     (|_| Vec::new(), |_, _, _| false), // THEMES (8) has its own page, no rows
     (libraries::rows, libraries::choose),
+    (|_| Vec::new(), |_, _, _| false), // native compatibility manager
+    (extensions::rows, extensions::choose),
 ];
 
-/// Redraws the open category's rows (call after changing a setting kept outside [`Prefs`], e.g. in store.db).
+fn navigation(app: &App) {
+    let s = app.global::<PrefsState>();
+    let categories = s.get_categories();
+    let category = s.get_category();
+    if let Some(i) = categories.iter().position(|c| c.id == category) {
+        s.set_category_index(i as i32);
+    }
+    let old = s.get_category_titles();
+    if old.row_count() != categories.row_count()
+        || categories
+            .iter()
+            .zip(old.iter())
+            .any(|(c, title)| c.title != title)
+    {
+        s.set_category_titles(ModelRc::new(VecModel::from(
+            categories.iter().map(|c| c.title).collect::<Vec<_>>(),
+        )));
+        s.set_category_icons(ModelRc::new(VecModel::from(
+            categories.iter().map(|c| c.icon).collect::<Vec<_>>(),
+        )));
+    }
+}
+
+fn filter(app: &App, query: &str) {
+    let s = app.global::<PrefsState>();
+    s.set_query(query.into());
+    let rows = ROWS.with_borrow(|index| index.rows(query, s.get_section().max(0) as usize));
+    s.set_rows(ModelRc::new(VecModel::from(rows)));
+    app.global::<PluginState>().invoke_filter(query.into());
+}
+
+/// Rebuild only when settings change; typing searches the current page's cached metadata.
 pub fn refresh() {
     let Some(app) = app() else { return };
+    navigation(&app);
     let s = app.global::<PrefsState>();
     if !s.get_visible() {
-        return; // rebuilt when the dialog opens (`category-chosen`); page rows may be costly (device lists)
+        return;
     }
     let rows = PAGES
         .get(s.get_category().max(0) as usize)
         .map_or_else(Vec::new, |(rows, _)| rows(&live::get()));
-    s.set_rows(ModelRc::new(VecModel::from(
-        rows.into_iter().map(PrefRowData::from).collect::<Vec<_>>(),
-    )));
+    let mut index = super::filter::Index::new(rows);
+    let old_sections = s.get_sections();
+    let selected = if s.get_section() > 0 {
+        old_sections.row_data(s.get_section() as usize)
+    } else {
+        None
+    };
+    let section = selected
+        .and_then(|name| {
+            let mut matching = index
+                .sections
+                .iter()
+                .enumerate()
+                .filter(|(_, text)| **text == name);
+            let first = matching.next().map(|(i, _)| i);
+            if matching.next().is_none() {
+                first
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0);
+    s.set_section(section as i32);
+    s.set_sections(ModelRc::new(VecModel::from(std::mem::take(
+        &mut index.sections,
+    ))));
+    ROWS.with(|cached| *cached.borrow_mut() = index);
+    filter(&app, &s.get_query());
+}
+
+fn enter(id: i32) {
+    let Some(app) = app() else { return };
+    let s = app.global::<PrefsState>();
+    s.set_category(if id >= 0 && (id as usize) < PAGES.len() {
+        id
+    } else {
+        0
+    });
+    s.set_query("".into());
+    s.set_section(0);
+    s.set_help_key("".into());
+    refresh();
 }
 
 fn choose(key: &str, i: usize) {
@@ -106,7 +180,12 @@ pub fn wire(app: &App) -> Timer {
         dj_system::text(&key, &v); // its row keys are made from the plugins' schemas, so it routes them itself
         refresh();
     });
-    s.on_category_chosen(|_| refresh());
+    s.on_category_chosen(enter);
+    s.on_filter_changed(|query| {
+        if let Some(app) = self::app() {
+            filter(&app, &query);
+        }
+    });
     dj_system::init(app);
     live::on_change(|_| refresh());
     controller::wire();

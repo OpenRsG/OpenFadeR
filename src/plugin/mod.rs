@@ -621,7 +621,7 @@ impl Plugin {
         let name = &self.manifest.name;
         let mut request = request.clone();
         if let Some(o) = request.as_object_mut() {
-            o.insert("settings".into(), config::get().values(&self.manifest));
+            o.insert("settings".into(), config::values(&self.manifest));
             o.insert("lang".into(), crate::locale::code().into());
         }
         let command: Vec<String> = match (&self.manifest.command[..], &self.manifest.script) {
