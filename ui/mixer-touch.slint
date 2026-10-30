@@ -23,9 +23,9 @@ export component TouchTransport inherits Rectangle {
         x: 8px; y: root.height - Theme.touch-target - 4px;
         width: root.width - 16px; height: Theme.touch-target; spacing: 8px;
         Text { text: "A"; color: Theme.deck1; horizontal-stretch: 0; vertical-alignment: center; }
-        Fader { value: MixerState.crossfader; detent: true; edited(v) => { MixerState.crossfader = v; MixerState.crossfade(v); } }
+        Fader { enabled: MixerState.crossfader-enabled; value: MixerState.crossfader; detent: true; edited(v) => { MixerState.crossfader = v; MixerState.crossfade(v); } }
         Text { text: "B"; color: Theme.deck2; horizontal-stretch: 0; vertical-alignment: center; }
-        Chip { text: @tr("Mid"); width: 52px; horizontal-stretch: 0; tooltip: @tr("Center crossfader"); clicked => { MixerState.crossfader = 0.5; MixerState.crossfade(0.5); } }
+        Chip { text: @tr("Mid"); enabled: MixerState.crossfader-enabled; width: 52px; horizontal-stretch: 0; tooltip: @tr("Center crossfader"); clicked => { MixerState.crossfader = 0.5; MixerState.crossfade(0.5); } }
     }
 }
 
@@ -94,7 +94,7 @@ export component TouchMixer inherits Rectangle {
             Chip { text: @tr("Split cue"); active: MixerState.bus.split; clicked => { MixerState.split-toggled(); } }
             Chip { text: MixerState.bus.rec ? @tr("Stop recording") : @tr("Record"); active: MixerState.bus.rec; active-color: Theme.rec; clicked => { MixerState.rec-toggled(); } }
         }
-        Chip { text: @tr("Crossfader: {}", [@tr("Smooth"), @tr("Sharp"), @tr("Constant")][MixerState.curve]); clicked => { MixerState.curve-cycled(); } }
+        Chip { text: @tr("Crossfader: {}", MixerState.crossfader-enabled ? [@tr("Smooth"), @tr("Sharp"), @tr("Constant")][MixerState.curve] : @tr("OFF")); enabled: MixerState.crossfader-enabled; clicked => { MixerState.curve-cycled(); } }
         Text { text: MixerState.bus.status; color: Theme.text; font-size: Theme.font-size; wrap: word-wrap; }
     }
 }

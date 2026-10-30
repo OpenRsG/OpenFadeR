@@ -132,13 +132,14 @@ component MixerPage inherits Rectangle {
                 reset => { MixerState.bus-knob(p, p == 1 ? 0.0 : 0.5); }
             }
             VerticalLayout { alignment: center; horizontal-stretch: 0; width: 46px; StageButton { height: 22px; text: @tr("SPLIT"); font-size: Theme.font-xs; active: MixerState.bus.split; clicked => { MixerState.split-toggled(); } } }
-            VerticalLayout { alignment: center; horizontal-stretch: 0; width: 46px; StageButton { height: 22px; text: [@tr("SMOOTH"), @tr("SHARP"), @tr("CONST")][MixerState.curve]; font-size: Theme.font-xs; clicked => { MixerState.curve-cycled(); } } }
+            VerticalLayout { alignment: center; horizontal-stretch: 0; width: 46px; StageButton { height: 22px; enabled: MixerState.crossfader-enabled; text: MixerState.crossfader-enabled ? [@tr("SMOOTH"), @tr("SHARP"), @tr("CONST")][MixerState.curve] : @tr("OFF"); font-size: Theme.font-xs; clicked => { MixerState.curve-cycled(); } } }
         }
         HorizontalLayout {
             height: 22px;
             spacing: 6px;
             Cap { text: "A"; width: 14px; horizontal-stretch: 0; color: StageState.tone(root.chs[0]); font-size: Theme.font-sm; }
             StageFader {
+                enabled: MixerState.crossfader-enabled;
                 vertical: false;
                 accent: Theme.accent;
                 value: MixerState.crossfader;

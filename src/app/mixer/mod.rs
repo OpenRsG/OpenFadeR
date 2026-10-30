@@ -45,14 +45,14 @@ pub(in crate::app) use control::note;
 pub(in crate::app) use map::{CFX, HI, LOW, MID};
 
 use super::{
-    deck::{Decks, DECKS},
-    prefs::{self, CrossfaderCurve},
     App, BusView, ChannelView, DeckState, MixerState,
+    deck::{DECKS, Decks},
+    prefs::{self, CrossfaderCurve},
 };
 use cfg::{Cfg, auto_db};
 use openfader::audio::{
-    cfx::{self, Kind},
     Bus, Headphones,
+    cfx::{self, Kind},
 };
 use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use std::{
@@ -76,10 +76,12 @@ fn gain(trim_db: f32, fader: f32, side: f32) -> f32 {
     map::db_to_gain(trim_db) * fader * side
 }
 
-/// The `[A, B]` crossfade gains of the crossfader position and curve in `s` (Automix's transition forces constant power).
+/// Disabled manual control leaves both sides open; Automix still applies its transition gains.
 fn crossfade_gains(s: &MixerState) -> [f32; 2] {
     let curve = if s.get_auto_fade() {
         CrossfaderCurve::Constant
+    } else if !s.get_crossfader_enabled() {
+        return [1.0, 1.0];
     } else {
         curve::from_index(s.get_curve())
     };
@@ -133,7 +135,13 @@ struct Mixer {
 }
 
 pub fn wire(app: &App, decks: Decks) {
-    let (cfg, curve) = prefs::with(|p| (Cfg::of(p), p.crossfader_curve));
+    let (cfg, curve, crossfader_enabled) = prefs::with(|p| {
+        (
+            Cfg::of(p),
+            p.crossfader_curve,
+            p.controller.crossfader_enabled,
+        )
+    });
     // Each row owns its inner models: cloning one row would share them between the channels. Decks A and C
     // start on the crossfader's A side, B and D on its B side.
     let channel = |i: usize| ChannelView {
@@ -202,9 +210,10 @@ pub fn wire(app: &App, decks: Decks) {
         timer: Timer::default(),
     });
     state.set_curve(curve::index(curve));
+    state.set_crossfader_enabled(crossfader_enabled);
     state.set_iso_shown(cfg.iso_shown);
     state.set_cfx_stop(cfg.cfx_stop());
-    mixer.apply_all(); // the crossfader starts in the middle: A and B sides at -3 dB
+    mixer.apply_all();
     prefs::with(|p| mixer.sync_aux(p));
 
     let m = mixer.clone();
@@ -231,6 +240,7 @@ pub fn wire(app: &App, decks: Decks) {
         let old = m.cfg.replace(cfg);
         let s = app.global::<MixerState>();
         s.set_curve(curve::index(p.crossfader_curve));
+        s.set_crossfader_enabled(p.controller.crossfader_enabled);
         s.set_iso_shown(cfg.iso_shown);
         s.set_cfx_stop(cfg.cfx_stop());
         if !cfg.stems || !cfg.iso_shown {

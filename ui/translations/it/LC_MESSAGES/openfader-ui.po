@@ -477,7 +477,7 @@ msgid "VIDEO (BETA)"
 msgstr "VIDEO (BETA)"
 
 #: ui/app.slint:529
-#: ui/stage/mixer.slint:224
+#: ui/stage/mixer.slint:225
 msgid "FX"
 msgstr "FX"
 
@@ -493,8 +493,8 @@ msgid "SAMPLER"
 msgstr "SAMPLER"
 
 #: ui/app.slint:533
-#: ui/stage/mixer.slint:224
-#: ui/stage/mixer.slint:226
+#: ui/stage/mixer.slint:225
+#: ui/stage/mixer.slint:227
 msgid "MIXER"
 msgstr "MIXER"
 
@@ -888,7 +888,7 @@ msgid "SKIP"
 msgstr "SALTA"
 
 #: ui/browser.slint:258
-#: ui/mixer.slint:138
+#: ui/mixer.slint:139
 #: ui/stage/deck-performance.slint:74
 msgid "FILTER"
 msgstr "FILTER"
@@ -1257,7 +1257,7 @@ msgstr "Non ora"
 
 #: ui/deck-compact.slint:70
 #: ui/deck-controls.slint:171
-#: ui/exportmode-parts.slint:281
+#: ui/exportmode-parts.slint:282
 msgid "Tempo range"
 msgstr "Intervallo di tempo"
 
@@ -1287,12 +1287,12 @@ msgstr "Modalità SLIP"
 
 #: ui/deck-controls.slint:155
 #: ui/deck-touch.slint:69
-#: ui/exportmode-parts.slint:338
+#: ui/exportmode-parts.slint:339
 msgid "Quantize"
 msgstr "Quantize"
 
 #: ui/deck-controls.slint:156
-#: ui/exportmode-parts.slint:279
+#: ui/exportmode-parts.slint:280
 #: ui/stage/deck-controller.slint:125
 msgid "MT"
 msgstr "MT"
@@ -1304,7 +1304,7 @@ msgid "Master tempo (key lock)"
 msgstr "Master tempo (KEY LOCK)"
 
 #: ui/deck-controls.slint:195
-#: ui/exportmode-parts.slint:215
+#: ui/exportmode-parts.slint:216
 #: ui/sampler.slint:218
 msgid "LOOP"
 msgstr "LOOP"
@@ -1322,30 +1322,30 @@ msgid "OUT"
 msgstr "OUT"
 
 #: ui/deck-controls.slint:214
-#: ui/exportmode-parts.slint:231
-#: ui/stage/deck-parts.slint:703
+#: ui/exportmode-parts.slint:232
+#: ui/stage/deck-parts.slint:704
 msgid "RELOOP"
 msgstr "RELOOP"
 
 #: ui/deck-controls.slint:220
-#: ui/exportmode-parts.slint:205
-#: ui/stage/deck-parts.slint:673
+#: ui/exportmode-parts.slint:206
+#: ui/stage/deck-parts.slint:674
 msgid "Halve the loop"
 msgstr "Dimezza il LOOP"
 
 #: ui/deck-controls.slint:226
-#: ui/exportmode-parts.slint:226
-#: ui/stage/deck-parts.slint:689
+#: ui/exportmode-parts.slint:227
+#: ui/stage/deck-parts.slint:690
 msgid "Double the loop"
 msgstr "Raddoppia il LOOP"
 
 #: ui/deck-controls.slint:231
-#: ui/exportmode-parts.slint:199
+#: ui/exportmode-parts.slint:200
 msgid "AU"
 msgstr "AU"
 
 #: ui/deck-controls.slint:231
-#: ui/exportmode-parts.slint:199
+#: ui/exportmode-parts.slint:200
 msgid "MA"
 msgstr "MA"
 
@@ -1363,7 +1363,7 @@ msgstr "CARICA UNA TRACCIA"
 
 #: ui/deck-header.slint:64
 #: ui/deck-touch.slint:34
-#: ui/exportmode-parts.slint:148
+#: ui/exportmode-parts.slint:149
 msgid "KEY SYNC"
 msgstr "KEY SYNC"
 
@@ -1386,13 +1386,13 @@ msgid "Tempo master"
 msgstr "Tempo MASTER"
 
 #: ui/deck-header.slint:70
-#: ui/exportmode-parts.slint:149
+#: ui/exportmode-parts.slint:150
 #: ui/studio/deck-head.slint:70
 msgid "Key down"
 msgstr "Key giù"
 
 #: ui/deck-header.slint:76
-#: ui/exportmode-parts.slint:151
+#: ui/exportmode-parts.slint:152
 #: ui/studio/deck-head.slint:81
 msgid "Key up"
 msgstr "Key su"
@@ -1492,8 +1492,8 @@ msgid "Delete a hot cue: press its pad"
 msgstr "Elimina un HOT CUE: premi il suo PAD"
 
 #: ui/deck-panel.slint:118
-#: ui/exportmode-cues.slint:159
-#: ui/exportmode-parts.slint:324
+#: ui/exportmode-cues.slint:160
+#: ui/exportmode-parts.slint:325
 msgid "MEMORY"
 msgstr "MEMORY"
 
@@ -1520,8 +1520,8 @@ msgid "Vinyl stop"
 msgstr "Stop vinile"
 
 #: ui/deck-panel.slint:151
-#: ui/exportmode-parts.slint:310
-#: ui/exportmode-parts.slint:312
+#: ui/exportmode-parts.slint:311
+#: ui/exportmode-parts.slint:313
 msgid "GRID"
 msgstr "GRID"
 
@@ -2192,7 +2192,7 @@ msgstr "COPIA"
 
 #: ui/edit.slint:152
 #: ui/exportmode-grid.slint:73
-#: ui/video.slint:303
+#: ui/video.slint:304
 msgid "CUT"
 msgstr "TAGLIA"
 
@@ -2229,7 +2229,7 @@ msgid "click: playhead · drag: select (snapped) · wheel: scroll · Ctrl+wheel:
 msgstr "clic: cursore di riproduzione · trascina: seleziona (allineato) · rotella: scorri · Ctrl+rotella: zoom · Space play · Ctrl+C/X/V copia/taglia/incolla · Ctrl+I inserisci · Del elimina · M mute · S silenzio · Ctrl+D duplica · Ctrl+Z/Y annulla/ripeti · B aggancio · 0 adatta"
 
 #: ui/exportmode-cues.slint:42
-#: ui/pads.slint:267
+#: ui/pads.slint:269
 msgid "comment"
 msgstr "commento"
 
@@ -2241,39 +2241,39 @@ msgstr "Loop: clic per riprodurlo"
 msgid "Delete"
 msgstr "Elimina"
 
-#: ui/exportmode-cues.slint:159
+#: ui/exportmode-cues.slint:160
 #: ui/stage/deck-parts.slint:508
 #: src/app/deck/pads/mod.rs:83
 msgid "HOT CUE"
 msgstr "HOT CUE"
 
-#: ui/exportmode-cues.slint:159
+#: ui/exportmode-cues.slint:160
 msgid "INFO"
 msgstr "INFO"
 
-#: ui/exportmode-cues.slint:214
+#: ui/exportmode-cues.slint:215
 msgid "Color"
 msgstr "Colore"
 
-#: ui/exportmode-cues.slint:215
+#: ui/exportmode-cues.slint:216
 #: ui/trackinfo.slint:186
 #: src/app/library/track.rs:162
 msgid "Comment"
 msgstr "Commento"
 
-#: ui/exportmode-cues.slint:216
+#: ui/exportmode-cues.slint:217
 msgid "File type"
 msgstr "Tipo di file"
 
-#: ui/exportmode-cues.slint:217
+#: ui/exportmode-cues.slint:218
 msgid "File size"
 msgstr "Dimensione del file"
 
-#: ui/exportmode-cues.slint:218
+#: ui/exportmode-cues.slint:219
 msgid "Sample rate"
 msgstr "Frequenza di campionamento"
 
-#: ui/exportmode-cues.slint:219
+#: ui/exportmode-cues.slint:220
 msgid "Bit rate"
 msgstr "Bit rate"
 
@@ -2450,19 +2450,19 @@ msgid "A-GAIN"
 msgstr "A-GAIN"
 
 #: ui/exportmode-parts.slint:108
-#: ui/mixer.slint:118
+#: ui/mixer.slint:119
 #: ui/stage/deck-controller.slint:59
 msgid "HIGH"
 msgstr "HIGH"
 
 #: ui/exportmode-parts.slint:108
-#: ui/mixer.slint:118
+#: ui/mixer.slint:119
 #: ui/stage/deck-controller.slint:59
 msgid "MID"
 msgstr "MID"
 
 #: ui/exportmode-parts.slint:108
-#: ui/mixer.slint:118
+#: ui/mixer.slint:119
 #: ui/stage/deck-controller.slint:59
 msgid "LOW"
 msgstr "LOW"
@@ -2471,85 +2471,85 @@ msgstr "LOW"
 msgid "Mute the band"
 msgstr "Silenzia la banda"
 
-#: ui/exportmode-parts.slint:152
-#: ui/exportmode-parts.slint:280
+#: ui/exportmode-parts.slint:153
+#: ui/exportmode-parts.slint:281
 msgid "RST"
 msgstr "RST"
 
-#: ui/exportmode-parts.slint:152
+#: ui/exportmode-parts.slint:153
 msgid "Back to the track's key"
 msgstr "Torna alla KEY della traccia"
 
-#: ui/exportmode-parts.slint:153
+#: ui/exportmode-parts.slint:154
 #: ui/stage/deck-parts.slint:155
 msgid "BEAT SYNC"
 msgstr "BEAT SYNC"
 
-#: ui/exportmode-parts.slint:241
+#: ui/exportmode-parts.slint:242
 msgid "Waveform colour, analyse the track, export"
 msgstr "Colore della forma d'onda, analisi della traccia, esportazione"
 
-#: ui/exportmode-parts.slint:255
+#: ui/exportmode-parts.slint:256
 msgid "WAVEFORM: 3BAND"
 msgstr "FORMA D'ONDA: 3BAND"
 
-#: ui/exportmode-parts.slint:255
+#: ui/exportmode-parts.slint:256
 msgid "WAVEFORM: RGB"
 msgstr "FORMA D'ONDA: RGB"
 
-#: ui/exportmode-parts.slint:255
+#: ui/exportmode-parts.slint:256
 msgid "WAVEFORM: BLUE"
 msgstr "FORMA D'ONDA: BLUE"
 
-#: ui/exportmode-parts.slint:255
+#: ui/exportmode-parts.slint:256
 msgid "ANALYZE TRACK"
 msgstr "ANALIZZA TRACCIA"
 
-#: ui/exportmode-parts.slint:255
+#: ui/exportmode-parts.slint:256
 msgid "EXPORT TRACKS…"
 msgstr "ESPORTA TRACCE…"
 
-#: ui/exportmode-parts.slint:255
+#: ui/exportmode-parts.slint:256
 msgid "DEVICES…"
 msgstr "DISPOSITIVI…"
 
-#: ui/exportmode-parts.slint:279
+#: ui/exportmode-parts.slint:280
 msgid "Master tempo"
 msgstr "Master tempo"
 
-#: ui/exportmode-parts.slint:280
+#: ui/exportmode-parts.slint:281
 msgid "Tempo reset"
 msgstr "Reimposta tempo"
 
-#: ui/exportmode-parts.slint:284
+#: ui/exportmode-parts.slint:285
 msgid "Pitch bend: hold to slow down"
 msgstr "Pitch bend: tieni premuto per rallentare"
 
-#: ui/exportmode-parts.slint:285
+#: ui/exportmode-parts.slint:286
 msgid "Pitch bend: hold to speed up"
 msgstr "Pitch bend: tieni premuto per accelerare"
 
-#: ui/exportmode-parts.slint:309
+#: ui/exportmode-parts.slint:310
 msgid "CUE/LOOP"
 msgstr "CUE/LOOP"
 
-#: ui/exportmode-parts.slint:312
+#: ui/exportmode-parts.slint:313
 msgid "Adjust the beat grid"
 msgstr "Regola la griglia dei beat"
 
-#: ui/exportmode-parts.slint:324
+#: ui/exportmode-parts.slint:325
 msgid "Save a memory cue at the playhead"
 msgstr "Salva un MEMORY cue sul cursore"
 
-#: ui/exportmode-parts.slint:325
+#: ui/exportmode-parts.slint:326
 msgid "Previous cue or loop"
 msgstr "Cue o loop precedente"
 
-#: ui/exportmode-parts.slint:326
+#: ui/exportmode-parts.slint:327
 msgid "Next cue or loop"
 msgstr "Cue o loop successivo"
 
-#: ui/exportmode-parts.slint:327
+#: ui/exportmode-parts.slint:328
 msgid "Delete the cue or loop at the playhead"
 msgstr "Elimina il cue o il loop sul cursore"
 
@@ -2576,14 +2576,14 @@ msgid "INPUT"
 msgstr "INPUT"
 
 #: ui/exportmode.slint:175
-#: ui/mixer.slint:259
-#: ui/stage/mixer.slint:209
+#: ui/mixer.slint:260
+#: ui/stage/mixer.slint:210
 msgid "● ARMED"
 msgstr "● ARMATO"
 
 #: ui/exportmode.slint:175
-#: ui/mixer.slint:259
-#: ui/stage/mixer.slint:209
+#: ui/mixer.slint:260
+#: ui/stage/mixer.slint:210
 msgid "● REC"
 msgstr "● REC"
 
@@ -2592,7 +2592,7 @@ msgid "Start / stop recording"
 msgstr "Avvia / ferma la registrazione"
 
 #: ui/fx.slint:104
-#: ui/stage/deck-parts.slint:736
+#: ui/stage/deck-parts.slint:737
 #: ui/studio/deck-controls.slint:34
 msgid "FX{}-{} ON"
 msgstr "FX{}-{} ON"
@@ -2613,8 +2613,8 @@ msgid "CH{}"
 msgstr "CH{}"
 
 #: ui/fx.slint:136
-#: ui/stage/mixer.slint:164
-#: ui/stage/mixer.slint:164
+#: ui/stage/mixer.slint:165
+#: ui/stage/mixer.slint:165
 msgid "FX{}"
 msgstr "FX{}"
 
@@ -2683,7 +2683,7 @@ msgid "BEAT up (the lit slot)"
 msgstr "BEAT su (lo slot acceso)"
 
 #: ui/fx.slint:223
-#: ui/stage/deck-parts.slint:821
+#: ui/stage/deck-parts.slint:822
 msgid "TEMPO"
 msgstr "TEMPO"
 
@@ -2693,7 +2693,7 @@ msgstr "Tap del tempo"
 
 #: ui/fx.slint:226
 #: ui/fx.slint:243
-#: ui/stage/mixer.slint:187
+#: ui/stage/mixer.slint:188
 msgid "CH"
 msgstr "CH"
 
@@ -2727,7 +2727,7 @@ msgid "FX PART: the stem the effect runs on"
 msgstr "FX PART: lo stem su cui agisce l'effetto"
 
 #: ui/fx.slint:325
-#: ui/stage/deck-parts.slint:724
+#: ui/stage/deck-parts.slint:725
 msgid "BEAT FX"
 msgstr "BEAT FX"
 
@@ -2770,7 +2770,7 @@ msgid "no plugin"
 msgstr "nessun plugin"
 
 #: ui/fxrack.slint:83
-#: ui/stage/deck-parts.slint:741
+#: ui/stage/deck-parts.slint:742
 #: ui/stage/strip.slint:91
 msgid "ON"
 msgstr "ON"
@@ -3123,7 +3123,7 @@ msgstr "Centra il crossfader"
 
 #: ui/mixer-touch.slint:42
 #: ui/mixer-touch.slint:78
-#: ui/mixer.slint:158
+#: ui/mixer.slint:159
 msgid "AUX"
 msgstr "AUX"
 
@@ -3150,7 +3150,7 @@ msgid "Filter"
 msgstr "Filtro"
 
 #: ui/mixer-touch.slint:45
-#: ui/mixer.slint:118
+#: ui/mixer.slint:119
 msgid "CFX"
 msgstr "CFX"
 
@@ -3168,7 +3168,7 @@ msgid "Drums"
 msgstr "Drums"
 
 #: ui/mixer-touch.slint:56
-#: ui/studio/mixer.slint:201
+#: ui/studio/mixer.slint:202
 msgid "STEM ISO"
 msgstr "STEM ISO"
 
@@ -3228,86 +3228,86 @@ msgstr "Netta"
 msgid "Constant"
 msgstr "Costante"
 
-#: ui/mixer.slint:118
+#: ui/mixer.slint:119
 #: ui/stage/deck-controller.slint:59
 #: ui/stage/mixer.slint:31
 msgid "TRIM"
 msgstr "TRIM"
 
-#: ui/mixer.slint:156
-#: ui/mixer.slint:160
+#: ui/mixer.slint:157
+#: ui/mixer.slint:161
 #: ui/stage/deck-controller.slint:67
 msgid "Headphone CUE"
 msgstr "CUE cuffie"
 
-#: ui/mixer.slint:157
-#: ui/mixer.slint:162
+#: ui/mixer.slint:158
+#: ui/mixer.slint:163
 #: ui/stage/mixer.slint:88
 msgid "STEM"
 msgstr "STEM"
 
-#: ui/mixer.slint:157
-#: ui/mixer.slint:162
+#: ui/mixer.slint:158
+#: ui/mixer.slint:163
 msgid "STEM mode: INST / VOCAL / DRUMS levels"
 msgstr "Modalità STEM: livelli INST / VOCAL / DRUMS"
 
-#: ui/mixer.slint:158
-#: ui/mixer.slint:164
+#: ui/mixer.slint:159
+#: ui/mixer.slint:165
 msgid "AUX input on / off"
 msgstr "Ingresso AUX attivo / disattivo"
 
-#: ui/mixer.slint:222
+#: ui/mixer.slint:223
 msgid "Crossfader assign"
 msgstr "Assegnazione crossfader"
 
-#: ui/mixer.slint:238
+#: ui/mixer.slint:239
 msgid "HP MIX"
 msgstr "MIX CUF"
 
-#: ui/mixer.slint:238
+#: ui/mixer.slint:239
 msgid "HP LEVEL"
 msgstr "LIV CUF"
 
-#: ui/mixer.slint:244
+#: ui/mixer.slint:245
 #: ui/stage/mixer.slint:134
-#: ui/stage/mixer.slint:214
+#: ui/stage/mixer.slint:215
 msgid "SPLIT"
 msgstr "SPLIT"
 
-#: ui/mixer.slint:244
-#: ui/studio/mixer.slint:168
+#: ui/mixer.slint:245
+#: ui/studio/mixer.slint:169
 msgid "Mono HP left / master right"
 msgstr "Cuffie mono a sinistra / master a destra"
 
-#: ui/mixer.slint:265
-#: ui/studio/mixer.slint:173
+#: ui/mixer.slint:266
+#: ui/studio/mixer.slint:174
 msgid "Waiting for audio, click to cancel"
 msgstr "In attesa dell'audio, clic per annullare"
 
-#: ui/mixer.slint:265
-#: ui/studio/mixer.slint:173
+#: ui/mixer.slint:266
+#: ui/studio/mixer.slint:174
 msgid "Record master"
 msgstr "Registra il master"
 
-#: ui/mixer.slint:289
+#: ui/mixer.slint:291
 #: ui/stage/mixer.slint:135
-#: ui/studio/mixer.slint:147
+#: ui/studio/mixer.slint:148
 msgid "SMOOTH"
 msgstr "MORBIDA"
 
-#: ui/mixer.slint:289
+#: ui/mixer.slint:291
 #: ui/stage/mixer.slint:135
-#: ui/studio/mixer.slint:147
+#: ui/studio/mixer.slint:148
 msgid "SHARP"
 msgstr "NETTA"
 
-#: ui/mixer.slint:289
+#: ui/mixer.slint:291
 #: ui/stage/mixer.slint:135
-#: ui/studio/mixer.slint:147
+#: ui/studio/mixer.slint:148
 msgid "CONST"
 msgstr "COST"
 
-#: ui/mixer.slint:293
+#: ui/mixer.slint:296
 msgid "Crossfader curve"
 msgstr "Curva del crossfader"
 
@@ -3367,15 +3367,15 @@ msgstr "SILENT: silenzia il deck MIX IN dall'inizio della traccia fino alla fine
 msgid "SILENT EDIT: click the MIX IN waveform to move the silent end"
 msgstr "SILENT EDIT: clicca sulla forma d'onda MIX IN per spostare la fine del silenzio"
 
-#: ui/pads.slint:189
+#: ui/pads.slint:191
 msgid "CUES / LOOPS"
 msgstr "CUE / LOOP"
 
-#: ui/pads.slint:191
+#: ui/pads.slint:193
 msgid "SAVE LOOP"
 msgstr "SAL. LOOP"
 
-#: ui/pads.slint:224
+#: ui/pads.slint:226
 msgid "Cue color and comment"
 msgstr "Colore e commento del cue"
 
@@ -3693,7 +3693,7 @@ msgid "REC…"
 msgstr "REC…"
 
 #: ui/sampler.slint:158
-#: ui/stage/mixer.slint:224
+#: ui/stage/mixer.slint:225
 #: src/app/deck/padopts.rs:63
 msgid "REC"
 msgstr "REC"
@@ -3800,7 +3800,7 @@ msgstr "Carica la traccia scelta sul deck {}"
 
 #: ui/stage/bar.slint:22
 #: ui/stage/bar.slint:24
-#: ui/stage/mixer.slint:226
+#: ui/stage/mixer.slint:227
 msgid "VIDEO"
 msgstr "VIDEO"
 
@@ -3840,33 +3840,33 @@ msgstr "BEAT LOOP"
 msgid "SLICER"
 msgstr "SLICER"
 
-#: ui/stage/deck-parts.slint:663
+#: ui/stage/deck-parts.slint:664
 #: ui/studio/deck-controls.slint:142
 msgid "Loop in at the playhead"
 msgstr "Loop in al cursore"
 
-#: ui/stage/deck-parts.slint:664
+#: ui/stage/deck-parts.slint:665
 #: ui/studio/deck-controls.slint:143
 msgid "Loop out at the playhead: the loop starts"
 msgstr "Loop out al cursore: il loop parte"
 
-#: ui/stage/deck-parts.slint:698
+#: ui/stage/deck-parts.slint:699
 #: ui/studio/deck-controls.slint:145
 msgid "Leave the loop, or go back into the last one"
 msgstr "Esci dal loop, o rientra nell'ultimo"
 
-#: ui/stage/deck-parts.slint:766
+#: ui/stage/deck-parts.slint:767
 msgid "DEPTH"
 msgstr "PROFONDITÀ"
 
-#: ui/stage/deck-parts.slint:787
-#: ui/stage/deck-parts.slint:810
+#: ui/stage/deck-parts.slint:788
+#: ui/stage/deck-parts.slint:811
 #: ui/studio/deck-controls.slint:222
 msgid "Slower"
 msgstr "Più lento"
 
-#: ui/stage/deck-parts.slint:787
-#: ui/stage/deck-parts.slint:810
+#: ui/stage/deck-parts.slint:788
+#: ui/stage/deck-parts.slint:811
 #: ui/studio/deck-controls.slint:222
 msgid "Faster"
 msgstr "Più veloce"
@@ -3921,12 +3921,12 @@ msgid "LOAD {}"
 msgstr "CARICA {}"
 
 #: ui/stage/mixer.slint:60
-#: ui/studio/mixer.slint:160
+#: ui/studio/mixer.slint:161
 msgid "A"
 msgstr "A"
 
 #: ui/stage/mixer.slint:60
-#: ui/studio/mixer.slint:160
+#: ui/studio/mixer.slint:161
 msgid "B"
 msgstr "B"
 
@@ -4102,24 +4102,24 @@ msgstr "Carica la traccia scelta sul deck {}"
 msgid "Headphone CUE, deck {}"
 msgstr "CUE cuffie, deck {}"
 
-#: ui/studio/mixer.slint:143
+#: ui/studio/mixer.slint:144
 msgid "FILTER KNOB (COLOR FX)"
 msgstr "MANOPOLA FILTER (COLOR FX)"
 
-#: ui/studio/mixer.slint:145
-#: src/app/prefs/controller/mixer.rs:55
+#: ui/studio/mixer.slint:146
+#: src/app/prefs/controller/mixer.rs:66
 msgid "CROSSFADER CURVE"
 msgstr "CURVA DEL CROSSFADER"
 
-#: ui/studio/mixer.slint:158
+#: ui/studio/mixer.slint:159
 msgid "DECK {} ON THE CROSSFADER"
 msgstr "DECK {} SUL CROSSFADER"
 
-#: ui/studio/mixer.slint:160
+#: ui/studio/mixer.slint:161
 msgid "THRU"
 msgstr "THRU"
 
-#: ui/studio/mixer.slint:201
+#: ui/studio/mixer.slint:202
 #: src/app/prefs/controller/mixer.rs:46
 #: src/app/prefs/controller/mod.rs:34
 msgid "EQ"
@@ -4892,11 +4892,11 @@ msgstr "TUTTI I VIDEO"
 msgid "no mp4 / mov / m4v tracks in this library"
 msgstr "nessuna traccia mp4 / mov / m4v in questa libreria"
 
-#: ui/video.slint:302
+#: ui/video.slint:303
 msgid "FADE"
 msgstr "DISSOLV."
 
-#: ui/video.slint:304
+#: ui/video.slint:305
 msgid "CH FADER DIMS"
 msgstr "CH FADER ATTENUA"
 
@@ -5294,7 +5294,7 @@ msgstr "la sorgente non è aperta"
 msgid "{} tracks relate to “{}” (registered partners, then compatible key, BPM ±6%)"
 msgstr "{} tracce collegate a “{}” (partner registrati, poi key compatibile, BPM ±6%)"
 
-#: src/app/browser/list.rs:125
+#: src/app/browser/list.rs:152
 msgid "{} of 8 banks, A first · MORE adds a cue from a deck or the chosen track, loads the list onto a deck"
 msgstr "{} di 8 banchi, prima A · MORE aggiunge un cue da un deck o dalla traccia scelta, carica la lista su un deck"
 
@@ -9638,7 +9638,7 @@ msgid "Audio output: could not restore"
 msgstr "Uscita audio: impossibile ripristinare"
 
 #: src/app/midi/session.rs:369
-#: src/app/mixer/mod.rs:173
+#: src/app/mixer/mod.rs:181
 msgid "Headphones: {}"
 msgstr "Cuffie: {}"
 
@@ -9904,7 +9904,7 @@ msgid "SHORTEST TRACK LISTED"
 msgstr "TRACCIA PIÙ BREVE ELENCATA"
 
 #: src/app/prefs/advanced.rs:232
-#: src/app/prefs/controller/mod.rs:260
+#: src/app/prefs/controller/mod.rs:261
 msgid "RECORDINGS"
 msgstr "REGISTRAZIONI"
 
@@ -10745,35 +10745,43 @@ msgstr "kill in fondo"
 msgid "CHANNEL FADER CURVE"
 msgstr "CURVA DEL FADER DI CANALE"
 
-#: src/app/prefs/controller/mixer.rs:53
+#: src/app/prefs/controller/mixer.rs:55
 msgid "COLOR FX KNOB"
 msgstr "MANOPOLA COLOR FX"
 
-#: src/app/prefs/controller/mixer.rs:54
+#: src/app/prefs/controller/mixer.rs:59
 msgid "SOUND COLOR FX knobs"
 msgstr "manopole SOUND COLOR FX"
 
-#: src/app/prefs/controller/mixer.rs:56
+#: src/app/prefs/controller/mixer.rs:62
+msgid "Enable crossfader"
+msgstr "Abilita crossfader"
+
+#: src/app/prefs/controller/mixer.rs:65
+msgid "Automix transitions remain active"
+msgstr "Le transizioni di Automix restano attive"
+
+#: src/app/prefs/controller/mixer.rs:67
 msgid "OUTPUT LEVEL"
 msgstr "LIVELLO DI USCITA"
 
-#: src/app/prefs/controller/mixer.rs:56
+#: src/app/prefs/controller/mixer.rs:67
 msgid "all decks"
 msgstr "tutti i deck"
 
-#: src/app/prefs/controller/mixer.rs:59
+#: src/app/prefs/controller/mixer.rs:70
 msgid "CONTROLLER AUDIO"
 msgstr "AUDIO DEL CONTROLLER"
 
-#: src/app/prefs/controller/mixer.rs:63
+#: src/app/prefs/controller/mixer.rs:74
 msgid "on connect"
 msgstr "alla connessione"
 
-#: src/app/prefs/controller/mixer.rs:65
+#: src/app/prefs/controller/mixer.rs:76
 msgid "MICROPHONE / TALK OVER"
 msgstr "MICROFONO / TALK OVER"
 
-#: src/app/prefs/controller/mixer.rs:66
+#: src/app/prefs/controller/mixer.rs:77
 msgid "needs a microphone input: OpenFadeR has none"
 msgstr "richiede un ingresso microfono: OpenFadeR non ne ha"
 

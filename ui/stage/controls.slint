@@ -301,6 +301,7 @@ export component StageKnob inherits Rectangle {
 /// with `detent`, which also marks it); `moved` carries the value while the cap is dragged or the groove is pressed, `reset` a double-click.
 export component StageFader inherits Rectangle {
     in property <float> value;
+    in property <bool> enabled: true;
     in property <bool> vertical: true;
     in property <color> accent: Theme.accent;
     in property <bool> detent;
@@ -326,6 +327,7 @@ export component StageFader inherits Rectangle {
         border-color: Theme.line;
     }
     Rectangle {
+        opacity: root.enabled ? 1 : 0.4;
         x: root.vertical ? (root.width - self.width) / 2 : min(root.from, root.at);
         y: root.vertical ? min(root.from, root.at) : (root.height - self.height) / 2;
         width: root.vertical ? 3px : abs(root.at - root.from);
@@ -341,6 +343,7 @@ export component StageFader inherits Rectangle {
         background: Theme.line-strong;
     }
     Rectangle {
+        opacity: root.enabled ? 1 : 0.4;
         x: root.vertical ? (root.width - self.width) / 2 : root.at - root.cap / 2;
         y: root.vertical ? root.at - root.cap / 2 : (root.height - self.height) / 2;
         width: root.vertical ? min(root.width - 2px, 28px) : root.cap;
@@ -361,6 +364,7 @@ export component StageFader inherits Rectangle {
         }
     }
     ta := TouchArea {
+        enabled: root.enabled;
         pointer-event(e) => {
             if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { root.moved(root.pick(root.vertical ? self.mouse-y : self.mouse-x)); }
         }

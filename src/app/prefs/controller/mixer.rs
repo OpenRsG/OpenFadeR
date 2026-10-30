@@ -50,8 +50,19 @@ pub(super) fn rows(p: &Prefs) -> Vec<Row> {
             Fader::names(),
             c.fader_curve.0,
         ),
-        named("cfx_knob", tr!("COLOR FX KNOB"), KnobMode::names(), c.cfx_knob.0)
-            .hint(tr!("SOUND COLOR FX knobs")),
+        named(
+            "cfx_knob",
+            tr!("COLOR FX KNOB"),
+            KnobMode::names(),
+            c.cfx_knob.0,
+        )
+        .hint(tr!("SOUND COLOR FX knobs")),
+        Row::check(
+            "crossfader_enabled",
+            tr!("Enable crossfader"),
+            c.crossfader_enabled,
+        )
+        .hint(tr!("Automix transitions remain active")),
         Row::of("curve", tr!("CROSSFADER CURVE"), p.crossfader_curve),
         Row::dropdown_of("output_level", tr!("OUTPUT LEVEL"), levels, level).hint(tr!("all decks")),
         Row::chips(

@@ -1,58 +1,63 @@
 <p align="center">
-  <img src="assets/openfader.png" alt="OpenFadeR logo" width="160">
+  <img src="assets/openfader.png" width="112" alt="OpenFadeR logo">
 </p>
 
-<h1 align="center">OpenFadeR</h1>
+# OpenFadeR
 
-<p align="center">
-  <img src="docs/media/hero.png" alt="OpenFadeR with two decks playing, synced, with waveforms, mixer and track browser" width="100%">
-</p>
+DJ software written in Rust with a Slint interface. Mix with two or four decks on Linux, Windows and macOS, using a mouse, keyboard or MIDI controller.
 
-<p align="center">
-  <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/github/license/OpenRsG/OpenFadeR"></a>
-  <a href="https://github.com/OpenRsG/OpenFadeR/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/OpenRsG/OpenFadeR?style=flat"></a>
-</p>
+[Download the latest release](https://github.com/OpenRsG/OpenFadeR/releases/latest) · [Watch a demo](docs/media/demo.mp4) · [Report a bug](https://github.com/OpenRsG/OpenFadeR/issues)
 
-OpenFadeR is an open-source DJ application for two or four decks, written in Rust with [Slint](https://slint.dev). It analyses your tracks, separates stems, mixes with effects and a sampler, and reads MIDI controllers from a growing set of mapping files. Themes, plugins and controller mappings install from GitHub repositories with one click.
+![OpenFadeR with two decks and the track browser](docs/media/hero.png)
 
-<p align="center">
-  <img src="docs/media/demo.webp" alt="Loading two tracks, syncing them, moving the crossfader and switching themes" width="100%">
-</p>
+## Download and run
 
-<p align="center"><a href="docs/media/demo.mp4">Watch the demo as MP4</a></p>
+Choose an archive from the [releases page](https://github.com/OpenRsG/OpenFadeR/releases/latest), extract it and run OpenFadeR from the extracted folder. Keep the companion folders with the executable.
 
-Every screenshot on this page comes from the running app, with a library of synthetic tracks generated for these pictures. There is no copyrighted music in them.
+| System | Build |
+| --- | --- |
+| Linux PC | x86_64 |
+| Windows PC | x86_64 |
+| macOS | Apple Silicon (arm64) |
+| Raspberry Pi / ARM Linux | aarch64 |
+| Raspberry Pi 4 / CM4 | Cortex-A72 build |
 
-## Download
+The Pi builds need a 64-bit OS based on Debian 13 (trixie). See the [Raspberry Pi guide](docs/raspberry-pi.md) for dependencies and setup. Prebuilt archives avoid compiling Rust on the Pi.
 
-Get the archive for your system from the [releases page](https://github.com/OpenRsG/OpenFadeR/releases): Linux (x86_64), Windows (x86_64), macOS (Apple silicon), or Raspberry Pi (64-bit Debian 13; generic and Pi4/CM4-tuned archives). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `OpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
+Windows builds are unsigned. macOS builds are ad-hoc signed, not Developer ID signed or notarized, so the OS may require you to approve them before launch.
 
-### Release builds
+Use Help > Check for updates to check for a newer release. Release notes describe changes and any upgrade requirements.
 
-Every release requires all five archives below. Shipping executables use optimization level 3, one codegen unit for the app
-and stripped symbols; bundled native libraries are stripped too. Local `--release` builds keep symbols for diagnostics.
+## Start mixing
 
-| Target | CPU baseline | App LTO |
-|---|---|---|
-| Linux x86_64 | Portable x86_64 | Thin |
-| Windows x86_64 | Portable x86_64 | Thin |
-| macOS ARM64 | Apple M1 and newer | Off: preserves the CoreML compiler-runtime link |
-| Generic Raspberry Pi ARM64 | Cortex-A53; also compatible with Pi 4 / 5 / CM4 | Fat |
-| Raspberry Pi 4 / CM4 ARM64 | Cortex-A72 | Fat |
+Open a folder of music or add a source in Preferences > Libraries. Select a track in the browser and press Enter to load deck A, or Shift+Enter to load deck B. Space starts or pauses deck A; Shift+Space controls deck B.
 
-CI starts the packaged Linux/Windows applications and both Pi archives (under QEMU/software rendering). macOS has a native
-Intel smoke plus ARM architecture/signature checks, not an ARM runtime check. A missing required archive blocks the release
-draft. These build settings are not a hardware performance guarantee.
+Select your output in Preferences > Audio before mixing. MIDI mappings live in Preferences > Controller, and keyboard shortcuts can be changed in Preferences > Keyboard. Press `?` for the shortcut list.
 
-### Updates
+### Disable the crossfader
 
-At start, once a day, the app asks GitHub for the latest release (PREFERENCES > ADVANCED > OTHERS > Check for updates, on by default; nothing else is sent). PREFERENCES > ADVANCED > OTHERS > Update channel is Stable (the default: only full releases) or Beta (release candidates and other pre-releases count too; `0.3.0-rc.1` is newer than `0.2.5` and older than `0.3.0`). A newer release shows a notice, and Help > Update to … (or Help > Check for Updates, which asks at once) opens its release notes, version and download size with UPDATE NOW, SKIP THIS VERSION and LATER. UPDATE NOW first backs up the library (the same zip as File > Library > Backup Library, without music) to `<data folder>/backups` and keeps the last 3 (PREFERENCES > ADVANCED > OTHERS > Back up the library before updating, on by default), then downloads the archive for your system (Linux x86_64, Raspberry Pi, Windows, macOS Apple silicon) with a progress bar, refuses it unless its SHA-256 is the digest GitHub lists for that file, unpacks it next to the install, swaps it in and restarts. Your settings, library and add-ons live in your per-user folders; the version you had stays in `<install folder>.prev` (for `./install.sh`: `~/.local/lib/openfader.prev`). Help > Roll Back to … puts it back; if the new version does not start, `openfader --rollback` (from a terminal) does the same. A new version may change the library file's format so that the old one cannot open it: then the roll-back also puts the backup made before the update in its place (and says so), and the newer library stays beside it as `store.v<N>.db`; with no such backup the roll-back is refused, because the old version could not open the library. An install the app cannot or must not replace (a package manager's, under `/usr`, a read-only folder, a build in a source tree) opens the release page instead. The same check counts the installed plugins that GET PLUGINS lists in a newer version. `OPENFADER_UPDATE_API` points the check at another API root (a mirror or a test server).
+In source builds, clear Enable crossfader under Preferences > Controller > Mixer. Manual crossfader input is ignored and both sides stay open. Channel faders still control their channels, and Automix keeps its automatic transitions. Re-enabling applies the crossfader position again.
 
-When an update changes the analysis (a new analysis version), the app does not re-analyse the library by itself: PREFERENCES > ANALYSIS > Auto Analysis > When an update changes the analysis is ASK (the default: a notice with the number of tracks and the time it takes, measured on your computer, with RE-ANALYSE NOW and LATER), IN THE BACKGROUND, or WHEN A TRACK IS LOADED (each track when it is loaded on a deck). A re-analysis only replaces the stored analysis: your own cues, beat grids and tags, and tracks with the analysis lock, are never changed.
+This setting is unreleased; the 0.2.8 downloads do not include it.
+
+## Mixing and library tools
+
+- Two- and four-deck layouts, scrolling waveforms, hot cues, loops and slip mode.
+- BPM and key analysis, editable beat grids, sync and key lock.
+- Channel EQ, filters, beat effects, a sampler and sequencer.
+- Library search, playlists, tags, cue editing and mix recording.
+- Automix with selectable transition styles.
+- USB library export for supported DJ players.
+- Optional STEMS separation. The first use downloads a model; separation needs additional CPU or GPU memory.
+- An EDIT view for arrangements, video playback and lighting tools. The lighting tools are beta.
+
+Rekordbox and Traktor readers are built in. Plugins add other library sources and effects. The [plugin repository](https://github.com/OpenRsG/OpenFadeR-Plugins) lists its integrations and their limits.
+
+Back up a USB device before exporting to it, and check the exported library on your player before relying on it at a gig. Format support varies by player and firmware.
 
 ## Build from source
 
-You need `git` and a [Rust toolchain](https://rustup.rs).
+Install Git, Python 3, stable Rust and your platform's native build tools. Linux also needs pkg-config and development packages for ALSA, fontconfig, XKB, Wayland and udev; the [CI workflow](.github/workflows/ci.yml) lists the Ubuntu packages.
 
 ```sh
 git clone https://github.com/OpenRsG/OpenFadeR.git
@@ -60,389 +65,40 @@ cd OpenFadeR
 ./start.sh ~/Music
 ```
 
-The first run clones the plugins, themes and mappings next to the code, builds everything and connects the folder you gave to the Collection. You should see your tracks in the browser, with BPM, key and waveform previews filling in as the analysis finishes. Double-click a track to load it on deck 1, press `Space` to play.
+`start.sh` fetches the companion repositories on the first run, builds native plugins and starts a release build. It uses plugin tag `v0.2.11` by default. Existing companion checkouts are left as they are; update them deliberately when changing core versions.
 
-`start.sh` without a path opens the Collection as you left it; every connected library and folder syncs at start and whenever it changes, and `$XDG_MUSIC_DIR` (else `~/Music/OpenFadeR`) is always connected. To build only the core: `cargo build --release`.
+On machines with little RAM, set `CARGO_BUILD_JOBS=1` to limit compiler parallelism. The [Pi guide](docs/raspberry-pi.md) also covers cross-compilation. Android has a separate [build guide](docs/android.md).
 
-To install it for your user on Linux instead (the `openfader` command and an application menu entry, with the plugins, themes and mappings bundled): `./install.sh`. It also sets the default plugin, theme and mapping repositories of PREFERENCES (GET PLUGINS / GET THEMES / GET MAPPINGS), which the app uses anyway until you edit the list. Run it again to update; `./install.sh --uninstall` removes it.
+On Linux, `./install.sh` builds and installs for the current user. `./install.sh --uninstall` removes that installation. See [CONTRIBUTING.md](CONTRIBUTING.md) for development and test instructions.
 
-Linux installation keeps ONNX/WebGPU runtime libraries beside the executable and companion libraries inside their plugin folders.
-Unrelated shared libraries left in the build directory are not installed. Local release builds retain their backtrace symbols.
+## Plugins, themes and controllers
 
-### Raspberry Pi
+Companion repositories are checked out into these folders when running from source:
 
-For a Raspberry Pi 3, 4 or CM4 (64-bit Raspberry Pi OS, Debian 13), `docker buildx build -f Dockerfile.pi -o dist/pi .` cross-compiles an optimised archive on any x86_64 machine. See [docs/raspberry-pi.md](docs/raspberry-pi.md) for memory use and settings. On a Pi, or a machine with at most 8 GiB of effective RAM, PREFS > ADVANCED > LOW-POWER MODE switches on automatically: smaller sampler slots, fewer loading/analysis workers and one stem-inference batch at a time.
-
-### Android
-
-The standalone phone/tablet app lives in [`mobile/`](mobile/): two decks, local music import, waveforms, cues, loops, sync, EQ and effects, using the shared Rust engine with a touch-first Slint UI. It excludes video, lighting and Beat Lab. See [Android build and usage](docs/android.md) for APK packaging, supported features and lifecycle behavior.
-
-
-## A tour
-
-### Analysis that is ready when you load
-
-BPM, beat grid, downbeat, key, a three-band waveform, phrases (intro, up, chorus, down) and automatic cues are computed in the background and cached. The pictures above show them: coloured phrase bars over the enlarged waveforms, hot cues A to H under each deck, and a key colour in the track list. Decks sync tempo and beats, key sync follows the key, and key lock keeps the pitch while you push the tempo (its time stretch places each grain at the drum hits, so kicks stay sharp far from the original tempo). Tracks whose sample rate differs from the sound card's are resampled with a windowed-sinc filter, not linear interpolation. Grids keep their meter: a 3/4 grid counts bars of three beats in automix, the ruler, beat sync phase and the slicer.
-
-Master Tempo matches stereo continuations over a search range scaled to the output sample rate. This keeps low bass from following small tempo changes and avoids losing the matching signal when the channels are out of phase. The WSOLA search covers complete periods down to about 29 Hz at unshifted pitch; dense polyphony, lower pitches and extreme tempo/key shifts still have quality limits. Its buffers are allocated before playback, not inside the audio callback.
-
-Loading publishes playable audio after decoding and preparing its initial gain and auto-cue position. Initial source/cache reads and stem-file preflight run off the UI thread. Missing waveform, grid and key analysis can finish during playback without replacing cue or grid edits made meanwhile. Replacing a deck load or preview cancels obsolete work; stopped and finished browser previews release their decoded audio.
-
-Bulk analysis reuses workers under one execution budget. Prepared jobs are bounded, and extra simultaneous runs receive a visible busy message instead of growing an unlimited queue. Cue edits and explicit deletions made while work is queued or running survive its completion. Same-track work stays ordered; a late alias cannot overwrite a newer bulk cache result. Device and folder probes also run in bounded background work, so stalled storage does not block those UI callbacks. Blocking filesystem calls still occupy their worker until the operating system returns.
-
-Analysis-cache headers, lengths and table counts are checked before large allocation; entries above 256 MiB are rejected and recomputed. Cached phrases are derived once using the requested options.
-
-Tracks that change tempo (a live drummer, an edit, a deliberate tempo change) get a grid in tempo sections: PREFERENCES > ANALYSIS > Detect tempo changes (on by default) splits the grid where the tempo changes for good, and a steady track stays one section. The deck BPM readout, SYNC and its beat phase, quantize, loops, beat jump, Beat FX, the MIDI clock and AUTOMIX follow the section under the playhead; the browser BPM stays the first tempo. In GRID mode the HERE chip (FROM HERE in EXPORT mode) makes TAP, ×2, ÷2, a typed BPM and widen / narrow change only the tempo section from the playhead up to the next tempo change, so a tempo change at the playhead is HERE, then TAP; MERGE removes the section under the playhead, and UNDO brings it back. Grid edits (downbeat, double, halve, tap, shift) re-derive the track's phrases so they start on bar lines, unless you edited the phrases yourself. With PREFERENCES > ANALYSIS > BEAT GRID FROM set to LIBRARY, a track whose library supplies a grid keeps it after ANALYZE; the status line says so, and OPENFADER ANALYSIS shows our grid instead.
-
-With PREFERENCES > ANALYSIS > KEY DETECTOR set to NEURAL, the key part runs a small convolutional network on the CPU instead of the chroma profiles. Its 1.8 MB model downloads once on first use (size and sha256 checked, progress on the track info status line); offline, the analysis stays CLASSIC and says so. See [docs/key-detector.md](docs/key-detector.md) for the model, its licence and measured accuracy.
-
-SYNC follows tempo while a master deck loops. Beat-phase correction pauses when the loop does not span a whole number of follower beats, so short loops do not make other decks repeat. Phase correction resumes when the loop ends or returns to a whole-beat length.
-
-The playing deck leads the tempo. SYNC on the only playing deck keeps its tempo and makes it the master; it never retunes an audible deck to follow an idle one. An idle deck follows a playing one. A deck you made MASTER with the MASTER button is followed even when it is idle.
-
-For clearer waveforms, open PREFERENCES > VIEW > WAVEFORM. Set BEAT GRID to BOLD for outlined lines over the enlarged waveform, with wider downbeats that do not rely on colour alone. The whole-track overview keeps thin bar lines behind the audio in either setting, so track dynamics and phrases stay readable. Set HOT CUE MARKERS to LARGE for double-size flags and letters on the decks and browser previews (when preview cue markers are enabled). Memory cues are solid bars in the theme's memory-cue colour with an M flag, drawn over the grid and wider than a bold downbeat, and they grow with LARGE too. Both settings apply immediately and are saved; NORMAL keeps the original sizes.
-
-The same WAVEFORM section has RENDERER: AUTO (default), GPU or CPU. AUTO selects hardware image composition when a
-graphics API is available. Both paths use the same source-pixel crop of the cached enlarged strip; they keep the overview
-static and move small playhead/slip textures instead of copying it every tick. GPU also permits emulated OpenGL for diagnosis;
-without a graphics API it falls back to CPU. Changes apply while playing without restarting or interrupting audio.
-The startup log identifies the graphics API, OpenGL renderer and waveform path.
-
-Cue markers, waveform columns and the fixed playhead share physical-pixel coordinates on both renderers, including fractional
-display scaling. The moving waveform follows the audible-position clock; briefly busy UI reads retain callback timing history
-rather than jumping to audio still queued for output. Each seek keeps its target until the matching audio position and clock
-are published. CUE prepares its resting frame before redraw; holding the button after a return cannot restart a preview through
-key repeat, and cancelling a held pointer releases it. Cue quantization and stored cue positions are unchanged.
-
-If the default graphics backend fails before its first frame, the app retries once with Slint's native software renderer.
-Windowless startup has a two-second deadline so a deferred driver error cannot leave an invisible process running.
-An explicit `SLINT_BACKEND` selection is never replaced. Drawing rate is an upper bound: actual cadence also depends on
-the display, renderer and hardware, not a promise of zero physical latency. See [Raspberry Pi performance advice](docs/raspberry-pi.md#speed).
-
-RAM and VRAM in the top-right show OpenFadeR's process usage, refreshed once a second by a background worker.
-RAM is resident memory, including shared pages. VRAM follows the driver's accounting: optional NVIDIA NVML or
-Linux DRM resident/local-memory counters, never whole-device usage or an estimate. Unsupported drivers and
-shared-memory-only GPUs show **—**, not a fabricated zero. Hover either row for details. Touch and Stage layouts
-put the same readout in the existing status line to preserve space for their controls.
-
-The browser and device window share background device/source discovery; the browser timer does not repeat filesystem or plugin
-probes. Selected-track analysis reads use cached summaries and one background read at a time, with the latest waiting selection
-replacing older requests. Late answers refresh analysis labels only, preserving unsaved comments and the editor's pinned track.
-
-Search and filter changes reuse one cached sort order per track list. Metadata and detected-value changes invalidate the affected
-ordering; manual playlists keep their own order. Unrelated store writes reuse library key indexes when the shared list is unchanged.
-Bulk analysis captures shared tracks and row indices, stages work on the existing workers, and publishes bounded result batches
-across event-loop turns. Superseded requests retain their identity checks, and a full backlog continues without waiting for the
-normal idle polling interval.
-Scrolling keeps a bounded recent-row cache rather than every visited formatted row. Models still held by the UI remain
-live and receive reference, played-state and metadata updates.
-
-Metadata undo/reload builds a temporary lookup only for sources it actually needs, preserving source precedence and inherited
-values without scanning each library again for every retained track.
-Suggest's refresh timer runs only while Suggest is active; Playlist Palette's runs only while enabled and open. Opening either
-requests an immediate refresh. Background analysis continues while these panels are closed.
-While open, Playlist Palette reuses its snapshot instead of rereading unchanged playlist entries. Store edits, assignments,
-Tag List changes, playlist names and BPM precision invalidate it; failed playlist reads are retried.
-Playlist chooser and move-menu paths share one temporary node index per operation instead of rescanning the hierarchy
-for every parent. Menu ordering and the existing cycle limits are preserved.
-Expanded My Playlists sidebar rows reuse that node-index helper for icon selection during rebuilds. Folded sections
-avoid building the index; no hierarchy cache is retained between rebuilds.
-EXPORT's player panels refresh only while EXPORT is open and catch up on entry. Background device/export jobs continue
-when another mode is selected.
-
-Track-list dividers resize only their own column, including TITLE; those widths are saved. Overflow scrolls horizontally
-with the column headings in the desktop, Studio and Stage tables. Loaded-deck badges identify the media, not its title,
-so two tracks with the same name do not both appear loaded. Sorting or replacing a row between clicks does not turn
-the second click into a load of a different track.
-
-Held CUE, scratch and pad controls release their original deck, pad and mode, including after a deck-layer or sampler-bank
-change. Leaving a pad mode ends its momentary action; replacing a deck track does not release independent sampler slots.
-Clearing a sampler slot also cancels its pending load, so a late decode cannot refill it.
-
-Theme deletion asks for confirmation. Path dialogs focus their input on every opening; an empty submission leaves the
-dialog open, and a late file-chooser answer cannot replace a newer request. Device jobs offer cancellation only when
-the worker supports it; progress stays CANCELLING until completion. Cancellation can leave completed changes on the device.
-
-PREFERENCES > AUDIO > BUFFER shows what AUTO requests: 512 frames on a full-power machine, or the driver's default in LOW-POWER MODE. An explicit frame count overrides either choice; a driver that refuses it falls back to its own buffer and reports that in the audio status. The Linux backend requests two periods per fixed buffer. Smaller buffers reduce output delay but can underrun under load: increase the buffer if audio crackles. Output-device lookup runs off the UI thread; the status shows a pending lookup and then the device actually in use. MIDI dispatch, drawing time and the sound card's output delay are separate costs, not zero physical latency.
-The shared resampling table is initialized during stream preparation, before the first audio callback needs a fractional read.
-Non-stretched stem FX reuses the selected-stem sample for both subtraction and effect processing. Key lock and pitch shift
-keep independent stretchers for the selected part and the rest of the mix, with their existing interpolation behavior.
-
-If an output stops delivering callbacks or reports a fatal error, the engine reconnects to that same device without
-discarding the loaded tracks, cues, loops or transport commands. Device lookup runs off the UI thread; retries are
-coalesced and spaced at least a second apart. Recovery does not silently substitute another output. ALSA underruns
-retain their existing prepare/retry path; a fatal `POLLERR` stops its worker instead of spinning and flooding the log.
-Teardown joins that worker even if its shutdown pipe receiver has already closed, and retries interrupted wake-up writes.
-
-The interface is in English, French, Spanish, German, Portuguese (Brazil), Italian or Dutch: PREFERENCES > VIEW > LANGUAGE, where SYSTEM follows the computer's language. Button labels that match DJ hardware (CUE, SYNC, LOOP, BEAT FX …) stay in English in every language.
-
-### Two decks or four
-
-<p align="center"><img src="docs/media/four-decks.png" alt="Four decks playing in sync with four stacked waveform lanes" width="100%"></p>
-
-Press `D` to switch layouts. All four decks get their own pads, loops, slip, sync and stem buttons. The deck layout (horizontal or vertical) is a VIEW setting, and a theme can ask for it.
-
-A four-deck controller (the DDJ-FLX6, for one) has two physical decks and DECK 1 / 2 / 3 / 4 buttons for the layer each one controls. In the 2-deck layout, DECK 3 / 4 keep the two decks on screen: the left (right) deck then draws deck 3 (4), its waveform, panel, pads, mixer channel and number, and DECK 1 / 2 bring decks 1 / 2 back. All four decks keep playing; when the deck on the other layer of a side is playing, a small box with its number sits next to the deck number. The 4-deck layout shows every deck at once and does not change with the layer. The number of a deck is drawn large on its waveform box, centred; PREFERENCES > VIEW > WAVEFORM > DECK NUMBER moves it to the top left.
-
-### Automix transition styles
-
-Start AUTOMIX on a three-track list (or any longer list), then click the style chip beside it to open the panel.
-LENGTH sets 8, 16 or 32 bars. STYLE offers SMOOTH (the original crossfade and bass swap), BASS SWAP (a longer overlap),
-FILTER (outgoing high-pass sweep), FILTER IN (incoming low-pass opening), ECHO OUT, REVERB OUT, CUT, BRAKE, LOOP OUT
-and EQ BLEND (mids/highs first, bass later). CUT uses one bar, BRAKE two and the two FX throws four; the other styles use LENGTH.
-The mixer shows the timed moves and restores borrowed controls when the transition ends. Set channel faders to your intended
-on-air levels before starting; styles do not raise them for you.
-
-RANDOM chooses separately for each transition, never the same style twice in a row. The lit RANDOM USES chips select its pool
-(at least two remain enabled). PLAN shows the chosen style for each track; the running status also names it. Changing STYLE
-or the pool redraws upcoming choices; a transition already running keeps its choice. The choice and pool are saved.
-SKIP still mixes at the next downbeat, or completes an active transition. Mix points, short tracks and late analysis follow
-the existing planner; without usable grids the outgoing track ends with a cut. All styles work offline on the CPU, including
-Raspberry Pi. Plugins can add [JSON recipes](docs/plugins.md#automix-styles) using the same engine as the built-ins.
-
-### Effects
-
-<p align="center"><img src="docs/media/fx.png" alt="Beat FX units with echo, reverb and flanger above the decks, and the color FX row" width="100%"></p>
-
-Beat FX has several units with three slots each. A unit's tempo comes from the deck on its channel (CH, the default), from the master deck (MST), or from taps (TAP); a unit on MASTER follows the master deck. COLOR FX (filter, space, dub echo, sweep, noise, crush, cross-pass) sits on every channel and MERGE FX works on the whole mix. More effects arrive through effect plugins; the beat, send, lever and mic effect packs are on from the first start.
-
-Effect replacements are prepared outside the audio callback. While a replacement is pending, that unit passes dry audio. Turning the selected effect off keeps its tail.
-
-### AUX input
-
-A line source (a turntable preamp, a phone, a synth) can join the mix as a fifth channel beside the microphone. In PREFERENCES > AUDIO > AUX INPUT tick Enable AUX input and pick the input device (SAME AS INPUT DEVICE uses the device of INPUT CHANNELS) and the channel pair. An AUX strip appears after the decks, on the desktop mixer and in the touch mixer: TRIM, HIGH / MID / LOW, a FILTER knob, the LEVEL fader, a headphone CUE and the AUX switch, which opens the input pair and lets the channel play (the pair stays closed while the strip is off). The strip's meter shows the level after the fader. Assign a Beat FX unit to AUX to apply its effects, including plugin effects, like on a deck. MASTER FX and the LEVER rack also hear it in their sum.
-
-AUX DUCK LEVEL lowers the decks while the AUX is heard after its fader, talkover style (OFF, -6 … -24 dB; the decks' master paths, so the headphone cue is untouched), and AUX DUCK RELEASE sets how long they take to come back. The microphone's own talkover (TALKOVER MODE / TALKOVER LEVEL) ducks everything else, the AUX included. Controllers can map `aux-level`, `aux-cue` and `aux-on`. The AUX is mixed in the internal mixer only; the External mixer mode sends the decks raw and leaves it out. Where no input device is available, for example on a Raspberry Pi with nothing plugged in, the AUX switch reports the problem on the mixer bar and the rest of the app is unaffected.
-
-### Sampler
-
-<p align="center"><img src="docs/media/sampler.png" alt="Sampler strip with sixteen slots, banks and a sequencer" width="100%"></p>
-
-Sixteen slots in two banks, loaded from a deck or from a file. Slots play as a shot or a gate, can follow the tempo, and a sequencer records and replays a pattern.
-
-### Stems
-
-<p align="center"><img src="docs/media/stems.png" alt="Stem buttons on two decks with vocal and drums muted on deck A" width="100%"></p>
-
-Enable STEMS in PREFERENCES > EXTENSIONS and each loaded track is separated into vocal, instrument, bass and drums (a 3-stem mode exists too) by an ONNX model that runs on the CPU or the GPU. Switching STEMS on downloads that model once (316 MB), with a progress card at the bottom right. A deck's stem button is filled while its stem plays at full level; a click turns that stem off, another brings it back. The pads and a controller can mute or solo, and the mixer's knobs can act on stems. The waveform follows what you hear.
-
-Stem buffers allocate on a worker while the original track remains playable. STEM INSTANT DOUBLES shares completed audio and stems between decks, with independent transport and stem gains.
-Compatible ordinary loads also share in-flight separation and output. Each deck keeps its own completion and SPEED-mode
-play/cue focus; unloading one subscriber does not cancel the others. Changed source versions, decoded audio, rate, length,
-quality, threading or stem-file settings do not share that work.
-
-Model sessions open only for uncached inference and are shared by active batches. The last batch releases the CPU/GPU
-sessions immediately; no speculative warm-up or 90-second idle hold remains. Low-power mode runs one batch, prefers
-the GPU with CPU fallback, and caps CPU inference at two threads; other devices use at most eight. Native RAM detection
-also respects Linux cgroup v2 limits. Full-quality inference still needs substantial temporary memory, and retained
-16-bit track/stem data grows with track length. Smaller budgets reduce concurrency, not audio quality.
-
-Stem outputs reserve space before allocation, including cache hits and embedded stem files. Their process-wide budget is
-one eighth of effective RAM (including Linux cgroup limits); unknown capacity uses a 256 MiB output budget. Completed stems
-remain charged until their last audio/waveform consumer releases them, with shared outputs charged only once. **RAM WAIT**
-means the original audio remains usable while output space is held elsewhere. Unloading a track or turning STEMS off releases
-its consumers; waiting work resumes automatically. A single output larger than the budget reports an error instead of waiting
-forever. This budgets stem output, not the whole process.
-
-Separated-stem disk caches are trimmed to a 4 GiB budget when storing new results. Oldest stored entries and interrupted writes are removed first; active cache reads/writes are protected by a directory lock across app processes. A result too large for the budget remains playable in memory but is not cached. Cache and embedded-stem metadata lookup runs on bounded, cancel-owned workers.
-Cache reads, writes and lock waits check cancellation between chunks; a cancelled replacement preserves the previous complete
-entry and removes its partial file. Embedded parts are capped to the mix length while decoding, not trimmed only after growing.
-
-**Stem files** (`.stem.mp4` / `.stem.m4a`: an MP4 with the stereo mix as its first audio track and four stem tracks after it, the part names in a JSON box) play their own parts. The mix plays as the track; with STEMS on, the four parts feed the stem buttons, pads and knobs exactly as separated stems would, with no model run and no cache entry (it needs no model download either). The parts are mapped by their names: vocals (vocal, vox, voice, acapella) to VOCAL, drums (drum, perc, kick) to DRUMS, bass to BASS, anything else to INST. When the names do not give each stem exactly once, the usual order applies: drums, bass, melody, vocals. The browser marks stem files with a STEMS badge, the track info lists their part names and a stem button's tooltip names its part. PREFERENCES > EXTENSIONS > STEMS > "Use the parts of stem files" (on by default) switches this off: the file then plays and separates like any other MP4. Without STEMS on, or with the setting off, a stem file is just its mix.
-
-### BEAT LAB
-
-<p align="center"><img src="docs/media/beatlab.png" alt="BEAT LAB strip with drum loops captured from two decks" width="100%"></p>
-
-BEAT LAB captures a few beats of a deck's drum stem into a slot. Fill the slots of a deck, swap between them, and drop drums from one track under the melody of another. It needs STEMS and is switched on in the same preferences page.
-
-### A browser that suggests
-
-<p align="center"><img src="docs/media/suggest.png" alt="Track browser showing suggestions for the loaded track, ranked by match" width="100%"></p>
-
-The browser reads folders (subfolders become playlists) or library plugins, and has search, sortable columns, a track filter (BPM range, key match, rating), related tracks, a Tag List, smart playlists, history, a duplicate finder and a missing-file manager. The SUGGEST tab ranks the rest of your collection against the loaded track and shows a score for each, with filters for BPM and key. Your own edits (track fields, cues, loops, grid, rating, comment, colour) live in `store.db`.
-
-The tree on the left marks each list with a glyph (playlist, folder, smart playlist, history day, tag, stage, USB stick …). Its sections (My Playlists, Cue Bank, Stages, History, Tags, Library health, Library, Devices) start folded: click a heading, or press Right / Left on it, to unfold or fold what is under it. A list you open from elsewhere (a playlist just made, a stick just opened) unfolds its section. From a controller: the browse knob walks the tree, its push on a heading folds or unfolds it (on a list it goes to the tracks), BACK in the tree folds the section you are in and goes to its heading.
-
-A History day, or the Session history, saves as an M3U8 playlist or, with SAVE SET LIST, as a set list in two files: a `.csv` table (position, time, title, artist, BPM, key, length) and a `.txt` with one `HH:MM  Artist - Title` line per track, ready to paste into a track-list post.
-
-The right-click menu on a track groups its actions under six headings, in two columns: PLAY (load, related tracks), PLAYLISTS (Tag List, playlists, palettes, the order of the list), USB STICK / SD CARD (Transfer to each plugged-in device; Import to Collection on the tracks of a stick), ANALYSIS (Analyze track, Make Auto Cue point, Analysis lock), TRACK INFO (details, tags, reloading the tags, artwork) and FILE (show, relocate, remove from the Collection). Every layout (classic, Studio, Stage) has the same menu. It works without the mouse too: the Menu key, or the controller's menu button (DDJ-FLX6: SHIFT + browse push; any controller: map `browse-menu` with MIDI LEARN), opens it on the chosen track; the browse knob or Up / Down moves through it, the knob's push or Enter runs the item, BACK or Esc closes it. Themes can restyle the tree and the menu (headings, glyphs, lines, one or two columns: docs/skins.md, "Library tree and track menu").
-
-Select several tracks like in a file manager: Ctrl+click adds or removes a row, Shift+click (or Shift+Up/Down/PageUp/PageDown/Home/End) selects the range from the last row you clicked, Ctrl+A selects every row shown and Esc goes back to the chosen row. A search or filter drops the rows it hides from the selection; a re-sort keeps it. Drag any selected row to carry the whole selection onto a playlist (tracks the playlist already holds are skipped and counted), the Tag List, a tag, a stage or a palette; a deck still loads just the dragged track. The right-click menu then starts with "N tracks selected" and acts on all of them (Add to Tag List, Add to playlist, New playlist from selection, palettes, Remove from list, Analyze, Analysis lock, Reload tag, Fetch missing artwork, Auto relocate, Remove from Collection with one confirmation); the items that need one track (Load to deck, Edit track details, Tags, Related tracks, Move up/down, Find artwork, Show in file manager, Relocate) are greyed out. The status line counts the selection.
-
-Right-click a browser track and choose Edit track details, or use Track > Edit Track Details (touch themes: Actions > Selected track).
-Edit the title, artist, album, genre, label and comment while working on a playlist. Save fields and comment or Enter saves the text,
-including empty values. Rating and colour save immediately. Close discards unsaved text. Saved edits appear in Collection, playlists
-and loaded decks without restarting playback, and survive restarting the app.
-
-Descriptive fields require a local-file track; remote-only tracks still support comments, rating and colour. BPM/key use the
-grid/analysis controls; file paths and technical properties are read-only. OpenFadeR stores overrides in `store.db` and leaves
-audio-file tags unchanged. Explicitly enabled two-way library connections retain their existing write-back behavior.
-
-**Make Auto Cue point.** Right-click the selected tracks > Make Auto Cue point (Track menu) gives them their automatic cues: the cue point (a memory cue) on the first sound at or above the AUTO CUE LEVEL (Preferences > Controller > Deck), and hot cues A to H on the phrase changes of the beat grid, where CUE Analysis puts them (Preferences > Analysis sets how many hot and memory cues). A track's cue point is its earliest memory cue that is not a loop. If some tracks already have a cue point or hot cues, a dialog asks: Replace moves the cue point and swaps the hot cues for the automatic ones (loops and other memory cues stay), Add missing gives a cue point to tracks without one and fills the empty pads; closing it cancels. With Preferences > Analysis > Prohibit overwriting CUEs on, existing cues are kept without asking. A track without a beat grid gets only the cue point: analyse it first. The tracks are decoded one at a time off the interface, progress is in the status line, choosing the item again stops it, and the whole batch is one undo step.
-
-**Library health.** The browser's Library health node lists the problems of your Collection, one row per check with its number of tracks: missing file, corrupt or undecodable (a load or analysis of the file failed), not analysed, missing tags (title, artist, genre, key, BPM; the key and BPM of our analysis count), no artwork, no rating, very long (a mix or a podcast), probably not music (audiobook or podcast hints in the genre, folder or file type, "Chapter 3" titles, a long track with no beat), duplicates and low bitrate. Choose a row to list its tracks, then use the bar above the list: ANALYSE, RELOCATE (or AUTO RELOCATE ALL), EDIT TAGS, REMOVE, and IGNORE to hide a track from that one check. SHOW IGNORED lists what you hid and UN-IGNORE brings it back. The counts are worked out on a background thread a moment after an edit, an import, a relocation or a finished analysis; choosing the node, or RESCAN, looks at every file again. Preferences > Advanced > Browse > Library health sets the minutes from which a track is "very long" (default 20) and the kbps below which it is "low bitrate" (default 128); 0 switches either check off.
-
-### Edit mode
-
-<p align="center"><img src="docs/media/edit.png" alt="EDIT mode with a bar-snapped selection of 16 bars on a full-track waveform" width="100%"></p>
-
-EDIT shows the whole track with its beat grid. Select with snap to beat or bar, then copy, cut, paste, insert, delete, mute, duplicate or add silence, undo and redo, and render the result to a WAV file or load it on a deck.
-
-### Recording
-
-REC writes the master mix (or an audio input) to WAV files, started and split by silence if you like. Next to each file it also writes a cue sheet (kept up to date during the recording, so a crash does not lose it) and a tracklist of what led the mix (by the master deck, the channel faders and the crossfader), and, if you switch it on, a JSON-lines log of every deck, mixer and effect control you touched. See [docs/recording-files.md](docs/recording-files.md); the three are switched in PREFERENCES > ADVANCED > RECORDINGS.
-
-### Lighting mode (beta)
-
-<p align="center"><img src="docs/media/lighting.png" alt="LIGHTING mode with fixtures lit by the phrase of the playing track" width="100%"></p>
-
-LIGHTING patches fixtures (RGB pars, RGBW pars, moving heads, strobes) and drives them from the phrase that is playing, so a chorus looks different from a breakdown. Pick a palette and a scene, or let AUTO choose. DMX goes out over Art-Net or sACN, or nowhere: the stage view works without any hardware. It is disabled by default: turn it on in PREFERENCES > EXTENSIONS to add LIGHTING to the mode menu.
-
-### Export and video
-
-EXPORT mode shows cues and memory points for the two decks next to a DEVICES panel. USB sticks and SD cards are written by device plugins, several formats side by side on one stick, so the same stick plays on different players and apps. Formats share the audio where possible; Serato needs a private tagged copy under `_Serato_/Audio` when the original file has too little metadata padding. The export preview includes that extra space, and the copies in `Contents` stay unchanged. A track that is both in the collection and on a stick keeps the same cues, grid and phrases on both copies: plugging the stick in fills the copy that has none, and loading a track makes the copy you loaded win. A track that is only on the stick is saved back to it: cues set on it (a deck edit, Make Auto Cue point) are written into the stick's own library a few seconds later, in every format picked for that stick, and its colour and rating stay as they were.
-
-Sending tracks to a stick takes no export window: drag them onto the device in the browser's tree (or onto one of its playlists: they join what it holds), drag a playlist onto the device, or right-click and choose **Transfer to** the device. A blank stick is listed under Devices too; the first transfer creates its library. A playlist the stick already holds under the same name takes the collection's version. Tracks without a beat grid or a key are analysed first; then they are written with their cues, grid, waveform and key in every format picked for the device, and the stick shows them in the tree when it is done.
-
-Right-click a Collection or My Playlists playlist and choose **Export to a device** to open EXPORT with it selected. A blank target starts with every available format enabled; an existing target starts with its existing formats plus rekordbox. Format switches are saved per target. Typing a folder uses that folder's switches and writes there instead of the selected device; the note and confirmation name the actual destination. Clear the folder field to write to the device again.
-
-The rekordbox writer produces Device Library and OneLibrary together, player settings, cues, grids and waveform files, plus 80×80 and 240×240 JPEG covers. The layouts are checked against a rekordbox 7 export, but the waveform analysis is OpenFadeR's, not a copy of rekordbox's analysis. Account credentials and undocumented vocal-detection data are not generated. Compatibility on physical players remains a separate hardware check.
-
-The other way, from a stick to this computer: right-click tracks of the stick in the browser (or Track > Import To Collection), or right-click one of its playlists in the tree, and choose **Import to Collection**. The music is copied into your Music folder (`Music/<stick name>/…`, the stick is only read) and joins the Collection with what the stick knows of it: key, BPM, rating, comment, cues, hot cues, loops, beat grid and phrases; a playlist also becomes a playlist of the copies in My Playlists. A track you already have is not copied again. Where your copy has other cues, grid, key, rating or comment than the stick's, nothing is overwritten by itself: a list of those tracks opens, and APPLY takes the stick's values of the ticked ones, CANCEL keeps all of yours (UNDO afterwards puts yours back).
-
-<p align="center"><img src="docs/media/export.png" alt="EXPORT mode with cue editing for two decks and a devices panel" width="100%"></p>
-
-VIDEO (beta) plays video tracks on an output window and crossfades between the two decks' pictures. It is disabled by default: like LIGHTING, it shows in the mode menu once turned on in PREFERENCES > EXTENSIONS.
-
-### New music in steps: INBOX → REVIEW → COLLECTION
-
-Name the folders you download to (PREFERENCES > ADVANCED > DATABASE > INBOX) and the app watches them while it runs: a new audio file, or a zip with audio (unpacked beside the zip), appears in **INBOX** in the browser's **Stages** node, analysed as after an import. Nothing is in the Collection until you move it: drag a track onto REVIEW or COLLECTION, or use MORE on a stage to move the chosen track or every shown one. The stage names are yours (RENAME) and + NEW adds more before COLLECTION. With "Move the file with the track" the file goes to a folder per stage under your library root, by a pattern such as `{artist}/{album}/{file}`, and never over another file (a taken name gets ` (2)`). A file the Collection has already (same path or same audio) is linked, not added twice. Every move is one step: Edit > Undo, or MORE > Recent moves, puts the files, stages and paths back. Plugins hear `inbox_added` and `inbox_moved`.
-
-### Your library is yours
-
-The Collection is OpenFadeR's own database. Other apps' libraries connect to it through library plugins (PREFERENCES > LIBRARIES) and are synced in; a format that holds less than the Collection (fewer hot cues, no loops, a smaller colour palette) is written from a fitted copy, and the status line says what did not fit. File > Export Collection also writes an open JSON file, a CSV table and an M3U8 playlist, described with the database tables in [docs/library-format.md](docs/library-format.md).
-
-The Collection is read once on a worker while the window is built, with stored text and rating edits applied as rows are read; unrelated database writes no longer copy the track list. Device reads use the unencrypted Device Library only when it is at least as new as OneLibrary and no OneLibrary WAL is present. Otherwise they read OneLibrary, reusing its derived key for the session. Uncheckpointed WAL data is read through a temporary local copy, without writing beside the source library.
-
-Track > Find Artwork… asks the artwork plugins (`cover-art` covers MusicBrainz, iTunes and Discogs) for covers, shows them to pick from, and keeps the chosen one for the album; Fetch Missing Artwork does it for a whole list. Folder images beside the files count too. See [Artwork plugins](docs/plugins.md#artwork).
-
-### A stick you can trust
-
-Every USB stick or SD card the app handles has a verdict at the top of its DEVICES tab, in big letters you can read in a dark booth: READY, NEEDS FIXING, UNREADABLE or EMPTY. It is found in the background when the stick is mounted, after anything writes to it and when the tab opens; the device list shows it as a chip. DETAILS lists the libraries on the stick (when written, tracks, playlists, cues), what is wrong as cause / consequence / action, and for each player model OK / NO / ? with the reason ("needs OneLibrary, this stick has none", "cannot read exFAT"; a model nobody has measured yet is never a plain OK). Tick the players of your booth there (or pick a preset) and the verdict is for those only: one of them that cannot read the stick makes it NEEDS FIXING. With none ticked the players are listed and the verdict is about the stick itself, so a stick made for software on a laptop is not called broken (a file system no player reads still is). FIX THE STICK repairs what it can, after a backup of the stick's library: it finishes or undoes an export a pulled stick cut off, runs the extensions' own repairs, copies audio files a library lists but the stick lost from your collection again, and rebuilds a library nothing can repair from your collection after asking. Nothing is ever deleted. A stick that an export cut off is put right when it is mounted, and with PREFERENCES > DJ SYSTEM > DEVICE > "Check the stick before it is ejected" an eject of a stick that needs fixing asks first.
-
-A stick plugged in through a USB hub gets a warning in the device list: hubs that reset their link make long exports fail with an input/output error. An export cut off that way keeps the audio already copied; export again and it carries on with the rest (each file is retried once after a link reset).
-
-`openfader verify <mount> [--players "CDJ-3000X,CDJ-2000NXS2"] [--json]` does the same check from a terminal, with no window and no audio, and never writes (a cut-off export is reported, not put right). It prints the verdict, libraries, problems and players, or JSON, and its exit code is the verdict: 0 ready, 1 needs fixing or empty, 2 unreadable, 3 it could not be checked (no such folder, not a stick the app lists, no device extension on). `openfader verify --help` shows the usage; `OPENFADER_DEVICE_ROOTS=<folder>` makes a folder a pretend stick for trying it out.
-
-## Themes
-
-<p align="center"><img src="docs/media/themes-grid.jpg" alt="The same view in Catppuccin Mocha, Latte, Rek, So Pro, Dracula, Nord, Tokyo Night and Gruvbox Dark" width="100%"></p>
-
-The app ships with Catppuccin Mocha (the default) and Latte. The [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) repository adds eleven more, so there are 13 in total. A theme is one JSON file that can change colours, fonts, sizes and even the workspace (desktop, touch, studio or stage, where the waveform placement, deck panel style, pads, mixer and a neon or bevelled look are tokens too), and it applies at once. PREFERENCES > THEMES has an editor for every token with live preview, SAVE AS, and import; [docs/skins.md](docs/skins.md) is the author guide.
-
-<p align="center"><img src="docs/media/themes-gallery.png" alt="PREFERENCES, THEMES page with the gallery and GET THEMES" width="100%"></p>
-
-## Plugins, themes and mappings
-
-Three companion repositories feed the app, and PREFERENCES lists them from the first run:
-
-| Repository | Holds | Where in the app |
+| Repository | Folder | Documentation |
 | --- | --- | --- |
-| [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins) | library, device, effect, action, source and controller plugins (19 at the time of writing; `mixxx` runs Mixxx's `.midi.xml` mappings with their scripts from your own Mixxx folders) | PREFERENCES > EXTENSIONS > GET PLUGINS |
-| [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) | themes | PREFERENCES > THEMES > GET THEMES |
-| [OpenFadeR-Map](https://github.com/OpenRsG/OpenFadeR-Map) | MIDI controller mappings (more than 170 files) | PREFERENCES > CONTROLLER > GET MAPPINGS |
+| [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins) | `extension/plugin` | [Plugin guide](docs/plugins.md) |
+| [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) | `extension/skin` | [Skin guide](docs/skins.md) |
+| [OpenFadeR-Map](https://github.com/OpenRsG/OpenFadeR-Map) | `mappings` | [Controller mapping guide](docs/mappings.md) |
 
-INSTALL installs one. Add any repository by its GitHub path (`user/name`) and the app finds the plugins, themes or mappings in it too, so sharing a theme is publishing a GitHub repository.
+Use the [SDK](sdk/) to write a native plugin. Use a controller mapping compatible with your hardware; MIDI support does not imply that every controller's audio interface is configured automatically.
 
-### Compatibility layer
+## Backups and bug reports
 
-OpenFadeR's Collection uses its own plain SQLite `store.db` and independent schema in `src/store/`. External library and device
-formats are handled by the compatibility layer: built-in adapters under `compatibility/` and companion plugins built separately.
-Import, export and supported device/cue writeback translate through those adapters without replacing the native collection schema.
-The [adapter inventory](docs/plugins.md#compatibility-layer) lists the formats and their supported operations, including iTunes/Music,
-sampler packs and the companion's separate Mixxx controller-mapping integration.
+File > Library > Backup library saves OpenFadeR's library metadata. It does not back up your music files. Keep a separate backup of the audio and make a library backup before major upgrades.
 
-The built-in Rekordbox adapters (USB sticks and SD cards in Device Library and OneLibrary formats, collection XML and the desktop collection) are always on, with nothing to install. Traktor is also compiled into the app, with an on/off switch and no separate installation. A fresh profile starts with Traktor, the companion Engine DJ, Serato and VirtualDJ adapters and the effect packs on (`beat-fx`, `send-fx`, `lever-fx`, `mic-fx`, `soft-mix`, `cross-pass`); the other plugins start switched off. Existing plugin choices, including disabled or removed Traktor, are preserved. At the first start a welcome window offers the suggested ones and STEMS; ACCEPT switches them on, SKIP leaves them off. Help > Welcome opens it again. Plugging in a stick whose reader is off opens the same window with that reader.
-
-At each start the app asks GitHub for the newest release; when it is newer than the running version a window offers to open its download page. Offline, nothing is shown.
-
-Plug in a controller that has no mapping yet and the app offers the matching file from the mapping repository: one click on INSTALL and the controller works. Mapping files cover the default layer of each controller; MIDI learn and LED feedback are built in, and hot-plug detection picks controllers up while the app runs (on Linux at once, from the system's own announcements; sticks and connected libraries are noticed the same way, with a slow check left as a safety net). The format is described in [docs/mappings.md](docs/mappings.md).
-
-External gear can follow the mix: name an output port in PREFERENCES > CONTROLLER > MIDI CLOCK OUT and it receives a 24 PPQN MIDI clock locked to the playing master deck's beat grid, with START on its next bar line and STOP when no deck plays. A deck without a beat grid sends no clock.
-
-Knobs and faders that send absolute values use soft takeover: after the on-screen value changed (a layer switch, a mouse edit, a load) a control is ignored until it reaches that value, and a notification shows which way to turn it. PREFERENCES > CONTROLLER > Others > Soft takeover switches it off.
-
-## Keyboard shortcuts
-
-One table drives dispatch and the `?` help overlay (Shift = deck B, Ctrl = deck C, Ctrl+Shift = deck D):
-
-| Key | Action | Key | Action |
-| --- | --- | --- | --- |
-| Space | play/pause | K | key sync |
-| Z / X | CUE A / CUE B | `-` / `=` / 0 | key down / up / reset |
-| 1–8 | pads (per pad mode) | M | next pad mode |
-| L | 4-beat loop | V / E / B | slip / reverse / brake |
-| I / O / R | loop in / out / reloop | T | add to Tag List |
-| `[` / `]` | beat jump −4 / +4 | ← / → | FX beat fraction |
-| Enter | LOAD | F | FX on/off |
-| S | SYNC | Ctrl+F | focus search |
-| Q | MASTER | W / Shift+W | VIEW / Area |
-| Up / Down | browser selection | ? | help overlay |
-| G / Y / N | grid row / tap / beat 1 here | `,` / `.` | grid shift ∓1 ms |
-| P | sampler strip | A / Shift+A | AUTOMIX on/off / skip |
-| D | 2 / 4-deck layout | Ctrl+Z / Ctrl+Shift+Z (Ctrl+Y) | undo / redo a library edit |
-
-The table is editable in PREFERENCES > KEYBOARD.
-
-## Where things are found
-
-Each kind is looked up in an environment-variable folder list (`:`-separated), a folder in the config directory, and the bundled folder next to the executable (or in a folder above it).
-
-| Kind | Environment variable | Config folder | Bundled folder |
-| --- | --- | --- | --- |
-| Plugins | `OPENFADER_PLUGINS` | `~/.config/openfader/extension/plugin/` | `extension/plugin/` |
-| Themes | `OPENFADER_SKINS` | `~/.config/openfader/extension/skin/` | `extension/skin/` |
-| Controller mappings | `OPENFADER_MAPPINGS` | `~/.config/openfader/mappings/` | `mappings/` |
-
-`start.sh` clones the three repositories into those bundled folders (git ignores them here) and the native plugins build with `extension/plugin/build.sh` against this checkout's `sdk/` and compatibility helpers. Core 0.2.8 uses OpenFadeR-Plugins tag `v0.2.11`; `PLUGINS_REF` overrides that ref for the first clone in `start.sh` and `install.sh`. Existing checkouts are left untouched: switch an older plugin checkout to the matching tag before building. Settings live in `$XDG_CONFIG_HOME/openfader/` (default `~/.config/openfader/`), the Collection (`store.db`) and our analysis in `$XDG_DATA_HOME/openfader/` (default `~/.local/share/openfader/`).
-
-### Linux, Windows and macOS
-
-The docs write the Linux folders; the others follow their system's convention (`$XDG_*_HOME` wins on every OS when set):
-
-| | Linux | macOS | Windows |
-| --- | --- | --- | --- |
-| Settings, your plugins, themes, mappings (`~/.config/openfader/` in these docs) | `~/.config/openfader/` | `~/Library/Application Support/openfader/` | `%APPDATA%\openfader\` |
-| Store, analysis, downloaded plugin files | `~/.local/share/openfader/` | `~/Library/Application Support/openfader/` | `%LOCALAPPDATA%\openfader\` |
-| Caches (stems, models) | `~/.cache/openfader/` | `~/Library/Caches/openfader/` | `%LOCALAPPDATA%\openfader\cache\` |
-
-The release archives hold the bundled folders next to the executable (`OpenFadeR.app/Contents/Resources/` on macOS). Removable devices are found as USB sticks mounted below `/run/media` or `/media` (Linux), removable drive letters (Windows) and volumes below `/Volumes` (macOS); ejecting uses udisks, the volume's own eject request, or `diskutil`. **FORMAT…** on the DEVICES tab erases the whole stick or card (after showing every volume on it and asking for its label to be typed) and makes one MBR partition with FAT32, which every player reads, or exFAT (not on SD cards): through udisks over D-Bus on Linux (no root; polkit asks for a password where it must), `diskutil eraseDisk` on macOS, and diskpart on Windows, where FAT32 above 32 GB is written by the app itself after one UAC prompt. The disk the system, your home folder or the app run from is never touched. The partition table of every device (MBR or GPT) shows in its summary line. Linux alone has the per-card volume sliders on the audio page (ALSA mixer, the sound server) and mounts a plugged stick itself (udisks): on Windows and macOS the volume is the system's and the OS mounts the stick. File choosers are zenity or kdialog on Linux, PowerShell's dialogs on Windows and `osascript` on macOS.
-
-Audio, MIDI and folder behaviour can be set with `OPENFADER_OUTPUT_DEVICE`, `OPENFADER_HP_CHANNELS`, `OPENFADER_CUE_DEVICE`, `OPENFADER_MIDI_PORT`, `OPENFADER_MIDI_LOG`, `OPENFADER_JOG_TICKS`, `OPENFADER_REC_DIR`, `OPENFADER_EXPORT_DIR`, `OPENFADER_PATH_MAP` (audio path remap, `from=>to;…`) and `OPENFADER_DEVICE_ROOTS` (extra folders treated as devices). `OPENFADER_UPDATE_API` is the root of the release API the update check asks (default `https://api.github.com`).
-
-The vertical on-screen tempo fader has + at the top; PREFERENCES > VIEW > Tempo fader: + at the bottom reverses it (turntable style; horizontal tempo faders keep + at the right). A controller whose tempo fader moves the wrong way is fixed with PREFERENCES > CONTROLLER > Deck > Invert hardware tempo fader.
-
-## When something goes wrong
-
-Everything the app prints is also written, with timestamps, to `logs/openfader.log` in the data folder (rotated at 1 MiB). A crash leaves a `crash-….md` report there and the next start offers to send it; **Help > Report a Problem** shows the report of the running session with buttons to copy it, open the logs folder and open a prefilled GitHub issue. Paths and passwords are taken out. See [docs/diagnostics.md](docs/diagnostics.md). On macOS **Cmd+,** opens the preferences.
+For a bug report, use Help > Report a problem and include the steps to reproduce it. The [diagnostics guide](docs/diagnostics.md) explains logs, crash reports and what the report contains. Check reports for private information before posting them publicly.
 
 ## Documentation
 
-- [docs/plugins.md](docs/plugins.md): plugin format and the library / device / controller ABIs, with the SDK in [`sdk/`](sdk/)
-- [docs/skins.md](docs/skins.md): the theme author guide: file format, every token with its values, the four workspaces, recipes, layout hints
-- [docs/mappings.md](docs/mappings.md): controller mapping files
-- [docs/library-format.md](docs/library-format.md): the open JSON / CSV export and the library database tables
-- [docs/recording-files.md](docs/recording-files.md): the cue sheet, tracklist and control log REC writes next to a recording
-- [docs/diagnostics.md](docs/diagnostics.md): the log file, crash reports and the problem report format
-- [docs/key-detector.md](docs/key-detector.md): the NEURAL key detector, its model, licence and accuracy
-
-The code follows [docs/code-structure.md](docs/code-structure.md): one folder per section (`library/`, `analysis/`, `audio/`, `plugin/`, `app/`, …), a base `mod.rs` and one child per variant. Only `app/` and the `ui/` crate use Slint.
-
-## Contributing
-
-Bug reports, mapping files, themes and plugins are all welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; the [code of conduct](CODE_OF_CONDUCT.md) applies, and security reports go through [SECURITY.md](SECURITY.md). `cargo test --release` runs the tests, and the companion repositories' tests run too when they are checked out.
+- [Library format and import/export](docs/library-format.md)
+- [Recording files](docs/recording-files.md)
+- [Key detection](docs/key-detector.md)
+- [Code structure](docs/code-structure.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
 
 ## License
 
-AGPL-3.0, see [LICENSE](LICENSE). Made by [OpenRsG](https://github.com/OpenRsG).
+[AGPL-3.0](LICENSE). Maintained by [OpenRsG](https://github.com/OpenRsG).
