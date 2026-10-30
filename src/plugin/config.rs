@@ -159,6 +159,11 @@ pub fn get() -> Config {
     CONFIG.read().clone()
 }
 
+/// [`Config::values`] of the current configuration, computed under the read lock without copying the whole config.
+pub fn values(m: &Manifest) -> Value {
+    CONFIG.read().values(m)
+}
+
 /// Switches on the [`DEFAULT_ON`] plugins among `found` when the user has decided nothing yet (no `plugins.json`), in
 /// memory only: nothing is written until the user changes something (the write then records them like the user's own
 /// switches). Later calls do nothing.
@@ -220,7 +225,12 @@ mod tests {
                 ..Config::default()
             };
             c.seed(&found);
-            assert!(c.enabled("traktor"));
+            assert!(
+                ["engine-dj", "serato", "traktor", "virtualdj"]
+                    .iter()
+                    .all(|n| c.enabled(n))
+            );
+            assert!(!c.enabled("itunes"), "iTunes stays off until switched on");
         }
     }
 
@@ -260,5 +270,30 @@ mod tests {
         assert!(old.adopt(&["a", "b"]) && old.enabled == ["a"]);
         assert!(!old.adopt(&["a", "b", "c"]) && old.enabled == ["a"]);
         assert!(!serde_json::to_string(&old).unwrap().contains("disabled"));
+    }
+
+    #[test]
+    fn values_read_under_the_lock_equal_those_of_a_copy() {
+        let m = |name: &str| -> Manifest {
+            serde_json::from_value(json!({
+                "name": name,
+                "settings": [{"id": "n", "label": "N", "type": "number"}]
+            }))
+            .unwrap()
+        };
+        let (a, b) = (m("cfg-test-a"), m("cfg-test-b"));
+        let _ = CONFIG
+            .write()
+            .settings
+            .insert("cfg-test-a".into(), json!({"n": 1}));
+        let _ = CONFIG
+            .write()
+            .settings
+            .insert("cfg-test-b".into(), json!({"n": 2}));
+        for m in [&a, &b] {
+            assert_eq!(values(m), get().values(m));
+        }
+        assert_eq!(values(&a), json!({"n": 1}));
+        assert_eq!(values(&b), json!({"n": 2}));
     }
 }

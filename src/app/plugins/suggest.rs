@@ -1,13 +1,13 @@
 //! Suggesting a reader by what a device holds: a stick with `Engine Library/` on it has an Engine DJ library, but with
-//! `engine-dj` off no plugin handles the stick and the device list does not show it at all. [`discover`] reads each unseen
-//! device's top-level folders on the device worker; [`devices`] offers an installed reader that is off through the welcome
-//! window ([`crate::app::welcome::offer`]). The rekordbox readers are built into the app and always on.
+//! `engine-dj` off no adapter handles the stick and the device list does not show it at all. [`discover`] reads each unseen
+//! device's top-level folders on the device worker; [`devices`] offers an optional built-in adapter (or installed plugin) that
+//! is off through the welcome window ([`crate::app::welcome::offer`]). The rekordbox readers are always on.
 
 use crate::app::{App, welcome};
 use openfader::{device::Device, plugin::current};
 use std::{cell::RefCell, collections::HashSet};
 
-/// A top-level folder of a device, and the extension that reads the library inside it.
+/// A top-level folder of a device, and the optional built-in adapter that reads the library inside it.
 const FOLDERS: &[(&str, &str)] = &[
     ("Engine Library", "engine-dj"),
     ("_Serato_", "serato"),

@@ -63,7 +63,8 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) -> Timer {
     });
     let weak = app.as_weak();
     let timer = Timer::default();
-    timer.start(TimerMode::Repeated, Duration::from_millis(100), move || {
+    // 250 ms: it only picks up a finished decode and the end of the playback, which no one times to a tenth of a second.
+    timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
         let Some(app) = weak.upgrade() else { return };
         let state = app.global::<BrowserState>();
         let bus = audio::live_bus();

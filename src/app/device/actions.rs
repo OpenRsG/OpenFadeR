@@ -4,8 +4,9 @@
 //! Eject is `Ctx::eject` in the `backup` child (it backs up first).
 
 use super::{
+    App, Ctx, DeviceState,
     review::{self, Planned},
-    toast, App, Ctx, DeviceState,
+    toast,
 };
 use openfader::{
     device::{self, Device, history, update},
@@ -66,7 +67,7 @@ fn run_action(cx: &Rc<Ctx>, d: &Device, id: &str, confirmed: bool) {
         return;
     }
     let Some(provider) = d.provider() else {
-        return cx.say(&tr!("{}: its extension is switched off. Switch it on in PREFERENCES > EXTENSIONS, then restart.", d.label), true);
+        return cx.say(&tr!("{}: its library format is switched off. Enable it in Preferences > Library formats.", d.label), true);
     };
     let config = device_settings::config(&cx.store, &d.id);
     let (dev, id) = (d.clone(), id.to_owned());

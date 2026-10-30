@@ -27,6 +27,7 @@ pub struct Row {
     pub key: String,
     pub label: String,
     pub hint: String,
+    pub help: String,
     pub kind: Kind,
     pub options: Vec<String>,
     pub current: usize,
@@ -39,6 +40,7 @@ impl Row {
             key: key.into(),
             label: label.into(),
             hint: String::new(),
+            help: super::help::text(key).to_owned(),
             kind,
             options: options.iter().map(|s| s.to_string()).collect(),
             current,
@@ -114,6 +116,11 @@ impl Row {
         self
     }
 
+    pub fn help(mut self, help: &str) -> Row {
+        self.help = help.into();
+        self
+    }
+
     /// Greyed out and unclickable while `on` is false.
     pub fn enabled(mut self, on: bool) -> Row {
         self.enabled = on;
@@ -127,6 +134,7 @@ impl From<Row> for PrefRowData {
             key: r.key.into(),
             label: r.label.into(),
             hint: r.hint.into(),
+            help: r.help.into(),
             kind: r.kind as i32,
             options: ModelRc::new(VecModel::from(
                 r.options

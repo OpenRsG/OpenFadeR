@@ -1,7 +1,8 @@
+import { ListView } from "std-widgets.slint";
 import { Theme } from "theme.slint";
 import { DialogFrame, Note } from "dialog.slint";
-import { Dropdown } from "widgets.slint";
-import { PrefRowData, PrefRows, PrefsState } from "prefs-state.slint";
+import { Chip, Dropdown, Glyph, Icon, IconButton, TextField, Tooltip } from "widgets.slint";
+import { PrefCategory, PrefRowData, PrefRows, PrefsState } from "prefs-state.slint";
 import { PrefsView } from "prefs-view.slint";
 import { PrefsAudio } from "prefs-audio.slint";
 import { PrefsAnalysis } from "prefs-analysis.slint";
@@ -11,82 +12,180 @@ import { PrefsExtensions } from "prefs-extensions.slint";
 import { PrefsDjSystem } from "prefs-djsystem.slint";
 import { PrefsAdvanced } from "prefs-advanced.slint";
 import { ThemesPage } from "themes.slint";
-export { PrefRowData, PrefsState }
+import { PluginManager } from "plugins.slint";
+export { PrefCategory, PrefRowData, PrefsState }
 
-/// Category entry of the left column.
-component Category inherits Rectangle {
-    in property <string> text;
+/// One entry of the sidebar: its glyph and title in a pill (lit when open), under the group label of the first entry of a group.
+component Category inherits FocusScope {
+    in property <PrefCategory> entry;
+    in property <bool> group-start;
+    in property <bool> first;
     in property <bool> active;
     callback clicked;
-    height: Theme.h-row + Theme.space-sm;
-    background: root.active ? Theme.select : ta.has-hover ? Theme.panel-high : transparent;
-    Text {
-        x: Theme.space-lg;
-        text: root.text;
-        vertical-alignment: center;
-        color: root.active ? Theme.text-bright : Theme.text-dim;
+    property <length> heading-h: root.group-start ? (root.first ? 26px : 34px) : 0px;
+    property <length> row-h: max(34px, Theme.h-row + Theme.space-md);
+    height: root.row-h + root.heading-h;
+    if root.group-start: Text {
+        x: 2 * Theme.space-lg;
+        y: root.heading-h - 22px;
+        height: 20px;
+        text: root.entry.group;
+        color: Theme.text-faint;
         font-family: Theme.font;
-        font-size: Theme.font-sm;
+        font-size: Theme.font-xs;
         font-weight: Theme.weight-bold;
+        letter-spacing: 0.8px;
+        vertical-alignment: center;
     }
-    ta := TouchArea { clicked => { root.clicked(); } }
+    pill := Rectangle {
+        x: Theme.space-md;
+        y: root.heading-h + 1px;
+        width: root.width - 2 * Theme.space-md;
+        height: root.row-h - 2px;
+        border-radius: Theme.radius-lg;
+        background: root.active ? Theme.select : area.has-hover ? Theme.hover-row : transparent;
+        border-width: root.has-focus ? 1px : 0px;
+        border-color: Theme.accent;
+        animate background { duration: Theme.t-fast; }
+        accessible-role: button;
+        accessible-label: root.entry.title;
+        accessible-action-default => { root.clicked(); }
+        Glyph {
+            x: Theme.space-lg;
+            y: (parent.height - self.height) / 2;
+            width: Theme.icon-size;
+            height: Theme.icon-size;
+            icon: root.entry.icon;
+            tint: root.active ? Theme.accent-hi : Theme.text-dim;
+        }
+        Text {
+            x: Theme.space-lg + Theme.icon-size + Theme.space-md;
+            width: max(0px, parent.width - self.x - Theme.space-md);
+            height: parent.height;
+            text: root.entry.title;
+            vertical-alignment: center;
+            color: root.active ? Theme.text-bright : Theme.text;
+            font-family: Theme.font;
+            font-size: Theme.font-md;
+            font-weight: root.active ? Theme.weight-semi : Theme.weight;
+            overflow: elide;
+        }
+        area := TouchArea { clicked => { root.focus(); root.clicked(); } }
+        Tooltip { width: parent.width; height: parent.height; text: root.entry.description; hovered: area.has-hover; }
+    }
+    key-pressed(event) => {
+        if event.text == "\n" || event.text == " " { root.clicked(); return accept; }
+        return reject;
+    }
 }
 
-/// PREFERENCES dialog : categories on the left, the chosen category's page on the
-/// right in a scrolling viewport. Page rows are built by Rust (src/app/prefs); a page may add its own controls.
 export component PrefsOverlay inherits DialogFrame {
     visible: PrefsState.visible;
     title: @tr("PREFERENCES");
-    // The card follows the window (DialogFrame keeps 8 px of scrim around it): 80 % of the width (at least 860 px, at most 1400 px), 92 % of the height.
-    card-width: Theme.layout-profile == 1 ? root.width - 16px : min(1400px, max(860px, root.width * 0.8));
+    property <bool> compact: Theme.layout-profile == 1 || root.width < 900px;
+    property <bool> path-open;
+    property <bool> searchable: PrefsState.category != 4 && PrefsState.category != 8;
+    card-width: root.compact ? root.width - 16px : min(root.width - 16px, min(1280px, max(940px, root.width * 0.88)));
     card-height: root.height * 0.92;
     body-padding: 0px;
     closed => { PrefsState.visible = false; }
     changed visible => {
         if self.visible { PrefsState.category-chosen(PrefsState.category); }
     }
-    if Theme.layout-profile == 1: Dropdown {
-        options: [@tr("VIEW"), @tr("THEMES"), @tr("AUDIO"), @tr("ANALYSIS"), @tr("CONTROLLER"), @tr("KEYBOARD"), @tr("EXTENSIONS"), @tr("DJ SYSTEM"), @tr("ADVANCED"), @tr("LIBRARIES")];
-        current: PrefsState.category == 9 ? 9 : PrefsState.category == 8 ? 1 : PrefsState.category > 0 ? PrefsState.category + 1 : 0;
+    if root.compact: Dropdown {
+        options: PrefsState.category-titles;
+        icons: PrefsState.category-icons;
+        current: PrefsState.category-index;
         chose(n) => {
-            PrefsState.category = n == 9 ? 9 : n == 1 ? 8 : n > 1 ? n - 1 : n;
+            PrefsState.category-chosen(PrefsState.categories[n].id);
             flick.content-y = 0;
             flick.content-x = 0;
-            PrefsState.category-chosen(PrefsState.category);
         }
     }
     HorizontalLayout {
         spacing: 0px;
-        Rectangle {
-            width: Theme.layout-profile == 1 ? 0px : 160px;
-            visible: Theme.layout-profile != 1;
+        if !root.compact: Rectangle {
+            width: 224px;
             background: Theme.bg;
-            VerticalLayout {
-                padding-top: Theme.space-sm;
-                alignment: start;
-                // THEMES (category 8, added last so the numbers of the others stay) is listed second, next to VIEW.
-                for name[i] in [@tr("VIEW"), @tr("THEMES"), @tr("AUDIO"), @tr("ANALYSIS"), @tr("CONTROLLER"), @tr("KEYBOARD"), @tr("EXTENSIONS"), @tr("DJ SYSTEM"), @tr("ADVANCED"), @tr("LIBRARIES")]: Category {
-                    property <int> cat: i == 9 ? 9 : i == 1 ? 8 : i > 1 ? i - 1 : i;
-                    text: name;
-                    active: PrefsState.category == self.cat;
+            ListView {
+                width: parent.width - 1px;
+                for entry[i] in PrefsState.categories: Category {
+                    entry: entry;
+                    first: i == 0;
+                    group-start: i == 0 || entry.group != PrefsState.categories[i - 1].group;
+                    active: PrefsState.category == entry.id;
                     clicked => {
-                        PrefsState.category = self.cat;
+                        PrefsState.category-chosen(entry.id);
                         flick.content-y = 0;
-                        PrefsState.category-chosen(self.cat);
+                        flick.content-x = 0;
                     }
                 }
             }
+            Rectangle { x: parent.width - 1px; width: 1px; background: Theme.line; }
         }
-        VerticalLayout {
-            padding: Theme.space-xl;
-            spacing: Theme.space-lg;
+        content := VerticalLayout {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            max-width: 100000px;
+            padding-left: root.compact ? Theme.space-lg : 2 * Theme.space-xl;
+            padding-right: root.compact ? Theme.space-lg : 2 * Theme.space-xl;
+            padding-top: root.compact ? Theme.space-lg : Theme.space-xl;
+            padding-bottom: Theme.space-md;
+            spacing: Theme.space-md;
+            // The page: left-aligned and at most 1000 px wide, so labels, controls and help stay close together on a wide window.
+            // Derived from the card, not from this layout's own width (that would be a binding loop).
+            property <length> page-w: min(1000px, min(root.width - 16px, root.card-width) - (root.compact ? 0px : 224px) - self.padding-left - self.padding-right);
+            Text {
+                text: PrefsState.categories[PrefsState.category-index].title;
+                color: Theme.text-bright;
+                font-family: Theme.font;
+                font-size: Theme.font-xl;
+                font-weight: Theme.weight-bold;
+                vertical-stretch: 0;
+            }
+            Text {
+                width: parent.page-w;
+                text: PrefsState.categories[PrefsState.category-index].description;
+                color: Theme.text-dim;
+                font-family: Theme.font;
+                font-size: Theme.font-size;
+                wrap: word-wrap;
+                vertical-stretch: 0;
+            }
+            if root.searchable && root.compact && PrefsState.sections.length > 2: Dropdown {
+                width: parent.page-w;
+                options: PrefsState.sections;
+                current: PrefsState.section;
+                chose(n) => { PrefsState.section = n; PrefsState.filter-changed(PrefsState.query); flick.content-y = 0; }
+            }
+            if root.searchable: HorizontalLayout {
+                width: parent.page-w;
+                height: Theme.target-size(32px);
+                spacing: Theme.space-md;
+                TextField {
+                    text <=> PrefsState.query;
+                    icon: Icon.search;
+                    placeholder-text: @tr("Find a setting on this page");
+                    edited(t) => { PrefsState.filter-changed(t); flick.content-y = 0; }
+                }
+                if !root.compact && PrefsState.sections.length > 2: Dropdown {
+                    width: 240px;
+                    horizontal-stretch: 0;
+                    options: PrefsState.sections;
+                    current: PrefsState.section;
+                    chose(n) => { PrefsState.section = n; PrefsState.filter-changed(PrefsState.query); flick.content-y = 0; }
+                }
+            }
             flick := Flickable {
-                // Rows wider than the page (a long device name) are cut or elided, never scrolled sideways: the labels stay where they are.
-                content-width: Theme.layout-profile == 1 ? max(self.width, page.preferred-width) : self.width;
-                content-height: page.preferred-height;
+                preferred-height: 0px;
+                vertical-stretch: 1;
+                content-width: self.width;
+                content-height: page.preferred-height + Theme.space-xl;
                 page := VerticalLayout {
-                    width: flick.content-width;
+                    x: 0px;
+                    width: content.page-w;
                     alignment: start;
+                    padding-top: Theme.space-sm;
                     if PrefsState.category == 0: PrefsView {}
                     if PrefsState.category == 1: PrefsAudio {}
                     if PrefsState.category == 2: PrefsAnalysis {}
@@ -97,9 +196,35 @@ export component PrefsOverlay inherits DialogFrame {
                     if PrefsState.category == 7: PrefsAdvanced {}
                     if PrefsState.category == 8: ThemesPage {}
                     if PrefsState.category == 9: PrefRows {}
+                    if PrefsState.category == 10: VerticalLayout {
+                        max-width: 100000px;
+                        spacing: Theme.space-md;
+                        Chip {
+                            text: @tr("Manage library sources");
+                            horizontal-stretch: 0;
+                            width: max(200px, self.fit-width);
+                            clicked => { PrefsState.category-chosen(9); flick.content-y = 0; }
+                        }
+                        PluginManager { compatibility: true; }
+                    }
+                    if PrefsState.category == 11: PrefRows {}
                 }
             }
-            Note { text: @tr("Saved on every change to {}.", PrefsState.path); }
+            HorizontalLayout {
+                width: parent.page-w;
+                height: Theme.target-size(24px);
+                spacing: Theme.space-sm;
+                Note { text: @tr("Changes save automatically."); vertical-alignment: center; }
+                Rectangle { horizontal-stretch: 1; }
+                IconButton {
+                    width: Theme.target-size(24px);
+                    icon: Icon.info;
+                    tooltip: PrefsState.path;
+                    accessible-label: @tr("Settings file location");
+                    clicked => { root.path-open = !root.path-open; }
+                }
+            }
+            if root.path-open: Note { width: parent.page-w; text: PrefsState.path; }
         }
     }
 }

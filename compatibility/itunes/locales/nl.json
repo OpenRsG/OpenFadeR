@@ -1,0 +1,19 @@
+{
+ "C:/Users/x/Music=>/home/y/Music;… (empty: $OPENFADER_PATH_MAP)": "C:/Users/x/Music=>/home/y/Music;… (leeg: $OPENFADER_PATH_MAP)",
+ "Convert iTunes \"Grouping\" to rekordbox \"Label\"": "iTunes-\"Grouping\" omzetten naar rekordbox-\"Label\"",
+ "Import from iTunes…": "Importeren uit iTunes…",
+ "Path map": "Padtoewijzing",
+ "Reads an iTunes / Music Library.xml: tracks and playlists.": "Leest een iTunes / Music Library.xml: tracks en afspeellijsten.",
+ "iTunes Library File": "iTunes-bibliotheekbestand",
+ "path map entry '{}' is not <from>=><to>": "padtoewijzing '{}' heeft niet de vorm <van>=><naar>",
+ "path of the iTunes / Music Library.xml, listed in the Media Browser": "pad van de iTunes / Music Library.xml, getoond in de mediabrowser",
+ "the plugin panicked": "de plugin is gecrasht",
+ "{}: bad attribute in <{}>": "{}: ongeldig attribuut in <{}>",
+ "{}: malformed dict in property list": "{}: onjuist dictionary in de propertylist",
+ "{}: malformed property list": "{}: onjuiste propertylist",
+ "{}: not an iTunes library (no <plist>)": "{}: geen iTunes-bibliotheek (geen <plist>)",
+ "{}: unexpected end of property list": "{}: onverwacht einde van de propertylist",
+ "{}: unquoted attribute {}": "{}: attribuut zonder aanhalingstekens {}",
+ "{}: unterminated attribute value": "{}: niet-afgesloten attribuutwaarde",
+ "{}: unterminated tag": "{}: niet-afgesloten tag"
+}

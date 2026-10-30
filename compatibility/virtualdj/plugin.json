@@ -1,0 +1,25 @@
+{
+  "name": "virtualdj",
+  "version": "0.1.1",
+  "description": "VirtualDJ database: read the desktop library (database.xml with its lists), and export a collection with its cues, loops, grids and playlists to a drive's own VirtualDJ/database.xml.",
+  "library": {
+    "formats": [
+      "dir",
+      "xml"
+    ],
+    "device": true,
+    "detect": {
+      "linux": [
+        "~/Documents/VirtualDJ/database.xml",
+        "~/.wine/drive_c/users/*/Documents/VirtualDJ/database.xml"
+      ],
+      "macos": [
+        "~/Library/Application Support/VirtualDJ/database.xml",
+        "~/Documents/VirtualDJ/database.xml"
+      ],
+      "windows": [
+        "%USERPROFILE%/Documents/VirtualDJ/database.xml"
+      ]
+    }
+  }
+}

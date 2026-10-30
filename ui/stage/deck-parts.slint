@@ -257,7 +257,7 @@ export component StageWave inherits Rectangle {
 
 /// The jog in the `Theme.jog-style`: 0 a thick ring in the deck colour with the BPM and key inside, 1 a vinyl platter showing the
 /// cover and title, 2 a thin ring with beat ticks. A ring arc (style 2: a dot) follows the playhead on a 33⅓ rpm platter. A drag
-/// scratches (as the studio jog does); a double-click on the figure resets the tempo. Sized by the smaller of its width and height.
+/// scratches; a double-click on the figure resets the tempo. Sized by the smaller of its width and height.
 export component StageJog inherits Rectangle {
     in property <int> index;
     in property <color> tone;

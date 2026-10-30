@@ -4,9 +4,7 @@ import { DeckDetail } from "../deck-wave.slint";
 import { DeckScroll, DeckState } from "../deck-state.slint";
 import { DeviceProgress } from "../device.slint";
 import { DragTracker } from "../dnd.slint";
-import { KeysState } from "../help.slint";
 import { PrefsState } from "../prefs-state.slint";
-import { StudioState } from "../studio-state.slint";
 import { TrackInfoState } from "../trackinfo.slint";
 import { Glyph, Icon } from "../widgets.slint";
 import { StageBar } from "bar.slint";
@@ -14,7 +12,7 @@ import { StageDeck, StageDeckSize } from "deck.slint";
 import { StageLibrary } from "library.slint";
 import { StageMixer } from "mixer.slint";
 import { StageColorSampler, StageEffects } from "strip.slint";
-import { StageMetrics } from "state.slint";
+import { StageMetrics, StageState } from "state.slint";
 import { ResourceChip } from "../resources.slint";
 
 /// The row of bar numbers over one waveform: Rust gives the number of the first labelled bar, the x of its line and the distance
@@ -63,7 +61,7 @@ component Wave inherits Rectangle {
 /// The Stage presentation (`Theme.layout-profile` 3) of the PERFORMANCE mode with two decks: one window, laid out from the Stage tokens.
 /// The top bar; the enlarged waveforms stacked across the top (`stage-wave` 0), in a column between the decks over the mixer (1) or
 /// inside the decks (2); a deck panel per side round the mixer; the optional strip of effects, colour FX and sampler under the decks;
-/// the library, its side bar and the status line. It drives the same globals as the desktop and studio workspaces, so switching
+/// the library, its side bar and the status line. It drives the same globals as the desktop workspace, so switching
 /// profiles keeps every setting and the playing decks. Every big part is its own permanent `if true` item tree (docs/code-structure.md).
 export component StageWorkspace inherits Rectangle {
     property <length> g: Theme.stage-gap;
@@ -99,18 +97,13 @@ export component StageWorkspace inherits Rectangle {
     background: Theme.bg;
     DragTracker { x: 0px; y: 0px; width: root.width; height: root.height; }
     FocusScope {
-        init => { self.focus(); }
+        init => { if !PrefsState.visible { self.focus(); } }
         key-pressed(e) => {
-            // Arrows reach here only when neither the search box nor the track list has focus.
-            if (e.text == Key.UpArrow || e.text == Key.DownArrow) {
-                StudioState.browse(e.text == Key.DownArrow ? 1 : -1);
+            if !PrefsState.visible && (e.text == Key.UpArrow || e.text == Key.DownArrow) {
+                StageState.browse(e.text == Key.DownArrow ? 1 : -1);
                 return accept;
             }
-            // Held keys repeat; a shortcut fires once per press.
-            if (!e.repeat && KeysState.key(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
-        }
-        key-released(e) => {
-            if (KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
+            return reject;
         }
         if true: StageBar { x: 0px; y: 0px; width: root.width; height: root.bar-h; }
         for i in root.browse || !root.top-waves ? 0 : 2: Wave {

@@ -1,0 +1,19 @@
+{
+ "C:/Users/x/Music=>/home/y/Music;… (empty: $OPENFADER_PATH_MAP)": "C:/Users/x/Music=>/home/y/Music;… (vuoto: $OPENFADER_PATH_MAP)",
+ "Convert iTunes \"Grouping\" to rekordbox \"Label\"": "Converti il \"Grouping\" di iTunes in \"Label\" di rekordbox",
+ "Import from iTunes…": "Importa da iTunes…",
+ "Path map": "Mappa dei percorsi",
+ "Reads an iTunes / Music Library.xml: tracks and playlists.": "Legge un iTunes / Music Library.xml: tracce e playlist.",
+ "iTunes Library File": "File libreria iTunes",
+ "path map entry '{}' is not <from>=><to>": "la voce della mappa dei percorsi '{}' non è nella forma <da>=><a>",
+ "path of the iTunes / Music Library.xml, listed in the Media Browser": "percorso di iTunes / Music Library.xml, elencato nel browser multimediale",
+ "the plugin panicked": "il plugin è andato in crash",
+ "{}: bad attribute in <{}>": "{}: attributo non valido in <{}>",
+ "{}: malformed dict in property list": "{}: dizionario malformato nella lista di proprietà",
+ "{}: malformed property list": "{}: lista di proprietà malformata",
+ "{}: not an iTunes library (no <plist>)": "{}: non è una libreria iTunes (nessun <plist>)",
+ "{}: unexpected end of property list": "{}: fine inattesa della lista di proprietà",
+ "{}: unquoted attribute {}": "{}: attributo senza virgolette {}",
+ "{}: unterminated attribute value": "{}: valore dell'attributo non terminato",
+ "{}: unterminated tag": "{}: tag non terminato"
+}

@@ -1,4 +1,7 @@
-//! STEMS on a deck: the PREFS switch starts a background separation shared by compatible loaded tracks, shown as progress
+//! STEMS on a deck: with the PREFS switch on, a loaded track's stems come from the cache or a stem file at once; an uncached
+//! track is separated in the background when a stem control of its deck is first used (a part button, pad, ACTIVE PART, an
+//! isolator knob, an FX PART SELECT, INSTANT DOUBLES), so a track played as the mix costs no stems memory or inference.
+//! The separation is shared by compatible loaded tracks and shown as progress
 //! text in each stem row. Each deck owns a subscription; unloading the last one cancels the native job
 //! ([`openfader::stems::Job`]). The stems go to the player ([`openfader::audio::Player::set_stems`]) as soon as the worker
 //! allocates them and fill in while the track plays: frames not separated yet play as the original. SPEED prioritizes every
@@ -141,6 +144,9 @@ pub(super) struct State {
     seen: Option<(bool, bool, bool, bool, bool, bool)>,
     /// (play position's segment, hot cue frame hash) the subscription was last pointed at.
     focus: Option<(usize, u64)>,
+    /// A stem control of this deck was used on the loaded track: an uncached separation may start (until then the track
+    /// plays as the mix and costs no stems memory or inference).
+    wanted: bool,
 }
 
 impl Default for State {
@@ -157,6 +163,7 @@ impl Default for State {
             parts: None,
             seen: None,
             focus: None,
+            wanted: false,
         }
     }
 }
@@ -230,7 +237,7 @@ impl Deck {
             s.job = None;
             s.attached = None;
             s.parts = None;
-            (s.ready, s.complete, s.focus) = (false, false, None);
+            (s.ready, s.complete, s.focus, s.wanted) = (false, false, None, false);
             s.text.clear();
             if prefs::with(|p| p.stems_reset) {
                 s.mute = [false; STEM_COUNT];
@@ -260,7 +267,7 @@ impl Deck {
         if !prefs::with(|p| p.stems) {
             prefs::update(|p| p.stems = true);
         }
-        self.ensure_stems();
+        self.want_stems();
         let (levels, selected) = {
             let mut s = self.stems.borrow_mut();
             let iso = s.iso;
@@ -297,6 +304,9 @@ impl Deck {
             }
             let unmuted = s.mute != mute;
             drop(s);
+            if knobs.is_some() && iso != [1.0; 3] {
+                self.want_stems();
+            }
             if unmuted {
                 self.refresh_stem_buttons();
             } else {

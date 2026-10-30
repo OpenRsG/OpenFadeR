@@ -1,0 +1,40 @@
+{
+  "name": "itunes",
+  "version": "0.1.0",
+  "description": "Reads an iTunes / Music Library.xml: tracks and playlists.",
+  "library": {
+    "formats": [
+      "xml"
+    ],
+    "detect": [
+      "~/Music/iTunes/iTunes Music Library.xml",
+      "%USERPROFILE%/Music/iTunes/iTunes Music Library.xml",
+      "~/Music/Music/Media/Music Library.xml"
+    ],
+    "collection_reader": "Import from iTunes…",
+    "browser": {
+      "label": "iTunes",
+      "path_setting": "file"
+    }
+  },
+  "settings": [
+    {
+      "id": "file",
+      "label": "iTunes Library File",
+      "type": "text",
+      "help": "path of the iTunes / Music Library.xml, listed in the Media Browser"
+    },
+    {
+      "id": "convert_grouping",
+      "label": "Convert iTunes \"Grouping\" to rekordbox \"Label\"",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "id": "path_map",
+      "label": "Path map",
+      "type": "text",
+      "help": "C:/Users/x/Music=>/home/y/Music;… (empty: $OPENFADER_PATH_MAP)"
+    }
+  ]
+}

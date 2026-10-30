@@ -146,7 +146,7 @@ impl Submission {
                         .map(openfader::store::id_key)
                         .unwrap_or_else(|| format!("pending:{}", path.display())),
                     path,
-                    track: track.clone(),
+                    track: Subject::Row(source.tracks.clone(), index),
                     explicit: source.explicit,
                     refresh: source.refresh,
                     keep_cues: source.keep_cues,

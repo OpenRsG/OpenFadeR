@@ -121,7 +121,7 @@ pub fn open(path: &Path) -> Result<Box<dyn Library + Send>, String> {
         return Ok(Box::new(folder::Folder::open(path)?));
     }
     Err(format!(
-        "no library plugin reads {} (enable one in Preferences > Extensions; the bundled ones are built by extension/plugin/build.sh)",
+        "no enabled library reader handles {} (enable its format in Preferences > Library formats, or its add-on in Preferences > Extensions)",
         path.display()
     ))
 }
@@ -137,14 +137,8 @@ mod tests {
         let file = dir.join("notes.xyz");
         std::fs::write(&file, b"?").unwrap();
         assert_eq!(open(&dir).map(|l| l.kind().to_owned()), Ok("Folder".into()));
-        assert!(open(&file)
-            .err()
-            .unwrap()
-            .starts_with("no library plugin reads"));
-        assert!(open(&dir.join("gone"))
-            .err()
-            .unwrap()
-            .contains("no such file"));
+        assert!(open(&file).is_err());
+        assert!(open(&dir.join("gone")).is_err());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

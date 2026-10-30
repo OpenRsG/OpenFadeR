@@ -1,0 +1,23 @@
+{
+  "name": "engine-dj",
+  "version": "0.1.0",
+  "description": "Engine DJ libraries (Engine Library/Database2/m.db): connect the library of Engine DJ desktop or a USB stick or SD card, and export tracks, cues, loops, beat grids, waveforms and playlists to a device for Denon DJ, Numark and RANE players.",
+  "library": {
+    "formats": [
+      "db",
+      "dir"
+    ],
+    "device": true,
+    "detect": {
+      "linux": [
+        "~/Music/Engine Library/Database2/m.db"
+      ],
+      "macos": [
+        "~/Music/Engine Library/Database2/m.db"
+      ],
+      "windows": [
+        "%USERPROFILE%/Music/Engine Library/Database2/m.db"
+      ]
+    }
+  }
+}

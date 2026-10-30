@@ -117,7 +117,7 @@ component MenuKnow inherits VerticalLayout {
 /// theme asks for it or the table is narrower than both). Put it in a `PopupWindow` sized `menu-w` × `menu-h`; `done`
 /// closes it. Up / Down (or the browse knob) walk the items, Enter (or the knob's push) runs the one they are on.
 export component TrackMenu inherits Rectangle {
-    /// Stage and Studio load to the two shown decks by name; the classic browser loads as a double click does.
+    /// Stage loads to the two shown decks by name; the classic browser loads as a double click does.
     in property <bool> two-decks;
     in property <bool> palettes;
     in property <bool> narrow;

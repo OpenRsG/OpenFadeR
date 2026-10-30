@@ -30,7 +30,7 @@ pub fn take(deck: &Deck, beats: u32, original: bool) -> Result<Drum, String> {
             p.capture(from, (to - from) / 1000.0)
         } else {
             let stems = p.stems().ok_or(tr!(
-                "DRUM CAPTURE needs the STEMS of this track (PREFS > Extensions)"
+                "DRUM CAPTURE needs this track's STEMS (Preferences > Creative tools)"
             ))?;
             let frame = |ms: f64| (ms * rate as f64 / 1000.0).round() as usize;
             capture::drums(&stems, rate, frame(from), frame(to) - frame(from))?

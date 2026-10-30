@@ -543,7 +543,6 @@ mod tests {
             import { WaveStrip, DeckDetail } from "../../../ui/deck-wave.slint";
             import { Chip, RingButton } from "../../../ui/widgets.slint";
             import { StageButton } from "../../../ui/stage/controls.slint";
-            import { BigButton } from "../../../ui/studio/parts.slint";
             import { DeckDetailV } from "../../../ui/deck-wave-v.slint";
             import { StageWave, StagePads } from "../../../ui/stage/deck-parts.slint";
             import { DeckState } from "../../../ui/deck-state.slint";
@@ -568,7 +567,6 @@ mod tests {
                 Chip { x: 0px; width: 80px; height: 80px; pressed => { root.down(); } released => { root.up(); } clicked => { root.clicked(); } }
                 RingButton { x: 80px; width: 80px; height: 80px; pressed => { root.down(); } released => { root.up(); } clicked => { root.clicked(); } }
                 StageButton { x: 160px; width: 80px; height: 80px; pressed => { root.down(); } released => { root.up(); } clicked => { root.clicked(); } }
-                BigButton { x: 240px; width: 80px; height: 80px; pressed => { root.down(); } released => { root.up(); } clicked => { root.clicked(); } }
             }
             export component CueWaves inherits Window {
                 in property <int> index;
@@ -811,7 +809,7 @@ mod tests {
             let ui = CueButtons::new().unwrap();
             ui.show().unwrap();
             let window = crate::app::headless::last_window();
-            window.set_size(PhysicalSize::new(320, 80));
+            window.set_size(PhysicalSize::new(240, 80));
             let counts = Rc::new(Cell::new((0, 0, 0)));
             let c = counts.clone();
             ui.on_down(move || {
@@ -828,7 +826,7 @@ mod tests {
                 let (d, u, k) = c.get();
                 c.set((d, u, k + 1));
             });
-            for (n, x) in [40.0, 120.0, 200.0, 280.0].into_iter().enumerate() {
+            for (n, x) in [40.0, 120.0, 200.0].into_iter().enumerate() {
                 let position = LogicalPosition::new(x, 40.0);
                 let button = PointerEventButton::Left;
                 ui.window()

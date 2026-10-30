@@ -106,7 +106,7 @@ pub fn adopt(store: &Store, path: &Path) -> R<Connection> {
         ),
         None => {
             return Err(format!(
-                "no library plugin reads {} (enable one in Preferences > Extensions)",
+                "no enabled library reader handles {} (enable its format in Preferences > Library formats, or its add-on in Preferences > Extensions)",
                 path.display()
             ))
         }

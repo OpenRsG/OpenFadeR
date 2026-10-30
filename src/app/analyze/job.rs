@@ -50,10 +50,34 @@ pub struct Guide {
     pub cue_revision: i64,
 }
 
+/// The track a job analyses: a row of the submitted list (shared, never copied per job) until preparation swaps in the
+/// Collection's listing of it ([`super::listed`]).
+#[derive(Clone)]
+pub enum Subject {
+    Row(Arc<Vec<Track>>, usize),
+    Listed(Arc<Track>),
+}
+
+impl std::ops::Deref for Subject {
+    type Target = Track;
+    fn deref(&self) -> &Track {
+        match self {
+            Self::Row(list, i) => &list[*i],
+            Self::Listed(t) => t,
+        }
+    }
+}
+
+impl From<Track> for Subject {
+    fn from(t: Track) -> Self {
+        Self::Listed(Arc::new(t))
+    }
+}
+
 pub struct Job {
     pub path: PathBuf,
     /// What the analysis is of: its identity names the stored entry ([`cache`]).
-    pub track: Track,
+    pub track: Subject,
     /// [`openfader::store::key`] of the track.
     pub key: String,
     /// Asked for by the user (the track menu): analysed again whatever the cache holds, and its key is written to the tag
@@ -230,7 +254,7 @@ struct Subscriber {
 }
 
 struct Work {
-    track: Track,
+    track: Subject,
     path: PathBuf,
     key: String,
     explicit: bool,
@@ -434,7 +458,9 @@ fn wake() -> &'static Condvar {
 
 fn prepare(sub: &mut Subscriber) -> Result<bool, String> {
     let job = &mut sub.job;
-    job.track = super::listed(&sub.store, &job.track);
+    if let Some(t) = super::listed(&sub.store, &job.track) {
+        job.track = t.into();
+    }
     job.path = job
         .track
         .file
@@ -462,7 +488,7 @@ fn prepare(sub: &mut Subscriber) -> Result<bool, String> {
     let mut own = job
         .reader
         .as_ref()
-        .and_then(|read| read(&job.track))
+        .and_then(|read| read(&*job.track))
         .unwrap_or_default();
     let mut edits = sub.store.edits(&job.key)?;
     let edited_grid = edits.grid.is_some();
@@ -814,7 +840,8 @@ mod tests {
             track: Track {
                 file: Some(path.into()),
                 ..Track::default()
-            },
+            }
+            .into(),
             key: format!("{path}|1"),
             explicit: false,
             refresh: false,
@@ -826,6 +853,26 @@ mod tests {
             ticket: None,
             cue_epoch: u64::MAX,
         }
+    }
+
+    #[test]
+    fn a_row_subject_shares_the_submitted_list() {
+        let list = Arc::new(vec![
+            Track::default(),
+            Track {
+                title: "b".into(),
+                ..Track::default()
+            },
+        ]);
+        let subject = Subject::Row(list.clone(), 1);
+        assert_eq!(subject.title, "b");
+        let copy = subject.clone();
+        assert_eq!(
+            Arc::strong_count(&list),
+            3,
+            "cloned by reference, not by value"
+        );
+        drop(copy);
     }
 
     fn settings(tag: bool) -> Settings {

@@ -14,12 +14,15 @@
 //!
 //! Transients: a grain boundary that lands on a drum hit smears it (a hit half-faded in, or played twice a few ms apart).
 //! So each block looks at the source for onsets (a jump in the energy of the first difference of the mono sum, per
-//! `BIN` frames). A new onset in the next grain, with none in the previous grain's continuation to match, moves the
-//! splice to just before it: the old grain plays on untouched, a short `XF` fade ends at the onset, the new grain starts
-//! there at full level and exactly at its nominal position. An onset both grains have (the same hit, `|dt|` within
-//! the search tolerance, as the grains overlap in the source when slowing down, or the new one jumps ahead when speeding up) is
-//! aligned instead: the correlation search runs on the hit alone, so the two copies coincide and the usual 50 % fade sums
-//! them to one sharp hit. Blocks without onsets run the plain search and fade.
+//! `BIN` frames, that is also at least `STRONG` of the loudest bin of the region: a hit, not a syllable or a swell of a
+//! sustained voice, whose splices would chirp it, issue 35). A new onset in the next grain, with none in the previous
+//! grain's continuation to match, moves the splice to just before it: the old grain plays on untouched, a short `XF` fade
+//! ends at the onset, the new grain starts there at full level, at the offset that keeps the sustained sound before the
+//! hit in phase (the correlation search on that stretch; the hit itself then lands within the search tolerance of its
+//! nominal time). An onset both grains have (the same hit, `|dt|` within the search tolerance, as the grains overlap in
+//! the source when slowing down, or the new one jumps ahead when speeding up) is aligned instead: the correlation search
+//! runs on the hit alone, so the two copies coincide and the usual 50 % fade sums them to one sharp hit. Blocks without
+//! onsets run the plain search and fade.
 //!
 //! shortcut: one lag for both channels, a fixed 2048-frame grain, and only the first onset placed per grain
 //! still make dense polyphony phasey; upgrade to a phase-vocoder / elastique-class stretcher when that is required.
@@ -34,11 +37,13 @@ const HS: usize = 1024;
 /// Correlation looks at every DECIM-th frame.
 const DECIM: usize = 2;
 /// Onset detector: frames per energy bin, bins of history an onset is measured against,
-/// the energy ratio that makes one (~8 dB) and the energy below which nothing is (about -50 dBFS of first difference).
+/// the energy ratio that makes one (~8 dB), the energy below which nothing is (about -50 dBFS of first difference)
+/// and the share of the region's loudest bin a hit must reach (quieter rises are the texture of a sustained sound).
 const BIN: usize = 32;
 const LOOKBACK: usize = 4;
 const RISE: f32 = 6.0;
 const FLOOR: f32 = 1e-5;
+const STRONG: f32 = 0.25;
 /// Splice at an onset: the fade is at most `XF` frames and ends at the onset, at least `MIN_XF` long.
 const XF: usize = 128;
 const MIN_XF: usize = 32;
@@ -52,6 +57,7 @@ pub struct Stretch {
     mono: Vec<f32>,            // mono source region, for onset detection only
     cont: Vec<f32>, // stereo natural continuation of the previous grain (its second half, unwindowed), HS frames
     en: Vec<f32>,   // first-difference energy of `mono` per BIN frames
+    peak: f32,      // the largest of `en`
     out: Vec<f32>,  // stereo output block, HS frames
     rise: Vec<f32>, // HS Hann rising half (falling half = 1 - rise)
     at: usize,      // next unread frame of `out`; HS = exhausted
@@ -76,6 +82,7 @@ impl Stretch {
             mono: vec![0.0; seg],
             cont: vec![0.0; 2 * HS],
             en: vec![0.0; seg / BIN],
+            peak: 0.0,
             out: vec![0.0; 2 * HS],
             rise,
             at: HS,
@@ -160,15 +167,19 @@ impl Stretch {
             }
             *e = sum / BIN as f32;
         }
+        self.peak = self.en.iter().copied().fold(0.0, f32::max);
+    }
+
+    /// Bin `b` starts a hit: a rise over the bins before it that is loud for this region.
+    fn hit(&self, b: usize) -> bool {
+        let before = self.en[b - LOOKBACK..b].iter().sum::<f32>() / LOOKBACK as f32;
+        self.en[b] > RISE * before + FLOOR && self.en[b] >= STRONG * self.peak
     }
 
     /// The first onset starting in `mono[from..to]` (`from` at least `LOOKBACK` bins in): the frame its bin starts at.
     fn onset(&self, from: usize, to: usize) -> Option<usize> {
         (from.div_ceil(BIN)..to / BIN)
-            .find(|&b| {
-                let before = self.en[b - LOOKBACK..b].iter().sum::<f32>() / LOOKBACK as f32;
-                self.en[b] > RISE * before + FLOOR
-            })
+            .find(|&b| self.hit(b))
             .map(|b| b * BIN)
     }
 
@@ -176,10 +187,7 @@ impl Stretch {
     fn last_onset(&self, to: usize) -> Option<usize> {
         (LOOKBACK..to / BIN)
             .rev()
-            .find(|&b| {
-                let before = self.en[b - LOOKBACK..b].iter().sum::<f32>() / LOOKBACK as f32;
-                self.en[b] > RISE * before + FLOOR
-            })
+            .find(|&b| self.hit(b))
             .map(|b| b * BIN)
     }
 
@@ -200,10 +208,11 @@ impl Stretch {
         // The crossfade runs over a..b of the block: the whole block (Hann) unless an onset is spliced at.
         let (mut a, mut b, mut d) = (0, HS, self.tol);
         if self.primed {
-            // Frames at the head of the new grain the previous block has played already (the grains overlap in the source
-            // when slowing down); an onset there is a repeat, not a new hit.
-            let overlap = ((self.prev_pos - pos) / k + (HS + self.prev_d) as f64 - self.tol as f64)
-                .clamp(0.0, HS as f64) as usize;
+            // Where the previous grain's natural continuation lies in this region: an offset there joins it without any
+            // phase step. Frames at the head of the new grain before it the previous block has played already (the grains
+            // overlap in the source when slowing down); an onset there is a repeat, not a new hit.
+            let exact = (self.prev_pos - pos) / k + (HS + self.prev_d) as f64 - self.tol as f64;
+            let overlap = exact.clamp(0.0, HS as f64) as usize;
             let new = self
                 .onset(self.tol + overlap, self.tol + HS)
                 .map(|j| j - self.tol);
@@ -220,6 +229,16 @@ impl Stretch {
                 (Some(t), _) => {
                     b = t.max(MIN_XF);
                     a = b.saturating_sub(XF);
+                    // The sound before the hit stays in phase across the short fade: the offset that continues it, found
+                    // on that stretch when it is long enough to tell, else the continuation itself.
+                    d = if t >= ALIGN {
+                        self.best(0, t, lo)
+                    } else {
+                        (exact + self.tol as f64)
+                            .round()
+                            .clamp(lo as f64, 2.0 * self.tol as f64)
+                            as usize
+                    };
                 }
                 (None, _) => d = self.best(0, HS, lo),
             }

@@ -81,7 +81,7 @@ export component WelcomeOverlay inherits DialogFrame {
     Rectangle { height: 1px; background: Theme.line; }
     if WelcomeState.done == "" && WelcomeState.plugins.length > 0: VerticalLayout {
         spacing: Theme.space-md;
-        Text { text: @tr("SUGGESTED EXTENSIONS ({})", WelcomeState.plugins.length); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
+        Text { text: @tr("SUGGESTED OPTIONS ({})", WelcomeState.plugins.length); color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
         Note { text: WelcomeState.intro; }
         ListView {
             height: min(320px, WelcomeState.plugins.length * 78px);
@@ -89,7 +89,7 @@ export component WelcomeOverlay inherits DialogFrame {
         }
     }
     if WelcomeState.done == "" && WelcomeState.plugins.length == 0: Note {
-        text: @tr("Every suggested extension is already on. More are in PREFERENCES > EXTENSIONS > GET PLUGINS.");
+        text: @tr("Suggested options are already enabled. Manage native compatibility in Library formats and add-ons in Extensions.");
         horizontal-alignment: center;
     }
     if WelcomeState.done != "": Text {
@@ -100,7 +100,7 @@ export component WelcomeOverlay inherits DialogFrame {
         font-family: Theme.font;
         font-size: Theme.font-md;
     }
-    Note { text: @tr("You can change this later in PREFERENCES > EXTENSIONS, and open this window again from Help > Welcome."); horizontal-alignment: center; }
+    Note { text: @tr("Change compatibility in Library formats, native features in Creative tools, and add-ons in Extensions. Reopen this window from Help > Welcome."); horizontal-alignment: center; }
     HorizontalLayout {
         alignment: end;
         spacing: Theme.space-sm;

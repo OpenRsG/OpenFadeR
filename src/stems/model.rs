@@ -458,16 +458,172 @@ fn gpu_verdict<T>(out: &Result<T, String>) -> Option<String> {
     out.as_ref().err().cloned()
 }
 
-/// `OPENFADER_STEMS_GPU=0` keeps the GPU out (comparisons, machines where Vulkan misbehaves); a build without the `stems-gpu`
-/// feature has none.
+/// PREFS > Creative tools > STEMS PROCESSING: `Auto` uses the GPU where that is safe, `Cpu` never does. Set by the app from the
+/// settings; a running separation keeps its engines, the next one follows the new choice.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Processor {
+    #[default]
+    Auto,
+    Cpu,
+}
+
+static PROCESSOR: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+pub fn set_processor(p: Processor) {
+    PROCESSOR.store(p as u8, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn processor() -> Processor {
+    match PROCESSOR.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => Processor::Cpu,
+        _ => Processor::Auto,
+    }
+}
+
+/// Whether the GPU engine may open: the setting ([`Processor`]), `OPENFADER_STEMS_GPU=0` (comparisons, machines where Vulkan
+/// misbehaves), a build without the `stems-gpu` feature, and on Windows a machine whose only graphics adapters are integrated
+/// ones ([`integrated_only`]): there the desktop runs on the same GPU, and a segment of inference (seconds of compute the
+/// driver cannot preempt) freezes the screen, the pointer and the taskbar with it (issue 42). `OPENFADER_STEMS_GPU=1` overrides
+/// that check.
 fn gpu_allowed() -> Result<(), &'static str> {
+    let forced = std::env::var("OPENFADER_STEMS_GPU").ok();
     if !cfg!(feature = "stems-gpu") {
         Err("not in this build")
-    } else if std::env::var("OPENFADER_STEMS_GPU").is_ok_and(|v| v == "0") {
+    } else if forced.as_deref() == Some("0") {
         Err("disabled by OPENFADER_STEMS_GPU=0")
+    } else if processor() == Processor::Cpu {
+        Err("STEMS PROCESSING is set to CPU")
+    } else if forced.as_deref() != Some("1") && integrated_only() {
+        Err("only integrated graphics here: the desktop would freeze while a segment runs")
     } else {
         Ok(())
     }
+}
+
+/// Windows: every display adapter the driver class lists is an integrated one. The registry's display class
+/// (`{4d36e968-e325-11ce-bfc1-08002be10318}`) holds one subkey per adapter with its `DriverDesc` and, from the driver, its
+/// dedicated memory (`HardwareInformation.qwMemorySize`); an Intel adapter that is not an Arc, or any adapter the driver gives
+/// less than 1 GiB of its own memory, is integrated. Unreadable = false (the GPU stays allowed, as before). Checked once.
+#[cfg(windows)]
+fn integrated_only() -> bool {
+    static ONLY: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| {
+        let adapters = display_adapters();
+        let verdict =
+            !adapters.is_empty() && adapters.iter().all(|(desc, mem)| integrated(desc, *mem));
+        if verdict {
+            eprintln!(
+                "stems: integrated graphics only ({}): GPU separation off",
+                adapters
+                    .iter()
+                    .map(|a| a.0.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+        verdict
+    });
+    *ONLY
+}
+
+#[cfg(not(windows))]
+fn integrated_only() -> bool {
+    false
+}
+
+/// Whether an adapter with this `DriverDesc` and dedicated memory (bytes, `None` when the driver reports none) is integrated.
+fn integrated(desc: &str, dedicated: Option<u64>) -> bool {
+    let d = desc.to_ascii_lowercase();
+    if d.contains("intel") {
+        return !d.contains("arc");
+    }
+    dedicated.is_none_or(|m| m < 1 << 30)
+}
+
+/// `(DriverDesc, HardwareInformation.qwMemorySize)` of every adapter under the display class key.
+#[cfg(windows)]
+fn display_adapters() -> Vec<(String, Option<u64>)> {
+    use windows_sys::Win32::Foundation::{ERROR_NO_MORE_ITEMS, ERROR_SUCCESS};
+    use windows_sys::Win32::System::Registry::{
+        HKEY, HKEY_LOCAL_MACHINE, KEY_READ, RRF_RT_REG_QWORD, RRF_RT_REG_SZ, RegCloseKey,
+        RegEnumKeyExW, RegGetValueW, RegOpenKeyExW,
+    };
+    fn wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+    let class =
+        wide(r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}");
+    let mut key: HKEY = std::ptr::null_mut();
+    // SAFETY: valid null-terminated path, out-pointer to an HKEY; the key is closed below.
+    if unsafe { RegOpenKeyExW(HKEY_LOCAL_MACHINE, class.as_ptr(), 0, KEY_READ, &mut key) }
+        != ERROR_SUCCESS
+    {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for index in 0.. {
+        let mut name = [0u16; 256];
+        let mut len = name.len() as u32;
+        // SAFETY: the buffer and its length are passed together; unused out-parameters are null as the API allows.
+        let r = unsafe {
+            RegEnumKeyExW(
+                key,
+                index,
+                name.as_mut_ptr(),
+                &mut len,
+                std::ptr::null(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        };
+        if r == ERROR_NO_MORE_ITEMS || r != ERROR_SUCCESS {
+            break;
+        }
+        let sub = String::from_utf16_lossy(&name[..len as usize]);
+        if !sub.chars().all(|c| c.is_ascii_digit()) {
+            continue; // "Properties" and the like
+        }
+        let sub_w = wide(&sub);
+        let mut desc = [0u16; 512];
+        let mut size = (desc.len() * 2) as u32;
+        // SAFETY: byte size of the buffer is passed with it; RRF_RT_REG_SZ makes the API null-terminate within it.
+        let r = unsafe {
+            RegGetValueW(
+                key,
+                sub_w.as_ptr(),
+                wide("DriverDesc").as_ptr(),
+                RRF_RT_REG_SZ,
+                std::ptr::null_mut(),
+                desc.as_mut_ptr().cast(),
+                &mut size,
+            )
+        };
+        if r != ERROR_SUCCESS {
+            continue;
+        }
+        let chars = (size as usize / 2).min(desc.len());
+        let desc = String::from_utf16_lossy(&desc[..chars])
+            .trim_end_matches('\0')
+            .to_owned();
+        let mut mem = 0u64;
+        let mut msize = 8u32;
+        // SAFETY: an 8-byte out-buffer for a QWORD value.
+        let r = unsafe {
+            RegGetValueW(
+                key,
+                sub_w.as_ptr(),
+                wide("HardwareInformation.qwMemorySize").as_ptr(),
+                RRF_RT_REG_QWORD,
+                std::ptr::null_mut(),
+                (&mut mem as *mut u64).cast(),
+                &mut msize,
+            )
+        };
+        out.push((desc, (r == ERROR_SUCCESS).then_some(mem)));
+    }
+    // SAFETY: the key was opened above.
+    unsafe { RegCloseKey(key) };
+    out
 }
 
 fn gpu_session(slot: &mut Slot<Model>) -> Result<&mut Model, String> {
@@ -582,6 +738,31 @@ pub fn engines(multithread: bool, low_memory: bool) -> [Engine; 2] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn integrated_adapters_are_told_from_dedicated_ones() {
+        assert!(integrated("Intel(R) Iris(R) Xe Graphics", Some(128 << 20)));
+        assert!(integrated("Intel(R) UHD Graphics 630", None));
+        assert!(!integrated(
+            "Intel(R) Arc(TM) A770 Graphics",
+            Some(16 << 30)
+        ));
+        assert!(!integrated("NVIDIA GeForce RTX 3090", Some(24 << 30)));
+        assert!(
+            integrated("AMD Radeon(TM) Graphics", Some(512 << 20)),
+            "an APU"
+        );
+        assert!(!integrated("AMD Radeon RX 6700 XT", Some(12 << 30)));
+    }
+
+    #[test]
+    #[cfg(feature = "stems-gpu")]
+    fn the_cpu_choice_keeps_the_gpu_closed() {
+        set_processor(Processor::Cpu);
+        assert_eq!(gpu_allowed(), Err("STEMS PROCESSING is set to CPU"));
+        set_processor(Processor::Auto);
+        assert_ne!(gpu_allowed(), Err("STEMS PROCESSING is set to CPU"));
+    }
 
     #[test]
     fn folding_requires_known_free_memory_for_its_peak() {

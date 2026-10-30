@@ -50,7 +50,7 @@ impl Loaded {
 
     /// The plugin's settings as the user set them.
     pub(super) fn settings(&self) -> Value {
-        config::get().values(&self.plugin.manifest)
+        config::values(&self.plugin.manifest)
     }
 
     /// Whether `formats` allows `path`.

@@ -11,7 +11,7 @@ use openfader::{
 };
 use slint::SharedString;
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     path::PathBuf,
     rc::Rc,
     sync::{Arc, LazyLock, mpsc},
@@ -45,6 +45,12 @@ impl Snapshot {
 
 thread_local! {
     static MOUNTED: RefCell<Snapshot> = RefCell::new(Snapshot::default());
+    /// Bumped whenever [`MOUNTED`] is replaced, so readers can skip a merge when nothing was published.
+    static GENERATION: Cell<u64> = const { Cell::new(0) };
+}
+
+pub(crate) fn generation() -> u64 {
+    GENERATION.get()
 }
 
 pub(crate) fn mounted() -> Vec<Device> {
@@ -56,6 +62,7 @@ pub(crate) fn with_snapshot<R>(f: impl FnOnce(&Snapshot) -> R) -> R {
 }
 
 fn publish(snapshot: Snapshot) -> bool {
+    GENERATION.set(GENERATION.get() + 1);
     MOUNTED.with_borrow_mut(|held| {
         let changed = held.mounted != snapshot.mounted;
         *held = snapshot;
@@ -64,6 +71,7 @@ fn publish(snapshot: Snapshot) -> bool {
 }
 
 pub(super) fn reset() {
+    GENERATION.set(GENERATION.get() + 1);
     MOUNTED.with_borrow_mut(|s| *s = Snapshot::default());
 }
 
@@ -465,5 +473,14 @@ mod tests {
         assert!(mounted().is_empty());
         reset();
         with_snapshot(|s| assert!(s.plugins.is_empty() && s.explorer.is_none()));
+    }
+
+    #[test]
+    fn generation_moves_with_every_publication() {
+        let g = generation();
+        publish(snapshot("/a"));
+        assert_eq!(generation(), g + 1);
+        reset();
+        assert_eq!(generation(), g + 2);
     }
 }

@@ -17,10 +17,13 @@ struct Prepared {
     parts: Option<stemfile::Info>,
     source: Option<Source>,
     identified: bool,
+    /// A cache entry good enough for the wanted quality exists: starting costs no inference.
+    cached: bool,
 }
 
 struct LookupWork {
     file: PathBuf,
+    quality: Quality,
     from_file: bool,
     cancelled: Arc<AtomicBool>,
     back: mpsc::Sender<Prepared>,
@@ -39,6 +42,7 @@ fn prepare(
         parts,
         source: None,
         identified: false,
+        cached: false,
     })
 }
 
@@ -61,6 +65,7 @@ static LOOKUPS: LazyLock<(Mutex<VecDeque<LookupWork>>, Condvar)> = LazyLock::new
                             .then(|| stemfile::read_info(&work.file))
                             .flatten()
                     })?;
+                    prepared.cached = openfader::stems::cache::has(&work.file, work.quality);
                     if let Some(pcm) = &work.pcm {
                         prepared.source = Source::identify(
                             &work.file,
@@ -105,6 +110,7 @@ impl Lookup {
         if queue.len() < 8 {
             queue.push_back(LookupWork {
                 file: file.clone(),
+                quality,
                 from_file,
                 cancelled: cancelled.clone(),
                 back,
@@ -132,6 +138,7 @@ impl Lookup {
         if queue.len() < 8 {
             queue.push_back(LookupWork {
                 file: self.file.clone(),
+                quality: self.quality,
                 from_file: self.from_file,
                 cancelled: self.cancelled.clone(),
                 back,
@@ -208,13 +215,18 @@ impl Deck {
 impl Deck {
     /// Starts allocation and separation off the UI thread; unseparated frames play the original.
     pub(in crate::app::deck) fn stems_start(&self, file: PathBuf, pcm: Arc<audio::Track16>) {
-        let (stems, fast, multithread, from_file) = prefs::with(|p| {
+        let (stems, fast, multithread, from_file, processor) = prefs::with(|p| {
             (
                 p.stems,
                 p.stems_fast,
                 p.extensions.stems_multithread,
                 p.extensions.stem_files,
+                p.extensions.stems_processor,
             )
+        });
+        openfader::stems::model::set_processor(match processor {
+            prefs::extensions::StemsProcessor::Auto => openfader::stems::model::Processor::Auto,
+            prefs::extensions::StemsProcessor::Cpu => openfader::stems::model::Processor::Cpu,
         });
         if !stems {
             return;
@@ -289,6 +301,19 @@ impl Deck {
         if lookup.pcm.is_some() && !prepared.identified {
             lookup.identify();
             self.stems.borrow_mut().lookup = Some(lookup);
+            return;
+        }
+        // Inference starts on the first stem control of this deck; a cache entry or a stem file costs none, so they start now.
+        let start = prepared.cached || prepared.parts.is_some() || self.stems.borrow().wanted;
+        if !start {
+            lookup.ready = Some(prepared);
+            let mut s = self.stems.borrow_mut();
+            s.lookup = Some(lookup);
+            let shown = std::mem::take(&mut s.text);
+            drop(s);
+            if !shown.is_empty() {
+                self.show_stems();
+            }
             return;
         }
         if let Some(pcm) = lookup.pcm.take() {
@@ -519,7 +544,14 @@ impl Deck {
         self.show_stems();
     }
 
-    /// Starts or retries separation for the loaded track without restarting an attached job.
+    /// A stem control was used: the loaded track's separation starts (a parked uncached lookup starts on the next poll).
+    pub(in crate::app) fn want_stems(&self) {
+        self.stems.borrow_mut().wanted = true;
+        self.ensure_stems();
+    }
+
+    /// Starts or retries the lookup for the loaded track without restarting an attached job; inference waits for
+    /// [`Self::want_stems`] unless the stems are cached.
     pub(super) fn ensure_stems(&self) {
         let s = self.stems.borrow();
         if s.ready || s.job.is_some() {

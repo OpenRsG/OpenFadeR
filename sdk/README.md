@@ -171,8 +171,8 @@ In Rust implement [`LibraryPlugin`] (`probe`, `open`, optionally `write_collecti
 `openfader_library_v1` entry point and keeps panics from crossing the C boundary (an `{"error"}` answer instead; keep the default
 `panic = "unwind"`). A built-in compatibility adapter (`compatibility/` in the core repository) skips the macro: the host
 calls the table `library::api::<MyFormat>()` builds, through the same JSON `call`. `playlist_tree` turns flat folder rows into the depth-first list `playlists` answers with. Examples: the
-library plugins of `extension/plugin/` (one Cargo workspace; `build.sh` builds them and copies each library next to its
-`plugin.json`).
+built-in adapters of `compatibility/` (compiled in, no library file) and `extension/plugin/sample-pack` (a library plugin; `build.sh`
+builds it and copies the library next to its `plugin.json`).
 
 ### The library ABI (version 1)
 

@@ -5,7 +5,6 @@ import { Theme } from "../theme.slint";
 import { BrowserState } from "../browser-state.slint";
 import { DeckState } from "../deck-state.slint";
 import { DragState } from "../dnd.slint";
-import { StudioState } from "../studio-state.slint";
 import { StageState } from "state.slint";
 
 /// A column title of the track list; sortable ones carry `clicked`.
@@ -49,7 +48,7 @@ component Cell inherits Text {
 /// The Stage track list: the row number, with `Theme.stage-list-wave` 1 the deck the track is loaded on (a badge in its colour) and a
 /// waveform preview (a click plays from there), then the cover, title, artist, BPM, the key in its Camelot colour, genre, length and
 /// the rating of each row of `BrowserState.tracks`. Selection, double-click to load, drag to a deck, the right-click menu and the
-/// sort titles are the studio list's.
+/// sort titles are the desktop list's.
 export component StageTable inherits Rectangle {
     in property <length> row-h: Theme.stage-row;
     callback focused;
@@ -116,8 +115,8 @@ export component StageTable inherits Rectangle {
         root.menu-x = x;
         root.menu-y = y;
     }
-    init => { StudioState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
-    changed height => { StudioState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
+    init => { StageState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
+    changed height => { StageState.rows = max(1, floor((root.height - Theme.h-header) / root.row-h)); }
     forward-focus: fs;
     border-radius: Theme.stage-radius;
     clip: true;
@@ -144,15 +143,15 @@ export component StageTable inherits Rectangle {
                     height: parent.height;
                     Head { x: root.pad; width: root.w-num; height: Theme.h-header; y: Theme.space-sm; title: "#"; sortable: false; }
                     if root.wave: Head { x: root.x-wave; width: root.w-wave; height: Theme.h-header; y: Theme.space-sm; title: @tr("WAVEFORM"); sortable: false; }
-                    Head { x: root.x-title; width: root.w-title; height: Theme.h-header; y: Theme.space-sm; title: @tr("TITLE"); sorted: BrowserState.sort-col == 0; clicked => { StudioState.sort-by(0); } }
-                    Head { x: root.x-artist; width: root.w-artist; height: Theme.h-header; y: Theme.space-sm; title: @tr("ARTIST"); sorted: BrowserState.sort-col == 1; clicked => { StudioState.sort-by(1); } }
-                    if root.album: Head { x: root.x-album; width: root.w-album; height: Theme.h-header; y: Theme.space-sm; title: @tr("ALBUM"); sorted: BrowserState.sort-col == 12; clicked => { StudioState.sort-by(12); } }
-                    Head { x: root.x-bpm; width: root.w-bpm; height: Theme.h-header; y: Theme.space-sm; title: "BPM"; right: true; sorted: BrowserState.sort-col == 4; clicked => { StudioState.sort-by(4); } }
-                    Head { x: root.x-key; width: root.w-key; height: Theme.h-header; y: Theme.space-sm; title: @tr("KEY"); sorted: BrowserState.sort-col == 3; clicked => { StudioState.sort-by(3); } }
-                    if root.w-genre > 0px: Head { x: root.x-genre; width: root.w-genre; height: Theme.h-header; y: Theme.space-sm; title: @tr("GENRE"); sorted: BrowserState.sort-col == 2; clicked => { StudioState.sort-by(2); } }
-                    Head { x: root.x-time; width: root.w-time; height: Theme.h-header; y: Theme.space-sm; title: @tr("LENGTH"); right: true; sorted: BrowserState.sort-col == 5; clicked => { StudioState.sort-by(5); } }
-                    Head { x: root.x-rating; width: root.w-rating; height: Theme.h-header; y: Theme.space-sm; title: @tr("RATING"); sorted: BrowserState.sort-col == 6; clicked => { StudioState.sort-by(6); } }
-                    if root.added: Head { x: root.x-added; width: root.w-added; height: Theme.h-header; y: Theme.space-sm; title: @tr("DATE ADDED"); sorted: BrowserState.sort-col == 13; clicked => { StudioState.sort-by(13); } }
+                    Head { x: root.x-title; width: root.w-title; height: Theme.h-header; y: Theme.space-sm; title: @tr("TITLE"); sorted: BrowserState.sort-col == 0; clicked => { StageState.sort-by(0); } }
+                    Head { x: root.x-artist; width: root.w-artist; height: Theme.h-header; y: Theme.space-sm; title: @tr("ARTIST"); sorted: BrowserState.sort-col == 1; clicked => { StageState.sort-by(1); } }
+                    if root.album: Head { x: root.x-album; width: root.w-album; height: Theme.h-header; y: Theme.space-sm; title: @tr("ALBUM"); sorted: BrowserState.sort-col == 12; clicked => { StageState.sort-by(12); } }
+                    Head { x: root.x-bpm; width: root.w-bpm; height: Theme.h-header; y: Theme.space-sm; title: "BPM"; right: true; sorted: BrowserState.sort-col == 4; clicked => { StageState.sort-by(4); } }
+                    Head { x: root.x-key; width: root.w-key; height: Theme.h-header; y: Theme.space-sm; title: @tr("KEY"); sorted: BrowserState.sort-col == 3; clicked => { StageState.sort-by(3); } }
+                    if root.w-genre > 0px: Head { x: root.x-genre; width: root.w-genre; height: Theme.h-header; y: Theme.space-sm; title: @tr("GENRE"); sorted: BrowserState.sort-col == 2; clicked => { StageState.sort-by(2); } }
+                    Head { x: root.x-time; width: root.w-time; height: Theme.h-header; y: Theme.space-sm; title: @tr("LENGTH"); right: true; sorted: BrowserState.sort-col == 5; clicked => { StageState.sort-by(5); } }
+                    Head { x: root.x-rating; width: root.w-rating; height: Theme.h-header; y: Theme.space-sm; title: @tr("RATING"); sorted: BrowserState.sort-col == 6; clicked => { StageState.sort-by(6); } }
+                    if root.added: Head { x: root.x-added; width: root.w-added; height: Theme.h-header; y: Theme.space-sm; title: @tr("DATE ADDED"); sorted: BrowserState.sort-col == 13; clicked => { StageState.sort-by(13); } }
                 }
             }
             list := ListView {

@@ -1,0 +1,15 @@
+{
+  "name": "serato",
+  "version": "0.1.0",
+  "description": "Serato DJ library: read the library of a computer or a USB stick (database V2, crates, and cues, loops and beat grid from the audio file tags) and write it to USB sticks and SD cards, sharing the audio of the other formats on the stick.",
+  "library": {
+    "formats": [
+      "dir"
+    ],
+    "device": true,
+    "detect": [
+      "~/Music/_Serato_",
+      "%USERPROFILE%/Music/_Serato_"
+    ]
+  }
+}

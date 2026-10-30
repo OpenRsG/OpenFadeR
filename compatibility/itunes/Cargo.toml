@@ -1,0 +1,9 @@
+[package]
+name = "compat-itunes"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+openfader-plugin.workspace = true
+compat-rekordbox-common.workspace = true
+serde_json.workspace = true

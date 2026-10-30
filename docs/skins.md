@@ -1,16 +1,16 @@
 # Themes (skins)
 
 A theme is one JSON file that restyles the whole UI (colours, fonts, sizes, spacing, animation times) and may ask for a layout, while
-the app runs. Pick one in PREFERENCES > THEMES (a gallery: click a card), or in PREFERENCES > VIEW > Color > SKIN; it applies at
+the app runs. Pick one in Preferences > Themes (click a gallery card), or in Preferences > Appearance > Color > SKIN; it applies at
 once, in the main window and in the split-screen window, and the choice is kept by the theme's name. A theme file that is missing at
 the next start falls back to Catppuccin Mocha (a line on stderr says so). "Skin" and "theme" are the same thing: the settings key, the folder and
 the code say `skin`.
 
-A theme can also choose the **workspace**, the way the window is laid out: the desktop, touch, studio or stage workspace (see
+A theme can also choose the **workspace**, the way the window is laid out: the desktop, touch or stage workspace (see
 [Structural presentation](#structural-presentation)). The stage workspace is built from tokens, so one JSON file can change where the
-waveforms sit, how a deck panel looks and what the mixer shows. [Writing one](#writing-one) has the short path and four recipes.
+waveforms sit, how a deck panel looks and what the mixer shows. [Writing one](#writing-one) has the minimal theme, the token groups and four recipes.
 
-PREFERENCES > VIEW > DISPLAY TYPE > TEMPO DECIMAL PLACES switches BPM readouts between 1 and 2 decimals (default: 2).
+Preferences > Appearance > DISPLAY TYPE > TEMPO DECIMAL PLACES switches BPM readouts between 1 and 2 decimals (default: 2).
 It applies immediately to deck headers and jogs, browser tables, track info and BEAT FX, and is saved independently of the theme.
 Regular and Pocket layouts share this preference. Compact jogs still hide the fractional part; playback, SYNC, stored BPM and the
 editable grid-tempo field keep their original precision.
@@ -31,7 +31,6 @@ editable grid-tempo field keep their original precision.
 | So Pro | dark | near-black greys, a bright blue accent, a white platter, eight coloured pads in a 4 × 2 grid, the vertical 2-deck layout |
 | Ocean, High Contrast | dark | small examples that list only a few tokens |
 | Pocket | dark | the full Linux app with a touch workspace, focused/paired decks, persistent transport and mixer controls, and all desktop modes and commands |
-| Studio | dark | the studio layout (`layout-profile` 2): one window with both waveforms stacked across the top, a deck panel on each side of a central mixer, the library and AUTOMIX under them; near-black panels, rounded controls, an orange-to-red waveform |
 
 Except the two built-ins, they are the files of the [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) repository:
 copy them into `~/.config/openfader/extension/skin/`, or point `OPENFADER_SKINS` at a checkout of it.
@@ -42,8 +41,8 @@ copy them into `~/.config/openfader/extension/skin/`, or point `OPENFADER_SKINS`
   has a blue frame and a tick. Click a card to apply it: colours, fonts, sizes and, when the theme has `layout` hints, the layout
   change at once.
 * **CUSTOMIZE** opens the editor on the applied theme. Every token is there, in the groups SURFACES, TEXT, ACCENTS, WAVEFORM, DECKS
-  AND METERS, TYPOGRAPHY, SIZES, STAGE, STYLE and MOTION, with the doc line of ui/theme.slint as its hint. Every change shows in the
-  whole app at once (the app is the preview).
+  AND METERS, TYPOGRAPHY, SIZES, STAGE, STYLE, LIBRARY TREE AND TRACK MENU and MOTION, with the doc line of ui/theme.slint as its hint.
+  Every change shows in the whole app at once (the app is the preview).
   * a colour: click its swatch for the picker (hue, saturation, value and alpha sliders, the hex code, and the theme's own colours to
     pick from), or type `#rrggbb` / `#rrggbbaa` (the `#` is optional) and press Enter;
   * a size, weight, time or number: `−` and `+` step it (1 px, a weight by 100, 10 ms, 0.05) or type the value (`12`, `12px`, `80ms`,
@@ -110,10 +109,18 @@ Put `*.json` files in any of these folders (the first folder that has a name win
 | `locales` | Translations of the description, per language of the app (`fr`, `es`, `de`, `pt`, `it`, `nl`): `{"fr": {"Cool blues on a near-black window": "Bleus froids sur fenêtre presque noire"}}`. The gallery shows the description in the UI language when it is there, else as written. |
 | `base` | `"dark"` (default) or `"light"`: the built-in values every token you do not list keeps. It also picks the light or dark scheme of the menu bar and its menus, which Slint draws itself and which no token reaches. |
 | `layout` | VIEW settings the theme sets when it is chosen (optional), see below. |
-| `tokens` | Token name to value. Anything you leave out is the base's value. Files written by the editor list every token. |
+| `tokens` | Token name to value. Anything you leave out is the base's value, so list only what you change. Files written by the editor list every token. |
 
 A theme sets *every* token (yours, else the base's), so switching from one theme to another, or back to a built-in one, never leaves
 anything of the previous theme behind. Files from before `author`, `description` and `layout` existed load unchanged.
+
+### Older themes
+
+The Studio workspace (`layout-profile` 2) was removed; Stage replaced it. A saved Studio selection reads as Catppuccin Mocha when the
+theme file is gone (stderr names it) and keeps working when you have a copy of `studio.json` in your own themes folder, which is never
+deleted: it loads as a Stage theme. Reading a file migrates it, nothing is rewritten until you save from the editor: `layout-profile` 3
+(Stage's old number) is 2 now, and the six Studio sizes are the Stage sizes of the same name (`studio-radius` → `stage-radius`,
+`studio-radius-ctl`, `studio-button`, `studio-gap`, `studio-cover`, `studio-row` likewise; a theme that sets both keeps the `stage-*` one).
 
 ### Tokens that follow another token
 
@@ -163,7 +170,7 @@ Sizes of the regions (deck height, waveform heights, the jog, the mixer channel)
 
 ### Structural presentation
 
-Themes can select a different presentation, not just recolor the desktop. The `layout-profile` token is `0` for the desktop workspace, `1` for the touch workspace, `2` for the studio workspace and `3` for the stage workspace. These use the same Linux application, engine, Collection, plugins and callbacks; `mobile/` is the separate Android frontend and is not the Linux phone application.
+Themes can select a different presentation, not just recolor the desktop. The `layout-profile` token is `desktop` (0), `touch` (1) or `stage` (2). These use the same Linux application, engine, Collection, plugins and callbacks; `mobile/` is the separate Android frontend and is not the Linux phone application.
 
 Pocket (`extension/skin/pocket.json`) selects the touch presentation. Its workspace selector exposes decks/export players, Library, mixer/output, effects, sampler, Mix Point Link, Beat Lab and all commands. EDIT, LIGHTING and VIDEO use the same mode selector as desktop; optional features retain their normal preference/extension switches. Two or four decks are available. Below `touch-breakpoint`, select a deck; wider windows show a pair. All eight pads and all desktop pad modes, cue/loop editing and grid tools remain available.
 
@@ -172,21 +179,6 @@ Play/pause, transport CUE, channel levels, headphone cues and the crossfader rem
 Library → Actions includes every browser sort column, direction and a headphone-preview waveform that seeks without loading a deck. Mix Point Link keeps a selected deck's editable waveform in the same workspace as MIX IN/OUT and SILENT, with separate touch buttons for deck and linked-lane zoom.
 
 `touch-target` sizes primary touch controls; `icon-size` sizes their centered glyphs independently. Shared Slint controls use `Theme.target-size(base)` to retain their desktop size in profile `0` and enforce the touch target in profile `1`. The existing font, spacing and region tokens still apply. Switching to a desktop theme restores the desktop presentation without changing or copying library data. These tokens are editable and saved by the existing theme editor.
-
-### Studio workspace (`layout-profile` 2)
-
-Studio (`extension/skin/studio.json`) selects a modern single-window performance layout, built in `ui/studio/*.slint` from the shared widgets and driving the same globals as the desktop workspace (`DeckState`, `MixerState`, `FxState`, `PadsState`, `BrowserState`, `AutomixState`, `MixPointState`), so every control changes the real deck, mixer, effect, pad, library or AUTOMIX state:
-
-* **Top bar**: the mode buttons (EXPORT, PERFORM, EDIT, and LIGHTING / VIDEO when their extensions are on), the logo in the middle, the MASTER meter, REC, the MIDI and DEVICES buttons, the clock and the gear that opens PREFERENCES.
-* **Waveforms**: both decks' scrolling waveforms stacked across the full width, with the centre playhead (the desktop's `DeckDetail`: drag to scratch, the zoom column on the right).
-* **Deck panels**, mirrored for deck 2: the cover art, title, artist, BPM, the key with its − / + shift (a click on the key returns to the track's key) and MT (key lock), the big remaining time with the track length under it, and the overview waveform. Under it: three Beat FX slots (ON, effect drop-down, level knob; deck 1 drives FX1, deck 2 FX2, the CH chip switches the unit between this deck and the master) with BEAT ◀ ▶; the LOOP block (◀ halves, ▶ doubles, the number starts or leaves a loop, IN, OUT, RELOOP); the round jog with ± tempo, BPM, elapsed and remaining time (drag it to scratch); the tempo fader with − and + and the range chip; the big PLAY, CUE (hold to preview) and SYNC buttons; and the pads with the tabs HOT CUES / PAD FX / BEAT JUMP / SAMPLER (MORE reaches every other pad mode, × deletes a hot cue; the mode's option chips show under the pads).
-* **Mixer**, the centre column: MIXER and SETTINGS tabs and the EQ menu (EQ or STEM ISO on both channels, when STEMS is on). MIXER: GAIN, HIGH, MID, LOW and FILTER knobs per channel, the channel faders with their meters between them, headphone CUE buttons, the PHONES, MIX and MASTER knobs and the crossfader. SETTINGS: the COLOR FX of the FILTER knobs, the crossfader curve, each channel's side of the crossfader, SPLIT and REC.
-* **Library**: a sidebar (icon strip: folders = all tracks, favourites = the Tag List, session history, duplicates, related tracks, one icon per device; and the folder tree with My Playlists, the stored history days, Tags and the library's own lists), the search field, and the track list: thumbnail, rating, title, artist, length, BPM, key in its Camelot colour and genre; the chosen row is lit, the column titles sort, a right click opens the track menu, rows drag onto the decks.
-* **AUTOMIX panel** with the tabs Automix (the AUTOMIX and SKIP buttons, the LENGTH of a transition, the mix STYLE when the build has styles, and the queue: the list from the chosen track on), Sidelist (the Tag List) and Linked (MIX POINT LINK: modes, SELECT, LINK, SILENT, the OUT and IN points; and the related tracks of the chosen track).
-
-The studio workspace is the two-deck PERFORMANCE mode. The 4-deck layouts, EXPORT, EDIT, LIGHTING and VIDEO keep the desktop workspace, with its own global bar whose mode selector comes back to the studio. The window grows to at least 1100 × 720 px. Switching between desktop, touch and studio changes only how the same state is drawn: the library, the playing decks, the mixer and the effects keep their values. The browse view (W) gives the library the whole window under the top bar. The studio's panels are separate item trees, as docs/code-structure.md asks, so the 1 MiB start-up stack is not exceeded. BEAT LAB, the SAMPLER panel and the grid-editing, slip and reverse controls are in the desktop layout; the SAMPLER pad tab and the MORE pad modes cover the sampler's pads and the other pad functions.
-
-The studio tokens are `studio-radius` (panel corners), `studio-radius-ctl` (big buttons, pads, tabs, fields), `studio-button` (height of PLAY / CUE / SYNC), `studio-gap` (spacing between panels), `studio-cover` (side of the cover art) and `studio-row` (height of a track-list row); the usual colour, font and region tokens (`h-bar`, `h-wave-2`, `h-overview`, `radius`, `pad-style`, …) apply as well. Windows under 900 px high shrink the cover, the overview and the waveforms. Pick Studio (or any theme with `layout-profile` 2) in PREFERENCES > THEMES, and Catppuccin Mocha or any other theme to go back to the desktop layout.
 
 For the full Linux app's viewport check (Xvfb, Openbox, xdotool and ImageMagick required):
 
@@ -197,9 +189,9 @@ xvfb-run -a -s '-screen 0 1440x1400x24' sh -c \
 
 This runs the actual binary with disposable settings and checks compact portrait/landscape window sizes, saving screenshots and logs. It is not proof of physical audio output, controllers or device export.
 
-### Stage workspace (`layout-profile` 3)
+### Stage workspace (`layout-profile` 2)
 
-Stage is a two-deck performance workspace like Studio, built in `ui/stage/*.slint` from the same globals (`DeckState`, `MixerState`,
+Stage is a two-deck performance workspace built in `ui/stage/*.slint` from the same globals as the desktop workspace (`DeckState`, `MixerState`,
 `FxState`, `PadsState`, `BrowserState`, ...), so every control changes the real deck, mixer, effect, pad or library state, and a tab or
 button with no backing feature does not appear. What differs is that its look is tokens: one theme file decides where the waveforms
 sit, which deck panel is drawn, how pads, buttons and the jog look and what the mixer and the strip hold. A deck panel shows the deck
@@ -318,7 +310,7 @@ What each token picks (values in the Tokens tables):
   the vertical gradient and the outline of every panel; `deck-tint` 1 colours each deck's controls (jog arc, PLAY and CUE rims, lit
   pads, knob arcs, meters, the deck badge) with its `deckN`; `font-display` and `weight-display` the big figures.
 
-Switching to any other theme restores that theme's workspace; the library, the decks, the mixer and the effects keep their values.
+The Stage workspace is the two-deck PERFORMANCE mode. The 4-deck layouts, EXPORT, EDIT, LIGHTING and VIDEO keep the desktop workspace, with its own global bar whose mode selector comes back to Stage. The window grows to the smallest size the tokens fit (at least 1100 × 720 px). Switching to any other theme restores that theme's workspace; the library, the decks, the mixer and the effects keep their values.
 
 ### Value forms
 
@@ -327,7 +319,7 @@ Switching to any other theme restores that theme's workspace; the library, the d
 | color | `"#rrggbb"` or `"#rrggbbaa"` (alpha last) |
 | length | a number (logical px) or `"12px"` |
 | string | text, e.g. a font family name |
-| int | a whole number, e.g. a font weight (`400`, `700`). Some tokens take only a fixed set of values (`layout-profile`, `pad-style`, every `stage-*` choice, `button-style`, `jog-style`, `deck-tint`, `wave-style`): the Values column of the Tokens tables lists them |
+| int | a whole number, e.g. a font weight (`400`, `700`). Some tokens take only a fixed set of values (`layout-profile`, `pad-style`, every `stage-*` choice, `button-style`, `jog-style`, `deck-tint`, `wave-style`): write the option's name (`"stage-deck": "turntable"`, any capitals) or its number; the Values column of the Tokens tables lists both. The editor writes names |
 | float | a number. `glow`, `bevel`, `wave-fade`, `key-sat` and `key-val` take 0 to 1 |
 | duration | a number of milliseconds, `"80ms"` or `"0.2s"` |
 
@@ -336,7 +328,7 @@ Switching to any other theme restores that theme's workspace; the library, the d
 A token that is unknown, of the wrong type or has a bad value (`"red"` is not a colour) is reported on stderr as
 `skin <file>: token "accent": bad colour "red", use #rrggbb or #rrggbbaa` and left at the base's value; the rest of the theme still
 applies. So is a value outside what the token allows: `skin <file>: token "stage-deck": 7 is not allowed, use 0 (performance), 1
-(turntable), 2 (controller), 3 (ring)` or `token "glow": 1.5 is out of range, use 0 to 1`. A file that is not valid JSON, or has no JSON
+(turntable), 2 (controller), 3 (ring)` (a name that is not one of them is reported the same way) or `token "glow": 1.5 is out of range, use 0 to 1`. A file that is not valid JSON, or has no JSON
 object at its top, holds no theme and is skipped. IMPORT and `install` refuse a file with no valid token at all.
 
 ## Tokens
@@ -491,7 +483,7 @@ and brightness of the key column's colours, whose hue is the key's.
 
 | Token | Type | Default (dark / light if they differ) | Values | Meaning |
 |---|---|---|---|---|
-| `layout-profile` | int | `0` | `0` desktop, `1` touch, `2` studio, `3` stage | Presentation profile: 0 desktop workspace, 1 touch workspace, 2 studio workspace (one window: stacked waveforms, a deck panel per side, a central mixer, the library and AUTOMIX under them), 3 stage workspace (the same, built from the Stage tokens: waveform placement, deck panel style, mixer, strip, library), all with the same application features. |
+| `layout-profile` | int | `0` | `0` desktop, `1` touch, `2` stage | Presentation profile: 0 desktop workspace, 1 touch workspace, 2 stage workspace (one window: waveforms, a deck panel per side, a central mixer, the library under them; its look is the Stage tokens below). Same application features in all three. |
 | `touch-breakpoint` | length | `760px` |  | Width below which the touch workspace presents one selected deck instead of two columns. |
 | `touch-target` | length | `44px` |  | Minimum primary control size in the touch presentation. |
 | `icon-size` | length | `14px` |  | Glyph size inside shared buttons, independent of the control's hit area. |
@@ -524,20 +516,14 @@ and brightness of the key column's colours, whose hue is the key's.
 | `w-channel` | length | `52px` |  | Width of one mixer channel. |
 | `jog` | length | `112px` |  | Diameter of the jog. |
 | `ring` | length | `36px` |  | Diameter of the CUE and PLAY buttons. |
-| `studio-radius` | length | `12px` |  | Corner radius of the studio workspace's panels (layout-profile 2). |
-| `studio-radius-ctl` | length | `8px` |  | Corner radius of the studio workspace's big buttons, pads, tabs and fields. |
-| `studio-button` | length | `48px` |  | Height of the studio workspace's big PLAY, CUE and SYNC buttons. |
-| `studio-gap` | length | `8px` |  | Spacing between the studio workspace's panels. |
-| `studio-cover` | length | `72px` |  | Side of the cover art in the studio workspace's deck panels. |
-| `studio-row` | length | `36px` |  | Row height of the studio workspace's track list (a row carries a thumbnail). |
 
-### Stage (the stage workspace, `layout-profile` 3)
+### Stage (the stage workspace, `layout-profile` 2)
 
-The tokens of the stage workspace, described under [Stage workspace](#stage-workspace-layout-profile-3). They have no effect in the other workspaces, except `wave-style` and `wave-fade` (Style), which also colour the desktop's waveforms.
+The tokens of the stage workspace, described under [Stage workspace](#stage-workspace-layout-profile-2). They have no effect in the other workspaces, except `wave-style` and `wave-fade` (Style), which also colour the desktop's waveforms.
 
 | Token | Type | Default (dark / light if they differ) | Values | Meaning |
 |---|---|---|---|---|
-| `stage-wave` | int | `0` | `0` top, `1` centre, `2` decks | Stage workspace (layout-profile 3): where the enlarged waveforms sit. 0 = stacked across the top, 1 = in a centre column between the decks (above the mixer), 2 = inside each deck panel. |
+| `stage-wave` | int | `0` | `0` top, `1` centre, `2` decks | Stage workspace (layout-profile 2): where the enlarged waveforms sit. 0 = stacked across the top, 1 = in a centre column between the decks (above the mixer), 2 = inside each deck panel. |
 | `stage-deck` | int | `0` | `0` performance, `1` turntable, `2` controller, `3` ring | Stage deck panel: 0 = performance (pad grid, LOOP, BEAT FX, jog ring), 1 = turntable (big platter with the cover art, hot cue list, tempo fader), 2 = controller (a row of EQ / filter knobs, big CUE / PLAY / SYNC buttons), 3 = ring (a large tempo ring with the BPM, round PLAY / CUE, tempo fader). |
 | `stage-pads` | int | `0` | `0` numbered grid, `1` cue list, `2` coloured grid | Stage hot cue pads: 0 = numbered grid (1-8, outlined, the lit one in the deck colour), 1 = cue list (A-F rows with the cue time and a delete cross), 2 = grid filled in each cue's colour. |
 | `stage-mixer` | int | `0` | `0` two channels, `1` four channels | Stage mixer: 0 = two channels, 1 = four channels (decks 3 and 4 follow the controller's layers). |
@@ -603,7 +589,7 @@ browse knob or the arrow keys are on. Bigger orange headings, no glyphs on the l
 
 | Token | Type | Default (dark / light if they differ) | Values | Meaning |
 |---|---|---|---|---|
-| `tree-heading-grow` | length | `2px` |  | How much bigger than a list row the text of a tree heading is. |
+| `tree-heading-grow` | length | `2px` |  | How much bigger than a list row the text of a tree heading (My Playlists, History, Devices …) is. |
 | `tree-heading-extra` | length | `10px` |  | How much taller than a list row a tree heading is. |
 | `tree-heading` | color | follows `text-bright` |  | Text of the tree headings. |
 | `tree-heading-icon` | color | follows `accent-hi` |  | Glyph of the tree headings. |
@@ -626,16 +612,46 @@ browse knob or the arrow keys are on. Bigger orange headings, no glyphs on the l
 
 ## Writing one
 
+The smallest working theme is a name and the tokens that differ (the rest is the base's):
+
+```json
+{
+  "name": "My blue",
+  "base": "dark",
+  "tokens": { "accent": "#00b4d8", "select": "#0b6a85" }
+}
+```
+
+Where to start, by what you want to change (the Tokens tables list every token under these groups; the editor shows the same groups):
+
+| You want | Tokens |
+|---|---|
+| Colours of windows, panels, lists | Surfaces: `bg`, `bg-deep`, `panel`, `panel-raised`, `panel-high`, `row-alt`, `line`, `select`, `hover-row` |
+| Readable text | Text: `text-bright`, `text`, `text-dim`, `text-faint` (`text-bright` sits on `accent` and `select`) |
+| Buttons that are on, PLAY, CUE, REC | Accents: `accent`, `accent-hi`, `play`, `cue`, `sync`, `master`, `danger`, `rec` |
+| Waveforms | Waveform: `wave-bg`, `wave-low`, `wave-mid`, `wave-high`, `wave-fade`; per deck `wave-style`, `deck1` to `deck4` |
+| Deck colours, jog, meters, pads | Decks and meters: `deck1` to `deck4`, `jog-*`, `meter-*`, `pad-style` |
+| Fonts | Typography: `font`, `font-xs` to `font-xxl`, `weight`, `weight-bold` |
+| Spacing, corners, heights | Sizes: `space-*`, `radius*`, `h-*`, `jog`, `ring`, and the touch tokens |
+| A different window arrangement | `layout-profile` (`touch`, `stage`) and the Stage group |
+| Glow, bevel, button and jog looks | Style: `glow`, `bevel`, `button-style`, `jog-style`, `panel-*`, `deck-tint` |
+| Tree and track menu | Library tree and track menu |
+| Speed of hover fades | Motion |
+
 1. Easiest: PREFERENCES > THEMES, apply the theme closest to what you want, CUSTOMIZE, SAVE AS. By hand: copy
    `extension/skin/ocean.json` (coloured dark) or `extension/skin/rek-light.json` (light base) into
    `~/.config/openfader/extension/skin/` and change `name`.
-2. List only what you change; start with the surfaces (`bg`, `panel*`, `text*`) and `accent`.
-3. Keep text readable on `select`, `hover-row` and `accent` (`text-bright` sits on them); `extension/skin/high-contrast.json` shows a
+2. List only what you change; start with the surfaces (`bg`, `panel*`, `text*`) and `accent`. A value equal to the base's adds
+   nothing (the bundled themes leave it out; a file that lists it is still valid). A Stage theme spells out its arrangement (the
+   `stage-*` choices) so the file reads as a recipe.
+3. Write a choice by its name (`"stage-pads": "cue list"`), a length as a number (logical px) and a colour as `"#rrggbb"`. A token
+   that follows another (`panel-top`, `menu-focus`, `tree-heading`, ...) needs no line unless you want it different.
+4. Keep text readable on `select`, `hover-row` and `accent` (`text-bright` sits on them); `extension/skin/high-contrast.json` shows a
    high contrast set.
-4. Preview: the theme shows within a second of saving the file (the app compares the folders once a second), the applied theme
+5. Preview: the theme shows within a second of saving the file (the app compares the folders once a second), the applied theme
    restyles at once, so keep the app open next to a text editor; stderr tells what was left out and why. A working folder of your own:
    `OPENFADER_SKINS=~/my-themes openfader`. In CUSTOMIZE every change shows in the whole app as you make it.
-5. Share: a theme is one `.json` file, so send the file (IMPORT… or drop it on the window installs it), or put it in a GitHub
+6. Share: a theme is one `.json` file, so send the file (IMPORT… or drop it on the window installs it), or put it in a GitHub
    repository (files at the top or at most two folders deep) that others add in GET THEMES. Fill `author` and `description` (and
    `locales` for translations) so the gallery card says what it is. Do not use the names or logos of other products in a theme, its
    description or its screenshots.
@@ -651,17 +667,17 @@ colours fading towards their edges, four channels in the mixer. `panel-top` is n
   "base": "dark",
   "description": "Black panels, lime deck 1, purple deck 2, glowing controls",
   "tokens": {
-    "layout-profile": 3,
-    "stage-wave": 0,
-    "stage-deck": 0,
-    "stage-pads": 0,
-    "stage-mixer": 1,
-    "stage-list-wave": 1,
-    "button-style": 1,
-    "jog-style": 0,
+    "layout-profile": "stage",
+    "stage-wave": "top",
+    "stage-deck": "performance",
+    "stage-pads": "numbered grid",
+    "stage-mixer": "four channels",
+    "stage-list-wave": "on",
+    "button-style": "outlined",
+    "jog-style": "ring",
     "glow": 0.8,
-    "deck-tint": 1,
-    "wave-style": 1,
+    "deck-tint": "on",
+    "wave-style": "per deck",
     "wave-fade": 0.6,
     "bg": "#050505",
     "panel": "#0b0b0d",
@@ -684,17 +700,17 @@ Light bevelled: a light base, raised buttons, a gradient from a lighter top to t
   "base": "light",
   "description": "Light frosted grey, raised buttons, vinyl platter",
   "tokens": {
-    "layout-profile": 3,
-    "stage-deck": 1,
-    "stage-pads": 1,
-    "stage-tabs": 1,
+    "layout-profile": "stage",
+    "stage-deck": "turntable",
+    "stage-pads": "cue list",
+    "stage-tabs": "MIXER FX REC",
     "bevel": 0.7,
-    "button-style": 2,
-    "jog-style": 1,
+    "button-style": "raised",
+    "jog-style": "platter",
     "panel-top": "#f7f8fa",
     "panel": "#dfe2e8",
     "panel-border": "#b9bec9",
-    "wave-style": 1,
+    "wave-style": "per deck",
     "deck1": "#2f7cf6",
     "deck2": "#ff6a3d"
   }
@@ -709,14 +725,14 @@ colours.
   "name": "Centre recipe",
   "description": "Waveforms between the decks, orange and blue",
   "tokens": {
-    "layout-profile": 3,
-    "stage-wave": 1,
-    "stage-deck": 3,
-    "stage-pads": 2,
-    "stage-strip": 1,
-    "deck-tint": 1,
-    "jog-style": 2,
-    "wave-style": 1,
+    "layout-profile": "stage",
+    "stage-wave": "centre",
+    "stage-deck": "ring",
+    "stage-pads": "coloured grid",
+    "stage-strip": "effects and sampler",
+    "deck-tint": "on",
+    "jog-style": "ticks",
+    "wave-style": "per deck",
     "wave-fade": 0.4,
     "deck1": "#ff8a1f",
     "deck1-hi": "#ffc27a",
@@ -726,11 +742,11 @@ colours.
 }
 ```
 
-Per-deck waveforms on the desktop workspace (`layout-profile` stays 0): only the waveform tokens.
+Per-deck waveforms on the desktop workspace (`layout-profile` stays `desktop`): only the waveform tokens.
 
 ```json
 {
   "name": "Lime and purple recipe",
-  "tokens": { "wave-style": 1, "wave-fade": 0.6, "deck1": "#a6e22e", "deck2": "#9b59ff" }
+  "tokens": { "wave-style": "per deck", "wave-fade": 0.6, "deck1": "#a6e22e", "deck2": "#9b59ff" }
 }
 ```

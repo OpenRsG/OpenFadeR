@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "players": [
+    {
+      "model": "Denon DJ Prime",
+      "reads": [
+        "Engine Library"
+      ],
+      "file_systems": [],
+      "partition_tables": [],
+      "status": "to_measure",
+      "firmware": "",
+      "note": "Reads Engine Library/Database2/m.db. Source: the notes of this plugin (libdjinterop engine_schema.hpp: schema 3.0.0 is what Engine OS/Desktop 4.1.0 to 4.2.1 write). File systems and firmware: not measured."
+    },
+    {
+      "model": "Denon DJ SC6000",
+      "reads": [
+        "Engine Library"
+      ],
+      "file_systems": [],
+      "partition_tables": [],
+      "status": "to_measure",
+      "firmware": "",
+      "note": "Reads Engine Library/Database2/m.db. Source: the notes of this plugin (libdjinterop engine_schema.hpp: schema 3.0.0 is what Engine OS/Desktop 4.1.0 to 4.2.1 write). File systems and firmware: not measured."
+    },
+    {
+      "model": "Denon DJ SC Live",
+      "reads": [
+        "Engine Library"
+      ],
+      "file_systems": [],
+      "partition_tables": [],
+      "status": "to_measure",
+      "firmware": "",
+      "note": "Reads Engine Library/Database2/m.db. Source: the notes of this plugin (libdjinterop engine_schema.hpp: schema 3.0.0 is what Engine OS/Desktop 4.1.0 to 4.2.1 write). File systems and firmware: not measured."
+    }
+  ],
+  "presets": []
+}
