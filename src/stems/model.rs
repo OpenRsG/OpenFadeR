@@ -756,6 +756,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "stems-gpu")]
     fn the_cpu_choice_keeps_the_gpu_closed() {
         set_processor(Processor::Cpu);
         assert_eq!(gpu_allowed(), Err("STEMS PROCESSING is set to CPU"));
