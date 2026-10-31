@@ -1,6 +1,6 @@
 [package]
 name = "openfader"
-version = "0.2.9"
+version = "0.2.10"
 edition = "2024"
 
 # Built-in format adapters live in compatibility/ (src/plugin/builtin.rs). The SDK and UI are workspace members too.

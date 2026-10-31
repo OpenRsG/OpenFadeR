@@ -164,6 +164,11 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
                 }
             }
         });
+    if job.explicit && !job.refresh {
+        if let Err(e) = store.system(|| store.reset_grid(&job.key)) {
+            eprintln!("analyze: {}: grid edit kept: {e}", job.path.display());
+        }
+    }
     let tag = s
         .tag
         .as_ref()
@@ -491,7 +496,12 @@ fn prepare(sub: &mut Subscriber) -> Result<bool, String> {
         .and_then(|read| read(&*job.track))
         .unwrap_or_default();
     let mut edits = sub.store.edits(&job.key)?;
-    let edited_grid = edits.grid.is_some();
+    // Analyze Track replaces an edited grid too (its confirmation says so; the Analysis Lock is the protection); the
+    // store entry goes in `finish`, once the analysis exists.
+    let edited_grid = edits.grid.is_some() && !(job.explicit && !job.refresh);
+    if !edited_grid {
+        edits.grid = None;
+    }
     job.guide.has_cues = edits.cues.take().is_some() || !own.cues.is_empty();
     openfader::store::apply(&mut own, &edits);
     job.guide.beats = own.beats;
@@ -1000,15 +1010,20 @@ mod tests {
         assert!(!out.cues && out.tag.is_none());
         let edits = store.edits(&j.key).unwrap();
         assert_eq!(edits.cues, Some(mine));
-        assert_eq!(edits.grid, Some(grid));
+        assert_eq!(edits.grid, Some(grid.clone()));
         assert_eq!(
             std::fs::read(&file).unwrap(),
             before,
             "the file is untouched"
         );
-        // The same job without the refresh mark (the track menu's re-analysis) does overwrite the cues.
+        // The same job without the refresh mark (an import's analysis) overwrites the cues, keeps the edited grid.
         j.refresh = false;
         assert!(finish(&j, &analysed(), src(), &settings(false), &store).cues);
+        assert_eq!(store.edits(&j.key).unwrap().grid, Some(grid));
+        // The track menu's Analyze Track (explicit) replaces the edited grid as well.
+        j.explicit = true;
+        finish(&j, &analysed(), src(), &settings(false), &store);
+        assert_eq!(store.edits(&j.key).unwrap().grid, None);
         std::fs::remove_dir_all(dir).unwrap();
     }
 

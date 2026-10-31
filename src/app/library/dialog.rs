@@ -41,6 +41,8 @@ pub enum Confirm {
     AutoCue(Vec<super::autocue::Job>),
     /// A two-way connection's write-back, after its dry run (the plan is held by [`crate::app::connect`]).
     WriteBack,
+    /// Analyze Track on tracks that already have an analysis: 1 = analyse again, replacing it.
+    Analyze(std::sync::Arc<Vec<Track>>, Vec<usize>),
 }
 
 /// How a file chooser picks.

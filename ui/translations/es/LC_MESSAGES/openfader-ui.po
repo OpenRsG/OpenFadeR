@@ -166,12 +166,12 @@ msgid "Analysis Lock"
 msgstr "Bloqueo de análisis"
 
 #: ui/app.slint:267
-#: src/app/library/track.rs:177
+#: src/app/library/track.rs:204
 msgid "Reload Tag"
 msgstr "Recargar etiqueta"
 
 #: ui/app.slint:268
-#: src/app/library/track.rs:179
+#: src/app/library/track.rs:206
 msgid "Reload Tag (discard edits)"
 msgstr "Recargar etiqueta (descartar ediciones)"
 
@@ -959,7 +959,7 @@ msgstr "Analizar todas las pistas de la lista"
 
 #: ui/browser.slint:338
 #: ui/library.slint:222
-#: src/app/library/dialog.rs:144
+#: src/app/library/dialog.rs:146
 msgid "RELOCATE"
 msgstr "REUBICAR"
 
@@ -1670,7 +1670,7 @@ msgid "Libraries, problems, which players read this stick, the booth profile"
 msgstr "Bibliotecas, problemas, qué reproductores leen este pendrive, el perfil de cabina"
 
 #: ui/device-check.slint:121
-#: src/app/library/mod.rs:387
+#: src/app/library/mod.rs:388
 msgid "NO"
 msgstr "NO"
 
@@ -2232,7 +2232,7 @@ msgstr "Color"
 
 #: ui/exportmode-cues.slint:216
 #: ui/trackinfo.slint:186
-#: src/app/library/track.rs:162
+#: src/app/library/track.rs:189
 msgid "Comment"
 msgstr "Comentario"
 
@@ -2869,7 +2869,7 @@ msgid "SAVE AS TEXT…"
 msgstr "GUARDAR COMO TEXTO…"
 
 #: ui/library.slint:50
-#: src/app/library/mod.rs:386
+#: src/app/library/mod.rs:387
 msgid "YES"
 msgstr "SÍ"
 
@@ -4375,7 +4375,7 @@ msgstr "Eliminar lista"
 
 #: ui/touch-actions.slint:74
 #: ui/trackinfo.slint:196
-#: src/app/library/track.rs:157
+#: src/app/library/track.rs:184
 msgid "Title"
 msgstr "Título"
 
@@ -4692,12 +4692,12 @@ msgid "comment (Enter saves)"
 msgstr "comentario (Intro guarda)"
 
 #: ui/trackinfo.slint:200
-#: src/app/library/track.rs:159
+#: src/app/library/track.rs:186
 msgid "Album"
 msgstr "Álbum"
 
 #: ui/trackinfo.slint:204
-#: src/app/library/track.rs:161
+#: src/app/library/track.rs:188
 msgid "Label"
 msgstr "Sello"
 
@@ -4855,16 +4855,16 @@ msgstr "PLAY"
 msgid "Pause"
 msgstr "Pausa"
 
-#: src/app/analyze/job.rs:337
+#: src/app/analyze/job.rs:342
 msgid "Analysis is busy: wait for an existing analysis run to finish or cancel it."
 msgstr "El análisis está ocupado: espera a que termine un análisis en curso o cancélalo."
 
-#: src/app/analyze/job.rs:473
+#: src/app/analyze/job.rs:478
 #: src/app/exportmode/mod.rs:180
 msgid "this track has an Analysis Lock: unlock it first"
 msgstr "esta pista tiene un bloqueo de análisis: desbloquéala primero"
 
-#: src/app/analyze/job.rs:506
+#: src/app/analyze/job.rs:516
 msgid "analysing “{}”…{}"
 msgstr "analizando «{}»…{}"
 
@@ -8224,7 +8224,7 @@ msgid "BPM: type a tempo between 30 and 300"
 msgstr "BPM: escribe un tempo entre 30 y 300"
 
 #: src/app/exportmode/mod.rs:183
-#: src/app/library/track.rs:68
+#: src/app/library/track.rs:95
 msgid "analysing “{}”…"
 msgstr "analizando «{}»…"
 
@@ -8654,7 +8654,7 @@ msgid "Restore {}? The Collection, playlists, cues, grids, ratings, tags, histor
 msgstr "¿Restaurar {}? La colección, listas, cues, cuadrículas, valoraciones, etiquetas, historial y preferencias se reemplazan por los de la copia."
 
 #: src/app/library/backup.rs:62
-#: src/app/library/dialog.rs:121
+#: src/app/library/dialog.rs:123
 msgid "RESTORE LIBRARY"
 msgstr "RESTAURAR BIBLIOTECA"
 
@@ -8678,89 +8678,89 @@ msgstr "La colección se restauró{}"
 msgid "restore failed: {}"
 msgstr "error de restauración: {}"
 
-#: src/app/library/dialog.rs:76
+#: src/app/library/dialog.rs:78
 msgid "IMPORT TRACK"
 msgstr "IMPORTAR PISTA"
 
-#: src/app/library/dialog.rs:77
+#: src/app/library/dialog.rs:79
 msgid "Path of a music file, or several separated by | (mp3, m4a, aac, flac, wav, aiff)."
 msgstr "Ruta de un archivo de música, o varios separados por | (mp3, m4a, aac, flac, wav, aiff)."
 
-#: src/app/library/dialog.rs:83
+#: src/app/library/dialog.rs:85
 msgid "IMPORT FOLDER"
 msgstr "IMPORTAR CARPETA"
 
-#: src/app/library/dialog.rs:84
+#: src/app/library/dialog.rs:86
 msgid "Every music file below this folder joins the Collection."
 msgstr "Todos los archivos de música de esta carpeta se añaden a la colección."
 
-#: src/app/library/dialog.rs:88
+#: src/app/library/dialog.rs:90
 msgid "IMPORT PLAYLIST"
 msgstr "IMPORTAR LISTA"
 
-#: src/app/library/dialog.rs:89
+#: src/app/library/dialog.rs:91
 msgid "An .m3u, .m3u8 or .pls file: its tracks join the Collection and a playlist of the same name lists them."
 msgstr "Un archivo .m3u, .m3u8 o .pls: sus pistas se añaden a la colección y una lista con el mismo nombre las contiene."
 
-#: src/app/library/dialog.rs:95
+#: src/app/library/dialog.rs:97
 msgid "IMPORT COLLECTION"
 msgstr "IMPORTAR COLECCIÓN"
 
-#: src/app/library/dialog.rs:96
+#: src/app/library/dialog.rs:98
 msgid "A collection file of the library plugin you chose: its tracks, playlists, ratings, comments, cues and beat grids are imported."
 msgstr "Un archivo de colección del plugin de biblioteca elegido: se importan sus pistas, listas, valoraciones, comentarios, cues y cuadrículas de beats."
 
-#: src/app/library/dialog.rs:112
-#: src/app/library/mod.rs:384
+#: src/app/library/dialog.rs:114
+#: src/app/library/mod.rs:385
 msgid "BACKUP LIBRARY"
 msgstr "COPIA DE LA BIBLIOTECA"
 
-#: src/app/library/dialog.rs:113
+#: src/app/library/dialog.rs:115
 msgid "Folder for the backup zip (and for the music files, in a backup folder beside it)."
 msgstr "Carpeta para el zip de la copia (y para los archivos de música, en una carpeta de copia junto a él)."
 
-#: src/app/library/dialog.rs:122
+#: src/app/library/dialog.rs:124
 msgid "A backup zip made by Backup Library. The Collection, playlists, cues and every other stored edit are replaced."
 msgstr "Un zip de copia hecho con Backup Library. La colección, las listas, los cues y cualquier otra edición guardada se reemplazan."
 
-#: src/app/library/dialog.rs:129
+#: src/app/library/dialog.rs:131
 msgid "EXPORT PLAYLIST (M3U8)"
 msgstr "EXPORTAR LISTA (M3U8)"
 
-#: src/app/library/dialog.rs:130
+#: src/app/library/dialog.rs:132
 msgid "EXPORT PLAYLIST (PLS)"
 msgstr "EXPORTAR LISTA (PLS)"
 
-#: src/app/library/dialog.rs:131
+#: src/app/library/dialog.rs:133
 msgid "EXPORT PLAYLIST (TEXT)"
 msgstr "EXPORTAR LISTA (TEXTO)"
 
-#: src/app/library/dialog.rs:133
-#: src/app/library/dialog.rs:138
+#: src/app/library/dialog.rs:135
+#: src/app/library/dialog.rs:140
 msgid "File to write (an existing file is never overwritten)."
 msgstr "Archivo que se escribirá (nunca se sobrescribe un archivo existente)."
 
-#: src/app/library/dialog.rs:137
+#: src/app/library/dialog.rs:139
 msgid "SAVE IMPORT REPORT"
 msgstr "GUARDAR INFORME DE IMPORTACIÓN"
 
-#: src/app/library/dialog.rs:145
+#: src/app/library/dialog.rs:147
 msgid "The new file of the first track — the others are looked for in its folder — or a folder to look in for all of them."
 msgstr "El nuevo archivo de la primera pista (las demás se buscan en su carpeta) o una carpeta donde buscarlas todas."
 
-#: src/app/library/dialog.rs:151
+#: src/app/library/dialog.rs:153
 msgid "ADD LIBRARY"
 msgstr "AÑADIR BIBLIOTECA"
 
-#: src/app/library/dialog.rs:153
+#: src/app/library/dialog.rs:155
 msgid "A folder of music: its files and sub-folders are synced into the Collection and follow the folder."
 msgstr "Una carpeta de música: sus archivos y subcarpetas se sincronizan con la Colección y siguen a la carpeta."
 
-#: src/app/library/dialog.rs:157
+#: src/app/library/dialog.rs:159
 msgid "A library file another app wrote, read by an enabled library plugin: its tracks and playlists are synced into the Collection."
 msgstr "Un archivo de biblioteca escrito por otra aplicación, leído por un plugin de biblioteca activado: sus pistas y listas se sincronizan con la Colección."
 
-#: src/app/library/dialog.rs:311
+#: src/app/library/dialog.rs:313
 msgid "cannot open {}: {}"
 msgstr "no se puede abrir {}: {}"
 
@@ -9073,35 +9073,35 @@ msgstr[1] "{n} pistas quitadas de la Colección"
 msgid "a path is needed"
 msgstr "hace falta una ruta"
 
-#: src/app/library/mod.rs:288
+#: src/app/library/mod.rs:289
 msgid "Delete theme {}? This removes its saved file and discards unsaved changes to this theme."
 msgstr "¿Borrar el tema {}? Se eliminará su archivo guardado y se descartarán los cambios sin guardar de este tema."
 
-#: src/app/library/mod.rs:294
+#: src/app/library/mod.rs:295
 msgid "DELETE THEME"
 msgstr "BORRAR TEMA"
 
-#: src/app/library/mod.rs:314
+#: src/app/library/mod.rs:315
 msgid "WRITE BACK"
 msgstr "ESCRIBIR"
 
-#: src/app/library/mod.rs:316
+#: src/app/library/mod.rs:317
 msgid "WRITE"
 msgstr "ESCRIBIR"
 
-#: src/app/library/mod.rs:344
+#: src/app/library/mod.rs:345
 msgid "recording added to the Collection ({})"
 msgstr "grabación añadida a la Colección ({})"
 
-#: src/app/library/mod.rs:346
+#: src/app/library/mod.rs:347
 msgid "recording not imported: {}"
 msgstr "grabación no importada: {}"
 
-#: src/app/library/mod.rs:385
+#: src/app/library/mod.rs:386
 msgid "Do you want to back up music files as well?"
 msgstr "¿Quieres hacer también una copia de seguridad de los archivos de música?"
 
-#: src/app/library/mod.rs:405
+#: src/app/library/mod.rs:406
 msgid "unknown menu action {}"
 msgstr "acción de menú desconocida {}"
 
@@ -9297,7 +9297,7 @@ msgid "0 = off"
 msgstr "0 = desactivado"
 
 #: src/app/library/track.rs:33
-#: src/app/library/track.rs:80
+#: src/app/library/track.rs:107
 msgid "this track has no file"
 msgstr "esta pista no tiene archivo"
 
@@ -9317,51 +9317,63 @@ msgstr "QUITAR DE LA COLECCIÓN"
 msgid "unknown track action {}"
 msgstr "acción de pista desconocida {}"
 
-#: src/app/library/track.rs:69
+#: src/app/library/track.rs:75
+msgid "“{}” is already analysed. Analyse it again? Its BPM, grid, key and waveform are replaced; cues follow Preferences > Analysis."
+msgstr "«{}» ya está analizado. ¿Analizarlo de nuevo? Se reemplazan su BPM, rejilla, tonalidad y forma de onda; los cues siguen Preferencias > Análisis."
+
+#: src/app/library/track.rs:79
+msgid "{} of these tracks are already analysed. Analyse them again? Their BPM, grid, key and waveform are replaced; cues follow Preferences > Analysis."
+msgstr "{} de estas pistas ya están analizadas. ¿Analizarlas de nuevo? Se reemplazan su BPM, rejilla, tonalidad y forma de onda; los cues siguen Preferencias > Análisis."
+
+#: src/app/library/track.rs:86
+msgid "ANALYSE AGAIN"
+msgstr "ANALIZAR DE NUEVO"
+
+#: src/app/library/track.rs:96
 msgid "analysing {} tracks…"
 msgstr "analizando {} pistas…"
 
-#: src/app/library/track.rs:83
+#: src/app/library/track.rs:110
 msgid "already in the Collection"
 msgstr "ya está en la Colección"
 
-#: src/app/library/track.rs:87
+#: src/app/library/track.rs:114
 msgid "“{}” imported to the Collection"
 msgstr "«{}» importada a la Colección"
 
-#: src/app/library/track.rs:106
+#: src/app/library/track.rs:133
 msgid "Analysis Lock on for “{}”"
 msgstr "Bloqueo de análisis activado para «{}»"
 
-#: src/app/library/track.rs:108
+#: src/app/library/track.rs:135
 msgid "Analysis Lock off for “{}”"
 msgstr "Bloqueo de análisis desactivado para «{}»"
 
-#: src/app/library/track.rs:110
+#: src/app/library/track.rs:137
 msgid "Analysis Lock on for {} tracks"
 msgstr "Bloqueo de análisis activado para {} pistas"
 
-#: src/app/library/track.rs:111
+#: src/app/library/track.rs:138
 msgid "Analysis Lock off for {} tracks"
 msgstr "Bloqueo de análisis desactivado para {} pistas"
 
-#: src/app/library/track.rs:174
+#: src/app/library/track.rs:201
 msgid "the file is missing: relocate it first"
 msgstr "falta el archivo: reubícalo primero"
 
-#: src/app/library/track.rs:188
+#: src/app/library/track.rs:215
 msgid "tags of “{}” reloaded"
 msgstr "etiquetas de «{}» recargadas"
 
-#: src/app/library/track.rs:189
+#: src/app/library/track.rs:216
 msgid "Reload Tag: kept your edits of {}"
 msgstr "Recargar etiqueta: se conservan tus ediciones de {}"
 
-#: src/app/library/track.rs:190
+#: src/app/library/track.rs:217
 msgid "tags of {} tracks reloaded"
 msgstr "etiquetas de {} pistas recargadas"
 
-#: src/app/library/track.rs:193
+#: src/app/library/track.rs:220
 msgid "{} files are missing"
 msgstr "faltan {} archivos"
 
