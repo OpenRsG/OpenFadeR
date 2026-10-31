@@ -7,7 +7,7 @@ use openfader::{
     library::{Track, folder},
     store,
 };
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 pub fn act(c: &Rc<Ctx>, id: &str) {
     if id == "track-analyze" {
@@ -59,11 +59,38 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
     }
 }
 
-/// Analysis workers check locks and prepare source guides without holding the UI callback.
+/// Analysis workers check locks and prepare source guides without holding the UI callback. A track that already has an
+/// analysis is asked about first: the new one replaces it.
 fn analyze_tracks(c: &Rc<Ctx>) {
     let Some((tracks, rows)) = browser::analysis_selection() else {
         return c.say(tr!("choose a track first"));
     };
+    let analysed: Vec<&Track> = rows
+        .iter()
+        .map(|i| &tracks[*i])
+        .filter(|t| openfader::analysis::cache::glance(t).is_some())
+        .collect();
+    let text = match analysed.as_slice() {
+        [] => return analyze_now(c, tracks, rows),
+        [t] => tr!(
+            "“{}” is already analysed. Analyse it again? Its BPM, grid, key and waveform are replaced; cues follow Preferences > Analysis.",
+            t.title
+        ),
+        many => tr!(
+            "{} of these tracks are already analysed. Analyse them again? Their BPM, grid, key and waveform are replaced; cues follow Preferences > Analysis.",
+            many.len()
+        ),
+    };
+    c.confirm(
+        Confirm::Analyze(tracks, rows),
+        tr!("ANALYSE AGAIN"),
+        &text,
+        tr!("OK"),
+        "",
+    );
+}
+
+pub(super) fn analyze_now(c: &Rc<Ctx>, tracks: Arc<Vec<Track>>, rows: Vec<usize>) {
     let msg = match rows.as_slice() {
         [i] => tr!("analysing “{}”…", tracks[*i].title),
         many => tr!("analysing {} tracks…", many.len()),

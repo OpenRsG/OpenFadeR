@@ -256,6 +256,7 @@ fn confirm_done(c: &Rc<Ctx>, answer: i32) {
         (Confirm::AutoCue(j), 2) => autocue::run(c, j, autocue::Mode::Keep, false),
         (Confirm::RemoveMissing(t), 1) => missing::remove(c, t),
         (Confirm::RemoveTheme(name), 1) => super::skin::remove_named(&name),
+        (Confirm::Analyze(t, rows), 1) => track::analyze_now(c, t, rows),
         _ => {}
     }
 }
