@@ -18,7 +18,8 @@ export component WaveView inherits Image {
     changed height => { self.resized(self.width, self.height); }
 }
 
-/// The enlarged waveform of deck `index`: a source-pixel crop of Rust's cached three-view picture (`DeckLive.detail`).
+/// The enlarged waveform of deck `index`: a source-pixel crop of Rust's cached three-view picture (`DeckLive.detail`), which
+/// arrives as tiles because a GPU texture is limited in width (Pi 5: 4096 px; the picture is three views wide).
 /// `DeckScroll.strip-x` selects the crop under the fixed playhead; CPU and GPU use the same mapping at the raster's
 /// physical size. Only `DeckScroll` changes during playback (src/app/deck/frame.rs), without rebuilding the image.
 /// Reports its visible size like [`WaveView`]; Rust draws the picture at that height and three times that width.
@@ -26,22 +27,32 @@ export component WaveStrip inherits Rectangle {
     in property <int> index;
     callback resized(length, length);
     property <DeckScroll> s: DeckState.scroll[root.index];
-    property <length> pixel-size: root.s.strip-w / max(1, strip.source.width);
-    property <length> playhead-x: root.s.strip-w > 0px ? floor(strip.source.width / 6) * root.pixel-size : root.width / 2;
+    property <[image]> tiles: DeckState.live[root.index].detail;
+    // Every tile but the last is `tile-px` wide; together they are `strip-px` physical pixels (three views).
+    property <float> tile-px: root.tiles[0].width;
+    property <float> strip-px: root.tiles.length > 0 ? (root.tiles.length - 1) * root.tile-px + root.tiles[root.tiles.length - 1].width : 0;
+    property <length> pixel-size: root.s.strip-w / max(1.0, root.strip-px);
+    property <length> playhead-x: root.s.strip-w > 0px ? floor(root.strip-px / 6) * root.pixel-size : root.width / 2;
+    // First physical column of the picture under the view.
+    property <float> crop-x: round(-root.s.strip-x / max(1px, root.s.strip-w) * root.strip-px);
     clip: true;
     init => { self.resized(self.width, self.height); }
     changed width => { self.resized(self.width, self.height); }
     changed height => { self.resized(self.width, self.height); }
     changed index => { self.resized(self.width, self.height); }
-    // A shared source-pixel crop avoids backend-dependent snapping of a translated image at fractional scales.
-    strip := Image {
-        x: 0;
+    // Each tile shows its part of the shared source-pixel crop [crop-x, crop-x + one view): this avoids backend-dependent
+    // snapping of a translated image at fractional scales, and tiles that miss the crop are hidden.
+    for tile[k] in root.tiles: Image {
+        property <float> lo: max(root.crop-x, k * root.tile-px);
+        property <float> hi: min(root.crop-x + root.strip-px / 3, k * root.tile-px + tile.width);
+        visible: self.hi > self.lo;
+        x: (self.lo - root.crop-x) * root.pixel-size;
         y: 0;
-        width: root.s.strip-w / 3;
-        height: self.source.height * root.pixel-size;
-        source: DeckState.live[root.index].detail;
-        source-clip-x: round(-root.s.strip-x / max(1px, root.s.strip-w) * self.source.width);
-        source-clip-width: self.source.width / 3;
+        width: max(0.0, self.hi - self.lo) * root.pixel-size;
+        height: tile.height * root.pixel-size;
+        source: tile;
+        source-clip-x: self.lo - k * root.tile-px;
+        source-clip-width: max(0.0, self.hi - self.lo);
         image-fit: fill;
         image-rendering: pixelated;
     }

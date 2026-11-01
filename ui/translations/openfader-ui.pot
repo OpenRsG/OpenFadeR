@@ -622,7 +622,7 @@ msgid "LIST"
 msgstr ""
 
 #: ui/browser-state.slint:92
-#: ui/deck-compact.slint:76
+#: ui/deck-compact.slint:78
 #: ui/deck-header.slint:66
 msgid "MASTER"
 msgstr ""
@@ -1236,16 +1236,22 @@ msgstr ""
 msgid "Not now"
 msgstr ""
 
-#: ui/deck-compact.slint:70
+#: ui/deck-compact.slint:72
 #: ui/deck-controls.slint:171
 #: ui/exportmode-parts.slint:282
 msgid "Tempo range"
 msgstr ""
 
-#: ui/deck-compact.slint:75
+#: ui/deck-compact.slint:77
 #: ui/deck-header.slint:65
 #: ui/deck-touch.slint:35
 msgid "SYNC"
+msgstr ""
+
+#: ui/deck-compact.slint:79
+#: ui/deck-panel.slint:172
+#: ui/exportmode-parts.slint:311
+msgid "GRID"
 msgstr ""
 
 #: ui/deck-controls.slint:128
@@ -1292,13 +1298,13 @@ msgstr ""
 
 #: ui/deck-controls.slint:211
 #: ui/deck-wave-v.slint:105
-#: ui/deck-wave.slint:179
+#: ui/deck-wave.slint:190
 msgid "IN"
 msgstr ""
 
 #: ui/deck-controls.slint:212
 #: ui/deck-wave-v.slint:97
-#: ui/deck-wave.slint:172
+#: ui/deck-wave.slint:183
 msgid "OUT"
 msgstr ""
 
@@ -1418,100 +1424,94 @@ msgstr ""
 msgid " · click to separate"
 msgstr ""
 
-#: ui/deck-panel.slint:22
+#: ui/deck-panel.slint:43
 #: ui/exportmode-grid.slint:27
 msgid "BEAT 1"
 msgstr ""
 
-#: ui/deck-panel.slint:23
+#: ui/deck-panel.slint:44
 #: ui/exportmode-grid.slint:37
 #: ui/fx.slint:125
 msgid "TAP"
 msgstr ""
 
-#: ui/deck-panel.slint:28
+#: ui/deck-panel.slint:49
 #: ui/exportmode-grid.slint:56
 #: ui/exportmode-grid.slint:75
 msgid "RESET"
 msgstr ""
 
-#: ui/deck-panel.slint:31
+#: ui/deck-panel.slint:52
 #: ui/exportmode-grid.slint:48
 msgid "METRO"
 msgstr ""
 
-#: ui/deck-panel.slint:31
+#: ui/deck-panel.slint:52
 msgid "Metronome: click on every beat of the grid"
 msgstr ""
 
-#: ui/deck-panel.slint:32
+#: ui/deck-panel.slint:53
 msgid "HERE"
 msgstr ""
 
-#: ui/deck-panel.slint:32
+#: ui/deck-panel.slint:53
 msgid "Tempo change here: TAP, ×2, ÷2 change only the tempo section from the playhead on"
 msgstr ""
 
-#: ui/deck-panel.slint:33
+#: ui/deck-panel.slint:54
 #: ui/fx.slint:275
 #: ui/library.slint:258
 msgid "MERGE"
 msgstr ""
 
-#: ui/deck-panel.slint:33
+#: ui/deck-panel.slint:54
 msgid "Remove the tempo section at the playhead"
 msgstr ""
 
-#: ui/deck-panel.slint:117
+#: ui/deck-panel.slint:138
 #: ui/stage/deck-parts.slint:516
 msgid "Delete a hot cue: press its pad"
 msgstr ""
 
-#: ui/deck-panel.slint:118
+#: ui/deck-panel.slint:139
 #: ui/exportmode-cues.slint:160
 #: ui/exportmode-parts.slint:325
 msgid "MEMORY"
 msgstr ""
 
-#: ui/deck-panel.slint:118
+#: ui/deck-panel.slint:139
 msgid "Store a memory cue at the playhead"
 msgstr ""
 
-#: ui/deck-panel.slint:149
+#: ui/deck-panel.slint:170
 #: src/app/deck/pads/mod.rs:144
 #: src/app/deck/pads/mod.rs:153
 msgid "REV"
 msgstr ""
 
-#: ui/deck-panel.slint:149
+#: ui/deck-panel.slint:170
 msgid "Reverse playback"
 msgstr ""
 
-#: ui/deck-panel.slint:150
+#: ui/deck-panel.slint:171
 msgid "BRAKE"
 msgstr ""
 
-#: ui/deck-panel.slint:150
+#: ui/deck-panel.slint:171
 msgid "Vinyl stop"
 msgstr ""
 
-#: ui/deck-panel.slint:151
-#: ui/exportmode-parts.slint:311
-#: ui/exportmode-parts.slint:313
-msgid "GRID"
-msgstr ""
-
-#: ui/deck-panel.slint:151
+#: ui/deck-panel.slint:172
 msgid "Beat grid editing"
 msgstr ""
 
-#: ui/deck-panel.slint:152
+#: ui/deck-panel.slint:173
 #: ui/device-check.slint:145
 #: src/app/device/review.rs:215
 msgid "CUES"
 msgstr ""
 
-#: ui/deck-panel.slint:152
+#: ui/deck-panel.slint:173
 msgid "Cue / loop list"
 msgstr ""
 
@@ -1573,19 +1573,19 @@ msgid "Memory cue"
 msgstr ""
 
 #: ui/deck-wave-v.slint:112
-#: ui/deck-wave.slint:186
+#: ui/deck-wave.slint:197
 #: ui/mixpoint.slint:132
 msgid "SILENT"
 msgstr ""
 
 #: ui/deck-wave-v.slint:173
-#: ui/deck-wave.slint:246
+#: ui/deck-wave.slint:257
 #: ui/stage/deck-parts.slint:234
 msgid "Zoom in"
 msgstr ""
 
 #: ui/deck-wave-v.slint:175
-#: ui/deck-wave.slint:244
+#: ui/deck-wave.slint:255
 #: ui/stage/deck-parts.slint:232
 msgid "Zoom out"
 msgstr ""
@@ -4860,7 +4860,7 @@ msgid "Analysis is busy: wait for an existing analysis run to finish or cancel i
 msgstr ""
 
 #: src/app/analyze/job.rs:478
-#: src/app/exportmode/mod.rs:180
+#: src/app/exportmode/mod.rs:164
 msgid "this track has an Analysis Lock: unlock it first"
 msgstr ""
 
@@ -6242,59 +6242,63 @@ msgstr ""
 msgid "cue deleted"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:151
+#: src/app/deck/exportedit.rs:157
 msgid "Analysis Lock is on: unlock the track to edit its grid"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:161
+#: src/app/deck/exportedit.rs:167
 msgid "the Analysis Lock needs a track of the library"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:166
+#: src/app/deck/exportedit.rs:172
 msgid "Analysis Lock on: the grid and the analysis are kept"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:168
+#: src/app/deck/exportedit.rs:174
 msgid "Analysis Lock off"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:170
+#: src/app/deck/exportedit.rs:176
 msgid "Analysis Lock: {}"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:196
+#: src/app/deck/exportedit.rs:202
 #: src/app/edit/ops.rs:146
 #: src/app/library/undo.rs:31
 msgid "nothing to undo"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:198
+#: src/app/deck/exportedit.rs:204
 #: src/app/edit/ops.rs:148
 #: src/app/library/undo.rs:29
 msgid "nothing to redo"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:211
+#: src/app/deck/exportedit.rs:217
 msgid "grid undone"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:213
+#: src/app/deck/exportedit.rs:219
 msgid "grid redone"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:224
+#: src/app/deck/exportedit.rs:230
 msgid "grid edits apply from the playhead on"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:226
+#: src/app/deck/exportedit.rs:232
 msgid "grid edits apply to the whole track"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:240
+#: src/app/deck/exportedit.rs:246
 msgid "beat distance {} ms"
 msgstr ""
 
-#: src/app/deck/exportedit.rs:254
+#: src/app/deck/exportedit.rs:256
+msgid "BPM: type a tempo between 30 and 300"
+msgstr ""
+
+#: src/app/deck/exportedit.rs:264
 msgid "BPM entered"
 msgstr ""
 
@@ -6368,7 +6372,7 @@ msgid "{} beats run past the end of the track"
 msgstr ""
 
 #: src/app/deck/groove.rs:28
-#: src/app/exportmode/mod.rs:178
+#: src/app/exportmode/mod.rs:162
 msgid "load a track first"
 msgstr ""
 
@@ -6416,7 +6420,7 @@ msgid "loading… · {}"
 msgstr ""
 
 #: src/app/deck/load.rs:713
-#: src/app/midi/session.rs:281
+#: src/app/midi/session.rs:286
 msgid "audio: {}"
 msgstr ""
 
@@ -6866,7 +6870,7 @@ msgstr ""
 msgid "synced start cancelled"
 msgstr ""
 
-#: src/app/deck/tick.rs:186
+#: src/app/deck/tick.rs:193
 msgid "end of track"
 msgstr ""
 
@@ -8215,28 +8219,24 @@ msgstr ""
 msgid "EDITED"
 msgstr ""
 
-#: src/app/exportmode/mod.rs:157
-msgid "BPM: type a tempo between 30 and 300"
-msgstr ""
-
-#: src/app/exportmode/mod.rs:183
+#: src/app/exportmode/mod.rs:167
 #: src/app/library/track.rs:95
 msgid "analysing “{}”…"
 msgstr ""
 
-#: src/app/exportmode/mod.rs:196
+#: src/app/exportmode/mod.rs:180
 msgid "load a track in both players first"
 msgstr ""
 
-#: src/app/exportmode/mod.rs:207
+#: src/app/exportmode/mod.rs:191
 msgid "matching: {}"
 msgstr ""
 
-#: src/app/exportmode/mod.rs:208
+#: src/app/exportmode/mod.rs:192
 msgid "“{}” and “{}” are now related tracks"
 msgstr ""
 
-#: src/app/exportmode/mod.rs:209
+#: src/app/exportmode/mod.rs:193
 msgid "“{}” and “{}” are no longer related"
 msgstr ""
 
@@ -9501,95 +9501,95 @@ msgstr ""
 msgid "no MIDI output port matching {}"
 msgstr ""
 
-#: src/app/midi/session.rs:39
+#: src/app/midi/session.rs:41
 msgid "connected · {} · {}"
 msgstr ""
 
-#: src/app/midi/session.rs:139
+#: src/app/midi/session.rs:142
 #: src/app/prefs/controller/drivers.rs:82
 msgid "no MIDI input ports"
 msgstr ""
 
-#: src/app/midi/session.rs:148
+#: src/app/midi/session.rs:151
 #: src/app/midi/wire.rs:102
 msgid "MIDI unavailable: {}"
 msgstr ""
 
-#: src/app/midi/session.rs:164
+#: src/app/midi/session.rs:167
 msgid "{} disconnected"
 msgstr ""
 
-#: src/app/midi/session.rs:186
+#: src/app/midi/session.rs:190
 msgid "audio unchanged"
 msgstr ""
 
-#: src/app/midi/session.rs:187
+#: src/app/midi/session.rs:191
 msgid "no state dump"
 msgstr ""
 
-#: src/app/midi/session.rs:193
+#: src/app/midi/session.rs:197
 msgid "{} connected"
 msgstr ""
 
-#: src/app/midi/session.rs:209
+#: src/app/midi/session.rs:213
 msgid "{}: {} bindings, {} LEDs"
 msgstr ""
 
-#: src/app/midi/session.rs:224
+#: src/app/midi/session.rs:228
 msgid "no LED output: {}"
 msgstr ""
 
-#: src/app/midi/session.rs:241
+#: src/app/midi/session.rs:246
 msgid "no controller mapping for these ports (mappings/*.xml)"
 msgstr ""
 
-#: src/app/midi/session.rs:245
+#: src/app/midi/session.rs:250
 msgid "controller mapping failed"
 msgstr ""
 
-#: src/app/midi/session.rs:257
-#: src/app/midi/session.rs:353
+#: src/app/midi/session.rs:262
+#: src/app/midi/session.rs:358
 msgid "audio unchanged (PREFS: controller audio off)"
 msgstr ""
 
-#: src/app/midi/session.rs:263
+#: src/app/midi/session.rs:268
 msgid "audio: looking for {}…"
 msgstr ""
 
-#: src/app/midi/session.rs:282
+#: src/app/midi/session.rs:287
 msgid "Audio output: {}"
 msgstr ""
 
-#: src/app/midi/session.rs:286
+#: src/app/midi/session.rs:291
 msgid "audio unchanged (no output device of its own)"
 msgstr ""
 
-#: src/app/midi/session.rs:287
+#: src/app/midi/session.rs:292
 msgid "Audio output: unchanged"
 msgstr ""
 
-#: src/app/midi/session.rs:331
+#: src/app/midi/session.rs:336
 msgid "Audio output: restored"
 msgstr ""
 
-#: src/app/midi/session.rs:335
+#: src/app/midi/session.rs:340
 msgid "Audio output: could not restore"
 msgstr ""
 
-#: src/app/midi/session.rs:369
+#: src/app/midi/session.rs:374
 #: src/app/mixer/mod.rs:181
 msgid "Headphones: {}"
 msgstr ""
 
-#: src/app/midi/session.rs:385
+#: src/app/midi/session.rs:390
 msgid "state dump requested"
 msgstr ""
 
-#: src/app/midi/session.rs:420
+#: src/app/midi/session.rs:425
 msgid "no reply to the state dump: controls sync on their first move"
 msgstr ""
 
-#: src/app/midi/session.rs:422
+#: src/app/midi/session.rs:427
 msgid "state dump: {} of {} reports applied"
 msgstr ""
 

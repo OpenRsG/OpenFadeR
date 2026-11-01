@@ -1,4 +1,4 @@
-import { Chip, Dropdown } from "widgets.slint";
+import { Chip, Dropdown, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DeckState, DeckView } from "deck-state.slint";
 import { DeckOverview } from "deck-wave.slint";
@@ -7,11 +7,32 @@ import { JogWheel, LoopBlock, RingColumn, SideButtons, TempoColumn } from "deck-
 import { DeckDropTarget } from "dnd.slint";
 import { CueList, PadGrid, PadOptions } from "pads.slint";
 
-/// GRID edit block (replaces the pads while GRID is on): shift by n ms, beat 1 at the playhead, BPM ×2 / ÷2, TAP, reset, METRO.
+/// Unpitched grid tempo entry shared by the normal and compact decks.
+export component GridBpm inherits HorizontalLayout {
+    in property <int> index;
+    property <bool> en: DeckState.decks[root.index].loaded;
+    property <float> bpm: DeckState.decks[root.index].grid-bpm;
+    changed bpm => { if (!field.has-focus) { field.text = root.bpm > 0 ? root.bpm.to-fixed(2) : ""; } }
+    init => { field.text = root.bpm > 0 ? root.bpm.to-fixed(2) : ""; }
+    spacing: 4px;
+    Text { text: "BPM"; color: Theme.text-dim; font-size: Theme.font-xs; vertical-alignment: center; horizontal-stretch: 0; }
+    field := TextField {
+        min-width: 80px;
+        input-type: text;
+        placeholder-text: "BPM";
+        opacity: root.en ? 1 : 0.5;
+        accepted(t) => { if (root.en) { DeckState.grid-bpm(root.index, t); } }
+    }
+}
+
+/// GRID edit block: typed BPM, shift, beat 1, ×2 / ÷2, TAP, reset and METRO.
 export component GridEdit inherits GridLayout {
     in property <int> index;
     property <bool> en: DeckState.decks[root.index].loaded;
     spacing: 2px;
+    Row {
+        GridBpm { colspan: 3; index: root.index; }
+    }
     Row {
         Chip { text: "−10"; enabled: root.en; clicked => { DeckState.grid-shift(root.index, -10); } }
         Chip { text: "−1"; enabled: root.en; clicked => { DeckState.grid-shift(root.index, -1); } }
@@ -85,7 +106,7 @@ export component DeckPanel inherits Rectangle {
             Rectangle {
                 x: ctl.x-pads;
                 width: ctl.pw;
-                if root.v.grid-edit: GridEdit { index: root.index; height: 4 * Theme.h-ctl + 3 * 2px; y: 0; }
+                if root.v.grid-edit: GridEdit { index: root.index; height: 5 * Theme.h-ctl + 4 * 2px; y: 0; }
                 if !root.v.grid-edit && root.show-cues: CueList {
                     height: parent.height;
                     cues: root.v.cues;

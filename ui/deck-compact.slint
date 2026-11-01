@@ -5,6 +5,7 @@ import { DeckOverview } from "deck-wave.slint";
 import { DeckTitle, Jacket, StemRow } from "deck-header.slint";
 import { JogWheel, RingColumn, SideButtons } from "deck-controls.slint";
 import { DeckDropTarget } from "dnd.slint";
+import { GridBpm } from "deck-panel.slint";
 
 /// Decks C and D of the 4-deck layout (132 px): header 28, overview 28 + phrase strip 12, a 64 px control row:
 /// hot cues A-D, tempo fader, SYNC / MASTER, STEMS | CUE / PLAY | jog | SLIP Q MT, mirrored for the odd decks. Loops, key
@@ -40,7 +41,7 @@ export component DeckCompact inherits Rectangle {
                 width: ctl.wm;
                 height: ctl.height - 2px;
                 spacing: 2px;
-                HorizontalLayout {
+                if !root.v.grid-edit: HorizontalLayout {
                     spacing: 2px;
                     for i in [0, 1, 2, 3]: Chip {
                         width: 28px;
@@ -57,6 +58,7 @@ export component DeckCompact inherits Rectangle {
                     if root.v.stems && root.v.stem-buttons: StemRow { index: root.index; h: 22px; }
                     Rectangle { horizontal-stretch: 1; }
                 }
+                if root.v.grid-edit: GridBpm { index: root.index; height: Theme.h-ctl; }
                 HorizontalLayout {
                     height: 18px;
                     spacing: 4px;
@@ -74,6 +76,7 @@ export component DeckCompact inherits Rectangle {
                     spacing: 2px;
                     Chip { text: @tr("SYNC"); width: 44px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.synced; active-color: Theme.sync; clicked => { DeckState.sync(root.index); } }
                     Chip { text: @tr("MASTER"); width: 50px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.master; active-color: Theme.master; clicked => { DeckState.master-toggle(root.index); } }
+                    Chip { text: @tr("GRID"); width: 40px; height: 18px; horizontal-stretch: 0; font-size: Theme.font-xs; enabled: root.v.loaded; active: root.v.grid-edit; clicked => { DeckState.grid-toggle(root.index); } }
                     if root.v.sync-rate != "": Text { text: root.v.sync-rate; width: 22px; horizontal-stretch: 0; color: Theme.accent-hi; font-size: Theme.font-sm; font-weight: Theme.weight-bold; horizontal-alignment: center; vertical-alignment: center; }
                     Text {
                         text: (!root.v.stem-buttons && root.v.stem-text != "" ? root.v.stem-text + " · " : "") + (root.v.title != "" ? root.v.key-shift : root.v.status);

@@ -174,6 +174,13 @@ impl Deck {
         }
         let mut dirty = false;
         let mut v = self.view.borrow_mut();
+        if v.grid_edit {
+            let grid_bpm = tempo_at(&l.analysis.beats, pos).unwrap_or(0.0) as f32;
+            if v.grid_bpm != grid_bpm {
+                v.grid_bpm = grid_bpm;
+                dirty = true;
+            }
+        }
         if v.playing != playing {
             let track = l.track.as_ref().map(openfader::plugin::source::track_json);
             let deck = self.index + 1;

@@ -1,7 +1,7 @@
 //! Creates the decks and routes the `DeckState` callbacks.
 
-use super::{active, frame, mixpoint, padopts, shown, slots, sync, tick, Deck, Decks, DECKS};
-use crate::app::{prefs, App, DeckLive, DeckScroll, DeckState, DeckView};
+use super::{DECKS, Deck, Decks, active, frame, mixpoint, padopts, shown, slots, sync, tick};
+use crate::app::{App, DeckLive, DeckScroll, DeckState, DeckView, prefs};
 use openfader::{
     analysis,
     library::{Library, Track},
@@ -83,6 +83,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, selected: Rc<RefCell<Option<Track>>
     on!(state, at decks, on_grid_double, |d| d.grid_double());
     on!(state, at decks, on_grid_halve, |d| d.grid_halve());
     on!(state, at decks, on_grid_tap, |d| d.grid_tap());
+    on!(state, at decks, on_grid_bpm, |d, text| d.grid_set_bpm(&text));
     on!(state, at decks, on_grid_reset, |d| d.grid_reset());
     on!(state, at decks, on_grid_here, |d| d.grid_here_toggle());
     on!(state, at decks, on_grid_merge, |d| d.grid_section_remove());

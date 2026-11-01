@@ -6,6 +6,7 @@ message lights which light. The format is documented at the top of `src/app/midi
 (`:`-separated folders), `~/.config/openfader/mappings/` (`$XDG_CONFIG_HOME/openfader/mappings`) and the bundled `mappings/` next to
 the executable; a file in an earlier folder replaces one of the same name in a later one. When a controller connects, the file whose
 `<port>` is the longest one found inside a MIDI input port name (case-insensitive) is loaded.
+The same `<port>` matches the MIDI output for LED feedback; `<name>` is only the display label. `OPENFADER_MIDI_PORT`, when set, overrides the port filter for both directions. If controls work but LEDs do not, check the MIDI status for **no LED output** and confirm the mapping's `<port>` matches the controller's output port.
 
 A controller without a matching mapping can also use a **controller plugin** (Preferences > Decks & controllers > CONTROLLER PLUGINS):
 the plugin claims the port and our mapping file for it is not read. The bundled `mixxx` plugin runs Mixxx's own `.midi.xml` mappings
