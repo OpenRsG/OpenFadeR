@@ -14,9 +14,9 @@ mod info;
 mod phrase;
 
 use super::{
-    analyze,
+    App, DeckState, ExportDeck, ExportModeState, HotCue, analyze,
     deck::{Deck, Decks},
-    prefs, toast, App, DeckState, ExportDeck, ExportModeState, HotCue,
+    prefs, toast,
 };
 use openfader::{library::Track, store};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
@@ -26,12 +26,6 @@ use std::{cell::RefCell, rc::Rc};
 const PLAYERS: usize = 2;
 /// DUAL PLAYER is layout 2 of `ExportModeState.layout`.
 const DUAL: i32 = 2;
-
-/// A BPM typed into the GRID panel: 30-300, a comma counts as the decimal point.
-fn parse_bpm(text: &str) -> Option<f64> {
-    let v: f64 = text.trim().replace(',', ".").parse().ok()?;
-    (30.0..=300.0).contains(&v).then_some(v)
-}
 
 /// What the loaded-track part of a row was last read for: the deck's load counter.
 #[derive(Default, Clone, Copy, PartialEq)]
@@ -148,17 +142,7 @@ pub fn wire(app: &App, decks: Decks) {
     on!(state, at players, on_grid_stretch, |d, ms| d.grid_stretch(ms));
     on!(state, at players, on_grid_range, |d, from_here| d.grid_range(from_here));
     on!(state, at players, on_grid_lock, |d| d.toggle_grid_lock());
-    {
-        let w = weak.clone();
-        on!(state, at players, on_grid_bpm, |d, text| match parse_bpm(&text) {
-            Some(bpm) => d.grid_set_bpm(bpm),
-            None => {
-                if let Some(app) = w.upgrade() {
-                    toast::show(&app, tr!("BPM: type a tempo between 30 and 300"));
-                }
-            }
-        });
-    }
+    on!(state, at players, on_grid_bpm, |d, text| d.grid_set_bpm(&text));
     {
         let (w, decks) = (weak.clone(), decks.clone());
         state.on_play(move |i| {
@@ -263,7 +247,7 @@ mod tests {
     #[test]
     fn export_panels_catch_up_on_entry_and_poll_only_while_visible() {
         use openfader::{
-            library::{own::Own, Library},
+            library::{Library, own::Own},
             store::Store,
         };
         use std::time::Duration;
@@ -296,20 +280,5 @@ mod tests {
         pump(Duration::from_millis(20));
         assert!(state.get_decks().row_data(0).unwrap().from_here);
         app.hide().unwrap();
-    }
-
-    #[test]
-    fn a_typed_bpm_is_a_tempo_in_range() {
-        assert_eq!(parse_bpm(" 128 "), Some(128.0));
-        assert_eq!(parse_bpm("114,5"), Some(114.5));
-        assert_eq!(
-            [
-                parse_bpm("29.9"),
-                parse_bpm("300.1"),
-                parse_bpm("abc"),
-                parse_bpm("")
-            ],
-            [None; 4]
-        );
     }
 }

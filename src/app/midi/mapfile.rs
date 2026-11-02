@@ -28,8 +28,8 @@
 //! `light` one of [`Led`] written as in Rust.
 
 use super::{Binding, Led, LedRow, Msg, actions::ACTIONS};
-use openfader_plugin::markup::{Edge, tags};
 use openfader::paths::search_path;
+use openfader_plugin::markup::{Edge, tags};
 use std::collections::HashMap;
 #[cfg(test)]
 use std::fmt::Write as _;
@@ -265,23 +265,28 @@ pub(super) fn files() -> Vec<(String, String)> {
     out
 }
 
-/// The mapping for the connected input `ports`: the file whose `<port>` is the longest one found inside a port name
-/// (case-insensitive). `Ok(None)` when none matches (the user's midi.map still works), `Err` for a broken file.
-pub(super) fn load(ports: &[String]) -> Result<Option<Mapping>, String> {
+/// The mapping for the connected input `ports` and its `<port>` match: the file whose `<port>` is the longest one found inside a
+/// port name (case-insensitive). The match, not the file's `<name>`, finds the controller's output port too: ALSA names the
+/// card "DJControl Inpulse 500", the file says "Hercules DJControl Inpulse 500". `Ok(None)` when none matches (the user's
+/// midi.map still works), `Err` for a broken file.
+pub(super) fn load(ports: &[String]) -> Result<Option<(Mapping, String)>, String> {
     pick(ports, files())
 }
 
-fn pick(ports: &[String], files: Vec<(String, String)>) -> Result<Option<Mapping>, String> {
-    let mut best: Option<(usize, Mapping)> = None;
+pub(super) fn pick(
+    ports: &[String],
+    files: Vec<(String, String)>,
+) -> Result<Option<(Mapping, String)>, String> {
+    let mut best: Option<(usize, Mapping, String)> = None;
     for (name, text) in files {
         let (m, port) = parse(&text).map_err(|e| format!("{name}: {e}"))?;
         if let Some(len) = match_len(ports, &port)
-            && best.as_ref().is_none_or(|(l, _)| len > *l)
+            && best.as_ref().is_none_or(|(l, ..)| len > *l)
         {
-            best = Some((len, m));
+            best = Some((len, m, port));
         }
     }
-    Ok(best.map(|(_, m)| m))
+    Ok(best.map(|(_, m, port)| (m, port)))
 }
 
 /// How well a file's `<port>` fits the connected input `ports`: its length when one port name contains it (case-insensitive), `None`
@@ -330,7 +335,7 @@ mod tests {
 
     #[test]
     fn a_file_carries_its_controls_and_lights() {
-        let m = pick(
+        let (m, _) = pick(
             &["Test Controller:Test Controller MIDI 1 20:0".into()],
             vec![file("Test Controller", "Test Controller")],
         )
@@ -360,7 +365,7 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
-        let pro = pick(&["Test Pro MIDI 1".into()], files()).unwrap().unwrap();
+        let (pro, _) = pick(&["Test Pro MIDI 1".into()], files()).unwrap().unwrap();
         assert_eq!(pro.controller, "Test Pro", "not the shorter Test");
         let (m, port) = parse(
             "<OpenFadeRMapping><info><name>X</name></info><controls>\
@@ -372,6 +377,34 @@ mod tests {
         assert_eq!(
             m.bad,
             ["unknown action \"nope\"", "unknown light \"Fx(0,9,9)\""]
+        );
+    }
+
+    /// Issue #49: the shipped Inpulse 500 file is named "Hercules DJControl Inpulse 500" but ALSA lists the card without the
+    /// brand, so the output port must be looked up by the file's `<port>`, which is also what matched the input.
+    #[test]
+    fn the_inpulse_500_output_is_looked_up_by_its_port_not_its_display_name() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("mappings/Hercules_DJControl_Inpulse_500.xml");
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            return; // no OpenFadeR-Map checkout
+        };
+        let alsa = "DJControl Inpulse 500:DJControl Inpulse 500 MIDI 1 20:0".to_owned();
+        let (m, port) = pick(&[alsa.clone()], vec![("Hercules.xml".into(), text)])
+            .unwrap()
+            .unwrap();
+        assert_eq!(m.controller, "Hercules DJControl Inpulse 500");
+        assert_eq!(port, "DJControl Inpulse 500");
+        let finds = |want: &str| match_len(&[alsa.clone()], want).is_some(); // connect_out's rule
+        assert!(finds(&port));
+        assert!(
+            !finds(&m.controller),
+            "the display name matches no ALSA port"
+        );
+        assert!(
+            m.leds
+                .iter()
+                .any(|l| l.led == Led::Play && l.msg == (0x91, 0x07))
         );
     }
 }

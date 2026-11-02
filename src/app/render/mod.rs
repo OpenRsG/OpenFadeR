@@ -435,6 +435,28 @@ impl Canvas {
     pub fn image(&self) -> Image {
         Image::from_rgba8(self.buf.clone())
     }
+    /// The picture as columns of at most `max` pixels, left to right (one image when it fits): a GPU texture is limited in
+    /// width (GL_MAX_TEXTURE_SIZE, 4096 on the Pi 5), which a picture three views wide exceeds on a large window.
+    pub fn tiles(&self, max: usize) -> Vec<Image> {
+        if self.w <= max {
+            return vec![self.image()];
+        }
+        (0..self.w)
+            .step_by(max)
+            .map(|x| {
+                let tw = max.min(self.w - x);
+                let mut buf = SharedPixelBuffer::<Rgba8Pixel>::new(tw as u32, self.h as u32);
+                for (dst, src) in buf
+                    .make_mut_slice()
+                    .chunks_exact_mut(tw)
+                    .zip(self.buf.as_slice().chunks_exact(self.w))
+                {
+                    dst.copy_from_slice(&src[x..x + tw]);
+                }
+                Image::from_rgba8(buf)
+            })
+            .collect()
+    }
     /// A copy with `extra` rows of the skin background appended below (the overview's phrase strip sits there).
     pub fn extended(&self, extra: usize) -> Canvas {
         let mut c = Canvas::new(self.w, self.h + extra);

@@ -502,6 +502,93 @@ mod tests {
         );
     }
 
+    /// Issue #49: ALSA lists the Inpulse 500 as "DJControl Inpulse 500" but its file's `<name>` is "Hercules DJControl Inpulse 500";
+    /// the output port was looked up by that name, found nothing, and no light ever left. A virtual ALSA port stands in for the
+    /// controller (skipped without ALSA seq): the transport lights of both decks must arrive on the port the file's `<port>` names.
+    #[cfg(unix)]
+    #[test]
+    fn lights_reach_the_output_port_the_mapping_port_names_not_its_display_name() {
+        use super::super::{mapfile, port};
+        use midir::{
+            MidiInput, MidiOutput,
+            os::unix::{VirtualInput, VirtualOutput},
+        };
+        use std::time::Duration;
+        let (tx, rx) = std::sync::mpsc::channel();
+        let Ok(input) = MidiInput::new("rk-led-test").map(|i| {
+            i.create_virtual(
+                "rk-djcontrol-inpulse-500",
+                move |_, m, _| drop(tx.send(m.to_vec())),
+                (),
+            )
+        }) else {
+            return eprintln!("skip: no MIDI backend");
+        };
+        let Ok(_input) = input else {
+            return eprintln!("skip: no ALSA seq");
+        };
+        let _source = MidiOutput::new("rk-led-source")
+            .unwrap()
+            .create_virtual("rk-djcontrol-inpulse-500")
+            .unwrap();
+        let lister = MidiInput::new("rk-led-list").unwrap();
+        let listed: Vec<String> = lister
+            .ports()
+            .iter()
+            .filter_map(|p| lister.port_name(p).ok())
+            .filter(|n| n.contains("rk-djcontrol-inpulse-500"))
+            .collect();
+        let outputs: String = (0..2)
+            .flat_map(|d| {
+                // The Inpulse 500 file's transport outputs: PLAY 0x07, CUE 0x06, SYNC 0x05, HP CUE 0x0C, LOOP 0x2C.
+                [("Play", 0x07), ("Cue", 0x06), ("Sync", 0x05), ("HpCue", 0x0C), ("Loop", 0x2C)].map(|(l, n)| {
+                    format!("<output status=\"0x{:02X}\" midino=\"0x{n:02X}\" light=\"{l}\" deck=\"{d}\"/>", 0x91 + d)
+                })
+            })
+            .collect();
+        let text = format!(
+            "<OpenFadeRMapping><info><name>Hercules rk-djcontrol-inpulse-500</name><port>rk-djcontrol-inpulse-500</port></info>\
+             <controls></controls><outputs>{outputs}</outputs></OpenFadeRMapping>"
+        );
+        let (m, port_match) = mapfile::pick(&listed, vec![("inpulse.xml".into(), text)])
+            .unwrap()
+            .unwrap();
+        assert!(
+            port::connect_out(&m.controller).is_err(),
+            "the display name is no port name"
+        );
+
+        let sink = port::Sink::new(
+            port::connect_out(&port_match).unwrap().0,
+            Duration::from_millis(1),
+        );
+        let mut s = Snap::default();
+        s.decks[0].playing = true;
+        s.decks[1].at_cue = true;
+        s.decks[1].loop_active = true;
+        Leds::new(m.leds).update(&s, |m| sink.send(m));
+        drop(sink); // waits for the queue
+
+        let mut got: Vec<Vec<u8>> = (0..10)
+            .map(|_| rx.recv_timeout(Duration::from_secs(2)).unwrap())
+            .collect();
+        got.sort();
+        let mut want = vec![
+            [0x91, 0x07, ON],
+            [0x91, 0x06, 0],
+            [0x91, 0x05, 0],
+            [0x91, 0x0C, 0],
+            [0x91, 0x2C, 0],
+            [0x92, 0x07, 0],
+            [0x92, 0x06, ON],
+            [0x92, 0x05, 0],
+            [0x92, 0x0C, 0],
+            [0x92, 0x2C, ON],
+        ];
+        want.sort();
+        assert_eq!(got, want);
+    }
+
     /// "PLAY went dark right after starting the deck": the light is the player's state, so it goes dark exactly when
     /// the deck stops (the null audio device runs a track out in well under a second), and the ring then rests
     /// on the last playhead segment.

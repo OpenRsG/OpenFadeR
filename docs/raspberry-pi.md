@@ -102,8 +102,9 @@ or a guarantee that longer tracks and larger libraries fit the same budget.
 
 Decks, previews and analysis decode to 16-bit on every machine, so that is not part of the mode.
 
-The image-composition path keeps the enlarged strip in a texture and changes its source rectangle, rather than
-moving a three-view-wide item. It also keeps each overview and its cue marker in a texture: the playhead and dashed
+The image-composition path keeps the enlarged strip in tiles at most 2048 physical pixels wide and changes their source rectangles,
+rather than moving a three-view-wide item. A single three-view texture exceeds the Pi 5's 4096-pixel limit on large screens.
+It also keeps each overview and its cue marker in a texture: the playhead and dashed
 slip ghost are tiny separate textures. The CPU prepares waveform pixels only when the cached strip or overview
 changes (load, zoom, size, palette, grid, cues, loops or stem data), not on each playhead step. The existing detail
 strip cache is retained; no shader duplicates the CPU painter's palette, grid or cue rules.

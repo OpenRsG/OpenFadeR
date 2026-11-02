@@ -93,6 +93,7 @@ fn scrolling_cached_detail_preserves_grid_cues_and_loop_at_each_zoom() {
                 60,
                 false,
             )
+            .image()
             .to_rgba8()
             .unwrap();
             for offset in [0, 128, 512, 1024] {
@@ -107,6 +108,7 @@ fn scrolling_cached_detail_preserves_grid_cues_and_loop_at_each_zoom() {
                     60,
                     false,
                 )
+                .image()
                 .to_rgba8()
                 .unwrap();
                 for y in 0..60 {
@@ -120,6 +122,31 @@ fn scrolling_cached_detail_preserves_grid_cues_and_loop_at_each_zoom() {
         }
     }
     prefs::set_for_test(|p| p.view = old);
+}
+
+#[test]
+fn strip_tiles_rejoin_to_the_whole_picture_within_the_texture_limit() {
+    let a = fixture();
+    for (w, max) in [(100, 128), (128, 128), (300, 128), (385, 128), (1, 1)] {
+        let strip = detail::render_strip(None, &a, 0.0, 0.05, 2000, None, w, 20, false);
+        let whole = strip.image().to_rgba8().unwrap();
+        let tiles = strip.tiles(max);
+        assert_eq!(tiles.len(), w.div_ceil(max), "{w} wide in tiles of {max}");
+        let mut x = 0;
+        for tile in &tiles {
+            let tile = tile.to_rgba8().unwrap();
+            let tw = tile.width() as usize;
+            assert!(tw <= max && tile.height() == 20);
+            for y in 0..20 {
+                assert_eq!(
+                    &tile.as_slice()[y * tw..][..tw],
+                    &whole.as_slice()[y * w + x..][..tw]
+                );
+            }
+            x += tw;
+        }
+        assert_eq!(x, w);
+    }
 }
 
 // Independent pre-culling reference: retain every beat/cue iteration and let the canvas clip it.
@@ -219,6 +246,7 @@ fn detail_viewport_culling_matches_all_markers_at_fractional_edges() {
                         60,
                         false,
                     )
+                    .image()
                     .to_rgba8()
                     .unwrap();
                     assert_eq!(
@@ -273,6 +301,7 @@ fn benchmark_detail_viewport_metadata() {
                     120,
                     false,
                 )
+                .image()
             });
         }
         println!(

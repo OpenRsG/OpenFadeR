@@ -71,6 +71,8 @@ Separate a track into parts for mixing. The first use downloads a model, and sep
 
 Inspect waveforms and adjust beat grids before mixing. Keep cues, loops and track metadata in the library, with Beat Lab available alongside the decks.
 
+In a deck's **GRID** panel, type the known tempo in **BPM** and press Enter (30–300 BPM; `.` or `,` for decimals). It changes the beat grid, not the playback tempo fader. The beat nearest the playhead stays anchored; with **HERE** on, only the current tempo section changes. The edit is saved with the track; Analysis Lock prevents changes. EXPORT mode offers the same BPM entry with UNDO / REDO.
+
 ![Beat Lab waveform editor open above the track list](docs/media/beatlab.png)
 
 ### EDIT workspace

@@ -94,7 +94,7 @@ export component TouchDeck inherits Rectangle {
             Chip { text: @tr("Delete cue"); active: root.v.delete-mode; active-color: Theme.danger; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.cue-delete(root.index); } }
             Chip { text: @tr("Memory cue"); enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.memory-cue(root.index); } }
         }
-        if root.page == 2: GridEdit { index: root.index; height: 4 * Theme.touch-target + 6px; }
+        if root.page == 2: GridEdit { index: root.index; height: 5 * Theme.touch-target + 8px; }
         if root.page == 3: CueList {
             height: 280px; cues: root.v.cues; enabled: root.v.loaded; loop-active: root.v.loop-active;
             palette: DeckState.cue-palette;

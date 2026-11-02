@@ -88,13 +88,16 @@ export struct DeckView {
     metronome: bool,
     /// HERE chip (GRID edit block): grid edits change only the tempo section from the playhead on.
     grid-here: bool,
+    /// Unpitched grid tempo at the playhead; 0 without a grid.
+    grid-bpm: float,
 }
 
 /// What changes while a deck plays, but not every frame: the time readouts (ten times a second) and the
 /// waveform still pictures (`DeckScroll` moves the detail and composes the overview's tiny markers).
 /// Kept apart from `DeckView` so these pushes redraw only what shows them (src/app/deck/tick.rs, frame.rs).
 export struct DeckLive {
-    detail: image,
+    /// The enlarged waveform's still picture as tiles, left to right (`render::Canvas::tiles`): a GPU texture is limited in width.
+    detail: [image],
     overview: image,
     time-text: string,
     /// Elapsed "02:06.4" and remaining "-05:43.9" time of the header.
@@ -244,6 +247,7 @@ export global DeckState {
     callback grid-double(int);
     callback grid-halve(int);
     callback grid-tap(int);
+    callback grid-bpm(int, string);
     callback grid-reset(int);
     callback grid-here(int);
     callback grid-merge(int);

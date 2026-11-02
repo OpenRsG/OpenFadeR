@@ -19,6 +19,9 @@ use std::{
 
 /// Views of track the strip holds: one before the visible one and one after it.
 const VIEWS: f64 = 3.0;
+/// Widest picture handed to the renderer: GPUs limit texture width (Pi 5: 4096, VideoCore IV: 2048), and three views of a
+/// large window exceed it. The strip is cut into tiles of this width, which `WaveStrip` puts together without scaling.
+const TILE: usize = 2048;
 /// Tolerated zoom mismatch before the strip is drawn again (a pitch fader in motion would otherwise redraw it every frame).
 const SPAN_SLACK: f64 = 0.005;
 
@@ -90,8 +93,9 @@ impl Deck {
                     (w as f64 * VIEWS) as usize,
                     h,
                     grid_edit,
-                );
-                self.set_live(|r| r.detail = image);
+                )
+                .tiles(TILE);
+                self.set_live(|r| r.detail = slint::ModelRc::new(slint::VecModel::from(image)));
                 l.strip = Some(Strip {
                     key,
                     start_ms,
@@ -952,7 +956,8 @@ mod tests {
                 ui.window().dispatch_event(WindowEvent::ScaleFactorChanged {
                     scale_factor: scale,
                 });
-                for lw in [256.0f32, 257.0, 257.2] {
+                // 700 px: three views exceed one tile (2 to 3 tiles at every scale), so the crop crosses tile seams.
+                for lw in [256.0f32, 257.0, 257.2, 700.0] {
                     let lh = 44.2f32;
                     let (w, h) = ((lw * scale).round() as usize, (lh * scale).round() as usize);
                     let (sw, sh) = ((lw * scale).ceil() as usize, (lh * scale).ceil() as usize);
@@ -999,6 +1004,7 @@ mod tests {
                             h,
                             false,
                         )
+                        .image()
                         .to_rgba8()
                         .unwrap();
                         let peak = wave.as_slice()[h / 2 * w * 3 + cue_col];
@@ -1008,8 +1014,15 @@ mod tests {
                             bg,
                             "the PCM transient must occupy its cue column"
                         );
-                        let marked = deck.live.row_data(0).unwrap().detail.to_rgba8().unwrap();
-                        let cue = marked.as_slice()[h / 2 * w * 3 + cue_col];
+                        let tiles = deck.live.row_data(0).unwrap().detail;
+                        assert_eq!(tiles.row_count(), (w * 3).div_ceil(super::super::TILE));
+                        let tile = tiles
+                            .row_data(cue_col / super::super::TILE)
+                            .unwrap()
+                            .to_rgba8()
+                            .unwrap();
+                        let cue = tile.as_slice()
+                            [h / 2 * tile.width() as usize + cue_col % super::super::TILE];
                         assert_eq!(
                             [cue.r, cue.g, cue.b],
                             render::palette().cue,
@@ -1043,6 +1056,24 @@ mod tests {
                                 [pixel.r, pixel.g, pixel.b],
                                 render::palette().cue,
                                 "visible cue source column: scale={scale}, width={lw}, pos={pos}, x={expected}"
+                            );
+                        }
+                        // The whole visible row is the crop of the tiles joined, so a seam never shifts, repeats or drops a column.
+                        let mut line = Vec::new();
+                        for t in 0..tiles.row_count() {
+                            let t = tiles.row_data(t).unwrap().to_rgba8().unwrap();
+                            let tw = t.width() as usize;
+                            line.extend_from_slice(&t.as_slice()[h / 2 * tw..][..tw]);
+                        }
+                        let crop = (-f64::from(row.strip_x) / f64::from(row.strip_w)
+                            * line.len() as f64)
+                            .round() as usize;
+                        for x in (0..w).filter(|x| x.abs_diff(w / 2) > 2) {
+                            let (got, want) = (pixels[h / 2 * sw + x], line[crop + x]);
+                            assert_eq!(
+                                [got.r, got.g, got.b],
+                                [want.r, want.g, want.b],
+                                "scale={scale}, width={lw}, pos={pos}, crop={crop}: column {x} of the view"
                             );
                         }
                         if pos == 510.0 {

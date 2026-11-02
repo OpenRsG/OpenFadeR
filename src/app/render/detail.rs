@@ -10,8 +10,8 @@
 //! With the STEM waveform on (PREFS) and a part muted, the 3-band wave of the stems heard ([`wave_3band`]) replaces these.
 
 use super::{
-    color_layer, cue_letter, hot_cue_rgb, mono_layers, mono_rgbh, phrase::phrase_band, single,
-    sources, three_band, Axis, Canvas, Layers, Palette, Src, Wave,
+    Axis, Canvas, Layers, Palette, Src, Wave, color_layer, cue_letter, hot_cue_rgb, mono_layers,
+    mono_rgbh, phrase::phrase_band, single, sources, three_band,
 };
 use crate::app::prefs::{
     self,
@@ -142,7 +142,7 @@ pub fn render_strip(
     w: usize,
     h: usize,
     grid_edit: bool,
-) -> slint::Image {
+) -> Canvas {
     let view = prefs::with(|p| p.view.clone()); // plain-data section: a copy, not a borrow held across the frame
     let mut c = Canvas::new(w, h);
     let axis = Axis {
@@ -231,7 +231,7 @@ pub fn render_strip(
         }
     }
     super::cue_marker(&mut c, axis.col(cue_ms as f64), (h / 12).clamp(5, 12));
-    c.image()
+    c
 }
 
 #[cfg(test)]
@@ -337,6 +337,7 @@ mod tests {
         };
         prefs::set_for_test(|p| p.view.beat_grid = BeatGrid::Bold);
         let image = render_strip(Some(&wave), &a, 0.0, 1.0, u32::MAX, None, 80, 60, false)
+            .image()
             .to_rgba8()
             .unwrap();
         let pixel = |x: usize| {
@@ -384,6 +385,7 @@ mod tests {
                 };
             });
             render_strip(None, &a, 0.0, 1.0, u32::MAX, None, 80, 60, false)
+                .image()
                 .to_rgba8()
                 .unwrap()
         };

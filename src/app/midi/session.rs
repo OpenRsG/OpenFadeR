@@ -8,11 +8,11 @@
 //! it went away it puts the previous output back. Each step is announced with a toast. One mapped controller per run
 //! (the file with the longest port name found in a port name), the others work through `midi.map` only.
 
-use super::{dump, hotplug, led, mapfile, port, prefs_audio, App, Ev, LedRow, Midi, Outcome};
+use super::{App, Ev, LedRow, Midi, Outcome, dump, hotplug, led, mapfile, port, prefs_audio};
 use crate::app::{
-    catalog,
-    deck::{active, slots, DECKS},
-    toast, MidiState, MixerState,
+    MidiState, MixerState, catalog,
+    deck::{DECKS, active, slots},
+    toast,
 };
 use openfader::audio;
 use slint::ComponentHandle;
@@ -26,6 +26,8 @@ use std::{
 pub struct Link {
     /// The mapping file's controller name.
     pub controller: String,
+    /// The mapping file's `<port>`: what the connected ports are matched with, input and output.
+    port: String,
     /// What the audio switch did, for the status line ("audio: Test Controller", "audio unchanged (PREFS off)", "audio: <why not>").
     pub audio: String,
     /// What the state dump did.
@@ -53,6 +55,7 @@ struct Loaded {
     /// The mapping file's state request (empty = none).
     request: Vec<u8>,
     controller: Option<String>,
+    port: String,
 }
 
 impl Midi {
@@ -118,7 +121,7 @@ impl Midi {
         let before = self.link.borrow_mut().take();
         let still_there = before
             .as_ref()
-            .is_some_and(|b| names.iter().any(|n| n.contains(&b.controller)));
+            .is_some_and(|b| mapfile::match_len(&names, &b.port).is_some());
         self.close(still_there);
         *self.names.borrow_mut() = names;
         self.file_binds.borrow_mut().clear();
@@ -183,6 +186,7 @@ impl Midi {
         catalog::mapped();
         let mut link = Link {
             controller: name.clone(),
+            port: loaded.port,
             audio: tr!("audio unchanged").into(),
             dump: tr!("no state dump").into(),
             switched: false,
@@ -205,7 +209,7 @@ impl Midi {
     fn load_mapping(&self, in_names: &[String]) -> Loaded {
         let mut status = Vec::new();
         match mapfile::load(in_names) {
-            Ok(Some(m)) => {
+            Ok(Some((m, port))) => {
                 let mut text = tr!(
                     "{}: {} bindings, {} LEDs",
                     m.controller,
@@ -213,7 +217,7 @@ impl Midi {
                     m.leds.len()
                 );
                 // The output port carries the lights and the state-dump request.
-                match port::connect_out(self.filter.as_deref().unwrap_or(&m.controller)) {
+                match port::connect_out(self.filter.as_deref().unwrap_or(&port)) {
                     Ok((conn, name)) => {
                         text += &format!(" → {name}");
                         *self.out.borrow_mut() = Some(port::Sink::new(
@@ -235,6 +239,7 @@ impl Midi {
                     ring_ms: Some(m.ring_ms.unwrap_or(led::RING_MS)),
                     request: m.request,
                     controller: Some(m.controller),
+                    port,
                 }
             }
             Ok(None) => Loaded {
@@ -467,7 +472,7 @@ mod tests {
     use crate::app::prefs::set_for_test;
     use cpal::traits::{DeviceTrait, HostTrait};
     use openfader::{
-        library::{own::Own, Library},
+        library::{Library, own::Own},
         store::Store,
     };
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -502,6 +507,7 @@ mod tests {
         let before = audio::status().device;
         let mut link = Link {
             controller: want.clone(),
+            port: want.clone(),
             audio: String::new(),
             dump: String::new(),
             switched: false,

@@ -29,7 +29,7 @@ export component GridTools inherits HorizontalLayout {
         width: Theme.layout-profile == 1 ? 80px : 58px;
         horizontal-stretch: 0;
         height: Theme.target-size(22px);
-        input-type: decimal;
+        input-type: text;
         placeholder-text: "BPM";
         opacity: root.en ? 1 : 0.5;
         accepted(t) => { ExportModeState.grid-bpm(root.index, t); }

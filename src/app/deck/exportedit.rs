@@ -134,6 +134,12 @@ pub fn bpm_at(beats: &[Beat], ms: f64) -> Option<f64> {
     (d > 0.0).then(|| 60_000.0 / d)
 }
 
+/// A BPM typed into the GRID panel: 30–300, with either decimal separator.
+fn parse_bpm(text: &str) -> Option<f64> {
+    let bpm: f64 = text.trim().replace(',', ".").parse().ok()?;
+    (30.0..=300.0).contains(&bpm).then_some(bpm)
+}
+
 impl Deck {
     /// Whether the track has an Analysis Lock (no grid editing, no re-analysis).
     pub(in crate::app) fn grid_locked(&self) -> bool {
@@ -242,10 +248,13 @@ impl Deck {
     }
 
     /// A typed BPM: a constant-tempo grid through the beat at the playhead (the playhead itself without a grid).
-    pub fn grid_set_bpm(&self, bpm: f64) {
+    pub fn grid_set_bpm(&self, text: &str) {
         if !self.ready() || self.grid_refused() {
             return;
         }
+        let Some(bpm) = parse_bpm(text) else {
+            return self.say(tr!("BPM: type a tempo between 30 and 300"));
+        };
         let anchor = {
             let l = self.loaded.borrow();
             let (pos, _) = self.clock(&l);
@@ -285,6 +294,118 @@ impl Deck {
 mod tests {
     use super::*;
     use crate::app::deck::grid::shift;
+
+    slint::slint! {
+        import { GridEdit } from "../../../ui/deck-panel.slint";
+        export { DeckState, DeckView } from "../../../ui/deck-state.slint";
+        export component BpmEntryTest inherits Window {
+            width: 240px; height: 140px;
+            GridEdit { index: 0; width: parent.width; height: parent.height; }
+        }
+    }
+
+    #[test]
+    fn a_typed_bpm_is_a_tempo_in_range() {
+        assert_eq!(parse_bpm(" 128 "), Some(128.0));
+        assert_eq!(parse_bpm("114,5"), Some(114.5));
+        assert_eq!(parse_bpm("30"), Some(30.0));
+        assert_eq!(parse_bpm("300"), Some(300.0));
+        for text in ["29.9", "300.1", "abc", "", "NaN", "inf", "-120"] {
+            assert_eq!(parse_bpm(text), None, "{text}");
+        }
+    }
+
+    #[test]
+    fn a_typed_tempo_changes_the_grid_and_can_be_undone() {
+        use openfader::{
+            library::{Library, own::Own},
+            store::Store,
+        };
+        use slint::ComponentHandle;
+        use std::rc::Rc;
+        crate::app::headless::init();
+        let app = crate::app::App::new().unwrap();
+        let lib: Rc<dyn Library> =
+            Rc::new(Own::new(std::sync::Arc::new(Store::in_memory().unwrap())));
+        let decks = crate::app::deck::wire(&app, lib, Default::default());
+        let deck = &decks[3];
+        let original = grid(13);
+        {
+            let mut loaded = deck.loaded.borrow_mut();
+            loaded.ready = true;
+            loaded.duration_ms = 6000;
+            loaded.analysis.beats = original.clone();
+        }
+        deck.show(|v| v.loaded = true);
+        let input = BpmEntryTest::new().unwrap();
+        let state = input.global::<DeckState>();
+        state.set_decks(slint::ModelRc::new(slint::VecModel::from(vec![DeckView {
+            loaded: true,
+            ..Default::default()
+        }])));
+        let edited = deck.clone();
+        state.on_grid_bpm(move |_, text| edited.grid_set_bpm(&text));
+        input.show().unwrap();
+        let window = crate::app::headless::last_window();
+        window.set_size(slint::PhysicalSize::new(240, 140));
+        let mut pixels = vec![slint::Rgb8Pixel::default(); 240 * 140];
+        window.draw_if_needed(|r| {
+            r.render(&mut pixels, 240);
+        });
+        use slint::{
+            LogicalPosition,
+            platform::{PointerEventButton, WindowEvent},
+        };
+        for event in [
+            WindowEvent::PointerPressed {
+                position: LogicalPosition::new(90.0, 12.0),
+                button: PointerEventButton::Left,
+            },
+            WindowEvent::PointerReleased {
+                position: LogicalPosition::new(90.0, 12.0),
+                button: PointerEventButton::Left,
+            },
+        ] {
+            input.window().dispatch_event(event);
+        }
+        for c in "130,5\n".chars() {
+            let text: slint::SharedString = c.to_string().into();
+            input
+                .window()
+                .dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
+            input
+                .window()
+                .dispatch_event(WindowEvent::KeyReleased { text });
+        }
+        assert!(
+            deck.loaded
+                .borrow()
+                .analysis
+                .beats
+                .iter()
+                .all(|b| b.bpm_x100 == 13050)
+        );
+        deck.grid_undo();
+        assert_eq!(deck.loaded.borrow().analysis.beats, original);
+        input.hide().unwrap();
+        deck.grid_set_bpm("180");
+        let changed = deck.loaded.borrow().analysis.beats.clone();
+        assert_eq!(
+            changed
+                .iter()
+                .take(4)
+                .map(|b| b.time_ms)
+                .collect::<Vec<_>>(),
+            [0, 333, 667, 1000]
+        );
+        assert!(changed.iter().all(|b| b.bpm_x100 == 18000));
+        deck.grid_set_bpm("NaN");
+        assert_eq!(deck.loaded.borrow().analysis.beats, changed);
+        deck.grid_undo();
+        assert_eq!(deck.loaded.borrow().analysis.beats, original);
+        deck.grid_redo();
+        assert_eq!(deck.loaded.borrow().analysis.beats, changed);
+    }
 
     fn grid(n: u32) -> Vec<Beat> {
         (0..n)
