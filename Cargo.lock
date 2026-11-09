@@ -3793,7 +3793,7 @@ dependencies = [
 
 [[package]]
 name = "openfader"
-version = "0.2.11"
+version = "0.2.12"
 dependencies = [
  "alsa 0.9.1",
  "chrono",

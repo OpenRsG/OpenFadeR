@@ -43,7 +43,7 @@ jobs:
         run: |
           git clone --depth 1 --branch "${{ inputs.plugins_ref || 'v0.2.12' }}" https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
           git clone --depth 1 --branch openfader-v0.2.9 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
-          git clone --depth 1 --branch openfader-v0.2.9 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
+          git clone --depth 1 --branch openfader-v0.2.12 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
       - name: System libraries
         if: matrix.name == 'linux'
         run: |

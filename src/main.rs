@@ -88,6 +88,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd.spawn()?;
         }
     }
+    // Windows kills the other threads before the main thread's destructors run, so a `Drop` that joins one of them
+    // (MIDI, mixer, fx workers) panics in std and leaves a crash report on every exit (#53). Everything is flushed: end here.
+    #[cfg(windows)]
+    if result.is_ok() {
+        // SAFETY: ends this process; nothing runs after it.
+        unsafe {
+            windows_sys::Win32::System::Threading::TerminateProcess(
+                windows_sys::Win32::System::Threading::GetCurrentProcess(),
+                0,
+            )
+        };
+    }
     result
 }
 
