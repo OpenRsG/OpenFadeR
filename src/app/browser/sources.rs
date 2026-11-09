@@ -162,6 +162,14 @@ fn collect_snapshot(
                 .find(|o| o.as_ref().is_some_and(|o| o.kind.same(&kind)))
                 .and_then(Option::take);
             match kept {
+                // A stick read as blank (nothing found yet, or while it was still settling) that now holds a library.
+                Some(o) if !o.reading && late_library(&o.kind, &kind) => Source {
+                    name: kind.name(),
+                    kind,
+                    lib: None,
+                    playlists: Vec::new(),
+                    reading: false,
+                },
                 Some(o) => Source {
                     name: kind.name(),
                     kind,
@@ -177,6 +185,11 @@ fn collect_snapshot(
             }
         })
         .collect()
+}
+
+/// `old` and `new` are the same stick, and only `new` has a library.
+fn late_library(old: &Kind, new: &Kind) -> bool {
+    matches!((old, new), (Kind::Device(a), Kind::Device(b)) if a.id == b.id && !a.has_library() && b.has_library())
 }
 
 impl Source {
@@ -441,7 +454,9 @@ impl View {
         let fresh: Vec<usize> = (0..self.sources.len())
             .filter(|&i| {
                 matches!(self.sources[i].kind, Kind::Device(_))
-                    && !before.iter().any(|b| b.same(&self.sources[i].kind))
+                    && !before.iter().any(|b| {
+                        b.same(&self.sources[i].kind) && !late_library(b, &self.sources[i].kind)
+                    })
             })
             .collect();
         for i in fresh {
@@ -628,5 +643,26 @@ mod tests {
         snapshot.plugins.clear();
         snapshot.mounted.clear();
         assert!(collect_snapshot(sources, false, &snapshot).is_empty());
+    }
+
+    /// Issue 51: a stick listed before its library was found was read as blank and stayed empty for the whole session.
+    #[test]
+    fn a_stick_whose_library_turns_up_later_is_read_again() {
+        let mut snapshot = crate::app::device::Discovery {
+            mounted: vec![export_device("stick", "Stick")],
+            ..Default::default()
+        };
+        let mut old = collect_snapshot(Vec::new(), false, &snapshot);
+        let blank: Rc<dyn Library> = Rc::new(Blank);
+        old[0].lib = Some(blank);
+        let mut found = export_device("stick", "Stick");
+        found.info.libraries.push("rekordbox".into());
+        snapshot.mounted = vec![found];
+        let sources = collect_snapshot(old, false, &snapshot);
+        assert!(sources[0].lib.is_none(), "the blank placeholder is dropped");
+        assert!(late_library(
+            &Kind::Device(export_device("stick", "Stick")),
+            &sources[0].kind
+        ));
     }
 }

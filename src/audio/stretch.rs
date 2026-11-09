@@ -47,9 +47,15 @@ const STRONG: f32 = 0.25;
 /// Splice at an onset: the fade is at most `XF` frames and ends at the onset, at least `MIN_XF` long.
 const XF: usize = 128;
 const MIN_XF: usize = 32;
+/// The shortest fade that moves a hit to its nominal time (the hit hides the step).
+const MIN_CUT: usize = 8;
 /// Aligning a shared onset: the correlation window starts `PRE` frames before it and is `ALIGN` long.
 const PRE: usize = 64;
 const ALIGN: usize = 512;
+/// Search: the score loses this share per search half-width away from the nominal start.
+const BIAS: f32 = 0.03;
+/// A spliced hit lands at its nominal time unless the continuation is within `tol / SNAP` of it: the hit hides the phase step.
+const SNAP: usize = 16;
 
 /// One stretcher per voice; all working buffers are allocated in [`Stretch::new`].
 pub struct Stretch {
@@ -63,9 +69,10 @@ pub struct Stretch {
     at: usize,      // next unread frame of `out`; HS = exhausted
     primed: bool,   // a previous grain exists
     cont_onset: Option<usize>, // first onset in `cont`, in frames from its start
-    prev_pos: f64,    // the nominal position and chosen offset of the previous grain
+    prev_pos: f64,  // the nominal position and chosen offset of the previous grain
     prev_d: usize,
     tol: usize, // search half-width in output frames, scaled to the actual device rate
+    hi: usize,  // the latest grain start this block's search may pick
 }
 
 impl Stretch {
@@ -91,6 +98,7 @@ impl Stretch {
             prev_pos: 0.0,
             prev_d: tol,
             tol,
+            hi: 2 * tol,
         }
     }
 
@@ -131,16 +139,22 @@ impl Stretch {
     /// Search outward from the nominal start, then refine the best coarse lag to one frame.
     /// Stereo scoring cannot cancel an antiphase signal; the coarse pass bounds its cost.
     fn best(&self, a: usize, len: usize, lo: usize) -> usize {
-        let end = 2 * self.tol;
+        let end = self.hi;
         let stride = (4 * self.tol).div_ceil(768);
+        // A periodic sound (a bass line) matches at every period: the candidate nearest the nominal start wins ties, so
+        // the grains do not wander the whole search range, and the beat with them (issue 52).
+        let score = |c: usize| {
+            let sc = self.score(c, a, len);
+            sc - BIAS * sc.abs() * c.abs_diff(self.tol) as f32 / self.tol as f32
+        };
         let (mut d, mut s) = (lo.min(end), f32::NEG_INFINITY);
         for o in (0..=self.tol).step_by(stride) {
             let both = [self.tol - o, self.tol + o];
             for &c in if o == 0 { &both[..1] } else { &both[..] } {
-                if c < lo {
+                if c < lo || c > end {
                     continue;
                 }
-                let sc = self.score(c, a, len);
+                let sc = score(c);
                 if sc > s {
                     (d, s) = (c, sc);
                 }
@@ -148,7 +162,7 @@ impl Stretch {
         }
         let coarse = d;
         for c in coarse.saturating_sub(stride - 1).max(lo)..=(coarse + stride - 1).min(end) {
-            let sc = self.score(c, a, len);
+            let sc = score(c);
             if sc > s {
                 (d, s) = (c, sc);
             }
@@ -173,7 +187,9 @@ impl Stretch {
     /// Bin `b` starts a hit: a rise over the bins before it that is loud for this region.
     fn hit(&self, b: usize) -> bool {
         let before = self.en[b - LOOKBACK..b].iter().sum::<f32>() / LOOKBACK as f32;
-        self.en[b] > RISE * before + FLOOR && self.en[b] >= STRONG * self.peak
+        // A hit that starts late in its bin puts most of its energy in the next one: that counts for its share too.
+        let next = self.en.get(b + 1).copied().unwrap_or(0.0);
+        self.en[b] > RISE * before + FLOOR && self.en[b] + next >= STRONG * self.peak
     }
 
     /// The first onset starting in `mono[from..to]` (`from` at least `LOOKBACK` bins in): the frame its bin starts at.
@@ -221,7 +237,29 @@ impl Stretch {
             let lo = self
                 .last_onset(self.tol + overlap)
                 .map_or(0, |j| j + 2 * BIN);
+            // A hit just beyond the nominal grain: a grain starting later than this would play it in this block, ahead of time.
+            self.hi = self
+                .onset(self.tol + HS, 2 * self.tol + HS)
+                .map_or(2 * self.tol, |j| j - HS);
             match (new, self.cont_onset) {
+                // The same hit, but the continuation plays it off its nominal time (the grains' offset drifted with the tempo,
+                // or went to a bass phase): the old grain ends just before it, the new one plays it on time.
+                (Some(t), Some(c))
+                    if t.abs_diff(c + overlap) <= self.tol
+                        && t.abs_diff(c) > self.tol / SNAP
+                        && c >= MIN_CUT =>
+                {
+                    b = c.min(t).max(MIN_CUT);
+                    a = b.saturating_sub(XF);
+                    d = self.tol.max(lo);
+                }
+                // A hit only the continuation holds, played ahead of its nominal time: it is dropped here and the new grain,
+                // which has it a block later, plays it on time.
+                (None, Some(c)) if overlap > self.tol / SNAP && c >= MIN_CUT => {
+                    b = c;
+                    a = b.saturating_sub(XF);
+                    d = self.tol.max(lo);
+                }
                 (Some(t), Some(c)) if t.abs_diff(c + overlap) <= self.tol => {
                     let from = c.saturating_sub(PRE).min(HS - ALIGN);
                     d = self.best(from, ALIGN, lo);
@@ -239,6 +277,11 @@ impl Stretch {
                             .clamp(lo as f64, 2.0 * self.tol as f64)
                             as usize
                     };
+                    // The hit is heard at `t + tol - d`: a continuation that drifted off the nominal start would shift the
+                    // beat by that much, so the splice goes to the nominal start and the hit covers the phase step.
+                    if d.abs_diff(self.tol) > self.tol / SNAP {
+                        d = self.tol.max(lo);
+                    }
                 }
                 (None, _) => d = self.best(0, HS, lo),
             }
@@ -252,7 +295,8 @@ impl Stretch {
                 self.rise[(i - a) * HS / (b - a)]
             };
             for c in 0..2 {
-                self.out[2 * i + c] = (1.0 - w) * self.cont[2 * i + c] + w * self.seg[2 * (d + i) + c];
+                self.out[2 * i + c] =
+                    (1.0 - w) * self.cont[2 * i + c] + w * self.seg[2 * (d + i) + c];
                 self.cont[2 * i + c] = self.seg[2 * (d + HS + i) + c];
             }
         }
@@ -322,7 +366,9 @@ mod tests {
         for start in (period..n - 24).step_by(period) {
             for j in 0..24 {
                 let (t, tau) = (j as f64, std::f64::consts::TAU);
-                let x = (0.8 * (0.5 - 0.5 * (tau * t / 24.0).cos()) * (tau * 3000.0 * t / 44100.0).sin()) as f32;
+                let x = (0.8
+                    * (0.5 - 0.5 * (tau * t / 24.0).cos())
+                    * (tau * 3000.0 * t / 44100.0).sin()) as f32;
                 v[2 * (start + j)] = x;
                 v[2 * (start + j) + 1] = x;
             }
@@ -479,11 +525,22 @@ mod tests {
                 }
                 interior += 1;
                 // the heard hit may lead or lag its nominal time by a grain's worth of search (TOL) and the tempo error
-                let near: Vec<_> = found.iter().filter(|b| b.2.abs_diff(at as usize) <= 900).collect();
-                assert_eq!(near.len(), 1, "tempo {tempo}, hit {m} at {at:.0}: {found:?}");
+                let near: Vec<_> = found
+                    .iter()
+                    .filter(|b| b.2.abs_diff(at as usize) <= 900)
+                    .collect();
+                assert_eq!(
+                    near.len(),
+                    1,
+                    "tempo {tempo}, hit {m} at {at:.0}: {found:?}"
+                );
                 let (first, last, _, peak) = *near[0];
                 assert!(peak > 0.5, "tempo {tempo}, hit {m} smeared: peak {peak}");
-                assert!(last - first < 60, "tempo {tempo}, hit {m} smeared over {} frames", last - first);
+                assert!(
+                    last - first < 60,
+                    "tempo {tempo}, hit {m} smeared over {} frames",
+                    last - first
+                );
             }
             assert!(
                 found.len() <= interior + 1,
@@ -513,5 +570,68 @@ mod tests {
             None,
             "a steady tone has no onset"
         );
+    }
+
+    /// Issue 52: a steady bass line lets the search pick any grain offset in its range, so slowed or sped-up kicks were heard
+    /// anywhere within about 19 ms of their beat. Nearly all must now land within 2.5 ms.
+    #[test]
+    fn kicks_over_a_bass_line_stay_on_the_beat_off_tempo() {
+        let beat = 21339usize; // 124 BPM
+        let n = 44100 * 40;
+        let mut v = vec![0.0f32; 2 * n];
+        let tau = std::f64::consts::TAU;
+        for i in 0..n {
+            // sustained bass + pad with slow phase-coherent content
+            let b = (0.25 * (tau * 55.0 * i as f64 / 44100.0).sin()
+                + 0.15 * (tau * 82.4 * i as f64 / 44100.0).sin()) as f32;
+            v[2 * i] = b;
+            v[2 * i + 1] = b;
+        }
+        for start in (beat..n - 24).step_by(beat) {
+            for j in 0..24 {
+                let x = (0.8
+                    * (0.5 - 0.5 * (tau * j as f64 / 24.0).cos())
+                    * (tau * 3000.0 * j as f64 / 44100.0).sin()) as f32;
+                v[2 * (start + j)] += x;
+                v[2 * (start + j) + 1] += x;
+            }
+            let h = start + beat / 2;
+            if h + 24 < n {
+                for j in 0..24 {
+                    let x = (0.5
+                        * (0.5 - 0.5 * (tau * j as f64 / 24.0).cos())
+                        * (tau * 5000.0 * j as f64 / 44100.0).sin())
+                        as f32;
+                    v[2 * (h + j)] += x;
+                    v[2 * (h + j) + 1] += x;
+                }
+            }
+        }
+        let src = Pcm {
+            rate: 44100,
+            samples: v,
+        };
+        for tempo in [0.97, 0.98, 1.03] {
+            let out = render(&src, tempo, 44100 * 20);
+            let diff: Vec<f32> = out.windows(2).map(|w| w[1] - w[0]).collect();
+            let found: Vec<_> = bursts(&diff).into_iter().filter(|b| b.3 > 0.15).collect();
+            let (mut hits, mut on_time) = (0, 0);
+            for m in 1.. {
+                let at = (m * beat) as f64 / tempo;
+                if at > (out.len() - 900) as f64 {
+                    break;
+                }
+                hits += 1;
+                let near = found.iter().filter(|b| b.2.abs_diff(at as usize) <= 1500);
+                on_time += near
+                    .filter(|b| (b.2 as f64 - at).abs() <= 110.0)
+                    .count()
+                    .min(1);
+            }
+            assert!(
+                on_time * 10 >= hits * 9,
+                "tempo {tempo}: {on_time} of {hits} kicks within 2.5 ms of the beat"
+            );
+        }
     }
 }
