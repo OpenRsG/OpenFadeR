@@ -54,8 +54,8 @@ pub use decode::{
 };
 pub use dsp::{EQ_KILL_DB, EQ_MAX_DB};
 pub use player::{
-    Player, Status, Switch, configure, controller, live_bus, release_controller, set_output, set_waker,
-    settle, status, when_settled,
+    Player, Status, Switch, configure, controller, live_bus, no_output, release_controller, set_output,
+    set_waker, settle, status, when_settled,
 };
 pub use rec::{new_path as rec_path, Options as RecOptions, Recorder, Take};
 pub use stems::{

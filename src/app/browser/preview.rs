@@ -67,7 +67,7 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) -> Timer {
     timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
         let Some(app) = weak.upgrade() else { return };
         let state = app.global::<BrowserState>();
-        let bus = audio::live_bus();
+        let bus = audio::live_bus().filter(|_| audio::no_output().is_none());
         let mut slot = pending.borrow_mut();
         if let Some((rx, from_ms)) = slot.as_ref() {
             match rx.try_recv() {

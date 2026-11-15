@@ -59,12 +59,12 @@ renderer: OpenGL (femtovg)       or "software (…)" when there is no GPU path
 gpu: Mesa Intel(R) UHD (OpenGL 4.6 Mesa 23.2)
 controller_ports: Port A; Port B  the MIDI input ports
 controller_mapping: Test Controller (258 bindings)   or none
-audio_device: …                  the output device in use
+audio_device: …                  the output device in use; none = no output could be opened (audio_notes says why)
 audio_source: settings           OPENFADER_OUTPUT_DEVICE | controller | settings | system default
 sample_rate: 48000
 buffer: 512 frames               or automatic
 channels: 2
-audio_notes: …                   why a setting was not honoured
+audio_notes: …                   why a setting was not honoured, or why there is no output
 time: 2026-10-23T12:00:00+02:00
 uptime: 342 s
 ```

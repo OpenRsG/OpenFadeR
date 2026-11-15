@@ -101,8 +101,8 @@ impl Mixer {
             }
         } else {
             match &self.bus {
-                Some(bus) => (bus.tap(), None),
-                None => {
+                Some(bus) if openfader::audio::no_output().is_none() => (bus.tap(), None),
+                _ => {
                     return self.set_status(tr!("REC: no audio output, nothing to record").into());
                 }
             }
