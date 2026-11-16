@@ -243,7 +243,7 @@ fn pairs_of(caps: Option<&Caps>) -> (usize, usize) {
     (ch, route::pairs(ch).min(MAX_PAIRS))
 }
 
-fn buffer_in_use(_p: &Prefs, st: &Status) -> u32 {
+fn buffer_in_use(st: &Status) -> u32 {
     // A callback contains a period, not the full ALSA buffer. Unknown driver buffering must not be labelled as its size.
     st.buffer.unwrap_or(0)
 }
