@@ -1,12 +1,13 @@
 name: Release
 
-# Tag v*: package Linux, Windows, Apple silicon and Raspberry Pi archives, then create a draft release.
+# Tag v*: a draft release with the Linux, Windows, Apple silicon and Raspberry Pi archives, in the layout of
+# docs/releases/README.md. Publish it with: gh release edit <tag> --draft=false --latest
+# A push to main that changes Cargo.lock (every release commit does) and a manual run package the same archives without
+# releasing. That proves them before the tag exists and leaves the dependency cache where tag builds can read it (a cache
+# saved by a tag run is private to that tag). When the tagged commit was packaged that way, the tag builds nothing: its draft
+# is made from those archives, a minute of work instead of half an hour. Otherwise the tag builds everything.
 # macOS is two parallel jobs: a native Intel build that is smoke-tested, and the ARM cross-build with archive
 # architecture/signature checks that ships. The draft needs both.
-# A manual run, and a push to main that changes Cargo.lock (every release commit does), package without releasing: that
-# proves the archives before the tag exists and leaves the dependency cache where tag builds can read it (a cache saved
-# by a tag run is private to that tag).
-# Publish a draft with: gh release edit <tag> --draft=false
 on:
   push:
     tags: ["v*"]
@@ -17,8 +18,43 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # The companion tags this release bundles (Dockerfile.pi has its own copies of the same three).
+  PLUGINS_REF: v0.2.12
+  THEMES_REF: openfader-v0.2.9
+  MAPPINGS_REF: openfader-v0.2.13
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      reuse: ${{ steps.plan.outputs.reuse }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version, release notes, reusable archives
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)
+          reuse=
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            [ "${GITHUB_REF_NAME#v}" = "$v" ] || { echo "::error::tag $GITHUB_REF_NAME does not match version $v in Cargo.toml"; exit 1; }
+            [ -f "docs/releases/$v.md" ] || { echo "::error::docs/releases/$v.md is missing: write the release notes first (docs/releases/README.md)"; exit 1; }
+            python3 .github/release_notes.py --check "docs/releases/$v.md"
+            for run in $(gh run list --workflow release.yml --commit "$GITHUB_SHA" --branch main --status success --json databaseId --jq '.[].databaseId'); do
+              have=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts?per_page=100" \
+                --jq '[.artifacts[] | select(.expired | not) | .name | select(test("^package-(linux|windows|macos|pi|pi4)$"))] | unique | length')
+              if [ "$have" = 5 ]; then reuse=$run; echo "Reusing the archives of run $run"; break; fi
+            done
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
+
   package:
     strategy:
       fail-fast: false
@@ -33,6 +69,8 @@ jobs:
               arch: arm64,
               target: aarch64-apple-darwin,
             }
+    needs: plan
+    if: needs.plan.outputs.reuse == ''
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ startsWith(matrix.name, 'macos') && 240 || 120 }}
     defaults:
@@ -43,9 +81,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Companions (plugins, themes, mappings)
         run: |
-          git clone --depth 1 --branch v0.2.12 https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
-          git clone --depth 1 --branch openfader-v0.2.9 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
-          git clone --depth 1 --branch openfader-v0.2.13 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
+          git clone --depth 1 --branch "$PLUGINS_REF" https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
+          git clone --depth 1 --branch "$THEMES_REF" https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
+          git clone --depth 1 --branch "$MAPPINGS_REF" https://github.com/OpenRsG/OpenFadeR-Map.git mappings
       - name: System libraries
         if: matrix.name == 'linux'
         run: |
@@ -79,9 +117,7 @@ jobs:
           key: macos-ort-intel-${{ hashFiles('.github/macos-ort.sh') }}
       - name: Version
         id: version
-        run: |
-          if [ "${GITHUB_REF_TYPE}" = tag ]; then v=${GITHUB_REF_NAME#v}; else v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)-dev; fi
-          echo "version=$v" >> "$GITHUB_OUTPUT"
+        run: echo "version=${{ needs.plan.outputs.version }}" >> "$GITHUB_OUTPUT"
       # The app links SQLCipher with its own OpenSSL (the rekordbox extensions): Git Bash's perl lacks modules, Strawberry Perl (on
       # the runners) has them.
       - name: OpenSSL build tools (Windows)
@@ -101,9 +137,9 @@ jobs:
           CARGO_PROFILE_DIST_LTO: ${{ matrix.name == 'macos-smoke' && 'false' || 'thin' }}
         run: |
           if [ "${{ matrix.name }}" = macos-smoke ]; then
-            cargo build --profile dist --no-default-features --features app
+            cargo build --profile dist --timings --no-default-features --features app
           else
-            cargo build --profile dist
+            cargo build --profile dist --timings
           fi
       - name: Native macOS smoke
         if: matrix.name == 'macos-smoke'
@@ -122,7 +158,7 @@ jobs:
           CARGO_PROFILE_RELEASE_STRIP: symbols
         run: |
           extension/plugin/build.sh --quiet
-          cargo build --profile dist
+          cargo build --profile dist --timings
       - name: Package
         if: matrix.name != 'macos-smoke'
         env:
@@ -235,6 +271,14 @@ jobs:
           name: package-smoke-${{ matrix.name }}
           path: smoke/
           if-no-files-found: ignore
+      # Where the time went, per crate: open it in a browser.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: timings-${{ matrix.name }}
+          path: target/cargo-timings/cargo-timing.html
+          retention-days: 14
+          if-no-files-found: ignore
 
   # Both archives keep whole-program LTO; Pi4/CM4 also uses Cortex-A72 code generation.
   pi:
@@ -244,6 +288,8 @@ jobs:
         include:
           - { variant: pi, cpu: cortex-a53 }
           - { variant: pi4, cpu: cortex-a72 }
+    needs: plan
+    if: needs.plan.outputs.reuse == ''
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -295,49 +341,41 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [package, pi]
+    needs: [plan, package, pi]
+    # The builds are skipped when the archives are reused.
+    if: always() && startsWith(github.ref, 'refs/tags/') && needs.plan.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
+        if: needs.plan.outputs.reuse == ''
         with:
           pattern: package-*
           path: out
           merge-multiple: true
-      - name: Require every platform archive
+      - uses: actions/download-artifact@v4
+        if: needs.plan.outputs.reuse != ''
+        with:
+          run-id: ${{ needs.plan.outputs.reuse }}
+          github-token: ${{ github.token }}
+          pattern: package-*
+          path: out
+          merge-multiple: true
+      # Refuses a missing archive or release notes that break the format; the smoke artifacts that came with the download
+      # (app.log, screenshot.png) are not archives and not release assets.
+      - name: Release notes
         env:
-          VERSION: ${{ github.ref_name }}
-        run: |
-          python3 - <<'PY'
-          import os, pathlib
-          v = os.environ["VERSION"].removeprefix("v")
-          expected = {
-              f"openfader-{v}-linux-x86_64.tar.gz",
-              f"openfader-{v}-windows-x86_64.zip",
-              f"OpenFadeR-{v}-macos-arm64.zip",
-              f"openfader-{v}-linux-aarch64-pi.tar.gz",
-              f"openfader-{v}-linux-aarch64-pi4.tar.gz",
-          }
-          actual = {p.name for p in pathlib.Path("out").iterdir() if p.name.endswith((".zip", ".tar.gz"))}
-          assert actual == expected, f"Missing: {sorted(expected - actual)}; unexpected: {sorted(actual - expected)}"
-          PY
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: python3 .github/release_notes.py "$VERSION" out "docs/releases/$VERSION.md" --repo "$GITHUB_REPOSITORY" --plugins "$PLUGINS_REF" --themes "$THEMES_REF" --mappings "$MAPPINGS_REF" > release-body.md
       - uses: softprops/action-gh-release@v2
         with:
+          name: OpenFadeR ${{ needs.plan.outputs.version }}
           draft: true
-          # the smoke artifacts (app.log, screenshot.png) are downloaded too: only the archives are release assets
           files: |
             out/*.zip
             out/*.tar.gz
+          body_path: release-body.md
           generate_release_notes: true
-          body: |
-            Archives (each holds the app with its themes, controller mappings and plugins, ready to run; built-in compatibility adapters are part of the app itself):
-
-            - **Linux** (x86_64): `openfader-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
-            - **Raspberry Pi 3, 4, 5 and CM4** (aarch64, 64-bit Raspberry Pi OS based on Debian 13): `openfader-<version>-linux-aarch64-pi.tar.gz`. Unpack and run `./openfader-<version>-linux-aarch64-pi/openfader`. See docs/raspberry-pi.md.
-            - **Raspberry Pi 4 and CM4, CPU-tuned** (aarch64, Debian 13): `openfader-<version>-linux-aarch64-pi4.tar.gz` uses Cortex-A72 code generation and whole-program LTO. Its updater stays on this variant; it is not for Pi 3.
-            - **Windows** (x86_64): `openfader-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
-            - **macOS** (Apple silicon): `OpenFadeR-<version>-macos-arm64.zip` holds `OpenFadeR.app`. It is ad-hoc signed, not developer-signed or notarized: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/OpenFadeR.app`. Native tests/smoke run on Intel macOS; the ARM archive is cross-built and checked for ARM libraries and signatures, without an ARM runtime smoke test.
-
-            Optional: `ffmpeg` on the PATH for video; `python` (3) for the Python plugins. Volume sliders of the audio page exist on Linux only: on Windows and macOS the volume is the system's.

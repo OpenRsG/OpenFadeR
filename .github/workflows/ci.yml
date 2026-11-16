@@ -55,6 +55,14 @@ jobs:
       - name: Linux installer packaging
         if: matrix.name == 'linux'
         run: python .github/test_install.py -v
+      # The release notes of this version must exist and follow the format: a version bump without them fails here, not at the tag.
+      - name: Release notes
+        if: matrix.name == 'linux'
+        run: |
+          python .github/test_release_notes.py -v
+          for f in docs/releases/[0-9]*.md; do python .github/release_notes.py --check "$f"; done
+          v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | sed -n 1p)
+          test -f "docs/releases/$v.md" || { echo "docs/releases/$v.md is missing"; exit 1; }
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
