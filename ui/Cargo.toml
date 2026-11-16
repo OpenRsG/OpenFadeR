@@ -8,6 +8,12 @@ publish = false
 # every edit of the app's Rust code (src/app/), which depends on it.
 [lib]
 path = "lib.rs"
+# No tests or benchmarks live here. Without these, `cargo test --workspace` and `--all-targets` (rust-analyzer's check)
+# compile the generated crate again as an empty test binary, beside the first copy when both are cold (two compilers of
+# 6-10 GB each), and run rustdoc over it.
+test = false
+doctest = false
+bench = false
 
 [dependencies]
 slint = "1.17"

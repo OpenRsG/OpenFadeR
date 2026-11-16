@@ -1,17 +1,22 @@
 name: Release
 
 # Tag v*: package Linux, Windows, Apple silicon and Raspberry Pi archives, then create a draft release.
-# macOS uses native Intel smoke tests plus an ARM cross-build with archive architecture/signature checks.
-# A manual run uploads workflow artifacts only.
+# macOS is two parallel jobs: a native Intel build that is smoke-tested, and the ARM cross-build with archive
+# architecture/signature checks that ships. The draft needs both.
+# A manual run, and a push to main that changes Cargo.lock (every release commit does), package without releasing: that
+# proves the archives before the tag exists and leaves the dependency cache where tag builds can read it (a cache saved
+# by a tag run is private to that tag).
 # Publish a draft with: gh release edit <tag> --draft=false
 on:
   push:
     tags: ["v*"]
+    # Path filters are not evaluated for tags: every v* tag still runs.
+    branches: [main]
+    paths: [Cargo.lock]
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_BUILD_JOBS: "1"
 
 jobs:
   package:
@@ -21,6 +26,7 @@ jobs:
         include:
           - { name: linux, os: ubuntu-latest, arch: x86_64 }
           - { name: windows, os: windows-latest, arch: x86_64 }
+          - { name: macos-smoke, os: macos-15-intel }
           - {
               name: macos,
               os: macos-15-intel,
@@ -28,8 +34,7 @@ jobs:
               target: aarch64-apple-darwin,
             }
     runs-on: ${{ matrix.os }}
-    # macOS builds two architectures serially under the single-job memory policy.
-    timeout-minutes: ${{ matrix.name == 'macos' && 240 || 120 }}
+    timeout-minutes: ${{ startsWith(matrix.name, 'macos') && 240 || 120 }}
     defaults:
       run:
         shell: bash
@@ -60,15 +65,15 @@ jobs:
             extension/plugin
           key: release-${{ matrix.name }}
       - uses: actions/cache/restore@v4
-        if: matrix.name == 'macos'
+        if: matrix.name == 'macos-smoke'
         with:
           path: .local/onnxruntime-intel
           key: macos-ort-intel-${{ hashFiles('.github/macos-ort.sh') }}
       - name: Intel ONNX Runtime
-        if: matrix.name == 'macos'
+        if: matrix.name == 'macos-smoke'
         run: bash .github/macos-ort.sh
       - uses: actions/cache/save@v4
-        if: always() && matrix.name == 'macos' && hashFiles('.local/onnxruntime-intel/*.dylib') != ''
+        if: always() && matrix.name == 'macos-smoke' && hashFiles('.local/onnxruntime-intel/*.dylib') != ''
         with:
           path: .local/onnxruntime-intel
           key: macos-ort-intel-${{ hashFiles('.github/macos-ort.sh') }}
@@ -85,21 +90,23 @@ jobs:
           echo "OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl.exe" >> "$GITHUB_ENV"
           echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
       - name: Build the plugins
+        if: matrix.name != 'macos'
         env:
           CARGO_PROFILE_RELEASE_STRIP: symbols
         run: extension/plugin/build.sh --quiet
       - name: Build the app
+        if: matrix.name != 'macos'
         # macOS: cross-crate LTO drops the compiler runtime's `__isPlatformVersionAtLeast`, which ONNX Runtime's CoreML code needs at link time.
         env:
-          CARGO_PROFILE_DIST_LTO: ${{ matrix.name == 'macos' && 'false' || 'thin' }}
+          CARGO_PROFILE_DIST_LTO: ${{ matrix.name == 'macos-smoke' && 'false' || 'thin' }}
         run: |
-          if [ "${{ matrix.name }}" = macos ]; then
+          if [ "${{ matrix.name }}" = macos-smoke ]; then
             cargo build --profile dist --no-default-features --features app
           else
             cargo build --profile dist
           fi
       - name: Native macOS smoke
-        if: matrix.name == 'macos'
+        if: matrix.name == 'macos-smoke'
         run: |
           mkdir native-smoke
           cp target/dist/openfader native-smoke/
@@ -114,10 +121,10 @@ jobs:
           CARGO_TARGET_AARCH64_APPLE_DARWIN_RUSTFLAGS: "-C target-cpu=apple-m1"
           CARGO_PROFILE_RELEASE_STRIP: symbols
         run: |
-          unset ORT_LIB_LOCATION ORT_PREFER_DYNAMIC_LINK
           extension/plugin/build.sh --quiet
           cargo build --profile dist
       - name: Package
+        if: matrix.name != 'macos-smoke'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -182,8 +189,9 @@ jobs:
             ;;
           esac
           ls -l out
-      # Linux/Windows execute their unpacked packages; the ARM macOS bundle is checked after the native Intel smoke.
+      # Linux/Windows execute their unpacked packages; the ARM macOS bundle is checked here, the native Intel smoke is its own job.
       - name: Unpack the archive
+        if: matrix.name != 'macos-smoke'
         run: |
           mkdir unpacked
           cd unpacked
@@ -213,8 +221,9 @@ jobs:
               assert "arm64" in arches, f"{path}: expected arm64, got {arches}"
           PY
           codesign --verify --deep --strict unpacked/OpenFadeR.app
-      # Upload only after the platform smoke test and, for cross-built macOS, archive validation.
+      # Upload only after the platform smoke test or, for cross-built macOS, archive validation.
       - name: Upload validated package
+        if: matrix.name != 'macos-smoke'
         uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.name }}
