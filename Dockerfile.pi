@@ -64,21 +64,29 @@ RUN for pair in "extension/plugin OpenFadeR-Plugins $PLUGINS_REF" "extension/ski
       set -- $pair; [ -e "$1/.git" ] || [ -n "$(ls -A "$1" 2>/dev/null)" ] || git clone --quiet --depth 1 --branch "$3" "https://github.com/OpenRsG/$2.git" "$1"; \
     done
 
-# The native plugins (their own workspace), then the app without the GPU STEMS engine (no ONNX Runtime WebGPU build for ARM Linux).
+# The native plugins (their own workspace) build beside the app (no GPU STEMS engine: ONNX Runtime has no WebGPU build for ARM
+# Linux): they share no artifacts, and the app's serial stages (the UI crate's front end, the whole-program link) leave the other
+# cores idle. `wait` fails the step when the plugin build failed.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/src/extension/plugin/target \
-    --mount=type=cache,target=/src/target \
-    CARGO_PROFILE_RELEASE_STRIP=symbols extension/plugin/build.sh --locked --quiet \
-    && cargo build --locked --quiet --timings --profile pi --no-default-features --features app \
-    && mkdir -p /out && cp target/cargo-timings/cargo-timing.html /out/cargo-timing-$PI_VARIANT.html \
-    && v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1) \
-    && d=/out/openfader-$v-linux-aarch64-$PI_VARIANT \
-    && mkdir -p "$d" \
-    && cp target/$TARGET/pi/openfader "$d/" \
-    && python3 .github/bundle.py "$d" \
-    && cp LICENSE README.md "$d/" && cp assets/icon.png "$d/openfader.png" \
-    && tar -C /out -czf "$d.tar.gz" "$(basename "$d")"
+    --mount=type=cache,target=/src/target <<'SH'
+set -e
+CARGO_PROFILE_RELEASE_STRIP=symbols extension/plugin/build.sh --locked --quiet &
+plugins=$!
+cargo build --locked --quiet --timings --profile pi --no-default-features --features app
+wait "$plugins"
+mkdir -p /out
+cp target/cargo-timings/cargo-timing.html "/out/cargo-timing-$PI_VARIANT.html"
+v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+d=/out/openfader-$v-linux-aarch64-$PI_VARIANT
+mkdir -p "$d"
+cp "target/$TARGET/pi/openfader" "$d/"
+python3 .github/bundle.py "$d"
+cp LICENSE README.md "$d/"
+cp assets/icon.png "$d/openfader.png"
+tar -C /out -czf "$d.tar.gz" "$(basename "$d")"
+SH
 
 FROM scratch AS bundle
 COPY --from=build /out/ /
