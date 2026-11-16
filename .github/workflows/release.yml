@@ -366,8 +366,9 @@ jobs:
 
   release:
     needs: [plan, package, pi]
-    # The builds are skipped when the archives are reused.
-    if: always() && startsWith(github.ref, 'refs/tags/') && needs.plan.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    # Runs on every main and manual run too, up to the publishing step: the download, the notes check and the body are then
+    # exercised long before a tag needs them. The builds are skipped when the archives are reused.
+    if: always() && needs.plan.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -394,7 +395,13 @@ jobs:
         env:
           VERSION: ${{ needs.plan.outputs.version }}
         run: python3 .github/release_notes.py "$VERSION" out "docs/releases/$VERSION.md" --repo "$GITHUB_REPOSITORY" --plugins "$PLUGINS_REF" --themes "$THEMES_REF" --mappings "$MAPPINGS_REF" > release-body.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-body
+          path: release-body.md
+          retention-days: 14
       - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           name: OpenFadeR ${{ needs.plan.outputs.version }}
           draft: true
