@@ -31,6 +31,7 @@ pub mod commit;
 mod device;
 pub mod host;
 mod model;
+pub mod pathmap;
 mod tree;
 pub use device::*;
 pub use model::*;

@@ -3,11 +3,12 @@
 
 pub mod anlz;
 pub mod list;
-pub mod pathmap;
 pub mod pdb;
 pub mod sql;
 
-pub use pathmap::{PathMap, parse_path_map, path_map, remap_path};
+pub use openfader_plugin::library::pathmap::{
+    PathMap, location, parse_path_map, path_map, remap_path,
+};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
@@ -47,36 +48,4 @@ pub fn at<T, E: std::fmt::Display>(r: Result<T, E>, p: &Path) -> Result<T, Strin
 /// `rel` as a device library stores a path (leading `/` allowed) under the device root `root`.
 pub fn on_device(root: &Path, rel: &str) -> PathBuf {
     root.join(rel.trim_start_matches('/'))
-}
-
-/// `file://localhost/C:/Music/a%20b.mp3` → `C:/Music/a b.mp3`, then through `map`.
-pub fn location(url: &str, map: &PathMap) -> Option<PathBuf> {
-    let p = url
-        .strip_prefix("file://localhost")
-        .or_else(|| url.strip_prefix("file://"))
-        .unwrap_or(url);
-    let b = p.as_bytes();
-    let mut raw = Vec::with_capacity(b.len());
-    let mut i = 0;
-    while i < b.len() {
-        match (
-            b[i],
-            p.get(i + 1..i + 3)
-                .and_then(|h| u8::from_str_radix(h, 16).ok()),
-        ) {
-            (b'%', Some(byte)) => {
-                raw.push(byte);
-                i += 3;
-            }
-            (c, _) => {
-                raw.push(c);
-                i += 1;
-            }
-        }
-    }
-    let p = String::from_utf8_lossy(&raw);
-    // A drive path follows the URI's slash: `/C:/Music` → `C:/Music`.
-    let drive = matches!(p.as_bytes(), [b'/', d, b':', ..] if d.is_ascii_alphabetic());
-    let p = if drive { &p[1..] } else { &p[..] };
-    (!p.is_empty()).then(|| PathBuf::from(remap_path(p, map)))
 }

@@ -96,6 +96,12 @@ It uses only the standard library and is available without SDK features. `tags` 
 decoded attributes and following text. It does not validate nesting or resolve DTD entities; consumers keep their
 format-specific validation.
 
+## Path maps and cue colours
+
+With the `library` feature, `openfader_plugin::library::pathmap` reads the `path_map` setting / `OPENFADER_PATH_MAP`
+(`path_map`, `remap_path`) and decodes `file://` locations (`location`); `openfader_plugin::library::colors` holds the
+hot-cue colour table (`RAINBOW`) and the colours the cue colour picker offers (`picker`).
+
 
 ## Bundled plugins
 
