@@ -531,6 +531,7 @@ fn integrated_only() -> bool {
 }
 
 /// Whether an adapter with this `DriverDesc` and dedicated memory (bytes, `None` when the driver reports none) is integrated.
+#[cfg(any(windows, test))]
 fn integrated(desc: &str, dedicated: Option<u64>) -> bool {
     let d = desc.to_ascii_lowercase();
     if d.contains("intel") {
