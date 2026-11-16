@@ -70,7 +70,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/extension/plugin/target \
     --mount=type=cache,target=/src/target \
     CARGO_PROFILE_RELEASE_STRIP=symbols extension/plugin/build.sh --locked --quiet \
-    && cargo build --locked --quiet --profile pi --no-default-features --features app \
+    && cargo build --locked --quiet --timings --profile pi --no-default-features --features app \
+    && mkdir -p /out && cp target/cargo-timings/cargo-timing.html /out/cargo-timing-$PI_VARIANT.html \
     && v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1) \
     && d=/out/openfader-$v-linux-aarch64-$PI_VARIANT \
     && mkdir -p "$d" \

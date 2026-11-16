@@ -347,6 +347,13 @@ jobs:
           path: pi-smoke/
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: timings-${{ matrix.variant }}
+          path: dist/pi/cargo-timing-*.html
+          retention-days: 14
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.variant }}
           path: dist/pi/*.tar.gz
