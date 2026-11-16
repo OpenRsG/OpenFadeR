@@ -451,10 +451,6 @@ impl Player {
         }
     }
 
-    pub fn stem_gain(&self, stem: usize) -> f32 {
-        self.shared.stem.get(stem).map_or(1.0, load_f32)
-    }
-
     /// Starts playing at full speed (a hot cue, CUE, fader start, synced start); a PAUSE brake still running is cancelled.
     pub fn play(&mut self) {
         self.launch(false);

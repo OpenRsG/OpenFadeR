@@ -22,7 +22,7 @@ use super::pdb::{
 use super::progress::Progress;
 use super::run::{complete, CueCheck};
 use super::settings::DeviceConfig;
-use super::{convert, onelibrary, stage_pdb, verify, wants_onelibrary, EXT, ONE, OWNER, PDB};
+use super::{convert, onelibrary, stage_pdb, verify, wants_onelibrary, ONE, OWNER, PDB};
 use openfader_plugin::library::{
     commit::{self, Commit},
     ActionAnswer, CheckReport, LibraryState, Problem, Severity, Track,
@@ -507,7 +507,3 @@ fn clean(root: &Path) -> Result<String, String> {
     }
     Ok(format!("Removed {n} unfinished temporary file(s)."))
 }
-
-/// `exportExt.pdb` path, for the tests.
-#[doc(hidden)]
-pub const MYTAG: &str = EXT;
