@@ -1,4 +1,5 @@
-//! `OPENFADER_PATH_MAP`: rewriting path prefixes written on another OS (a library from Windows opened on Linux).
+//! `OPENFADER_PATH_MAP`: rewriting path prefixes written on another OS (a library from Windows opened on Linux), and
+//! `file://` locations. One definition for the host and the format adapters.
 
 /// `from => to` path-prefix pairs (see [`parse_path_map`]).
 pub type PathMap = Vec<(String, String)>;
@@ -25,8 +26,17 @@ pub fn parse_path_map(spec: &str) -> Result<PathMap, String> {
 }
 
 /// `OPENFADER_PATH_MAP`, parsed; unset = no remapping.
-pub(super) fn path_map_from_env() -> Result<PathMap, String> {
+pub fn path_map_from_env() -> Result<PathMap, String> {
     std::env::var("OPENFADER_PATH_MAP").map_or_else(|_| Ok(Vec::new()), |s| parse_path_map(&s))
+}
+
+/// A plugin's `path_map` setting: its text, or `OPENFADER_PATH_MAP` when that is empty.
+pub fn path_map(setting: &str) -> Result<PathMap, String> {
+    if setting.trim().is_empty() {
+        path_map_from_env()
+    } else {
+        parse_path_map(setting)
+    }
 }
 
 /// With an empty map `path` is returned as is. Otherwise backslashes become `/` and the first

@@ -53,6 +53,8 @@ pub struct DeckSnap {
     loop_beats: i32,
     /// Channel VU, 0..127.
     level: u8,
+    /// The channel meter's peak-hold marker is at the top (0 dB): the clip light.
+    clip: bool,
     /// Playhead, track ms (jog ring).
     pub pos_ms: f64,
     /// STEMS: parts at full level (VOCAL, INST, BASS, DRUMS; none until the stems are ready) and the channel's PART ISOLATOR mode.
@@ -87,6 +89,9 @@ pub struct Snap {
     sampler_open: bool,
     /// Loaded state of the visible sampler bank's 8 pads.
     sampler: [bool; 8],
+    /// Master VU, 0..127, and its clip light (as a channel's).
+    master_level: u8,
+    master_clip: bool,
     /// The deck selected on each side of the controller.
     pub layer: Layer,
     /// Milliseconds since the lights started: the blink phase.
@@ -142,6 +147,8 @@ pub fn snap(app: &App, vinyl: [bool; DECKS], cutter: [bool; DECKS], pos_ms: [f64
         }),
         sampler_open: sp.get_open(),
         sampler: std::array::from_fn(|n| slots.row_data(bank + n).is_some_and(|v| v.loaded)),
+        master_level: (mx.get_bus().level.clamp(0.0, 1.0) * 127.0).round() as u8,
+        master_clip: mx.get_bus().peak >= 1.0,
         ..Snap::default()
     };
     for (i, d) in s
@@ -173,6 +180,7 @@ pub fn snap(app: &App, vinyl: [bool; DECKS], cutter: [bool; DECKS], pos_ms: [f64
             level: ch
                 .as_ref()
                 .map_or(0, |c| (c.level.clamp(0.0, 1.0) * 127.0).round() as u8),
+            clip: ch.as_ref().is_some_and(|c| c.peak >= 1.0),
             pos_ms: pos_ms[i],
             stem_on: std::array::from_fn(|n| {
                 v.stem_ready && v.stem_full.row_data(n).unwrap_or(false)
@@ -226,6 +234,9 @@ fn lit(led: Led, d: usize, s: &Snap) -> bool {
         Led::Tap => k.grid_edit,
         Led::Loop4 => k.loop_active && k.loop_beats == 4,
         Led::Level => k.level > 0,
+        Led::MasterLevel => s.master_level > 0,
+        Led::Peak => k.clip,
+        Led::MasterPeak => s.master_clip,
         Led::Ring => k.loaded,
         Led::MergePreset(side, n) => s.merge_preset[side] == n as i32,
         Led::MergeOn(side) => s.merge_on[side],
@@ -269,6 +280,7 @@ pub fn beat_code(i: usize) -> u8 {
 fn value(led: Led, d: usize, s: &Snap) -> u8 {
     match led {
         Led::Level => s.decks[d].level,
+        Led::MasterLevel => s.master_level,
         Led::Ring if s.decks[d].loaded => ring(s.decks[d].pos_ms),
         Led::FxBeat(u) => beat_code(s.fx_beat[u]),
         _ if lit(led, d, s) => ON,
@@ -298,8 +310,8 @@ fn intro_value(led: Led, deck: usize, u: f64, t: u64) -> u8 {
             let seg = ((t * 216 / INTRO_SWEEP + deck as u64 * 18) % 72) as u8; // three turns
             if deck % 2 == 0 { seg + 1 } else { 72 - seg }
         }
-        Led::Level if flash => 127,
-        Led::Level => {
+        Led::Level | Led::MasterLevel if flash => 127,
+        Led::Level | Led::MasterLevel => {
             let phase = t as f64 / 400.0 * std::f64::consts::PI + deck as f64;
             ((phase.sin().abs() * 7.0).round() * 18.0).min(127.0) as u8 // 8 steps: fewer messages than a smooth bounce
         }
@@ -642,6 +654,23 @@ mod tests {
         s.decks[1].level = 0;
         out.extend(drain(&mut leds, &s));
         assert_eq!(out, [[0xB0, 0x02, 0], [0xB0, 0x02, 90], [0xB0, 0x02, 0]]);
+    }
+
+    /// Issue #49: the Inpulse 500's master VU and red clip lights stayed dark.
+    #[test]
+    fn master_vu_and_clip_lights_follow_the_mixer_meters() {
+        let mut leds = Leds::new(vec![
+            row(Led::MasterLevel, 0, (0xB0, 0x40)),
+            row(Led::Peak, 1, (0x92, 0x39)),
+            row(Led::MasterPeak, 0, (0x90, 0x0A)),
+        ]);
+        let mut s = Snap::default();
+        drain(&mut leds, &s);
+        (s.master_level, s.master_clip, s.decks[1].clip) = (100, true, true);
+        assert_eq!(
+            drain(&mut leds, &s),
+            [[0xB0, 0x40, 100], [0x92, 0x39, ON], [0x90, 0x0A, ON]]
+        );
     }
 
     #[test]

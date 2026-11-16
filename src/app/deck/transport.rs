@@ -82,6 +82,11 @@ impl Deck {
         } else if !self.play_quantized() {
             self.with_player(|p| p.start());
         }
+        // Without an output the deck only arms (it starts when the output is back): say why PLAY does nothing.
+        if let Some(e) = openfader::audio::no_output() {
+            self.say(tr!("audio disabled: {}", e));
+            self.silent.set(true);
+        }
         if let Some(app) = self.app.upgrade() {
             app.window().request_redraw();
         }

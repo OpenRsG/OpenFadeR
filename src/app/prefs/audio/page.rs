@@ -125,7 +125,7 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     );
     let (mut o, at) = value_options(&c.buffers, a.buffer_size, tr!("frames"));
     o[0] = automatic_buffer_label(p, &st);
-    let frames = buffer_in_use(p, &st);
+    let frames = buffer_in_use(&st);
     let latency = device::latency_ms(frames, st.rate);
     rows.push(
         Row::dropdown_of("buffer_size", tr!("BUFFER SIZE"), o, at)

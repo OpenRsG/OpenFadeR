@@ -20,7 +20,7 @@ use crate::library::Track;
 use rusqlite::params;
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 /// What a stage is for.
@@ -279,20 +279,12 @@ impl Store {
             )
         })
     }
-
-    /// The row listing the file at `path` that waits in a stage (not the Collection).
-    pub fn staged_at(&self, path: &Path) -> R<Option<i64>> {
-        scalar(
-            &self.db(),
-            "SELECT id FROM collection WHERE path = ?1 AND stage IS NOT NULL",
-            [path.to_string_lossy()],
-        )
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn track(dir: &Path, name: &str) -> Track {
         std::fs::create_dir_all(dir).unwrap();

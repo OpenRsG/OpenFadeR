@@ -151,6 +151,11 @@ enum Led {
     Loop4,
     /// Channel VU meter: velocity = level 0..127, not on / off.
     Level,
+    /// Master VU meter (velocity = level 0..127), and the clip light of a channel / of the master (lit while its meter's
+    /// peak-hold marker is at 0 dB).
+    MasterLevel,
+    Peak,
+    MasterPeak,
     /// Jog ring: segment 1..=72 of the playhead's turn (0 = no track).
     Ring,
     /// MERGE FX side 0 / 1: preset `n` (0..4) selected / effect held on.

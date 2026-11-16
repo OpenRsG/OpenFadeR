@@ -29,7 +29,7 @@ use super::metronome::{self, Hits};
 use super::transport::Transport;
 use super::{clamped_in, load_f32, store_clamped, Pcm, Stems, Track16, STEM_COUNT};
 use clock::{audible, heard_frames, Anchor, Clock};
-pub use engine::{configure, live_bus, set_output, settle, when_settled, Switch};
+pub use engine::{configure, live_bus, no_output, set_output, settle, when_settled, Switch};
 use engine::{Engine, ENGINE};
 pub use output::{controller, release_controller, set_waker, status, Status};
 use parking_lot::Mutex;
@@ -350,7 +350,7 @@ impl Player {
         let engine = match ENGINE.with_borrow(Weak::upgrade) {
             Some(e) => e,
             None => {
-                let e = Rc::new(Engine::open()?);
+                let e = Rc::new(Engine::open());
                 ENGINE.set(Rc::downgrade(&e));
                 e
             }
@@ -449,10 +449,6 @@ impl Player {
         if let Some(a) = self.shared.stem.get(stem) {
             store_clamped(a, gain, 1.0, 1.0);
         }
-    }
-
-    pub fn stem_gain(&self, stem: usize) -> f32 {
-        self.shared.stem.get(stem).map_or(1.0, load_f32)
     }
 
     /// Starts playing at full speed (a hot cue, CUE, fader start, synced start); a PAUSE brake still running is cancelled.

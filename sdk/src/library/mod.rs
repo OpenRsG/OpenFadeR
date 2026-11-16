@@ -26,10 +26,12 @@
 //! `<plugin>:<opaque>` ([`owned_ref`]): the plugin only ever sees its own opaque part. In Rust, implement [`LibraryPlugin`]
 //! and [`Source`] and call [`export_library!`]: it generates the C ABI and keeps panics from crossing it.
 
+pub mod colors;
 pub mod commit;
 mod device;
 pub mod host;
 mod model;
+pub mod pathmap;
 mod tree;
 pub use device::*;
 pub use model::*;

@@ -3,7 +3,7 @@
 //! source last said) and `source_node` (the source's playlist id → our playlist node). Deleting a connection drops its maps
 //! (foreign keys cascade); the tracks stay in the Collection.
 
-use super::{column, exec, exec_count, query_all, scalar, Store, R};
+use super::{exec, exec_count, query_all, scalar, Store, R};
 use rusqlite::params;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -166,15 +166,6 @@ impl Store {
             }
             Ok(())
         })
-    }
-
-    /// Our track ids the connection maps.
-    pub fn mapped_ids(&self, conn: i64) -> R<Vec<i64>> {
-        column(
-            &self.db(),
-            "SELECT track FROM source_map WHERE conn = ?1",
-            [conn],
-        )
     }
 
     /// The source's playlist id → our node.

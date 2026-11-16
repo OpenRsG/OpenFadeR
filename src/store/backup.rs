@@ -251,7 +251,9 @@ impl Store {
             let (orig, from) = (Path::new(orig), base.join(rel));
             if orig.exists() {
                 out.music_present += 1;
-            } else if from.is_file()
+            // A path of another system (a Windows backup on Linux) is relative here: it would land in the working folder.
+            } else if orig.is_absolute()
+                && from.is_file()
                 && orig
                     .parent()
                     .is_some_and(|p| std::fs::create_dir_all(p).is_ok())

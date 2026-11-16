@@ -51,7 +51,7 @@ fn request(fresh: bool) {
     let job = Job {
         saved,
         all,
-        frames: crate::app::prefs::with(|p| super::super::buffer_in_use(p, &st)),
+        frames: super::super::buffer_in_use(&st),
         controller: audio::controller(),
         open: OPEN.with_borrow(Clone::clone),
         st,

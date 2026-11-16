@@ -174,13 +174,14 @@ Use the [SDK](sdk/) to write a native plugin. Use a controller mapping compatibl
 
 ## Backups and bug reports
 
-File > Library > Backup library saves OpenFadeR's library metadata. It does not back up your music files. Keep a separate backup of the audio and make a library backup before major upgrades.
+File > Library > Backup library saves OpenFadeR's library, and the music files too when you answer yes to its question. Make a backup before major upgrades. [Backup, export and sync](docs/backup-export-sync.md) explains which of the three to use, also between two computers.
 
 For a bug report, use Help > Report a problem and include the steps to reproduce it. The [diagnostics guide](docs/diagnostics.md) explains logs, crash reports and what the report contains. Check reports for private information before posting them publicly.
 
 ## Documentation
 
 - [Library format and import/export](docs/library-format.md)
+- [Backup, export and sync](docs/backup-export-sync.md)
 - [Recording files](docs/recording-files.md)
 - [Key detection](docs/key-detector.md)
 - [Code structure](docs/code-structure.md)

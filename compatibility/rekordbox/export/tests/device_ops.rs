@@ -630,17 +630,7 @@ fn hot_cue_bank_lists_are_written_to_the_onelibrary_and_survive_updates() {
     );
 }
 
-fn copy_tree(from: &Path, to: &Path) {
-    std::fs::create_dir_all(to).unwrap();
-    for e in std::fs::read_dir(from).unwrap().flatten() {
-        let t = to.join(e.file_name());
-        if e.path().is_dir() {
-            copy_tree(&e.path(), &t);
-        } else {
-            std::fs::copy(e.path(), t).unwrap();
-        }
-    }
-}
+use openfader_plugin::testkit::copy_tree;
 
 #[test]
 fn a_backup_lists_the_tracks_the_restore_copies_back() {

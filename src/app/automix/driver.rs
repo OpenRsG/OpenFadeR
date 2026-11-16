@@ -21,7 +21,7 @@ impl Automix {
     }
 
     /// Crossfader travel towards the incoming deck, constant power.
-    fn drive(app: &App, _out: usize, inc: usize, x: f64) {
+    fn drive(app: &App, inc: usize, x: f64) {
         let s = app.global::<MixerState>();
         let pos = if inc % 2 == 1 {
             x as f32
@@ -42,7 +42,7 @@ impl Automix {
     /// The incoming deck takes over completely: crossfader on it, the outgoing deck pauses.
     pub(super) fn finish(&self, run: &mut Run, app: &App, out: usize, inc: usize) -> Stage {
         self.decks[out].with_player(|p| p.pause());
-        Self::drive(app, out, inc, 1.0);
+        Self::drive(app, inc, 1.0);
         if let Some(f) = run.fade.take() {
             f.end();
         }
@@ -203,7 +203,7 @@ impl Automix {
                 run.stage = match cur {
                     None => {
                         d.with_player(|p| p.play());
-                        Self::drive(app, inc ^ 1, inc, 1.0); // first track: its side of the crossfader, full
+                        Self::drive(app, inc, 1.0); // first track: its side of the crossfader, full
                         Self::release(app);
                         Stage::OnAir { cur: Some(inc) }
                     }

@@ -257,10 +257,12 @@ thread_local! {
 impl Engine {
     /// Opens the stream the settings ask for; when that fails and the settings are not the defaults, the defaults
     /// play instead and the status says what failed (a saved device that no longer works must not silence the app).
-    pub(super) fn open() -> Result<Engine, String> {
+    /// When nothing opens (no sound server yet, no card) the engine starts without a stream: decks still load, the
+    /// status says why, and [`Engine::recover`] opens the output once a second until one answers.
+    pub(super) fn open() -> Engine {
         let shared = [(); SLOTS].map(|_| Arc::new(Shared::new()));
-        match Engine::build(&shared) {
-            Ok(e) => Ok(e),
+        let error = match Engine::build(&shared) {
+            Ok(e) => return e,
             Err(first) if !output::settings().same_stream(&Settings::default()) => {
                 let keep = output::settings();
                 output::replace_settings(Settings {
@@ -274,21 +276,47 @@ impl Engine {
                     external: Settings::default().external,
                     ..keep
                 });
-                let e = Engine::build(&shared).map_err(|again| {
-                    format!("{first}; and the default output failed too: {again}")
-                })?;
-                output::note_error(first);
-                Ok(e)
+                match Engine::build(&shared) {
+                    Ok(e) => {
+                        output::note_error(first);
+                        return e;
+                    }
+                    Err(again) => format!("{first}; and the default output failed too: {again}"),
+                }
             }
-            Err(e) => Err(e),
+            Err(e) => e,
+        };
+        Engine::without_stream(shared, error)
+    }
+
+    fn without_stream(shared: [Arc<Shared>; SLOTS], error: String) -> Engine {
+        output::publish(output::Status {
+            error: Some(error),
+            ..Default::default()
+        });
+        let bus = Arc::new(Bus::new(44_100, bus::Headphones::Split)); // `install` sets the real rate and route
+        bus.apply(&output::settings());
+        let health = Arc::new(Health::default());
+        health.state.store(RECOVERING, Relaxed);
+        watch(&health);
+        Engine {
+            shared,
+            bus,
+            claimed: Cell::new(0),
+            stream: RefCell::new(None),
+            cue: RefCell::new(None),
+            health,
+            // An empty name: there is no device to go back to, `recover` takes what the settings pick.
+            recovery: RefCell::new(Some(Recovery {
+                name: String::new(),
+                source: "",
+                retry_at: Instant::now() + RETRY,
+            })),
         }
     }
 
     fn build(shared: &[Arc<Shared>; SLOTS]) -> Result<Engine, String> {
-        let mut out = choose()?;
-        if out.status.pending.is_some() {
-            PENDING.with_borrow_mut(|p| _ = p.get_or_insert_with(Pending::default)); // `settle` moves the stream when it is found
-        }
+        let mut out = chosen()?;
         let bus = Arc::new(Bus::new(out.cfg.sample_rate.0, out.headphones.clone()));
         bus.apply(&output::settings());
         let health = Arc::new(Health::default());
@@ -364,7 +392,12 @@ impl Engine {
             self.recovery.replace(Some(recovery));
             return;
         }
-        let Some(found) = output::recover(&recovery.name, recovery.source) else {
+        let found = if recovery.name.is_empty() {
+            Some(chosen())
+        } else {
+            output::recover(&recovery.name, recovery.source)
+        };
+        let Some(found) = found else {
             self.recovery.replace(Some(recovery));
             return;
         };
@@ -372,7 +405,11 @@ impl Engine {
             Ok(_) => {}
             Err(e) => {
                 self.health.state.store(RECOVERING, Relaxed);
-                output::note_error(format!("{}: {e}; reconnecting", recovery.name));
+                output::note_error(if recovery.name.is_empty() {
+                    e
+                } else {
+                    format!("{}: {e}; reconnecting", recovery.name)
+                });
                 output::forget_recovery(&recovery.name);
                 recovery.retry_at = now + RETRY;
                 self.recovery.replace(Some(recovery));
@@ -403,6 +440,15 @@ struct Pending {
 
 thread_local! {
     static PENDING: RefCell<Option<Pending>> = const { RefCell::new(None) };
+}
+
+/// [`choose`]; when the default plays while the asked device is still looked up, [`settle`] moves the stream once it is found.
+fn chosen() -> Result<Output, String> {
+    let out = choose()?;
+    if out.status.pending.is_some() {
+        PENDING.with_borrow_mut(|p| _ = p.get_or_insert_with(Pending::default));
+    }
+    Ok(out)
 }
 
 /// Moves the stream to the device [`choose`] now picks (or, for no stream yet, just checks it), puts the request back with
@@ -503,6 +549,13 @@ pub fn configure(s: Settings) -> Result<(), String> {
 /// (`Bus::preview`) and the recorder tap, for code that has no `Player` at hand.
 pub fn live_bus() -> Option<Arc<Bus>> {
     ENGINE.with_borrow(Weak::upgrade).map(|e| e.bus.clone())
+}
+
+/// Why nothing can be heard: the output's problem while no stream runs (none opened yet, or lost and reconnecting).
+/// `None` while one plays.
+pub fn no_output() -> Option<String> {
+    let engine = ENGINE.with_borrow(Weak::upgrade)?;
+    (!engine.available()).then(|| output::status().error.unwrap_or_default())
 }
 
 #[cfg(test)]
@@ -663,6 +716,25 @@ mod tests {
             "the replacement stream can render the retained track"
         );
         assert!(f64::from_bits(sh.pos.load(Relaxed)) > 12000.0);
+    }
+
+    /// Issue #57: an output that cannot be opened at start left every deck without a player for the whole session.
+    #[test]
+    fn an_engine_started_without_an_output_keeps_its_decks_and_opens_it_later() {
+        let shared = [(); SLOTS].map(|_| Arc::new(Shared::new()));
+        let engine = std::rc::Rc::new(Engine::without_stream(shared, "no card".into()));
+        ENGINE.set(std::rc::Rc::downgrade(&engine));
+        let _deck = Player::new().expect("a deck needs no output to exist");
+        assert_eq!(no_output().as_deref(), Some("no card"));
+        engine.recover(Instant::now());
+        assert!(no_output().is_some(), "the first retry waits a second");
+        engine.recover(Instant::now() + RETRY);
+        match no_output() {
+            // This machine has an output: the retry opened it.
+            None => assert!(!status().device.is_empty()),
+            // It has none: the reason stays, and the next retry is due.
+            Some(e) => assert!(!e.is_empty() && engine.recovery.borrow().is_some(), "{e:?}"),
+        }
     }
 
     /// Plays the UI thread: waits for the worker's waker, then runs what the app posts (`settle`).

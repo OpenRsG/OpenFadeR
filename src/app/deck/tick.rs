@@ -154,6 +154,10 @@ impl Deck {
         self.track_tempo();
         self.follow();
         self.slicer_tick();
+        if self.silent.get() && openfader::audio::no_output().is_none() {
+            self.silent.set(false);
+            self.say(tr!("Audio output: {}", openfader::audio::status().device));
+        }
         let Some(app) = self.app.upgrade() else {
             return;
         };

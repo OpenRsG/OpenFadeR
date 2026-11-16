@@ -13,7 +13,7 @@ ARG RUST_VERSION=1.99
 FROM rust:${RUST_VERSION}-trixie AS build
 ARG PLUGINS_REF=v0.2.12
 ARG THEMES_REF=openfader-v0.2.9
-ARG MAPPINGS_REF=openfader-v0.2.12
+ARG MAPPINGS_REF=openfader-v0.2.13
 # Cortex-A53 (Pi 3) code also runs on the A72 of the Pi 4 / CM4 and on later cores.
 ARG TARGET_CPU=cortex-a53
 ARG PI_VARIANT=pi
@@ -37,8 +37,7 @@ ENV TARGET=aarch64-unknown-linux-gnu \
     AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu \
     AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR=/usr/include \
     CARGO_TERM_COLOR=never \
-    CARGO_INCREMENTAL=0 \
-    CARGO_BUILD_JOBS=1
+    CARGO_INCREMENTAL=0
 # Pi 3/4 omit the optional crypto instructions assumed by LLVM's CPU presets.
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C target-cpu=${TARGET_CPU} -C target-feature=-aes,-sha2"
 ENV OPENFADER_BUILD_VARIANT=${PI_VARIANT}

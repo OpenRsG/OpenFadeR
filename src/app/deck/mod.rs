@@ -227,6 +227,8 @@ pub struct Deck {
     pending: Cell<Option<(f64, f64, quantize::Call)>>,
     /// HOT CUE gate: the cue a held pad returns to when released ([`pads`]).
     gate: Cell<Option<u32>>,
+    /// The status line says why there is no audio output; [`tick`] replaces it when the output is there.
+    silent: Cell<bool>,
     /// The plugin pad mode and pad held now, whose `release` steps run when it lets go ([`pads`]).
     plugin_held: Cell<Option<(&'static openfader::plugin::PadModeDecl, usize)>>,
     /// JOG CUE RETURN: the platter was touched while paused on the cue point ([`transport`]).
@@ -290,7 +292,10 @@ impl Deck {
         let (player, status) = match audio::Player::new() {
             Ok(p) => (
                 Some(RefCell::new(p)),
-                tr!("Select a track, then LOAD").to_owned(),
+                audio::no_output().map_or_else(
+                    || tr!("Select a track, then LOAD").to_owned(),
+                    |e| tr!("audio disabled: {}", e),
+                ),
             ),
             Err(e) => (None, tr!("audio disabled: {}", e)),
         };
@@ -350,6 +355,7 @@ impl Deck {
             double: RefCell::new(None),
             pending: Cell::new(None),
             gate: Cell::new(None),
+            silent: Cell::new(audio::no_output().is_some()),
             plugin_held: Cell::new(None),
             jog_cue: Cell::new(false),
             rev_slip: Cell::new(false),

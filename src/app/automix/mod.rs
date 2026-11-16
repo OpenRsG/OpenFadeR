@@ -161,7 +161,9 @@ impl Automix {
         if queue.is_empty() {
             return say(tr!("AUTOMIX: the list is empty"));
         }
-        if self.decks.iter().any(|d| d.with_player(|_| ()).is_none()) {
+        if openfader::audio::no_output().is_some()
+            || self.decks.iter().any(|d| d.with_player(|_| ()).is_none())
+        {
             return say(tr!("AUTOMIX: no audio output"));
         }
         let (view, master) = (

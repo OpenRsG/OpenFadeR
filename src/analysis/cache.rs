@@ -658,14 +658,6 @@ pub fn get_or_analyze(t: &Track) -> Result<(Analysis, Source), String> {
     Ok(analyze_cached(t, &track, track.rate))
 }
 
-/// Analyses `t` again under the current options, ignoring and replacing what the cache holds (an explicit
-/// "Analyze Track").
-pub fn reanalyze(t: &Track) -> Result<Analysis, String> {
-    let (track, print) = crate::audio::decode_track16_cancellable(audio_of(t)?, &|| false)?;
-    remember_fingerprint(t, &print);
-    Ok(analyze_fresh(t, &track, track.rate, &options::get()))
-}
-
 /// Gives a Collection track the fingerprint `print` of its decoded audio ([`super::fingerprint`], empty for no audio) when it
 /// has none yet: what finds the file again after it moved. Tracks outside the Collection (no id) and failed writes are
 /// skipped silently. The file's content print ([`crate::library::print`]) is filled here too.
