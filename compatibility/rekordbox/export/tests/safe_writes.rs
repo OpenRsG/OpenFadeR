@@ -93,43 +93,7 @@ fn export(dev: &Path, snap: &Snapshot, o: &ExportOptions) -> Result<ExportReport
     out
 }
 
-/// Every file and folder below `root` (folders end in `/`) with the bytes of the files.
-fn tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
-    fn walk(base: &Path, dir: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
-        let Ok(rd) = std::fs::read_dir(dir) else {
-            return;
-        };
-        for e in rd.flatten() {
-            let p = e.path();
-            let rel = p
-                .strip_prefix(base)
-                .unwrap()
-                .to_string_lossy()
-                .replace('\\', "/");
-            if p.is_dir() {
-                out.insert(format!("{rel}/"), Vec::new());
-                walk(base, &p, out);
-            } else {
-                out.insert(rel, std::fs::read(&p).unwrap());
-            }
-        }
-    }
-    let mut out = BTreeMap::new();
-    walk(root, root, &mut out);
-    out
-}
-
-fn copy_tree(from: &Path, to: &Path) {
-    std::fs::create_dir_all(to).unwrap();
-    for e in std::fs::read_dir(from).unwrap().flatten() {
-        let t = to.join(e.file_name());
-        if e.path().is_dir() {
-            copy_tree(&e.path(), &t);
-        } else {
-            std::fs::copy(e.path(), t).unwrap();
-        }
-    }
-}
+use openfader_plugin::testkit::{copy_tree, tree};
 
 fn one(root: &Path) -> Connection {
     let c = Connection::open(root.join("PIONEER/rekordbox/exportLibrary.db")).unwrap();

@@ -10,7 +10,6 @@ use openfader_plugin::library::{
 };
 use serde_json::{json, Value};
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use compat_traktor::{Plugin, FILE};
 
@@ -223,43 +222,8 @@ pub fn snapshot(r: &Root, which: &[usize], cues_of_a: u16) -> Snapshot {
     }
 }
 
-/// Every file and folder below `root` (folders end in `/`) with the bytes of the files; empty when `root` does not exist.
-pub fn tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
-    fn walk(base: &Path, dir: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
-        let Ok(rd) = std::fs::read_dir(dir) else {
-            return;
-        };
-        for e in rd.flatten() {
-            let p = e.path();
-            let rel = p
-                .strip_prefix(base)
-                .unwrap()
-                .to_string_lossy()
-                .replace('\\', "/");
-            if p.is_dir() {
-                out.insert(format!("{rel}/"), Vec::new());
-                walk(base, &p, out);
-            } else {
-                out.insert(rel, std::fs::read(&p).unwrap());
-            }
-        }
-    }
-    let mut out = BTreeMap::new();
-    walk(root, root, &mut out);
-    out
-}
-
-pub fn copy_tree(from: &Path, to: &Path) {
-    std::fs::create_dir_all(to).unwrap();
-    for e in std::fs::read_dir(from).unwrap().flatten() {
-        let t = to.join(e.file_name());
-        if e.path().is_dir() {
-            copy_tree(&e.path(), &t);
-        } else {
-            std::fs::copy(e.path(), t).unwrap();
-        }
-    }
-}
+#[allow(unused_imports)] // each test binary uses a subset
+pub use openfader_plugin::testkit::{copy_tree, tree};
 
 /// What the plugin's own reader finds in the collection of the stick: `(tracks, playlists, cues of T0)`.
 pub fn read_back(dev: &Path) -> (usize, usize, usize) {
@@ -282,35 +246,10 @@ pub fn read_back(dev: &Path) -> (usize, usize, usize) {
     )
 }
 
-/// The text the host would show in every language of the plugin's `locales/` (the rule of the host's `locale.rs`: the text
-/// itself is a key, or matches a key whose `{}` stand for values of at least one character).
+/// Panics unless the host would show `text` in every language of the plugin's `locales/`.
 pub fn assert_translated(text: &str) {
-    fn matches(key: &str, text: &str) -> bool {
-        let parts: Vec<&str> = key.split("{}").collect();
-        let (first, rest) = parts.split_first().unwrap();
-        let Some((last, middle)) = rest.split_last() else {
-            return false;
-        };
-        let Some(mut s) = text.strip_prefix(first).and_then(|t| t.strip_suffix(last)) else {
-            return false;
-        };
-        for part in middle {
-            let start = s.char_indices().nth(1).map_or(s.len(), |(i, _)| i);
-            match s.get(start..).and_then(|r| r.find(part)) {
-                Some(i) => s = &s[start + i + part.len()..],
-                None => return false,
-            }
-        }
-        !s.is_empty()
-    }
-    for lang in ["de", "es", "fr", "it", "nl", "pt"] {
-        let file = format!("{}/locales/{lang}.json", env!("CARGO_MANIFEST_DIR"));
-        let map: std::collections::HashMap<String, String> =
-            serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
-        let found = map.get(text).is_some_and(|t| !t.is_empty())
-            || map
-                .iter()
-                .any(|(k, v)| !v.is_empty() && k.contains("{}") && matches(k, text));
-        assert!(found, "{lang} has no translation of: {text}");
-    }
+    openfader_plugin::testkit::assert_translated(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/locales"),
+        text,
+    );
 }

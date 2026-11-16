@@ -237,38 +237,10 @@ pub fn export(
     with_host(|| compat_rekordbox_export::export(root, snap, options, &settings(key)))
 }
 
-/// Panics unless the host would show `text` in every language of the plugin's `locales/` (the rule of the host's `locale.rs`: the
-/// text itself is a key, or matches a key whose `{}` stand for values of at least one character).
+/// Panics unless the host would show `text` in every language of the device plugin's `locales/`.
 pub fn assert_translated(text: &str) {
-    fn matches(key: &str, text: &str) -> bool {
-        let parts: Vec<&str> = key.split("{}").collect();
-        let (first, rest) = parts.split_first().unwrap();
-        let Some((last, middle)) = rest.split_last() else {
-            return false;
-        };
-        let Some(mut s) = text.strip_prefix(first).and_then(|t| t.strip_suffix(last)) else {
-            return false;
-        };
-        for part in middle {
-            let start = s.char_indices().nth(1).map_or(s.len(), |(i, _)| i);
-            match s.get(start..).and_then(|r| r.find(part)) {
-                Some(i) => s = &s[start + i + part.len()..],
-                None => return false,
-            }
-        }
-        !s.is_empty()
-    }
-    for lang in ["de", "es", "fr", "it", "nl", "pt"] {
-        let file = format!(
-            "{}/../device/locales/{lang}.json",
-            env!("CARGO_MANIFEST_DIR")
-        );
-        let map: std::collections::HashMap<String, String> =
-            serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
-        let found = map.get(text).is_some_and(|t| !t.is_empty())
-            || map
-                .iter()
-                .any(|(k, v)| !v.is_empty() && k.contains("{}") && matches(k, text));
-        assert!(found, "{lang} has no translation of: {text}");
-    }
+    openfader_plugin::testkit::assert_translated(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../device/locales"),
+        text,
+    );
 }

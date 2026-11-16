@@ -250,6 +250,9 @@ pub mod markup;
 
 #[cfg(feature = "library")]
 pub mod library;
+#[cfg(feature = "library")]
+#[doc(hidden)]
+pub mod testkit;
 
 #[cfg(test)]
 mod tests;
