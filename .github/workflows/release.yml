@@ -106,14 +106,19 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       # The generated UI crate is 5 minutes of a Linux build and 24 of a macOS one, and it changes only with a .slint file: the
       # compiler cache serves it (and every other workspace crate that did not change). Only main and manual runs write it.
+      # The server is started here and never idles out (the default 10 minutes ends it during the UI crate, and a restart in the
+      # middle needs the cache service); when it cannot start, the build runs without the cache instead of failing.
       - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Use the compiler cache
         env:
           MODE: ${{ (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && 'READ_WRITE' || 'READ_ONLY' }}
         run: |
-          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
-          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
-          echo "SCCACHE_GHA_RW_MODE=$MODE" >> "$GITHUB_ENV"
+          export SCCACHE_GHA_ENABLED=true SCCACHE_GHA_RW_MODE="$MODE" SCCACHE_IDLE_TIMEOUT=0
+          if sccache --start-server; then
+            { echo RUSTC_WRAPPER=sccache; echo SCCACHE_GHA_ENABLED=true; echo SCCACHE_GHA_RW_MODE="$MODE"; echo SCCACHE_IDLE_TIMEOUT=0; } >> "$GITHUB_ENV"
+          else
+            echo "::warning::sccache did not start: building without the compiler cache"
+          fi
       - uses: actions/cache/restore@v4
         if: matrix.name == 'macos-smoke'
         with:
